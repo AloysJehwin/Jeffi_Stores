@@ -1,405 +1,256 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import AdminSelect from '@/components/admin/AdminSelect'
+import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
+import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { KeyedTrendCard, MixDonutCard, type TrendPoint } from '@/components/admin/kit/charts'
+import { delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
-import DatePicker from '@/components/ui/DatePicker'
-import { EmptyState, badgeCls, InfiniteFooter } from '@/components/admin/kit'
 import {
-  Skeleton,
-  SummaryCard,
-  btnPrimary,
-  btnSecondary,
-  labelCls,
-  formatDate,
-  formatINR,
-  thCls,
-  thRight,
-  thCenter,
-  theadCls,
-  tableWrapCls,
-  tableWrapClippedCls,
-  payoutBadge,
-  inputCls,
-} from './shared'
+  FinancePeriodBar,
+  useFinancePeriod,
+  type FinanceBucket,
+  type FinanceOverviewContract,
+} from './finance'
 
-const TYPE_OPTIONS = [
-  { value: 'all', label: 'All' },
-  { value: 'inflow', label: 'Inflow only' },
-  { value: 'outflow', label: 'Outflow only' },
-]
+type Totals = { inflow: number; outflow: number; net: number; count: number }
+type MethodRow = { method: string; inflow: number; outflow: number; count: number }
+type PartyRow = {
+  party: string
+  party_type: 'customer' | 'supplier' | 'cash' | 'order'
+  user_id: string | null
+  supplier_id: string | null
+  expense_id: string | null
+  inflow: number
+  outflow: number
+  count: number
+}
+type TxnOverview = FinanceOverviewContract<Totals> & {
+  series: TrendPoint[]
+  bucket: FinanceBucket
+  by_method: MethodRow[]
+  by_party: PartyRow[]
+}
 
-export function TransactionsTab({ initialData }: { initialData: any }) {
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [search, setSearch] = useState('')
-  const [type, setType] = useState('all')
-  const [data, setData] = useState<any>(initialData)
-  const [loading, setLoading] = useState(false)
-  const [page, setPage] = useState(1)
-  const [more, setMore] = useState<{ loading: boolean; error: string | null }>({ loading: false, error: null })
-  const applied = useRef('')
-  const inflight = useRef(false)
+const METHOD_LABEL: Record<string, string> = {
+  bank_transfer: 'Bank transfer',
+  upi: 'UPI',
+  cash: 'Cash',
+  cheque: 'Cheque',
+  card: 'Card',
+  online: 'Online',
+  cod: 'Cash on delivery',
+  wallet: 'Wallet',
+  unknown: 'Unknown',
+}
+const METHOD_COLOR: Record<string, string> = {
+  bank_transfer: 'rgb(59 130 246)',
+  upi: 'rgb(16 185 129)',
+  cash: 'rgb(234 179 8)',
+  cheque: 'rgb(168 85 247)',
+  card: 'rgb(236 72 153)',
+  online: 'rgb(14 165 233)',
+  cod: 'rgb(249 115 22)',
+}
+const FALLBACK = 'rgb(148 163 184)'
+const SERIES_KEYS = ['inflow', 'outflow'] as const
+const SERIES_LABELS = { inflow: 'Inflow', outflow: 'Outflow' } as const
+const KIND_LABEL: Record<PartyRow['party_type'], string> = {
+  customer: 'Customer',
+  supplier: 'Supplier',
+  cash: 'Cash sale',
+  order: 'Guest order',
+}
 
-  useEffect(() => {
-    if (initialData !== null) {
-      setData(initialData)
-      setPage(1)
-    }
-  }, [initialData])
+const labelOf = (m: string) =>
+  METHOD_LABEL[m] ?? m.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
-  // Page 1 replaces (with the current filters); later pages append with the filters page 1 used.
-  const load = useCallback(
-    async (p = 1) => {
-      if (p > 1 && inflight.current) return
-      inflight.current = true
-      let params: URLSearchParams
-      if (p === 1) {
-        setLoading(true)
-        params = new URLSearchParams()
-        if (from) params.set('from', from)
-        if (to) params.set('to', to)
-        if (search) params.set('search', search)
-      if (type !== 'all') params.set('type', type)
-        applied.current = params.toString()
-      } else {
-        setMore({ loading: true, error: null })
-        params = new URLSearchParams(applied.current)
-      }
-      params.set('page', String(p))
-      try {
-        const res = await fetch(`/api/admin/financial/transactions?${params}`)
-        const json = await res.json()
-        if (p === 1) setData(json?.error ? null : json)
-        else if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load')
-        else setData((prev: any) => ({ ...prev, rows: [...(prev?.rows ?? []), ...(json.rows ?? [])], total: json.total }))
-        setPage(p)
-        setMore({ loading: false, error: null })
-      } catch (e) {
-        if (p > 1) setMore({ loading: false, error: e instanceof Error ? e.message : 'Failed to load' })
-      } finally {
-        inflight.current = false
-        if (p === 1) setLoading(false)
-      }
-    },
-    [from, to, search, type]
+function partyHref(r: PartyRow): string | null {
+  if (r.party_type === 'customer' && r.user_id) return `/admin/customers/${r.user_id}/view`
+  if (r.party_type === 'supplier' && r.supplier_id) return `/admin/suppliers/${r.supplier_id}/view`
+  if (r.party_type === 'supplier' && r.expense_id) return `/admin/financial/payables/${r.expense_id}/view`
+  return null
+}
+
+export function TransactionsTab() {
+  const { range } = useFinancePeriod()
+  const { data, error, loading, reload } = useOverviewData<TxnOverview>(
+    `/api/admin/financial/transactions?from=${range.from}&to=${range.to}`
   )
+  return (
+    <div className="space-y-5">
+      <FinancePeriodBar onRefresh={reload} busy={loading} />
+      {error && <Banner ok={false}>{error}</Banner>}
+      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} />}
+    </div>
+  )
+}
 
-  const handleRefresh = () => load(1)
+function Body({ d }: { d: TxnOverview }) {
+  const c = d.current
+  const p = d.previous
+  const methodSegments = d.by_method
+    .map(r => ({
+      label: labelOf(r.method),
+      value: r.inflow + r.outflow,
+      color: METHOD_COLOR[r.method] ?? FALLBACK,
+    }))
+    .filter(s => s.value > 0)
 
+  const methodCols: Col<MethodRow>[] = [
+    { key: 'method', label: 'Method', render: r => labelOf(r.method), sort: r => r.method },
+    { key: 'inflow', label: 'Inflow', num: true, render: r => money(r.inflow), sort: r => r.inflow },
+    { key: 'outflow', label: 'Outflow', num: true, render: r => money(r.outflow), sort: r => r.outflow },
+    {
+      key: 'net',
+      label: 'Net',
+      num: true,
+      render: r => money(r.inflow - r.outflow),
+      sort: r => r.inflow - r.outflow,
+    },
+    { key: 'count', label: 'Txns', num: true, render: r => count(r.count), sort: r => r.count },
+  ]
+  const partyCols: Col<PartyRow>[] = [
+    {
+      key: 'party',
+      label: 'Counterparty',
+      sort: r => r.party,
+      render: r => {
+        const href = partyHref(r)
+        return href ? (
+          <Link href={ap(href)} className="hover:text-accent-500 hover:underline">
+            {r.party}
+          </Link>
+        ) : (
+          <span>{r.party}</span>
+        )
+      },
+    },
+    { key: 'kind', label: 'Kind', render: r => KIND_LABEL[r.party_type] ?? r.party_type },
+    { key: 'inflow', label: 'Inflow', num: true, render: r => money(r.inflow), sort: r => r.inflow },
+    { key: 'outflow', label: 'Outflow', num: true, render: r => money(r.outflow), sort: r => r.outflow },
+    { key: 'count', label: 'Txns', num: true, render: r => count(r.count), sort: r => r.count },
+  ]
 
-  const exportCSV = () => {
-    if (!data?.rows?.length) return
-    const headers = ['Date', 'Type', 'Party', 'Ref', 'Method', 'Amount', 'Reference', 'Payout ID', 'Payout Status']
-    const rows = data.rows.map((r: any) => [
-      r.txn_date,
-      r.direction,
-      r.party,
-      r.txn_ref,
-      r.method,
-      r.amount,
-      r.reference || '',
-      r.payout_id || '',
-      r.payout_status || '',
-    ])
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-  }
+  const partyKey = (r: PartyRow) =>
+    `${r.party_type}:${r.user_id ?? r.supplier_id ?? r.expense_id ?? r.party}`
 
   return (
     <div className="space-y-5">
-      <div className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <label className={labelCls}>From</label>
-            <DatePicker className="w-36" value={from} onChange={setFrom} />
-          </div>
-          <div>
-            <label className={labelCls}>To</label>
-            <DatePicker className="w-36" value={to} onChange={setTo} />
-          </div>
-          <div className="w-36">
-            <AdminSelect label="Type" value={type} onChange={setType} options={TYPE_OPTIONS} />
-          </div>
-          <div className="flex-1 min-w-[180px]">
-            <label className={labelCls}>Search party / ref</label>
-            <input
-              className={inputCls}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleRefresh()}
-              placeholder="Supplier, customer, ref..."
-            />
-          </div>
-          <div className="flex gap-2 pb-0.5">
-            <button type="button" className={btnPrimary} onClick={handleRefresh} disabled={loading}>
-              {loading ? 'Loading…' : 'Refresh'}
-            </button>
-            {data?.rows?.length > 0 && (
-              <button type="button" className={btnSecondary} onClick={exportCSV}>
-                Export CSV
-              </button>
-            )}
-          </div>
+      <KpiGrid>
+        <Kpi
+          label="Inflow"
+          value={money(c.inflow)}
+          delta={delta(c.inflow, p.inflow)}
+          sub="Payments received"
+          highlight
+        />
+        <Kpi
+          label="Outflow"
+          value={money(c.outflow)}
+          delta={delta(c.outflow, p.outflow)}
+          invert
+          sub="Payments made"
+        />
+        <Kpi
+          label="Net"
+          value={money(c.net)}
+          delta={delta(c.net, p.net)}
+          sub={c.net >= 0 ? 'Surplus' : 'Deficit'}
+        />
+        <Kpi label="Transactions" value={count(c.count)} delta={delta(c.count, p.count)} />
+      </KpiGrid>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2">
+          <KeyedTrendCard
+            title="Inflow vs outflow"
+            data={d.series}
+            keys={[...SERIES_KEYS]}
+            labels={SERIES_LABELS}
+            granularity={d.bucket}
+          />
         </div>
+        <MixDonutCard
+          title="By method"
+          segments={methodSegments}
+          total={money(c.inflow + c.outflow)}
+          totalLabel="Total movement"
+        />
       </div>
 
-      {!data ? (
-        <Skeleton />
-      ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <SummaryCard label="Total Inflow" value={formatINR(data.summary.total_inflow)} sub="payments received" />
-            <SummaryCard label="Total Outflow" value={formatINR(data.summary.total_outflow)} sub="payments made" />
-            <SummaryCard
-              label="Net"
-              value={formatINR(data.summary.net)}
-              sub={data.summary.net >= 0 ? 'surplus' : 'deficit'}
-            />
-          </div>
+      <Section
+        title="By method"
+        action={
+          <CsvAction
+            name="methods"
+            headers={['Method', 'Inflow', 'Outflow', 'Net', 'Txns']}
+            rows={d.by_method.map(r => [
+              labelOf(r.method),
+              r.inflow,
+              r.outflow,
+              r.inflow - r.outflow,
+              r.count,
+            ])}
+          />
+        }
+      >
+        <Table
+          rows={d.by_method}
+          cols={methodCols}
+          rowKey={r => r.method}
+          empty="No transactions in this period."
+        />
+      </Section>
 
-          {data.rows.length === 0 ? (
-            <EmptyState title="No transactions found" />
-          ) : (
-            <>
-              <div className={`hidden md:block overflow-x-auto ${tableWrapClippedCls}`}>
-                <table className="w-full text-sm">
-                  <thead className={theadCls}>
-                    <tr>
-                      <th className={thCls}>Date</th>
-                      <th className={thCls}>Type</th>
-                      <th className={thCls}>Party</th>
-                      <th className={thCls}>Ref</th>
-                      <th className={thCls}>Method</th>
-                      <th className={thRight}>Amount</th>
-                      <th className={thCls}>UTR / Payout</th>
-                      <th className={thCenter}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-default">
-                    {data.rows.map((r: any) => (
-                      <tr key={r.id + r.direction} className="hover:bg-surface-secondary/40 transition-colors">
-                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
-                          {formatDate(r.txn_date)}
-                        </td>
-                        <td className="px-4 py-3">
-                          {r.direction === 'inflow' ? (
-                            <span className={badgeCls('green')}>
-                              Inflow
-                            </span>
-                          ) : (
-                            <span className={badgeCls('red')}>
-                              Outflow
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-foreground">
-                          {r.direction === 'inflow' ? (
-                            r.source === 'cash_sale' ? (
-                              <span>{r.party}</span>
-                            ) : r.user_id ? (
-                              <Link
-                                href={ap(`/admin/customers/${r.user_id}/view`)}
-                                className="hover:text-accent-500 hover:underline"
-                              >
-                                {r.party}
-                              </Link>
-                            ) : (
-                              <Link
-                                href={ap(`/admin/orders/${r.id}/view`)}
-                                className="hover:text-accent-500 hover:underline"
-                              >
-                                {r.party}
-                              </Link>
-                            )
-                          ) : r.supplier_id ? (
-                            <Link
-                              href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
-                              className="hover:text-accent-500 hover:underline"
-                            >
-                              {r.party}
-                            </Link>
-                          ) : (
-                            <Link
-                              href={ap(`/admin/financial/payables/${r.expense_id}/view`)}
-                              className="hover:text-accent-500 hover:underline"
-                            >
-                              {r.party}
-                            </Link>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-foreground-secondary">
-                          {r.direction === 'inflow' ? (
-                            r.source === 'cash_sale' ? (
-                              <a
-                                href={`/api/admin/cash-sale/${r.id}/receipt`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="hover:text-accent-500 hover:underline font-mono"
-                              >
-                                {r.txn_ref}
-                              </a>
-                            ) : r.invoice_number ? (
-                              <Link
-                                href={ap(`/admin/invoices/${r.id}/view`)}
-                                className="hover:text-accent-500 hover:underline font-mono"
-                              >
-                                {r.txn_ref}
-                              </Link>
-                            ) : (
-                              <Link
-                                href={ap(`/admin/orders/${r.id}/view`)}
-                                className="hover:text-accent-500 hover:underline font-mono"
-                              >
-                                {r.txn_ref}
-                              </Link>
-                            )
-                          ) : (
-                            <Link
-                              href={ap(`/admin/financial/payables/${r.expense_id}/view`)}
-                              className="hover:text-accent-500 hover:underline font-mono"
-                            >
-                              {r.txn_ref}
-                            </Link>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-foreground-secondary capitalize">
-                          {r.method?.replace('_', ' ')}
-                        </td>
-                        <td
-                          className={`px-4 py-3 text-right font-semibold tabular-nums ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-                        >
-                          {r.direction === 'inflow' ? '+' : '-'}
-                          {formatINR(parseFloat(r.amount))}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-foreground-secondary font-mono">
-                          {r.payout_id || r.reference || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {payoutBadge(r.payout_status)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className={`md:hidden divide-y divide-border-default ${tableWrapCls}`}>
-                {data.rows.map((r: any) => (
-                  <div key={r.id + r.direction} className="p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        {r.direction === 'inflow' ? (
-                          r.source === 'cash_sale' ? (
-                            <span className="font-medium text-foreground text-sm">{r.party}</span>
-                          ) : r.user_id ? (
-                            <Link
-                              href={ap(`/admin/customers/${r.user_id}/view`)}
-                              className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
-                            >
-                              {r.party}
-                            </Link>
-                          ) : (
-                            <Link
-                              href={ap(`/admin/orders/${r.id}/view`)}
-                              className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
-                            >
-                              {r.party}
-                            </Link>
-                          )
-                        ) : r.supplier_id ? (
-                          <Link
-                            href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
-                            className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
-                          >
-                            {r.party}
-                          </Link>
-                        ) : (
-                          <Link
-                            href={ap(`/admin/financial/payables/${r.expense_id}/view`)}
-                            className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
-                          >
-                            {r.party}
-                          </Link>
-                        )}
-                        {r.txn_ref &&
-                          (r.direction === 'inflow' ? (
-                            r.source === 'cash_sale' ? (
-                              <a
-                                href={`/api/admin/cash-sale/${r.id}/receipt`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block"
-                              >
-                                {r.txn_ref}
-                              </a>
-                            ) : r.invoice_number ? (
-                              <Link
-                                href={ap(`/admin/invoices/${r.id}/view`)}
-                                className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block"
-                              >
-                                {r.txn_ref}
-                              </Link>
-                            ) : (
-                              <Link
-                                href={ap(`/admin/orders/${r.id}/view`)}
-                                className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block"
-                              >
-                                {r.txn_ref}
-                              </Link>
-                            )
-                          ) : (
-                            <Link
-                              href={ap(`/admin/financial/payables/${r.expense_id}/view`)}
-                              className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block"
-                            >
-                              {r.txn_ref}
-                            </Link>
-                          ))}
-                      </div>
-                      <p
-                        className={`font-semibold text-sm shrink-0 ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-                      >
-                        {r.direction === 'inflow' ? '+' : '-'}
-                        {formatINR(parseFloat(r.amount))}
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
-                      <span>{formatDate(r.txn_date)}</span>
-                      {r.method && <span className="capitalize">{r.method.replace('_', ' ')}</span>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {r.direction === 'inflow' ? (
-                        <span className={badgeCls('green')}>
-                          Inflow
-                        </span>
-                      ) : (
-                        <span className={badgeCls('red')}>
-                          Outflow
-                        </span>
-                      )}
-                      {r.payout_status && payoutBadge(r.payout_status)}
-                    </div>
-                    {(r.payout_id || r.reference) && (
-                      <p className="text-xs text-foreground-secondary font-mono">{r.payout_id || r.reference}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <InfiniteFooter
-                shown={data.rows.length}
-                noun="rows"
-                control={{ total: data.total, hasMore: data.rows.length < (data.total ?? 0), loadingMore: more.loading, error: more.error, loadMore: () => load(page + 1) }}
-              />
-            </>
-          )}
-        </>
-      )}
+      <Section
+        title="Top counterparties"
+        action={
+          <CsvAction
+            name="counterparties"
+            headers={['Party', 'Kind', 'Inflow', 'Outflow', 'Txns']}
+            rows={d.by_party.map(r => [
+              r.party,
+              KIND_LABEL[r.party_type] ?? r.party_type,
+              r.inflow,
+              r.outflow,
+              r.count,
+            ])}
+          />
+        }
+      >
+        <Table
+          rows={d.by_party}
+          cols={partyCols}
+          rowKey={partyKey}
+          empty="No transactions in this period."
+        />
+      </Section>
     </div>
+  )
+}
+
+function CsvAction({
+  name,
+  headers,
+  rows,
+}: {
+  name: string
+  headers: string[]
+  rows: (string | number)[][]
+}) {
+  if (!rows.length) return null
+  const download = () => {
+    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
+    const csv = [headers.join(','), ...rows.map(r => r.map(esc).join(','))].join('\n')
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    a.download = `transactions-${name}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+  }
+  return (
+    <button type="button" onClick={download} className="text-xs text-accent-500 hover:underline">
+      Export CSV
+    </button>
   )
 }
