@@ -82,12 +82,44 @@ export function preserveTokens(original: string, result: string, allowed: Set<st
     if (alt) text = text.replace(alt[0], t.raw)
     else problems.push(`missing ${t.raw}`)
   }
-  const wantKeys = new Set(want.map(t => t.key))
+  // Case-insensitive match: 'ProductName' vs 'product_name' both count as the same key.
+  const wantKeys = new Set(want.map(t => t.key.toLowerCase()))
+  const allowedLc = new Set([...allowed].map(k => k.toLowerCase()))
   for (const t of tokens(text)) {
-    if (wantKeys.has(t.key) || allowed.has(t.key) || /^(#if|\/if)/.test(t.key)) continue
+    const lc = t.key.toLowerCase()
+    if (wantKeys.has(lc) || allowedLc.has(lc) || /^(#if|\/if)/.test(t.key)) continue
     problems.push(`invented ${t.raw}`)
   }
   return { text, problems }
+}
+
+/** Extract the "result" string from a model response, forgiving of common formatting slips:
+ *  bare JSON, code-fenced JSON, embedded JSON object, or prose. Returns null when nothing usable. */
+export function extractResult(content: string): string | null {
+  if (!content) return null
+  const tryParse = (s: string): string | null => {
+    const obj = parseAiJson<{ result?: unknown }>(s)
+    if (obj && typeof obj.result === 'string' && obj.result.trim()) return obj.result.trim()
+    return null
+  }
+  // (a) bare parse
+  let r = tryParse(content)
+  if (r) return r
+  // (b) strip markdown code fence, retry
+  const fenced = content.match(/```(?:json|JSON)?\s*([\s\S]*?)\s*```/)
+  if (fenced?.[1]) {
+    r = tryParse(fenced[1])
+    if (r) return r
+  }
+  // (c) greedy {...} match, retry
+  const obj = content.match(/\{[\s\S]*\}/)
+  if (obj) {
+    r = tryParse(obj[0])
+    if (r) return r
+  }
+  // (d) direct-string mode: model answered in prose; use the whole thing (trim fences / quotes / backticks)
+  const bare = content.replace(/^```[a-zA-Z]*\s*|\s*```$/g, '').replace(/^["']|["']$/g, '').trim()
+  return bare || null
 }
 
 /** Runs the model and returns the enriched text (throws with a user-facing message on failure). */
@@ -98,7 +130,8 @@ export async function enrichField(i: EnrichInput): Promise<string> {
   if (i.format === 'whatsapp') allowed.clear()
   const messages = buildEnrichMessages(i)
   let strict = ''
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let lastRaw = ''
+  for (let attempt = 0; attempt < 4; attempt++) {
     const r = await aiChat({
       feature: 'enrichment',
       modelHint: 'enrich',
@@ -107,13 +140,17 @@ export async function enrichField(i: EnrichInput): Promise<string> {
       noCache: true,
       messages: strict ? [...messages, { role: 'user' as const, content: strict }] : messages,
     })
-    const obj = parseAiJson<{ result?: string }>(r.content)
-    const raw = String(obj?.result || '').trim()
-    if (!raw) throw Object.assign(new Error('AI returned an empty result'), { status: 502 })
+    const raw = extractResult(r.content) ?? ''
+    if (!raw) {
+      strict = 'Return a single JSON object exactly like {"result":"…"}, nothing else — no code fences, no commentary.'
+      continue
+    }
+    lastRaw = raw
     const { text, problems } = preserveTokens(i.value, raw, allowed)
     if (!problems.length) return i.maxLength && text.length > i.maxLength ? text.slice(0, i.maxLength) : text
     strict = `Your previous answer broke the merge-variable rules (${problems.join(', ')}). Rewrite it: keep every original token exactly as written and add no new tokens. Return only {"result":"…"}.`
   }
+  if (!lastRaw) throw Object.assign(new Error('AI returned an empty result'), { status: 502 })
   throw Object.assign(new Error('AI kept changing the merge variables — try again or edit by hand'), { status: 502 })
 }
 
