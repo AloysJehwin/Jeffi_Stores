@@ -5,7 +5,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
-import { discardReviewFormDraft } from './actions'
+import { discardReviewFormDraft, resnapshotReviewFormSession } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,6 +84,7 @@ export default async function EditReviewFormPage({
           formId={form.id}
           backUrl={backUrl}
           discardAction={isDraft ? discardReviewFormDraft.bind(null, id) : undefined}
+          resnapshotAction={resnapshotReviewFormSession.bind(null, id)}
           defaultValues={{
             title: df.title ?? form.title,
             slug: df.slug ?? form.slug,
