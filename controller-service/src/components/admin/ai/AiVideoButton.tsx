@@ -298,7 +298,16 @@ function VideoDialog({
                 </p>
               )}
               {error && <p className="text-xs text-red-600">{error}</p>}
-              {videoUrl && <video src={videoUrl} controls className="aspect-video w-full rounded-lg border border-border-default" />}
+              {videoUrl && (
+                <video
+                  key={videoUrl}
+                  src={videoUrl}
+                  controls
+                  preload="metadata"
+                  playsInline
+                  className="max-h-[60vh] w-full rounded-lg border border-border-default bg-black"
+                />
+              )}
               {videoUrl && (charged ?? price) != null && (
                 <p className="text-xs text-foreground-muted" data-testid="ai-charge">
                   {(charged ?? price)! > 0 ? `Charged ₹${(charged ?? price)!.toFixed(2)} to your wallet.` : 'No charge.'}
