@@ -1,8 +1,12 @@
-// Replicate (BFL Flux images, Wan 2.2 text-to-video).
+// Replicate (BFL Flux images, Wan 2.2 text-to-video / image-to-video).
 // POST /v1/models/<owner>/<name>/predictions   → { id, status, urls:{get} }
 // GET  /v1/predictions/<id>                    → { status: starting|processing|succeeded|failed|canceled, output, error }
 // output is a URL string or array of URL strings. For video we pick the first.
-// Video model picked: wan-video/wan-2.2-t2v-fast — currently available and cheap (480p, ~5 s).
+// Video models:
+//   wan-video/wan-2.2-t2v-fast — accepts aspect_ratio in {'16:9','9:16'}, resolution in {'480p','720p'}.
+//   wan-video/wan-2.2-i2v-fast — NO aspect_ratio field (output aspect comes from the input image);
+//                                 resolution in {'480p','720p'}.
+// We default resolution to '720p' for both; num_frames clamps to the model's floor (81).
 
 import type { ImageGenInput, ImageGenOutput, MediaProvider, VideoGenInput, VideoPoll, VideoStart } from './types'
 import { ProviderError, fetchBytes, fetchJson, loadImage, nearestAspect, toImage } from './types'
@@ -71,19 +75,32 @@ export class ReplicateProvider implements MediaProvider {
     // (64 frames) 422s otherwise. Clamp up to the model's floor so short-duration
     // picks render a ~5s clip instead of failing.
     const MIN_FRAMES = 81
-    const input: Record<string, unknown> = {
-      prompt: req.prompt,
-      aspect_ratio: req.aspect,
-      num_frames: Math.max(MIN_FRAMES, Math.round(req.durationSec * 16)),
-      frames_per_second: 16,
-    }
-    if (req.imageUrl) {
-      const img = await loadImage('replicate', req.imageUrl)
-      input.image = `data:${img.mime};base64,${img.data}`
-    }
+    const num_frames = Math.max(MIN_FRAMES, Math.round(req.durationSec * 16))
+    const input: Record<string, unknown> = req.imageUrl
+      ? {
+          // i2v: aspect comes from the input image; aspect_ratio is not a schema field.
+          prompt: req.prompt,
+          image: await this.toDataUrl(req.imageUrl),
+          num_frames,
+          frames_per_second: 16,
+          resolution: '720p',
+        }
+      : {
+          // t2v: aspect_ratio enum ['16:9','9:16']; caller already normalises.
+          prompt: req.prompt,
+          aspect_ratio: req.aspect,
+          num_frames,
+          frames_per_second: 16,
+          resolution: '720p',
+        }
     const pred = await this.create(model, input)
     if (!pred.id) throw new ProviderError('replicate', 'prediction missing id')
     return { opId: pred.id, model, durationSec: req.durationSec }
+  }
+
+  private async toDataUrl(url: string): Promise<string> {
+    const img = await loadImage('replicate', url)
+    return `data:${img.mime};base64,${img.data}`
   }
 
   async pollVideo(opId: string, model: string): Promise<VideoPoll> {

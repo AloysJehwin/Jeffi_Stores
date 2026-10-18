@@ -37,28 +37,31 @@ describe('google', () => {
     expect(new GoogleProvider('').configured()).toBe(false)
   })
 
-  it('generates images through the interactions API, one call per image', async () => {
-    const calls = mockFetch(() => ({ status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'image', mime_type: 'image/png', data: PNG_B64 }] }] }))
-    const g = new GoogleProvider('k', 'gemini-3.1-flash-image', 'gemini-3-pro-image', '')
+  it('generates images through generateContent, one call per image', async () => {
+    const calls = mockFetch(() => ({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: PNG_B64 } }] } }] }))
+    const g = new GoogleProvider('k', 'gemini-2.5-flash-image-preview', 'gemini-2.5-flash-image-preview', '')
     const out = await g.generateImage!({ ...req, seed: 3 })
-    expect(out.model).toBe('gemini-3.1-flash-image')
+    expect(out.model).toBe('gemini-2.5-flash-image-preview')
     expect(out.images).toHaveLength(2)
     expect(out.images[0]).toMatchObject({ width: 512, height: 768, mime: 'image/png' })
-    expect(calls[0].url).toBe('https://generativelanguage.googleapis.com/v1beta/interactions')
+    expect(calls[0].url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent')
     expect((calls[0].init?.headers as Record<string, string>)['x-goog-api-key']).toBe('k')
-    expect(body(calls[0])).toMatchObject({ model: 'gemini-3.1-flash-image', input: 'red shoe', response_format: { type: 'image', aspect_ratio: '16:9', image_size: '1K' }, generation_config: { seed: 3 } })
+    expect(body(calls[0])).toMatchObject({
+      contents: [{ role: 'user', parts: [{ text: 'red shoe' }] }],
+      generationConfig: { responseModalities: ['IMAGE', 'TEXT'], imageConfig: { aspectRatio: '16:9' }, seed: 3 },
+    })
   })
 
   it('uses the premium model for premium quality and the imagen fallback only when set', async () => {
     let n = 0
     const calls = mockFetch(url => {
       n++
-      if (url.endsWith('/interactions')) return new Response('nope', { status: 500 })
+      if (url.includes(':generateContent')) return new Response('nope', { status: 500 })
       return { predictions: [{ bytesBase64Encoded: PNG_B64, mimeType: 'image/png' }] }
     })
-    const g = new GoogleProvider('k', 'gemini-3.1-flash-image', 'gemini-3-pro-image', 'imagen-4.0-generate-001')
+    const g = new GoogleProvider('k', 'gemini-2.5-flash-image-preview', 'gemini-3-pro-image', 'imagen-4.0-generate-001')
     const out = await g.generateImage!({ ...req, n: 1, quality: 'premium' })
-    expect(body(calls[0]).model).toBe('gemini-3-pro-image')
+    expect(calls[0].url).toContain('/models/gemini-3-pro-image:generateContent')
     expect(calls[1].url).toContain('/models/imagen-4.0-generate-001:predict')
     expect(body(calls[1])).toMatchObject({ instances: [{ prompt: 'red shoe' }], parameters: { sampleCount: 1, aspectRatio: '16:9' } })
     expect(out.model).toBe('imagen-4.0-generate-001')
