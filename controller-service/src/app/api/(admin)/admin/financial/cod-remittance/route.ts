@@ -1,88 +1,154 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/auth/jwt'
+import { authenticateAdmin, requireAdminScope } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, query } from '@/lib/shared/db'
+import { queryMany, queryOne, query } from '@/lib/shared/db'
 import { generateOrderInvoice } from '@/lib/documents/invoice'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
 import { recordCodSettlement } from '@/lib/payments/route-settlement'
+import { MAX_SPAN_DAYS, bucketFor, isDate, parsePeriod, previousPeriod, spanDays, type Period } from '@/lib/overview/period'
+import { fillSeries } from '@/app/(admin)/admin/financial/_components/overview-period'
+import type { FinanceOverviewContract } from '@/app/(admin)/admin/financial/_components/finance-overview-contract'
+import type { TrendPoint } from '@/components/admin/kit/charts'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
-  const admin = await authenticateAdmin(request)
-  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+const IST = `'Asia/Kolkata'`
+const n = (v: unknown) => (v == null ? 0 : Number(v) || 0)
 
-  const { searchParams } = new URL(request.url)
-  const status = searchParams.get('status') || 'cod_collected' // cod_pending | cod_collected | paid
-  // Optional paging (limit/offset). Without it: the first 500, as before.
-  const paged = searchParams.has('limit')
-  const limit = paged ? Math.min(500, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50)) : 500
-  const offset = paged ? Math.max(0, parseInt(searchParams.get('offset') || '0', 10) || 0) : 0
+export type CodStatus = 'cod_pending' | 'cod_collected' | 'paid'
+const STATUS_KEYS: readonly CodStatus[] = ['cod_pending', 'cod_collected', 'paid']
 
-  const [orders, allCod, counted] = await Promise.all([
-    queryMany(
-      `SELECT o.id, o.order_number, o.customer_name, o.customer_email,
-              o.total_amount, o.payment_status, o.payment_mode,
-              o.delivered_at, o.cod_remitted_at, o.updated_at,
-              o.status AS order_status
-       FROM orders o
-       WHERE o.payment_mode = 'cod'
-         AND ($1 = 'all' OR o.payment_status = $1)
-       ORDER BY o.delivered_at DESC NULLS LAST, o.updated_at DESC, o.id
-       LIMIT $2 OFFSET $3`,
-      [status, limit, offset]
-    ),
-    queryMany(
-      `SELECT payment_status, total_amount
+export interface CodTotals {
+  collected_count: number
+  collected_amount: number
+  pending_count: number
+  pending_amount: number
+  remitted_count: number
+  remitted_amount: number
+}
+
+export interface CodByStatus {
+  key: CodStatus
+  count: number
+  amount: number
+}
+
+export interface CodTopRow {
+  id: string
+  order_number: string
+  customer_name: string | null
+  payment_status: string
+  total_amount: number
+  delivered_at: string | null
+  cod_remitted_at: string | null
+}
+
+export type CodOverview = Omit<FinanceOverviewContract<CodTotals, CodByStatus>, 'series' | 'top'> & {
+  series: TrendPoint[]
+  by_dim: CodByStatus[]
+  top: CodTopRow[]
+}
+
+const inRange = (col: string) =>
+  `${col} >= ($1::date)::timestamp AT TIME ZONE ${IST} AND ${col} < ($2::date + 1)::timestamp AT TIME ZONE ${IST}`
+
+async function codTotals(p: Period): Promise<CodTotals> {
+  const row = await queryOne<Record<string, string>>(
+    `SELECT
+       COUNT(*) FILTER (WHERE payment_status = 'cod_collected' AND ${inRange('delivered_at')}) AS collected_count,
+       COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'cod_collected' AND ${inRange('delivered_at')}), 0) AS collected_amount,
+       COUNT(*) FILTER (WHERE payment_status = 'cod_pending' AND ${inRange('created_at')}) AS pending_count,
+       COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'cod_pending' AND ${inRange('created_at')}), 0) AS pending_amount,
+       COUNT(*) FILTER (WHERE payment_status = 'paid' AND ${inRange('cod_remitted_at')}) AS remitted_count,
+       COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid' AND ${inRange('cod_remitted_at')}), 0) AS remitted_amount
+     FROM orders WHERE payment_mode = 'cod'`,
+    [p.from, p.to]
+  ).catch(() => null)
+  return {
+    collected_count: n(row?.collected_count),
+    collected_amount: n(row?.collected_amount),
+    pending_count: n(row?.pending_count),
+    pending_amount: n(row?.pending_amount),
+    remitted_count: n(row?.remitted_count),
+    remitted_amount: n(row?.remitted_amount),
+  }
+}
+
+async function codOverview(p: Period, status: CodStatus | 'all'): Promise<CodOverview> {
+  const prev = previousPeriod(p)
+  const bucket = bucketFor(p)
+  const [current, previous, seriesRows, topRows] = await Promise.all([
+    codTotals(p),
+    codTotals(prev),
+    queryMany<{ b: string; k: string; v: string }>(
+      `SELECT date_trunc($3::text, (delivered_at AT TIME ZONE ${IST})::date)::date::text AS b,
+              'collected' AS k, COALESCE(SUM(total_amount), 0) AS v
+         FROM orders
+         WHERE payment_mode = 'cod' AND payment_status IN ('cod_collected', 'paid') AND ${inRange('delivered_at')}
+         GROUP BY 1
+       UNION ALL
+       SELECT date_trunc($3::text, (cod_remitted_at AT TIME ZONE ${IST})::date)::date::text AS b,
+              'remitted' AS k, COALESCE(SUM(total_amount), 0) AS v
+         FROM orders
+         WHERE payment_mode = 'cod' AND payment_status = 'paid' AND ${inRange('cod_remitted_at')}
+         GROUP BY 1`,
+      [p.from, p.to, bucket]
+    ).catch(() => []),
+    queryMany<CodTopRow & { total_amount: string }>(
+      `SELECT id, order_number, customer_name, payment_status, total_amount, delivered_at, cod_remitted_at
        FROM orders
-       WHERE payment_mode = 'cod'`,
-      []
-    ),
-    paged
-      ? queryMany<{ n: string }>(`SELECT COUNT(*)::text AS n FROM orders WHERE payment_mode = 'cod' AND ($1 = 'all' OR payment_status = $1)`, [status])
-      : Promise.resolve(null),
+       WHERE payment_mode = 'cod'
+         AND ($3 = 'all' OR payment_status = $3)
+         AND COALESCE(cod_remitted_at, delivered_at, created_at) >= ($1::date)::timestamp AT TIME ZONE ${IST}
+         AND COALESCE(cod_remitted_at, delivered_at, created_at) < ($2::date + 1)::timestamp AT TIME ZONE ${IST}
+       ORDER BY COALESCE(cod_remitted_at, delivered_at, created_at) DESC
+       LIMIT 50`,
+      [p.from, p.to, status]
+    ).catch(() => []),
   ])
-
-  // Group cod_collected by delivery week
-  const weeks: Record<string, { weekLabel: string; weekStart: string; orders: any[]; total: number }> = {}
-  for (const o of orders) {
-    if (o.payment_status === 'cod_collected' && o.delivered_at) {
-      const d = new Date(o.delivered_at)
-      // Monday of delivery week
-      const day = d.getDay()
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-      const mon = new Date(d.setDate(diff))
-      const weekStart = mon.toISOString().slice(0, 10)
-      if (!weeks[weekStart]) {
-        weeks[weekStart] = {
-          weekLabel: `Week of ${mon.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`,
-          weekStart,
-          orders: [],
-          total: 0,
-        }
-      }
-      weeks[weekStart].orders.push(o)
-      weeks[weekStart].total += parseFloat(o.total_amount)
-    }
+  const by_dim: CodByStatus[] = [
+    { key: 'cod_collected', count: current.collected_count, amount: current.collected_amount },
+    { key: 'cod_pending', count: current.pending_count, amount: current.pending_amount },
+    { key: 'paid', count: current.remitted_count, amount: current.remitted_amount },
+  ]
+  return {
+    range: p,
+    previous_range: prev,
+    bucket,
+    current,
+    previous,
+    series: fillSeries(p, bucket, ['collected', 'remitted'] as const, seriesRows),
+    by_dim,
+    top: topRows.map(r => ({
+      id: r.id,
+      order_number: r.order_number,
+      customer_name: r.customer_name,
+      payment_status: r.payment_status,
+      total_amount: n(r.total_amount),
+      delivered_at: r.delivered_at,
+      cod_remitted_at: r.cod_remitted_at,
+    })),
   }
+}
 
-  const summary = {
-    cod_pending: allCod.filter(o => o.payment_status === 'cod_pending').length,
-    cod_collected: allCod.filter(o => o.payment_status === 'cod_collected').length,
-    cod_collected_amount: allCod
-      .filter(o => o.payment_status === 'cod_collected')
-      .reduce((s, o) => s + parseFloat(o.total_amount), 0),
-    total_collected_amount: allCod
-      .filter(o => ['cod_collected', 'paid'].includes(o.payment_status))
-      .reduce((s, o) => s + parseFloat(o.total_amount), 0),
+export async function GET(request: NextRequest) {
+  const admin = await requireAdminScope(request, 'financial:read')
+  if (admin instanceof NextResponse) return admin
+
+  const sp = request.nextUrl.searchParams
+  const from = sp.get('from')
+  const to = sp.get('to')
+  if ((from || to) && !(isDate(from) && isDate(to) && from <= to && spanDays({ from, to }) <= MAX_SPAN_DAYS))
+    return NextResponse.json({ error: `from and to must be YYYY-MM-DD, from <= to, at most ${MAX_SPAN_DAYS} days` }, { status: 400 })
+
+  const statusRaw = sp.get('status') || 'all'
+  const status: CodStatus | 'all' = (STATUS_KEYS as readonly string[]).includes(statusRaw) ? (statusRaw as CodStatus) : 'all'
+
+  try {
+    return NextResponse.json(await codOverview(parsePeriod(from, to), status))
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
-
-  return NextResponse.json({
-    orders,
-    weeks: Object.values(weeks).sort((a, b) => b.weekStart.localeCompare(a.weekStart)),
-    summary,
-    ...(counted ? { total: parseInt(counted[0]?.n ?? '0', 10) } : {}),
-  })
 }
 
 export async function POST(request: NextRequest) {
