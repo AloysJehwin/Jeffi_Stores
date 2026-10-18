@@ -31,6 +31,8 @@ import LibraryTemplatePicker from '@/components/admin/messaging-templates/Librar
 import LinkedTemplateEditor from '@/components/admin/messaging-templates/LinkedTemplateEditor'
 import type { EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 import { bridgeVars, campaignCanFill } from '@/lib/templates/var-bridge'
+import { Badge, FormFooter } from '@/components/admin/kit'
+import { resnapshotCampaignSession } from './edit/actions'
 
 interface Campaign {
   kind: string
@@ -220,7 +222,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     setSaving(true)
     try {
       await writeDraft(form)
-      if (edit.sessionId) await edit.save()
+      // Session stays OPEN on Save as Draft; resnapshot so a later Cancel reverts to this
+      // just-saved A2 state, not the pre-session A1 snapshot.
+      await resnapshotCampaignSession(kind)
       showToast('Draft saved', 'success')
       router.push(ap('/admin/campaigns'))
     } catch (e: any) {
@@ -783,25 +787,6 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest">
             Scenario &amp; parameters
           </h3>
-          <span
-            className={`text-[11px] font-medium ${
-              autoSaveStatus === 'saving'
-                ? 'text-foreground-muted'
-                : autoSaveStatus === 'saved'
-                  ? 'text-green-600 dark:text-green-400'
-                  : autoSaveStatus === 'error'
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-foreground-muted/50'
-            }`}
-          >
-            {autoSaveStatus === 'saving'
-              ? 'Saving…'
-              : autoSaveStatus === 'saved'
-                ? 'Saved'
-                : autoSaveStatus === 'error'
-                  ? 'Save failed'
-                  : 'Auto-saves on change'}
-          </span>
         </div>
         <div>
           <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
@@ -925,23 +910,13 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         })()}
       </div>
 
-      {/* Sticky action bar — Cancel / test send / Save Draft / Publish, pinned to the bottom like
-          the other edit pages (the logs/preview live on the read-only view page now). */}
+      {/* Send test — preserved from the old sticky bar, now its own card so the FormFooter stays
+          focused on edit intents. Fires against the live campaign, so admins can sanity-check
+          the current (saved) template without touching the draft. */}
       <RequireWrite scope="campaigns:write">
-        <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 mt-2 border-t border-border-default bg-surface-elevated/95 backdrop-blur px-4 sm:px-6 py-3">
-          {hasDraft && (
-            <div className="mb-2 flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/40">
-              <p className="text-xs text-amber-700 dark:text-amber-400 flex-1">Draft pending — changes not live yet.</p>
-              <button
-                type="button"
-                onClick={discardDraft}
-                className="h-control-sm inline-flex items-center px-2.5 rounded-md border border-amber-500/40 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
-              >
-                Discard
-              </button>
-            </div>
-          )}
-          <div className="flex sm:ml-0 items-center gap-2 flex-wrap">
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+          <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Send test</h3>
+          <div className="flex items-center gap-2 flex-wrap">
             <input
               type="email"
               value={testEmail}
@@ -957,42 +932,48 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             >
               {testBusy ? 'Sending…' : 'Send test'}
             </button>
-            <button
-              type="button"
-              onClick={async () => {
-                const ok = await confirm({
-                  title: 'Discard changes?',
-                  message:
-                    'Any edits made since you opened this campaign will be rolled back. The live campaign stays as-is.',
-                  confirmLabel: 'Discard',
-                  variant: 'danger',
-                })
-                if (!ok) return
-                if (edit.sessionId) await edit.cancel()
-                router.push(ap('/admin/campaigns'))
-              }}
-              className="h-control sm:ml-auto inline-flex items-center justify-center px-4 rounded-lg text-sm font-semibold border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              className="h-control inline-flex items-center justify-center px-4 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save Draft'}
-            </button>
-            <button
-              type="button"
-              onClick={publish}
-              disabled={publishing}
-              className="h-control inline-flex items-center justify-center px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-            >
-              {publishing ? 'Publishing…' : 'Publish'}
-            </button>
           </div>
         </div>
+      </RequireWrite>
+
+      {/* Shared editor bottom bar — see docs/plans/EDITOR_SESSION_SEMANTICS.md.
+          No top chrome: cancel, discard, save-as-draft, publish all live here. */}
+      <RequireWrite scope="campaigns:write">
+        <FormFooter
+          sticky
+          autosave={autoSaveStatus}
+          draftBadge={hasDraft ? <Badge tone="amber">Draft pending</Badge> : null}
+          discard={hasDraft ? discardDraft : undefined}
+          cancel={async () => {
+            const ok = await confirm({
+              title: 'Discard changes?',
+              message:
+                'Any edits made since you opened this campaign will be rolled back. The live campaign stays as-is.',
+              confirmLabel: 'Discard',
+              variant: 'danger',
+            })
+            if (!ok) return
+            if (edit.sessionId) await edit.cancel()
+            router.push(ap(`/admin/campaigns/${kind}/view`))
+          }}
+        >
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || publishing}
+            className="control-md inline-flex items-center justify-center whitespace-nowrap border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Saving…' : 'Save as Draft'}
+          </button>
+          <button
+            type="button"
+            onClick={publish}
+            disabled={saving || publishing}
+            className="control-md inline-flex items-center justify-center whitespace-nowrap bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {publishing ? 'Publishing…' : 'Update & Publish'}
+          </button>
+        </FormFooter>
       </RequireWrite>
     </div>
   )
