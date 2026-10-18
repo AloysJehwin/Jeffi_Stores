@@ -1,4 +1,5 @@
 import { scopeSql, type ServiceScope } from '@jeffi/tenancy'
+import { processingFeeInr, type MessagingChannel } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
 import { poolsForTenant } from './pools.js'
@@ -31,13 +32,19 @@ export async function applyStatus(id: string, status: string, o: { code?: string
     return
   }
   const error = next === 'failed' ? deliveryReason(o.code, o.message) : null
-  const m = await one<{ tenant_id: string; reference: string | null; channel: string; to_address: string; charged_inr: string }>(
+  const m = await one<{ tenant_id: string; reference: string | null; channel: string; to_address: string; charged_inr: string; metadata: Record<string, unknown> | null }>(
     `UPDATE messages SET status=$2, error=COALESCE($3,error), updated_at=now() WHERE id=$1 AND status <> $2
-     RETURNING tenant_id, reference, channel, to_address, charged_inr`, [id, next, error])
-  // Nothing reached the recipient (e.g. Meta's marketing cap, 63049), so the send is not billed.
+     RETURNING tenant_id, reference, channel, to_address, charged_inr, metadata`, [id, next, error])
+  // Nothing reached the recipient (e.g. Meta's marketing cap, 63049): keep the processing fee under P2
+  // and refund the rest; media (if any) is fully refunded. wallet.trueUp is idempotent per externalRef,
+  // so an unconditional media:${id} refund is a no-op when the row wasn't hosted (closes audit Gap 2).
   if (m && next === 'failed' && Number(m.charged_inr) > 0) {
-    await wallet.trueUp({ tenantId: m.tenant_id, amountInr: 0, externalRef: `pub:${id}`, note: `refund: ${m.channel} not delivered` })
-    await db.query(`UPDATE messages SET charged_inr=$2 WHERE id=$1`, [id, 0])
+    const internal = !!(m.metadata && (m.metadata as Record<string, unknown>).internal)
+    const fee = processingFeeInr(m.channel as MessagingChannel, internal)
+    await wallet.trueUp({ tenantId: m.tenant_id, amountInr: fee, externalRef: `pub:${id}`, note: `refund: ${m.channel} not delivered` })
+    await wallet.trueUp({ tenantId: m.tenant_id, amountInr: 0, externalRef: `media:${id}`, note: 'refund: media for a non-delivered send' })
+    await db.query(`UPDATE messages SET charged_inr=$2 WHERE id=$1`, [id, fee])
+    if (fee > 0) console.log(`processing fee kept: ₹${fee.toFixed(2)} on ${id}`)
   }
   const campaignId = m?.reference?.match(/^messaging:([0-9a-f-]{36})$/)?.[1]
   if (!m || next !== 'failed' || !campaignId) return

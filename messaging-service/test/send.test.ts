@@ -79,11 +79,11 @@ describe('sendMessage', () => {
     expect(sendSms).not.toHaveBeenCalled()
   })
 
-  it('refunds (true-up to 0) and marks failed when the provider throws', async () => {
+  it('refunds (keeping the P2 processing fee) and marks failed when the provider throws', async () => {
     vi.mocked(sendSms).mockRejectedValue(new Error('twilio down'))
     const m = await sendMessage(ctx, { channel: 'sms', to: '+919999999999', body: 'x' } as any)
     expect(m.status).toBe('failed')
     expect(m.error).toBe('twilio down')
-    expect(vi.mocked(wallet.trueUp).mock.calls[0][0]).toMatchObject({ tenantId: 't1', amountInr: 0, externalRef: `pub:${m.id}` })
+    expect(vi.mocked(wallet.trueUp).mock.calls[0][0]).toMatchObject({ tenantId: 't1', amountInr: 0.5, externalRef: `pub:${m.id}` })
   })
 })

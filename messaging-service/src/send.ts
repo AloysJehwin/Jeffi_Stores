@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { SendMessageRequest, Channel } from '@jeffi/api-contracts'
-import { mediaPriceInr, messagePriceInr } from '@jeffi/pricing'
+import { mediaPriceInr, messagePriceInr, processingFeeInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
 import { signLink } from '@jeffi/tenancy'
@@ -253,11 +253,13 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     )
     await db.query(`INSERT INTO message_events (message_id, event) VALUES ($1,'sent')`, [id])
   } catch (e: any) {
-    // Provider failed: refund by truing the debit up to zero.
-    await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `pub:${id}`, note: `refund: ${req.channel} failed` })
+    // Provider failed: refund the price minus the non-refundable processing fee (P2); media is fully refunded.
+    const fee = processingFeeInr(req.channel, ctx.internal)
+    await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: fee, externalRef: `pub:${id}`, note: `refund: ${req.channel} failed` })
     if (mediaHosted) await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `media:${id}`, note: 'refund: media for a failed send' })
-    await db.query(`UPDATE messages SET status='failed', error=$2, charged_inr=0, updated_at=now() WHERE id=$1`, [id, String(e?.message ?? e).slice(0, 500)])
+    await db.query(`UPDATE messages SET status='failed', error=$2, charged_inr=$3, updated_at=now() WHERE id=$1`, [id, String(e?.message ?? e).slice(0, 500), debit.charged ? fee : 0])
     await db.query(`INSERT INTO message_events (message_id, event, payload) VALUES ($1,'failed',$2)`, [id, { error: String(e?.message ?? e) }])
+    if (fee > 0 && debit.charged) console.log(`processing fee kept: ₹${fee.toFixed(2)} on ${id}`)
   }
   return (await one<MessageRow>(`SELECT * FROM messages WHERE id=$1`, [id]))!
 }
