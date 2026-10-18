@@ -7,6 +7,7 @@ import { aiGatewayUrl } from '@/lib/shared/ai-client'
 import { uploadGalleryImage, putObjectBuffer, getS3Url, currentBucket } from '@/lib/shared/s3'
 import { query, queryOne } from '@/lib/shared/db'
 import { AI_VIDEO_DURATIONS } from './media-features'
+import { padToAspect, extForMime } from './reshape-image'
 
 export { AiWalletError }
 
@@ -319,13 +320,30 @@ export async function generateVideo(opts: GenerateVideoOpts): Promise<GenerateVi
     ref: opts.ref,
     actor: opts.actor ?? null,
   })
+  // i2v models (Replicate wan-2.2-i2v-fast, Veo i2v) derive output aspect from the input shape, so a
+  // 1:1 product photo would ignore a 9:16 request. Pad the ref image to the requested aspect first
+  // so the model's output matches what the admin picked. Padding failures fall back to the original.
+  let gatewayImageUrl = opts.imageUrl
+  if (opts.imageUrl && aspect) {
+    try {
+      const bytes = await fetchBytes(opts.imageUrl)
+      const padded = await padToAspect(bytes, aspect)
+      if (padded.changed) {
+        const key = `ai/video-ref/${usageId.replace(/[^a-zA-Z0-9_-]/g, '_')}.${extForMime(padded.mime)}`
+        await putObjectBuffer(key, padded.buffer, padded.mime)
+        gatewayImageUrl = await getS3Url(key)
+      }
+    } catch (err) {
+      console.warn(`[ai-media] reference image padding failed, using original: ${(err as Error).message}`)
+    }
+  }
   let gw: GatewayVideoStart
   try {
     gw = await gatewayFetch<GatewayVideoStart>('/v1/video/generate', {
       method: 'POST',
       body: JSON.stringify({
         prompt: opts.prompt,
-        imageUrl: opts.imageUrl,
+        imageUrl: gatewayImageUrl,
         durationSec,
         aspect,
         provider: opts.provider,
@@ -345,6 +363,7 @@ export async function generateVideo(opts: GenerateVideoOpts): Promise<GenerateVi
     prompt: opts.prompt,
     model: gw.model,
     aspect,
+    referenceImageUrl: opts.imageUrl ?? null,
   })
   return { jobId: gw.jobId, usageId, estimatedPriceInr: priceInr, provider: gw.provider, model: gw.model }
 }
@@ -357,6 +376,8 @@ interface JobState {
   prompt?: string
   model?: string
   aspect?: AiVideoAspect
+  /** User's original reference image URL (pre-padding), kept so provenance records what they picked. */
+  referenceImageUrl?: string | null
   done?: VideoJobResult
 }
 
