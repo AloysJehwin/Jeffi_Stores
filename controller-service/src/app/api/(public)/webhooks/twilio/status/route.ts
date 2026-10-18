@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { query } from '@/lib/shared/db'
-import { debitMessageCost } from '@/lib/shared/messaging/billing'
+import { debitMessageCost, refundMessageEstimate } from '@/lib/shared/messaging/billing'
 import { usdToInr } from '@/lib/shared/messaging/pricing'
 import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 
 export const dynamic = 'force-dynamic'
 
-// Twilio delivery/price status callback. Debits the EXACT provider price (USD→INR) to the tenant
-// wallet and records it on the message_logs row. Tenant id travels on ?t= (webhook has no Host).
+// Twilio delivery/price status callback. On a priced success the exact provider price (USD→INR) is
+// trued up on the wallet; on a terminal failure (failed / undelivered — Twilio sends Price=0 there,
+// so the old priceInr>0 branch never refunded) the send-time estimate is refunded except for the
+// non-refundable processing fee. Tenant id travels on ?t= (webhook has no Host).
 export async function POST(request: Request) {
   const authToken = process.env.TWILIO_AUTH_TOKEN
   if (!authToken) return NextResponse.json({ error: 'not configured' }, { status: 500 })
@@ -33,9 +35,17 @@ export async function POST(request: Request) {
   if (!sid || !tenantId) return new NextResponse(null, { status: 204 })
 
   const priceInr = price ? usdToInr(price) : 0
+  const terminalFailure = status === 'failed' || status === 'undelivered'
 
   try {
-    if (priceInr > 0) {
+    // Terminal failure: refund the estimate down to the processing fee; net wallet charge = fee.
+    // Success with a priced row: existing true-up to the exact provider price. Both are keyed on
+    // msg:<sid> so Twilio retries are idempotent.
+    let chargedInr: number | null = priceInr || null
+    if (terminalFailure) {
+      const { keptInr } = await refundMessageEstimate({ tenantId, sid, channel, status })
+      chargedInr = keptInr
+    } else if (priceInr > 0) {
       await debitMessageCost({ tenantId, channel, providerSid: sid, priceInr })
     }
     const ctx = await lookupTenantContextById(tenantId)
@@ -44,13 +54,13 @@ export async function POST(request: Request) {
         query(
           `UPDATE message_logs SET delivery_status = $2, price = $3, currency = 'INR', priced_at = now(), provider = 'twilio'
            WHERE provider_sid = $1`,
-          [sid, status, priceInr || null]
+          [sid, status, chargedInr]
         )
       )
     }
     return new NextResponse(null, { status: 204 })
   } catch {
-    // Let Twilio retry; the debit is idempotent on msg:<sid>.
+    // Let Twilio retry; the debit / refund is idempotent on msg:<sid>.
     return NextResponse.json({ error: 'retry' }, { status: 503 })
   }
 }
