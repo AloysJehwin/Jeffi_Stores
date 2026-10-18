@@ -774,6 +774,10 @@ CREATE INDEX idx_failed_login_user_time ON public.failed_login_attempts USING bt
 
 CREATE INDEX idx_gallery_images_created ON public.gallery_images USING btree (created_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_gallery_images_tenant_created ON public.gallery_images USING btree (tenant_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_gallery_images_tenant_source ON public.gallery_images USING btree (tenant_id, source);
+
 
 
 --
@@ -2322,3 +2326,18 @@ CREATE INDEX idx_cart_items_created_at ON public.cart_items USING btree (created
 CREATE INDEX idx_pending_payment_intents_created_at ON public.pending_payment_intents USING btree (created_at);
 CREATE INDEX idx_product_views_user_created ON public.product_views USING btree (user_id, created_at);
 CREATE INDEX idx_wishlist_items_product_id ON public.wishlist_items USING btree (product_id);
+
+CREATE INDEX IF NOT EXISTS idx_gallery_videos_tenant_created ON public.gallery_videos USING btree (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_gallery_videos_tenant_source ON public.gallery_videos USING btree (tenant_id, source);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_gallery_videos_bucket_key ON public.gallery_videos USING btree (s3_bucket, s3_key);
+
+CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_tenant_kind_feature_order ON public.ai_prompt_presets USING btree (tenant_id, kind, feature, display_order);
+CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_kind_feature ON public.ai_prompt_presets USING btree (kind, feature);
+-- Nullable tenant_id/feature mean a plain UNIQUE would allow dupes; COALESCE collapses NULL so the
+-- (tenant, kind, feature, scenario) key is enforced even for platform rows and the "any-feature" slot.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_prompt_presets_scope_scenario ON public.ai_prompt_presets USING btree (
+    COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    kind,
+    COALESCE(feature, ''::text),
+    scenario
+);
