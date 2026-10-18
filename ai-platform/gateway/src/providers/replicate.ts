@@ -67,10 +67,14 @@ export class ReplicateProvider implements MediaProvider {
   async startVideo(req: VideoGenInput): Promise<VideoStart> {
     this.assert()
     const model = this.videoModel(req)
+    // wan-2.2 i2v/t2v on Replicate requires num_frames >= 81; a 4s @16fps request
+    // (64 frames) 422s otherwise. Clamp up to the model's floor so short-duration
+    // picks render a ~5s clip instead of failing.
+    const MIN_FRAMES = 81
     const input: Record<string, unknown> = {
       prompt: req.prompt,
       aspect_ratio: req.aspect,
-      num_frames: Math.round(req.durationSec * 16),
+      num_frames: Math.max(MIN_FRAMES, Math.round(req.durationSec * 16)),
       frames_per_second: 16,
     }
     if (req.imageUrl) {
