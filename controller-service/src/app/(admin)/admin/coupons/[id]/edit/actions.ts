@@ -5,6 +5,23 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/shared/db'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
+
+// Keep the admin's open editor session's snapshot in step with the draft just saved.
+// After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
+// pre-session snapshot (A1). Never fails the enclosing save on error.
+async function resnapshotCouponSession(couponId: string) {
+  try {
+    const session = await getAdminSession()
+    if (!session) return
+    const open = await findOpenSession(session.adminId, 'coupon', couponId)
+    if (!open) return
+    await resnapshotSession(open.id, session.adminId)
+  } catch (err) {
+    console.error('[coupon-edit] resnapshotSession failed for', couponId, err)
+  }
+}
 
 export async function updateCoupon(id: string, formData: FormData) {
   const code = (formData.get('code') as string).toUpperCase().trim()
@@ -27,7 +44,6 @@ export async function updateCoupon(id: string, formData: FormData) {
   const intent = formData.get('intent') as string | null
   const host = await getHost()
   const rawBack = formData.get('_back') as string | null
-  // Save as Draft always returns to the list.
   const destination = rawBack && rawBack.startsWith('/admin/coupons') ? rawBack : '/admin/coupons'
 
   const draftFields = {
@@ -48,7 +64,9 @@ export async function updateCoupon(id: string, formData: FormData) {
     if (intent === 'discard') {
       await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
       revalidatePath(`/admin/coupons/${id}/edit`)
-      redirect(ap(`/admin/coupons/${id}/edit`, host))
+      revalidatePath(`/admin/coupons/${id}/view`)
+      // Draft discarded; redirect to the view page (edit now redirects to view when no draft).
+      redirect(ap(`/admin/coupons/${id}/view`, host))
     }
 
     // Save to draft
@@ -84,6 +102,10 @@ export async function updateCoupon(id: string, formData: FormData) {
       revalidatePath('/admin/coupons')
       redirect(ap('/admin/coupons', host))
     }
+
+    // Save as Draft (intent === 'draft'): resnapshot so a later Cancel reverts to this exact state (A2),
+    // not the pre-session snapshot (A1). Session stays open; next edit resumes it.
+    await resnapshotCouponSession(id)
 
     revalidatePath(`/admin/coupons/${id}/edit`)
     redirect(ap(destination, host))
