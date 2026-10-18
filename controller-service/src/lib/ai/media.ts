@@ -51,7 +51,7 @@ export interface GeneratedImage {
   height: number
   thumbnailUrl?: string
   blurhash?: string | null
-  /** gallery_images id when `saveToGallery` was set. */
+  /** gallery_images id (always set when the gallery insert succeeds). */
   galleryId?: string
   /** product_images id when `attachToProductId` was set. */
   productImageId?: string
@@ -70,10 +70,12 @@ export interface GenerateImageOpts {
   feature: string
   ref?: string
   actor?: string | null
-  /** Also insert a gallery_images row per image (the product editor picks gallery images by id). */
+  /** @deprecated gallery insert is now unconditional; kept for client compat. */
   saveToGallery?: boolean
   /** Also add each image to this product's images (Google Ads assets are product_images rows). */
   attachToProductId?: string
+  /** Pre-resolved tenant id; routes thread it so persistImage never has to re-resolve. */
+  tenantId?: string | null
 }
 
 export interface GenerateImageResult {
@@ -110,6 +112,8 @@ export interface VideoJobResult {
   durationSec?: number
   /** Final charge once settled. */
   priceInr?: number
+  /** gallery_videos id once the finished video has been written to the tenant gallery. */
+  galleryVideoId?: string
   error?: string
 }
 
@@ -191,7 +195,7 @@ async function fetchBytes(url: string): Promise<Buffer> {
   }
 }
 
-async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: number): Promise<GeneratedImage> {
+async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: number, model: string): Promise<GeneratedImage> {
   const bytes = await fetchBytes(img.url)
   const up = await uploadGalleryImage(bytes, `ai-${opts.feature}-${Date.now()}-${idx}.png`)
   const out: GeneratedImage = {
@@ -201,13 +205,18 @@ async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: num
     thumbnailUrl: up.thumbnailUrl,
     blurhash: up.blurhash,
   }
-  if (opts.saveToGallery) {
+  // Always land the generation in the tenant gallery with provenance; a gallery write failure
+  // must not fail the generation (the caller already has the asset URL).
+  try {
+    const tenantId = opts.tenantId ?? (await resolveTenantIdSafe())
     const row = await queryOne<{ id: string }>(
-      `INSERT INTO gallery_images (image_url, thumbnail_url, s3_key, s3_thumbnail_key, s3_bucket, file_name, file_size, mime_type, width, height, blurhash, custom_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'image/png', $8, $9, $10, $11) RETURNING id`,
-      [up.url, up.thumbnailUrl, up.s3Key, up.s3ThumbnailKey, await currentBucket(), up.fileName, up.fileSize, up.width, up.height, up.blurhash, `AI: ${opts.prompt.slice(0, 80)}`]
+      `INSERT INTO gallery_images (image_url, thumbnail_url, s3_key, s3_thumbnail_key, s3_bucket, file_name, file_size, mime_type, width, height, blurhash, custom_name, tenant_id, source, prompt_text, model_name, media_kind)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'image/png', $8, $9, $10, $11, $12, 'ai', $13, $14, 'image') RETURNING id`,
+      [up.url, up.thumbnailUrl, up.s3Key, up.s3ThumbnailKey, await currentBucket(), up.fileName, up.fileSize, up.width, up.height, up.blurhash, `AI: ${opts.prompt.slice(0, 80)}`, tenantId, opts.prompt, model]
     )
     if (row) out.galleryId = row.id
+  } catch (err) {
+    console.warn(`[ai-media] gallery_images insert failed: ${(err as Error).message}`)
   }
   if (opts.attachToProductId) {
     const row = await queryOne<{ id: string }>(
@@ -219,6 +228,16 @@ async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: num
     if (row) out.productImageId = row.id
   }
   return out
+}
+
+/** Dynamic resolveTenantId that never throws — mirrors namespace() so edge-safe. */
+async function resolveTenantIdSafe(): Promise<string | null> {
+  try {
+    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+    return await resolveTenantId()
+  } catch {
+    return null
+  }
 }
 
 // preauthorize runs before routing is known ('auto'); record the provider that served the call so
@@ -271,7 +290,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
   await recordProvider(usageId, gw.provider, gw.model)
   const images: GeneratedImage[] = []
   try {
-    for (let i = 0; i < gw.images.length; i++) images.push(await persistImage(gw.images[i], opts, i))
+    for (let i = 0; i < gw.images.length; i++) images.push(await persistImage(gw.images[i], opts, i, gw.model))
   } catch (err) {
     // Provider cost is real; the store got nothing, so it is not charged.
     await settle(usageId, { units: [{ type: 'image', qty: 0 }], costInr: gw.usage?.costInr ?? 0, latencyMs: Date.now() - started, status: 'failed', error: `persist: ${(err as Error).message}` }).catch(() => {})
@@ -290,6 +309,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
 export async function generateVideo(opts: GenerateVideoOpts): Promise<GenerateVideoResult> {
   // Veo renders 4, 6 or 8 s; snap to the nearest so the estimate matches what is rendered.
   const durationSec = AI_VIDEO_DURATIONS.reduce((best, d) => (Math.abs(d - (opts.durationSec ?? 4)) < Math.abs(best - (opts.durationSec ?? 4)) ? d : best), 4)
+  const aspect: AiVideoAspect = opts.aspect === '16:9' ? '16:9' : '9:16'
   const { usageId, priceInr } = await preauthorize({
     feature: opts.feature,
     capability: 'video',
@@ -307,7 +327,7 @@ export async function generateVideo(opts: GenerateVideoOpts): Promise<GenerateVi
         prompt: opts.prompt,
         imageUrl: opts.imageUrl,
         durationSec,
-        aspect: opts.aspect === '16:9' ? '16:9' : '9:16',
+        aspect,
         provider: opts.provider,
         providers: (await getAiRouting().catch(() => ({}) as { video?: string[] })).video,
         namespace: await namespace(),
@@ -318,13 +338,25 @@ export async function generateVideo(opts: GenerateVideoOpts): Promise<GenerateVi
     throw err
   }
   await recordProvider(usageId, gw.provider, gw.model)
-  jobs.set(gw.jobId, { usageId, startedAt: Date.now() })
+  jobs.set(gw.jobId, {
+    usageId,
+    startedAt: Date.now(),
+    tenantId: await resolveTenantIdSafe(),
+    prompt: opts.prompt,
+    model: gw.model,
+    aspect,
+  })
   return { jobId: gw.jobId, usageId, estimatedPriceInr: priceInr, provider: gw.provider, model: gw.model }
 }
 
 interface JobState {
   usageId: string | null
   startedAt: number
+  /** Context captured at generateVideo time so finishJob can write gallery_videos with provenance. */
+  tenantId?: string | null
+  prompt?: string
+  model?: string
+  aspect?: AiVideoAspect
   done?: VideoJobResult
 }
 
@@ -343,8 +375,9 @@ async function usageStatus(usageId: string): Promise<string | null> {
   return row?.status ?? null
 }
 
-export async function videoJob(jobId: string, usageId?: string): Promise<VideoJobResult> {
+export async function videoJob(jobId: string, usageId?: string, tenantIdFallback?: string | null): Promise<VideoJobResult> {
   const state = jobs.get(jobId) ?? { usageId: usageId ?? null, startedAt: Date.now() }
+  if (tenantIdFallback && !state.tenantId) state.tenantId = tenantIdFallback
   if (state.done) return state.done
   const inflight = finishing.get(jobId)
   if (inflight) return inflight
@@ -377,7 +410,21 @@ async function finishJob(jobId: string, state: JobState, gw: GatewayJob): Promis
   }
   const bytes = await fetchBytes(gw.result.videoUrl)
   await putObjectBuffer(key, bytes, gw.result.mime || 'video/mp4')
-  const out: VideoJobResult = { status: 'done', videoUrl: await getS3Url(key), durationSec: gw.result.durationSec }
+  const videoUrl = await getS3Url(key)
+  const out: VideoJobResult = { status: 'done', videoUrl, durationSec: gw.result.durationSec }
+  // Land the finished video in the tenant gallery with provenance; a gallery write failure
+  // must not fail the job (the caller already has the asset URL).
+  try {
+    const tenantId = state.tenantId ?? (await resolveTenantIdSafe())
+    const row = await queryOne<{ id: string }>(
+      `INSERT INTO gallery_videos (tenant_id, s3_bucket, s3_key, url, mime, duration_seconds, aspect, prompt_text, model_name, source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ai') RETURNING id`,
+      [tenantId, await currentBucket(), key, videoUrl, gw.result.mime || 'video/mp4', gw.result.durationSec, state.aspect ?? null, state.prompt ?? null, state.model ?? null]
+    )
+    if (row) out.galleryVideoId = row.id
+  } catch (err) {
+    console.warn(`[ai-media] gallery_videos insert failed: ${(err as Error).message}`)
+  }
   if (state.usageId && pending) {
     await settle(state.usageId, {
       units: [{ type: 'video_second', qty: gw.usage?.units ?? gw.result.durationSec }],

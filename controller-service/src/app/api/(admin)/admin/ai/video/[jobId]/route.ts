@@ -9,6 +9,7 @@ import { aiDenial, AI_ADMIN_SCOPE } from '@/lib/auth/ai-scope'
 import { currentTenantPlanGate } from '@/lib/auth/plan-gate'
 import { videoJob } from '@/lib/ai/media'
 import { aiMediaErrorResponse } from '@/lib/ai/media-route'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 
 const Params = z.object({
   jobId: z.string().min(1).max(200).regex(/^[A-Za-z0-9_.:-]+$/),
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!parsed.success) return NextResponse.json({ error: 'Invalid job id' }, { status: 400 })
 
   try {
-    return NextResponse.json(await videoJob(parsed.data.jobId, parsed.data.usageId))
+    return NextResponse.json(await videoJob(parsed.data.jobId, parsed.data.usageId, await resolveTenantId()))
   } catch (err) {
     return aiMediaErrorResponse(err, 'Video job poll failed')
   }
