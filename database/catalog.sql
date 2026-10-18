@@ -98,7 +98,12 @@ CREATE TABLE public.gallery_images (
     source_url character varying(1000),
     created_at timestamp with time zone DEFAULT now(),
     custom_name character varying(255),
-    category_id uuid
+    category_id uuid,
+    tenant_id uuid,
+    media_kind text DEFAULT 'image'::text NOT NULL,
+    source text DEFAULT 'upload'::text NOT NULL,
+    prompt_text text,
+    model_name text
 );
 
 
@@ -705,6 +710,58 @@ CREATE TABLE public.homepage_drafts (
     sections jsonb DEFAULT '[]'::jsonb NOT NULL,
     hero_slides jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: gallery_videos; Type: TABLE; Schema: public; Owner: -
+-- Tenant-scoped video media (upload / AI / import); mirrors gallery_images shape. url carries the
+-- public CDN or signed URL the UI renders; tenant_id is nullable during the backfill window.
+--
+
+CREATE TABLE public.gallery_videos (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid,
+    s3_bucket text NOT NULL,
+    s3_key text NOT NULL,
+    url text NOT NULL,
+    mime text DEFAULT 'video/mp4'::text NOT NULL,
+    duration_seconds numeric(6,2),
+    aspect text,
+    width integer,
+    height integer,
+    blurhash text,
+    thumbnail_url text,
+    prompt_text text,
+    model_name text,
+    source text DEFAULT 'upload'::text NOT NULL,
+    category text,
+    label text,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ai_prompt_presets; Type: TABLE; Schema: public; Owner: -
+-- Prompt catalog for AI image/video generation. tenant_id NULL = platform default; non-null = tenant
+-- override. feature NULL = applies to any feature. The UI loads the (tenant, kind, feature) rows
+-- ordered by display_order and lets the operator pick a scenario.
+--
+
+CREATE TABLE public.ai_prompt_presets (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid,
+    kind text NOT NULL,
+    feature text,
+    scenario text NOT NULL,
+    prompt text NOT NULL,
+    display_order integer DEFAULT 100 NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
