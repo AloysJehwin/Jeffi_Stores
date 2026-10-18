@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, query } from '@/lib/shared/db'
-import { getPayables } from '@/lib/payments/financial'
+import { queryOne } from '@/lib/shared/db'
+import { MAX_SPAN_DAYS, isDate, parsePeriod, spanDays } from '@/lib/overview/period'
+import { getPayablesOverview } from './summary'
 
 export const dynamic = 'force-dynamic'
 
+// Payables overview — FinanceOverviewContract<PayablesTotals, Bill|Supplier> shape.
 export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
@@ -13,24 +15,19 @@ export async function GET(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'financial:read'))
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status') || ''
-    const from = searchParams.get('from') || ''
-    const to = searchParams.get('to') || ''
-    const search = searchParams.get('search') || ''
-    const page = parseInt(searchParams.get('page') || '1', 10)
+    const sp = request.nextUrl.searchParams
+    const from = sp.get('from')
+    const to = sp.get('to')
+    if ((from || to) && !(isDate(from) && isDate(to) && from <= to && spanDays({ from, to }) <= MAX_SPAN_DAYS))
+      return NextResponse.json(
+        { error: `from and to must be YYYY-MM-DD, from <= to, at most ${MAX_SPAN_DAYS} days` },
+        { status: 400 }
+      )
 
-    const result = await getPayables({
-      status: status || undefined,
-      from: from || undefined,
-      to: to || undefined,
-      search: search || undefined,
-      page,
-    })
-
-    return NextResponse.json(result)
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
+    return NextResponse.json(await getPayablesOverview(parsePeriod(from, to)))
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal server error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -73,7 +70,8 @@ export async function POST(request: NextRequest) {
     )
 
     return NextResponse.json({ success: true, id: inserted?.id, expense_number: expenseNumber })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal server error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

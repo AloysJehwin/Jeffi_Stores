@@ -1,39 +1,316 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import Link from 'next/link'
-import AdminTypeahead from '@/components/admin/AdminTypeahead'
-import { ap } from '@/lib/shared/admin-path'
+import { Plus } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
+import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { EmptyState, useActionToast, InfiniteFooter } from '@/components/admin/kit'
 import {
-  inputCls,
-  labelCls,
-  btnPrimary,
-  btnSecondary,
-  Skeleton,
-  SummaryCard,
-  StatusBadge,
-  formatDate,
-  formatINR,
-  thCls,
-  thRight,
-  thCenter,
-  theadCls,
-  tableWrapCls,
-  tableWrapClippedCls,
-} from './shared'
+  Banner,
+  Dialog,
+  FormField,
+  Kpi,
+  KpiGrid,
+  NumberInput,
+  Section,
+  Table,
+  TextInput,
+  useActionToast,
+  type Col,
+} from '@/components/admin/kit'
+import { OverviewSkeleton, useOverviewData } from '@/components/admin/kit/period'
+import { KeyedTrendCard, type TrendPoint } from '@/components/admin/kit/charts'
+import { delta } from '@/lib/overview/period'
+import {
+  AGING_COLORS,
+  AgingDonutCard,
+  FinancePeriodBar,
+  useFinancePeriod,
+  type AgingDonutRow,
+} from './finance'
 import { PayablesPayModal } from './PayablesPayModal'
+import { StatusBadge, formatINR } from './shared'
 
-export function PayablesTab({ initialData }: { initialData: any }) {
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [search, setSearch] = useState('')
-  const [data, setData] = useState<any>(initialData)
-  const [loading, setLoading] = useState(false)
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [addForm, setAddForm] = useState({
+// Client-side mirror of the server contract (see api/.../payables/summary.ts). Narrowed once here.
+
+type Totals = {
+  outstanding: number
+  due_this_week: number
+  overdue: number
+  paid: number
+  bills_open: number
+}
+
+type Bill = {
+  id: string
+  expense_number: string
+  supplier_id: string | null
+  supplier_name: string
+  total_amount: number
+  paid_amount: number
+  due_date: string | null
+  days_overdue: number | null
+  status: string
+  supplier_bank_name: string | null
+  supplier_account_number: string | null
+  supplier_ifsc: string | null
+  supplier_upi_id: string | null
+}
+
+type SupplierRow = {
+  supplier_id: string | null
+  supplier_name: string
+  bills_open: number
+  outstanding: number
+  overdue: number
+}
+
+type AgingKey = 'current' | 'd1_30' | 'd31_60' | 'd61_90' | 'd90_plus'
+type Aging = { key: AgingKey; label: string; value: number }
+
+type Overview = {
+  range: { from: string; to: string }
+  previous_range: { from: string; to: string }
+  bucket: 'day' | 'week' | 'month'
+  current: Totals
+  previous: Totals
+  series: TrendPoint[]
+  pay_methods: string[]
+  by_dim: Aging[]
+  by_dim2: SupplierRow[]
+  top: Bill[]
+}
+
+const METHOD_LABEL: Record<string, string> = {
+  bank_transfer: 'Bank transfer',
+  upi: 'UPI',
+  cash: 'Cash',
+  cheque: 'Cheque',
+}
+
+const AGING_COLOR: Record<AgingKey, string> = {
+  current: AGING_COLORS.current,
+  d1_30: 'rgb(132 204 22)',
+  d31_60: AGING_COLORS.d31_60,
+  d61_90: AGING_COLORS.d61_90,
+  d90_plus: AGING_COLORS.d90_plus,
+}
+
+const remaining = (b: Bill) => Math.max(b.total_amount - b.paid_amount, 0)
+
+export function PayablesTab({ initialData: _initialData }: { initialData?: unknown } = {}) {
+  const { from, to } = useFinancePeriod()
+  const { data, error, loading, reload } = useOverviewData<Overview>(
+    `/api/admin/financial/payables?from=${from}&to=${to}`
+  )
+  const [showAdd, setShowAdd] = useState(false)
+  const [payBill, setPayBill] = useState<Bill | null>(null)
+  const canWrite = useCanWrite('financial:write')
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FinancePeriodBar onRefresh={reload} busy={loading} />
+        {canWrite && (
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="control-md inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-sm font-medium text-white hover:bg-accent-600"
+          >
+            <Plus className="h-4 w-4" /> Add bill
+          </button>
+        )}
+      </div>
+
+      {error && <Banner ok={false}>{error}</Banner>}
+      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} canWrite={canWrite} onPay={setPayBill} />}
+
+      {showAdd && (
+        <AddBillDialog
+          onClose={() => setShowAdd(false)}
+          onSaved={() => {
+            setShowAdd(false)
+            reload()
+          }}
+        />
+      )}
+
+      {payBill && (
+        <PayModalHost
+          bill={payBill}
+          onClose={() => {
+            setPayBill(null)
+            reload()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function Body({ d, canWrite, onPay }: { d: Overview; canWrite: boolean; onPay: (b: Bill) => void }) {
+  const c = d.current
+  const p = d.previous
+
+  const agingRows: AgingDonutRow[] = d.by_dim.map(r => ({
+    label: r.label,
+    value: r.value,
+    color: AGING_COLOR[r.key],
+  }))
+
+  const billCols: Col<Bill>[] = [
+    {
+      key: 'bill',
+      label: 'Bill',
+      render: r => (
+        <div className="min-w-0">
+          <Link
+            href={ap(`/admin/financial/payables/${r.id}/view`)}
+            className="font-mono text-xs text-foreground hover:text-accent-500 hover:underline"
+          >
+            {r.expense_number}
+          </Link>
+          <div className="text-xs text-foreground-muted">
+            {r.supplier_id ? (
+              <Link
+                href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
+                className="hover:text-accent-500 hover:underline"
+              >
+                {r.supplier_name}
+              </Link>
+            ) : (
+              r.supplier_name
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'due',
+      label: 'Due',
+      render: r =>
+        r.due_date ? (
+          <span className={r.days_overdue ? 'text-red-500 dark:text-red-400' : 'text-foreground-muted'}>
+            {r.due_date}
+            {r.days_overdue ? ` · ${r.days_overdue}d late` : ''}
+          </span>
+        ) : (
+          <span className="text-foreground-muted">—</span>
+        ),
+    },
+    { key: 'total', label: 'Amount', num: true, render: r => formatINR(r.total_amount) },
+    { key: 'paid', label: 'Paid', num: true, render: r => formatINR(r.paid_amount) },
+    {
+      key: 'due_now',
+      label: 'Due now',
+      num: true,
+      render: r => <span className="font-medium">{formatINR(remaining(r))}</span>,
+    },
+    { key: 'status', label: 'Status', render: r => <StatusBadge status={r.status} /> },
+    {
+      key: 'action',
+      label: '',
+      render: r =>
+        canWrite ? (
+          <button
+            type="button"
+            onClick={() => onPay(r)}
+            className="control-sm rounded-md bg-accent-500 px-2 text-xs font-medium text-white hover:bg-accent-600"
+          >
+            Pay
+          </button>
+        ) : null,
+    },
+  ]
+
+  const supplierCols: Col<SupplierRow>[] = [
+    {
+      key: 'name',
+      label: 'Supplier',
+      render: r =>
+        r.supplier_id ? (
+          <Link
+            href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
+            className="font-medium text-foreground hover:text-accent-500 hover:underline"
+          >
+            {r.supplier_name}
+          </Link>
+        ) : (
+          <span className="font-medium text-foreground">{r.supplier_name}</span>
+        ),
+    },
+    { key: 'bills_open', label: 'Open bills', num: true, render: r => r.bills_open.toLocaleString('en-IN') },
+    { key: 'overdue', label: 'Overdue', num: true, render: r => formatINR(r.overdue) },
+    { key: 'outstanding', label: 'Outstanding', num: true, render: r => formatINR(r.outstanding) },
+  ]
+
+  return (
+    <div className="space-y-5">
+      <KpiGrid>
+        <Kpi
+          label="Outstanding"
+          value={formatINR(c.outstanding)}
+          delta={delta(c.outstanding, p.outstanding)}
+          invert
+          highlight
+        />
+        <Kpi label="Overdue" value={formatINR(c.overdue)} delta={delta(c.overdue, p.overdue)} invert />
+        <Kpi label="Due this week" value={formatINR(c.due_this_week)} sub="Next 7 days" />
+        <Kpi label="Paid in period" value={formatINR(c.paid)} delta={delta(c.paid, p.paid)} />
+        <Kpi
+          label="Open bills"
+          value={c.bills_open.toLocaleString('en-IN')}
+          delta={delta(c.bills_open, p.bills_open)}
+          invert
+        />
+      </KpiGrid>
+
+      {c.overdue > 0 && (
+        <Banner ok={false}>
+          {formatINR(c.overdue)} is past due. Review the open bills table and remit the overdue ones first.
+        </Banner>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2">
+          <KeyedTrendCard
+            title="Outflow by method"
+            data={d.series}
+            keys={d.pay_methods}
+            labels={METHOD_LABEL}
+            granularity={d.bucket}
+          />
+        </div>
+        <AgingDonutCard
+          title="Aging"
+          rows={agingRows}
+          total={formatINR(c.outstanding)}
+          centerLabel="Outstanding"
+        />
+      </div>
+
+      <Section title="Open bills">
+        <Table rows={d.top} cols={billCols} rowKey={r => r.id} empty="No open bills right now." />
+      </Section>
+
+      <Section title="Top suppliers by outstanding">
+        <Table
+          rows={d.by_dim2}
+          cols={supplierCols}
+          rowKey={r => r.supplier_id ?? r.supplier_name}
+          empty="No supplier balances in this period."
+        />
+      </Section>
+    </div>
+  )
+}
+
+// Add-bill dialog; posts to the untouched POST /api/admin/financial/payables route.
+function AddBillDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const toast = useActionToast()
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
     supplier_name: '',
     amount: '',
     tax_amount: '',
@@ -43,114 +320,121 @@ export function PayablesTab({ initialData }: { initialData: any }) {
     supplier_gstin: '',
     notes: '',
   })
-  const [saving, setSaving] = useState(false)
-  const [payModal, setPayModal] = useState<any | null>(null)
-  const [payTab, setPayTab] = useState<'manual' | 'razorpayx'>('manual')
-  const [payForm, setPayForm] = useState({
-    amount: '',
-    payment_date: new Date().toISOString().slice(0, 10),
-    payment_method: 'bank_transfer',
-    reference: '',
-  })
-  const [rzpForm, setRzpForm] = useState({ mode: 'IMPS', amount: '', notes: '' })
-  const [paying, setPaying] = useState(false)
-  const [payoutResult, setPayoutResult] = useState<any>(null)
-  const [page, setPage] = useState(1)
-  const [more, setMore] = useState<{ loading: boolean; error: string | null }>({ loading: false, error: null })
-  const applied = useRef('')
-  const inflight = useRef(false)
-  const canWrite = useCanWrite('financial:write')
-  const toast = useActionToast()
+  const canSubmit = !!(form.supplier_name && form.amount && form.expense_date) && !saving
 
-  useEffect(() => {
-    if (initialData !== null) {
-      setData(initialData)
-      setPage(1)
-    }
-  }, [initialData])
-
-  // Page 1 replaces (with the current filters); later pages append with the filters page 1 used.
-  const load = useCallback(
-    async (p = 1) => {
-      if (p > 1 && inflight.current) return
-      inflight.current = true
-      let params: URLSearchParams
-      if (p === 1) {
-        setLoading(true)
-        params = new URLSearchParams()
-        if (from) params.set('from', from)
-        if (to) params.set('to', to)
-        if (search) params.set('search', search)
-        applied.current = params.toString()
-      } else {
-        setMore({ loading: true, error: null })
-        params = new URLSearchParams(applied.current)
-      }
-      params.set('page', String(p))
-      try {
-        const res = await fetch(`/api/admin/financial/payables?${params}`)
-        const json = await res.json()
-        if (p === 1) setData(json?.error ? null : json)
-        else if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load')
-        else setData((prev: any) => ({ ...prev, rows: [...(prev?.rows ?? []), ...(json.rows ?? [])], total: json.total }))
-        setPage(p)
-        setMore({ loading: false, error: null })
-      } catch (e) {
-        if (p > 1) setMore({ loading: false, error: e instanceof Error ? e.message : 'Failed to load' })
-      } finally {
-        inflight.current = false
-        if (p === 1) setLoading(false)
-      }
-    },
-    [from, to, search]
-  )
-
-  const handleRefresh = () => load(1)
-
-
-  const submitBill = async () => {
-    if (!addForm.supplier_name || !addForm.amount || !addForm.expense_date) return
+  const submit = async () => {
+    if (!canSubmit) return
     setSaving(true)
     const res = await fetch('/api/admin/financial/payables', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(addForm),
+      body: JSON.stringify(form),
     })
     toast.result({ ok: res.ok }, { success: 'Bill saved.', error: 'Could not save the bill.' })
-    setShowAddForm(false)
-    setAddForm({
-      supplier_name: '',
-      amount: '',
-      tax_amount: '',
-      expense_date: '',
-      due_date: '',
-      description: '',
-      supplier_gstin: '',
-      notes: '',
-    })
     setSaving(false)
-    load()
+    if (res.ok) onSaved()
   }
 
+  const upd = <K extends keyof typeof form>(k: K) => (v: (typeof form)[K]) => setForm(f => ({ ...f, [k]: v }))
+
+  return (
+    <Dialog
+      open
+      size="lg"
+      title="New supplier bill"
+      onClose={onClose}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="control-md border border-border-default px-3 text-sm text-foreground hover:bg-surface-secondary"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={submit}
+            className="control-md bg-accent-500 px-3 text-sm font-medium text-white hover:bg-accent-600 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save bill'}
+          </button>
+        </>
+      }
+    >
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <FormField label="Supplier" required>
+          <TextInput value={form.supplier_name} onChange={e => upd('supplier_name')(e.target.value)} />
+        </FormField>
+        <FormField label="GSTIN">
+          <TextInput
+            className="font-mono"
+            maxLength={15}
+            placeholder="00XXXXX0000X0Z0"
+            value={form.supplier_gstin}
+            onChange={e => upd('supplier_gstin')(e.target.value.toUpperCase())}
+          />
+        </FormField>
+        <FormField label="Description" span={2}>
+          <TextInput value={form.description} onChange={e => upd('description')(e.target.value)} />
+        </FormField>
+        <FormField label="Amount (excl. tax)" required>
+          <NumberInput step="0.01" value={form.amount} onChange={e => upd('amount')(e.target.value)} />
+        </FormField>
+        <FormField label="Tax amount">
+          <NumberInput step="0.01" value={form.tax_amount} onChange={e => upd('tax_amount')(e.target.value)} />
+        </FormField>
+        <FormField label="Bill date" required>
+          <DatePicker className="w-full" value={form.expense_date} onChange={v => upd('expense_date')(v)} />
+        </FormField>
+        <FormField label="Due date">
+          <DatePicker className="w-full" value={form.due_date} onChange={v => upd('due_date')(v)} />
+        </FormField>
+        <FormField label="Notes" span={2}>
+          <TextInput value={form.notes} onChange={e => upd('notes')(e.target.value)} />
+        </FormField>
+      </div>
+    </Dialog>
+  )
+}
+
+// Preserves PayablesPayModal exactly (manual record + RazorpayX payout); only the open/close
+// plumbing changes.
+function PayModalHost({ bill, onClose }: { bill: Bill; onClose: () => void }) {
+  const toast = useActionToast()
+  const remainingStr = remaining(bill).toFixed(2)
+  const [payTab, setPayTab] = useState<'manual' | 'razorpayx'>('manual')
+  const [payForm, setPayForm] = useState({
+    amount: remainingStr,
+    payment_date: new Date().toISOString().slice(0, 10),
+    payment_method: 'bank_transfer',
+    reference: '',
+  })
+  const [rzpForm, setRzpForm] = useState({ mode: 'IMPS', amount: remainingStr, notes: '' })
+  const [paying, setPaying] = useState(false)
+  const [payoutResult, setPayoutResult] = useState<{ ok: boolean; payout_id?: string; status?: string; error?: string } | null>(null)
+  const hasBank = !!(bill.supplier_account_number && bill.supplier_ifsc)
+  const hasUpi = !!bill.supplier_upi_id
+
   const submitPayment = async () => {
-    if (!payModal || !payForm.amount) return
+    if (!payForm.amount) return
     setPaying(true)
-    const res = await fetch(`/api/admin/financial/payables/${payModal.id}/pay`, {
+    const res = await fetch(`/api/admin/financial/payables/${bill.id}/pay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payForm),
     })
     toast.result({ ok: res.ok }, { success: 'Payment recorded.', error: 'Could not record the payment.' })
-    setPayModal(null)
     setPaying(false)
-    load()
+    if (res.ok) onClose()
   }
 
   const submitPayout = async () => {
-    if (!payModal || !rzpForm.amount) return
+    if (!rzpForm.amount) return
     setPaying(true)
     setPayoutResult(null)
-    const res = await fetch(`/api/admin/financial/payables/${payModal.id}/payout`, {
+    const res = await fetch(`/api/admin/financial/payables/${bill.id}/payout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rzpForm),
@@ -160,341 +444,35 @@ export function PayablesTab({ initialData }: { initialData: any }) {
     if (json.success) {
       setPayoutResult({ ok: true, payout_id: json.payout_id, status: json.payout_status })
       toast.success(`Payout queued. ID ${json.payout_id}, status ${json.payout_status}.`)
-      fetch('/api/admin/financial/payables/sync-payouts', { method: 'POST' })
-      load()
+      fetch('/api/admin/financial/payables/sync-payouts', { method: 'POST' }).catch(() => {})
+      onClose()
     } else {
       setPayoutResult({ ok: false, error: json.error })
       toast.error(json.error || 'Payout failed.')
     }
   }
 
-  const openPayModal = (r: any) => {
-    const remaining = parseFloat(r.total_amount) - parseFloat(r.paid_amount)
-    setPayModal(r)
-    setPayTab('manual')
-    setPayoutResult(null)
-    setPayForm(f => ({ ...f, amount: remaining.toFixed(2) }))
-    setRzpForm({ mode: 'IMPS', amount: remaining.toFixed(2), notes: '' })
-  }
-
-  const closePayModal = () => {
-    setPayModal(null)
-    setPayoutResult(null)
-  }
-
-  const hasBank = payModal && payModal.supplier_account_number && payModal.supplier_ifsc
-  const hasUpi = payModal && payModal.supplier_upi_id
-
   return (
-    <div className="space-y-5">
-      <div className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <label className={labelCls}>From</label>
-            <DatePicker className="w-36" value={from} onChange={setFrom} />
-          </div>
-          <div>
-            <label className={labelCls}>To</label>
-            <DatePicker className="w-36" value={to} onChange={setTo} />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className={labelCls}>Search supplier / bill #</label>
-            <AdminTypeahead
-              type="payables"
-              value={search}
-              onChange={setSearch}
-              onEnter={handleRefresh}
-              placeholder="Supplier name, bill #..."
-            />
-          </div>
-          <div className="flex gap-2 pb-0.5">
-            <button type="button" className={btnPrimary} onClick={handleRefresh} disabled={loading}>
-              {loading ? 'Loading…' : 'Refresh'}
-            </button>
-            {canWrite && (
-              <button type="button" className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>
-                + Add Bill
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {showAddForm && (
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">New Supplier Bill</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className={labelCls}>Supplier Name *</label>
-              <input
-                className={inputCls}
-                value={addForm.supplier_name}
-                onChange={e => setAddForm(f => ({ ...f, supplier_name: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>GSTIN</label>
-              <input
-                className={inputCls + ' font-mono'}
-                value={addForm.supplier_gstin}
-                onChange={e => setAddForm(f => ({ ...f, supplier_gstin: e.target.value.toUpperCase() }))}
-                maxLength={15}
-                placeholder="00XXXXX0000X0Z0"
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Description</label>
-              <input
-                className={inputCls}
-                value={addForm.description}
-                onChange={e => setAddForm(f => ({ ...f, description: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Amount (excl. tax) *</label>
-              <input
-                type="number"
-                step="0.01"
-                className={inputCls}
-                value={addForm.amount}
-                onChange={e => setAddForm(f => ({ ...f, amount: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Tax Amount</label>
-              <input
-                type="number"
-                step="0.01"
-                className={inputCls}
-                value={addForm.tax_amount}
-                onChange={e => setAddForm(f => ({ ...f, tax_amount: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Bill Date *</label>
-              <DatePicker value={addForm.expense_date} onChange={v => setAddForm(f => ({ ...f, expense_date: v }))} />
-            </div>
-            <div>
-              <label className={labelCls}>Due Date</label>
-              <DatePicker value={addForm.due_date} onChange={v => setAddForm(f => ({ ...f, due_date: v }))} />
-            </div>
-            <div>
-              <label className={labelCls}>Notes</label>
-              <input
-                className={inputCls}
-                value={addForm.notes}
-                onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))}
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button type="button" className={btnPrimary} onClick={submitBill} disabled={saving}>
-              {saving ? 'Saving…' : 'Save Bill'}
-            </button>
-            <button type="button" className={btnSecondary} onClick={() => setShowAddForm(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!data ? (
-        <Skeleton />
-      ) : (
-        data.summary && (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <SummaryCard label="Total Payable" value={formatINR(data.summary.total_payable)} />
-              <SummaryCard label="Due This Week" value={formatINR(data.summary.due_this_week)} />
-              <SummaryCard label="Overdue" value={formatINR(data.summary.overdue)} sub="past due date" />
-            </div>
-
-            {data.rows.length === 0 ? (
-              <EmptyState title="No outstanding payables" />
-            ) : (
-              <>
-                <div className={`hidden md:block overflow-x-auto ${tableWrapClippedCls}`}>
-                  <table className="w-full text-sm">
-                    <thead className={theadCls}>
-                      <tr>
-                        <th className={thCls}>Supplier</th>
-                        <th className={thCls}>Bill #</th>
-                        <th className={thCls}>Bill Date</th>
-                        <th className={thCls}>Due Date</th>
-                        <th className={thRight}>Amount</th>
-                        <th className={thRight}>Paid</th>
-                        <th className={thCenter}>Status</th>
-                        <th className={thCenter}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-default">
-                      {data.rows.map((r: any) => {
-                        const remaining = parseFloat(r.total_amount) - parseFloat(r.paid_amount)
-                        return (
-                          <tr key={r.id} className="hover:bg-surface-secondary/40 transition-colors">
-                            <td className="px-4 py-3">
-                              {r.supplier_id ? (
-                                <Link
-                                  href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
-                                  className="font-medium text-foreground hover:text-accent-500 hover:underline"
-                                >
-                                  {r.supplier_name}
-                                </Link>
-                              ) : (
-                                <span className="font-medium text-foreground">{r.supplier_name}</span>
-                              )}
-                              {r.description && (
-                                <div className="text-xs text-foreground-secondary">{r.description}</div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-foreground-secondary">
-                              <Link
-                                href={ap(`/admin/financial/payables/${r.id}/view`)}
-                                className="font-mono hover:text-accent-500 hover:underline"
-                              >
-                                {r.expense_number}
-                              </Link>
-                            </td>
-                            <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
-                              {formatDate(r.expense_date)}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {r.due_date ? (
-                                <span
-                                  className={
-                                    r.days_overdue
-                                      ? 'text-red-600 dark:text-red-400 font-medium'
-                                      : 'text-foreground-secondary'
-                                  }
-                                >
-                                  {formatDate(r.due_date)}
-                                  {r.days_overdue ? ` (${r.days_overdue}d overdue)` : ''}
-                                </span>
-                              ) : (
-                                <span className="text-foreground-secondary">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium text-foreground">
-                              {formatINR(parseFloat(r.total_amount))}
-                            </td>
-                            <td className="px-4 py-3 text-right text-foreground-secondary">
-                              {formatINR(parseFloat(r.paid_amount))}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <StatusBadge status={r.status} />
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {canWrite && (
-                                <button
-                                  className="control-sm bg-accent-500 hover:bg-accent-600 text-white transition-colors"
-                                  onClick={() => openPayModal(r)}
-                                >
-                                  Pay
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className={`md:hidden divide-y divide-border-default ${tableWrapCls}`}>
-                  {data.rows.map((r: any) => {
-                    const remaining = parseFloat(r.total_amount) - parseFloat(r.paid_amount)
-                    return (
-                      <div key={r.id} className="p-4 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            {r.supplier_id ? (
-                              <Link
-                                href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
-                                className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
-                              >
-                                {r.supplier_name}
-                              </Link>
-                            ) : (
-                              <span className="font-medium text-foreground text-sm">{r.supplier_name}</span>
-                            )}
-                            {r.description && (
-                              <p className="text-xs text-foreground-secondary mt-0.5">{r.description}</p>
-                            )}
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="font-semibold text-foreground text-sm">
-                              {formatINR(parseFloat(r.total_amount))}
-                            </p>
-                            {parseFloat(r.paid_amount) > 0 && (
-                              <p className="text-xs text-foreground-secondary mt-0.5">
-                                Paid {formatINR(parseFloat(r.paid_amount))}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
-                          <Link
-                            href={ap(`/admin/financial/payables/${r.id}/view`)}
-                            className="font-mono hover:text-accent-500 hover:underline"
-                          >
-                            {r.expense_number}
-                          </Link>
-                          <span>{formatDate(r.expense_date)}</span>
-                        </div>
-                        {r.due_date && (
-                          <p
-                            className={`text-xs ${r.days_overdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-foreground-secondary'}`}
-                          >
-                            Due {formatDate(r.due_date)}
-                            {r.days_overdue ? ` · ${r.days_overdue}d overdue` : ''}
-                          </p>
-                        )}
-                        <div className="flex items-center justify-between gap-2">
-                          <StatusBadge status={r.status} />
-                          {canWrite && (
-                            <button
-                              className="control-sm bg-accent-500 hover:bg-accent-600 text-white transition-colors"
-                              onClick={() => openPayModal(r)}
-                            >
-                              Pay
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <InfiniteFooter
-                  shown={data.rows.length}
-                  noun="rows"
-                  control={{ total: data.total, hasMore: data.rows.length < (data.total ?? 0), loadingMore: more.loading, error: more.error, loadMore: () => load(page + 1) }}
-                />
-              </>
-            )}
-          </>
-        )
-      )}
-
-      {payModal && (
-        <PayablesPayModal
-          payModal={payModal}
-          payTab={payTab}
-          setPayTab={setPayTab}
-          payForm={payForm}
-          setPayForm={setPayForm}
-          rzpForm={rzpForm}
-          setRzpForm={setRzpForm}
-          paying={paying}
-          payoutResult={payoutResult}
-          setPayoutResult={setPayoutResult}
-          hasBank={hasBank}
-          hasUpi={hasUpi}
-          submitPayment={submitPayment}
-          submitPayout={submitPayout}
-          closePayModal={closePayModal}
-        />
-      )}
-    </div>
+    <PayablesPayModal
+      payModal={{
+        ...bill,
+        total_amount: String(bill.total_amount),
+        paid_amount: String(bill.paid_amount),
+      }}
+      payTab={payTab}
+      setPayTab={setPayTab as Dispatch<SetStateAction<'manual' | 'razorpayx'>>}
+      payForm={payForm}
+      setPayForm={setPayForm}
+      rzpForm={rzpForm}
+      setRzpForm={setRzpForm}
+      paying={paying}
+      payoutResult={payoutResult}
+      setPayoutResult={setPayoutResult as Dispatch<SetStateAction<unknown>>}
+      hasBank={hasBank}
+      hasUpi={hasUpi}
+      submitPayment={submitPayment}
+      submitPayout={submitPayout}
+      closePayModal={onClose}
+    />
   )
 }
