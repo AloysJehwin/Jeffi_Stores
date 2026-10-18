@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
 import { ap } from '@/lib/shared/admin-path'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
 import AIFillForm from './AIFillForm'
 import { useEditSession } from '@/hooks/useEditSession'
-import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
-import { EditSessionActions, FormButton, FormField, FormFooter, FormGrid, FormSection, TextArea, TextInput, NumberInput, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { Badge, FormField, FormFooter, FormGrid, FormSection, TextArea, TextInput, NumberInput, fieldInputCls, useActionToast } from '@/components/admin/kit'
 
 interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
@@ -41,6 +41,7 @@ export default function BrandForm({
   const [replacementDays, setReplacementDays] = useState<number>(brand?.replacement_window_days ?? 7)
   const formRef = useRef<HTMLFormElement>(null)
   const toast = useActionToast()
+  const router = useRouter()
   const edit = useEditSession({ resourceType: 'brand', resourceId: brand?.id ?? null })
 
   function setInput(name: string, value: string) {
@@ -90,26 +91,6 @@ export default function BrandForm({
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-      {edit.sessionId && (
-        <div className="flex justify-end">
-          <EditSessionActions
-            autosaveStatus={'idle' as AutosaveStatus}
-            sessionStatus={edit.status}
-            onCancel={edit.cancel}
-            cancelHref={ap('/admin/brands')}
-            draft={isDraft}
-            discard={
-              isDraft && discardAction
-                ? () => {
-                    const fd = new FormData()
-                    fd.set('intent', 'discard')
-                    void discardAction(fd)
-                  }
-                : undefined
-            }
-          />
-        </div>
-      )}
 
       <FormSection
         title="Brand"
@@ -238,20 +219,59 @@ export default function BrandForm({
         </FormSection>
       )}
 
-      <FormFooter cancelHref={ap('/admin/brands')}>
+      {/* Shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
+      <FormFooter
+        sticky
+        draftBadge={isDraft ? <Badge tone="amber">Draft pending</Badge> : undefined}
+        discard={
+          isDraft && discardAction
+            ? () => {
+                const fd = new FormData()
+                fd.set('intent', 'discard')
+                void discardAction(fd)
+              }
+            : undefined
+        }
+        cancel={
+          edit.sessionId
+            ? async () => {
+                const ok = await edit.cancel()
+                if (ok) router.push(ap(backUrl && backUrl.startsWith('/admin/brands') ? backUrl : '/admin/brands'))
+              }
+            : undefined
+        }
+        cancelHref={edit.sessionId ? undefined : ap(backUrl && backUrl.startsWith('/admin/brands') ? backUrl : '/admin/brands')}
+      >
         {isDraft ? (
-          <>
-            <FormButton variant="secondary" name="intent" value="draft" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Save Draft'}
-            </FormButton>
-            <FormButton name="intent" value="publish" disabled={isSubmitting}>
-              {isSubmitting ? 'Publishing…' : 'Publish'}
-            </FormButton>
-          </>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="submit"
+              name="intent"
+              value="draft"
+              formNoValidate
+              disabled={isSubmitting}
+              className="control-md border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Saving…' : 'Save as Draft'}
+            </button>
+            <button
+              type="submit"
+              name="intent"
+              value="publish"
+              disabled={isSubmitting}
+              className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Publishing…' : brand ? 'Update & Publish' : 'Save & Publish'}
+            </button>
+          </div>
         ) : (
-          <FormButton disabled={isSubmitting}>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {isSubmitting ? 'Saving...' : submitLabel || (brand ? 'Update Brand' : 'Create Brand')}
-          </FormButton>
+          </button>
         )}
       </FormFooter>
     </form>
