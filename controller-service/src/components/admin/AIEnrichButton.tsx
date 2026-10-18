@@ -7,6 +7,8 @@ import type { EnrichFormat } from '@/lib/ai/enrich-field'
 
 export const ECOM_ENRICH_ENDPOINT = '/api/ecom/ai/enrich-field'
 
+type Placement = 'corner' | 'in-field' | 'above-label' | 'inline'
+
 interface Props {
   fieldLabel: string
   value: string
@@ -25,18 +27,59 @@ interface Props {
   broadcast?: boolean
   /** Admin route by default; the ecom console passes ECOM_ENRICH_ENDPOINT (gated server-side). */
   endpoint?: string
-  /** 'corner' overlays the field; 'inline' renders as a sibling (for rows that already have buttons). */
-  placement?: 'corner' | 'inline'
-  children?: React.ReactNode // the raw <input> or <textarea> (omit with placement 'inline')
+  /** 'corner' (default) wraps children and overlays the sparkle on the field. 'above-label' is the
+   *  same visual contract — kept for callers that read better with the semantic name. 'in-field'
+   *  renders ONLY the sparkle, absolute-positioned inside a relative parent the caller owns.
+   *  'inline' renders as a sibling (for rows that already have buttons). */
+  placement?: Placement
+  /** 'in-field' positioning override. Default: 'absolute right-2 top-2'. */
+  anchorClassName?: string
+  /** External busy flag; shows the spinner alongside internal loading. */
+  aiBusy?: boolean
+  /** Replace the built-in fetch with a caller-owned handler. When set, the sparkle calls this and
+   *  skips the enrich endpoint; the caller owns value/onChange side-effects and error surfacing. */
+  aiFill?: () => void | Promise<void>
+  children?: React.ReactNode // the raw <input> or <textarea>; ignored for 'inline' and 'in-field'
 }
 
-export default function AIEnrichButton({ fieldLabel, value, onChange, scope, context, multiline, format, variables, maxLength, write, broadcast, endpoint = '/api/admin/ai-enrich-field', placement = 'corner', children }: Props) {
+export default function AIEnrichButton({
+  fieldLabel,
+  value,
+  onChange,
+  scope,
+  context,
+  multiline,
+  format,
+  variables,
+  maxLength,
+  write,
+  broadcast,
+  endpoint = '/api/admin/ai-enrich-field',
+  placement = 'corner',
+  anchorClassName,
+  aiBusy,
+  aiFill,
+  children,
+}: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [prev, setPrev] = useState<string | null>(null)
 
   async function handleEnrich() {
-    if ((!value.trim() && !write) || loading) return
+    if (loading || aiBusy) return
+    if (aiFill) {
+      setLoading(true)
+      setError(null)
+      try {
+        await aiFill()
+      } catch {
+        setError('AI call failed')
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+    if (!value.trim() && !write) return
     setLoading(true)
     setError(null)
     try {
@@ -67,47 +110,55 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, scope, con
     }
   }
 
-  const canRun = !loading && (!!value.trim() || !!write)
+  const busy = loading || aiBusy === true
+  const canRun = !busy && (aiFill ? true : !!value.trim() || !!write)
   // The ecom console has no admin scope context; its route checks approval instead.
   const gate = (node: React.ReactNode) => (endpoint === ECOM_ENRICH_ENDPOINT ? node : <RequireAi scope={scope}>{node}</RequireAi>)
   const buttons = (
     <>
-            {prev !== null && (
-              <button
-                type="button"
-                onClick={handleUndo}
-                title="Undo AI enrichment"
-                className="inline-flex items-center justify-center w-6 h-6 rounded text-amber-500 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-800/40 transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 14L5 10l4-4M5 10h9a5 5 0 010 10H9" />
-                </svg>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={handleEnrich}
-              disabled={!canRun}
-              title={value.trim() ? 'Enrich with AI' : 'Write with AI'}
-              className="inline-flex items-center justify-center w-6 h-6 rounded text-violet-500 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-800/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-              ) : (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
-                  />
-                </svg>
-              )}
-            </button>
+      {prev !== null && !aiFill && (
+        <button
+          type="button"
+          onClick={handleUndo}
+          title="Undo AI enrichment"
+          aria-label="Undo AI enrichment"
+          className="inline-flex items-center justify-center w-6 h-6 rounded text-amber-500 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-800/40 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 14L5 10l4-4M5 10h9a5 5 0 010 10H9" />
+          </svg>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={handleEnrich}
+        disabled={!canRun}
+        title={value.trim() ? 'Enrich with AI' : 'Write with AI'}
+        aria-label="AI enrich"
+        className="inline-flex items-center justify-center w-6 h-6 rounded text-violet-500 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-800/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        {busy ? (
+          <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+        ) : (
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+            />
+          </svg>
+        )}
+      </button>
     </>
   )
+
+  if (placement === 'in-field') {
+    const pos = anchorClassName ?? 'absolute right-2 top-2'
+    return gate(<div className={`${pos} flex items-center gap-1`}>{buttons}</div>)
+  }
 
   if (placement === 'inline') {
     return gate(
@@ -117,6 +168,8 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, scope, con
       </>
     )
   }
+
+  // 'corner' | 'above-label' — wrap children, overlay the sparkle.
   return (
     <div className="space-y-1">
       <div className={`relative ${multiline ? '' : 'flex items-center'}`}>
