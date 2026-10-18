@@ -3,6 +3,7 @@ import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
 import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AutoRefresh from '@/components/admin/AutoRefresh'
+import Tooltip from '@/components/ui/Tooltip'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { TONE_CLS } from '@/components/admin/kit/tones'
@@ -92,6 +93,7 @@ export default async function CampaignDetailPage({
 
   const sentCount = logs.filter(l => l.status === 'sent').length
   const failedCount = logs.filter(l => l.status === 'failed').length
+  const campaignError = logs.find(l => l.status === 'failed' && l.error)?.error ?? null
   // SMS/WhatsApp outcomes land after the send — keep refreshing for 10 minutes.
   const awaiting =
     campaign.status === 'sending' ||
@@ -104,13 +106,16 @@ export default async function CampaignDetailPage({
         back={{ href: ap(backUrl, host), label: 'Messaging' }}
         title={campaign.title}
         subtitle={campaign.subject}
-        status={
-          <span
-            className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium capitalize ${STATUS_STYLES[campaign.status] || 'bg-surface-secondary text-foreground-muted'}`}
-          >
-            {campaign.status}
-          </span>
-        }
+        status={(() => {
+          const badge = (
+            <span
+              className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium capitalize ${STATUS_STYLES[campaign.status] || 'bg-surface-secondary text-foreground-muted'}`}
+            >
+              {campaign.status}
+            </span>
+          )
+          return campaignError ? <Tooltip content={campaignError}>{badge}</Tooltip> : badge
+        })()}
         actions={
           (campaign.status === 'draft' || campaign.status === 'scheduled') && (
             <DispatchCampaignButton id={campaign.id} />
@@ -213,7 +218,15 @@ export default async function CampaignDetailPage({
                           timeZone: 'Asia/Kolkata',
                         })}
                       </td>
-                      <td className="px-5 py-2.5 text-xs text-red-500">{l.error || '—'}</td>
+                      <td className="px-5 py-2.5 text-xs text-red-500">
+                        {l.error ? (
+                          <Tooltip content={l.error}>
+                            <span className="inline-block max-w-[18ch] truncate align-bottom">{l.error}</span>
+                          </Tooltip>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                     </tr>
                     ),
                   }))}

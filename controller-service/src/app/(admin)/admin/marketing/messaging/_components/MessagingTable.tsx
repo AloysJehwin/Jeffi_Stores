@@ -20,6 +20,7 @@ export interface Campaign {
   scheduled_at: string | null
   sent_at: string | null
   created_at: string
+  error?: string | null
 }
 
 export const MESSAGE_STATUS: StatusMap = {
@@ -109,7 +110,7 @@ export default function MessagingTable({
       num: true,
       render: c => <span className="text-foreground-secondary">{c.recipient_count ?? '—'}</span>,
     },
-    { key: 'status', label: 'Status', render: c => <StatusBadge status={c.status} map={MESSAGE_STATUS} /> },
+    { key: 'status', label: 'Status', render: c => <StatusBadge status={c.status} map={MESSAGE_STATUS} title={c.error ?? undefined} /> },
     {
       key: 'date',
       label: 'Date',
