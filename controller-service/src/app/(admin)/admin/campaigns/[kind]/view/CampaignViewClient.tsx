@@ -24,6 +24,7 @@ import {
   type RecentSend,
   type WhatsAppLog,
 } from '@/app/(admin)/admin/campaigns/[kind]/_components/CampaignOpsPanels'
+import { startCampaignDraft } from './actions'
 
 // Same sample values the editor preview uses, so the view mirrors what a recipient sees.
 const SAMPLE_VARS: Record<string, string | number> = {
@@ -64,7 +65,13 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-export default function CampaignViewClient({ kind }: { kind: string }) {
+export default function CampaignViewClient({
+  kind,
+  hasDraftInitial = false,
+}: {
+  kind: string
+  hasDraftInitial?: boolean
+}) {
   const canWrite = useHasScope('campaigns:write')
   const [c, setC] = useState<ViewCampaign | null>(null)
   const [recentSends, setRecentSends] = useState<RecentSend[]>([])
@@ -73,6 +80,8 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
   const [smsLibraryBody, setSmsLibraryBody] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Server-side seed; refreshed from the API payload once it lands.
+  const [hasDraft, setHasDraft] = useState(hasDraftInitial)
 
   useEffect(() => {
     ;(async () => {
@@ -84,6 +93,10 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
         setRecentSends(data.recentSends || [])
         setSendsTotal(data.total || 0)
         setWhatsappLogs(data.whatsappLogs || [])
+        // Keep the badge/Edit variant in step with the live draft state even after the user
+        // publishes-and-returns within the same mount.
+        const df = data.campaign?.draft_fields
+        setHasDraft(!!df && typeof df === 'object' && Object.keys(df).length > 0)
       } catch (e: any) {
         setError(e?.message || 'Failed to load campaign')
       } finally {
@@ -142,17 +155,32 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
                   {getChannels(kind).map(ch => (
                     <ChannelChip key={ch} channel={ch} />
                   ))}
+                  {hasDraft && (
+                    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                      Draft pending
+                    </span>
+                  )}
                 </div>
                 {c.description && <p className="text-sm text-foreground-secondary mt-1">{c.description}</p>}
               </div>
-              {canWrite && (
-                <Link
-                  href={ap(`/admin/campaigns/${kind}/edit`)}
-                  className="hidden md:inline-flex items-center gap-1.5 h-control-sm px-3 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold"
-                >
-                  <Pencil className="w-3.5 h-3.5" /> Edit
-                </Link>
-              )}
+              {canWrite &&
+                (hasDraft ? (
+                  <Link
+                    href={ap(`/admin/campaigns/${kind}/edit`)}
+                    className="hidden md:inline-flex items-center gap-1.5 h-control-sm px-3 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold"
+                  >
+                    <Pencil className="w-3.5 h-3.5" /> Edit Draft
+                  </Link>
+                ) : (
+                  <form action={startCampaignDraft.bind(null, kind)} className="hidden md:block">
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-1.5 h-control-sm px-3 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold"
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </button>
+                  </form>
+                ))}
             </div>
 
             <div className="mt-4">
