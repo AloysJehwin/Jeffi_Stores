@@ -117,10 +117,10 @@ export function DataToolbar({ search, filters = [], savedViews, children }: { se
   useEffect(() => setQ(sp.get(param) || ''), [sp, param])
   const active = filters.some(f => sp.get(f.name)) || !!sp.get(param)
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center gap-2 overflow-x-auto -mx-4 px-4 pb-1">
       {search &&
         (search.suggestType ? (
-          <div className="min-w-[200px] flex-1">
+          <div className="min-w-[200px] flex-1 shrink-0">
             <AdminTypeahead
               type={search.suggestType}
               value={q}
@@ -132,7 +132,7 @@ export function DataToolbar({ search, filters = [], savedViews, children }: { se
           </div>
         ) : (
           <form
-            className="relative min-w-[200px] flex-1"
+            className="relative min-w-[200px] flex-1 shrink-0"
             onSubmit={e => {
               e.preventDefault()
               set({ [param]: q.trim() || null })
@@ -150,7 +150,7 @@ export function DataToolbar({ search, filters = [], savedViews, children }: { se
           </form>
         ))}
       {filters.map(f => (
-        <div key={f.name} className="w-[160px]">
+        <div key={f.name} className="w-[160px] shrink-0">
           <Select<string>
             className="w-full"
             value={sp.get(f.name) || ''}
@@ -162,12 +162,12 @@ export function DataToolbar({ search, filters = [], savedViews, children }: { se
       ))}
       {savedViews && <SavedViews storageKey={savedViews.storageKey} />}
       {active && (
-        <button type="button" onClick={() => router.push(pathname)} className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary">
+        <button type="button" onClick={() => router.push(pathname)} className="control-md shrink-0 border border-border-default text-foreground-secondary hover:bg-surface-secondary">
           <X className="h-4 w-4" />
           Clear
         </button>
       )}
-      {children && <div className="ml-auto flex items-center gap-2">{children}</div>}
+      {children && <div className="ml-auto flex items-center gap-2 shrink-0">{children}</div>}
     </div>
   )
 }

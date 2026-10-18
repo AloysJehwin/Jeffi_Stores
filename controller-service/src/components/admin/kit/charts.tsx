@@ -457,7 +457,7 @@ export function TrendChart({
 
   return (
     <div className="w-full">
-      <div className="flex items-center gap-2 flex-wrap mb-3">
+      <div className="flex items-center gap-2 overflow-x-auto -mx-4 px-4 pb-1 mb-3">
         {SERIES_DEFS.map(s => (
           <SeriesChip
             key={s.key}
@@ -469,7 +469,8 @@ export function TrendChart({
         ))}
       </div>
 
-      <div className="relative w-full" style={{ height }}>
+      <div className="overflow-x-auto -mx-4 px-4">
+      <div className="relative min-w-[640px]" style={{ height }}>
         {hasMoney && (
           <div className="absolute left-0 top-0 w-9" style={{ bottom: 20 }}>
             {Array.from({ length: GRID + 1 }, (_, t) => (
@@ -675,6 +676,7 @@ export function TrendChart({
             </span>
           ))}
         </div>
+      </div>
       </div>
     </div>
   )

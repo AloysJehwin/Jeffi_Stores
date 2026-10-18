@@ -126,7 +126,7 @@ export default function AdminShell({
           {/* Left sidebar — desktop only */}
           <AdminSidebarNav navLinks={desktopNavLinks} collapsed={collapsed} />
 
-          <main className="flex-1 min-w-0 bg-surface-secondary overflow-y-auto relative z-0">
+          <main className="flex-1 min-w-0 bg-surface-secondary overflow-y-auto overflow-x-clip relative z-0">
             <AdminScopesProvider role={role} scopes={scopes}>
               {children}
             </AdminScopesProvider>

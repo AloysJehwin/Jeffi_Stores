@@ -1648,8 +1648,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           </TabActionsPortal>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-[200px] flex-1">
+        <div className="flex items-center gap-2 overflow-x-auto -mx-4 px-4 pb-1">
+          <div className="min-w-[200px] flex-1 shrink-0">
             <AdminTypeahead
               type="invoices"
               value={searchInput}
@@ -1673,11 +1673,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               setSearchQ(searchInput)
               syncUrl({ search: searchInput })
             }}
-            className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600"
+            className="control-md shrink-0 bg-accent-500 font-medium text-white hover:bg-accent-600"
           >
             Search
           </button>
-          <div className="w-[190px]">
+          <div className="w-[190px] shrink-0">
             <Select<string>
               value={sourceFilter}
               onChange={v => {
@@ -1692,7 +1692,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               ]}
             />
           </div>
-          <div className="w-[170px]">
+          <div className="w-[170px] shrink-0">
             <Select<string>
               value={paymentFilter}
               onChange={v => {
@@ -1739,7 +1739,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 setToDate('')
                 syncUrl({ search: '', source: '', payment: '', from: '', to: '' })
               }}
-              className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary"
+              className="control-md shrink-0 border border-border-default text-foreground-secondary hover:bg-surface-secondary"
             >
               <X className="h-4 w-4" />
               Clear
