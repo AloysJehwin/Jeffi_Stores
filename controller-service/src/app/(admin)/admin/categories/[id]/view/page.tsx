@@ -4,9 +4,9 @@ import { Info } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
-import DraftEditButton from '@/components/admin/DraftEditButton'
 import CopySku from '@/components/ui/CopySku'
 import { ACTIVE_STATUS, Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge } from '@/components/admin/kit'
+import { startCategoryDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -114,14 +114,24 @@ export default async function CategoryViewPage({
           subtitle={category.description || undefined}
           identifiers={[{ label: 'Created', value: created }]}
           actions={
-            <DraftEditButton
-              entity="categories"
-              id={id}
-              name={category.name}
-              hasDraft={!!hasDraft}
-              backUrl={backUrl}
-              className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold"
-            />
+            hasDraft ? (
+              <Link
+                href={ap(`/admin/categories/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
+                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+              >
+                Edit Draft
+              </Link>
+            ) : (
+              <form action={startCategoryDraft.bind(null, id)}>
+                <input type="hidden" name="_back" value={backUrl} />
+                <button
+                  type="submit"
+                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+                >
+                  Edit
+                </button>
+              </form>
+            )
           }
         />
       }

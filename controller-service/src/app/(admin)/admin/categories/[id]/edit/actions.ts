@@ -7,6 +7,23 @@ import { revalidatePath } from 'next/cache'
 import { query, queryOne } from '@/lib/shared/db'
 import { publishCategoryDraft } from '@/lib/catalog/category-draft'
 import { suggestIcon } from '@/lib/shared/icon-suggest'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
+
+// Keep the admin's open editor session's snapshot in step with the draft just saved.
+// After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
+// pre-session snapshot (A1). Never fails the enclosing save on error.
+async function resnapshotCategorySession(categoryId: string) {
+  try {
+    const session = await getAdminSession()
+    if (!session) return
+    const open = await findOpenSession(session.adminId, 'category', categoryId)
+    if (!open) return
+    await resnapshotSession(open.id, session.adminId)
+  } catch (err) {
+    console.error('[category-edit] resnapshotSession failed for', categoryId, err)
+  }
+}
 
 export async function updateCategory(categoryId: string, formData: FormData) {
   const name = formData.get('name') as string
@@ -114,7 +131,8 @@ export async function updateCategory(categoryId: string, formData: FormData) {
       redirect(ap(`/admin/categories`, host))
     }
 
-    // Save as Draft always returns to the list.
+    // Save as Draft resnapshots so Cancel reverts to this just-saved state.
+    await resnapshotCategorySession(categoryId)
     revalidatePath(`/admin/categories/${categoryId}/edit`)
     revalidatePath('/admin/categories')
     const back = formData.get('_back') as string | null
@@ -130,6 +148,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
      ON CONFLICT (category_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
     [categoryId, JSON.stringify(draftFields)]
   )
+  await resnapshotCategorySession(categoryId)
   revalidatePath(`/admin/categories/${categoryId}/edit`)
   redirect(ap(`/admin/categories/${categoryId}/edit`, host))
 }
