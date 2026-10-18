@@ -619,9 +619,11 @@ export async function debitWallet(opts: {
 /**
  * Messaging debit with true-up. SMS/WhatsApp debit an estimate at send (status 'estimated') then the
  * provider status callback reconciles to the exact price. Keyed by externalRef = `msg:<sid>`:
- *  - no existing row  → debit `amountInr`
- *  - existing row + `trueUp` → adjust the wallet by the delta (exact − already-debited) and overwrite
- *    the row's amount, so the net charge equals the exact price (never double-charges, delta may be ±).
+ *  - no existing row  → debit `amountInr` (skipped when `trueUp` + `amountInr === 0`, so refund paths
+ *    don't invent a post-hoc charge for a message that was never debited at send time).
+ *  - existing row + `trueUp` → adjust the wallet by the delta (final − already-debited) and overwrite
+ *    the row's amount, so the net charge equals `amountInr` (never double-charges, delta may be ±).
+ *    `amountInr === 0` is allowed in trueUp mode: refunds the full estimate on terminal failure.
  *  - existing row, no `trueUp` (duplicate send-time call) → no-op.
  * Floor 0; a true-up never blocks (the message already went out). Flagship exempt.
  */
@@ -634,7 +636,8 @@ export async function debitMessaging(opts: {
   trueUp?: boolean
 }): Promise<void> {
   if (isFlagshipTenant(opts.tenantId)) return
-  if (!(opts.amountInr > 0)) return
+  if (opts.amountInr < 0) return
+  if (!opts.trueUp && opts.amountInr === 0) return
   const amount = round2(opts.amountInr)
   await withWalletTx(opts.tenantId, async client => {
     await lockWallet(client, opts.tenantId, 0)
@@ -643,6 +646,7 @@ export async function debitMessaging(opts: {
       [opts.tenantId, opts.externalRef]
     )
     if (!existing.rowCount) {
+      if (amount === 0) return
       await client.query(
         `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, external_ref, note)
          VALUES ($1, 'debit', $2, $3, $4, $5)`,

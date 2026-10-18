@@ -1,3 +1,4 @@
+import { processingFeeInr } from '@jeffi/pricing'
 import {
   debitWallet,
   debitMessaging,
@@ -78,6 +79,41 @@ export async function debitMessageCost(params: {
     note: `${params.channel} message ${params.providerSid}`,
     trueUp: true,
   })
+}
+
+// Terminal Twilio statuses: the message is NOT delivered. Provider price is 0, so the pre-existing
+// debitMessageCost branch never refunded the send-time estimate (Gap 2). Refund path keeps only the
+// non-refundable processing fee from `@jeffi/pricing` (whatsapp ₹0.20 / sms ₹0.50; internal/platform
+// tier = ₹0 → full refund).
+const TERMINAL_FAILURE_STATUSES: ReadonlySet<string> = new Set(['failed', 'undelivered'])
+
+// On a terminal failure, true-up the send-time estimate (msg:<sid> ledger row) down to the processing
+// fee, so the net wallet charge equals the fee and the rest is credited back. Idempotent on retries
+// (keyed by provider sid). No-op for non-terminal status, flagship, or when the gate is off. Returns
+// the amounts for the caller to persist on the message row / metrics.
+export async function refundMessageEstimate(params: {
+  tenantId?: string | null
+  sid: string
+  channel: MessagingChannel
+  status: string
+  internal?: boolean
+}): Promise<{ refundedInr: number; keptInr: number }> {
+  if (!gateEnabled() || !params.sid) return { refundedInr: 0, keptInr: 0 }
+  if (!TERMINAL_FAILURE_STATUSES.has(params.status)) return { refundedInr: 0, keptInr: 0 }
+  const tenantId = params.tenantId ?? (await resolveTenantId().catch(() => null))
+  if (!tenantId || isFlagshipTenant(tenantId)) return { refundedInr: 0, keptInr: 0 }
+  const keptInr = processingFeeInr(params.channel, params.internal)
+  const estimatedInr = estimateFor(params.channel)
+  const refundedInr = Math.max(0, Math.round((estimatedInr - keptInr) * 100) / 100)
+  await debitMessaging({
+    tenantId,
+    category: channelCategory(params.channel) as WalletCategory,
+    amountInr: keptInr,
+    externalRef: `msg:${params.sid}`,
+    note: `${params.channel} message ${params.sid} (${params.status}; refund)`,
+    trueUp: true,
+  }).catch(() => {})
+  return { refundedInr, keptInr }
 }
 
 // Message kinds that are marketing (gated on low balance). Transactional kinds (otp, order_*,
