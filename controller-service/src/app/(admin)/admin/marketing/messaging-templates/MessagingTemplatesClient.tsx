@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Plus } from 'lucide-react'
 import { Tabs, TabAction } from '@/components/admin/channels/ui'
 import TemplateEditor, {
@@ -168,6 +169,16 @@ export default function MessagingTemplatesClient() {
     }),
     [items]
   )
+  const canUseScenarioFill = useCanWrite('templates')
+  // New templates created from this admin page are platform-library drafts (source !== 'tenant' when
+  // saved); editing an existing one looks up the row's source to split platform-tier vs tenant-tier
+  // billing in the scenario-fill endpoint.
+  const isPlatformLibrary = useMemo(() => {
+    if (!selected) return true
+    if (!selected.id) return true
+    const match = items.find(i => i.id === selected.id)
+    return match?.source !== 'tenant'
+  }, [selected, items])
 
   return (
     <div className="p-4 sm:p-6 animate-fade-in">
@@ -349,6 +360,9 @@ export default function MessagingTemplatesClient() {
                 onSave={save}
                 saving={saving}
                 apiNote="API sends use the Messaging-API copy of this template (ecom console → Messaging), so edits to the store copy here do not change them."
+                canUseScenarioFill={canUseScenarioFill}
+                isPlatformLibrary={isPlatformLibrary}
+                tenantContext={{ storeName: isPlatformLibrary ? 'The platform' : 'This store' }}
               />
             </>
           )}

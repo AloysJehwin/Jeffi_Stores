@@ -70,6 +70,10 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Shared modal committed via a parent-owned onConfirm — the gate sits on each caller's
   // open control (cash-sale, quotations, invoices, order status), not the modal.
   'controller-service/src/components/admin/BatchPickerModal.tsx',
+  // Shared "Fill from scenario" dialog — the opener is only rendered when the caller
+  // passes canUseScenarioFill (useCanWrite('templates') / server-derived canEdit), and
+  // the applyFill callback lives in the parent editor. Same pattern as BatchPickerModal.
+  'controller-service/src/components/admin/messaging-templates/ScenarioFillDialog.tsx',
   // Mutation lives in the parent form; this is a field editor feeding onChange.
   'controller-service/src/components/admin/LineItemsSection.tsx',
   // Image-URL field feeding onChange; its upload POST is a CDN asset write the server gates on the

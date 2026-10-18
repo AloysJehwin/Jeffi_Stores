@@ -266,6 +266,9 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                     onSave={save}
                     saving={saving}
                     aiEndpoint={ECOM_ENRICH_ENDPOINT}
+                    canUseScenarioFill={canEdit}
+                    isPlatformLibrary={false}
+                    tenantContext={{ storeName: 'This store' }}
                   />
                   </fieldset>
                 </Card>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import EmailBlockBuilder from '@/components/admin/email-composer/EmailBlockBuilder'
 import { renderBlocks } from '@/lib/templates/blocks'
@@ -8,11 +8,18 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import EmojiPicker from './EmojiPicker'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
-import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-react'
+import { Smile, Link2, ImageIcon, Loader2, Sparkles, Upload, RefreshCw } from 'lucide-react'
 import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
 import PhonePreview from './PhonePreview'
 import ApiCurlHint from './ApiCurlHint'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import ScenarioFillDialog from './ScenarioFillDialog'
+import type { EditorFieldSnapshot, UndoHandle } from '@/lib/ai/scenario-fill-apply'
+import type {
+  TemplateMode,
+  TemplateScenarioFill,
+  TenantContext as ScenarioTenantContext,
+} from '@/lib/ai/template-scenario.schema'
 import { emailPreviewDoc, emailBodyDoc, previewSubject } from '@/lib/templates/email-preview'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
 import { rejectionHints } from '@jeffi/api-contracts'
@@ -88,6 +95,14 @@ type Props = {
   apiNote?: string
   /** AI enrich endpoint — admin route by default; the ecom console passes its own. */
   aiEndpoint?: string
+  /** When true, show the "Fill from scenario" header CTA. Admin side: useCanWrite('templates');
+   *  tenant side: canEdit. The server also gates the endpoint itself. */
+  canUseScenarioFill?: boolean
+  /** Platform-library templates bill the platform tenant at internal pricing; store templates bill
+   *  the caller tenant at tenant pricing. Defaults to false (tenant-owned). */
+  isPlatformLibrary?: boolean
+  /** Store context handed to the scenario-fill prompt (name, brand accent, …). */
+  tenantContext?: ScenarioTenantContext
 }
 
 const SMS_GSM_LIMIT = 160
@@ -114,6 +129,9 @@ export default function TemplateEditor({
   variableNames,
   apiNote,
   aiEndpoint,
+  canUseScenarioFill,
+  isPlatformLibrary,
+  tenantContext,
 }: Props) {
   const derived = campaignKind ?? (value.slug?.startsWith('campaign/') ? value.slug.slice('campaign/'.length) : null)
   const kind = isCampaignKind(derived) && value.channel !== 'whatsapp' ? derived : null
@@ -189,6 +207,8 @@ export default function TemplateEditor({
     format,
     maxLength,
     context,
+    children,
+    multiline,
   }: {
     label: string
     field: string
@@ -197,20 +217,28 @@ export default function TemplateEditor({
     format: 'plain' | 'sms' | 'whatsapp' | 'html' | 'label' | 'subject'
     maxLength?: number
     context?: string
+    children: React.ReactNode
+    multiline?: boolean
   }) => (
-    <div className="mb-1.5 flex items-center justify-between gap-2">
-      <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide">{label}</label>
-      <AIEnrichButton
-        placement="inline"
-        fieldLabel={field}
-        value={v}
-        onChange={oc}
-        {...ai}
-        format={format}
-        maxLength={maxLength}
-        context={context ?? aiCtx}
-      />
-    </div>
+    <>
+      <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">
+        {label}
+      </label>
+      <div className="relative">
+        {children}
+        <AIEnrichButton
+          placement="in-field"
+          anchorClassName={multiline ? 'absolute right-2 bottom-2' : 'absolute right-2 top-1/2 -translate-y-1/2'}
+          fieldLabel={field}
+          value={v}
+          onChange={oc}
+          {...ai}
+          format={format}
+          maxLength={maxLength}
+          context={context ?? aiCtx}
+        />
+      </div>
+    </>
   )
   const [preview, setPreview] = useState<{
     subject?: string | null
@@ -242,6 +270,80 @@ export default function TemplateEditor({
 
   const uploadUrl = assetsBase ?? `${apiBase}/assets/upload`
   const shortUrl = shortLinksBase ?? `${apiBase}/short-links`
+
+  // Scenario-fill dialog: opens on the primary header CTA, writes name/body/subject/buttons/header
+  // media atomically via a single onChange so the editor's own autosave treats it as one patch.
+  const [scenarioOpen, setScenarioOpen] = useState(false)
+  const scenarioMode: TemplateMode = useMemo(() => {
+    if (value.channel === 'whatsapp') {
+      const m = (value.meta_category ?? '').toLowerCase()
+      if (m === 'marketing' || m === 'authentication' || m === 'utility') return m as TemplateMode
+      return 'utility'
+    }
+    if (kind) return 'marketing'
+    return 'transactional'
+  }, [value.channel, value.meta_category, kind])
+  const scenarioTenant: ScenarioTenantContext = tenantContext ?? { storeName: 'This store' }
+  const scenarioSnapshot = useCallback<() => EditorFieldSnapshot>(() => {
+    const wb = (value.blocks as WaBlocks | undefined) ?? {}
+    const waButtons = (wb.buttons ?? []).map(b => ({ type: b.type, label: b.label, value: b.value }))
+    const waImage = (wb.types as { 'twilio/media'?: { media?: string[] } } | undefined)?.['twilio/media']?.media?.[0] ?? null
+    const bodyText = (value.body ?? '').toString()
+    const placeholders =
+      value.channel === 'whatsapp'
+        ? [...new Set([...bodyText.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => m[1]))]
+        : [...new Set([...bodyText.matchAll(/\{\{?\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\}?\}/g)].map(m => m[1]))]
+    return {
+      name: value.name ?? '',
+      body: bodyText,
+      placeholders,
+      buttons: value.channel === 'whatsapp' ? waButtons : [],
+      subject: value.channel === 'email' ? (value.subject ?? '') : undefined,
+      image_url: value.channel === 'whatsapp' ? waImage : undefined,
+    }
+  }, [value])
+  const applyScenarioFill = useCallback(
+    async (payload: TemplateScenarioFill): Promise<UndoHandle> => {
+      const prev = value
+      let next: EditorTemplate
+      if (value.channel === 'whatsapp') {
+        const wb = (value.blocks as WaBlocks | undefined) ?? {}
+        const nextBlocks: WaBlocks = {
+          ...wb,
+          buttons: (payload.buttons ?? []).map(b => ({ type: b.type, label: b.label, value: b.value })),
+        }
+        if (payload.image_url) {
+          nextBlocks.types = {
+            ...(wb.types ?? {}),
+            'twilio/media': { body: payload.body, media: [payload.image_url] },
+          }
+        }
+        next = {
+          ...value,
+          name: payload.name,
+          body: payload.body,
+          blocks: nextBlocks,
+          blocks_format: 'wa-content',
+          media_type: payload.image_url ? (value.media_type ?? 'image') : value.media_type,
+        }
+      } else if (value.channel === 'sms') {
+        next = { ...value, name: payload.name, body: payload.body, blocks_format: 'sms-text' }
+      } else {
+        // email — the AI returns HTML; switch to the Tiptap composer so the body renders as-written.
+        next = {
+          ...value,
+          name: payload.name,
+          body: payload.body,
+          subject: payload.subject ?? value.subject ?? '',
+          blocks: payload.body,
+          blocks_format: 'tiptap-html',
+        }
+      }
+      onChange(next)
+      return { sessionId: null, undo: () => onChange(prev) }
+    },
+    [value, onChange]
+  )
 
   const smsStats = useMemo(() => {
     if (value.channel !== 'sms') return null
@@ -369,6 +471,7 @@ export default function TemplateEditor({
   )
 
   return (
+    <>
     <div className={embedded ? 'space-y-4' : 'grid grid-cols-1 lg:grid-cols-2 gap-6'}>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" />
       {!embedded && (
@@ -377,6 +480,22 @@ export default function TemplateEditor({
         </p>
       )}
       <div className={embedded ? 'space-y-4' : 'hidden md:block space-y-4'}>
+        {canUseScenarioFill && (
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setScenarioOpen(true)}
+              className="control-md inline-flex items-center gap-1.5 border border-border-secondary bg-surface font-semibold text-foreground hover:bg-surface-secondary"
+            >
+              <Sparkles className="h-4 w-4 text-accent-500" />
+              Fill from scenario
+            </button>
+            <span className="text-[11px] text-foreground-muted">
+              Describe the message once — the AI drafts name, body{value.channel === 'email' ? ', subject' : ''}
+              {value.channel === 'whatsapp' ? ', buttons and header media' : ''} for you.
+            </span>
+          </div>
+        )}
         <div>
           {aiLabel({
             label: 'Name',
@@ -386,12 +505,14 @@ export default function TemplateEditor({
             format: 'plain',
             maxLength: 80,
             context: `A short human name for a ${value.channel} template with slug "${value.slug}". Body starts: "${(value.body ?? '').replace(/<[^>]+>/g, ' ').slice(0, 160)}"`,
+            children: (
+              <input
+                className="w-full px-4 py-2 pr-10 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                value={value.name}
+                onChange={e => onChange({ ...value, name: e.target.value })}
+              />
+            ),
           })}
-          <input
-            className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-            value={value.name}
-            onChange={e => onChange({ ...value, name: e.target.value })}
-          />
         </div>
 
         {value.channel === 'email' && (
@@ -407,13 +528,15 @@ export default function TemplateEditor({
                   .replace(/<[^>]+>/g, ' ')
                   .replace(/\s+/g, ' ')
                   .slice(0, 400)}"`,
+                children: (
+                  <input
+                    className="w-full px-4 py-2 pr-10 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                    value={value.subject ?? ''}
+                    onChange={e => onChange({ ...value, subject: e.target.value })}
+                    placeholder="e.g. Order #{{order_number}} confirmed"
+                  />
+                ),
               })}
-              <input
-                className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                value={value.subject ?? ''}
-                onChange={e => onChange({ ...value, subject: e.target.value })}
-                placeholder="e.g. Order #{{order_number}} confirmed"
-              />
             </div>
             {!kind && (
               <div>
@@ -444,18 +567,7 @@ export default function TemplateEditor({
                   }
                 />
               ) : (
-                <>
-                  <div className="mb-1.5 flex justify-end">
-                    <AIEnrichButton
-                      placement="inline"
-                      fieldLabel="Email body (HTML)"
-                      value={typeof value.body === 'string' ? value.body : ''}
-                      onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
-                      {...ai}
-                      format="html"
-                      context={`${aiCtx} Subject: "${value.subject ?? ''}". Keep the structure; a single call-to-action button linking to ${kind ? '{ctaUrl}' : '{storeUrl}'}.`}
-                    />
-                  </div>
+                <div className="relative">
                   <EmailComposer
                     value={typeof value.body === 'string' ? value.body : ''}
                     onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
@@ -463,7 +575,17 @@ export default function TemplateEditor({
                     ctaHref={kind ? '{ctaUrl}' : '{storeUrl}'}
                     extraVariables={composerVars}
                   />
-                </>
+                  <AIEnrichButton
+                    placement="in-field"
+                    anchorClassName="absolute right-2 top-2 z-10"
+                    fieldLabel="Email body (HTML)"
+                    value={typeof value.body === 'string' ? value.body : ''}
+                    onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
+                    {...ai}
+                    format="html"
+                    context={`${aiCtx} Subject: "${value.subject ?? ''}". Keep the structure; a single call-to-action button linking to ${kind ? '{ctaUrl}' : '{storeUrl}'}.`}
+                  />
+                </div>
               )}
               {kind && (
                 <div className="mt-2">
@@ -486,14 +608,17 @@ export default function TemplateEditor({
               value: value.body,
               onChange: body => onChange({ ...value, body, blocks_format: 'sms-text' }),
               format: 'sms',
+              multiline: true,
+              children: (
+                <textarea
+                  ref={textRef}
+                  className="w-full px-4 py-2 pr-10 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm font-mono"
+                  rows={6}
+                  value={value.body}
+                  onChange={e => onChange({ ...value, body: e.target.value, blocks_format: 'sms-text' })}
+                />
+              ),
             })}
-            <textarea
-              ref={textRef}
-              className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm font-mono"
-              rows={6}
-              value={value.body}
-              onChange={e => onChange({ ...value, body: e.target.value, blocks_format: 'sms-text' })}
-            />
             {toolbar}
             {emojiPanel}
             {smsStats && (
@@ -686,14 +811,17 @@ export default function TemplateEditor({
                     value: value.body,
                     onChange: body => onChange({ ...value, body, blocks_format: 'wa-content' }),
                     format: 'whatsapp',
+                    multiline: true,
+                    children: (
+                      <textarea
+                        ref={textRef}
+                        className="w-full px-4 py-2 pr-10 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm font-mono"
+                        rows={6}
+                        value={value.body}
+                        onChange={e => onChange({ ...value, body: e.target.value, blocks_format: 'wa-content' })}
+                      />
+                    ),
                   })}
-                  <textarea
-                    ref={textRef}
-                    className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm font-mono"
-                    rows={6}
-                    value={value.body}
-                    onChange={e => onChange({ ...value, body: e.target.value, blocks_format: 'wa-content' })}
-                  />
                   {toolbar}
                   {emojiPanel}
                 </div>
@@ -730,23 +858,26 @@ export default function TemplateEditor({
                             { value: 'phone', label: 'Call phone' },
                           ]}
                         />
-                        <AIEnrichButton
-                          placement="inline"
-                          fieldLabel="WhatsApp button label"
-                          value={btn.label}
-                          onChange={label => updateButton(i, { label })}
-                          {...ai}
-                          format="label"
-                          maxLength={25}
-                          context={`${aiCtx} Button type: ${btn.type}.`}
-                        />
-                        <input
-                          className="field-sm border border-border-secondary rounded-lg bg-surface text-sm text-foreground flex-1 min-w-[8rem] focus:outline-none focus:ring-2 focus:ring-accent-500"
-                          placeholder="Label (max 25 chars)"
-                          maxLength={25}
-                          value={btn.label}
-                          onChange={e => updateButton(i, { label: e.target.value })}
-                        />
+                        <div className="relative flex-1 min-w-[8rem]">
+                          <input
+                            className="field-sm w-full pr-9 border border-border-secondary rounded-lg bg-surface text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                            placeholder="Label (max 25 chars)"
+                            maxLength={25}
+                            value={btn.label}
+                            onChange={e => updateButton(i, { label: e.target.value })}
+                          />
+                          <AIEnrichButton
+                            placement="in-field"
+                            anchorClassName="absolute right-1 top-1/2 -translate-y-1/2"
+                            fieldLabel="WhatsApp button label"
+                            value={btn.label}
+                            onChange={label => updateButton(i, { label })}
+                            {...ai}
+                            format="label"
+                            maxLength={25}
+                            context={`${aiCtx} Button type: ${btn.type}.`}
+                          />
+                        </div>
                         {btn.type !== 'quick_reply' && (
                           <input
                             className="field-sm border border-border-secondary rounded-lg bg-surface text-sm text-foreground flex-1 min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-accent-500"
@@ -798,15 +929,16 @@ export default function TemplateEditor({
                           remove
                         </button>
                         <div className="text-xs text-foreground-secondary mb-1">Card {i + 1}</div>
-                        <div className="flex items-center gap-1 mb-1">
+                        <div className="relative mb-1">
                           <input
-                            className="w-full border border-border-default rounded-lg px-2 py-1 text-sm"
+                            className="w-full pr-9 border border-border-default rounded-lg px-2 py-1 text-sm"
                             placeholder="Title"
                             value={card.title ?? ''}
                             onChange={e => updateCard(i, { title: e.target.value })}
                           />
                           <AIEnrichButton
-                            placement="inline"
+                            placement="in-field"
+                            anchorClassName="absolute right-1 top-1/2 -translate-y-1/2"
                             fieldLabel={`Carousel card ${i + 1} title`}
                             value={card.title ?? ''}
                             onChange={title => updateCard(i, { title })}
@@ -815,16 +947,17 @@ export default function TemplateEditor({
                             maxLength={60}
                           />
                         </div>
-                        <div className="flex items-start gap-1">
+                        <div className="relative">
                           <textarea
-                            className="w-full border border-border-default rounded-lg px-2 py-1 text-sm font-mono"
+                            className="w-full pr-9 border border-border-default rounded-lg px-2 py-1 text-sm font-mono"
                             rows={2}
                             placeholder="Body — use {{1}}, {{2}} …"
                             value={card.body ?? ''}
                             onChange={e => updateCard(i, { body: e.target.value })}
                           />
                           <AIEnrichButton
-                            placement="inline"
+                            placement="in-field"
+                            anchorClassName="absolute right-1 bottom-1"
                             fieldLabel={`Carousel card ${i + 1} body`}
                             value={card.body ?? ''}
                             onChange={body => updateCard(i, { body })}
@@ -1073,5 +1206,18 @@ export default function TemplateEditor({
         </div>
       )}
     </div>
+    {canUseScenarioFill && (
+      <ScenarioFillDialog
+        open={scenarioOpen}
+        onClose={() => setScenarioOpen(false)}
+        channel={value.channel}
+        templateMode={scenarioMode}
+        tenantContext={scenarioTenant}
+        current={scenarioSnapshot()}
+        isPlatformLibrary={isPlatformLibrary ?? false}
+        applyFill={applyScenarioFill}
+      />
+    )}
+    </>
   )
 }
