@@ -27,6 +27,8 @@ import { Card, Field, Fields } from '@/components/admin/kit/layout'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
 import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, STATUS_BADGE, type Supplier } from '@/components/admin/purchasing/shared'
+import { FormFooter } from '@/components/admin/kit/form'
+import { resnapshotPoReceiveSession } from './receive-actions'
 
 const PO_STATUS: StatusMap = {
   draft: { label: 'Draft', tone: 'muted' },
@@ -536,21 +538,22 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   // Explicitly save the in-progress receive as a draft and exit. The form already
   // autosaves as you type; this writes immediately (bypassing the debounce) so the
   // user can confidently leave and resume later from the PO list.
-  function saveDraftAndExit() {
-    if (!receiveMode?.po?.id) return
+  async function saveDraftAndExit() {
+    const poId = receiveMode?.po?.id
+    if (!poId) return
+    const slim = receiveItems.map(it => ({
+      id: it.id,
+      receive_qty: it.receive_qty,
+      receive_cost: it.receive_cost,
+      lot_number: it.lot_number,
+      expiry_date: it.expiry_date,
+      manufacture_date: it.manufacture_date,
+      location_id: it.location_id,
+      serial_numbers: it.serial_numbers,
+    }))
     try {
-      const slim = receiveItems.map(it => ({
-        id: it.id,
-        receive_qty: it.receive_qty,
-        receive_cost: it.receive_cost,
-        lot_number: it.lot_number,
-        expiry_date: it.expiry_date,
-        manufacture_date: it.manufacture_date,
-        location_id: it.location_id,
-        serial_numbers: it.serial_numbers,
-      }))
       localStorage.setItem(
-        `po_receive_draft:${receiveMode.po.id}`,
+        `po_receive_draft:${poId}`,
         JSON.stringify({
           items: slim,
           notes: receiveNotes,
@@ -558,10 +561,31 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
           savedAt: Date.now(),
         })
       )
-      showToast('Draft saved — resume this receipt anytime from the PO list.', 'success')
+    } catch {}
+    // Flush the server draft synchronously so resnapshot captures the latest state
+    // (autosave is debounced 600ms — a quick Save as Draft could outrun it).
+    let flushed = true
+    try {
+      const r = await fetch(`/api/admin/inventory/po/${poId}/receive/draft`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          line_items: slim,
+          serials: slim.flatMap(r => (Array.isArray(r.serial_numbers) ? r.serial_numbers : [])),
+        }),
+      })
+      if (!r.ok) flushed = false
     } catch {
-      showToast('Could not save draft', 'error')
+      flushed = false
     }
+    if (!flushed) {
+      showToast('Could not save draft', 'error')
+      return
+    }
+    // Resnapshot so a later Cancel on a resumed session reverts to this A2 state,
+    // not the pre-session snapshot (A1). Never fails the enclosing save on error.
+    try { await resnapshotPoReceiveSession(poId) } catch {}
     // Close the session as 'save' — server does NOT roll back the draft on save.
     const sid = receiveSessionIdRef.current
     if (sid) {
@@ -573,6 +597,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
       }).catch(() => {})
       receiveSessionIdRef.current = null
     }
+    showToast('Draft saved — resume this receipt anytime from the PO list.', 'success')
     setReceiveMode(null)
   }
 
@@ -1088,21 +1113,27 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             onChange={e => setReceiveNotes(e.target.value)}
           />
         </div>
-        <div className="flex gap-3">
-          <button className={btnPrimary} onClick={submitReceive} disabled={receiveSaving}>
-            {receiveSaving ? 'Saving...' : 'Confirm Receipt'}
-          </button>
+        <FormFooter
+          cancel={cancelReceive}
+          cancelLabel="Cancel"
+        >
           <button
-            className="control-sm border border-border-default text-foreground-secondary font-medium hover:bg-surface-secondary transition-colors"
+            type="button"
+            className="control-md inline-flex items-center border border-border-secondary bg-surface text-foreground-secondary hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={saveDraftAndExit}
             disabled={receiveSaving}
           >
-            Save Draft
+            Save as Draft
           </button>
-          <button className={btnSecondary} onClick={cancelReceive}>
-            Cancel
+          <button
+            type="button"
+            className="control-md inline-flex items-center border border-accent-500 bg-accent-500 text-white font-medium hover:bg-accent-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={submitReceive}
+            disabled={receiveSaving}
+          >
+            {receiveSaving ? 'Saving...' : 'Confirm Receipt'}
           </button>
-        </div>
+        </FormFooter>
       </div>
     )
   }
