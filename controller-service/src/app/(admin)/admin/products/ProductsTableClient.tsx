@@ -184,7 +184,7 @@ export default function ProductsTableClient({
       label: 'Product',
       sortParam: 'name',
       render: product => (
-        <div className="flex items-center gap-2 min-w-0 max-w-[320px]">
+        <div className="flex items-center gap-2 min-w-0 max-w-[220px] lg:max-w-[280px] xl:max-w-[320px]">
           <div className="flex-shrink-0 h-10 w-10">
             <ProductImage thumbnailUrl={thumb(product)} altText={product.name} />
           </div>
@@ -261,8 +261,8 @@ export default function ProductsTableClient({
         </span>
       ),
     },
-    { key: 'category', label: 'Category', sortParam: 'category', hideBelow: 'lg', render: product => <span className="text-foreground">{product.categories?.name || 'N/A'}</span> },
-    { key: 'brand', label: 'Brand', sortParam: 'brand', hideBelow: 'xl', render: product => <span className="text-foreground">{product.brands?.name || 'N/A'}</span> },
+    { key: 'category', label: 'Category', sortParam: 'category', hideBelow: 'md', render: product => <span className="text-foreground">{product.categories?.name || 'N/A'}</span> },
+    { key: 'brand', label: 'Brand', sortParam: 'brand', hideBelow: 'lg', render: product => <span className="text-foreground">{product.brands?.name || 'N/A'}</span> },
     { key: 'price', label: 'Price', sortParam: 'price', num: true, render: product => <PriceCell product={product} /> },
     { key: 'stock', label: 'Stock', sortParam: 'stock', render: product => <StockCell product={product} /> },
     {

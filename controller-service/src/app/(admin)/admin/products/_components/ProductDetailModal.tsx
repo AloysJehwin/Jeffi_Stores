@@ -373,20 +373,20 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                 <p className="text-xs text-foreground-muted uppercase tracking-wide mb-2">
                   Variants ({variants.length})
                 </p>
-                <div className="rounded-lg border border-border-default overflow-hidden">
-                  <table className="w-full text-sm divide-y divide-border-default table-fixed">
+                <div className="rounded-lg border border-border-default overflow-x-auto">
+                  <table className="w-full text-sm divide-y divide-border-default sm:table-fixed">
                     <thead className="bg-surface-secondary">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[26%]">Name</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[16%]">SKU</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[18%]">Price</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium sm:w-[26%]">Name</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium sm:w-[16%]">SKU</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium sm:w-[18%]">Price</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium sm:w-[12%]">
                           Inventory
                         </th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[16%]">
+                        <th className="hidden sm:table-cell px-3 py-2 text-left text-xs text-foreground-muted font-medium sm:w-[16%]">
                           Listed
                         </th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">
+                        <th className="hidden sm:table-cell px-3 py-2 text-left text-xs text-foreground-muted font-medium sm:w-[12%]">
                           Status
                         </th>
                       </tr>
@@ -427,8 +427,8 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                                   : `Rs. ${Number(v.price || 0).toLocaleString('en-IN')}`}
                               </td>
                               <td className="px-3 py-2 text-foreground font-medium">{vInventory}</td>
-                              <td className="px-3 py-2 text-foreground-muted whitespace-nowrap">{vListed}</td>
-                              <td className="px-3 py-2">
+                              <td className="hidden sm:table-cell px-3 py-2 text-foreground-muted whitespace-nowrap">{vListed}</td>
+                              <td className="hidden sm:table-cell px-3 py-2">
                                 <span
                                   className={badgeCls(v.is_active ? 'green' : 'muted')}
                                 >
@@ -460,10 +460,10 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                                   <td className="px-3 py-1.5 text-foreground font-medium">
                                     {sv.inventory_quantity ?? 0}
                                   </td>
-                                  <td className="px-3 py-1.5 text-foreground-muted whitespace-nowrap">
+                                  <td className="hidden sm:table-cell px-3 py-1.5 text-foreground-muted whitespace-nowrap">
                                     {sv.stock_status || '—'}
                                   </td>
-                                  <td className="px-3 py-1.5">
+                                  <td className="hidden sm:table-cell px-3 py-1.5">
                                     <span
                                       className={badgeCls(sv.is_active ? 'green' : 'muted')}
                                     >

@@ -7,9 +7,7 @@ import * as Icons from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
-import { EditSessionActions } from '@/components/admin/kit'
 import { useEditSession } from '@/hooks/useEditSession'
-import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import { FormButton, FormFooter, FormSection, fieldInputCls, useActionToast } from '@/components/admin/kit'
 
 const ICON_OPTIONS = [
@@ -299,30 +297,24 @@ export default function CategoryForm({
     }
   }
 
+  async function handleCancel() {
+    await edit.cancel()
+    if (typeof window !== 'undefined') {
+      window.location.href = ap(category?.id ? `/admin/categories/${category.id}` : '/admin/categories')
+    }
+  }
+
+  async function handleDiscard() {
+    if (!discardAction) return
+    const fd = new FormData()
+    fd.set('intent', 'discard')
+    await discardAction(fd)
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <FormSection title="Category" description="Name, icon, parent, ordering and description.">
-        {edit.sessionId && (
-          <div className="flex justify-end">
-            <EditSessionActions
-              autosaveStatus={'idle' as AutosaveStatus}
-              sessionStatus={edit.status}
-              onCancel={edit.cancel}
-              cancelHref={ap('/admin/categories')}
-              draft={isDraft}
-              discard={
-                isDraft && discardAction
-                  ? () => {
-                      const fd = new FormData()
-                      fd.set('intent', 'discard')
-                      void discardAction(fd)
-                    }
-                  : undefined
-              }
-            />
-          </div>
-        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <label htmlFor="name" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
@@ -394,7 +386,7 @@ export default function CategoryForm({
                   onChange={e => setIconSearch(e.target.value)}
                   className={`${fieldInputCls} mb-3`}
                 />
-                <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5 max-h-52 overflow-y-auto">
+                <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-1.5 max-h-52 overflow-y-auto">
                   {filteredIcons.map(name => (
                     <button
                       key={name}
@@ -644,14 +636,20 @@ export default function CategoryForm({
         )}
       </FormSection>
 
-      <FormFooter cancelHref={ap('/admin/categories')}>
+      {/* Form Actions — shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
+      <FormFooter
+        sticky
+        discard={isDraft && discardAction ? handleDiscard : undefined}
+        cancel={edit.sessionId ? handleCancel : undefined}
+        cancelHref={edit.sessionId ? undefined : ap('/admin/categories')}
+      >
         {isDraft ? (
           <RequireWrite scope="categories:write">
             <FormButton variant="secondary" name="intent" value="draft" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Save Draft'}
+              {isSubmitting ? 'Saving…' : 'Save as Draft'}
             </FormButton>
             <FormButton name="intent" value="publish" disabled={isSubmitting}>
-              {isSubmitting ? 'Publishing…' : 'Publish'}
+              {isSubmitting ? 'Publishing…' : 'Update & Publish'}
             </FormButton>
           </RequireWrite>
         ) : (

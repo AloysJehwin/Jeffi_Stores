@@ -325,7 +325,7 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
           </div>
         ) : (
           <>
-            <div className="md:hidden p-4 pt-0 space-y-3">
+            <div className="lg:hidden p-4 pt-0 space-y-3">
               <PackingSlipsMobileList
                 orders={paged}
                 statusColors={STATUS_COLORS}
@@ -334,7 +334,7 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
                 onToggleOne={toggleOne}
               />
             </div>
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border-default bg-surface">

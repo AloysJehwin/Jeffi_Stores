@@ -245,44 +245,79 @@ export default async function CouponViewPage({
             {usageRows.length === 0 ? (
               <EmptyState bare title="No one has used this coupon yet." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className={thead}>
-                      <th className="px-5 py-2.5 text-left font-medium">User</th>
-                      <th className="px-3 py-2.5 text-left font-medium">Order</th>
-                      <th className="px-3 py-2.5 text-right font-medium">Discount</th>
-                      <th className="px-5 py-2.5 text-left font-medium">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {usageRows.map(r => (
-                      <tr key={r.id} className={row}>
-                        <td className="px-5 py-2.5">
-                          <p className="font-medium text-foreground">{r.user_name || '—'}</p>
-                          <p className="text-xs text-foreground-muted">{r.user_email || '—'}</p>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {r.order_id ? (
-                            <Link
-                              href={ap(`/admin/orders/${r.order_id}`, host)}
-                              className="font-mono text-xs text-accent-500 hover:underline"
-                            >
-                              #{r.order_display_id || r.order_id.slice(0, 8)}
-                            </Link>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-green-600 dark:text-green-400">
+              <>
+                {/* Mobile card list */}
+                <div className="md:hidden px-4 pb-4 pt-3 space-y-3">
+                  {usageRows.map(r => (
+                    <div
+                      key={r.id}
+                      className="rounded-lg border border-border-default bg-surface-elevated p-4"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">{r.user_name || '—'}</p>
+                          <p className="text-xs text-foreground-muted truncate">{r.user_email || '—'}</p>
+                        </div>
+                        <p className="font-semibold tabular-nums text-green-600 dark:text-green-400 whitespace-nowrap">
                           ₹{Number(r.discount_amount).toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-5 py-2.5 text-xs text-foreground-muted">{day(r.created_at)}</td>
+                        </p>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-2 text-xs text-foreground-muted">
+                        {r.order_id ? (
+                          <Link
+                            href={ap(`/admin/orders/${r.order_id}`, host)}
+                            className="font-mono text-accent-500 hover:underline"
+                          >
+                            #{r.order_display_id || r.order_id.slice(0, 8)}
+                          </Link>
+                        ) : (
+                          <span>—</span>
+                        )}
+                        <span>{day(r.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className={thead}>
+                        <th className="px-5 py-2.5 text-left font-medium">User</th>
+                        <th className="px-3 py-2.5 text-left font-medium">Order</th>
+                        <th className="px-3 py-2.5 text-right font-medium">Discount</th>
+                        <th className="px-5 py-2.5 text-left font-medium">Date</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {usageRows.map(r => (
+                        <tr key={r.id} className={row}>
+                          <td className="px-5 py-2.5">
+                            <p className="font-medium text-foreground">{r.user_name || '—'}</p>
+                            <p className="text-xs text-foreground-muted">{r.user_email || '—'}</p>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {r.order_id ? (
+                              <Link
+                                href={ap(`/admin/orders/${r.order_id}`, host)}
+                                className="font-mono text-xs text-accent-500 hover:underline"
+                              >
+                                #{r.order_display_id || r.order_id.slice(0, 8)}
+                              </Link>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-green-600 dark:text-green-400">
+                            ₹{Number(r.discount_amount).toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-5 py-2.5 text-xs text-foreground-muted">{day(r.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </Card>
 
@@ -309,37 +344,66 @@ export default async function CouponViewPage({
             {eligibleUsers.length === 0 && !isCampaign ? (
               <EmptyState bare title={isPersonal ? 'No user assigned.' : 'Open to all active users.'} />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className={thead}>
-                      <th className="px-5 py-2.5 text-left font-medium">User</th>
-                      <th className="px-3 py-2.5 text-left font-medium">{isCampaign ? 'Sent At' : 'Added At'}</th>
-                      <th className="px-5 py-2.5 text-left font-medium">Used</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {eligibleUsers.map(u => (
-                      <tr key={u.user_id} className={row}>
-                        <td className="px-5 py-2.5">
-                          <p className="font-medium text-foreground">
+              <>
+                {/* Mobile card list */}
+                <div className="md:hidden px-4 pb-4 pt-3 space-y-3">
+                  {eligibleUsers.map(u => (
+                    <div
+                      key={u.user_id}
+                      className="rounded-lg border border-border-default bg-surface-elevated p-4"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">
                             {[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}
                           </p>
-                          <p className="text-xs text-foreground-muted">{u.email}</p>
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-foreground-muted">{day(u.added_at)}</td>
-                        <td className="px-5 py-2.5">
-                          {u.times_used > 0 ? (
-                            <span className={badgeCls('green')}>{u.times_used}×</span>
-                          ) : (
-                            <span className="text-xs text-foreground-muted">Not yet</span>
-                          )}
-                        </td>
+                          <p className="text-xs text-foreground-muted truncate">{u.email}</p>
+                        </div>
+                        {u.times_used > 0 ? (
+                          <span className={badgeCls('green')}>{u.times_used}×</span>
+                        ) : (
+                          <span className="text-xs text-foreground-muted whitespace-nowrap">Not yet</span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-xs text-foreground-muted">
+                        {isCampaign ? 'Sent' : 'Added'}: {day(u.added_at)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className={thead}>
+                        <th className="px-5 py-2.5 text-left font-medium">User</th>
+                        <th className="px-3 py-2.5 text-left font-medium">{isCampaign ? 'Sent At' : 'Added At'}</th>
+                        <th className="px-5 py-2.5 text-left font-medium">Used</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {eligibleUsers.map(u => (
+                        <tr key={u.user_id} className={row}>
+                          <td className="px-5 py-2.5">
+                            <p className="font-medium text-foreground">
+                              {[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}
+                            </p>
+                            <p className="text-xs text-foreground-muted">{u.email}</p>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-foreground-muted">{day(u.added_at)}</td>
+                          <td className="px-5 py-2.5">
+                            {u.times_used > 0 ? (
+                              <span className={badgeCls('green')}>{u.times_used}×</span>
+                            ) : (
+                              <span className="text-xs text-foreground-muted">Not yet</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </Card>
         </>

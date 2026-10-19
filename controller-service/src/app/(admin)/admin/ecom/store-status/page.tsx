@@ -77,14 +77,14 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
             href={`/admin/ecom/store-status/${t.id}/view`}
             className="rounded-xl border border-border-default p-4 bg-surface-elevated hover:border-accent-400 transition-colors"
           >
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-foreground">{t.display_name}</span>
-              <span className="flex items-center gap-1.5 text-xs text-foreground-muted">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium text-foreground min-w-0 truncate">{t.display_name}</span>
+              <span className="shrink-0 flex items-center gap-1.5 text-xs text-foreground-muted">
                 <span className={`w-2 h-2 rounded-full ${DOT[t.status] || DOT.terminated}`} />
                 {t.status}
               </span>
             </div>
-            <div className="text-xs text-foreground-muted mt-1">{t.slug}.jeffistores.in</div>
+            <div className="text-xs text-foreground-muted mt-1 break-all">{t.slug}.jeffistores.in</div>
             <div className="text-xs text-foreground-muted mt-2 capitalize">Plan: {t.plan || '—'}</div>
           </Link>
         ))}

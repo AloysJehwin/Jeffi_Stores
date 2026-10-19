@@ -33,6 +33,22 @@ import {
   parseSubVariantPriceEntries,
 } from '@/lib/subscriptions/sub-variant-prices'
 import { getAdminSession } from '@/lib/auth/admin-auth'
+import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
+
+// Keep the admin's open editor session's snapshot in step with the draft just saved.
+// After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
+// pre-session snapshot (A1). Never fails the enclosing save on error.
+async function resnapshotProductSession(productId: string) {
+  try {
+    const session = await getAdminSession()
+    if (!session) return
+    const open = await findOpenSession(session.adminId, 'product', productId)
+    if (!open) return
+    await resnapshotSession(open.id, session.adminId)
+  } catch (err) {
+    console.error('[product-edit] resnapshotSession failed for', productId, err)
+  }
+}
 
 // Background AI enrichment after a save. Gated on catalog_enrichment:write, which the session
 // holds only when the admin's role AND the tenant's plan include it, so a plan without AI never
@@ -629,6 +645,8 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         revalidatePath(`/admin/products/${productId}`)
         return finish(`/admin/products/${productId}`)
       }
+      // Save-as-Draft (incl. draft-stay from variant popup): resnapshot so Cancel reverts to this save.
+      await resnapshotProductSession(productId)
       return finish(intent === 'draft-stay' ? stayDest() : listDest)
     }
 
@@ -1276,6 +1294,8 @@ export async function updateProduct(productId: string, formData: FormData): Prom
 
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/${productId}/edit`)
+    // Save-as-Draft on a create-draft (is_draft=true, in-place): resnapshot too, so Cancel reverts here.
+    if (!isPublish) await resnapshotProductSession(productId)
     return finish(intent === 'draft-stay' ? stayDest() : listDest)
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err

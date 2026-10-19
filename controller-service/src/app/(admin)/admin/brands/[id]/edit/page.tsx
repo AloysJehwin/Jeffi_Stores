@@ -41,7 +41,7 @@ export default async function EditBrandPage({
   // edit form (editing in place) rather than bouncing to the detail page.
   const isCreateDraft = !isDraft && !!(brand as { is_draft?: boolean }).is_draft
   if (!isDraft && !isCreateDraft) {
-    redirect(ap(`/admin/brands/${id}`, host))
+    redirect(ap(`/admin/brands/${id}/view`, host))
   }
 
   const brandForForm = draftRow?.fields ? { ...brand, ...draftRow.fields } : brand

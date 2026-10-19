@@ -640,6 +640,12 @@ ALTER TABLE ONLY public.failed_login_attempts
 ALTER TABLE ONLY public.gallery_images
     ADD CONSTRAINT gallery_images_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.gallery_images
+    ADD CONSTRAINT gallery_images_media_kind_check CHECK (media_kind IN ('image')) NOT VALID;
+
+ALTER TABLE ONLY public.gallery_images
+    ADD CONSTRAINT gallery_images_source_check CHECK (source IN ('upload','ai','import')) NOT VALID;
+
 
 
 --
@@ -3732,3 +3738,15 @@ ALTER TABLE ONLY public.mads_daily_metrics ADD CONSTRAINT mads_daily_metrics_pke
 ALTER TABLE ONLY public.mads_breakdowns ADD CONSTRAINT mads_breakdowns_pkey PRIMARY KEY (dimension, key);
 ALTER TABLE ONLY public.mads_capi_events ADD CONSTRAINT mads_capi_events_pkey PRIMARY KEY (order_id, event_name);
 ALTER TABLE ONLY public.mads_capi_events ADD CONSTRAINT mads_capi_events_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'sent'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])));
+
+ALTER TABLE ONLY public.gallery_videos
+    ADD CONSTRAINT gallery_videos_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.gallery_videos
+    ADD CONSTRAINT gallery_videos_source_check CHECK (source IN ('upload','ai','import')) NOT VALID;
+
+ALTER TABLE ONLY public.ai_prompt_presets
+    ADD CONSTRAINT ai_prompt_presets_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ai_prompt_presets
+    ADD CONSTRAINT ai_prompt_presets_kind_check CHECK (kind IN ('image','video')) NOT VALID;

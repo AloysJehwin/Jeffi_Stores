@@ -1,344 +1,263 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { ap } from '@/lib/shared/admin-path'
-import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { EmptyState, useActionToast, InfiniteFooter } from '@/components/admin/kit'
+import { useActionToast } from '@/components/admin/kit'
 import {
-  labelCls,
+  Banner,
+  Kpi,
+  KpiGrid,
+  Section,
+  Table,
+  btnGhost,
   btnPrimary,
-  btnSecondary,
-  Skeleton,
-  SummaryCard,
-  StatusBadge,
-  agingBadge,
-  formatDate,
-  formatINR,
-  thCls,
-  thRight,
-  thCenter,
-  theadCls,
-  tableWrapCls,
-} from './shared'
+  count,
+  money,
+  type Col,
+} from '@/components/admin/channels/ui'
+import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { KeyedTrendCard } from '@/components/admin/kit/charts'
+import { delta } from '@/lib/overview/period'
+import {
+  AGING_COLORS,
+  AgingDonutCard,
+  FinancePeriodBar,
+  useFinancePeriod,
+  type FinanceOverviewContract,
+} from './finance'
 
-export function ReceivablesTab({ initialData }: { initialData: any }) {
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [search, setSearch] = useState('')
-  const [data, setData] = useState<any>(initialData)
-  const [loading, setLoading] = useState(false)
-  const [markingPaid, setMarkingPaid] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const [more, setMore] = useState<{ loading: boolean; error: string | null }>({ loading: false, error: null })
-  const applied = useRef('')
-  const inflight = useRef(false)
-  const canWrite = useCanWrite('financial:write')
-  const toast = useActionToast()
+// Finance → Receivables, cloned from the AiCosts tab shape. Range comes from the shared ?from&to;
+// each row deep-links into orders/customers and the mark-paid button hits the existing write route.
 
-  useEffect(() => {
-    if (initialData !== null) {
-      setData(initialData)
-      setPage(1)
-    }
-  }, [initialData])
+type Totals = { outstanding: number; invoice_count: number; overdue: number; avg_days: number }
+type AgingKey = 'd0_30' | 'd31_60' | 'd60_plus'
+type AgingRow = { key: AgingKey; amount: number; count: number }
+type DebtorRow = {
+  user_id: string | null
+  order_id: string
+  customer_name: string
+  customer_phone: string | null
+  outstanding: number
+  invoice_count: number
+  oldest_days: number
+}
+type OverdueRow = {
+  order_id: string
+  order_number: string
+  invoice_number: string | null
+  customer_name: string
+  user_id: string | null
+  total_amount: number
+  invoice_date: string
+  days_outstanding: number
+  aging_bucket: AgingKey
+  payment_status: string
+}
+type Receivables = FinanceOverviewContract<Totals> & {
+  by_aging: AgingRow[]
+  top_debtors: DebtorRow[]
+  overdue: OverdueRow[]
+}
 
-  // Page 1 replaces (with the current filters); later pages append with the filters page 1 used.
-  const load = useCallback(
-    async (p = 1) => {
-      if (p > 1 && inflight.current) return
-      inflight.current = true
-      let params: URLSearchParams
-      if (p === 1) {
-        setLoading(true)
-        params = new URLSearchParams()
-        if (from) params.set('from', from)
-        if (to) params.set('to', to)
-        if (search) params.set('search', search)
-        applied.current = params.toString()
-      } else {
-        setMore({ loading: true, error: null })
-        params = new URLSearchParams(applied.current)
-      }
-      params.set('page', String(p))
-      try {
-        const res = await fetch(`/api/admin/financial/receivables?${params}`)
-        const json = await res.json()
-        if (p === 1) setData(json?.error ? null : json)
-        else if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load')
-        else setData((prev: any) => ({ ...prev, rows: [...(prev?.rows ?? []), ...(json.rows ?? [])], total: json.total }))
-        setPage(p)
-        setMore({ loading: false, error: null })
-      } catch (e) {
-        if (p > 1) setMore({ loading: false, error: e instanceof Error ? e.message : 'Failed to load' })
-      } finally {
-        inflight.current = false
-        if (p === 1) setLoading(false)
-      }
-    },
-    [from, to, search]
+const AGING_LABEL: Record<AgingKey, string> = {
+  d0_30: '0-30 days',
+  d31_60: '31-60 days',
+  d60_plus: '60+ days',
+}
+const AGING_COLOR: Record<AgingKey, string> = {
+  d0_30: AGING_COLORS.current,
+  d31_60: AGING_COLORS.d31_60,
+  d60_plus: AGING_COLORS.d90_plus,
+}
+const AGING_SERIES_KEYS: AgingKey[] = ['d0_30', 'd31_60', 'd60_plus']
+
+export function ReceivablesTab() {
+  const { from, to } = useFinancePeriod('30d')
+  const { data, error, loading, reload } = useOverviewData<Receivables>(
+    `/api/admin/financial/receivables?from=${from}&to=${to}`
   )
-
-  const handleRefresh = () => load(1)
-
-  const markPaid = async (orderId: string) => {
-    setMarkingPaid(orderId)
-    const res = await fetch(`/api/admin/orders/${orderId}/payment-status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payment_status: 'paid' }),
-    })
-    toast.result({ ok: res.ok }, { success: 'Marked as paid.', error: 'Could not mark as paid.' })
-    await load(1)
-    setMarkingPaid(null)
-  }
-
-  const exportCSV = () => {
-    if (!data?.rows?.length) return
-    const headers = ['Customer', 'Invoice #', 'Date', 'Amount', 'Age (days)', 'Bucket', 'Status']
-    const rows = data.rows.map((r: any) => [
-      r.customer_name,
-      r.invoice_number || r.order_number,
-      formatDate(r.invoice_date),
-      r.total_amount,
-      r.days_outstanding,
-      r.aging_bucket,
-      r.payment_status,
-    ])
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `receivables-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-  }
-
 
   return (
     <div className="space-y-5">
-      <div className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <label className={labelCls}>From</label>
-            <DatePicker className="w-36" value={from} onChange={setFrom} />
-          </div>
-          <div>
-            <label className={labelCls}>To</label>
-            <DatePicker className="w-36" value={to} onChange={setTo} />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className={labelCls}>Search customer / invoice</label>
-            <AdminTypeahead
-              type="receivables"
-              value={search}
-              onChange={setSearch}
-              onEnter={handleRefresh}
-              placeholder="Name, invoice #..."
-            />
-          </div>
-          <div className="flex gap-2 pb-0.5">
-            <button type="button" className={btnPrimary} onClick={handleRefresh} disabled={loading}>
-              {loading ? 'Loading…' : 'Refresh'}
-            </button>
-            {data?.rows?.length > 0 && (
-              <button className={btnSecondary} onClick={exportCSV}>
-                Export CSV
-              </button>
-            )}
-          </div>
+      <FinancePeriodBar onRefresh={reload} busy={loading} />
+      {error && <Banner ok={false}>{error}</Banner>}
+      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} onChanged={reload} />}
+    </div>
+  )
+}
+
+function Body({ d, onChanged }: { d: Receivables; onChanged: () => void }) {
+  const canWrite = useCanWrite('financial:write')
+  const toast = useActionToast()
+  const [paying, setPaying] = useState<string | null>(null)
+  const c = d.current
+  const p = d.previous
+  const agingTotal = d.by_aging.reduce((s, r) => s + r.amount, 0)
+
+  const markPaid = async (orderId: string) => {
+    setPaying(orderId)
+    try {
+      const r = await fetch(`/api/admin/orders/${orderId}/payment-status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_status: 'paid' }),
+      })
+      toast.result({ ok: r.ok }, { success: 'Marked as paid.', error: 'Could not mark as paid.' })
+      if (r.ok) onChanged()
+    } finally {
+      setPaying(null)
+    }
+  }
+
+  const exportCSV = () => {
+    const rows = d.overdue
+    if (!rows.length) return
+    const header = ['Invoice', 'Order', 'Customer', 'Date', 'Days', 'Amount', 'Status']
+    const body = rows.map(r => [
+      r.invoice_number ?? '',
+      r.order_number,
+      r.customer_name,
+      r.invoice_date,
+      r.days_outstanding,
+      r.total_amount,
+      r.payment_status,
+    ])
+    const csv = [header, ...body]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    a.download = `receivables-${d.range.from}-to-${d.range.to}.csv`
+    a.click()
+  }
+
+  const customerHref = (r: { user_id: string | null; order_id: string }) =>
+    r.user_id ? ap(`/admin/customers/${r.user_id}/view`) : ap(`/admin/orders/${r.order_id}/view`)
+
+  const debtorCols: Col<DebtorRow>[] = [
+    {
+      key: 'customer',
+      label: 'Customer',
+      render: r => (
+        <Link href={customerHref(r)} className="font-medium text-foreground hover:text-accent-500 hover:underline">
+          {r.customer_name || 'Guest'}
+          {r.customer_phone && <span className="ml-2 text-xs text-foreground-muted">+91 {r.customer_phone}</span>}
+        </Link>
+      ),
+    },
+    { key: 'invoices', label: 'Invoices', num: true, render: r => count(r.invoice_count) },
+    { key: 'oldest', label: 'Oldest', num: true, render: r => `${r.oldest_days}d` },
+    { key: 'outstanding', label: 'Outstanding', num: true, render: r => money(r.outstanding, 2) },
+  ]
+
+  const overdueCols: Col<OverdueRow>[] = [
+    {
+      key: 'invoice',
+      label: 'Invoice',
+      render: r => (
+        <Link href={ap(`/admin/orders/${r.order_id}/view`)} className="font-mono text-xs text-foreground hover:text-accent-500 hover:underline">
+          {r.invoice_number || r.order_number}
+        </Link>
+      ),
+    },
+    {
+      key: 'customer',
+      label: 'Customer',
+      render: r =>
+        r.user_id ? (
+          <Link href={ap(`/admin/customers/${r.user_id}/view`)} className="text-foreground hover:text-accent-500 hover:underline">
+            {r.customer_name}
+          </Link>
+        ) : (
+          <span className="text-foreground">{r.customer_name}</span>
+        ),
+    },
+    { key: 'date', label: 'Date', render: r => r.invoice_date },
+    { key: 'days', label: 'Days', num: true, render: r => `${r.days_outstanding}d` },
+    { key: 'amount', label: 'Amount', num: true, render: r => money(r.total_amount, 2) },
+    {
+      key: 'action',
+      label: '',
+      render: r =>
+        canWrite ? (
+          <button
+            type="button"
+            className={btnGhost}
+            disabled={paying === r.order_id}
+            onClick={() => markPaid(r.order_id)}
+          >
+            {paying === r.order_id ? '…' : 'Mark paid'}
+          </button>
+        ) : null,
+    },
+  ]
+
+  return (
+    <div className="space-y-5">
+      <KpiGrid>
+        <Kpi
+          label="Outstanding"
+          value={money(c.outstanding, 2)}
+          delta={delta(c.outstanding, p.outstanding)}
+          invert
+          highlight
+          sub={`${count(c.invoice_count)} unpaid`}
+        />
+        <Kpi label="Overdue (60+ days)" value={money(c.overdue, 2)} delta={delta(c.overdue, p.overdue)} invert />
+        <Kpi
+          label="Avg days outstanding"
+          value={`${c.avg_days}d`}
+          delta={delta(c.avg_days, p.avg_days)}
+          invert
+        />
+        <Kpi
+          label="Invoices"
+          value={count(c.invoice_count)}
+          delta={delta(c.invoice_count, p.invoice_count)}
+          invert
+        />
+      </KpiGrid>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2">
+          <KeyedTrendCard
+            title="Outstanding by aging"
+            data={d.series ?? []}
+            keys={AGING_SERIES_KEYS}
+            labels={AGING_LABEL}
+            granularity={d.bucket}
+          />
         </div>
+        <AgingDonutCard
+          rows={d.by_aging.map(a => ({ label: AGING_LABEL[a.key], value: a.amount, color: AGING_COLOR[a.key] }))}
+          total={money(agingTotal)}
+          centerLabel="Outstanding"
+        />
       </div>
 
-      {!data ? (
-        <Skeleton />
-      ) : (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <SummaryCard label="Total Outstanding" value={formatINR(data.summary.total)} />
-            <SummaryCard label="0–30 Days" value={formatINR(data.summary.bucket_0_30)} sub="current" />
-            <SummaryCard label="31–60 Days" value={formatINR(data.summary.bucket_31_60)} sub="aging" />
-            <SummaryCard label="60+ Days" value={formatINR(data.summary.bucket_60plus)} sub="overdue" />
-          </div>
+      <Section title="Top debtors">
+        <Table
+          rows={d.top_debtors}
+          cols={debtorCols}
+          rowKey={r => `${r.user_id ?? 'guest'}-${r.order_id}`}
+          empty="No unpaid customers in this period."
+        />
+      </Section>
 
-          {data.rows.length === 0 ? (
-            <EmptyState title="No outstanding receivables" />
-          ) : (
-            <>
-              <div className={`hidden md:block overflow-x-auto ${tableWrapCls}`}>
-                <table className="w-full text-sm">
-                  <thead className={theadCls}>
-                    <tr>
-                      <th className={thCls}>Customer</th>
-                      <th className={thCls}>Invoice #</th>
-                      <th className={thCls}>Date</th>
-                      <th className={thRight}>Amount</th>
-                      <th className={thCenter}>Age</th>
-                      <th className={thCenter}>Status</th>
-                      <th className={thCenter}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-default">
-                    {data.rows.map((r: any) => (
-                      <tr key={r.order_id} className="hover:bg-surface-secondary/40 transition-colors">
-                        <td className="px-4 py-3">
-                          {r.user_id ? (
-                            <Link
-                              href={ap(`/admin/customers/${r.user_id}/view`)}
-                              className="font-medium text-foreground hover:text-accent-500 hover:underline"
-                            >
-                              {r.customer_name}
-                            </Link>
-                          ) : (
-                            <Link
-                              href={ap(`/admin/orders/${r.order_id}/view`)}
-                              className="font-medium text-foreground hover:text-accent-500 hover:underline"
-                            >
-                              {r.customer_name}
-                            </Link>
-                          )}
-                          {r.customer_phone && (
-                            <div className="text-xs text-foreground-secondary">+91 {r.customer_phone}</div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-foreground-secondary">
-                          {r.invoice_number ? (
-                            <Link
-                              href={ap(`/admin/invoices/${r.order_id}/view`)}
-                              className="hover:text-accent-500 hover:underline font-mono"
-                            >
-                              {r.invoice_number || r.order_number}
-                            </Link>
-                          ) : (
-                            <Link
-                              href={ap(`/admin/orders/${r.order_id}/view`)}
-                              className="hover:text-accent-500 hover:underline font-mono"
-                            >
-                              {r.order_number}
-                            </Link>
-                          )}
-                          {r.invoice_number && (
-                            <a
-                              href={`/api/orders/${r.order_id}/invoice`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="ml-2 text-xs text-accent-500 hover:underline"
-                            >
-                              PDF
-                            </a>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
-                          {formatDate(r.invoice_date)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium text-foreground">
-                          {formatINR(parseFloat(r.total_amount))}
-                        </td>
-                        <td className="px-4 py-3 text-center">{agingBadge(r.aging_bucket)}</td>
-                        <td className="px-4 py-3 text-center">
-                          <StatusBadge status={r.payment_status} />
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {canWrite && (
-                            <button
-                              className="control-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
-                              disabled={markingPaid === r.order_id}
-                              onClick={() => markPaid(r.order_id)}
-                            >
-                              {markingPaid === r.order_id ? '…' : 'Mark Paid'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className={`md:hidden divide-y divide-border-default ${tableWrapCls}`}>
-                {data.rows.map((r: any) => (
-                  <div key={r.order_id} className="p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        {r.user_id ? (
-                          <Link
-                            href={ap(`/admin/customers/${r.user_id}/view`)}
-                            className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
-                          >
-                            {r.customer_name}
-                          </Link>
-                        ) : (
-                          <Link
-                            href={ap(`/admin/orders/${r.order_id}/view`)}
-                            className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
-                          >
-                            {r.customer_name}
-                          </Link>
-                        )}
-                        {r.customer_phone && (
-                          <p className="text-xs text-foreground-secondary mt-0.5">+91 {r.customer_phone}</p>
-                        )}
-                      </div>
-                      <p className="font-semibold text-foreground text-sm shrink-0">
-                        {formatINR(parseFloat(r.total_amount))}
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
-                      <div className="flex items-center gap-1.5">
-                        {r.invoice_number ? (
-                          <Link
-                            href={ap(`/admin/invoices/${r.order_id}/view`)}
-                            className="font-mono hover:text-accent-500 hover:underline"
-                          >
-                            {r.invoice_number || r.order_number}
-                          </Link>
-                        ) : (
-                          <Link
-                            href={ap(`/admin/orders/${r.order_id}/view`)}
-                            className="font-mono hover:text-accent-500 hover:underline"
-                          >
-                            {r.order_number}
-                          </Link>
-                        )}
-                        {r.invoice_number && (
-                          <a
-                            href={`/api/orders/${r.order_id}/invoice`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-accent-500 hover:underline"
-                          >
-                            PDF
-                          </a>
-                        )}
-                      </div>
-                      <span>{formatDate(r.invoice_date)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {agingBadge(r.aging_bucket)}
-                      <StatusBadge status={r.payment_status} />
-                    </div>
-                    {canWrite && (
-                      <button
-                        className="control-sm w-full mt-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
-                        disabled={markingPaid === r.order_id}
-                        onClick={() => markPaid(r.order_id)}
-                      >
-                        {markingPaid === r.order_id ? '…' : 'Mark Paid'}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <InfiniteFooter
-                shown={data.rows.length}
-                noun="rows"
-                control={{ total: data.total, hasMore: data.rows.length < (data.total ?? 0), loadingMore: more.loading, error: more.error, loadMore: () => load(page + 1) }}
-              />
-            </>
-          )}
-        </>
-      )}
+      <Section
+        title="Overdue invoices"
+        action={
+          d.overdue.length > 0 ? (
+            <button type="button" className={btnPrimary} onClick={exportCSV}>
+              Export CSV
+            </button>
+          ) : undefined
+        }
+      >
+        <Table rows={d.overdue} cols={overdueCols} rowKey={r => r.order_id} empty="Nothing overdue in this period." />
+      </Section>
     </div>
   )
 }

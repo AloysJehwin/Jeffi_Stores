@@ -10,7 +10,7 @@ vi.mock('@/lib/payments/wallet', () => ({
   isFlagshipTenant: (id: string | null | undefined) => !id || id === '00000000-0000-0000-0000-000000000000',
 }))
 
-import { checkMessagingBalance, debitMessageCost } from '@/lib/shared/messaging/billing'
+import { checkMessagingBalance, debitMessageCost, refundMessageEstimate } from '@/lib/shared/messaging/billing'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -56,6 +56,45 @@ describe('debitMessageCost', () => {
 
   it('is a no-op for a non-positive price', async () => {
     await debitMessageCost({ tenantId: 't1', channel: 'sms', providerSid: 'SM1', priceInr: 0 })
+    expect(debitMessaging).not.toHaveBeenCalled()
+  })
+})
+
+describe('refundMessageEstimate', () => {
+  it('trues up down to the SMS processing fee on failed', async () => {
+    debitMessaging.mockResolvedValue(undefined)
+    const r = await refundMessageEstimate({ tenantId: 't1', sid: 'SM1', channel: 'sms', status: 'failed' })
+    expect(r).toEqual({ refundedInr: 6.5, keptInr: 0.5 })
+    expect(debitMessaging).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: 't1', amountInr: 0.5, category: 'sms', externalRef: 'msg:SM1', trueUp: true })
+    )
+  })
+
+  it('trues up down to the WhatsApp processing fee on undelivered', async () => {
+    debitMessaging.mockResolvedValue(undefined)
+    const r = await refundMessageEstimate({ tenantId: 't1', sid: 'WA1', channel: 'whatsapp', status: 'undelivered' })
+    expect(r).toEqual({ refundedInr: 0.8, keptInr: 0.2 })
+    expect(debitMessaging).toHaveBeenCalledWith(
+      expect.objectContaining({ amountInr: 0.2, externalRef: 'msg:WA1', trueUp: true })
+    )
+  })
+
+  it('fully refunds internal/platform tier (zero processing fee)', async () => {
+    debitMessaging.mockResolvedValue(undefined)
+    const r = await refundMessageEstimate({ tenantId: 't1', sid: 'SM2', channel: 'sms', status: 'failed', internal: true })
+    expect(r).toEqual({ refundedInr: 7, keptInr: 0 })
+    expect(debitMessaging).toHaveBeenCalledWith(expect.objectContaining({ amountInr: 0, trueUp: true }))
+  })
+
+  it('is a no-op for a non-terminal status', async () => {
+    const r = await refundMessageEstimate({ tenantId: 't1', sid: 'SM1', channel: 'sms', status: 'delivered' })
+    expect(r).toEqual({ refundedInr: 0, keptInr: 0 })
+    expect(debitMessaging).not.toHaveBeenCalled()
+  })
+
+  it('exempts flagship (null tenant)', async () => {
+    const r = await refundMessageEstimate({ tenantId: null, sid: 'SM1', channel: 'sms', status: 'failed' })
+    expect(r).toEqual({ refundedInr: 0, keptInr: 0 })
     expect(debitMessaging).not.toHaveBeenCalled()
   })
 })

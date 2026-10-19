@@ -79,8 +79,8 @@ export default function SuppliersOverview() {
               ariaLabel="PO value raised and goods received"
             />
           </Section>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="md:col-span-2">
               <Section title="Top suppliers">
                 <Table
                   rows={data.top_suppliers}

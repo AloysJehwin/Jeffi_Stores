@@ -12,6 +12,12 @@ export const MEDIA_COST_INR = 0.5
 export const USD_INR_RATE = 88
 export const PUBLIC_MARGIN = 0.4 // public API price = provider cost × (1 + margin)
 
+// Non-refundable processing fee (INR) kept on terminal failure under policy P2. Covers template
+// render + provider roundtrip + webhook ingest even when the carrier rejects the message. The
+// messaging-service refund paths read this to decide how much of the message:${id} / media:${id}
+// debit to return. Internal / platform tier is 0 for every channel.
+export const PROCESSING_FEE_INR: Record<MessagingChannel, number> = { whatsapp: 0.2, sms: 0.5, email: 0 }
+
 export const round2 = (n: number) => Math.round(n * 100) / 100
 export const toPaise = (inr: number) => Math.round(inr * 100)
 export const usdToInr = (usd: number) => Math.round(Math.abs(usd) * USD_INR_RATE * 10000) / 10000
@@ -28,12 +34,30 @@ export function mediaPriceInr(internal = false): number {
 export function documentPriceInr(type: DocumentType): number {
   return withMargin(DOCUMENT_COST_INR[type])
 }
-export function priceList() {
+export function processingFeeInr(channel: MessagingChannel, internal = false): number {
+  if (internal) return 0
+  const fee = PROCESSING_FEE_INR[channel]
+  return typeof fee === 'number' ? round2(fee) : 0
+}
+
+export type PriceList = {
+  margin: number
+  currency: 'INR'
+  messages: Record<string, number>
+  documents: Record<string, number>
+  media: number
+  // Optional sibling that mirrors `messages` keys and gives the non-refundable processing fee kept
+  // on terminal failure. Optional for backwards-compat: older callers that only read priceInr are
+  // unaffected.
+  processingFees?: Record<string, number>
+}
+export function priceList(): PriceList {
   return {
     margin: PUBLIC_MARGIN,
     currency: 'INR',
     messages: Object.fromEntries((Object.keys(MESSAGING_COST_INR) as MessagingChannel[]).map(c => [c, messagePriceInr(c)])),
     documents: Object.fromEntries((Object.keys(DOCUMENT_COST_INR) as DocumentType[]).map(d => [d, documentPriceInr(d)])),
     media: mediaPriceInr(),
+    processingFees: Object.fromEntries((Object.keys(PROCESSING_FEE_INR) as MessagingChannel[]).map(c => [c, processingFeeInr(c)])),
   }
 }

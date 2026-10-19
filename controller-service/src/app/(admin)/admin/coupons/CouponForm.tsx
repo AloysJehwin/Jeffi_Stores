@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState, useRef } from 'react'
 import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -9,8 +10,8 @@ import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AIFillForm from '@/components/admin/AIFillForm'
 import CouponUserSelector from '@/components/admin/CouponUserSelector'
 import { useEditSession } from '@/hooks/useEditSession'
-import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
-import { EditSessionActions, FormButton, FormField, FormFooter, FormSection, fieldInputCls } from '@/components/admin/kit'
+import { Badge, FormButton, FormField, FormFooter, FormSection, fieldInputCls } from '@/components/admin/kit'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface CouponFormProps {
   action: (formData: FormData) => Promise<void>
@@ -53,11 +54,13 @@ export default function CouponForm({
   discardAction,
   defaultValues: d = {},
 }: CouponFormProps) {
+  const router = useRouter()
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
   const [validFrom, setValidFrom] = useState(d.valid_from ?? '')
   const [validUntil, setValidUntil] = useState(d.valid_until ?? '')
   const [couponDescription, setCouponDescription] = useState(d.description ?? '')
   const [discountType, setDiscountType] = useState(d.discount_type || 'percentage')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const edit = useEditSession({ resourceType: 'coupon', resourceId: couponId ?? null })
 
@@ -80,29 +83,33 @@ export default function CouponForm({
     if (values.is_active != null) setIsActive(Boolean(values.is_active))
   }
 
+  const listHref = ap(backUrl ?? '/admin/coupons')
+  const viewHref = couponId ? ap(`/admin/coupons/${couponId}/view`) : listHref
+
+  // Discard: fire the server action with intent=discard; the action redirects to view.
+  async function handleDiscard() {
+    if (!discardAction) return
+    setIsSubmitting(true)
+    try {
+      const fd = new FormData()
+      fd.set('intent', 'discard')
+      if (backUrl) fd.set('_back', backUrl)
+      await discardAction(fd)
+    } catch (err: any) {
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
+      setIsSubmitting(false)
+    }
+  }
+
+  // Cancel: roll the draft back to the session snapshot, then return to the view page.
+  async function handleCancel() {
+    const ok = await edit.cancel()
+    if (ok) router.push(viewHref)
+  }
+
   return (
     <form ref={formRef} action={action} className="space-y-4">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-      {edit.sessionId && (
-        <div className="flex justify-end">
-          <EditSessionActions
-            autosaveStatus={'idle' as AutosaveStatus}
-            sessionStatus={edit.status}
-            onCancel={edit.cancel}
-            cancelHref={ap('/admin/coupons')}
-            draft={isDraft}
-            discard={
-              isDraft && discardAction
-                ? () => {
-                    const fd = new FormData()
-                    fd.set('intent', 'discard')
-                    void discardAction(fd)
-                  }
-                : undefined
-            }
-          />
-        </div>
-      )}
       <AIFillForm
         fields={[
           { name: 'code', label: 'Coupon Code', type: 'text' },
@@ -119,8 +126,8 @@ export default function CouponForm({
         scope="coupons:write"
         context="Discount coupon for this store"
       />
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 space-y-4">
           <FormSection title="Code & Discount">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField label="Coupon Code" required>
@@ -257,18 +264,42 @@ export default function CouponForm({
         </FormSection>
       )}
 
-      <FormFooter cancelHref={ap(backUrl ?? '/admin/coupons')}>
+      {/* Shared editor bottom bar — see docs/plans/EDITOR_SESSION_SEMANTICS.md.
+          No top chrome: cancel, discard, save-as-draft, publish all live here. */}
+      <FormFooter
+        sticky
+        draftBadge={isDraft ? <Badge tone="amber">Draft pending</Badge> : null}
+        discard={isDraft && discardAction ? handleDiscard : undefined}
+        cancel={edit.sessionId ? handleCancel : undefined}
+        cancelHref={edit.sessionId ? undefined : listHref}
+      >
         {isDraft ? (
-          <>
-            <FormButton variant="secondary" name="intent" value="draft">
-              Save Draft
+          <RequireWrite scope="coupons:write">
+            <FormButton
+              variant="secondary"
+              name="intent"
+              value="draft"
+              formNoValidate
+              disabled={isSubmitting}
+              onClick={() => setIsSubmitting(true)}
+            >
+              {isSubmitting ? 'Saving...' : 'Save as Draft'}
             </FormButton>
-            <FormButton name="intent" value="publish">
-              Publish
+            <FormButton
+              name="intent"
+              value="publish"
+              disabled={isSubmitting}
+              onClick={() => setIsSubmitting(true)}
+            >
+              {isSubmitting ? 'Saving...' : 'Update & Publish'}
             </FormButton>
-          </>
+          </RequireWrite>
         ) : (
-          <FormButton>{submitLabel || 'Save Changes'}</FormButton>
+          <RequireWrite scope="coupons:write">
+            <FormButton disabled={isSubmitting} onClick={() => setIsSubmitting(true)}>
+              {isSubmitting ? 'Saving...' : submitLabel || 'Save Changes'}
+            </FormButton>
+          </RequireWrite>
         )}
       </FormFooter>
     </form>

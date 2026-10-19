@@ -134,7 +134,7 @@ export function Section({
 }
 
 export function FieldGrid({ children }: { children: React.ReactNode }) {
-  return <dl className="grid grid-cols-2 gap-4 min-w-0">{children}</dl>
+  return <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">{children}</dl>
 }
 
 export const TENANT_TABS = [

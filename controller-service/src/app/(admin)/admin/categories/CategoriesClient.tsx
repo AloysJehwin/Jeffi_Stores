@@ -494,7 +494,7 @@ function SortableRow({
           )}
         </div>
       </td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground-secondary">{category.slug}</td>
+      <td className="hidden lg:table-cell px-4 py-3 whitespace-nowrap text-sm text-foreground-secondary">{category.slug}</td>
       <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">{category.display_order}</td>
       <td className="px-4 py-3 whitespace-nowrap">
         <RequireWrite
@@ -801,7 +801,7 @@ export default function CategoriesClient({
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted">
                       Category
                     </th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted">
+                    <th className="hidden lg:table-cell px-4 py-2.5 text-left text-xs font-medium text-foreground-muted">
                       Slug
                     </th>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted">

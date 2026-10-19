@@ -541,7 +541,7 @@ export default function Composer({
               <input type="radio" checked={when === 'at'} onChange={() => setWhen('at')} /> At a set time
             </label>
             {when === 'at' && (
-              <DateTimePicker value={at} onChange={setAt} className="w-64" placeholder="Select date and time" />
+              <DateTimePicker value={at} onChange={setAt} className="w-full sm:w-64" placeholder="Select date and time" />
             )}
           </div>
           {canApprove && (
@@ -552,7 +552,7 @@ export default function Composer({
             />
           )}
           {problems.length > 0 && <p className="text-xs text-foreground-muted">{problems.join('. ')}.</p>}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               className={btnPrimary}

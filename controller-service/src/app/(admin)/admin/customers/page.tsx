@@ -108,7 +108,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
 function KpiRowSkeleton() {
   return (
-    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
+    <div className="grid gap-3 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] animate-pulse">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
       ))}

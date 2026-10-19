@@ -138,9 +138,7 @@ export default function CampaignsListClient() {
         value="campaigns"
         actions={
           <RequireWrite scope="campaigns:write">
-            <span className="hidden md:inline-flex">
-              <TabAction href={ap('/admin/campaigns/new')} icon={<Plus className="w-4 h-4" />} label="New Campaign" />
-            </span>
+            <TabAction href={ap('/admin/campaigns/new')} icon={<Plus className="w-4 h-4" />} label="New Campaign" />
           </RequireWrite>
         }
       />

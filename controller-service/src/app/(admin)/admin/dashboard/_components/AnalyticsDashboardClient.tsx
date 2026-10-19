@@ -110,20 +110,22 @@ export default function AnalyticsDashboardClient({
   const repeatRate = activeBuyers > 0 ? (data.customerSplit.returningCustomers / activeBuyers) * 100 : null
 
   const rangeBar = (
-    <div className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit">
-      {RANGES.map(r => (
-        <button
-          key={r.key}
-          type="button"
-          onClick={() => changeRange(r.key)}
-          disabled={loading}
-          className={`flex items-center px-2.5 sm:px-3 text-xs font-medium rounded-md disabled:opacity-50 ${
-            range === r.key ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'
-          }`}
-        >
-          {r.label}
-        </button>
-      ))}
+    <div className="max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="inline-flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg">
+        {RANGES.map(r => (
+          <button
+            key={r.key}
+            type="button"
+            onClick={() => changeRange(r.key)}
+            disabled={loading}
+            className={`flex items-center px-2.5 sm:px-3 text-xs font-medium rounded-md disabled:opacity-50 whitespace-nowrap ${
+              range === r.key ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'
+            }`}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 
@@ -259,7 +261,7 @@ export default function AnalyticsDashboardClient({
         <GroupLabel title="Product intelligence" hint="what sells, what sits, what customers want" />
         <ProductInsights data={data} host={host} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Section title="Top Products" action={<SectionLink href={ap('/admin/products', host)} label="All products" />}>
             <ListRows
               rows={metrics.topProducts.map((p, i) => ({

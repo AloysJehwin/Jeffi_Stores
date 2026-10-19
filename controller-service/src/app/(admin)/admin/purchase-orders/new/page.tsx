@@ -13,15 +13,17 @@ import { formatINR as formatINRBase } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { Dialog } from '@/components/admin/kit/dialog'
 import { PageHeader } from '@/components/admin/kit/layout'
+import { Badge } from '@/components/admin/kit/core'
 import { FormButton, FormField, FormFooter, FormGrid, FormSection, TextInput, fieldInputCls } from '@/components/admin/kit/form'
 import { useActionToast } from '@/components/admin/kit/toast'
+import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { round3 } from '@/lib/shared/number-display'
 import { useEditSession } from '@/hooks/useEditSession'
-import { useAutosaveDraft, type AutosaveStatus } from '@/hooks/useAutosaveDraft'
-import EditorToolbar from '@/components/admin/EditorToolbar'
+import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
+import { resnapshotPurchaseOrderSession } from './actions'
 
 const PURCHASE_UNITS = [
   { value: '', label: '— same as sell unit —' },
@@ -223,6 +225,11 @@ export default function NewPOPage() {
   const draftIdRef = useRef<string | null>(null)
   draftIdRef.current = draftId
   const hydratedRef = useRef(false)
+  // Autosave bookkeeping — mirrors other draft editors so Cancel/Discard can wait on in-flight.
+  const autosaveBlockedRef = useRef(false)
+  const inFlightRef = useRef(false)
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
 
   // Resume via ?draftId=<id> or open-or-create one on mount.
   useEffect(() => {
@@ -333,23 +340,28 @@ export default function NewPOPage() {
     save: async (value, signal) => {
       const id = draftIdRef.current
       if (!id) return
-      const res = await fetch(`/api/admin/inventory/po/draft/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        signal,
-        body: JSON.stringify({
-          supplier_id: value.form.supplier_id || null,
-          order_date: value.form.order_date || null,
-          expected_date: value.form.expected_date || null,
-          status: value.form.status || null,
-          notes: value.form.notes || null,
-          line_items: value.lineItems,
-        }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      inFlightRef.current = true
+      try {
+        const res = await fetch(`/api/admin/inventory/po/draft/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          signal,
+          body: JSON.stringify({
+            supplier_id: value.form.supplier_id || null,
+            order_date: value.form.order_date || null,
+            expected_date: value.form.expected_date || null,
+            status: value.form.status || null,
+            notes: value.form.notes || null,
+            line_items: value.lineItems,
+          }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      } finally {
+        inFlightRef.current = false
+      }
     },
-    enabled: () => !!draftIdRef.current && draftLoaded,
+    enabled: () => !!draftIdRef.current && draftLoaded && !autosaveBlockedRef.current,
   })
 
   // Trigger autosave whenever form or lineItems change (after the initial hydrate).
@@ -652,6 +664,60 @@ export default function NewPOPage() {
     })
   }
 
+  const listHref = ap('/admin/purchase-orders?tab=orders')
+
+  async function saveDraft() {
+    const id = draftIdRef.current
+    if (!id) return
+    setSavingDraft(true)
+    try {
+      await autosave.flush({ form, lineItems })
+      // Resnapshot so a later Cancel reverts to this saved draft, not the pre-session state.
+      await resnapshotPurchaseOrderSession(id)
+      router.push(listHref)
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save draft')
+      setSavingDraft(false)
+    }
+  }
+
+  async function discardDraft() {
+    autosaveBlockedRef.current = true
+    for (let i = 0; i < 100 && inFlightRef.current; i++) await new Promise(r => setTimeout(r, 100))
+    const id = draftIdRef.current
+    setDiscarding(true)
+    try {
+      if (id) {
+        const r = await fetch(`/api/admin/inventory/po/draft/${id}`, { method: 'DELETE', credentials: 'include' })
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}))
+          toast.error(j.error || 'Failed to discard draft')
+          autosaveBlockedRef.current = false
+          setDiscarding(false)
+          return
+        }
+      }
+      // Close the session so a later visit opens a fresh one.
+      await edit.save().catch(() => undefined)
+      router.push(listHref)
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to discard draft')
+      autosaveBlockedRef.current = false
+      setDiscarding(false)
+    }
+  }
+
+  async function cancelEdit() {
+    autosaveBlockedRef.current = true
+    for (let i = 0; i < 100 && inFlightRef.current; i++) await new Promise(r => setTimeout(r, 100))
+    const ok = await edit.cancel()
+    if (!ok) {
+      autosaveBlockedRef.current = false
+      return
+    }
+    // onCancelled navigates to the list.
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.supplier_id) {
@@ -727,24 +793,17 @@ export default function NewPOPage() {
   const poTotal = Math.round(rawTotal)
   const roundOff = poTotal - rawTotal
 
+  const hasDraftContent = !!(form.supplier_id || form.notes || form.order_date || form.expected_date) || lineItems.some(it => it.product_id)
+
   return (
     <MobileEditBlock>
-      <div className="p-4 sm:p-6 space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <PageHeader back={{ href: ap('/admin/purchase-orders?tab=orders'), label: 'Purchase orders' }} title="New Purchase Order" description="Create a new PO for a supplier" />
-          <EditorToolbar
-            autosaveStatus={autosave.status}
-            sessionStatus={edit.status}
-            onSave={() => {
-              // Toolbar Save mirrors the form submit — reuses handleSubmit via a synthetic event.
-              const btn = document.querySelector<HTMLButtonElement>('button[data-po-submit]')
-              btn?.click()
-            }}
-            onCancel={edit.cancel}
-            saveLabel={saving ? 'Creating…' : 'Create PO'}
-            disabled={saving || !form.supplier_id}
-          />
-        </div>
+      <div className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5">
+        <PageHeader
+          back={{ href: listHref, label: 'Purchase orders' }}
+          title="New Purchase Order"
+          description="Create a new PO for a supplier"
+          badges={hasDraftContent ? <Badge tone="amber">Draft pending</Badge> : undefined}
+        />
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <FormSection title="Order Details">
@@ -1223,7 +1282,7 @@ export default function NewPOPage() {
 
             {lineItems.some(it => it.line_total_incl_gst) && (
               <div className="border-t border-border-default pt-3 mt-3 flex justify-end">
-                <div className="text-right space-y-1 min-w-[220px]">
+                <div className="text-right space-y-1 w-full sm:w-auto sm:min-w-[220px]">
                   <div className="flex justify-between text-xs text-foreground-secondary">
                     <span>Taxable Value</span>
                     <span>₹{fmtINR2(taxableValue)}</span>
@@ -1253,9 +1312,30 @@ export default function NewPOPage() {
             )}
           </div>
 
-          <FormFooter cancelHref={ap('/admin/purchase-orders?tab=orders')}>
+          <FormFooter
+            autosave={<AutosaveStatusPill status={autosave.status} />}
+            draftBadge={hasDraftContent ? <Badge tone="amber">Draft pending</Badge> : undefined}
+            discard={hasDraftContent ? discardDraft : undefined}
+            cancel={edit.sessionId ? cancelEdit : undefined}
+            cancelHref={edit.sessionId ? undefined : listHref}
+          >
             <RequireWrite scope="inventory">
-              <FormButton data-po-submit disabled={saving || !form.supplier_id} pending={saving} pendingLabel="Creating...">
+              <FormButton
+                type="button"
+                variant="secondary"
+                onClick={() => void saveDraft()}
+                disabled={savingDraft || saving || discarding}
+                pending={savingDraft}
+                pendingLabel="Saving..."
+              >
+                Save as Draft
+              </FormButton>
+              <FormButton
+                data-po-submit
+                disabled={saving || savingDraft || discarding || !form.supplier_id}
+                pending={saving}
+                pendingLabel="Creating..."
+              >
                 Create PO
               </FormButton>
             </RequireWrite>

@@ -51,13 +51,11 @@ export default async function MailerPage({
         sp={sp}
         listLabel="Messages"
         actions={
-          <span className="hidden md:inline-flex">
-            <TabAction
-              href={ap('/admin/marketing/messaging/new', host)}
-              icon={<Plus className="w-4 h-4" />}
-              label="New message"
-            />
-          </span>
+          <TabAction
+            href={ap('/admin/marketing/messaging/new', host)}
+            icon={<Plus className="w-4 h-4" />}
+            label="New message"
+          />
         }
       />
 

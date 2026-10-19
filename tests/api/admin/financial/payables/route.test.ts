@@ -9,8 +9,8 @@ vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
-vi.mock('@/lib/payments/financial', () => ({
-  getPayables: vi.fn(),
+vi.mock('@/app/api/(admin)/admin/financial/payables/summary', () => ({
+  getPayablesOverview: vi.fn(),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -18,8 +18,8 @@ vi.mock('@/lib/payments/financial', () => ({
 import { GET, POST } from '@/app/api/(admin)/admin/financial/payables/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { query, queryOne } from '@/lib/shared/db'
-import { getPayables } from '@/lib/payments/financial'
+import { queryOne } from '@/lib/shared/db'
+import { getPayablesOverview } from '@/app/api/(admin)/admin/financial/payables/summary'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,9 +37,17 @@ function makePost(body: Record<string, unknown>) {
   })
 }
 
-const PAYABLES_RESULT = {
-  payables: [{ id: 'p1', supplier_name: 'Supplier A', amount: 5000 }],
-  total: 1,
+const OVERVIEW = {
+  range: { from: '2026-09-19', to: '2026-10-18' },
+  previous_range: { from: '2026-08-20', to: '2026-09-18' },
+  bucket: 'day' as const,
+  current: { outstanding: 5000, due_this_week: 1000, overdue: 2000, paid: 3000, bills_open: 4 },
+  previous: { outstanding: 4000, due_this_week: 500, overdue: 1500, paid: 2500, bills_open: 3 },
+  series: [],
+  pay_methods: ['bank_transfer', 'upi', 'cash', 'cheque'],
+  by_dim: [],
+  by_dim2: [],
+  top: [],
 }
 
 // ── GET tests ─────────────────────────────────────────────────────────────────
@@ -62,48 +70,34 @@ describe('GET /api/admin/financial/payables', () => {
     expect(res.status).toBe(403)
   })
 
-  it('returns payables result', async () => {
+  it('returns the overview envelope on happy path', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(getPayables).mockResolvedValue(PAYABLES_RESULT as any)
+    vi.mocked(getPayablesOverview).mockResolvedValue(OVERVIEW as any)
     const res = await GET(makeGet())
     expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body).toEqual(PAYABLES_RESULT)
+    expect(await res.json()).toEqual(OVERVIEW)
   })
 
-  it('passes query params to getPayables', async () => {
+  it('passes parsed period to getPayablesOverview', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(getPayables).mockResolvedValue(PAYABLES_RESULT as any)
-    await GET(makeGet('?status=pending&from=2024-01-01&to=2024-01-31&search=acme&page=2'))
-    expect(vi.mocked(getPayables)).toHaveBeenCalledWith({
-      status: 'pending',
-      from: '2024-01-01',
-      to: '2024-01-31',
-      search: 'acme',
-      page: 2,
-    })
+    vi.mocked(getPayablesOverview).mockResolvedValue(OVERVIEW as any)
+    await GET(makeGet('?from=2026-01-01&to=2026-01-31'))
+    expect(vi.mocked(getPayablesOverview)).toHaveBeenCalledWith({ from: '2026-01-01', to: '2026-01-31' })
   })
 
-  it('passes undefined for empty string params', async () => {
+  it('returns 400 on malformed range', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(getPayables).mockResolvedValue(PAYABLES_RESULT as any)
-    await GET(makeGet())
-    expect(vi.mocked(getPayables)).toHaveBeenCalledWith({
-      status: undefined,
-      from: undefined,
-      to: undefined,
-      search: undefined,
-      page: 1,
-    })
+    const res = await GET(makeGet('?from=nope&to=2026-01-31'))
+    expect(res.status).toBe(400)
   })
 
   it('returns 500 on error', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(getPayables).mockRejectedValue(new Error('db error'))
+    vi.mocked(getPayablesOverview).mockRejectedValue(new Error('db error'))
     const res = await GET(makeGet())
     expect(res.status).toBe(500)
     expect(await res.json()).toMatchObject({ error: 'db error' })

@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Info } from 'lucide-react'
-import DraftEditButton from '@/components/admin/DraftEditButton'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { Card, DetailHeader, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, EmptyState, Badge } from '@/components/admin/kit'
+import { startBrandDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,14 +87,24 @@ export default async function BrandViewPageDetail({
           subtitle={brand.description || undefined}
           identifiers={[{ label: 'Created', value: created }]}
           actions={
-            <DraftEditButton
-              entity="brands"
-              id={id}
-              name={brand.name}
-              hasDraft={!!hasDraft}
-              backUrl={backUrl}
-              className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold"
-            />
+            hasDraft ? (
+              <Link
+                href={ap(`/admin/brands/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
+                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+              >
+                Edit Draft
+              </Link>
+            ) : (
+              <form action={startBrandDraft.bind(null, id)}>
+                <input type="hidden" name="_back" value={backUrl} />
+                <button
+                  type="submit"
+                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+                >
+                  Edit
+                </button>
+              </form>
+            )
           }
         />
       }
@@ -124,39 +134,60 @@ export default async function BrandViewPageDetail({
           {products.length === 0 ? (
             <EmptyState bare title="No products assigned to this brand." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
-                    <th className="px-5 py-2.5 text-left font-medium">Product</th>
-                    <th className="px-3 py-2.5 text-left font-medium">SKU</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Price</th>
-                    <th className="px-5 py-2.5 text-left font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map(p => (
-                    <tr key={p.id} className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40">
-                      <td className="px-5 py-2.5">
-                        <Link href={ap(`/admin/products/${p.id}`, host)} className="font-medium text-accent-500 hover:underline">
-                          {p.name}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-xs text-foreground-muted">
-                        <span className="inline-flex items-center gap-1">
-                          {p.sku}
-                          {p.sku && <CopySku sku={p.sku} />}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-foreground">₹{Number(p.base_price).toLocaleString('en-IN')}</td>
-                      <td className="px-5 py-2.5">
-                        <StatusBadge status={String(p.is_active)} map={ACTIVE_STATUS} />
-                      </td>
+            <>
+              <ul className="md:hidden divide-y divide-border-default/60 border-y border-border-default">
+                {products.map(p => (
+                  <li key={p.id} className="px-5 py-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={ap(`/admin/products/${p.id}`, host)} className="block font-medium text-accent-500 hover:underline truncate">
+                        {p.name}
+                      </Link>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-foreground-muted font-mono">
+                        {p.sku}
+                        {p.sku && <CopySku sku={p.sku} />}
+                      </div>
+                    </div>
+                    <div className="shrink-0 flex flex-col items-end gap-1">
+                      <span className="font-semibold tabular-nums text-foreground text-sm">₹{Number(p.base_price).toLocaleString('en-IN')}</span>
+                      <StatusBadge status={String(p.is_active)} map={ACTIVE_STATUS} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
+                      <th className="px-5 py-2.5 text-left font-medium">Product</th>
+                      <th className="px-3 py-2.5 text-left font-medium">SKU</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Price</th>
+                      <th className="px-5 py-2.5 text-left font-medium">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {products.map(p => (
+                      <tr key={p.id} className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40">
+                        <td className="px-5 py-2.5">
+                          <Link href={ap(`/admin/products/${p.id}`, host)} className="font-medium text-accent-500 hover:underline">
+                            {p.name}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2.5 font-mono text-xs text-foreground-muted">
+                          <span className="inline-flex items-center gap-1">
+                            {p.sku}
+                            {p.sku && <CopySku sku={p.sku} />}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-foreground">₹{Number(p.base_price).toLocaleString('en-IN')}</td>
+                        <td className="px-5 py-2.5">
+                          <StatusBadge status={String(p.is_active)} map={ACTIVE_STATUS} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </Card>
       }

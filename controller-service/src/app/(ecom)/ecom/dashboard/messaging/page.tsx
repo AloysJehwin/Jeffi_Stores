@@ -11,10 +11,13 @@ export const dynamic = 'force-dynamic'
 export default async function MessagingPage() {
   const { tenant } = await loadOwnerContext()
   const wallet = hasService(tenant, 'messaging') ? await getTenantWallet(tenant.id, 0).catch(() => null) : null
+  if (hasService(tenant, 'messaging')) {
+    return <MessagingClient prices={{ ...priceList().messages, media: priceList().media }} balance={Number(wallet?.balance ?? 0)} />
+  }
   return (
     <>
       <PageHeader eyebrow="Developers" title="Messaging" description="Templates, bulk sends and the delivery log for email, SMS and WhatsApp sent through your API keys." />
-      {hasService(tenant, 'messaging') ? <MessagingClient prices={{ ...priceList().messages, media: priceList().media }} balance={Number(wallet?.balance ?? 0)} /> : <p className="text-sm text-foreground-secondary">Messaging is not added to this workspace yet. <Link href="/dashboard/services" className="font-semibold ecom-accent-text hover:underline">Add it from Services</Link>.</p>}
+      <p className="text-sm text-foreground-secondary">Messaging is not added to this workspace yet. <Link href="/dashboard/services" className="font-semibold ecom-accent-text hover:underline">Add it from Services</Link>.</p>
     </>
   )
 }

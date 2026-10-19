@@ -593,7 +593,7 @@ export default function DelhiveryPageClient({
             <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Eligible Orders</h2>
             <span className="text-sm text-foreground-secondary">{orders.length} found</span>
           </div>
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
             {pickupLocations.length > 0 && (
               <div className="flex items-center gap-2">
                 <label className="text-sm text-foreground-secondary">Pickup address</label>
@@ -602,7 +602,7 @@ export default function DelhiveryPageClient({
                   value={pickupLocation}
                   onChange={setPickupLocation}
                   options={pickupLocations.map(l => ({ value: l.name, label: l.name }))}
-                  className="min-w-48"
+                  className="min-w-[9rem] sm:min-w-48"
                 />
               </div>
             )}
@@ -875,7 +875,7 @@ export default function DelhiveryPageClient({
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2 lg:flex-nowrap">
                             {awbs.length > 0 && (
                               <button
                                 onClick={() => handleDownloadLabels(req)}
@@ -945,7 +945,7 @@ export default function DelhiveryPageClient({
                                   setAddAwbFor(addAwbFor === req.id ? null : req.id)
                                   setAddAwbOrderId('')
                                 }}
-                                className="hidden md:inline-flex items-center justify-center h-[34px] px-3 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors whitespace-nowrap"
+                                className="hidden lg:inline-flex items-center justify-center h-[34px] px-3 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors whitespace-nowrap"
                               >
                                 + Add AWB
                               </button>
@@ -986,8 +986,8 @@ export default function DelhiveryPageClient({
                       {addAwbFor === req.id && (
                         <tr key={`${req.id}-add`} className="bg-surface-secondary border-b border-border-default">
                           <td colSpan={6} className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap w-full sm:w-auto">
                                 Add order to this pickup:
                               </label>
                               <AdminSelect

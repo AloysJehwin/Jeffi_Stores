@@ -1,12 +1,13 @@
 // Google (Gemini API): Gemini image models for images, Veo for video.
-// Checked against ai.google.dev on 2026-10-16:
-// - Imagen is shut down in the Gemini API (docs/imagen). Images use the Interactions API from
-//   docs/image-generation:
-//     POST /v1beta/interactions { model, input: string | [{type:'text',text},{type:'image',mime_type,data}],
-//                                 response_format: { type:'image', aspect_ratio, image_size } }
-//     -> { status, steps: [{ type:'model_output', content: [{ type:'image', data, mime_type }] }] }
-//   One image per call, so n images means n calls. The Imagen ":predict" path is kept only as an
-//   opt-in fallback (GOOGLE_IMAGEN_MODEL) for keys that still have access.
+// Verified against ai.google.dev on 2026-10-18:
+// - Image gen on multimodal Gemini image models uses the standard generateContent path:
+//     POST /v1beta/models/<model>:generateContent
+//     { contents:[{ role:'user', parts:[{text},{inline_data?:{mime_type,data}}] }],
+//       generationConfig:{ responseModalities:['IMAGE','TEXT'],
+//                          imageConfig:{ aspectRatio }, seed? } }
+//     -> { candidates:[{ content:{ parts:[{inlineData:{mimeType,data}},{text?}] } }] }
+//   One image per call, so n images means n calls. Imagen's :predict path is kept only
+//   as an opt-in fallback (GOOGLE_IMAGEN_MODEL) for keys that still have access.
 // - Veo (docs/veo): POST /v1beta/models/<model>:predictLongRunning
 //     { instances:[{ prompt, image?:{inlineData:{mimeType,data}} }], parameters:{ aspectRatio, durationSeconds:"4"|"6"|"8", resolution, numberOfVideos } }
 //     -> { name }; GET /v1beta/<name> -> { done, response.generateVideoResponse.generatedSamples[0].video.uri }
@@ -17,8 +18,9 @@ import { ProviderError, fetchBytes, fetchJson, loadImage, nearestAspect, toImage
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
-interface InteractionContent { type?: string; data?: string; mime_type?: string }
-interface InteractionResponse { status?: string; steps?: { type?: string; content?: InteractionContent[] }[]; error?: { message?: string } }
+interface GenPart { text?: string; inlineData?: { mimeType?: string; data?: string } }
+interface GenCandidate { content?: { parts?: GenPart[] }; finishReason?: string }
+interface GenResponse { candidates?: GenCandidate[]; promptFeedback?: { blockReason?: string }; error?: { message?: string } }
 interface ImagenPrediction { bytesBase64Encoded?: string; mimeType?: string }
 interface ImagenResponse { predictions?: ImagenPrediction[] }
 interface VeoStartResponse { name?: string }
@@ -42,8 +44,8 @@ export class GoogleProvider implements MediaProvider {
   readonly name = 'google' as const
   constructor(
     private readonly apiKey = process.env.GOOGLE_AI_API_KEY || '',
-    private readonly imageModel = process.env.GOOGLE_IMAGE_MODEL || 'gemini-3.1-flash-image',
-    private readonly premiumImageModel = process.env.GOOGLE_IMAGE_PREMIUM_MODEL || 'gemini-3-pro-image',
+    private readonly imageModel = process.env.GOOGLE_IMAGE_MODEL || 'gemini-2.5-flash-image-preview',
+    private readonly premiumImageModel = process.env.GOOGLE_IMAGE_PREMIUM_MODEL || 'gemini-2.5-flash-image-preview',
     private readonly imagenModel = process.env.GOOGLE_IMAGEN_MODEL || '',
     private readonly veoModel = process.env.GOOGLE_VEO_MODEL || 'veo-3.1-fast-generate-preview',
     private readonly veoFallback = process.env.GOOGLE_VEO_FALLBACK || 'veo-3.0-generate-001',
@@ -64,33 +66,41 @@ export class GoogleProvider implements MediaProvider {
 
   private async geminiAt(model: string, req: ImageGenInput): Promise<ImageGenOutput> {
     const text = req.negativePrompt ? `${req.prompt}\n\nAvoid: ${req.negativePrompt}` : req.prompt
-    let input: unknown = text
+    const parts: Record<string, unknown>[] = [{ text }]
     if (req.referenceImageUrl) {
       const img = await loadImage('google', req.referenceImageUrl)
-      input = [{ type: 'text', text }, { type: 'image', mime_type: img.mime, data: img.data }]
+      parts.push({ inline_data: { mime_type: img.mime, data: img.data } })
     }
-    const body: Record<string, unknown> = {
-      model,
-      input,
-      response_format: {
-        type: 'image',
-        aspect_ratio: nearestAspect(req.width, req.height, GEMINI_IMAGE_ASPECTS),
-        image_size: Math.max(req.width, req.height) > 1024 ? '2K' : '1K',
-      },
-      store: false,
+    const generationConfig: Record<string, unknown> = {
+      responseModalities: ['IMAGE', 'TEXT'],
+      imageConfig: { aspectRatio: nearestAspect(req.width, req.height, GEMINI_IMAGE_ASPECTS) },
     }
-    if (typeof req.seed === 'number') body.generation_config = { seed: req.seed }
+    if (typeof req.seed === 'number') generationConfig.seed = req.seed
+    const body = {
+      contents: [{ role: 'user', parts }],
+      generationConfig,
+    }
     const one = async () => {
-      const r = await fetchJson<InteractionResponse>('google', `${BASE}/interactions`, {
+      const r = await fetchJson<GenResponse>('google', `${BASE}/models/${model}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.apiKey },
         body: JSON.stringify(body),
         timeoutMs: this.timeoutMs,
       })
       if (r.error?.message) throw new ProviderError('google', r.error.message)
-      const img = (r.steps || []).flatMap(s => s.content || []).filter(c => c.type === 'image' && c.data).pop()
-      if (!img?.data) throw new ProviderError('google', `no image in interaction (status ${r.status || 'unknown'})`)
-      return toImage(Buffer.from(img.data, 'base64'), img.mime_type || 'image/png', { width: req.width, height: req.height })
+      if (r.promptFeedback?.blockReason) throw new ProviderError('google', `blocked: ${r.promptFeedback.blockReason}`)
+      const img = (r.candidates || [])
+        .flatMap(c => c.content?.parts || [])
+        .find(p => p.inlineData?.data)
+      if (!img?.inlineData?.data) {
+        const reason = r.candidates?.[0]?.finishReason || 'no image in response'
+        throw new ProviderError('google', `no image returned (${reason})`)
+      }
+      return toImage(
+        Buffer.from(img.inlineData.data, 'base64'),
+        img.inlineData.mimeType || 'image/png',
+        { width: req.width, height: req.height },
+      )
     }
     const images = await Promise.all(Array.from({ length: req.n }, one))
     return { images, model }

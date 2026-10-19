@@ -6,6 +6,23 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import type { PoolClient } from 'pg'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
+
+// Keep the admin's open editor session's snapshot in step with the draft just saved.
+// After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
+// pre-session snapshot (A1). Never fails the enclosing save on error.
+async function resnapshotBrandSession(brandId: string) {
+  try {
+    const session = await getAdminSession()
+    if (!session) return
+    const open = await findOpenSession(session.adminId, 'brand', brandId)
+    if (!open) return
+    await resnapshotSession(open.id, session.adminId)
+  } catch (err) {
+    console.error('[brand-edit] resnapshotSession failed for', brandId, err)
+  }
+}
 
 export async function updateBrand(brandId: string, formData: FormData) {
   // The discard-draft form posts only `intent`, so name is missing there.
@@ -70,6 +87,8 @@ export async function updateBrand(brandId: string, formData: FormData) {
       ]
     )
     revalidatePath('/admin/brands')
+    // Save-as-Draft on a create-draft: resnapshot so Cancel reverts here.
+    if (!publish) await resnapshotBrandSession(brandId)
     // Publish → /view (new standardized destination); save-as-draft stays on list.
     redirect(ap(publish ? `/admin/brands/${brandId}/view` : '/admin/brands', host))
   }
@@ -121,7 +140,8 @@ export async function updateBrand(brandId: string, formData: FormData) {
         redirect(ap('/admin/brands', host))
       }
 
-      // Save as Draft always returns to the list.
+      // Save as Draft: resnapshot so Cancel reverts to this save (A2), not the pre-session (A1).
+      await resnapshotBrandSession(brandId)
       revalidatePath(`/admin/brands/${brandId}/edit`)
       revalidatePath('/admin/brands')
       const back = formData.get('_back') as string | null
@@ -136,6 +156,7 @@ export async function updateBrand(brandId: string, formData: FormData) {
        ON CONFLICT (brand_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
       [brandId, JSON.stringify(draftFields)]
     )
+    await resnapshotBrandSession(brandId)
     revalidatePath(`/admin/brands/${brandId}/edit`)
     redirect(ap(`/admin/brands/${brandId}/edit`, host))
   } catch (err: any) {

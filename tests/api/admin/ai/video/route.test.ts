@@ -91,7 +91,7 @@ describe('GET /api/admin/ai/video/[jobId]', () => {
     const res = await poll('job-1', USAGE)
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ status: 'done', videoUrl: 'https://cdn/ai/video/job-1.mp4' })
-    expect(h.videoJob).toHaveBeenCalledWith('job-1', USAGE)
+    expect(h.videoJob).toHaveBeenCalledWith('job-1', USAGE, null)
   })
 
   it('400s a malformed job id or usage id', async () => {

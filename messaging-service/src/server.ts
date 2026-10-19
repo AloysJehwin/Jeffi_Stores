@@ -229,12 +229,15 @@ app.post<{ Params: { id: string } }>('/v2/templates/:id/review', async (req, rep
   return { ok: true }
 })
 
-app.get<{ Params: { channel: string; slug: string }; Querystring: { locale?: string } }>(
+app.get<{ Params: { channel: string; slug: string }; Querystring: { locale?: string; source?: string } }>(
   '/v2/templates/:channel/:slug',
   async (req, reply) => {
     const { pools } = await poolFor(req)
     const channel = Channel.parse(req.params.channel)
-    const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, channel, req.params.slug, req.query.locale ?? 'en', spaceOf(req))
+    // ?source=platform: force the platform default (skip tenant override) — "Reset to platform default" uses it.
+    const t = req.query.source === 'platform'
+      ? await tpl.findPlatformBySlug(pools, channel, req.params.slug, req.query.locale ?? 'en')
+      : await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, channel, req.params.slug, req.query.locale ?? 'en', spaceOf(req))
     if (!t) return reply.code(404).send({ error: 'not_found' })
     const s = await settingsFor(req)
     if (s && !isAdmin(req) && t.family.tenant_id === tpl.PLATFORM_TENANT_ID && !gov.standardAllowed(s, channel, t.family.slug))

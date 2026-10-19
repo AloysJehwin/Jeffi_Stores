@@ -1562,27 +1562,29 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               }}
               secondary={
                 isEdit && editIsDraft && autoSaveStatus !== 'idle' ? (
-                  <span className={autoSaveStatus === 'saving' ? 'text-foreground-muted' : autoSaveStatus === 'saved' ? 'text-green-700 dark:text-green-400' : 'text-red-500'}>
+                  <span className={`w-full order-first md:order-none md:w-auto ${autoSaveStatus === 'saving' ? 'text-foreground-muted' : autoSaveStatus === 'saved' ? 'text-green-700 dark:text-green-400' : 'text-red-500'}`}>
                     {autoSaveStatus === 'saving' ? 'Auto-saving…' : autoSaveStatus === 'saved' ? 'Auto-saved' : 'Auto-save failed'}
                   </span>
                 ) : undefined
               }
             >
-              {!isEdit && canWrite && (
-                <FormButton type="button" variant="secondary" disabled={submitting} onClick={handleSaveDraft}>
-                  {submitting ? 'Saving…' : 'Save as Draft'}
-                </FormButton>
-              )}
-              {isEdit && editIsDraft && canWrite && (
-                <FormButton type="button" disabled={submitting} onClick={handleFinalizeEdit} className="bg-amber-500 hover:bg-amber-600">
-                  {submitting ? 'Finalizing…' : 'Save & Finalize'}
-                </FormButton>
-              )}
-              {canWrite && (
-                <FormButton disabled={submitting}>
-                  {submitting ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : 'Create Invoice'}
-                </FormButton>
-              )}
+              <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:items-center md:gap-2">
+                {!isEdit && canWrite && (
+                  <FormButton type="button" variant="secondary" disabled={submitting} onClick={handleSaveDraft} className="w-full md:w-auto">
+                    {submitting ? 'Saving…' : 'Save as Draft'}
+                  </FormButton>
+                )}
+                {isEdit && editIsDraft && canWrite && (
+                  <FormButton type="button" disabled={submitting} onClick={handleFinalizeEdit} className="w-full bg-amber-500 hover:bg-amber-600 md:w-auto">
+                    {submitting ? 'Finalizing…' : 'Save & Finalize'}
+                  </FormButton>
+                )}
+                {canWrite && (
+                  <FormButton disabled={submitting} className="col-span-2 w-full md:col-span-1 md:w-auto">
+                    {submitting ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : 'Create Invoice'}
+                  </FormButton>
+                )}
+              </div>
             </FormFooter>
           </form>
         </div>
@@ -1646,8 +1648,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           </TabActionsPortal>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-[200px] flex-1">
+        <div className="flex items-center gap-2 overflow-x-auto -mx-4 px-4 pb-1">
+          <div className="min-w-[200px] flex-1 shrink-0">
             <AdminTypeahead
               type="invoices"
               value={searchInput}
@@ -1671,11 +1673,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               setSearchQ(searchInput)
               syncUrl({ search: searchInput })
             }}
-            className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600"
+            className="control-md shrink-0 bg-accent-500 font-medium text-white hover:bg-accent-600"
           >
             Search
           </button>
-          <div className="w-[190px]">
+          <div className="w-[190px] shrink-0">
             <Select<string>
               value={sourceFilter}
               onChange={v => {
@@ -1690,7 +1692,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               ]}
             />
           </div>
-          <div className="w-[170px]">
+          <div className="w-[170px] shrink-0">
             <Select<string>
               value={paymentFilter}
               onChange={v => {
@@ -1706,7 +1708,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               ]}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap">
             <DatePicker
               className="w-36"
               value={fromDate}
@@ -1737,7 +1739,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 setToDate('')
                 syncUrl({ search: '', source: '', payment: '', from: '', to: '' })
               }}
-              className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary"
+              className="control-md shrink-0 border border-border-default text-foreground-secondary hover:bg-surface-secondary"
             >
               <X className="h-4 w-4" />
               Clear
@@ -1829,14 +1831,14 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 <div className="divide-y divide-amber-500/20 md:hidden">
                   {drafts.map(draft => (
                     <div key={draft.id} className="space-y-2 p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <a href={ap(`/admin/orders/${draft.id}/view`)} className="font-mono text-xs font-medium text-foreground hover:text-accent-500 hover:underline">
                             {draft.order_number}
                           </a>
                           <span className={badgeCls(draft.order_number?.startsWith('AMD-') ? 'blue' : 'amber')}>{draft.order_number?.startsWith('AMD-') ? 'Amendment Draft' : 'Draft'}</span>
                         </div>
-                        <span className="text-sm font-semibold tabular-nums text-foreground">₹{fmt(parseFloat(draft.total_amount))}</span>
+                        <span className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums text-foreground">₹{fmt(parseFloat(draft.total_amount))}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-foreground">{draft.customer_name}</span>

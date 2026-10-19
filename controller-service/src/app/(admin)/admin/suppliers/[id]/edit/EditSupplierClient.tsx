@@ -1,19 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { PageBody, PageHeader } from '@/components/admin/kit/layout'
+import { Badge } from '@/components/admin/kit'
 import { FormButton, FormField, FormFooter, FormGrid, FormPage, FormSection, NumberInput, TextArea, TextInput } from '@/components/admin/kit/form'
 import { ErrorState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
-import { EditSessionActions } from '@/components/admin/kit'
 import { useEditSession } from '@/hooks/useEditSession'
-import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
+import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
+import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
+import { resnapshotSupplierSession } from './actions'
 
 
 const emptyForm = {
@@ -31,9 +33,49 @@ const emptyForm = {
   upi_id: '',
 }
 
+type SupplierForm = typeof emptyForm
+
+function normalizePhone(raw: string) {
+  return (raw || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10)
+}
+
+function liveToForm(s: any): SupplierForm {
+  return {
+    name: s.name || '',
+    gstin: s.gstin || '',
+    contact_name: s.contact_name || '',
+    phone: normalizePhone(s.phone || ''),
+    email: s.email || '',
+    address: s.address || '',
+    payment_terms: String(s.payment_terms ?? '30'),
+    notes: s.notes || '',
+    bank_name: s.bank_name || '',
+    account_number: s.account_number || '',
+    ifsc: s.ifsc || '',
+    upi_id: s.upi_id || '',
+  }
+}
+
+function mergeDraft(live: SupplierForm, df: Record<string, any>): SupplierForm {
+  return {
+    name: df.name ?? live.name,
+    gstin: df.gstin ?? live.gstin,
+    contact_name: df.contact_name ?? live.contact_name,
+    phone: df.phone ?? live.phone,
+    email: df.email ?? live.email,
+    address: df.address ?? live.address,
+    payment_terms: df.payment_terms ?? live.payment_terms,
+    notes: df.notes ?? live.notes,
+    bank_name: df.bank_name ?? live.bank_name,
+    account_number: df.account_number ?? live.account_number,
+    ifsc: df.ifsc ?? live.ifsc,
+    upi_id: df.upi_id ?? live.upi_id,
+  }
+}
+
 export default function EditSupplierClient({ id }: { id: string }) {
   const router = useRouter()
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState<SupplierForm>(emptyForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -42,69 +84,97 @@ export default function EditSupplierClient({ id }: { id: string }) {
   const setError = (text: string) => text && toast.error(text)
   const [loadError, setLoadError] = useState('')
   const listHref = ap('/admin/suppliers?tab=suppliers')
+  const viewHref = ap(`/admin/suppliers/${id}/view`)
   const [ifscLookup, setIfscLookup] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const edit = useEditSession({ resourceType: 'supplier', resourceId: id ?? null })
 
-  useEffect(() => {
-    Promise.all([
-      fetch(`/api/admin/suppliers/${id}`).then(r => r.json()),
-      fetch(`/api/admin/suppliers/${id}/draft`, { credentials: 'include' }).then(r => r.json()),
-    ])
-      .then(([supplierJson, draftJson]) => {
-        const s = supplierJson.supplier
-        if (!s) {
-          setLoadError('Supplier not found')
-          return
-        }
-        const live = {
-          name: s.name || '',
-          gstin: s.gstin || '',
-          contact_name: s.contact_name || '',
-          phone: (s.phone || '')
-            .replace(/^\+?91/, '')
-            .replace(/\D/g, '')
-            .slice(-10),
-          email: s.email || '',
-          address: s.address || '',
-          payment_terms: String(s.payment_terms ?? '30'),
-          notes: s.notes || '',
-          bank_name: s.bank_name || '',
-          account_number: s.account_number || '',
-          ifsc: s.ifsc || '',
-          upi_id: s.upi_id || '',
-        }
-        const df = draftJson.draft_fields
-        if (df) {
-          setHasDraft(true)
-          setForm({
-            name: df.name ?? live.name,
-            gstin: df.gstin ?? live.gstin,
-            contact_name: df.contact_name ?? live.contact_name,
-            phone: df.phone ?? live.phone,
-            email: df.email ?? live.email,
-            address: df.address ?? live.address,
-            payment_terms: df.payment_terms ?? live.payment_terms,
-            notes: df.notes ?? live.notes,
-            bank_name: df.bank_name ?? live.bank_name,
-            account_number: df.account_number ?? live.account_number,
-            ifsc: df.ifsc ?? live.ifsc,
-            upi_id: df.upi_id ?? live.upi_id,
-          })
-        } else {
-          setForm(live)
-        }
-      })
-      .catch(() => setLoadError('Failed to load supplier'))
-      .finally(() => setLoading(false))
+  // Autosave bookkeeping — mirrors the Product editor so Cancel/Discard can wait on in-flight.
+  const autosaveBlockedRef = useRef(false)
+  const inFlightRef = useRef(false)
+  const didHydrateRef = useRef(false)
 
-    // Auto-create draft on first visit
-    fetch(`/api/admin/suppliers/${id}/draft`, {
-      method: 'PATCH',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    }).then(() => setHasDraft(true))
+  // Autosave shares the PATCH endpoint; payload stays byte-identical to Save as Draft.
+  const autosave = useAutosaveDraft<SupplierForm>({
+    enabled: v => !!v.name.trim() && !autosaveBlockedRef.current,
+    save: async (value, signal) => {
+      inFlightRef.current = true
+      try {
+        const r = await fetch(`/api/admin/suppliers/${id}/draft`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(value),
+          signal,
+        })
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}))
+          throw new Error(j?.error || `HTTP ${r.status}`)
+        }
+        setHasDraft(true)
+      } finally {
+        inFlightRef.current = false
+      }
+    },
+  })
+
+  async function hydrate() {
+    try {
+      const [supplierJson, draftJson] = await Promise.all([
+        fetch(`/api/admin/suppliers/${id}`).then(r => r.json()),
+        fetch(`/api/admin/suppliers/${id}/draft`, { credentials: 'include' }).then(r => r.json()),
+      ])
+      const s = supplierJson.supplier
+      if (!s) {
+        setLoadError('Supplier not found')
+        return
+      }
+      const live = liveToForm(s)
+      const df = draftJson.draft_fields
+      if (df) {
+        setHasDraft(true)
+        setForm(mergeDraft(live, df))
+      } else {
+        setHasDraft(false)
+        setForm(live)
+      }
+    } catch {
+      setLoadError('Failed to load supplier')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Load live + draft, then ensure the draft row exists (idempotent — never wipes if already there).
+  useEffect(() => {
+    void hydrate().then(async () => {
+      didHydrateRef.current = true
+      // Keep the on-mount PATCH so a direct /edit visit still works; the server's PATCH is a
+      // replace, so only touch it when no draft was fetched (otherwise it would wipe fields).
+      try {
+        const r = await fetch(`/api/admin/suppliers/${id}/draft`, { credentials: 'include' })
+        const j = await r.json().catch(() => ({}))
+        if (!j?.draft_fields) {
+          await fetch(`/api/admin/suppliers/${id}/draft`, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          })
+          setHasDraft(true)
+        }
+      } catch {
+        // Non-fatal — autosave will create the row on first edit.
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Trigger autosave on form change after the initial hydrate.
+  useEffect(() => {
+    if (!didHydrateRef.current) return
+    autosave.trigger(form)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form])
 
   async function lookupIfsc(code: string) {
     const clean = code.trim().toUpperCase()
@@ -129,20 +199,13 @@ export default function EditSupplierClient({ id }: { id: string }) {
     setError('')
     setSaving(true)
     try {
-      const res = await fetch(`/api/admin/suppliers/${id}/draft`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) {
-        const j = await res.json()
-        setError(j.error || 'Failed to save draft')
-        return
-      }
+      await autosave.flush(form)
       setHasDraft(true)
-      router.push(ap('/admin/suppliers?tab=suppliers'))
-    } finally {
+      // Resnapshot so a later Cancel reverts to this saved draft, not the pre-session state.
+      await resnapshotSupplierSession(id)
+      router.push(listHref)
+    } catch (e: any) {
+      setError(e?.message || 'Failed to save draft')
       setSaving(false)
     }
   }
@@ -155,50 +218,51 @@ export default function EditSupplierClient({ id }: { id: string }) {
     setError('')
     setPublishing(true)
     try {
-      // Save latest form to draft first, then publish
-      await fetch(`/api/admin/suppliers/${id}/draft`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
+      await autosave.flush(form)
       const res = await fetch(`/api/admin/suppliers/${id}/draft`, { method: 'POST', credentials: 'include' })
       if (!res.ok) {
-        const j = await res.json()
+        const j = await res.json().catch(() => ({}))
         setError(j.error || 'Failed to publish')
+        setPublishing(false)
         return
       }
-      router.push(ap('/admin/suppliers?tab=suppliers'))
-    } finally {
+      // Draft row is deleted on publish — close the open session, redirect to the list.
+      await edit.save().catch(() => undefined)
+      router.push(listHref)
+    } catch (e: any) {
+      setError(e?.message || 'Failed to publish')
       setPublishing(false)
     }
   }
 
   async function discardDraft() {
-    await fetch(`/api/admin/suppliers/${id}/draft`, { method: 'DELETE', credentials: 'include' })
-    setHasDraft(false)
-    // Reload from live
-    const res = await fetch(`/api/admin/suppliers/${id}`)
-    const json = await res.json()
-    const s = json.supplier
-    if (s)
-      setForm({
-        name: s.name || '',
-        gstin: s.gstin || '',
-        contact_name: s.contact_name || '',
-        phone: (s.phone || '')
-          .replace(/^\+?91/, '')
-          .replace(/\D/g, '')
-          .slice(-10),
-        email: s.email || '',
-        address: s.address || '',
-        payment_terms: String(s.payment_terms ?? '30'),
-        notes: s.notes || '',
-        bank_name: s.bank_name || '',
-        account_number: s.account_number || '',
-        ifsc: s.ifsc || '',
-        upi_id: s.upi_id || '',
-      })
+    autosaveBlockedRef.current = true
+    for (let i = 0; i < 100 && inFlightRef.current; i++) await new Promise(r => setTimeout(r, 100))
+    try {
+      const r = await fetch(`/api/admin/suppliers/${id}/draft`, { method: 'DELETE', credentials: 'include' })
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}))
+        setError(j.error || 'Failed to discard draft')
+        autosaveBlockedRef.current = false
+        return
+      }
+      await edit.save().catch(() => undefined)
+      router.push(viewHref)
+    } catch (e: any) {
+      setError(e?.message || 'Failed to discard draft')
+      autosaveBlockedRef.current = false
+    }
+  }
+
+  async function cancelEdit() {
+    autosaveBlockedRef.current = true
+    for (let i = 0; i < 100 && inFlightRef.current; i++) await new Promise(r => setTimeout(r, 100))
+    const ok = await edit.cancel()
+    if (!ok) {
+      autosaveBlockedRef.current = false
+      return
+    }
+    router.push(viewHref)
   }
 
   if (loading) return null
@@ -222,35 +286,45 @@ export default function EditSupplierClient({ id }: { id: string }) {
       <form
         onSubmit={e => {
           e.preventDefault()
-          saveDraft()
+          void saveDraft()
         }}
       >
         <FormPage
           header={
-            <>
-              {edit.sessionId && (
-                <div className="flex justify-end">
-                  <EditSessionActions
-                    autosaveStatus={'idle' as AutosaveStatus}
-                    sessionStatus={edit.status}
-                    onCancel={edit.cancel}
-                    cancelHref={ap('/admin/suppliers')}
-                    draft={hasDraft}
-                    discard={hasDraft ? discardDraft : undefined}
-                  />
-                </div>
-              )}
-              <PageHeader back={{ href: listHref, label: 'Suppliers' }} title={hasDraft ? 'Edit Draft' : 'Edit Supplier'} description={form.name} />
-            </>
+            <PageHeader
+              back={{ href: listHref, label: 'Suppliers' }}
+              title={hasDraft ? 'Edit Draft' : 'Edit Supplier'}
+              description={hasDraft ? 'Changes are saved to the draft only' : 'Update supplier information'}
+              badges={hasDraft ? <Badge tone="amber">Draft pending</Badge> : undefined}
+            />
           }
           footer={
-            <FormFooter cancelHref={listHref}>
+            <FormFooter
+              autosave={<AutosaveStatusPill status={autosave.status} />}
+              draftBadge={hasDraft ? <Badge tone="amber">Draft pending</Badge> : undefined}
+              discard={hasDraft ? discardDraft : undefined}
+              cancel={edit.sessionId ? cancelEdit : undefined}
+              cancelHref={edit.sessionId ? undefined : listHref}
+            >
               <RequireWrite scope="inventory">
-                <FormButton variant="secondary" disabled={saving || !form.name.trim()} pending={saving} pendingLabel="Saving…">
-                  Save Draft
+                <FormButton
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void saveDraft()}
+                  disabled={saving || !form.name.trim()}
+                  pending={saving}
+                  pendingLabel="Saving…"
+                >
+                  Save as Draft
                 </FormButton>
-                <FormButton type="button" onClick={publish} disabled={publishing || !form.name.trim()} pending={publishing} pendingLabel="Publishing…">
-                  Publish
+                <FormButton
+                  type="button"
+                  onClick={() => void publish()}
+                  disabled={publishing || !form.name.trim()}
+                  pending={publishing}
+                  pendingLabel="Publishing…"
+                >
+                  Update &amp; Publish
                 </FormButton>
               </RequireWrite>
             </FormFooter>

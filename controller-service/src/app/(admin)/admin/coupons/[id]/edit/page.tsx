@@ -162,7 +162,7 @@ export default async function EditCouponPage({
             back={{ href: ap(backUrl, host), label: 'Coupons' }}
             title={isDraft ? 'Edit Draft' : 'Edit Coupon'}
             description={<span className="font-mono">{coupon.code}</span>}
-            badges={isDraft && <Badge tone="amber">Draft</Badge>}
+            badges={isDraft && <Badge tone="amber">Draft pending</Badge>}
           />
         }
       >

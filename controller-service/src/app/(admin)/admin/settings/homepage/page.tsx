@@ -6,13 +6,13 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import HeroSlideManager from '@/components/admin/HeroSlideManager'
 import HomepageSectionManager from '@/components/admin/homepage/HomepageSectionManager'
-import HomepageDraftBar from '@/components/admin/homepage/HomepageDraftBar'
-import HomepageEditorToolbar from '@/components/admin/homepage/HomepageEditorToolbar'
+import HomepageFormFooter from '@/components/admin/homepage/HomepageFormFooter'
 import { getStorefrontContent, getStoreIdentity } from '@/lib/catalog/site-controls'
 import { defaultAboutCopy, resolveAboutStats } from '@/lib/catalog/homepage-sections'
 import { getEditableHomepage, getHomepageDraftSummary } from '@/lib/catalog/homepage-draft'
 import type { SectionOptions } from '@/components/admin/homepage/editors/fields'
-import { PageHeader } from '@/components/admin/kit/layout'
+import { Badge, PageHeader } from '@/components/admin/kit'
+import { resnapshotHomepageSession } from './actions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -103,18 +103,29 @@ export default async function HomepagePage() {
     getHomepageDraftSummary(),
   ])
   const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
+  const hasChangedSections =
+    draftSummary.sections.added +
+      draftSummary.sections.removed +
+      draftSummary.sections.edited +
+      (draftSummary.sections.reordered ? 1 : 0) >
+    0
+  const hasChangedSlides =
+    draftSummary.slides.added +
+      draftSummary.slides.removed +
+      draftSummary.slides.edited +
+      (draftSummary.slides.reordered ? 1 : 0) >
+    0
+  const draftPending = draftSummary.hasDraft && (hasChangedSections || hasChangedSlides)
 
+  // Mirror the other migrated entities: header carries only title + description + badges;
+  // one shared FormFooter at the bottom owns Cancel / Save as Draft / Publish / Discard.
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <PageHeader
-          title="Homepage"
-          description="Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish."
-        />
-        <HomepageEditorToolbar adminId={adminId} cancelHref={ap('/admin/settings', host)} />
-      </div>
-
-      <HomepageDraftBar initial={draftSummary} />
+    <div className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5">
+      <PageHeader
+        title="Homepage"
+        description="Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish."
+        badges={draftPending ? <Badge tone="amber">Draft pending</Badge> : null}
+      />
 
       <HomepageSectionManager
         initial={editable.sections}
@@ -129,6 +140,13 @@ export default async function HomepagePage() {
             materialOptions={hero.materialOptions}
           />
         }
+      />
+
+      <HomepageFormFooter
+        adminId={adminId}
+        initialSummary={draftSummary}
+        resnapshotAction={resnapshotHomepageSession}
+        cancelHref={ap('/admin/settings', host)}
       />
     </div>
   )

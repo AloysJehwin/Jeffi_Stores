@@ -67,5 +67,6 @@ export const thCls = 'px-4 py-2.5 text-left text-xs font-medium text-foreground-
 export const thRight = 'px-4 py-2.5 text-right text-xs font-medium text-foreground-muted whitespace-nowrap'
 export const thCenter = 'px-4 py-2.5 text-center text-xs font-medium text-foreground-muted whitespace-nowrap'
 export const theadCls = 'border-b border-border-default bg-surface-secondary/50'
-export const tableWrapCls = 'rounded-xl border border-border-default bg-surface-elevated overflow-hidden'
+export const tableWrapCls = 'rounded-xl border border-border-default bg-surface-elevated'
+export const tableWrapClippedCls = `${tableWrapCls} overflow-hidden`
 export const pagerBtn = 'control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors'

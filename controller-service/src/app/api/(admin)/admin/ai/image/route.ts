@@ -11,6 +11,7 @@ import { AI_IMAGE_FEATURES } from '@/lib/ai/media-features'
 import { AI_FEATURE_SCOPES } from '@/lib/ai/scope-map'
 import { generateImage } from '@/lib/ai/media'
 import { aiMediaErrorResponse } from '@/lib/ai/media-route'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 
 const Body = z.object({
   feature: z.enum(AI_IMAGE_FEATURES),
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
   if (!plan.allowed) return NextResponse.json({ error: 'AI tools are not available for your plan' }, { status: 403 })
 
   try {
-    const r = await generateImage({ ...body.data, actor: admin.email ?? null })
+    const r = await generateImage({ ...body.data, actor: admin.email ?? null, tenantId: await resolveTenantId() })
     return NextResponse.json({ images: r.images, provider: r.provider, model: r.model, usageId: r.usageId, priceInr: r.priceInr })
   } catch (err) {
     return aiMediaErrorResponse(err, 'Image generation failed')

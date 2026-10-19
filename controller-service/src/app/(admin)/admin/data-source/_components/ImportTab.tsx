@@ -73,8 +73,8 @@ export default function ImportTab({ refreshKey, onQueued }: { refreshKey: number
   const disabled = !canWrite || busy
 
   return (
-    <div className="grid gap-4 lg:grid-cols-5">
-      <div className="lg:col-span-3 space-y-4">
+    <div className="grid gap-4 md:grid-cols-5">
+      <div className="md:col-span-3 space-y-4">
         <Section title="Upload a file">
           <div
             role="button"
@@ -139,7 +139,7 @@ export default function ImportTab({ refreshKey, onQueued }: { refreshKey: number
         )}
       </div>
 
-      <div className="lg:col-span-2 space-y-4">
+      <div className="md:col-span-2 space-y-4">
         <Section title="Template">
           <div className="flex flex-wrap gap-2">
             <a href="/api/admin/data-source/template" className={btnGhost}>
