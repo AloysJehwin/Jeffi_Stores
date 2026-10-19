@@ -4,7 +4,6 @@ import { mediaPriceInr, messagePriceInr, processingFeeInr } from '@jeffi/pricing
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
 import { signLink } from '@jeffi/tenancy'
-import { findTemplate } from './templates.js'
 import * as tpl from './templates-v2.js'
 import { poolsForTenant } from './pools.js'
 import * as gov from './governance.js'
@@ -60,6 +59,9 @@ export const toApi = (m: MessageRow) => ({
 
 const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
 
+// One audit log line per template id the first time its WA send goes through the brand-at-{{1}} shift.
+const brandInjectedSeen = new Set<string>()
+
 interface Ctx {
   tenantId: string
   tenantSlug?: string
@@ -69,7 +71,9 @@ interface Ctx {
   space?: tpl.Space
 }
 
-// v2 library (tenant copy → platform default) first; legacy message_templates as fallback.
+// v2 library only (tenant copy → platform default). The legacy message_templates fallback was
+// removed in Phase 0 — scripts/backfill-legacy-wa-to-v2.ts migrates any legacy WA row into a v2
+// template_family first, then every tenant has a v2 copy at every slug it ever used.
 export async function resolveTemplate(tenantId: string, channel: string, slug: string, space: tpl.Space = 'store') {
   const { pools } = await poolsForTenant(tenantId)
   let t = await tpl.findBySlugWithDefaults(pools, tenantId, channel, slug, 'en', space)
@@ -94,9 +98,9 @@ export async function resolveTemplate(tenantId: string, channel: string, slug: s
     const live = channel === 'whatsapp' && t.variant.provider_ref
       ? (await tpl.liveVersion(pool, t.variant.id, t.variant.provider_ref)) ?? t.version
       : t.version
-    return { subject: live.subject, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any, layout: live.layout }
+    return { subject: live.subject, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any, layout: live.layout, meta_category: t.variant.meta_category ?? undefined }
   }
-  return findTemplate(tenantId, channel, slug)
+  return null
 }
 
 // WhatsApp templates with a header image `<prefix>{{n}}` and/or a URL button `<host>/{{m}}`: callers may
@@ -182,6 +186,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let providerRef: string | undefined = req.provider_ref
   let layout: 'store' | 'none' = 'store'
   let mediaHosted = false
+  let metaCategory: string | undefined
   if (req.template) {
     const t = await resolveTemplate(ctx.tenantId, req.channel, req.template, ctx.space)
     if (!t) throw new SendError(404, 'template_not_found', `No ${req.channel} template '${req.template}'`)
@@ -191,6 +196,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     body = t.body
     providerRef = providerRef ?? t.provider_ref ?? undefined
     layout = (t as any).layout === 'none' ? 'none' : 'store'
+    metaCategory = (t as any).meta_category
     if (req.channel === 'whatsapp') {
       const action = await actionVars(ctx, (t as any).blocks, vars, req)
       Object.assign(vars, action.vars)
@@ -198,11 +204,11 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     }
   }
   const html = req.channel === 'email'
-  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, layout, mediaHosted }
+  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, layout, mediaHosted, metaCategory }
 }
 
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
-  const { subject, body, providerRef, vars, layout, mediaHosted } = await compose(ctx, req)
+  const { subject, body, providerRef, vars, layout, mediaHosted, metaCategory } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
 
   const id = randomUUID()
@@ -243,8 +249,32 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     } else if (req.channel === 'sms') {
       ref = await sendSms({ to: req.to, body, messageId: id })
     } else {
-      // Twilio content variables are the numbered slots only.
-      const variables = Object.fromEntries(Object.entries(vars).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, String(v ?? '')]))
+      // Phase 0 convention: WA Content Templates reserve slot {{1}} for the store brand. The wrapper
+      // injects store_name at {{1}} and shifts the caller's numbered vars by +1 (descending), so a
+      // legacy caller passing variables.N keeps working on a template authored with brand-at-1.
+      // AUTHENTICATION (OTP) templates bypass — Meta pins {{1}} to the OTP code itself.
+      const callerVars = (req.variables ?? {}) as Record<string, unknown>
+      let variables: Record<string, string>
+      if (metaCategory !== 'AUTHENTICATION') {
+        const out: Record<string, string> = {}
+        // Non-caller numeric slots (actionVars: media/button) keep their template-authored slot.
+        for (const [k, v] of Object.entries(vars)) {
+          if (/^\d+$/.test(k) && !(k in callerVars)) out[k] = String(v ?? '')
+        }
+        // Caller numeric slots slide up by one, descending to avoid clobbering a lower key.
+        const callerNums = Object.keys(callerVars).filter(k => /^\d+$/.test(k)).map(Number).sort((a, b) => b - a)
+        for (const n of callerNums) out[String(n + 1)] = String(callerVars[String(n)] ?? '')
+        out['1'] = String(vars.store_name ?? '')
+        const auditKey = providerRef ?? req.template ?? ''
+        if (auditKey && !brandInjectedSeen.has(auditKey)) {
+          brandInjectedSeen.add(auditKey)
+          console.log(`brand injected at slot 1 for template ${auditKey}`)
+        }
+        variables = out
+      } else {
+        // OTP: caller already owns {{1}}; just filter to numbered slots.
+        variables = Object.fromEntries(Object.entries(vars).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, String(v ?? '')]))
+      }
       ref = await sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id })
     }
     await db.query(
