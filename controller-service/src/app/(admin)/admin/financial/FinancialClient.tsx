@@ -58,15 +58,13 @@ export default function FinancialClient() {
     fetch('/api/admin/financial/payables/sync-payouts', { method: 'POST' }).catch(() => {})
 
     Promise.allSettled([
-      fetch('/api/admin/financial/receivables').then(r => r.json()),
       fetch('/api/admin/financial/payables').then(r => r.json()),
       fetch('/api/admin/financial/transactions').then(r => r.json()),
       fetch(`/api/admin/financial/pl?from=${fyStart}&to=${fyEnd}`).then(r => r.json()),
       fetch(`/api/admin/financial/cashflow?from=${fyStart}&to=${fyEnd}`).then(r => r.json()),
     ]).then(results => {
-      const [rec, pay, txn, pl, cf] = results
+      const [pay, txn, pl, cf] = results
       setAllData({
-        receivables: rec.status === 'fulfilled' && !rec.value?.error ? rec.value : null,
         payables: pay.status === 'fulfilled' && !pay.value?.error ? pay.value : null,
         transactions: txn.status === 'fulfilled' && !txn.value?.error ? txn.value : null,
         pl: pl.status === 'fulfilled' ? pl.value : null,
@@ -86,10 +84,10 @@ export default function FinancialClient() {
 
       <div>
         {tab === 'overview' && <OverviewTab />}
-        {tab === 'receivables' && <ReceivablesTab initialData={allData.receivables ?? null} />}
+        {tab === 'receivables' && <ReceivablesTab />}
         {tab === 'payables' && <PayablesTab initialData={allData.payables ?? null} />}
-        {tab === 'transactions' && <TransactionsTab initialData={allData.transactions ?? null} />}
-        {tab === 'pl' && <PLTab initialData={allData.pl ?? null} />}
+        {tab === 'transactions' && <TransactionsTab />}
+        {tab === 'pl' && <PLTab />}
         {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
         {tab === 'cod_remittance' && <CodRemittanceTab />}
         {tab === 'messaging' && <MessagingTab />}

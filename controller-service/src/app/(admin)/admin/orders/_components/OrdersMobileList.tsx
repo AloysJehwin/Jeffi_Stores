@@ -24,10 +24,11 @@ function customerName(order: any) {
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  const title = typeof value === 'string' ? value : undefined
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs text-foreground-muted">{label}</p>
-      <p className="text-sm text-foreground font-medium">{value}</p>
+      <p className="text-sm text-foreground font-medium break-all" title={title}>{value}</p>
     </div>
   )
 }

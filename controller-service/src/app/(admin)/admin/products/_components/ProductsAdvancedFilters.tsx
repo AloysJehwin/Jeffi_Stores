@@ -25,6 +25,7 @@ export default function ProductsAdvancedFilters({
       type="button"
       onClick={() => setOpen(o => !o)}
       aria-expanded={open}
+      aria-label="Toggle attribute filters"
       className={`control-md border ${open ? 'border-accent-500/50 bg-accent-500/5 text-accent-600' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
     >
       <SlidersHorizontal className="h-4 w-4" />

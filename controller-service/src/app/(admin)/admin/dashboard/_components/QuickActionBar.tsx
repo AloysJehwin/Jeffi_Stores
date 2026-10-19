@@ -31,14 +31,14 @@ function Tile({ label, icon, path, primary, host }: Action & { host: string }) {
   return (
     <Link
       href={ap(path, host)}
-      className={`group ${display} flex-col items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated transition-colors duration-200`}
+      className={`group ${display} flex-col items-center justify-center gap-1.5 py-3 min-h-[88px] rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated transition-colors duration-200`}
     >
       <span
         className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${primary ? 'bg-accent-500/10 text-accent-600 group-hover:bg-accent-500 group-hover:text-white' : 'bg-surface-secondary text-foreground-secondary group-hover:text-foreground'} [&_svg]:w-5 [&_svg]:h-5`}
       >
         {NAV_ICONS[icon] ?? fallbackIcon()}
       </span>
-      <span className="text-center leading-tight">{label}</span>
+      <span className="text-center leading-tight line-clamp-2">{label}</span>
     </Link>
   )
 }

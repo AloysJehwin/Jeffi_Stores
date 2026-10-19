@@ -137,19 +137,20 @@ describe('POST /api/admin/ai-enrich-field', () => {
     expect((await res.json()).error).toMatch(/AI gateway HTTP 500/)
   })
 
-  it('returns 502 when AI returns unparseable response', async () => {
+  it('falls back to the raw text when AI reply is not JSON', async () => {
+    // extractResult now accepts a direct-string answer (step d) rather than failing.
     aiReply('not json at all !!!')
     const res = await POST(makeReq({ value: 'hex bolt M8' }))
-    expect(res.status).toBe(502)
-    // lib/ai/enrich-field reports an unparseable reply as an empty result.
-    expect((await res.json()).error).toMatch(/empty result/i)
+    expect(res.status).toBe(200)
+    expect((await res.json()).result).toBe('not json at all !!!')
   })
 
-  it('returns 502 when AI returns empty result field', async () => {
+  it('falls back to the raw object text when the result field is empty', async () => {
+    // {"result":""} fails parseAiJson, so the direct-string fallback returns the raw JSON string.
     aiReply(JSON.stringify({ result: '' }))
     const res = await POST(makeReq({ value: 'hex bolt M8' }))
-    expect(res.status).toBe(502)
-    expect((await res.json()).error).toMatch(/empty result/i)
+    expect(res.status).toBe(200)
+    expect((await res.json()).result).toBe('{"result":""}')
   })
 
   // ── Happy path ───────────────────────────────────────────────────────────

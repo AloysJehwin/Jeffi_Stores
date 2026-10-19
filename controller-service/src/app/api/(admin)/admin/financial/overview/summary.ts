@@ -8,6 +8,7 @@ import {
   type Bucket,
   type Range,
 } from '@/app/(admin)/admin/financial/_components/overview-period'
+import type { FinanceOverviewContract } from '@/app/(admin)/admin/financial/_components/finance-overview-contract'
 import { aiTotals } from '../ai-costs/summary'
 
 // Finance overview in SQL. Revenue, refunds and COGS follow getPLReport; cash in/out follow
@@ -312,7 +313,36 @@ async function attention() {
   return { receivables, payables, cod, refunds, returns, adjustments, payouts }
 }
 
-export async function getFinanceOverview(range: Range, opts: { withGst: boolean; flagship?: boolean }) {
+export type MixRow = { key: string; amount: number; count: number }
+
+// FinanceOverviewContract<PeriodTotals> plus the overview-specific receivables/payables/cod,
+// needs-attention lists, mix rows, top suppliers and AI roll-up the Overview tab needs.
+export interface FinanceOverview extends FinanceOverviewContract<PeriodTotals, MixRow> {
+  by_method: MixRow[]
+  by_channel: MixRow[]
+  receivables: { total: number; count: number; aging: { key: AgingKey; label: string; amount: number; count: number }[] }
+  payables: {
+    total: number; count: number
+    due_7d: number; due_7d_count: number
+    overdue: number; overdue_count: number
+    aging: { key: AgingKey; label: string; amount: number; count: number }[]
+    top_suppliers: { name: string; amount: number; n: number }[]
+  }
+  cod: { awaiting_remittance: number; awaiting_remittance_count: number; in_transit: number; in_transit_count: number }
+  attention: {
+    receivables: Record<string, any>[]
+    payables: Record<string, any>[]
+    cod: Record<string, any>[]
+    refunds: Record<string, any>[]
+    returns: Record<string, any>[]
+    adjustments: Record<string, any>[]
+    payouts: Record<string, any>[]
+    cod_stale_days: number
+  }
+  ai: { flagship: boolean; amount: number; previous: number; calls: number }
+}
+
+export async function getFinanceOverview(range: Range, opts: { withGst: boolean; flagship?: boolean }): Promise<FinanceOverview> {
   const prev = previousPeriod(range)
   const bucket = bucketFor(range)
   const [current, previous, trend, mix, snap, att, aiCur, aiPrev] = await Promise.all([
@@ -342,5 +372,3 @@ export async function getFinanceOverview(range: Range, opts: { withGst: boolean;
     ai: { flagship, amount: aiAmount(aiCur), previous: aiAmount(aiPrev), calls: aiCur.calls },
   }
 }
-
-export type FinanceOverview = Awaited<ReturnType<typeof getFinanceOverview>>

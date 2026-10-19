@@ -1,3 +1,4 @@
+import Tooltip from '@/components/ui/Tooltip'
 import { badgeCls, type Tone } from './tones'
 
 // Status chips from one map per domain. Unknown statuses fall back to a humanised muted chip.
@@ -6,10 +7,11 @@ export type StatusMap = Record<string, { label: string; tone: Tone }>
 
 export const humanize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ') : '-')
 
-export function StatusBadge({ status, map, label }: { status: string | null | undefined; map?: StatusMap; label?: string }) {
+export function StatusBadge({ status, map, label, title }: { status: string | null | undefined; map?: StatusMap; label?: string; title?: string | null }) {
   const key = status ?? ''
   const hit = map?.[key]
-  return <span className={badgeCls(hit?.tone ?? 'muted')}>{label ?? hit?.label ?? humanize(key)}</span>
+  const badge = <span className={badgeCls(hit?.tone ?? 'muted')}>{label ?? hit?.label ?? humanize(key)}</span>
+  return title ? <Tooltip content={title}>{badge}</Tooltip> : badge
 }
 
 export const ACTIVE_STATUS: StatusMap = {

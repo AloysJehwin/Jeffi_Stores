@@ -3,16 +3,16 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/payments/financial', () => ({ getCashflow: vi.fn() }))
+vi.mock('@/app/api/(admin)/admin/financial/cashflow/summary', () => ({ getCashflowOverview: vi.fn() }))
 
 import { GET } from '@/app/api/(admin)/admin/financial/cashflow/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { getCashflow } from '@/lib/payments/financial'
+import { getCashflowOverview } from '@/app/api/(admin)/admin/financial/cashflow/summary'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
-const mockGetCashflow = vi.mocked(getCashflow)
+const mockGet = vi.mocked(getCashflowOverview)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['financial'] }
 
@@ -20,6 +20,34 @@ function makeRequest(params: Record<string, string> = {}) {
   const url = new URL('http://localhost/api/admin/financial/cashflow')
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
   return new NextRequest(url.toString())
+}
+
+function overview(from: string, to: string) {
+  return {
+    range: { from, to },
+    previous_range: { from: '2023-10-01', to: '2023-12-31' },
+    bucket: 'month' as const,
+    current: { cash_in: 100000, cash_out: 60000, net: 40000, opening_balance: 0, closing_balance: 40000 },
+    previous: { cash_in: 90000, cash_out: 55000, net: 35000, opening_balance: 0, closing_balance: 0 },
+    series: [{ label: '2026-01-01', cash_in: 100000, cash_out: 60000, net: 40000 }],
+    by_dim: [{ key: 'online', label: 'Online', amount: 60000 }],
+    by_dim2: [{ key: 'po_payments', label: 'Supplier payments', amount: 50000 }],
+    monthly: [
+      {
+        month: '2026-01',
+        cash_in: 100000,
+        cash_in_online: 60000,
+        cash_in_business: 30000,
+        cash_in_cash_sale: 10000,
+        cash_in_offline: 0,
+        po_payments: 50000,
+        refunds_out: 10000,
+        cash_out: 60000,
+        net: 40000,
+        running_balance: 40000,
+      },
+    ],
+  }
 }
 
 describe('GET /api/admin/financial/cashflow', () => {
@@ -42,49 +70,42 @@ describe('GET /api/admin/financial/cashflow', () => {
     expect((await res.json()).error).toMatch(/insufficient/i)
   })
 
-  it('returns cashflow data with default FY date range', async () => {
+  it('returns the FinanceOverviewContract shape on success', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    const data = {
-      monthly: [
-        {
-          month: '2026-01',
-          cash_in: 100000,
-          cash_in_online: 60000,
-          cash_in_business: 30000,
-          cash_in_cash_sale: 10000,
-          cash_in_offline: 0,
-          po_payments: 50000,
-          refunds_out: 10000,
-          cash_out: 60000,
-          net: 40000,
-          running_balance: 40000,
-        },
-      ],
-    }
-    mockGetCashflow.mockResolvedValue(data)
+    const data = overview('2024-01-01', '2024-03-31')
+    mockGet.mockResolvedValue(data)
 
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body).toEqual(data)
-    expect(mockGetCashflow).toHaveBeenCalledOnce()
+    expect(mockGet).toHaveBeenCalledOnce()
   })
 
-  it('passes explicit from/to params to getCashflow', async () => {
+  it('passes explicit from/to params through parsePeriod', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockGetCashflow.mockResolvedValue({ monthly: [] })
+    mockGet.mockResolvedValue(overview('2024-01-01', '2024-03-31'))
 
     const res = await GET(makeRequest({ from: '2024-01-01', to: '2024-03-31' }))
     expect(res.status).toBe(200)
-    expect(mockGetCashflow).toHaveBeenCalledWith('2024-01-01', '2024-03-31')
+    expect(mockGet).toHaveBeenCalledWith(expect.objectContaining({ from: '2024-01-01', to: '2024-03-31' }))
   })
 
-  it('returns 500 on getCashflow error', async () => {
+  it('rejects malformed from/to with 400', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockGetCashflow.mockRejectedValue(new Error('DB error'))
+
+    const res = await GET(makeRequest({ from: 'bad', to: '2024-03-31' }))
+    expect(res.status).toBe(400)
+    expect(mockGet).not.toHaveBeenCalled()
+  })
+
+  it('returns 500 on helper error', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    mockGet.mockRejectedValue(new Error('DB error'))
 
     const res = await GET(makeRequest())
     expect(res.status).toBe(500)
@@ -94,7 +115,7 @@ describe('GET /api/admin/financial/cashflow', () => {
   it('returns 500 with generic message when error has no message', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockGetCashflow.mockRejectedValue({})
+    mockGet.mockRejectedValue({})
 
     const res = await GET(makeRequest())
     expect(res.status).toBe(500)

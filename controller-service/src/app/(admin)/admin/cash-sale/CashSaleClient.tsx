@@ -453,6 +453,8 @@ export default function CashSaleClient() {
               setReceipt(null)
               setView('list')
             }}
+            aria-label="Back to sales list"
+            title="Back to sales list"
             className="p-2 text-foreground-secondary hover:text-foreground transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -486,36 +488,38 @@ export default function CashSaleClient() {
               </div>
             </div>
 
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
-                  <th className="px-5 py-2.5 text-left font-medium">Item</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Qty</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Rate</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receipt.items.map((item, i) => {
-                  const qty = parseFloat(String(item.quantity || 0))
-                  const price = parseFloat(String(item.unit_price || 0))
-                  return (
-                    <tr key={i} className="border-b border-border-default last:border-0">
-                      <td className="px-5 py-3">
-                        <p className="font-medium text-foreground">{item.product_name}</p>
-                        {item.variant_name && (
-                          <p className="text-xs text-foreground-muted mt-0.5">{variantLabel(item)}</p>
-                        )}
-                        {item.hsn_code && <p className="text-xs text-foreground-muted">HSN: {item.hsn_code}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary">{qty}</td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary">₹{fmt(price)}</td>
-                      <td className="px-5 py-3 text-right font-semibold text-foreground">₹{fmt(qty * price)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
+                    <th className="px-5 py-2.5 text-left font-medium">Item</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Qty</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Rate</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receipt.items.map((item, i) => {
+                    const qty = parseFloat(String(item.quantity || 0))
+                    const price = parseFloat(String(item.unit_price || 0))
+                    return (
+                      <tr key={i} className="border-b border-border-default last:border-0">
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-foreground">{item.product_name}</p>
+                          {item.variant_name && (
+                            <p className="text-xs text-foreground-muted mt-0.5">{variantLabel(item)}</p>
+                          )}
+                          {item.hsn_code && <p className="text-xs text-foreground-muted">HSN: {item.hsn_code}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-right text-foreground-secondary">{qty}</td>
+                        <td className="px-4 py-3 text-right text-foreground-secondary">₹{fmt(price)}</td>
+                        <td className="px-5 py-3 text-right font-semibold text-foreground">₹{fmt(qty * price)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
 
             {receipt.notes && (
               <div className="px-5 py-3 border-t border-border-default">
@@ -656,6 +660,8 @@ export default function CashSaleClient() {
               resetForm()
               setView('list')
             }}
+            aria-label="Back to sales list"
+            title="Back to sales list"
             className="p-2 text-foreground-secondary hover:text-foreground transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -670,8 +676,8 @@ export default function CashSaleClient() {
 
 
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2 space-y-4">
               <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
                 <LineItemsSection
                   items={items}
@@ -720,7 +726,7 @@ export default function CashSaleClient() {
                   {PAYMENT_MODES.map(m => (
                     <label
                       key={m.value}
-                      className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-4 transition-colors ${
+                      className={`flex min-h-10 flex-1 min-w-[7rem] cursor-pointer items-center gap-2 rounded-lg border px-4 transition-colors ${
                         paymentMode === m.value ? 'border-accent-500 bg-accent-500/10 text-foreground' : 'border-border-default bg-surface-secondary text-foreground-secondary hover:border-accent-500/50'
                       }`}
                     >
@@ -796,16 +802,14 @@ export default function CashSaleClient() {
         <PageHeader title="Cash Sales" description="Walk-in sales — no customer details" />
         {canWrite && (
           <TabActionsPortal>
-            <span className="hidden md:inline-flex">
-              <TabAction
-                onClick={() => {
-                  resetForm()
-                  setView('new')
-                }}
-                icon={<Plus className="w-4 h-4" />}
-                label="New Cash Sale"
-              />
-            </span>
+            <TabAction
+              onClick={() => {
+                resetForm()
+                setView('new')
+              }}
+              icon={<Plus className="w-4 h-4" />}
+              label="New Cash Sale"
+            />
           </TabActionsPortal>
         )}
       </div>
@@ -870,9 +874,9 @@ export default function CashSaleClient() {
               { value: 'cancelled', label: 'Cancelled' },
             ]}
           />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <DatePicker
-              className="w-36"
+              className="flex-1 min-w-[9rem] sm:w-36 sm:flex-none"
               value={fromDate}
               onChange={v => {
                 setFromDate(v)
@@ -881,7 +885,7 @@ export default function CashSaleClient() {
             />
             <span className="text-foreground-secondary text-xs">to</span>
             <DatePicker
-              className="w-36"
+              className="flex-1 min-w-[9rem] sm:w-36 sm:flex-none"
               value={toDate}
               onChange={v => {
                 setToDate(v)

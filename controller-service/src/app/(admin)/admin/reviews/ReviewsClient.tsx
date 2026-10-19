@@ -330,7 +330,7 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
                           href={`/products/${review.products.slug}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-accent-500 hover:underline font-medium truncate max-w-[200px]"
+                          className="inline-flex items-center gap-1 text-xs text-accent-500 hover:underline font-medium truncate max-w-[160px] sm:max-w-xs md:max-w-md"
                         >
                           <ExternalLink className="h-3 w-3 shrink-0" />
                           {review.products.name}

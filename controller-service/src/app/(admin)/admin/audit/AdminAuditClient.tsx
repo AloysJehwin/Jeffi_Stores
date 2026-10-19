@@ -684,6 +684,7 @@ export default function AdminAuditClient() {
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
             <input
               type="text"
+              aria-label="Search mail log"
               placeholder="Search by recipient or subject..."
               value={mailQuery}
               onChange={e => setMailQuery(e.target.value)}
@@ -882,6 +883,7 @@ export default function AdminAuditClient() {
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
             <input
               type="text"
+              aria-label="Search SMS log"
               placeholder="Search by number or message..."
               value={smsQuery}
               onChange={e => setSmsQuery(e.target.value)}
@@ -1045,6 +1047,7 @@ export default function AdminAuditClient() {
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
             <input
               type="text"
+              aria-label="Search WhatsApp log"
               placeholder="Search by number or message..."
               value={waQuery}
               onChange={e => setWaQuery(e.target.value)}
@@ -1426,7 +1429,7 @@ export default function AdminAuditClient() {
                         >
                           <Icon className="w-4 h-4" />
                         </div>
-                        <div className="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-x-6 gap-y-2">
+                        <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-x-6 gap-y-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-[10px] font-mono uppercase tracking-wide text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
@@ -1573,7 +1576,7 @@ export default function AdminAuditClient() {
                         >
                           <Icon className="w-4 h-4" />
                         </div>
-                        <div className="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-x-6 gap-y-2">
+                        <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-x-6 gap-y-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-[10px] font-mono uppercase tracking-wide text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">

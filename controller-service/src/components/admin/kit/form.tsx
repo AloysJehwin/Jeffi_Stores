@@ -41,7 +41,12 @@ export function FormPage({ header, children, footer, onDirtyChange, guardUnload 
   }, [guardUnload, dirty])
   const mark = () => setDirty(true)
   return (
-    <div className="p-4 sm:p-6 space-y-5" onInput={mark} onChange={mark} onSubmit={() => setDirty(false)}>
+    <div
+      className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5"
+      onInput={mark}
+      onChange={mark}
+      onSubmit={() => setDirty(false)}
+    >
       {header}
       {children}
       {footer}
@@ -172,30 +177,106 @@ export interface FormFooterProps {
   cancelLabel?: string
   /** Left side: extra controls (e.g. "Discard draft"). */
   secondary?: ReactNode
-  autosave?: AutosaveStatus
+  /** Autosave pill — either a status enum (legacy) or a ready-to-render node. The node form lets
+   *  callers hide the pill when idle without the footer having to know the status. */
+  autosave?: AutosaveStatus | ReactNode
+  /** Pre-rendered Draft pending badge; shown left of the banner slot. */
+  draftBadge?: ReactNode
+  /** One-line notice beside Restore (e.g. "A newer local autosave exists."). */
+  banner?: ReactNode
+  /** Session-aware actions. Each hides when its handler is not provided. */
+  restore?: () => void | Promise<void>
+  discard?: () => void | Promise<void>
+  /** Session Cancel — when provided, overrides the plain Cancel href/button. Confirms once. */
+  cancel?: () => void | Promise<void>
   /** Custom submit buttons (draft/publish intents). Rendered at the right. */
   children?: ReactNode
   /** Sticky to the bottom of the viewport (default). */
   sticky?: boolean
 }
 
+const ghostCls =
+  'control-md inline-flex items-center border border-border-secondary bg-surface text-foreground-secondary hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+const ghostAccentCls =
+  'control-md inline-flex items-center border border-accent-500/40 bg-accent-500/10 text-accent-500 hover:bg-accent-500/20 font-semibold transition-colors'
+
+function isAutosaveStatus(v: unknown): v is AutosaveStatus {
+  return v === 'idle' || v === 'saving' || v === 'saved' || v === 'error'
+}
+
 /** Cancel and submit row. Render it inside the <form> so its buttons submit that form. */
-export function FormFooter({ submitLabel, pending, pendingLabel, dirty, onCancel, cancelHref, cancelLabel = 'Cancel', secondary, autosave, children, sticky = true }: FormFooterProps) {
-  const cancelCls = 'control-md border border-border-secondary text-foreground-secondary hover:bg-surface-secondary transition-colors'
+export function FormFooter({
+  submitLabel,
+  pending,
+  pendingLabel,
+  dirty,
+  onCancel,
+  cancelHref,
+  cancelLabel = 'Cancel',
+  secondary,
+  autosave,
+  draftBadge,
+  banner,
+  restore,
+  discard,
+  cancel,
+  children,
+  sticky = true,
+}: FormFooterProps) {
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const autosaveNode = isAutosaveStatus(autosave) ? <AutosaveStatusPill status={autosave} /> : autosave
+
+  const handleCancel = async () => {
+    if (!cancel) return
+    if (!confirmingCancel) {
+      setConfirmingCancel(true)
+      setTimeout(() => setConfirmingCancel(false), 4000)
+      return
+    }
+    setConfirmingCancel(false)
+    await cancel()
+  }
+
   return (
-    <div className={`${sticky ? 'sticky bottom-0 z-10' : ''} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`}>
-      <div className="flex min-w-0 items-center gap-3 text-xs text-foreground-muted">
-        {autosave && <AutosaveStatusPill status={autosave} />}
-        {dirty && <span>Unsaved changes</span>}
+    <div
+      className={`${sticky ? 'sticky bottom-0 z-10 !mt-3' : ''} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`}
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-foreground-muted">
+        {autosaveNode}
+        {draftBadge}
+        {banner && <span className="text-foreground-muted">{banner}</span>}
+        {restore && (
+          <button type="button" onClick={() => void restore()} className={ghostAccentCls}>
+            Restore
+          </button>
+        )}
+        {dirty && !autosaveNode && <span>Unsaved changes</span>}
         {secondary}
       </div>
       <div className="flex items-center gap-2">
-        {cancelHref ? (
-          <Link href={cancelHref} className={cancelCls}>
+        {discard && (
+          <button type="button" onClick={() => void discard()} className={ghostCls}>
+            Discard draft
+          </button>
+        )}
+        {cancel ? (
+          <button
+            type="button"
+            onClick={handleCancel}
+            className={
+              confirmingCancel
+                ? 'control-md inline-flex items-center border border-red-500/40 bg-red-500/10 text-red-600 hover:bg-red-500/20 transition-colors'
+                : ghostCls
+            }
+          >
+            {confirmingCancel ? 'Discard changes?' : cancelLabel}
+          </button>
+        ) : cancelHref ? (
+          <Link href={cancelHref} className={ghostCls}>
             {cancelLabel}
           </Link>
         ) : onCancel ? (
-          <button type="button" onClick={onCancel} className={cancelCls}>
+          <button type="button" onClick={onCancel} className={ghostCls}>
             {cancelLabel}
           </button>
         ) : null}

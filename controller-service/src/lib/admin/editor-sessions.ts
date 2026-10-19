@@ -435,6 +435,28 @@ export async function openSession(
   return row ? { id: row.id, resumed: false, startedAt: row.started_at, changeCount: 0 } : null
 }
 
+/**
+ * Resnapshot an open session to the current draft shape. Idempotent.
+ * Called after a Save-as-Draft so a later Cancel reverts to the just-saved draft
+ * (A2) and not to the pre-session snapshot (A1). Leaves open/close/restore alone.
+ */
+export async function resnapshotSession(sessionId: string, adminId: string): Promise<boolean> {
+  const session = await queryOne<{ resource_type: ResourceType; resource_id: string }>(
+    `SELECT resource_type, resource_id FROM editor_sessions
+     WHERE id = $1 AND admin_id = $2 AND closed_at IS NULL`,
+    [sessionId, adminId]
+  )
+  if (!session) return false
+  const snap = await snapshotResource(session.resource_type, session.resource_id)
+  if (!snap) return false
+  const r = await query(
+    `UPDATE editor_sessions SET snapshot = $1::jsonb
+     WHERE id = $2 AND admin_id = $3 AND closed_at IS NULL`,
+    [JSON.stringify(snap.snapshot), sessionId, adminId]
+  )
+  return (r.rowCount ?? 0) > 0
+}
+
 /** Mark the session saved — autosave already carried the final state to the draft. */
 export async function saveSession(sessionId: string, adminId: string): Promise<boolean> {
   const r = await query(

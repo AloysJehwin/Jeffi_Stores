@@ -9,7 +9,8 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from './FormsPreview'
 import Toggle from '@/components/ui/Toggle'
 import AIFillForm from '@/components/admin/AIFillForm'
-import { EditSessionActions } from '@/components/admin/kit'
+import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
+import { Badge, FormFooter } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
@@ -63,6 +64,8 @@ interface ReviewFormFormProps {
   backUrl?: string
   /** Server action to discard the draft (no args). */
   discardAction?: () => Promise<void>
+  /** Server action to resnapshot the open session after an explicit Save as Draft. */
+  resnapshotAction?: () => Promise<void>
   defaultValues?: {
     title?: string
     slug?: string
@@ -97,6 +100,7 @@ export default function ReviewFormForm({
   formId,
   backUrl,
   discardAction,
+  resnapshotAction,
   defaultValues: d = {},
 }: ReviewFormFormProps) {
   const router = useRouter()
@@ -111,13 +115,15 @@ export default function ReviewFormForm({
   const [submitting, setSubmitting] = useState(false)
   const { showToast } = useToast()
   const edit = useEditSession({ resourceType: 'review_form', resourceId: formId ?? null })
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [autoSaveStatus, setAutoSaveStatus] = useState<AutosaveStatus>('idle')
   const [formsHost, setFormsHost] = useState('forms.jeffistores.in')
   useEffect(() => {
     setFormsHost(formsHostForHost(window.location.host))
   }, [])
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstRender = useRef(true)
+  const autosaveBlockedRef = useRef(false)
+  const autosaveInFlightRef = useRef(false)
 
   // Keep a ref to current values so the debounced callback always has fresh data
   const valuesRef = useRef({ title, slug, templateType, googleUrl, couponId, description, isActive, customFields })
@@ -131,8 +137,10 @@ export default function ReviewFormForm({
     }
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(async () => {
+      if (autosaveBlockedRef.current) return
       const v = valuesRef.current
       setAutoSaveStatus('saving')
+      autosaveInFlightRef.current = true
       try {
         await fetch(`/api/admin/review-forms/${formId}/draft`, {
           method: 'PATCH',
@@ -155,6 +163,8 @@ export default function ReviewFormForm({
         setTimeout(() => setAutoSaveStatus('idle'), 2000)
       } catch {
         setAutoSaveStatus('idle')
+      } finally {
+        autosaveInFlightRef.current = false
       }
     }, 1500)
     return () => {
@@ -217,6 +227,11 @@ export default function ReviewFormForm({
           showToast(dd.error || 'Failed to save', 'error')
           return
         }
+        if (!publish && resnapshotAction) await resnapshotAction()
+        if (publish) {
+          autosaveBlockedRef.current = true
+          if (edit.sessionId) await edit.save()
+        }
         router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
         router.refresh()
         return
@@ -238,11 +253,13 @@ export default function ReviewFormForm({
             showToast(d.error || 'Failed to publish', 'error')
             return
           }
+          autosaveBlockedRef.current = true
+          if (edit.sessionId) await edit.save()
           router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
           router.refresh()
           return
         }
-        // Save draft, then return to the list.
+        // Save draft, resnapshot so Cancel reverts to this save, then return to the list.
         const res = await fetch(`/api/admin/review-forms/${formId}/draft`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -253,6 +270,7 @@ export default function ReviewFormForm({
           showToast(d.error || 'Failed to save draft', 'error')
           return
         }
+        if (resnapshotAction) await resnapshotAction()
         router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
         router.refresh()
         return
@@ -307,21 +325,35 @@ export default function ReviewFormForm({
     if (values.is_active != null) setIsActive(Boolean(values.is_active))
   }
 
+  async function handleDiscard() {
+    if (!discardAction) return
+    autosaveBlockedRef.current = true
+    for (let i = 0; i < 100 && autosaveInFlightRef.current; i++) await new Promise(r => setTimeout(r, 100))
+    await discardAction()
+    if (edit.sessionId) await edit.save()
+    const destination = backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms'
+    router.push(ap(destination))
+    router.refresh()
+  }
+
+  async function handleCancel() {
+    autosaveBlockedRef.current = true
+    for (let i = 0; i < 100 && autosaveInFlightRef.current; i++) await new Promise(r => setTimeout(r, 100))
+    const ok = await edit.cancel()
+    if (!ok) {
+      autosaveBlockedRef.current = false
+      return
+    }
+    const dest = formId
+      ? `/admin/review-forms/${formId}/view${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
+      : '/admin/review-forms'
+    router.push(ap(dest))
+    router.refresh()
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
-      {edit.sessionId && (
-        <div className="xl:col-span-2 flex justify-end">
-          <EditSessionActions
-            autosaveStatus={'idle' as AutosaveStatus}
-            sessionStatus={edit.status}
-            onCancel={edit.cancel}
-            cancelHref={ap('/admin/review-forms')}
-            draft={isDraft || isCreateDraft}
-            discard={isDraft && discardAction ? () => { void discardAction() } : undefined}
-          />
-        </div>
-      )}
-      <div className="xl:col-span-2">
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+      <div className="lg:col-span-2">
         <AIFillForm
           fields={[
             { name: 'title', label: 'Form Title', type: 'text' },
@@ -498,49 +530,6 @@ export default function ReviewFormForm({
             ))}
           </div>
         </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
-          <Link
-            href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')}
-            className="control-md border border-border-secondary bg-surface font-medium text-foreground hover:bg-surface-secondary"
-          >
-            Cancel
-          </Link>
-          <RequireWrite scope="review_forms:write">
-            {isDraft || isCreateDraft ? (
-              <>
-                <button
-                  type="submit"
-                  value="draft"
-                  disabled={submitting}
-                  className="control-md border border-border-secondary bg-surface font-semibold text-foreground hover:bg-surface-secondary disabled:opacity-50"
-                >
-                  {submitting ? 'Saving…' : 'Save Draft'}
-                </button>
-                <button
-                  type="submit"
-                  value="publish"
-                  disabled={submitting}
-                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
-                >
-                  {submitting ? 'Publishing…' : 'Publish'}
-                </button>
-                {autoSaveStatus === 'saving' && <span className="text-xs text-foreground-muted">Saving…</span>}
-                {autoSaveStatus === 'saved' && (
-                  <span className="text-xs text-green-600 dark:text-green-400">Saved</span>
-                )}
-              </>
-            ) : (
-              <button
-                type="submit"
-                disabled={submitting}
-                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
-              >
-                {submitting ? 'Saving…' : submitLabel || 'Save Changes'}
-              </button>
-            )}
-          </RequireWrite>
-        </div>
       </div>
 
       <div className="sticky top-6">
@@ -553,6 +542,55 @@ export default function ReviewFormForm({
           couponId={couponId}
           customFields={customFields}
         />
+      </div>
+
+      {/* Shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
+      <div className="lg:col-span-2">
+        <FormFooter
+          sticky
+          autosave={
+            isDraft && autoSaveStatus !== 'idle' ? <AutosaveStatusPill status={autoSaveStatus} /> : null
+          }
+          draftBadge={isDraft || isCreateDraft ? <Badge tone="amber">Draft pending</Badge> : null}
+          discard={isDraft && discardAction ? handleDiscard : undefined}
+          cancel={edit.sessionId ? handleCancel : undefined}
+          cancelHref={
+            edit.sessionId
+              ? undefined
+              : ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
+          }
+        >
+          <RequireWrite scope="review_forms:write">
+            {isDraft || isCreateDraft ? (
+              <>
+                <button
+                  type="submit"
+                  value="draft"
+                  disabled={submitting}
+                  className="control-md border border-border-secondary bg-surface font-semibold text-foreground hover:bg-surface-secondary disabled:opacity-50"
+                >
+                  {submitting ? 'Saving…' : 'Save as Draft'}
+                </button>
+                <button
+                  type="submit"
+                  value="publish"
+                  disabled={submitting}
+                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
+                >
+                  {submitting ? 'Publishing…' : 'Update & Publish'}
+                </button>
+              </>
+            ) : (
+              <button
+                type="submit"
+                disabled={submitting}
+                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
+              >
+                {submitting ? 'Saving…' : submitLabel || 'Save Changes'}
+              </button>
+            )}
+          </RequireWrite>
+        </FormFooter>
       </div>
     </form>
   )

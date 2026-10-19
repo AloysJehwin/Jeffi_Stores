@@ -278,18 +278,20 @@ export default function WalletClient({
           <div className="w-52">
             <AdminSelect label="Category" value={cat} onChange={setCat} options={categoryOptions} sm />
           </div>
-          <FormField label="From">
-            <DatePicker className="w-36" value={from} onChange={setFrom} />
-          </FormField>
-          <FormField label="To">
-            <DatePicker className="w-36" value={to} onChange={setTo} />
-          </FormField>
+          <div className="flex items-end gap-2">
+            <FormField label="From">
+              <DatePicker className="w-36" value={from} onChange={setFrom} />
+            </FormField>
+            <FormField label="To">
+              <DatePicker className="w-36" value={to} onChange={setTo} />
+            </FormField>
+          </div>
           <div className="min-w-[180px] flex-1">
             <FormField label="Search order / AWB / note" htmlFor="wallet-q">
               <input id="wallet-q" className={fieldInputCls} value={q} onChange={e => setQ(e.target.value)} placeholder="JS-123, AWB…" />
             </FormField>
           </div>
-          <FormButton type="button" variant="secondary" onClick={exportCsv} disabled={rows.length === 0}>
+          <FormButton type="button" variant="secondary" onClick={exportCsv} disabled={rows.length === 0} className="w-full md:w-auto">
             Export CSV
           </FormButton>
         </div>

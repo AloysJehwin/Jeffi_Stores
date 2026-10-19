@@ -41,9 +41,7 @@ export default async function ServiceAccountsPanel() {
   const neverUsed = accounts.filter((a: any) => !a.last_used_at && !a.is_revoked).length
 
   const createLink = canWrite ? (
-    <span className="hidden md:inline-flex">
-      <TabAction href={ap('/admin/service-accounts/add')} icon={<Plus className="w-4 h-4" />} label="Create" />
-    </span>
+    <TabAction href={ap('/admin/service-accounts/add')} icon={<Plus className="w-4 h-4" />} label="Create" />
   ) : undefined
 
   return (
@@ -70,9 +68,7 @@ export default async function ServiceAccountsPanel() {
               body="Create one to enable M2M authentication via mTLS."
               actionNode={
                 canWrite ? (
-                  <span className="hidden md:inline-flex">
-                    <TabAction href={ap('/admin/service-accounts/add')} icon={<Plus className="w-4 h-4" />} label="Create first account" />
-                  </span>
+                  <TabAction href={ap('/admin/service-accounts/add')} icon={<Plus className="w-4 h-4" />} label="Create first account" />
                 ) : undefined
               }
             />

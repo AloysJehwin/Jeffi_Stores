@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS public.template_variant (
     locale character varying(10) NOT NULL DEFAULT 'en',
     current_version_id uuid,
     provider_ref character varying(80),
+    -- Previous provider_ref kept at retirement so a bad Meta approval can be rolled back in one click
+    -- (Phase 0 WhatsApp body normalisation). Nullable; set when provider_ref is replaced.
+    deprecated_provider_ref text,
     meta_category character varying(16),
     media_type character varying(16),
     approval_status character varying(20) NOT NULL DEFAULT 'unsubmitted',

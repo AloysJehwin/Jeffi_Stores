@@ -9,9 +9,10 @@ import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
 import BulkMessages from './BulkMessages'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
-import { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
+import { ECOM_ENRICH_ENDPOINT, ECOM_SCENARIO_ENDPOINT } from '@/components/admin/AIEnrichButton'
 import PlayDialog, { PlayButton, type PlayTarget } from '../_components/PlayDialog'
 import { Segmented, currentRowCls, fieldCls, focusRing } from '../../_ui'
+import PageHeader from '../_components/PageHeader'
 
 interface ListItem { id: string; slug: string; channel: Channel; name: string; category?: string | null; approval_status?: string | null; source?: 'tenant' | 'platform'; review_status?: string | null }
 interface Msg { id: string; channel: string; to: string; template: string | null; status: string; price_inr: number; charged_inr: number; error: string | null; created_at: string }
@@ -131,8 +132,21 @@ export default function MessagingClient(props: { prices: Record<string, number>;
 
   return (
     <div className="space-y-6">
-      <Segmented ariaLabel="Messaging sections" value={tab} onChange={setTab}
-        options={[{ value: 'log', label: 'Message log' }, { value: 'templates', label: 'Templates' }, { value: 'bulk', label: 'Bulk' }]} />
+      <PageHeader
+        eyebrow="Developers"
+        title="Messaging"
+        description="Templates, bulk sends and the delivery log for email, SMS and WhatsApp sent through your API keys."
+        actions={
+          <div className="flex flex-row flex-wrap items-center justify-end gap-2">
+            <Segmented ariaLabel="Messaging sections" value={tab} onChange={setTab}
+              options={[{ value: 'log', label: 'Message log' }, { value: 'templates', label: 'Templates' }, { value: 'bulk', label: 'Bulk' }]} />
+            {tab === 'templates' && (
+              <Segmented<Channel> ariaLabel="Channel" value={channel} onChange={k => { setChannel(k); setSelected(null); setQuery('') }}
+                options={CHANNELS.map(c => ({ value: c.key, label: c.label, icon: c.icon, count: channel === c.key && items ? items.length : undefined }))} />
+            )}
+          </div>
+        }
+      />
 
       {tab === 'bulk' && <BulkMessages {...props} />}
 
@@ -150,13 +164,6 @@ export default function MessagingClient(props: { prices: Record<string, number>;
 
       {tab === 'templates' && (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Segmented<Channel> ariaLabel="Channel" value={channel} onChange={k => { setChannel(k); setSelected(null); setQuery('') }}
-              options={CHANNELS.map(c => ({ value: c.key, label: c.label, icon: c.icon, count: channel === c.key && items ? items.length : undefined }))} />
-            {items && items.length > 0 && (
-              <span className="text-xs text-foreground-muted">{customised} customised · {items.length - customised} standard</span>
-            )}
-          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6 items-start">
             <aside className="rounded-2xl border border-border-default bg-surface-elevated overflow-hidden md:sticky md:top-6">
@@ -266,6 +273,12 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                     onSave={save}
                     saving={saving}
                     aiEndpoint={ECOM_ENRICH_ENDPOINT}
+                    canUseScenarioFill={canEdit}
+                    isPlatformLibrary={false}
+                    tenantContext={{ storeName: 'This store' }}
+                    scenarioFillTheme="ecom"
+                    scenarioFillEndpoint={ECOM_SCENARIO_ENDPOINT}
+                    canResetToPlatform={canEdit}
                   />
                   </fieldset>
                 </Card>

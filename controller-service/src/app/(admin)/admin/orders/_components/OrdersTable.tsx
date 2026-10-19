@@ -103,7 +103,7 @@ export default function OrdersTable({ orders, total, page, pageSize, backUrl, pa
         </div>
       ),
     },
-    { key: 'source', label: 'Source', sortParam: 'source', render: o => <Badge tone={sourceTone(o.source)}>{sourceLabel(o.source)}</Badge> },
+    { key: 'source', label: 'Source', sortParam: 'source', hideBelow: 'lg', render: o => <Badge tone={sourceTone(o.source)}>{sourceLabel(o.source)}</Badge> },
     {
       key: 'customer',
       label: 'Customer',
@@ -138,7 +138,7 @@ export default function OrdersTable({ orders, total, page, pageSize, backUrl, pa
         ),
     },
     { key: 'total', label: 'Total', sortParam: 'total', num: true, render: o => <span className="font-medium text-foreground">{inr(o.total_amount)}</span> },
-    { key: 'payment', label: 'Payment', sortParam: 'payment', render: o => <StatusBadge status={o.payment_status} map={PAYMENT_STATUS_FULL} /> },
+    { key: 'payment', label: 'Payment', sortParam: 'payment', hideBelow: 'lg', render: o => <StatusBadge status={o.payment_status} map={PAYMENT_STATUS_FULL} /> },
     { key: 'status', label: 'Status', sortParam: 'status', render: o => <StatusBadge status={o.status} map={ORDER_STATUS_FULL} /> },
   ]
 

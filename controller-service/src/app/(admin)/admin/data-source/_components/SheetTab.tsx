@@ -111,8 +111,8 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-5">
-      <div className="lg:col-span-3 space-y-4">
+    <div className="grid gap-4 md:grid-cols-5">
+      <div className="md:col-span-3 space-y-4">
         <Section
           title="Connection"
           action={
@@ -188,7 +188,7 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
         )}
       </div>
 
-      <div className="lg:col-span-2 space-y-4">
+      <div className="md:col-span-2 space-y-4">
         <Section title="Actions">
           {!canWrite ? (
             <p className="text-sm text-foreground-muted">Read-only: you need products write access to connect or sync a sheet.</p>

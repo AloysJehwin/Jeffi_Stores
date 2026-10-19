@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { Dialog } from '@/components/admin/kit'
+import PresetChipRow from './PresetChipRow'
 import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import Select from '@/components/ui/Select'
@@ -28,7 +29,7 @@ interface Props {
   onPick: (image: { url: string; width: number; height: number; blurhash?: string | null; galleryId?: string; productImageId?: string }) => void
   /** Also add each image to this product's images. */
   attachToProductId?: string
-  /** Pass to also insert a gallery_images row (so the gallery picker can see it later). */
+  /** Insert a gallery_images row so the gallery picker can see it later. Default true. */
   saveToGallery?: boolean
   /** Logged on the usage row (product id, post id, campaign id). */
   usageRef?: string
@@ -57,7 +58,7 @@ export default function AiMediaButton(props: Props) {
   if (!canWrite || !canUseAi) return null
   const btnCls = props.compact
     ? 'inline-flex items-center gap-1 text-xs text-accent-600 hover:text-accent-700'
-    : 'inline-flex h-control items-center gap-1.5 rounded-lg border border-border-default px-3 text-xs font-semibold text-foreground hover:bg-surface-secondary'
+    : 'control-md inline-flex items-center gap-1.5 border border-border-default text-xs font-semibold text-foreground hover:bg-surface-secondary'
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={btnCls}>
@@ -76,13 +77,11 @@ function AiMediaDialog({
   referenceImageUrl,
   onPick,
   attachToProductId,
-  saveToGallery,
+  saveToGallery = true,
   usageRef,
   onClose,
 }: Props & { onClose: () => void }) {
   const { showToast } = useToast()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
   const [prompt, setPrompt] = useState(defaultPrompt)
   const [sizeKey, setSizeKey] = useState(sizes[0]?.key ?? 'square')
   const [quality, setQuality] = useState<AiQuality>('standard')
@@ -162,31 +161,31 @@ function AiMediaDialog({
     onClose()
   }
 
-  if (!mounted) return null
   return (
     <Dialog
       open
       onClose={onClose}
       size="lg"
-      title={(<span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-accent-500" />Generate image</span>) as unknown as string}
-      footer={(
-        <div className="flex items-center justify-end gap-2">
-          <button type="button" onClick={onClose} className="control-md rounded-lg border border-border-default px-3 text-xs font-semibold hover:bg-surface-secondary">
+      title={<span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-accent-500" />Generate image</span>}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="control-md border border-border-default text-xs font-semibold hover:bg-surface-secondary">
             Close
           </button>
           <button
             type="button"
             onClick={generate}
             disabled={busy || prompt.trim().length < 3}
-            className="control-md inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-xs font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
+            className="control-md bg-accent-500 text-xs font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
           >
-            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             {busy ? 'Generating…' : results ? 'Regenerate' : 'Generate'}
           </button>
-        </div>
-      )}
+        </>
+      }
     >
       <div className="space-y-3">
+          <PresetChipRow kind="image" feature={feature} onPick={(next: string) => setPrompt(next)} />
           <div>
             <label className="mb-1 block text-xs font-medium text-foreground-secondary">What to draw</label>
             <textarea
@@ -224,8 +223,8 @@ function AiMediaDialog({
           )}
           {error && <p className="text-xs text-red-600">{error}</p>}
           {results && (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {results.map((img, i) => (
                   <button
                     key={i}
@@ -234,7 +233,7 @@ function AiMediaDialog({
                     className="group relative overflow-hidden rounded-lg border border-border-default hover:border-accent-500"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt="" className="aspect-square w-full object-contain bg-surface-secondary" />
+                    <img src={img.url} alt="" className="aspect-square w-full bg-surface-secondary object-contain" />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-sm font-semibold text-white opacity-0 group-hover:opacity-100">
                       Use this
                     </span>
@@ -246,7 +245,7 @@ function AiMediaDialog({
                   {charged > 0 ? `Charged ₹${charged.toFixed(2)} to your wallet.` : 'No charge.'}
                 </p>
               )}
-            </>
+            </div>
           )}
       </div>
     </Dialog>

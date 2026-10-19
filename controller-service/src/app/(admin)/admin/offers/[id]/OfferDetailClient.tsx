@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DetailHeader, PageBody, StatusBadge, fieldInputCls } from '@/components/admin/kit'
+import { DetailHeader, FormFooter, PageBody, StatusBadge, fieldInputCls } from '@/components/admin/kit'
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
@@ -10,7 +10,6 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import Toggle from '@/components/ui/Toggle'
 import DatePicker from '@/components/ui/DatePicker'
 import OfferProductPicker, { type AssignOption } from '@/components/admin/OffersProductPicker'
-import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 
@@ -130,21 +129,9 @@ export default function OfferDetailClient({
         back={{ href: backHref, label: 'Offers' }}
         title={title || 'Untitled offer'}
         status={<StatusBadge status={String(isActive)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />}
-        actions={
-          canWrite ? (
-            <EditorToolbar
-              autosaveStatus={autosaveStatus}
-              sessionStatus={edit.status}
-              onSave={publish}
-              onCancel={edit.cancel}
-              saveLabel={publishing ? 'Publishing…' : 'Publish'}
-              disabled={publishing}
-            />
-          ) : undefined
-        }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] items-start">
+      <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] items-start">
         <div className="space-y-4 min-w-0">
           <div className="space-y-5 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Offer details</h2>
@@ -241,6 +228,25 @@ export default function OfferDetailClient({
           />
         </div>
       </div>
+
+      {canWrite && (
+        <FormFooter
+          autosave={autosaveStatus}
+          cancel={async () => {
+            await edit.cancel()
+          }}
+          cancelLabel="Cancel"
+        >
+          <button
+            type="button"
+            onClick={publish}
+            disabled={publishing || edit.status === 'closing' || edit.status === 'closed'}
+            className="control-md whitespace-nowrap bg-accent-500 text-white hover:bg-accent-600 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {publishing ? 'Publishing…' : 'Publish'}
+          </button>
+        </FormFooter>
+      )}
     </PageBody>
   )
 }

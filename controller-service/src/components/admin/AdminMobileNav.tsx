@@ -32,6 +32,14 @@ interface AdminMobileNavProps {
 export default function AdminMobileNav({ navLinks, username, role }: AdminMobileNavProps) {
   const host = useAdminHost()
   const [isOpen, setIsOpen] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const close = (e: MediaQueryListEvent | MediaQueryList) => { if (e.matches) setIsOpen(false) }
+    close(mq)
+    mq.addEventListener('change', close)
+    return () => mq.removeEventListener('change', close)
+  }, [])
   const pathname = usePathname()
 
   useEffect(() => {
@@ -64,7 +72,7 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
     <>
       <button
         type="button"
-        className="md:hidden p-2 text-gray-300 hover:text-white transition-colors"
+        className="lg:hidden p-2 text-gray-300 hover:text-white transition-colors"
         onClick={() => setIsOpen(true)}
         aria-label="Open navigation"
       >
@@ -74,12 +82,12 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
       </button>
 
       <div
-        className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`lg:hidden fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setIsOpen(false)}
       />
 
       <div
-        className={`fixed top-0 left-0 bottom-0 z-50 w-[80vw] max-w-[300px] bg-secondary-600 dark:bg-secondary-800 shadow-xl transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`lg:hidden fixed top-0 left-0 bottom-0 z-50 w-[80vw] max-w-[300px] bg-secondary-600 dark:bg-secondary-800 shadow-xl transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-4 border-b border-white/10">

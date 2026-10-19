@@ -395,7 +395,7 @@ export default function CatalogEnrichmentPage() {
                         {expanded.has(item.id) && (
                           <tr key={`${item.id}-expanded`} className="bg-surface-secondary/50">
                             <td colSpan={statusFilter === 'proposed' ? 7 : 6} className="px-4 py-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-[calc(100vw-3rem)] md:max-w-none break-words">
                                 {item.source_desc && (
                                   <div>
                                     <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">

@@ -1,9 +1,10 @@
 'use client'
 
-import { createContext, useCallback, useContext } from 'react'
+import { createContext, useCallback, useContext, useState } from 'react'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import ScenarioFillDialog from '@/components/admin/messaging-templates/ScenarioFillDialog'
 import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import {
   DndContext,
@@ -15,17 +16,47 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Trash2, Plus, Image as ImageIcon, Type, Heading, MousePointerClick, Minus, Space, Package, LayoutGrid } from 'lucide-react'
+import { GripVertical, Trash2, Plus, Image as ImageIcon, Type, Heading, MousePointerClick, Minus, Space, Package, LayoutGrid, Sparkles } from 'lucide-react'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
 import type { ComposerVariable } from '@/components/admin/email-composer/variables'
-import type { EmailBlock } from '@/lib/templates/blocks'
+import { renderBlocks, type EmailBlock } from '@/lib/templates/blocks'
+import type { EditorFieldSnapshot, UndoHandle } from '@/lib/ai/scenario-fill-apply'
+import type {
+  TemplateMode,
+  TemplateScenarioFill,
+  TenantContext as ScenarioTenantContext,
+} from '@/lib/ai/template-scenario.schema'
+
+interface ScenarioFillConfig {
+  /** Store context the AI uses to pick tone and defaults. */
+  tenantContext: ScenarioTenantContext
+  /** Platform-library blocks bill the platform tenant at internal pricing; store blocks bill the
+   *  caller tenant at tenant pricing. Defaults to false (tenant-owned). */
+  isPlatformLibrary?: boolean
+  /** Marketing / utility / … — defaults to marketing for block-built emails. */
+  templateMode?: TemplateMode
+  /** Hide the opener on an existing/edited template (default true — show for new only). The
+   *  per-block sparkles stay available in either case. */
+  isNewTemplate?: boolean
+  /** Pass 'ecom' when the email composer is mounted inside the ecom dashboard so the dialog
+   *  renders in the ecom portal theme (pill buttons, ecom-accent-bg). Defaults to 'admin'. */
+  theme?: 'admin' | 'ecom'
+  /** Scenario-fill API route — admin by default; the ecom console passes its own
+   *  (ownerApi + hasService gate). */
+  apiEndpoint?: string
+}
 
 interface Props {
   blocks: EmailBlock[]
   onChange: (blocks: EmailBlock[]) => void
   extraVariables?: ComposerVariable[]
+  /** When provided, renders a "Fill from scenario" header CTA that drafts the whole block tree.
+   *  Omit (the default) when a parent editor — e.g. TemplateEditor — already owns that dialog.
+   *  Set `isNewTemplate` to false to suppress the opener on an existing template (per-block
+   *  sparkles still work). */
+  scenarioFill?: ScenarioFillConfig
 }
 
 const VarsCtx = createContext<ComposerVariable[]>(CAMPAIGN_VARIABLES)
@@ -94,13 +125,15 @@ function BlockRow({
 
       {block.type === 'heading' && (
         <div className="flex gap-2">
-          <input
-            className={inputCls}
-            value={block.text}
-            onChange={e => onPatch({ ...block, text: e.target.value })}
-            placeholder="Heading text ({variables} allowed)"
-          />
-          <AIEnrichButton placement="inline" fieldLabel="Email heading" value={block.text} onChange={text => onPatch({ ...block, text })} scope="mailer:write" format="plain" maxLength={90} variables={varNames} write context="A heading inside a marketing email block." />
+          <div className="relative flex-1 min-w-0">
+            <input
+              className={`${inputCls} pr-10`}
+              value={block.text}
+              onChange={e => onPatch({ ...block, text: e.target.value })}
+              placeholder="Heading text ({variables} allowed)"
+            />
+            <AIEnrichButton placement="in-field" anchorClassName="absolute right-2 top-1/2 -translate-y-1/2" fieldLabel="Email heading" value={block.text} onChange={text => onPatch({ ...block, text })} scope="mailer:write" format="plain" maxLength={90} variables={varNames} write context="A heading inside a marketing email block." />
+          </div>
           <div className="w-32 shrink-0">
             <AdminSelect
               value={block.align ?? 'left'}
@@ -157,13 +190,15 @@ function BlockRow({
 
       {block.type === 'cta_button' && (
         <div className="flex gap-2">
-          <AIEnrichButton placement="inline" fieldLabel="Button text" value={block.text} onChange={text => onPatch({ ...block, text })} scope="mailer:write" format="label" maxLength={30} write context="Call-to-action button in a marketing email." />
-          <input
-            className={inputCls}
-            value={block.text}
-            onChange={e => onPatch({ ...block, text: e.target.value })}
-            placeholder="Button text"
-          />
+          <div className="relative flex-1 min-w-0">
+            <input
+              className={`${inputCls} pr-10`}
+              value={block.text}
+              onChange={e => onPatch({ ...block, text: e.target.value })}
+              placeholder="Button text"
+            />
+            <AIEnrichButton placement="in-field" anchorClassName="absolute right-2 top-1/2 -translate-y-1/2" fieldLabel="Button text" value={block.text} onChange={text => onPatch({ ...block, text })} scope="mailer:write" format="label" maxLength={30} write context="Call-to-action button in a marketing email." />
+          </div>
           <input
             className={inputCls}
             value={block.url}
@@ -202,7 +237,7 @@ function BlockRow({
   )
 }
 
-export default function EmailBlockBuilder({ blocks, onChange, extraVariables }: Props) {
+export default function EmailBlockBuilder({ blocks, onChange, extraVariables, scenarioFill }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   // Stable keys by index are fine here — blocks have no ids; we reorder the array directly.
   const ids = blocks.map((_, i) => `block-${i}`)
@@ -227,9 +262,41 @@ export default function EmailBlockBuilder({ blocks, onChange, extraVariables }: 
     onChange(arrayMove(blocks, from, to))
   }
 
+  // Scenario fill rewrites the whole block tree into a single text block holding the AI's HTML.
+  // Blocks mode can't represent arbitrary rich HTML round-trip; the caller typically pairs this
+  // dialog with a mode switch to Tiptap when they need the full HTML surface.
+  const [scenarioOpen, setScenarioOpen] = useState(false)
+  const scenarioSnapshot = (): EditorFieldSnapshot => ({
+    name: '',
+    body: renderBlocks(blocks),
+    placeholders: [],
+    buttons: [],
+  })
+  const applyScenarioFill = async (payload: TemplateScenarioFill): Promise<UndoHandle> => {
+    const prev = blocks
+    const next: EmailBlock[] = [{ type: 'text', html: payload.body }]
+    onChange(next)
+    return { sessionId: null, undo: () => onChange(prev) }
+  }
+
   return (
     <VarsCtx.Provider value={extraVariables ?? CAMPAIGN_VARIABLES}>
     <div className="space-y-3">
+      {scenarioFill && scenarioFill.isNewTemplate !== false && (
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setScenarioOpen(true)}
+            className="inline-flex h-control shrink-0 items-center gap-1.5 rounded-lg border border-border-secondary bg-surface px-3 text-sm font-semibold text-foreground hover:bg-surface-secondary"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-accent-500" aria-hidden />
+            <span className="whitespace-nowrap">Fill from scenario</span>
+          </button>
+          <span className="min-w-0 text-[11px] text-foreground-muted">
+            Describe the message once — the AI drafts the whole email for you.
+          </span>
+        </div>
+      )}
       <div className="flex flex-wrap gap-1.5">
         {PALETTE.map(p => (
           <button
@@ -265,6 +332,20 @@ export default function EmailBlockBuilder({ blocks, onChange, extraVariables }: 
         </DndContext>
       )}
     </div>
+    {scenarioFill && (
+      <ScenarioFillDialog
+        open={scenarioOpen}
+        onClose={() => setScenarioOpen(false)}
+        channel="email"
+        templateMode={scenarioFill.templateMode ?? 'marketing'}
+        tenantContext={scenarioFill.tenantContext}
+        current={scenarioSnapshot()}
+        isPlatformLibrary={scenarioFill.isPlatformLibrary ?? false}
+        applyFill={applyScenarioFill}
+        theme={scenarioFill.theme ?? 'admin'}
+        apiEndpoint={scenarioFill.apiEndpoint}
+      />
+    )}
     </VarsCtx.Provider>
   )
 }

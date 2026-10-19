@@ -124,57 +124,105 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
             {settings.enabled ? 'No members match.' : 'Members appear here once the program is switched on.'}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-foreground-muted">
-                  <th className="px-4 py-3 font-medium">Customer</th>
-                  <th className="px-4 py-3 font-medium">Tier</th>
-                  <th className="px-4 py-3 font-medium text-right">Points</th>
-                  <th className="px-4 py-3 font-medium text-right">Ever earned</th>
-                  <th className="px-4 py-3 font-medium">Updated</th>
-                </tr>
-              </thead>
+          <>
+            {/* Mobile card list */}
+            <div className="md:hidden px-4 pb-4">
               <ServerPagedItems
-                wrap="tbody"
+                wrap="div"
+                wrapClassName="space-y-3"
                 page={page}
                 total={list.total}
                 noun="members"
                 items={list.members.map(member => ({
                   key: String(member.userId),
                   node: (
-                  <tr key={member.userId} className="border-t border-border-default">
-                    <td className="px-4 py-3">
-                      <Link
-                        href={ap(`/admin/customers/${member.userId}/view`, host)}
-                        className="font-medium text-foreground hover:text-accent-600"
-                      >
-                        {member.name}
-                      </Link>
-                      <p className="text-xs text-foreground-muted">{member.email}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${TIER_BADGE[member.tier] ?? TIER_BADGE.bronze}`}
-                      >
-                        {tierName(member.tier)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium text-foreground">{number(member.points)}</td>
-                    <td className="px-4 py-3 text-right text-foreground-secondary">{number(member.lifetimePoints)}</td>
-                    <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
-                      {new Date(member.updatedAt).toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </td>
-                  </tr>
+                    <Link
+                      key={member.userId}
+                      href={ap(`/admin/customers/${member.userId}/view`, host)}
+                      className="block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">{member.name}</p>
+                          <p className="text-xs text-foreground-muted truncate">{member.email}</p>
+                        </div>
+                        <span
+                          className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${TIER_BADGE[member.tier] ?? TIER_BADGE.bronze}`}
+                        >
+                          {tierName(member.tier)}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between text-xs text-foreground-muted">
+                        <span>
+                          <span className="font-medium text-foreground">{number(member.points)}</span> pts ·{' '}
+                          <span>{number(member.lifetimePoints)}</span> ever
+                        </span>
+                        <span className="whitespace-nowrap">
+                          {new Date(member.updatedAt).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </span>
+                      </div>
+                    </Link>
                   ),
                 }))}
               />
-            </table>
-          </div>
+            </div>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-foreground-muted">
+                    <th className="px-4 py-3 font-medium">Customer</th>
+                    <th className="px-4 py-3 font-medium">Tier</th>
+                    <th className="px-4 py-3 font-medium text-right">Points</th>
+                    <th className="px-4 py-3 font-medium text-right">Ever earned</th>
+                    <th className="px-4 py-3 font-medium">Updated</th>
+                  </tr>
+                </thead>
+                <ServerPagedItems
+                  wrap="tbody"
+                  page={page}
+                  total={list.total}
+                  noun="members"
+                  items={list.members.map(member => ({
+                    key: String(member.userId),
+                    node: (
+                    <tr key={member.userId} className="border-t border-border-default">
+                      <td className="px-4 py-3">
+                        <Link
+                          href={ap(`/admin/customers/${member.userId}/view`, host)}
+                          className="font-medium text-foreground hover:text-accent-600"
+                        >
+                          {member.name}
+                        </Link>
+                        <p className="text-xs text-foreground-muted">{member.email}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${TIER_BADGE[member.tier] ?? TIER_BADGE.bronze}`}
+                        >
+                          {tierName(member.tier)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-foreground">{number(member.points)}</td>
+                      <td className="px-4 py-3 text-right text-foreground-secondary">{number(member.lifetimePoints)}</td>
+                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+                        {new Date(member.updatedAt).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </td>
+                    </tr>
+                    ),
+                  }))}
+                />
+              </table>
+            </div>
+          </>
         )}
       </div>
     </ProgramSection>

@@ -336,7 +336,7 @@ export default function ShelvingClient() {
           loadLocations={loadLocations}
         />
       ) : (
-        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col flex-1 lg:min-h-0 lg:overflow-hidden">
           {/* Chip bar */}
           <div className="shrink-0 bg-surface border-b border-border-default px-4 sm:px-6 py-3 space-y-2.5 overflow-visible">
             {/* Warehouse chips */}
@@ -646,7 +646,7 @@ export default function ShelvingClient() {
           )}
 
           {/* Stock panel — full width */}
-          <div className="flex-1 flex flex-col bg-surface-secondary overflow-hidden">
+          <div className="flex-1 flex flex-col bg-surface-secondary lg:overflow-hidden">
             {!activeLocation ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
@@ -1003,8 +1003,8 @@ function LabelsTab({
   const selectedLocs = locations.filter(l => labelSelections.includes(l.id))
 
   return (
-    <div className="flex-1 flex min-h-0 overflow-hidden">
-      <div className="flex flex-col w-72 xl:w-80 shrink-0 border-r border-border-default bg-surface overflow-hidden">
+    <div className="flex-1 flex flex-col lg:flex-row lg:min-h-0 lg:overflow-hidden">
+      <div className="flex flex-col w-full lg:w-72 xl:w-80 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-border-default bg-surface lg:overflow-hidden">
         <div className="px-4 py-3 border-b border-border-default shrink-0">
           <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
             Filter Locations
@@ -1121,7 +1121,7 @@ function LabelsTab({
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 bg-surface-secondary overflow-hidden">
+      <div className="flex flex-col flex-1 bg-surface-secondary lg:overflow-hidden">
         <div className="px-5 py-3 border-b border-border-default bg-surface shrink-0 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Selected</span>
@@ -1222,7 +1222,7 @@ function LabelsTab({
               <p className="text-xs text-foreground-muted mt-1">Check locations on the left to add them here</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
               {selectedLocs.map(loc => (
                 <div
                   key={loc.id}
