@@ -10,8 +10,6 @@ import * as twContent from '../src/providers/twilio-content.js'
 import { renumberForSubmit, submit } from '../src/wa-approval.js'
 import { metaSamples } from '@jeffi/api-contracts'
 
-const SKIP = new Set(['otp', 'verify'])
-
 type Row = { template_id: string; slug: string }
 const rows = (await db.query<Row>(
   `SELECT t.id AS template_id, f.slug
@@ -34,9 +32,9 @@ function liveBodyOf(types: Record<string, any> | undefined): string | undefined 
 
 let submitted = 0, skipped = 0, failed = 0
 for (const r of rows) {
-  if (SKIP.has(r.slug)) { console.log(`${r.slug}: skipped (authentication)`); skipped++; continue }
   const full = await findById(db, PLATFORM_TENANT_ID, r.template_id)
   if (!full?.variant || !full.version) { console.warn(`${r.slug}: skipped (no version)`); skipped++; continue }
+  if (full.variant.meta_category === 'AUTHENTICATION') { console.log(`${r.slug}: skipped (authentication)`); skipped++; continue }
   const oldSid = full.variant.provider_ref
   if (oldSid) {
     try {
