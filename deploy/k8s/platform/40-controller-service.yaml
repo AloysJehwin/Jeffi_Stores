@@ -43,15 +43,15 @@ spec:
             - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
             - { name: OTEL_TRACES_SAMPLER, value: parentbased_traceidratio }
             - { name: OTEL_TRACES_SAMPLER_ARG, value: '1.0' }
-            - { name: NODE_OPTIONS, value: --max-old-space-size=640 }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=1024 }
             - name: REDIS_PASSWORD
               valueFrom: { secretKeyRef: { name: redis, key: password } }
             - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
             - name: GOOGLE_SERVICE_ACCOUNT_JSON
               valueFrom: { secretKeyRef: { name: google-sa, key: json, optional: true } }
           resources:
-            requests: { cpu: 150m, memory: 512Mi }
-            limits: { cpu: 1500m, memory: 900Mi }
+            requests: { cpu: 150m, memory: 768Mi }
+            limits: { cpu: 1500m, memory: 1400Mi }
           startupProbe:
             httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
             periodSeconds: 5
