@@ -363,6 +363,7 @@ export default function MessagingTemplatesClient() {
                 canUseScenarioFill={canUseScenarioFill}
                 isPlatformLibrary={isPlatformLibrary}
                 tenantContext={{ storeName: isPlatformLibrary ? 'The platform' : 'This store' }}
+                canResetToPlatform={!isPlatformLibrary}
               />
             </>
           )}

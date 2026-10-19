@@ -8,12 +8,13 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import EmojiPicker from './EmojiPicker'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
-import { Smile, Link2, ImageIcon, Loader2, Sparkles, Upload, RefreshCw } from 'lucide-react'
+import { Smile, Link2, ImageIcon, Loader2, Sparkles, Upload, RefreshCw, RotateCcw } from 'lucide-react'
 import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
 import PhonePreview from './PhonePreview'
 import ApiCurlHint from './ApiCurlHint'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import ScenarioFillDialog from './ScenarioFillDialog'
+import ResetToPlatformDialog from './ResetToPlatformDialog'
 import type { EditorFieldSnapshot, UndoHandle } from '@/lib/ai/scenario-fill-apply'
 import type {
   TemplateMode,
@@ -111,6 +112,9 @@ type Props = {
   /** Scenario-fill API route — admin by default; the ecom console passes its own
    *  (ownerApi + hasService gate). */
   scenarioFillEndpoint?: string
+  /** Show "Reset to platform default" for forked tenant templates. Admin side hides it on the
+   *  platform-library view (nothing to reset to); ecom side always enables it. */
+  canResetToPlatform?: boolean
 }
 
 const SMS_GSM_LIMIT = 160
@@ -142,6 +146,7 @@ export default function TemplateEditor({
   tenantContext,
   scenarioFillTheme = 'admin',
   scenarioFillEndpoint,
+  canResetToPlatform,
 }: Props) {
   const derived = campaignKind ?? (value.slug?.startsWith('campaign/') ? value.slug.slice('campaign/'.length) : null)
   const kind = isCampaignKind(derived) && value.channel !== 'whatsapp' ? derived : null
@@ -281,6 +286,15 @@ export default function TemplateEditor({
   const uploadUrl = assetsBase ?? `${apiBase}/assets/upload`
   const shortUrl = shortLinksBase ?? `${apiBase}/short-links`
 
+  // Reset-to-platform-default: fetches the platform baseline, opens a diff dialog when the
+  // tenant body has drifted; applies platform body/subject/blocks via onChange + onSave(true) on
+  // confirm, then re-submits WA templates to Meta.
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetDialog, setResetDialog] = useState<null | {
+    current: { body: string; subject?: string }
+    platform: { body: string; subject?: string; blocks?: unknown; blocks_format?: string | null }
+  }>(null)
+
   // Scenario-fill dialog: opens on the primary header CTA, writes name/body/subject/buttons/header
   // media atomically via a single onChange so the editor's own autosave treats it as one patch.
   const [scenarioOpen, setScenarioOpen] = useState(false)
@@ -312,6 +326,99 @@ export default function TemplateEditor({
       image_url: value.channel === 'whatsapp' ? waImage : undefined,
     }
   }, [value])
+  // Reset-to-platform-default: apply, save, re-submit WA for approval. Dialog gates it when the
+  // tenant body has drifted; a no-drift click runs this directly (today's UX for un-forked tenants).
+  const applyPlatformReset = useCallback(
+    async (platform: {
+      body: string
+      subject?: string
+      blocks?: unknown
+      blocks_format?: string | null
+      media_type?: string | null
+    }) => {
+      setResetBusy(true)
+      try {
+        const next: EditorTemplate = {
+          ...value,
+          body: platform.body,
+          subject: platform.subject ?? value.subject,
+          blocks: platform.blocks ?? value.blocks,
+          blocks_format: platform.blocks_format ?? value.blocks_format,
+          media_type: platform.media_type ?? value.media_type,
+        }
+        onChange(next)
+        const saved = await onSave(true)
+        if (!saved?.id) return
+        if (value.channel !== 'whatsapp') {
+          showToast('Reset to platform default.', 'success')
+          return
+        }
+        const r = await fetch(`${apiBase}/wa/submit-approval`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ templateId: saved.id, category: saved.meta_category ?? 'UTILITY' }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) {
+          showToast(data?.message || data?.error || `Submit failed (HTTP ${r.status})`, 'error')
+          return
+        }
+        onChange({
+          ...saved,
+          approval_status: data.status ?? 'pending',
+          approval_reason: null,
+          needs_resubmission: false,
+        })
+        showToast('Reset to platform default and resubmitted to Meta.', 'success')
+      } finally {
+        setResetBusy(false)
+        setResetDialog(null)
+      }
+    },
+    [value, onChange, onSave, apiBase, showToast]
+  )
+
+  const onResetToPlatform = useCallback(async () => {
+    setResetBusy(true)
+    let platformSnap: {
+      body: string
+      subject?: string
+      blocks?: unknown
+      blocks_format?: string | null
+      media_type?: string | null
+    } | null = null
+    try {
+      const r = await fetch(
+        `${apiBase}/${value.channel}/${encodeURIComponent(value.slug)}?source=platform`
+      )
+      if (!r.ok) {
+        showToast('No platform default to reset to for this template.', 'info')
+        return
+      }
+      const api = await r.json()
+      const v = api?.current_version ?? {}
+      platformSnap = {
+        body: v.body ?? '',
+        subject: v.subject ?? undefined,
+        blocks: v.blocks ?? null,
+        blocks_format: v.blocks_format ?? null,
+        media_type: api?.media_type ?? null,
+      }
+    } finally {
+      setResetBusy(false)
+    }
+    if (!platformSnap) return
+    // No drift — apply + resubmit without the gating dialog.
+    if ((platformSnap.body ?? '') === (value.body ?? '')) {
+      await applyPlatformReset(platformSnap)
+      return
+    }
+    setResetDialog({
+      current: { body: value.body ?? '', subject: value.subject ?? undefined },
+      platform: platformSnap,
+    })
+  }, [apiBase, value, showToast, applyPlatformReset])
+
   const applyScenarioFill = useCallback(
     async (payload: TemplateScenarioFill): Promise<UndoHandle> => {
       const prev = value
@@ -1056,6 +1163,22 @@ export default function TemplateEditor({
                       <RefreshCw className="w-3.5 h-3.5" />
                       Re-check
                     </button>
+                    {canResetToPlatform && value.id && (
+                      <button
+                        type="button"
+                        disabled={resetBusy || submitting}
+                        className={`${TOOL} text-xs`}
+                        onClick={onResetToPlatform}
+                        title="Overwrite this store’s copy with the platform default and resubmit to Meta"
+                      >
+                        {resetBusy ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        )}
+                        Reset to platform default
+                      </button>
+                    )}
                   </div>
                   {value.needs_resubmission && (
                     <p className="text-xs text-amber-700 dark:text-amber-400">
@@ -1228,6 +1351,18 @@ export default function TemplateEditor({
         applyFill={applyScenarioFill}
         theme={scenarioFillTheme}
         apiEndpoint={scenarioFillEndpoint}
+      />
+    )}
+    {resetDialog && (
+      <ResetToPlatformDialog
+        open
+        onClose={() => (resetBusy ? undefined : setResetDialog(null))}
+        onConfirm={() => applyPlatformReset(resetDialog.platform)}
+        busy={resetBusy}
+        channel={value.channel}
+        current={resetDialog.current}
+        platform={{ body: resetDialog.platform.body, subject: resetDialog.platform.subject }}
+        theme={scenarioFillTheme}
       />
     )}
     </>
