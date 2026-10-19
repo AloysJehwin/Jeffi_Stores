@@ -83,7 +83,7 @@ export default function EcomDialogShell({
   if (!open || typeof document === 'undefined') return null
   return createPortal(
     <div
-      className="ecom-scope fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+      className="fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto p-4 sm:p-8"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -94,11 +94,12 @@ export default function EcomDialogShell({
         }
       }}
     >
-      <div className="fixed inset-0 bg-foreground/30 animate-fade-in" onClick={onClose} />
+      {/* backdrop: outside .ecom-scope so the dim overlay reads against whichever page is below */}
+      <div className="fixed inset-0 bg-black/40 animate-fade-in" onClick={onClose} />
       <div
         ref={panel}
         tabIndex={-1}
-        className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-border-default bg-surface-elevated shadow-2xl outline-none animate-fade-in-up"
+        className="ecom-scope relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-border-default bg-surface-elevated shadow-2xl outline-none animate-fade-in-up"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-border-default px-6 pb-4 pt-6">
