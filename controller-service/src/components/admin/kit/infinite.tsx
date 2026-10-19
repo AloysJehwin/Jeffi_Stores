@@ -227,10 +227,8 @@ export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param =
   const key = withoutPage(sp, param)
   const [pending, startTransition] = useTransition()
   const store = useRef<{ key: string; pages: Map<number, T[]> } | null>(null)
-  // Snapshot the scroll container before loadMore so we can restore if the RSC swap clamps it.
-  // Fixes jump-to-top when the Suspense boundary briefly swaps in TableSkeleton during the RSC
-  // round-trip, shrinking the pane and letting the browser clamp scrollTop to the new max.
-  const scrollSnap = useRef<{ el: HTMLElement; top: number } | null>(null)
+  // Where the scroll was when load-more started; restored below.
+  const scrollSnap = useRef<{ el: HTMLElement; top: number; page: number } | null>(null)
 
   let s = store.current
   if (!s || s.key !== key) {
@@ -281,13 +279,27 @@ export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param =
   useEffect(() => {
     if (!pending && requested.current && !requested.current.endsWith('#1')) requested.current = null
   }, [pending, page])
-  // After a load-more transition commits (page increments, pending flips false), restore the
-  // scroll if the browser clamped it upward. Runs before paint so there is no visible jump.
+  // Put the scroll back where load-more left it. In production Next reuses the route's param-less
+  // prefetch for ?page=N and then ignores `scroll: false`: it scrolls the page to the top from a
+  // parent layout effect, on the commit that shows the route's loading skeleton or on the one that
+  // brings the rows back. So after each commit check from the next frame (before paint) and keep
+  // checking while the rows stream in, a few frames more once the page has advanced. Gives up if the
+  // user has scrolled themselves.
   useLayoutEffect(() => {
     const snap = scrollSnap.current
     if (!snap || pending) return
-    scrollSnap.current = null
-    if (snap.el.scrollTop < snap.top - 2) snap.el.scrollTop = snap.top
+    const { el, top } = snap
+    const landed = page >= snap.page
+    let frames = 0
+    let raf = 0
+    const put = () => {
+      const y = el.scrollTop
+      if (y < top - 2 && y <= top / 2 && el.scrollHeight - el.clientHeight >= top) el.scrollTop = top
+      if (++frames < (landed ? 12 : 300)) raf = requestAnimationFrame(put)
+      else if (landed && scrollSnap.current === snap) scrollSnap.current = null
+    }
+    raf = requestAnimationFrame(put)
+    return () => cancelAnimationFrame(raf)
   }, [page, pending])
   // Filter/search change (key change) invalidates the snapshot — don't restore to a stale offset.
   useEffect(() => {
@@ -298,8 +310,11 @@ export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param =
     const target = `${key}#${page + 1}`
     if (requested.current === target) return
     requested.current = target
+    // A page that chains straight after the last one can start while Next has just scrolled to the
+    // top and the restore below hasn't run yet: keep the higher of the two positions.
     const el = findScrollParent()
-    if (el) scrollSnap.current = { el, top: el.scrollTop }
+    const prev = scrollSnap.current
+    if (el) scrollSnap.current = { el, top: Math.max(el.scrollTop, prev?.el === el ? prev.top : 0), page: page + 1 }
     startTransition(() => router.replace(href(page + 1), { scroll: false }))
   }, [pending, hasMore, router, href, page, key])
 
