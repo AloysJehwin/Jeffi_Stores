@@ -164,11 +164,6 @@ export default function MessagingClient(props: { prices: Record<string, number>;
 
       {tab === 'templates' && (
         <>
-          {items && items.length > 0 && (
-            <div className="flex justify-end">
-              <span className="text-xs text-foreground-muted">{customised} customised · {items.length - customised} standard</span>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6 items-start">
             <aside className="rounded-2xl border border-border-default bg-surface-elevated overflow-hidden md:sticky md:top-6">
