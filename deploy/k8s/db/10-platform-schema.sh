@@ -16,12 +16,17 @@ confirm "Apply the diff above (one transaction), then manual.sql?"
 
 say "Apply the diff"
 cp "$PLAN" "$OUT_DIR/applied-schema-platform.sql"
-if [ -s "$PLAN" ]; then psql_app jeffi_stores -1 -q -f "$PLAN"; else echo "(empty)"; fi
+# One transaction, so every ALTER's lock is held until commit: give up on a lock after 20s rather than
+# sit behind live traffic (or deadlock with it), and try again — the diff is idempotent.
+apply_plan() { psql_app jeffi_stores -1 -q -c "SET lock_timeout = '20s'" -f "$PLAN"; }
+if [ -s "$PLAN" ]; then
+  for attempt in 1 2 3; do apply_plan && break; [ $attempt = 3 ] && exit 3; echo "apply attempt $attempt failed; retrying in 15s"; sleep 15; done
+else echo "(empty)"; fi
 say "manual.sql"
 psql_app jeffi_stores -q -f "$REPO/deploy/k8s/db/manual.sql"
 say "Re-check"
 schema_diff jeffi_stores --set=platform --dry-run > "$OUT_DIR/schema-recheck.log" 2>&1
-# Expected leftovers: every CHECK (re-added NOT VALID each run), and indexes/primary keys that already exist under
+# Expected leftovers: every CHECK (migra sees NOT VALID vs valid; the DO block skips the unchanged ones), and indexes/primary keys that already exist under
 # the same name with an older definition (IF NOT EXISTS keeps them). Anything else did not apply.
 IDX=$(grep -oiE '^create (unique )?index if not exists [a-z0-9_]+' "$PLAN" | awk '{print $NF}' | tr '\n' ' ')
 PKS=$(grep -oE "t.relname = '[a-z0-9_]+' AND c.contype = 'p'" "$PLAN" | cut -d"'" -f2 | tr '\n' ' ')
