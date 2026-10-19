@@ -223,7 +223,9 @@ async function sendWhatsAppPart(
       Object.assign(variables, extra ?? {})
       const res = await sendByTemplate({ channel: 'whatsapp', slug, to: phone, variables, reference: `campaign:${kind}` })
       const sent = res.status !== 'failed' && res.status !== 'skipped'
-      logMessage({ channel: 'whatsapp', to: phone, from: 'messaging-service', body: t.body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_m, n) => variables[n] ?? ''),
+      const { getStoreIdentity } = await import('@/lib/catalog/site-controls')
+      const storeName = await getStoreIdentity().then(s => s.name).catch(() => '')
+      logMessage({ channel: 'whatsapp', to: phone, from: 'messaging-service', body: t.body.replace(/\{\{\s*brand_name\s*\}\}/g, storeName).replace(/\{\{\s*(\d+)\s*\}\}/g, (_m, n) => variables[n] ?? ''),
         kind, status: sent ? 'sent' : 'failed', error: res.error, providerSid: res.id, provider: 'messaging-service', ...entity })
       return sent
     }
