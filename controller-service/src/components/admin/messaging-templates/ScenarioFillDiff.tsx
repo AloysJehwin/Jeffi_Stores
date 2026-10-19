@@ -110,9 +110,9 @@ function DiffRow({ row }: { row: Row }) {
 function DiffCell({ label, value, tone, cls }: { label: string; value: string; tone: 'before' | 'after' | 'muted'; cls: string }) {
   const paint =
     tone === 'before'
-      ? 'bg-red-50 text-red-900 dark:bg-red-900/20 dark:text-red-100'
+      ? 'bg-rose-500/5 text-rose-700 dark:text-rose-400'
       : tone === 'after'
-        ? 'bg-green-50 text-green-900 dark:bg-green-900/20 dark:text-green-100'
+        ? 'bg-emerald-500/5 text-emerald-700 dark:text-emerald-400'
         : 'bg-surface-secondary text-foreground-secondary'
   const content: ReactNode = value ? value : <em className="not-italic text-foreground-muted">empty</em>
   return (
