@@ -40,6 +40,9 @@ interface ScenarioFillConfig {
   /** Hide the opener on an existing/edited template (default true — show for new only). The
    *  per-block sparkles stay available in either case. */
   isNewTemplate?: boolean
+  /** Pass 'ecom' when the email composer is mounted inside the ecom dashboard so the dialog
+   *  renders in the ecom portal theme (pill buttons, ecom-accent-bg). Defaults to 'admin'. */
+  theme?: 'admin' | 'ecom'
 }
 
 interface Props {
@@ -336,6 +339,7 @@ export default function EmailBlockBuilder({ blocks, onChange, extraVariables, sc
         current={scenarioSnapshot()}
         isPlatformLibrary={scenarioFill.isPlatformLibrary ?? false}
         applyFill={applyScenarioFill}
+        theme={scenarioFill.theme ?? 'admin'}
       />
     )}
     </VarsCtx.Provider>
