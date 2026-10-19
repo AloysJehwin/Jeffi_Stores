@@ -6,6 +6,7 @@ import type { AiActionScope } from '@/lib/auth/ai-scope'
 import type { EnrichFormat } from '@/lib/ai/enrich-field'
 
 export const ECOM_ENRICH_ENDPOINT = '/api/ecom/ai/enrich-field'
+export const ECOM_SCENARIO_ENDPOINT = '/api/ecom/ai/template-scenario'
 
 type Placement = 'corner' | 'in-field' | 'above-label' | 'inline'
 

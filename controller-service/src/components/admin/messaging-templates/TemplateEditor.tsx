@@ -108,6 +108,9 @@ type Props = {
   /** Pass 'ecom' when this editor is mounted inside the ecom dashboard so the scenario-fill dialog
    *  renders in the ecom portal theme (pill buttons, ecom-accent-bg). Defaults to 'admin'. */
   scenarioFillTheme?: 'admin' | 'ecom'
+  /** Scenario-fill API route — admin by default; the ecom console passes its own
+   *  (ownerApi + hasService gate). */
+  scenarioFillEndpoint?: string
 }
 
 const SMS_GSM_LIMIT = 160
@@ -138,6 +141,7 @@ export default function TemplateEditor({
   isPlatformLibrary,
   tenantContext,
   scenarioFillTheme = 'admin',
+  scenarioFillEndpoint,
 }: Props) {
   const derived = campaignKind ?? (value.slug?.startsWith('campaign/') ? value.slug.slice('campaign/'.length) : null)
   const kind = isCampaignKind(derived) && value.channel !== 'whatsapp' ? derived : null
@@ -1223,6 +1227,7 @@ export default function TemplateEditor({
         isPlatformLibrary={isPlatformLibrary ?? false}
         applyFill={applyScenarioFill}
         theme={scenarioFillTheme}
+        apiEndpoint={scenarioFillEndpoint}
       />
     )}
     </>

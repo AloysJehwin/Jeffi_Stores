@@ -43,6 +43,9 @@ interface ScenarioFillConfig {
   /** Pass 'ecom' when the email composer is mounted inside the ecom dashboard so the dialog
    *  renders in the ecom portal theme (pill buttons, ecom-accent-bg). Defaults to 'admin'. */
   theme?: 'admin' | 'ecom'
+  /** Scenario-fill API route — admin by default; the ecom console passes its own
+   *  (ownerApi + hasService gate). */
+  apiEndpoint?: string
 }
 
 interface Props {
@@ -340,6 +343,7 @@ export default function EmailBlockBuilder({ blocks, onChange, extraVariables, sc
         isPlatformLibrary={scenarioFill.isPlatformLibrary ?? false}
         applyFill={applyScenarioFill}
         theme={scenarioFill.theme ?? 'admin'}
+        apiEndpoint={scenarioFill.apiEndpoint}
       />
     )}
     </VarsCtx.Provider>
