@@ -28,7 +28,7 @@ const FORMAT_RULES: Record<EnrichFormat, string> = {
   subject: 'An email subject line: one line, at most 9 words, no trailing punctuation, no ALL CAPS, no emoji unless the current value has one.',
   label: 'A button label: 1–3 words, at most 25 characters, no punctuation, no emoji.',
   sms: 'An SMS: plain text, GSM-7 characters only (no emoji, no smart quotes), ideally under 160 characters; keep any URL or {short_url} token.',
-  whatsapp: 'A WhatsApp template body (Meta reviews it): plain text, *bold* _italic_ allowed, under 1024 characters, no URLs in the body, numbered slots {{1}} {{2}}… must all remain in order; friendly but not spammy; no promotional ALL CAPS.',
+  whatsapp: 'A WhatsApp template body (Meta reviews it): plain text, *bold* _italic_ allowed, under 1024 characters, no URLs in the body, numbered slots {{1}} {{2}}… must all remain in order; {{brand_name}} is the store name and stays on the closing line; friendly but not spammy; no promotional ALL CAPS.',
   html: 'An email body fragment: valid HTML with inline styles only (no <html>/<head>/<body>/<style>), keep all existing links, images and the call-to-action button markup; paragraphs as <p>, headings as <h2>; do not set text colours or fonts.',
 }
 

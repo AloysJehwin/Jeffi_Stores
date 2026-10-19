@@ -4,9 +4,20 @@ import { db } from './db.js'
 import { poolsForTenant } from './pools.js'
 import * as tpl from './templates-v2.js'
 import * as twContent from './providers/twilio-content.js'
-import { metaSamples, validateForMeta, type WaBlocks as Blocks, type WaButton as Button } from '@jeffi/api-contracts'
+import { metaSamples, planSlots, validateForMeta, type WaBlocks as Blocks, type WaButton as Button } from '@jeffi/api-contracts'
 
 export { extraSlots, samplesFor, validateForMeta } from '@jeffi/api-contracts'
+
+/**
+ * Meta requires image/button variables to continue the body's numbering, and {{brand_name}} is the
+ * slot right after the body's own. The stored template keeps the editor's numbering; only the
+ * submission payload is renumbered (see planSlots).
+ */
+export function renumberForSubmit(body: string, blocks: Blocks | null | undefined, samples: Record<string, string>)
+  : { body: string; blocks: Blocks; samples: Record<string, string> } {
+  const p = planSlots(body, blocks, samples)
+  return { body: p.body, blocks: p.blocks, samples: p.samples }
+}
 
 // WhatsApp template → Twilio Content → Meta approval.
 // The variant's provider_ref is always the LIVE (approved) SID that sends use. A submission puts its
@@ -52,12 +63,13 @@ export async function submit(pool: pg.Pool, tenantId: string, tenantSlug: string
     throw Object.assign(new Error('This version is already submitted. Edit and save to submit a new version.'), { status: 409 })
   const blocks = (t.version.blocks ?? {}) as Blocks
   const samples = metaSamples(t.version.body, blocks)
+  const outbound = renumberForSubmit(t.version.body, blocks, samples)
   const errors = validateForMeta(t.version.body, blocks, samples)
   if (errors.length) throw Object.assign(new Error(errors.join(' ')), { status: 422, errors })
   const category = (opts.category ?? t.variant.meta_category ?? 'UTILITY') as 'MARKETING' | 'UTILITY' | 'AUTHENTICATION'
   const name = opts.name || metaName(opts.space === 'api' ? `${tenantSlug ?? 'jeffi'}_api` : tenantSlug, t.family.slug, t.version.version)
   const content = await twContent.createContent({
-    friendly_name: name, language: t.variant.locale, types: composeTypes(t.version.body, blocks), variables: samples,
+    friendly_name: name, language: t.variant.locale, types: composeTypes(outbound.body, outbound.blocks), variables: outbound.samples,
   })
   let approval: twContent.ApprovalResource
   try {

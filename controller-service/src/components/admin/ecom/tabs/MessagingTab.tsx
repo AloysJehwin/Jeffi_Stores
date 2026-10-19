@@ -34,7 +34,7 @@ function Toggle({ on, onChange, label, hint }: { on: boolean; onChange: (v: bool
 
 const htmlDoc = (body: string) => `<!doctype html><meta charset="utf-8"><body style="margin:12px;font:14px system-ui">${body}</body>`
 
-export default function MessagingTab({ tenantId }: { tenantId: string }) {
+export default function MessagingTab({ tenantId, storeName }: { tenantId: string; storeName?: string }) {
   const base = `/api/admin/ecom/customers/${tenantId}/messaging`
   const { showToast } = useToast()
   const [section, setSection] = useState<'settings' | 'review' | 'templates'>('settings')
@@ -89,7 +89,7 @@ export default function MessagingTab({ tenantId }: { tenantId: string }) {
         <div className="space-y-4">{reviews.map(r => <ReviewCard key={r.id} row={r} onDecide={decide} />)}</div>
       ))}
 
-      {section === 'templates' && <TemplatesPanel base={base} onChanged={() => { loadCatalog(); loadReviews() }} />}
+      {section === 'templates' && <TemplatesPanel base={base} storeName={storeName} onChanged={() => { loadCatalog(); loadReviews() }} />}
     </div>
   )
 }
@@ -205,7 +205,7 @@ function ReviewCard({ row, onDecide }: { row: ReviewRow; onDecide: (r: ReviewRow
   )
 }
 
-function TemplatesPanel({ base, onChanged }: { base: string; onChanged: () => void }) {
+function TemplatesPanel({ base, storeName, onChanged }: { base: string; storeName?: string; onChanged: () => void }) {
   const { showToast } = useToast()
   const [channel, setChannel] = useState<Channel>('email')
   const [items, setItems] = useState<Item[] | null>(null)
@@ -266,7 +266,7 @@ function TemplatesPanel({ base, onChanged }: { base: string; onChanged: () => vo
               ) : <span className="font-mono text-xs text-foreground-muted">{selected.slug}</span>}
               {selected.id && <button className={`${btn} ml-auto border border-border-default`} onClick={archive}>Archive customer copy</button>}
             </div>
-            <TemplateEditor value={selected} apiBase={`${base}/v2/templates`} assetsBase="/api/admin/uploads/image" onChange={setSelected} onSave={save} saving={saving} />
+            <TemplateEditor value={selected} apiBase={`${base}/v2/templates`} assetsBase="/api/admin/uploads/image" onChange={setSelected} onSave={save} saving={saving} tenantContext={{ storeName: storeName || 'This store' }} />
           </>
         )}
       </div>
