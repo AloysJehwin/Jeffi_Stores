@@ -7,7 +7,8 @@
 import { db } from '../src/db.js'
 import { PLATFORM_TENANT_ID, findById } from '../src/templates-v2.js'
 import * as twContent from '../src/providers/twilio-content.js'
-import { submit } from '../src/wa-approval.js'
+import { renumberForSubmit, submit } from '../src/wa-approval.js'
+import { metaSamples } from '@jeffi/api-contracts'
 
 const SKIP = new Set(['otp', 'verify'])
 
@@ -40,7 +41,9 @@ for (const r of rows) {
   if (oldSid) {
     try {
       const live = await twContent.getContent(oldSid)
-      if (liveBodyOf(live.types) === full.version.body) {
+      // Compare what would be submitted ({{brand_name}} numbered), not the stored text.
+      const blocks = (full.version.blocks ?? {}) as any
+      if (liveBodyOf(live.types) === renumberForSubmit(full.version.body, blocks, metaSamples(full.version.body, blocks)).body) {
         console.log(`${r.slug}: no change needed`); skipped++; continue
       }
     } catch { /* dangling or inaccessible SID — fall through to submit */ }
