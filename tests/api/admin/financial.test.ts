@@ -53,27 +53,44 @@ function makeReq(url: string) {
 // ---------------------------------------------------------------------------
 
 describe('GET /api/admin/financial/pl', () => {
+  const TOTALS = {
+    revenue: 100000, refunds: 0, net_revenue: 100000, cogs: 60000, gross_profit: 40000,
+    gross_margin_pct: 40, operating_expenses: 10000, operating_profit: 30000,
+    tax_collected: 0, order_count: 10,
+    revenue_online: 60000, revenue_business: 20000, revenue_cash_sale: 15000, revenue_offline: 5000,
+  }
+  const MONTHLY = [
+    { month: '2024-04', revenue: 50000, cogs: 30000, gross_profit: 20000, net_revenue: 50000 },
+    { month: '2024-05', revenue: 50000, cogs: 30000, gross_profit: 20000, net_revenue: 50000 },
+  ]
+
   beforeEach(() => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(getPLReport).mockResolvedValue({
-      revenue: 100000,
-      cogs: 60000,
-      grossProfit: 40000,
-      expenses: 10000,
-      netProfit: 30000,
-    } as any)
+    vi.mocked(getPLReport).mockResolvedValue({ totals: TOTALS, monthly: MONTHLY } as any)
   })
 
-  it('returns P&L report for default financial year range', async () => {
+  it('returns the FinanceOverviewContract envelope for the default FY range', async () => {
     const res = await plGET(makeReq('http://localhost/api/admin/financial/pl'))
     const json = await res.json()
 
     expect(res.status).toBe(200)
-    expect(json).toMatchObject({ revenue: 100000, netProfit: 30000 })
+    expect(json).toMatchObject({
+      range: expect.objectContaining({ from: expect.any(String), to: expect.any(String) }),
+      previous_range: expect.objectContaining({ from: expect.any(String), to: expect.any(String) }),
+      bucket: expect.any(String),
+      current: expect.objectContaining({ revenue: 100000, operating_profit: 30000 }),
+      previous: expect.objectContaining({ revenue: 100000 }),
+    })
+    expect(Array.isArray(json.series)).toBe(true)
+    expect(json.series[0]).toMatchObject({ label: '2024-04-01', revenue: 50000, cogs: 30000 })
+    expect(json.by_dim).toEqual(MONTHLY)
+    // by_dim2 is the non-zero revenue sources from totals
+    expect(json.by_dim2.map((s: any) => s.key).sort()).toEqual(['business', 'cash_sale', 'offline', 'online'])
+    // Default FY range: from is April 1 of the current FY; to is today (truncated).
     expect(getPLReport).toHaveBeenCalledWith(
       expect.stringMatching(/^\d{4}-04-01$/),
-      expect.stringMatching(/^\d{4}-03-31$/)
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
     )
   })
 
