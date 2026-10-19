@@ -44,10 +44,11 @@ interface Props {
   theme?: 'admin' | 'ecom'
 }
 
-// The dialog renders in a React portal attached to document.body, which escapes `.ecom-scope`.
-// Use the root-scoped ecom-accent-bg class so terracotta resolves regardless of mount context —
-// consistent look in admin and ecom pages, no CSS-variable chasing.
-const PRIMARY_CLS = 'inline-flex items-center gap-1.5 rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40'
+// The dialog renders in a React portal attached to document.body, which escapes both
+// `.ecom-scope` and the ecom-only globals (ecom.css is imported only under (ecom)/*).
+// Hard-code the brand terracotta via Tailwind arbitrary values so the button resolves
+// consistently in admin AND ecom pages, no CSS-variable or import dependency.
+const PRIMARY_CLS = 'inline-flex items-center gap-1.5 rounded-full bg-[#c46a46] hover:bg-[#9f5436] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40'
 const SECONDARY_CLS = 'inline-flex items-center rounded-full border border-border-default bg-surface px-5 py-2 text-sm font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground disabled:opacity-50'
 
 const MODE_OPTIONS = [
