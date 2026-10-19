@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2, Sparkles, Undo2, X } from 'lucide-react'
 import { Dialog } from '@/components/admin/kit/dialog'
+import { fieldInputCls } from '@/components/admin/kit/form'
 import AdminSelect from '@/components/admin/AdminSelect'
 import Toggle from '@/components/ui/Toggle'
 import ScenarioFillDiff from './ScenarioFillDiff'
@@ -174,7 +175,7 @@ export default function ScenarioFillDialog({
           type="button"
           onClick={handleClose}
           disabled={busy}
-          className="control-md font-medium text-foreground-secondary hover:text-foreground disabled:opacity-50"
+          className="control-md border border-border-default bg-surface font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground disabled:opacity-50"
         >
           Cancel
         </button>
@@ -198,7 +199,7 @@ export default function ScenarioFillDialog({
             setError(null)
           }}
           disabled={busy}
-          className="control-md font-medium text-foreground-secondary hover:text-foreground disabled:opacity-50"
+          className="control-md border border-border-default bg-surface font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground disabled:opacity-50"
         >
           Back
         </button>
@@ -237,7 +238,7 @@ export default function ScenarioFillDialog({
                 onChange={e => setScenarioText(e.target.value.slice(0, MAX_SCENARIO))}
                 rows={4}
                 placeholder={PLACEHOLDER_BY_CHANNEL[channel]}
-                className="field-md w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent-500"
+                className={`${fieldInputCls} py-2`}
               />
               <div className="mt-1 flex items-center justify-between text-xs text-foreground-muted">
                 <span>What the template should say — the AI handles the exact wording.</span>
