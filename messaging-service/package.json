@@ -12,7 +12,8 @@
     "seed:catalog": "node --env-file=.env.local --import tsx scripts/seed-catalog.ts",
     "wa:sync": "node --env-file=.env.local --import tsx scripts/wa-approval-sync.ts",
     "wa:resubmit": "node --env-file=.env.local --import tsx scripts/resubmit-wa-templates.ts",
-    "wa:shift-action-bodies": "node --env-file=.env.local --import tsx scripts/shift-wa-action-bodies.ts"
+    "wa:shift-action-bodies": "node --env-file=.env.local --import tsx scripts/shift-wa-action-bodies.ts",
+    "wa:brand-token": "node --env-file=.env.local --import tsx scripts/wa-brand-token.ts"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1110.0",

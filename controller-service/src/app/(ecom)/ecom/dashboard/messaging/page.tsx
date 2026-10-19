@@ -12,7 +12,7 @@ export default async function MessagingPage() {
   const { tenant } = await loadOwnerContext()
   const wallet = hasService(tenant, 'messaging') ? await getTenantWallet(tenant.id, 0).catch(() => null) : null
   if (hasService(tenant, 'messaging')) {
-    return <MessagingClient prices={{ ...priceList().messages, media: priceList().media }} balance={Number(wallet?.balance ?? 0)} />
+    return <MessagingClient prices={{ ...priceList().messages, media: priceList().media }} balance={Number(wallet?.balance ?? 0)} storeName={tenant.display_name} />
   }
   return (
     <>

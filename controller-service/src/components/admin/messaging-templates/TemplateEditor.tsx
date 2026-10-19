@@ -8,7 +8,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import EmojiPicker from './EmojiPicker'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
-import { Smile, Link2, ImageIcon, Loader2, Sparkles, Upload, RefreshCw, RotateCcw } from 'lucide-react'
+import { Smile, Link2, ImageIcon, Loader2, Sparkles, Upload, RefreshCw, RotateCcw, Store } from 'lucide-react'
 import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
 import PhonePreview from './PhonePreview'
 import ApiCurlHint from './ApiCurlHint'
@@ -23,7 +23,7 @@ import type {
 } from '@/lib/ai/template-scenario.schema'
 import { emailPreviewDoc, emailBodyDoc, previewSubject } from '@/lib/templates/email-preview'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
-import { rejectionHints } from '@jeffi/api-contracts'
+import { BRAND_VAR, rejectionHints, withBrandToken } from '@jeffi/api-contracts'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
 
@@ -56,7 +56,7 @@ export function toEditorTemplate(api: any): EditorTemplate {
     name: api.name ?? '',
     category: api.category ?? null,
     subject: v.subject ?? api.subject ?? '',
-    body: v.body ?? api.body ?? '',
+    body: api.channel === 'whatsapp' ? withBrandToken(v.body ?? api.body ?? '') : (v.body ?? api.body ?? ''),
     blocks: v.blocks ?? api.blocks,
     blocks_format: v.blocks_format ?? api.blocks_format ?? null,
     meta_category: api.meta_category ?? null,
@@ -315,7 +315,7 @@ export default function TemplateEditor({
     const bodyText = (value.body ?? '').toString()
     const placeholders =
       value.channel === 'whatsapp'
-        ? [...new Set([...bodyText.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => m[1]))]
+        ? [...new Set([...bodyText.matchAll(/\{\{\s*(\d+|brand_name)\s*\}\}/g)].map(m => m[1]))]
         : [...new Set([...bodyText.matchAll(/\{\{?\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\}?\}/g)].map(m => m[1]))]
     return {
       name: value.name ?? '',
@@ -398,7 +398,7 @@ export default function TemplateEditor({
       const api = await r.json()
       const v = api?.current_version ?? {}
       platformSnap = {
-        body: v.body ?? '',
+        body: value.channel === 'whatsapp' ? withBrandToken(v.body ?? '') : (v.body ?? ''),
         subject: v.subject ?? undefined,
         blocks: v.blocks ?? null,
         blocks_format: v.blocks_format ?? null,
@@ -580,6 +580,17 @@ export default function TemplateEditor({
         <Link2 className="w-3.5 h-3.5" />
         Short link
       </button>
+      {value.channel === 'whatsapp' && (
+        <button
+          type="button"
+          className={TOOL}
+          title="Filled with the sending store's name. Meta reviews it as the next numbered variable."
+          onClick={() => insertAtCursor(`{{${BRAND_VAR}}}`)}
+        >
+          <Store className="w-3.5 h-3.5" />
+          Store name
+        </button>
+      )}
       <button type="button" disabled={uploading} className={TOOL} onClick={onPickImageTextual}>
         {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}Image as
         short link
@@ -923,7 +934,7 @@ export default function TemplateEditor({
 
                 <div className="relative">
                   {aiLabel({
-                    label: `Body (use {{1}}, {{2}} … placeholders)`,
+                    label: `Body (use {{1}}, {{2}} … and {{brand_name}} for the store name)`,
                     field: 'WhatsApp body',
                     value: value.body,
                     onChange: body => onChange({ ...value, body, blocks_format: 'wa-content' }),
@@ -1283,7 +1294,7 @@ export default function TemplateEditor({
                 <PhonePreview
                   channel={value.channel}
                   body={value.body}
-                  vars={value.channel === 'whatsapp' ? (wb.variables ?? {}) : {}}
+                  vars={value.channel === 'whatsapp' ? { ...(wb.variables ?? {}), [BRAND_VAR]: scenarioTenant.storeName } : {}}
                   headerMedia={
                     value.channel === 'whatsapp' ? ((wb.types as any)?.['twilio/media']?.media?.[0] ?? null) : null
                   }

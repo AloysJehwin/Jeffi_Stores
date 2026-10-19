@@ -107,7 +107,7 @@ export default async function TenantObjectPage({
         )}
         {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
         {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} approvals={approvals} />}
-        {tab === 'messaging' && hasService(t, 'messaging') && <MessagingTab tenantId={t.id} />}
+        {tab === 'messaging' && hasService(t, 'messaging') && <MessagingTab tenantId={t.id} storeName={t.display_name} />}
       </div>
     </div>
   )
