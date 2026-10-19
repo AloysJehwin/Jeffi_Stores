@@ -22,7 +22,8 @@ if (!jobId || !method || !path || !process.env.CRON_SECRET) {
 }
 
 // A new pod joins the k3s network-policy allow-list a moment after it starts, so the first
-// connection can be dropped; retry connection errors (not HTTP errors) briefly.
+// connection can be dropped; retry connection errors (not HTTP errors) up to 10 times with
+// 1.5s/3s/4.5s/6s... backoff (capped at 6s per wait, ~45s cumulative) to outlast cold-start.
 // The fan-out endpoint reads the jobId from the POST body (one CronJob drives all tenants for a job).
 // CRON_BODY (JSON) is for one-off release calls (deploy/k8s/db/lib.sh in_cluster).
 const callBody = process.env.CRON_BODY || (path === '/api/cron/fanout' ? JSON.stringify({ jobId }) : undefined)
@@ -33,8 +34,8 @@ async function call() {
     try {
       return await fetch(`${base}${path}`, { method, headers: callHeaders, body: callBody, signal: AbortSignal.timeout(timeoutMs) })
     } catch (err) {
-      if (attempt >= 5 || err?.name === 'TimeoutError') throw err
-      await new Promise(r => setTimeout(r, attempt * 1000))
+      if (attempt >= 10 || err?.name === 'TimeoutError') throw err
+      await new Promise(r => setTimeout(r, Math.min(attempt * 1500, 6000)))
     }
   }
 }
