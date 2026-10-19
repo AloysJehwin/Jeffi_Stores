@@ -37,6 +37,9 @@ interface ScenarioFillConfig {
   isPlatformLibrary?: boolean
   /** Marketing / utility / … — defaults to marketing for block-built emails. */
   templateMode?: TemplateMode
+  /** Hide the opener on an existing/edited template (default true — show for new only). The
+   *  per-block sparkles stay available in either case. */
+  isNewTemplate?: boolean
 }
 
 interface Props {
@@ -44,7 +47,9 @@ interface Props {
   onChange: (blocks: EmailBlock[]) => void
   extraVariables?: ComposerVariable[]
   /** When provided, renders a "Fill from scenario" header CTA that drafts the whole block tree.
-   *  Omit (the default) when a parent editor — e.g. TemplateEditor — already owns that dialog. */
+   *  Omit (the default) when a parent editor — e.g. TemplateEditor — already owns that dialog.
+   *  Set `isNewTemplate` to false to suppress the opener on an existing template (per-block
+   *  sparkles still work). */
   scenarioFill?: ScenarioFillConfig
 }
 
@@ -271,17 +276,17 @@ export default function EmailBlockBuilder({ blocks, onChange, extraVariables, sc
   return (
     <VarsCtx.Provider value={extraVariables ?? CAMPAIGN_VARIABLES}>
     <div className="space-y-3">
-      {scenarioFill && (
-        <div className="flex items-center justify-between gap-2">
+      {scenarioFill && scenarioFill.isNewTemplate !== false && (
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => setScenarioOpen(true)}
-            className="control-md inline-flex items-center gap-1.5 border border-border-secondary bg-surface font-semibold text-foreground hover:bg-surface-secondary"
+            className="inline-flex h-control shrink-0 items-center gap-1.5 rounded-lg border border-border-secondary bg-surface px-3 text-sm font-semibold text-foreground hover:bg-surface-secondary"
           >
-            <Sparkles className="h-4 w-4 text-accent-500" />
-            Fill from scenario
+            <Sparkles className="h-3.5 w-3.5 text-accent-500" aria-hidden />
+            <span className="whitespace-nowrap">Fill from scenario</span>
           </button>
-          <span className="text-[11px] text-foreground-muted">
+          <span className="min-w-0 text-[11px] text-foreground-muted">
             Describe the message once — the AI drafts the whole email for you.
           </span>
         </div>
