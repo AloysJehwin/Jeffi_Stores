@@ -9,7 +9,7 @@ import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
 import BulkMessages from './BulkMessages'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
-import { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
+import { ECOM_ENRICH_ENDPOINT, ECOM_SCENARIO_ENDPOINT } from '@/components/admin/AIEnrichButton'
 import PlayDialog, { PlayButton, type PlayTarget } from '../_components/PlayDialog'
 import { Segmented, currentRowCls, fieldCls, focusRing } from '../../_ui'
 import PageHeader from '../_components/PageHeader'
@@ -277,6 +277,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                     isPlatformLibrary={false}
                     tenantContext={{ storeName: 'This store' }}
                     scenarioFillTheme="ecom"
+                    scenarioFillEndpoint={ECOM_SCENARIO_ENDPOINT}
                   />
                   </fieldset>
                 </Card>

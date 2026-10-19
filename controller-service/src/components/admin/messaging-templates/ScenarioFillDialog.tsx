@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2, Sparkles, Undo2, X } from 'lucide-react'
-import { Dialog } from '@/components/admin/kit/dialog'
-import { fieldInputCls } from '@/components/admin/kit/form'
 import AdminSelect from '@/components/admin/AdminSelect'
 import Toggle from '@/components/ui/Toggle'
+import EcomDialogShell from './EcomDialogShell'
 import ScenarioFillDiff from './ScenarioFillDiff'
 import type { EditorFieldSnapshot, UndoHandle } from '@/lib/ai/scenario-fill-apply'
 import type {
@@ -42,14 +41,20 @@ interface Props {
    *  regardless of mount context, since the Portal escapes .ecom-scope and we want one consistent
    *  look in admin + ecom. Kept so existing callers don't need to drop the prop; ignored. */
   theme?: 'admin' | 'ecom'
+  /** Admin route by default; the ecom console passes '/api/ecom/ai/template-scenario'
+   *  (ownerApi + hasService messaging/documents gate, no admin scope). */
+  apiEndpoint?: string
 }
 
-// The dialog renders in a React portal attached to document.body, which escapes both
-// `.ecom-scope` and the ecom-only globals (ecom.css is imported only under (ecom)/*).
-// Hard-code the brand terracotta via Tailwind arbitrary values so the button resolves
-// consistently in admin AND ecom pages, no CSS-variable or import dependency.
+const DEFAULT_API_ENDPOINT = '/api/admin/ai/template-scenario'
+
+// EcomDialogShell wraps the portal content in `.ecom-scope`, so border/surface/foreground
+// tokens inside the dialog resolve to the ecom portal palette (cream panel, tan borders,
+// terracotta accents) even when the host page is admin. The brand terracotta is still
+// pinned via Tailwind arbitrary values so the primary button is identical in both apps.
 const PRIMARY_CLS = 'inline-flex items-center gap-1.5 rounded-full bg-[#c46a46] hover:bg-[#9f5436] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40'
 const SECONDARY_CLS = 'inline-flex items-center rounded-full border border-border-default bg-surface px-5 py-2 text-sm font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground disabled:opacity-50'
+const FIELD_CLS = 'ecom-field w-full rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground placeholder:text-foreground-muted'
 
 const MODE_OPTIONS = [
   { value: 'marketing', label: 'Marketing' },
@@ -88,6 +93,7 @@ export default function ScenarioFillDialog({
   current,
   isPlatformLibrary = false,
   applyFill,
+  apiEndpoint = DEFAULT_API_ENDPOINT,
 }: Props) {
   const primaryCls = PRIMARY_CLS
   const secondaryCls = SECONDARY_CLS
@@ -131,7 +137,7 @@ export default function ScenarioFillDialog({
     setBusy(true)
     setError(null)
     try {
-      const r = await fetch('/api/admin/ai/template-scenario', {
+      const r = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -215,10 +221,9 @@ export default function ScenarioFillDialog({
 
   return (
     <>
-      <Dialog
+      <EcomDialogShell
         open={open}
         onClose={handleClose}
-        size="lg"
         title="Fill from scenario"
         description="Describe what the template should accomplish — the AI drafts the whole thing, you review before anything lands in the editor."
         footer={footer}
@@ -236,7 +241,7 @@ export default function ScenarioFillDialog({
                 onChange={e => setScenarioText(e.target.value.slice(0, MAX_SCENARIO))}
                 rows={4}
                 placeholder={PLACEHOLDER_BY_CHANNEL[channel]}
-                className={`${fieldInputCls} py-2`}
+                className={FIELD_CLS}
               />
               <div className="mt-1 flex items-center justify-between text-xs text-foreground-muted">
                 <span>What the template should say — the AI handles the exact wording.</span>
@@ -295,7 +300,7 @@ export default function ScenarioFillDialog({
             </div>
           )
         )}
-      </Dialog>
+      </EcomDialogShell>
       {undoHandle && (
         <ScenarioFillUndoBar
           handle={undoHandle}
