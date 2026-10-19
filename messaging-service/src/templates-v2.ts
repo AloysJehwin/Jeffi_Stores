@@ -97,6 +97,11 @@ export async function findBySlugWithDefaults(p: Pools, tenantId: string, channel
   return findBySlug(p.platform, PLATFORM_TENANT_ID, channel, slug, locale)
 }
 
+// Platform default only (skip tenant override). Used by "Reset to platform default" to show the
+// baseline body alongside the tenant copy — the diff dialog gates the overwrite.
+export const findPlatformBySlug = (p: Pools, channel: string, slug: string, locale = 'en') =>
+  findBySlug(p.platform, PLATFORM_TENANT_ID, channel, slug, locale)
+
 /** Body/subject of the version Meta approved (the one the live provider_ref points at). */
 export const liveVersion = (e: Executor, variantId: string, providerRef: string) =>
   first<VersionRow>(e, `SELECT * FROM template_version WHERE variant_id=$1 AND provider_ref=$2 ORDER BY version DESC LIMIT 1`, [variantId, providerRef])
