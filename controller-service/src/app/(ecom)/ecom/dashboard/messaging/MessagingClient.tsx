@@ -281,6 +281,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                     canUseScenarioFill={canEdit}
                     isPlatformLibrary={false}
                     tenantContext={{ storeName: 'This store' }}
+                    scenarioFillTheme="ecom"
                   />
                   </fieldset>
                 </Card>
