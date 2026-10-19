@@ -22,7 +22,7 @@ describe('wa-approval', () => {
     expect(errs.join(' ')).toMatch(/end with a variable/)
     expect(errs.join(' ')).toMatch(/numbered/)
     expect(errs.join(' ')).toMatch(/sample value/)
-    const ok = '{{1}}: Your order {{2}} is confirmed. Thank you for shopping with us!'
+    const ok = 'Jeffi Stores: Your order {{1}} is confirmed. Thank you for shopping with us!'
     expect(validateForMeta(ok, {}, samplesFor(ok))).toEqual([])
   })
 
