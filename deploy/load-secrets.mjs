@@ -144,13 +144,14 @@ await loadSecrets()
 if (process.env.SPAWN_APP === '1') {
   const { spawn } = await import('child_process')
   // APP_ENTRY picks the process (the controller's cluster-server.js, or a service's src/server.ts with
-  // APP_NODE_ARGS='--import tsx'); paths are relative to the repo/image root.
+  // APP_NODE_ARGS='--import tsx'); paths are relative to the repo/image root. APP_ARGS go to the script.
   const entry = resolve(
     REPO_ROOT,
     process.env.APP_ENTRY || (existsSync(resolve(REPO_ROOT, 'controller-service/cluster-server.js')) ? 'controller-service/cluster-server.js' : 'cluster-server.js')
   )
   const nodeArgs = (process.env.APP_NODE_ARGS || '').split(' ').filter(Boolean)
-  const child = spawn(process.execPath, [...nodeArgs, entry], { stdio: 'inherit', env: process.env, cwd: process.env.APP_CWD ? resolve(REPO_ROOT, process.env.APP_CWD) : dirname(entry) })
+  const appArgs = (process.env.APP_ARGS || '').split(' ').filter(Boolean)
+  const child = spawn(process.execPath, [...nodeArgs, entry, ...appArgs], { stdio: 'inherit', env: process.env, cwd: process.env.APP_CWD ? resolve(REPO_ROOT, process.env.APP_CWD) : dirname(entry) })
   child.on('exit', (code, signal) => {
     process.exit(signal ? 1 : (code ?? 0))
   })

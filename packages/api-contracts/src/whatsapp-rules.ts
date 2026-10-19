@@ -14,8 +14,84 @@ export function extraSlots(blocks: WaBlocks | null | undefined): string[] {
   return placeholders([b.types?.['twilio/media']?.media?.[0] ?? '', ...(b.buttons ?? []).map(x => x.value ?? '')].join(' '))
 }
 
+// {{brand_name}}: the sending store's name. Editors write the token; Meta sees the next number after
+// the body's own variables, and every send fills it from the store's name.
+export const BRAND_VAR = 'brand_name'
+export const BRAND_SAMPLE = 'Jeffi Stores'
+const BRAND = /\{\{\s*brand_name\s*\}\}/g
+const LEGACY_TAIL = /— from \{\{\s*(\d+)\s*\}\} team(\s*)$/
+
+/** Rows saved before the token end "— from {{N}} team" with N the last slot; that slot is the brand. */
+export function withBrandToken(body: string): string {
+  const s = body || ''
+  const m = s.match(LEGACY_TAIL)
+  if (!m || /\{\{\s*brand_name\s*\}\}/.test(s)) return s
+  return placeholders(s).slice(-1)[0] === m[1] ? s.replace(LEGACY_TAIL, `— from {{${BRAND_VAR}}} team$2`) : s
+}
+
+export type Remap = { from: string; to: string }
+export type WaSlotPlan = {
+  /** Body with {{brand_name}} numbered — what Meta approves. */
+  body: string
+  /** Header media / button {{n}} renumbered to continue after the body. */
+  blocks: WaBlocks
+  samples: Record<string, string>
+  /** The caller's numbered body variables. */
+  bodySlots: string[]
+  brandSlot: string | null
+  media: Remap | null
+  /** One per button; null when that button has no variable. */
+  links: Array<Remap | null>
+}
+
+/**
+ * The one slot layout shared by submit and send: body variables 1..k, then {{brand_name}} as k+1,
+ * then header media, then each button, each taking the next number. Stored blocks keep whatever
+ * numbering the editor gave them; `samples` are keyed by that stored numbering.
+ */
+export function planSlots(body: string, blocks: WaBlocks | null | undefined, samples: Record<string, string> = {}): WaSlotPlan {
+  const b = blocks ?? {}
+  const src = withBrandToken(body)
+  const bodySlots = placeholders(src)
+  let next = bodySlots.reduce((m, v) => Math.max(m, +v), 0)
+  const brandSlot = /\{\{\s*brand_name\s*\}\}/.test(src) ? String(++next) : null
+  const out: Record<string, string> = {}
+  for (const v of bodySlots) if (samples[v] !== undefined) out[v] = samples[v]
+  if (brandSlot) out[brandSlot] = BRAND_SAMPLE
+  // Each location numbers its own placeholders, so a stored {{1}} in the header and in a button are two slots.
+  const relocate = (s: string): { s: string; first: Remap | null } => {
+    const local: Record<string, string> = {}
+    let first: Remap | null = null
+    for (const n of placeholders(s)) {
+      const to = String(++next)
+      local[n] = to
+      first ??= { from: n, to }
+      const sample = b.variables?.[n] ?? samples[n]
+      if (sample !== undefined) out[to] = sample
+    }
+    return { s: s.replace(PH, (_m, n: string) => `{{${local[n] ?? n}}}`), first }
+  }
+  const headerUrl: string | undefined = b.types?.['twilio/media']?.media?.[0]
+  const header = headerUrl ? relocate(headerUrl) : null
+  const btns = (b.buttons ?? []).map(btn => (btn.value ? relocate(btn.value) : null))
+  const types = header
+    ? { ...(b.types ?? {}), 'twilio/media': { ...(b.types?.['twilio/media'] ?? {}), media: [header.s, ...(b.types?.['twilio/media']?.media?.slice(1) ?? [])] } }
+    : b.types
+  const buttons = b.buttons?.map((btn, i) => (btns[i] ? { ...btn, value: btns[i]!.s } : btn))
+  return {
+    body: brandSlot ? src.replace(BRAND, `{{${brandSlot}}}`) : src,
+    blocks: { ...b, types, buttons, variables: out },
+    samples: out,
+    bodySlots,
+    brandSlot,
+    media: header?.first ?? null,
+    links: btns.map(x => x?.first ?? null),
+  }
+}
+
 /** Meta's rejection rules we can check before spending a submission. Empty array = OK. */
-export function validateForMeta(body: string, blocks: WaBlocks | null | undefined, samples: Record<string, string>): string[] {
+export function validateForMeta(storedBody: string, storedBlocks: WaBlocks | null | undefined, storedSamples: Record<string, string>): string[] {
+  const { body, blocks, samples } = planSlots(storedBody, storedBlocks, storedSamples)
   const errs: string[] = []
   const text = (body || '').trim()
   if (!text) errs.push('Body is empty.')
@@ -23,7 +99,7 @@ export function validateForMeta(body: string, blocks: WaBlocks | null | undefine
   if (/^\{\{\s*\d+\s*\}\}/.test(text)) errs.push('Body cannot start with a variable — add text before {{1}}.')
   if (/\{\{\s*\d+\s*\}\}[\s.!?]*$/.test(text)) errs.push('Body cannot end with a variable — add text after the last {{n}}.')
   const named = [...new Set([text, ...(blocks?.buttons ?? []).map(x => x.value ?? '')].join(' ').match(NAMED) ?? [])]
-  if (named.length) errs.push(`WhatsApp variables are numbered: replace ${named.join(', ')} with {{1}}, {{2}} … in order.`)
+  if (named.length) errs.push(`WhatsApp variables are numbered: replace ${named.join(', ')} with {{1}}, {{2}} … in order ({{brand_name}} is the only named one).`)
   const vars = placeholders(text)
   vars.forEach((v, i) => { if (+v !== i + 1) errs.push(`Variables must be numbered {{1}}, {{2}}, … in order (found {{${v}}}).`) })
   const words = text.replace(PH, '').split(/\s+/).filter(Boolean).length

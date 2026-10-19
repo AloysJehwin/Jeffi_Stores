@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { SendMessageRequest, Channel } from '@jeffi/api-contracts'
+import { planSlots, type SendMessageRequest, type Channel, type WaSlotPlan } from '@jeffi/api-contracts'
 import { mediaPriceInr, messagePriceInr, processingFeeInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
@@ -59,9 +59,6 @@ export const toApi = (m: MessageRow) => ({
 
 const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
 
-// One audit log line per template id the first time its WA send goes through the brand-at-{{1}} shift.
-const brandInjectedSeen = new Set<string>()
-
 interface Ctx {
   tenantId: string
   tenantSlug?: string
@@ -108,12 +105,17 @@ export async function resolveTemplate(tenantId: string, channel: string, slug: s
 // (any host, any image format) is re-hosted on our CDN first, which is charged as media.
 const PH = /\{\{\s*(\d+)\s*\}\}/
 const mediaErr = (e: unknown): never => { throw e instanceof MediaError ? new SendError(e.status, e.code, e.message) : e }
-async function actionVars(ctx: Ctx, blocks: any, vars: Vars, req: SendMessageRequest): Promise<{ vars: Vars; mediaHosted: boolean }> {
+// Values come back keyed by the submitted slot (plan); `variables` may name either that slot or the
+// stored one when it isn't a body slot.
+async function actionVars(ctx: Ctx, blocks: any, plan: WaSlotPlan, vars: Vars, req: SendMessageRequest): Promise<{ vars: Vars; mediaHosted: boolean }> {
   const out: Vars = {}
   let mediaHosted = false
+  const given = (r: { from: string; to: string }) => vars[r.to] ?? (plan.bodySlots.includes(r.from) ? undefined : vars[r.from])
   const media: string = blocks?.types?.['twilio/media']?.media?.[0] ?? ''
-  const mediaSlot = media.match(PH)?.[1]
-  if (mediaSlot && !vars[mediaSlot]) {
+  const mediaSlot = plan.media?.to
+  const mediaGiven = plan.media ? given(plan.media) : undefined
+  if (mediaSlot && mediaGiven) out[mediaSlot] = mediaGiven
+  else if (mediaSlot) {
     const prefix = media.slice(0, media.search(PH))
     if (!req.media_url) throw new SendError(422, 'missing_variables', `This template has an image header — pass media_url (an image under ${prefix}) or variables.${mediaSlot}`, { missing: [mediaSlot] })
     let url = req.media_url
@@ -128,9 +130,12 @@ async function actionVars(ctx: Ctx, blocks: any, vars: Vars, req: SendMessageReq
     }
     out[mediaSlot] = url.slice(prefix.length)
   }
-  const button = (blocks?.buttons ?? []).find((b: any) => b.type === 'url' && PH.test(b.value ?? ''))
-  const linkSlot = button?.value.match(PH)?.[1]
-  if (linkSlot && !vars[linkSlot]) {
+  const bi = (blocks?.buttons ?? []).findIndex((b: any) => b.type === 'url' && PH.test(b.value ?? ''))
+  const link = bi >= 0 ? plan.links[bi] : null
+  const linkSlot = link?.to
+  const linkGiven = link ? given(link) : undefined
+  if (linkSlot && linkGiven) out[linkSlot] = linkGiven
+  else if (linkSlot) {
     if (!req.button_url) throw new SendError(422, 'missing_variables', `This template has a link button — pass button_url or variables.${linkSlot}`, { missing: [linkSlot] })
     // Signed links resolve on any environment's redirect host; the row only counts clicks.
     const signed = signLink(req.button_url)
@@ -159,6 +164,7 @@ export async function systemVars(tenantId: string): Promise<Vars> {
   const vars: Vars = {
     ...Object.fromEntries(custom.map(c => [c.key, c.value ?? ''])),
     store_name: set.business_name || tenant?.display_name || '',
+    brand_name: set.business_name || tenant?.display_name || '',
     store_email: set.business_email || '',
     store_phone: set.business_phone || '',
     store_web: set.business_web || '',
@@ -186,7 +192,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let providerRef: string | undefined = req.provider_ref
   let layout: 'store' | 'none' = 'store'
   let mediaHosted = false
-  let metaCategory: string | undefined
+  let waVars: Record<string, string> | null = null
   if (req.template) {
     const t = await resolveTemplate(ctx.tenantId, req.channel, req.template, ctx.space)
     if (!t) throw new SendError(404, 'template_not_found', `No ${req.channel} template '${req.template}'`)
@@ -196,19 +202,24 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     body = t.body
     providerRef = providerRef ?? t.provider_ref ?? undefined
     layout = (t as any).layout === 'none' ? 'none' : 'store'
-    metaCategory = (t as any).meta_category
     if (req.channel === 'whatsapp') {
-      const action = await actionVars(ctx, (t as any).blocks, vars, req)
-      Object.assign(vars, action.vars)
+      // Slots follow the approved body: its own {{n}}, then {{brand_name}}, then header and button.
+      const blocks = (t as any).blocks
+      const plan = planSlots(t.body, blocks)
+      const action = await actionVars(ctx, blocks, plan, vars, req)
       mediaHosted = action.mediaHosted
+      waVars = {}
+      for (const v of plan.bodySlots) if (vars[v] != null) waVars[v] = String(vars[v])
+      if (plan.brandSlot) waVars[plan.brandSlot] = String(vars.brand_name ?? '')
+      for (const [k, v] of Object.entries(action.vars)) waVars[k] = String(v ?? '')
     }
   }
   const html = req.channel === 'email'
-  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, layout, mediaHosted, metaCategory }
+  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, waVars, layout, mediaHosted }
 }
 
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
-  const { subject, body, providerRef, vars, layout, mediaHosted, metaCategory } = await compose(ctx, req)
+  const { subject, body, providerRef, vars, waVars, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
 
   const id = randomUUID()
@@ -249,32 +260,8 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     } else if (req.channel === 'sms') {
       ref = await sendSms({ to: req.to, body, messageId: id })
     } else {
-      // Phase 0 convention: WA Content Templates reserve slot {{1}} for the store brand. The wrapper
-      // injects store_name at {{1}} and shifts the caller's numbered vars by +1 (descending), so a
-      // legacy caller passing variables.N keeps working on a template authored with brand-at-1.
-      // AUTHENTICATION (OTP) templates bypass — Meta pins {{1}} to the OTP code itself.
-      const callerVars = (req.variables ?? {}) as Record<string, unknown>
-      let variables: Record<string, string>
-      if (metaCategory !== 'AUTHENTICATION') {
-        const out: Record<string, string> = {}
-        // Non-caller numeric slots (actionVars: media/button) keep their template-authored slot.
-        for (const [k, v] of Object.entries(vars)) {
-          if (/^\d+$/.test(k) && !(k in callerVars)) out[k] = String(v ?? '')
-        }
-        // Caller numeric slots slide up by one, descending to avoid clobbering a lower key.
-        const callerNums = Object.keys(callerVars).filter(k => /^\d+$/.test(k)).map(Number).sort((a, b) => b - a)
-        for (const n of callerNums) out[String(n + 1)] = String(callerVars[String(n)] ?? '')
-        out['1'] = String(vars.store_name ?? '')
-        const auditKey = providerRef ?? req.template ?? ''
-        if (auditKey && !brandInjectedSeen.has(auditKey)) {
-          brandInjectedSeen.add(auditKey)
-          console.log(`brand injected at slot 1 for template ${auditKey}`)
-        }
-        variables = out
-      } else {
-        // OTP: caller already owns {{1}}; just filter to numbered slots.
-        variables = Object.fromEntries(Object.entries(vars).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, String(v ?? '')]))
-      }
+      // A raw content SID (no template) gets the caller's numbered variables as given.
+      const variables = waVars ?? Object.fromEntries(Object.entries(vars).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, String(v ?? '')]))
       ref = await sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id })
     }
     await db.query(

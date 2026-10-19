@@ -115,7 +115,7 @@ export default function ResetToPlatformDialog({ open, onClose, onConfirm, busy, 
   const bannerBody = (
     <>
       The platform catalogue was updated — resetting replaces your copy with the new wording.
-      {channel === 'whatsapp' && <> Brand name is now injected at slot <code className="font-mono">{'{{1}}'}</code>.</>}
+      {channel === 'whatsapp' && <> <code className="font-mono">{'{{brand_name}}'}</code> is filled with your store name on every send.</>}
     </>
   )
   const subjectChanged = channel === 'email' && (current.subject ?? '') !== (platform.subject ?? '')

@@ -25,7 +25,7 @@ const CHANNELS: Array<{ key: Channel; label: string; icon: typeof Mail }> = [
 const API = '/api/ecom/svc/messaging'
 const WA_TONE: Record<string, string> = { approved: 'org-sage org-sage-text', rejected: 'bg-[#f6d5cc] text-[#8a2e1f]' }
 
-export default function MessagingClient(props: { prices: Record<string, number>; balance: number }) {
+export default function MessagingClient({ storeName, ...props }: { prices: Record<string, number>; balance: number; storeName?: string }) {
   const [tab, setTab] = useState<'log' | 'templates' | 'bulk'>('log')
   const { showToast } = useToast()
   const [channel, setChannel] = useState<Channel>('email')
@@ -275,7 +275,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                     aiEndpoint={ECOM_ENRICH_ENDPOINT}
                     canUseScenarioFill={canEdit}
                     isPlatformLibrary={false}
-                    tenantContext={{ storeName: 'This store' }}
+                    tenantContext={{ storeName: storeName || 'This store' }}
                     scenarioFillTheme="ecom"
                     scenarioFillEndpoint={ECOM_SCENARIO_ENDPOINT}
                     canResetToPlatform={canEdit}
