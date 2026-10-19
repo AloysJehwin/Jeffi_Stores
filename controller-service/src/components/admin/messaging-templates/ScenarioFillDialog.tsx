@@ -38,20 +38,17 @@ interface Props {
    *  10-second Undo bar; return void to just dismiss. The caller is expected to wrap applyScenarioFill
    *  (which owns the setters and returns an UndoHandle). */
   applyFill: (payload: TemplateScenarioFill) => Promise<UndoHandle | void>
-  /** 'admin' uses the rectangular control-md + bg-accent-500 kit buttons; 'ecom' uses the ecom
-   *  portal's pill-shaped ecom-accent-bg + rounded-full convention so the dialog reads as part of
-   *  the surrounding ecom dashboard theme. Defaults to 'admin'. */
+  /** Legacy prop — the dialog now always renders in the ecom portal theme (pill + terracotta)
+   *  regardless of mount context, since the Portal escapes .ecom-scope and we want one consistent
+   *  look in admin + ecom. Kept so existing callers don't need to drop the prop; ignored. */
   theme?: 'admin' | 'ecom'
 }
 
-const PRIMARY_CLS: Record<NonNullable<Props['theme']>, string> = {
-  admin: 'control-md inline-flex items-center gap-1.5 bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50',
-  ecom: 'inline-flex items-center gap-1.5 rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40',
-}
-const SECONDARY_CLS: Record<NonNullable<Props['theme']>, string> = {
-  admin: 'control-md border border-border-default bg-surface font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground disabled:opacity-50',
-  ecom: 'inline-flex items-center rounded-full border border-border-default bg-surface px-5 py-2 text-sm font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground disabled:opacity-50',
-}
+// The dialog renders in a React portal attached to document.body, which escapes `.ecom-scope`.
+// Use the root-scoped ecom-accent-bg class so terracotta resolves regardless of mount context —
+// consistent look in admin and ecom pages, no CSS-variable chasing.
+const PRIMARY_CLS = 'inline-flex items-center gap-1.5 rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40'
+const SECONDARY_CLS = 'inline-flex items-center rounded-full border border-border-default bg-surface px-5 py-2 text-sm font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground disabled:opacity-50'
 
 const MODE_OPTIONS = [
   { value: 'marketing', label: 'Marketing' },
@@ -90,10 +87,9 @@ export default function ScenarioFillDialog({
   current,
   isPlatformLibrary = false,
   applyFill,
-  theme = 'admin',
 }: Props) {
-  const primaryCls = PRIMARY_CLS[theme]
-  const secondaryCls = SECONDARY_CLS[theme]
+  const primaryCls = PRIMARY_CLS
+  const secondaryCls = SECONDARY_CLS
   const [scenarioText, setScenarioText] = useState('')
   const [templateMode, setTemplateMode] = useState<TemplateMode>(initialTemplateMode)
   const supportsImage = CHANNEL_SUPPORTS_IMAGE[channel]

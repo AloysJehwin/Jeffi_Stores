@@ -137,7 +137,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
         title="Messaging"
         description="Templates, bulk sends and the delivery log for email, SMS and WhatsApp sent through your API keys."
         actions={
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-row flex-wrap items-center justify-end gap-2">
             <Segmented ariaLabel="Messaging sections" value={tab} onChange={setTab}
               options={[{ value: 'log', label: 'Message log' }, { value: 'templates', label: 'Templates' }, { value: 'bulk', label: 'Bulk' }]} />
             {tab === 'templates' && (
