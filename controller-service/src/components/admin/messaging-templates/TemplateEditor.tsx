@@ -95,8 +95,10 @@ type Props = {
   apiNote?: string
   /** AI enrich endpoint — admin route by default; the ecom console passes its own. */
   aiEndpoint?: string
-  /** When true, show the "Fill from scenario" header CTA. Admin side: useCanWrite('templates');
-   *  tenant side: canEdit. The server also gates the endpoint itself. */
+  /** When true (and the template has no id yet), show the "Fill from scenario" header CTA.
+   *  Admin side: useCanWrite('templates'); tenant side: canEdit. The CTA auto-hides once the
+   *  template is saved (value.id present) — editing an existing one uses the per-field sparkles.
+   *  The server also gates the endpoint itself. */
   canUseScenarioFill?: boolean
   /** Platform-library templates bill the platform tenant at internal pricing; store templates bill
    *  the caller tenant at tenant pricing. Defaults to false (tenant-owned). */
@@ -480,17 +482,17 @@ export default function TemplateEditor({
         </p>
       )}
       <div className={embedded ? 'space-y-4' : 'hidden md:block space-y-4'}>
-        {canUseScenarioFill && (
-          <div className="flex items-center justify-between gap-2">
+        {canUseScenarioFill && !value.id && (
+          <div className="flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => setScenarioOpen(true)}
-              className="control-md inline-flex items-center gap-1.5 border border-border-secondary bg-surface font-semibold text-foreground hover:bg-surface-secondary"
+              className="inline-flex h-control shrink-0 items-center gap-1.5 rounded-lg border border-border-secondary bg-surface px-3 text-sm font-semibold text-foreground hover:bg-surface-secondary"
             >
-              <Sparkles className="h-4 w-4 text-accent-500" />
-              Fill from scenario
+              <Sparkles className="h-3.5 w-3.5 text-accent-500" aria-hidden />
+              <span className="whitespace-nowrap">Fill from scenario</span>
             </button>
-            <span className="text-[11px] text-foreground-muted">
+            <span className="min-w-0 text-[11px] text-foreground-muted">
               Describe the message once — the AI drafts name, body{value.channel === 'email' ? ', subject' : ''}
               {value.channel === 'whatsapp' ? ', buttons and header media' : ''} for you.
             </span>
