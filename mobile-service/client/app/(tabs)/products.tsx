@@ -11,6 +11,8 @@ import { listCategories } from '../../src/api/categories'
 import { listBrands } from '../../src/api/brands'
 import TopNav from '../../src/components/layout/TopNav'
 import ProductCard from '../../src/components/product/ProductCard'
+import { useStoreConfig } from '../../src/hooks/useStoreConfig'
+import { toCard } from '../../src/lib/card'
 import Spinner from '../../src/components/ui/Spinner'
 import type { Category, Brand } from '../../src/types'
 
@@ -24,7 +26,8 @@ const SORT_OPTIONS = [
 ]
 
 export default function ProductsScreen() {
-  const { search: searchParam } = useLocalSearchParams<{ search?: string }>()
+  const { gstEnabled } = useStoreConfig().flags
+  const { search: searchParam, category: categoryParam, brand: brandParam } = useLocalSearchParams<{ search?: string; category?: string; brand?: string }>()
   const searchInputRef = useRef<TextInput>(null)
 
   const [search, setSearch] = useState(searchParam || '')
@@ -50,6 +53,14 @@ export default function ProductsScreen() {
       setDebouncedSearch(searchParam)
     }
   }, [searchParam])
+
+  // Storefront links (hero slides, offers, brand tiles) arrive as ?category=<slug> / ?brand=<slug or id>.
+  useEffect(() => {
+    if (categoryParam !== undefined) {
+      setSelectedCategory(categoryParam)
+      setPage(1)
+    }
+  }, [categoryParam])
 
   const handleSearch = (text: string) => {
     setSearch(text)
@@ -82,6 +93,15 @@ export default function ProductsScreen() {
   })
 
   const brands: Brand[] = brandsData || []
+
+  useEffect(() => {
+    if (!brandParam) return
+    const match = brands.find(b => b.id === brandParam || b.slug === brandParam)
+    if (match) {
+      setSelectedBrand(match.id)
+      setPage(1)
+    }
+  }, [brandParam, brandsData])
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', 'list', debouncedSearch, selectedCategory, selectedBrand, selectedSort.sort, selectedSort.order, page],
@@ -256,7 +276,7 @@ export default function ProductsScreen() {
           columnWrapperStyle={{ gap: 12, marginBottom: 12 }}
           renderItem={({ item }) => (
             <View style={{ width: '47.5%' }}>
-              <ProductCard product={item} />
+              <ProductCard product={toCard(item, gstEnabled)} />
             </View>
           )}
           showsVerticalScrollIndicator={false}

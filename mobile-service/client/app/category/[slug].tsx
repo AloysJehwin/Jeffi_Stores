@@ -6,11 +6,14 @@ import { listProducts } from '../../src/api/products'
 import { listCategories } from '../../src/api/categories'
 import TopNav from '../../src/components/layout/TopNav'
 import ProductCard from '../../src/components/product/ProductCard'
+import { useStoreConfig } from '../../src/hooks/useStoreConfig'
+import { toCard } from '../../src/lib/card'
 import Spinner from '../../src/components/ui/Spinner'
 
 const PAGE_SIZE = 21
 
 export default function CategoryScreen() {
+  const { gstEnabled } = useStoreConfig().flags
   const { slug } = useLocalSearchParams<{ slug: string }>()
   const router = useRouter()
 
@@ -76,7 +79,7 @@ export default function CategoryScreen() {
           columnWrapperStyle={{ gap: 12, marginBottom: 12 }}
           renderItem={({ item }) => (
             <View style={{ width: '47.5%' }}>
-              <ProductCard product={item} />
+              <ProductCard product={toCard(item, gstEnabled)} />
             </View>
           )}
           onEndReached={() => hasNextPage && fetchNextPage()}

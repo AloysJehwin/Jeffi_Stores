@@ -1,6 +1,6 @@
 // Same palette and semantic classes as the web (controller-service/tailwind.config.ts): both read
 // packages/design-tokens, so the app never carries its own copy of a colour. Semantic colours are CSS
-// variables set on :root / .dark (NativeWind resolves var() at runtime), exactly like the site.
+// variables (NativeWind resolves var() at runtime), the same values the site sets on :root / .dark.
 const plugin = require('tailwindcss/plugin')
 const tokens = require('../../packages/design-tokens')
 
@@ -27,5 +27,14 @@ module.exports = {
       fontFamily: { bebas: ['BebasNeue-Regular'], inter: ['Inter'] },
     },
   },
-  plugins: [plugin(({ addBase }) => addBase({ ':root': tokens.cssVars('light'), '.dark': tokens.cssVars('dark') }))],
+  // NativeWind reads dark variables from the prefers-color-scheme media block (it ignores a .dark rule) and
+  // follows nativewind's colorScheme, so dark: variants and the variables always agree.
+  plugins: [
+    plugin(({ addBase }) =>
+      addBase({
+        ':root': tokens.cssVars('light'),
+        '@media (prefers-color-scheme: dark)': { ':root': tokens.cssVars('dark') },
+      })
+    ),
+  ],
 }

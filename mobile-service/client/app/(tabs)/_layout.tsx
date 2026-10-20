@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router'
-import { View, Text, useColorScheme } from 'react-native'
+import { View, Text } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useCartStore } from '../../src/stores/cartStore'
+import { useTokens } from '../../src/theme'
 
 function CartIcon({ color, size }: { color: string; size: number }) {
   const count = useCartStore((s) => s.count)
@@ -20,18 +21,17 @@ function CartIcon({ color, size }: { color: string; size: number }) {
 }
 
 export default function TabLayout() {
-  const scheme = useColorScheme()
-  const isDark = scheme === 'dark'
+  const t = useTokens()
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#7cb900',
-        tabBarInactiveTintColor: isDark ? '#6B7280' : '#9CA3AF',
+        tabBarActiveTintColor: t.accent500,
+        tabBarInactiveTintColor: t.foregroundMuted,
         tabBarStyle: {
-          backgroundColor: isDark ? '#24252f' : '#FFFFFF',
-          borderTopColor: isDark ? '#3f4150' : '#E5E7EB',
+          backgroundColor: t.surfaceElevated,
+          borderTopColor: t.border,
           borderTopWidth: 1,
           height: 56,
           paddingBottom: 6,

@@ -10,6 +10,7 @@ import { useCartStore } from '../src/stores/cartStore'
 import { getStoredToken } from '../src/api/client'
 import { getMe } from '../src/api/auth'
 import { getCart } from '../src/api/cart'
+import Toast from '../src/components/ui/Toast'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +91,7 @@ export default function RootLayout() {
             <Stack.Screen name="account/profile" />
             <Stack.Screen name="account/addresses" />
           </Stack>
+          <Toast />
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

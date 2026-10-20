@@ -30,27 +30,11 @@ import {
   type HomepageSection,
 } from '@/lib/catalog/homepage-sections'
 import { cardPropsFor } from '@/lib/catalog/product-card-props'
+import type { SectionData } from '@/lib/catalog/homepage-model'
 import type { CategoryTab, CountdownDealData, Testimonial, ValueStat } from '@/lib/catalog/homepage-extras'
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 
-export interface SectionData {
-  heroSlides: any[]
-  offers: ProductOffer[]
-  mainCategories: any[]
-  topBrands: any[]
-  categoryShowcase: any[]
-  dealOfTheDay: any[]
-  productRows: Map<string, any[]>
-  freeShippingThreshold: number
-  gstEnabled: boolean
-  stats: { value: string; label: string }[]
-  aboutCopy: string
-  storeName: string
-  businessLandingUrl: string
-  businessSignupUrl: string
-  /** Per-section data for the section types that load their own (loadSectionExtras). */
-  extras: Map<string, unknown>
-}
+export type { SectionData } from '@/lib/catalog/homepage-model'
 
 // Per-row styling that the hardcoded page applied by position. Index 0/1/2 reproduce the
 // Featured / New Arrivals / Best Sellers looks so a default layout renders unchanged.
@@ -136,7 +120,9 @@ export default function SectionRenderer({
 
     case 'category_showcase':
       if (data.categoryShowcase.length === 0) return null
-      return <CategoryShowcase items={data.categoryShowcase} title={section.title} eyebrow={section.eyebrow} />
+      return (
+        <CategoryShowcase items={data.categoryShowcase} gstEnabled={data.gstEnabled} title={section.title} eyebrow={section.eyebrow} />
+      )
 
     case 'deal_of_the_day':
       if (data.dealOfTheDay.length === 0) return null

@@ -22,15 +22,24 @@ that affects the mobile viewport lands here too, in the same PR.
 | # | Scope | Web source | App target | Status |
 |---|---|---|---|---|
 | 0 | Shared tokens, semantic classes, Metro/Tailwind wiring | `globals.css`, `tailwind.config.ts` | `tailwind.config.js`, `src/theme.ts`, `metro.config.js` | done 2026-10-20 |
-| 1 | Shell: header (logo, search, cart badge, drawer), bottom tabs, drawer menu | `visitor/Header.tsx`, `MobileDrawer.tsx` | `components/layout/TopNav`, `(tabs)/_layout` | next |
-| 2 | Home: hero carousel (Top Picks), perks strip, offer slider, Shop by Category, Featured Products, brands row, New Arrivals, Explore categories with product tiles | `HeroCarousel`, `OfferSlider`, `FeaturedProducts`, `FeaturedForYou`, `(storefront)/page.tsx` | `(tabs)/index.tsx` + `components/home/*` | |
-| 3 | ProductCard: discount badge, SALE ribbon, brand/category lines, "From ₹", strike price, "Inclusive of all taxes", stock + "View Details →", "Deliver by", round add/wishlist buttons | `visitor/ProductCard.tsx`, `QuickAddButton` | `components/product/ProductCard.tsx` | |
+| 1 | Shell: header (logo, search, cart badge, drawer), bottom tabs, drawer menu | `visitor/Header.tsx`, `MobileDrawer.tsx` | `components/layout/TopNav`, `(tabs)/_layout` | done 2026-10-20 (header, search overlay, drawer) |
+| 2 | Home: hero carousel (Top Picks), perks strip, offer slider, Shop by Category, Featured Products, brands row, New Arrivals, Explore categories with product tiles | `HeroCarousel`, `OfferSlider`, `FeaturedProducts`, `FeaturedForYou`, `(storefront)/page.tsx` | `(tabs)/index.tsx` + `components/home/*` | done 2026-10-20: `GET /api/home` serves the page's model (`lib/catalog/homepage-model.ts`); every section type has an RN twin |
+| 3 | ProductCard: discount badge, SALE ribbon, brand/category lines, "From ₹", strike price, "Inclusive of all taxes", stock + "View Details →", "Deliver by", round add/wishlist buttons | `visitor/ProductCard.tsx`, `QuickAddButton` | `components/product/ProductCard.tsx` | done 2026-10-20 |
 | 4 | Product list + categories: search bar, Filters sheet, pagination, category tiles with tag chips | `ProductGrid`, `FilterSidebar`/`MobileFilterSheet`, `ListPagination`, `categories/page` | `(tabs)/products`, `categories/*`, `category/[slug]` | |
 | 5 | PDP: breadcrumb, gallery + thumbs, SALE ribbon, variant chips, price block (you save, incl. taxes), qty stepper with min/max, Buy Now / Add to Cart, bank offers strip, perks grid, pincode check, specifications, compare strip, description, sticky bottom bar | `ProductDetailClient`, `ProductImageGallery`, `ProductActions`, `PdpCompareSection` | `product/[slug].tsx` + `components/pdp/*` | |
 | 6 | Cart, wishlist, compare | `(storefront)/cart`, `wishlist`, `CompareBar` | `(tabs)/cart`, `(tabs)/wishlist` | |
 | 7 | Auth + account: email OTP sign-in, Google, account home, orders, addresses, transactions, referrals/rewards | `(storefront)/account/*`, `AccountMobileHeader`, `AccountSidebar` | `(auth)/*`, `account/*`, `orders/*` | |
 | 8 | Checkout: review, payment (Razorpay from server key, COD), order placed | `(storefront)/checkout` | `checkout/*` | |
 | 9 | Business (B2B) storefront: business price badge, quotation request | `components/business/*` | `components/business/*` | |
+
+## Home data contract
+
+- The web page and the app read one model: `buildHomeModel()` in `controller-service/src/lib/catalog/homepage-model.ts`.
+  `GET /api/home` returns `toHomeModelJson()` of it: section copy merged with `SECTION_COPY_DEFAULTS`, tiles validated
+  (or `SECTION_TILE_DEFAULTS`), and every product list reduced to ProductCard props (never raw rows: they carry
+  `cost_price`, `supplier_id` and storage keys). A new section type needs a case in both `SectionRenderer`s.
+- Storefront hrefs (`/products?category=`, `/brands/<slug>`, `/offers/<slug>`, `/products/<slug>`) are mapped to app
+  screens by `client/src/lib/links.ts` (`openHref`); anything else opens on the storefront.
 
 ## Verification per phase
 
