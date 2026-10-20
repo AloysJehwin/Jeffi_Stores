@@ -287,7 +287,7 @@ export default function CompareScreen() {
             </View>
 
             {loading ? (
-              <View className="gap-3">
+              <View key="skeleton" className="gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Pulse key={i} delay={i * 40}>
                     <View className="h-10 rounded bg-surface-secondary" />
@@ -295,7 +295,8 @@ export default function CompareScreen() {
                 ))}
               </View>
             ) : (
-              <View className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-sm">
+              // Own key: reusing the skeleton's View would add shadow-sm's CSS variables after mount (a css-interop remount).
+              <View key="table" className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-sm">
                 <ScrollView horizontal showsHorizontalScrollIndicator>
                   <View style={{ width: tableW }}>
                     <View className="flex-row border-b border-border-default">
