@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import type { GoogleOAuthResult } from '@/lib/client/google-oauth-popup'
+import { trackSaasEvent } from '@/lib/client/analytics'
 
 // OTP + Google auth form for ecom owners. mode 'signup' collects a name; 'signin'
 // doesn't. Both hit the same ecom auth endpoints (findOrCreateOwner upserts).
@@ -52,6 +53,7 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
         showToast(data.error || 'Invalid OTP', 'error')
         return
       }
+      if (data.isNew) trackSaasEvent('sign_up', { method: 'otp' })
       // New owner → onboarding wizard; returning → dashboard.
       router.push(mode === 'signup' ? '/onboard' : '/dashboard')
       router.refresh()
@@ -196,6 +198,7 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
         onError(data.error || 'Google sign-in failed')
         return
       }
+      if (data.isNew) trackSaasEvent('sign_up', { method: 'google' })
       router.push(mode === 'signup' ? '/onboard' : '/dashboard')
       router.refresh()
     } catch {

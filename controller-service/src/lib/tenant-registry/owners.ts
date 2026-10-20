@@ -8,8 +8,9 @@ export interface Owner {
   created_at: string
 }
 
-/** Upsert an owner by email (used by OTP/Google owner auth — verification already done). */
-export async function findOrCreateOwner(email: string, name: string | null): Promise<Owner> {
+/** Upsert an owner by email (used by OTP/Google owner auth — verification already done).
+ * `isNew` is true only when this call inserted the owner, so sign-up analytics count real sign-ups. */
+export async function findOrCreateOwner(email: string, name: string | null): Promise<Owner & { isNew: boolean }> {
   const pool = controlPlanePool()
   const existing = await pool.query(`SELECT id, email, name, created_at FROM owners WHERE email=$1`, [email])
   if (existing.rows[0]) {
@@ -17,13 +18,13 @@ export async function findOrCreateOwner(email: string, name: string | null): Pro
       await pool.query(`UPDATE owners SET name=$1, updated_at=now() WHERE id=$2`, [name, existing.rows[0].id])
       existing.rows[0].name = name
     }
-    return existing.rows[0] as Owner
+    return { ...(existing.rows[0] as Owner), isNew: false }
   }
   const res = await pool.query(
     `INSERT INTO owners (email, name) VALUES ($1, $2) RETURNING id, email, name, created_at`,
     [email, name]
   )
-  return res.rows[0] as Owner
+  return { ...(res.rows[0] as Owner), isNew: true }
 }
 
 /** Set the owner's name from what they entered at onboarding. Sign-in only fills a blank name,
