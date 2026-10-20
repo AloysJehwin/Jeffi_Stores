@@ -28,7 +28,7 @@ export default function CategoryShowcase({ section, data }: SectionProps) {
       </View>
       <Grid cols={2} gap={16}>
         {items.map(cat => (
-          <View key={cat.id} className="flex-1 overflow-hidden rounded-2xl border border-border-default bg-surface-elevated">
+          <View key={cat.id} className="grow overflow-hidden rounded-2xl border border-border-default bg-surface-elevated">
             <View className="flex-row items-center justify-between px-4 pb-2 pt-4">
               <Pressable className="shrink" onPress={() => openCategory(cat.slug)}>
                 <Text className="text-sm font-bold text-foreground" style={{ lineHeight: 17.5 }}>

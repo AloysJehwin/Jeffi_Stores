@@ -86,7 +86,7 @@ export default function ValueStats({ section, data }: SectionProps) {
       </View>
       <Grid cols={2} gap={16}>
         {stats.map(s => (
-          <View key={s.metric} className="flex-1 rounded-2xl border border-border-default bg-surface-elevated p-5">
+          <View key={s.metric} className="grow rounded-2xl border border-border-default bg-surface-elevated p-5">
             <Text
               className="text-center text-3xl font-black text-primary-600 dark:text-primary-400"
               style={{ fontVariant: ['tabular-nums'] }}

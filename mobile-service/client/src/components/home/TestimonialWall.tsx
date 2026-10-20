@@ -26,7 +26,7 @@ function Stars({ rating }: { rating: number }) {
 function TestimonialCard({ t }: { t: Testimonial }) {
   const router = useRouter()
   return (
-    <View className="flex-1 gap-3 rounded-2xl border border-border-default bg-surface-elevated p-5">
+    <View className="grow gap-3 rounded-2xl border border-border-default bg-surface-elevated p-5">
       <Stars rating={t.rating} />
       {t.title ? <Text className="text-base font-semibold text-foreground">{t.title}</Text> : null}
       <Text className="grow text-sm leading-relaxed text-foreground-secondary" numberOfLines={6}>
