@@ -1,364 +1,444 @@
-import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, Alert, useWindowDimensions } from 'react-native'
-import { Image } from 'expo-image'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { pushRecentlyViewed } from '../../src/stores/recentlyViewedStore'
-import { Ionicons } from '@expo/vector-icons'
-import { getProductBySlug } from '../../src/api/products'
-import { addToCart } from '../../src/api/cart'
-import { getWishlist, addToWishlist, removeFromWishlist } from '../../src/api/wishlist'
+import {
+  getCategoryRows,
+  getFreeDeliveryThreshold,
+  getPdpProduct,
+  getVaultOwned,
+  notifyBackInStock,
+  recordProductView,
+  type PdpProduct,
+} from '../../src/api/pdp'
 import { useAuthStore } from '../../src/stores/authStore'
-import type { ProductVariant } from '../../src/types'
+import { useCompareStore } from '../../src/stores/compareStore'
+import { showToast } from '../../src/stores/toastStore'
+import { useStoreConfig } from '../../src/hooks/useStoreConfig'
+import { useWishlistToggle } from '../../src/hooks/useWishlist'
+import { toCard } from '../../src/lib/card'
+import { SITE_URL } from '../../src/lib/links'
+import { useTokens } from '../../src/theme'
 import TopNav from '../../src/components/layout/TopNav'
 import Spinner from '../../src/components/ui/Spinner'
+import ProductCard from '../../src/components/product/ProductCard'
+import { Grid } from '../../src/components/home/layout'
+import { Glyph, P } from '../../src/components/pdp/Glyph'
+import { deduplicateByNameStem, nameStem, pickUnitPrice, round2 } from '../../src/components/pdp/pdp'
+import { useProductPurchase } from '../../src/components/pdp/useProductPurchase'
+import ProductImageGallery from '../../src/components/pdp/ProductImageGallery'
+import ProductActions from '../../src/components/pdp/ProductActions'
+import StickyAddToCartBar from '../../src/components/pdp/StickyAddToCartBar'
+import CompareBar from '../../src/components/pdp/CompareBar'
+import RazorpayOffers from '../../src/components/pdp/RazorpayOffers'
+import { DeliveryInfo, PincodeChecker } from '../../src/components/pdp/DeliveryInfo'
+import WarningBadges from '../../src/components/pdp/WarningBadges'
+import ProductReviews, { ReviewSummaryLink, reviewSummary, useReviews } from '../../src/components/pdp/ProductReviews'
+import FrequentlyBoughtTogether from '../../src/components/pdp/FrequentlyBoughtTogether'
+import ProductSpecifications from '../../src/components/pdp/ProductSpecifications'
+import FeaturesUseCases from '../../src/components/pdp/FeaturesUseCases'
+import PdpCompareSection, { type CompareItem } from '../../src/components/pdp/PdpCompareSection'
+import CustomersAlsoViewed from '../../src/components/pdp/CustomersAlsoViewed'
+import PdpRecentlyViewed from '../../src/components/pdp/PdpRecentlyViewed'
+import FeaturedForYou from '../../src/components/pdp/FeaturedForYou'
+
+// Mirror of controller-service app/(storefront)/products/[slug]/page.tsx + ProductDetailClient at the mobile breakpoint.
 
 export default function ProductDetailScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>()
+  const { slug, sku } = useLocalSearchParams<{ slug: string; sku?: string }>()
   const router = useRouter()
-  const qc = useQueryClient()
-  const { user } = useAuthStore()
-  const { width } = useWindowDimensions()
+  const { data: product, isLoading } = useQuery({ queryKey: ['product', slug], queryFn: () => getPdpProduct(slug) })
 
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
-  const [quantity, setQuantity] = useState(1)
-  const [imageIndex, setImageIndex] = useState(0)
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-surface">
+        <TopNav />
+        <Spinner />
+      </View>
+    )
+  }
+  if (!product) {
+    return (
+      <View className="flex-1 bg-surface">
+        <TopNav />
+        <View className="flex-1 items-center justify-center gap-3 px-4">
+          <Text className="text-xl font-bold text-foreground">Product Not Found</Text>
+          <Pressable onPress={() => router.push('/(tabs)/products')} className="rounded-lg bg-accent-500 px-5 py-2.5">
+            <Text className="font-semibold text-white">Browse products</Text>
+          </Pressable>
+        </View>
+      </View>
+    )
+  }
+  return <ProductDetail key={product.id} product={product} initialSku={typeof sku === 'string' ? sku : undefined} />
+}
 
-  const { data: product, isLoading } = useQuery({
-    queryKey: ['product', slug],
-    queryFn: () => getProductBySlug(slug),
+/** The page's displayPrice / GST-rebased MRP, shared by the recently-viewed entry and the compare section. */
+function cardPrice(p: PdpProduct, gstEnabled: boolean) {
+  const price =
+    p.has_variants && p.variant_min_price
+      ? Number(p.variant_min_price)
+      : Number(pickUnitPrice({ inclusive: p.base_price, exGst: p.price_ex_gst }, gstEnabled))
+  const rawMrp = p.mrp ? Number(p.mrp) : p.variant_min_mrp ? Number(p.variant_min_mrp) : null
+  const gstRate = Number(p.gst_percentage ?? 0)
+  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
+  return { price, mrp }
+}
+
+function primaryOf(p: PdpProduct) {
+  return p.product_images?.find(i => i.is_primary) || p.product_images?.[0]
+}
+
+function compareItem(p: PdpProduct, gstEnabled: boolean): CompareItem {
+  const img = primaryOf(p)
+  const { price, mrp } = cardPrice(p, gstEnabled)
+  return {
+    ...p,
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    price,
+    mrp,
+    image: img?.thumbnail_url || img?.image_url || null,
+    brandName: p.brands?.name || null,
+    categoryId: p.category_id || null,
+    certifications: (p.certifications as string[] | null) ?? null,
+  }
+}
+
+function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSku?: string }) {
+  const router = useRouter()
+  const t = useTokens()
+  const user = useAuthStore(s => s.user)
+  const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
+  const digital = digitalProductsEnabled && !!product.is_digital
+  const compareCount = useCompareStore(s => s.compareList.length)
+  const wishlist = useWishlistToggle(product.id)
+
+  const scrollRef = useRef<ScrollView>(null)
+  const contentRef = useRef<View>(null)
+  const optionsRef = useRef<View>(null)
+  const buyRef = useRef<View>(null)
+  const reviewsRef = useRef<View>(null)
+  const [viewportH, setViewportH] = useState(0)
+  const [buyBottom, setBuyBottom] = useState<number | null>(null)
+  const [pastControls, setPastControls] = useState(false)
+
+  const [notifyEmail, setNotifyEmail] = useState(user?.email ?? '')
+  const [notifySubmitted, setNotifySubmitted] = useState(false)
+
+  const { data: vault } = useQuery({
+    queryKey: ['pdp-vault-owned', product.id, user?.id],
+    queryFn: () => getVaultOwned(product.id),
+    enabled: digital && !!user,
   })
+  const vaultOwned = vault?.owned ?? !!product.owned_in_vault
+
+  const purchase = useProductPurchase(product, { gstEnabled, digital, alreadyOwned: vaultOwned, initialSku })
+  const variantImages = useMemo(
+    () => (purchase.selectedVariant?.variant_images?.length ? purchase.selectedVariant.variant_images : undefined),
+    [purchase.selectedVariantId]
+  )
+
+  const { data: reviews } = useReviews(product.id)
+  const summary = reviewSummary(reviews)
+  const { data: freeThreshold } = useQuery({ queryKey: ['pdp-free-threshold'], queryFn: getFreeDeliveryThreshold, staleTime: 300_000 })
+  const categorySlug = product.categories?.slug ?? null
+  const { data: categoryRows = [] } = useQuery({
+    queryKey: ['pdp-related', product.id, categorySlug],
+    queryFn: () => getCategoryRows(categorySlug!, 20),
+    enabled: !!categorySlug,
+  })
+  // page.tsx getRelatedProducts: same category, one per name stem, up to 4.
+  const relatedProducts = useMemo(
+    () => deduplicateByNameStem(categoryRows.filter(r => r.id !== product.id), nameStem(product.name)).slice(0, 4),
+    [categoryRows, product.id, product.name]
+  )
 
   useEffect(() => {
-    if (product?.has_variants && product.product_variants?.length > 0) {
-      const firstActive = product.product_variants.find((v) => v.is_active) ?? product.product_variants[0]
-      setSelectedVariant(firstActive)
-    }
-  }, [product?.id])
+    if (user?.email) setNotifyEmail(user.email)
+  }, [user])
 
-  // Same entry the web's TrackRecentlyViewed records, feeding the home "Recently viewed" section.
   useEffect(() => {
-    if (!product) return
-    const p = product as typeof product & Record<string, any>
-    const img = p.product_images?.find((i: any) => i.is_primary) || p.product_images?.[0]
+    recordProductView(product.id)
+  }, [product.id])
+
+  // Same entry the web's TrackRecentlyViewed records, feeding the "Recently viewed" sections.
+  useEffect(() => {
+    const img = primaryOf(product)
+    const { price, mrp } = cardPrice(product, gstEnabled)
     pushRecentlyViewed({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      price: Number(p.has_variants && p.variant_min_price ? p.variant_min_price : p.base_price),
-      mrp: p.mrp ? Number(p.mrp) : null,
-      brand: p.brands?.name ?? null,
-      inStock: p.has_variants ? Number(p.variant_stock_total ?? 0) > 0 : p.stock_status !== 'Out of Stock',
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      price,
+      mrp,
+      brand: product.brands?.name ?? null,
+      inStock: product.has_variants ? Number(product.variant_stock_total ?? 0) > 0 : product.stock_status !== 'Out of Stock',
       image: img?.thumbnail_url || img?.image_url || null,
-      categoryId: p.category_id ?? null,
+      categoryId: product.category_id ?? null,
     })
-  }, [product?.id])
+  }, [product.id])
 
-  const { data: wishlistItems } = useQuery({
-    queryKey: ['wishlist'],
-    queryFn: getWishlist,
-    enabled: !!user,
-  })
+  const measure = (ref: RefObject<View | null>, cb: (y: number, h: number) => void) => {
+    const node = ref.current
+    const content = contentRef.current
+    if (!node || !content) return
+    node.measureLayout(content, (_x, y, _w, h) => cb(y, h), () => {})
+  }
+  const remeasure = () => measure(buyRef, (y, h) => setBuyBottom(y + h))
+  const scrollToRef = (ref: RefObject<View | null>, center = false) =>
+    measure(ref, (y, h) => scrollRef.current?.scrollTo({ y: Math.max(0, center ? y - (viewportH - h) / 2 : y - 8), animated: true }))
 
-  const isWishlisted = wishlistItems?.some((w) => w.product_id === product?.id) ?? false
+  const handleShare = async () => {
+    const url = `${SITE_URL}/products/${product.slug}`
+    try {
+      await Share.share({ title: product.name, message: `Check out ${product.name}\n${url}`, url })
+    } catch {}
+  }
 
-  const addToCartMutation = useMutation({
-    mutationFn: () => addToCart({
-      product_id: product!.id,
-      variant_id: selectedVariant?.id ?? (variants.length > 0 ? variants[0].id : null),
-      quantity,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['cart'] })
-      Alert.alert('Added to Cart', `${product?.name} added to your cart.`, [
-        { text: 'Continue Shopping' },
-        { text: 'View Cart', onPress: () => router.push('/(tabs)/cart') },
-      ])
-    },
-    onError: (err: any) => Alert.alert('Error', err.message || 'Failed to add to cart'),
-  })
+  const handleNotifyMe = async () => {
+    const email = notifyEmail.trim()
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showToast('Enter a valid email address', 'error')
+      return
+    }
+    try {
+      await notifyBackInStock(product.id, email)
+      setNotifySubmitted(true)
+    } catch {
+      showToast('Failed to save. Try again.', 'error')
+    }
+  }
 
-  const buyNowMutation = useMutation({
-    mutationFn: () => addToCart({
-      product_id: product!.id,
-      variant_id: selectedVariant?.id ?? (variants.length > 0 ? variants[0].id : null),
-      quantity,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['cart'] })
-      router.push('/checkout/review')
-    },
-    onError: (err: any) => Alert.alert('Error', err.message || 'Failed to proceed'),
-  })
-
-  const wishlistMutation = useMutation({
-    mutationFn: () => isWishlisted ? removeFromWishlist(product!.id) : addToWishlist(product!.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['wishlist'] }),
-    onError: (err: any) => Alert.alert('Error', err.message || 'Failed to update wishlist'),
-  })
-
-  if (isLoading || !product) return <Spinner />
-
-  const images = product.product_images || []
-  const variants = product.product_variants || []
-  const currentVariant = selectedVariant || (variants.length > 0 ? variants[0] : null)
-
-  const price = currentVariant
-    ? (currentVariant.sale_price ?? currentVariant.price ?? product.base_price)
-    : (product.sale_price ?? product.base_price)
-  const mrp = currentVariant?.mrp
-    ? Number(currentVariant.mrp)
-    : (product.mrp ? Number(product.mrp) : null)
-  const discount = mrp && mrp > Number(price)
-    ? Math.round(((mrp - Number(price)) / mrp) * 100)
+  // Effective return / replacement policy: a brand opt-out wins, then category, then brand, then 7 days.
+  const brand = product.brands
+  const cat = product.categories
+  const returnAllowed =
+    brand?.return_allowed === false || cat?.return_allowed === false ? false : (brand?.return_allowed ?? cat?.return_allowed ?? true)
+  const returnDays = returnAllowed
+    ? brand?.return_allowed === false
+      ? (brand.return_window_days ?? 7)
+      : (cat?.return_window_days ?? brand?.return_window_days ?? 7)
     : 0
-  const savings = mrp && mrp > Number(price) ? mrp - Number(price) : 0
+  const replacementAllowed =
+    brand?.replacement_allowed === false || cat?.replacement_allowed === false
+      ? false
+      : (brand?.replacement_allowed ?? cat?.replacement_allowed ?? true)
+  const replacementDays = replacementAllowed
+    ? brand?.replacement_allowed === false
+      ? (brand.replacement_window_days ?? 7)
+      : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7)
+    : 0
 
-  const stockQty = currentVariant ? currentVariant.stock_quantity : product.stock_quantity
-  const inStock = stockQty > 0
-  const needsVariant = product.has_variants && variants.length > 0 && !selectedVariant
-  const canAct = inStock && !needsVariant
+  const primaryImage = primaryOf(product)
+  const currentCard = toCard(product as any, gstEnabled)
+  const handlingDays = Number(product.handling_days ?? 2)
+  const extraDeliveryDays = Number(product.extra_delivery_days ?? 0)
+  const discountPct = product.discount_pct != null ? Number(product.discount_pct) : null
 
   return (
-    <View className="flex-1 bg-white dark:bg-[#1a1b23]">
+    <View className="flex-1 bg-surface">
       <TopNav />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Breadcrumb */}
-        <View className="flex-row items-center px-4 py-2 flex-wrap gap-1">
-          <TouchableOpacity onPress={() => router.push('/(tabs)')}>
-            <Text className="text-xs text-gray-400">Home</Text>
-          </TouchableOpacity>
-          <Text className="text-xs text-gray-300 dark:text-gray-600"> / </Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/products')}>
-            <Text className="text-xs text-gray-400">Products</Text>
-          </TouchableOpacity>
-          {product.categories && (
-            <>
-              <Text className="text-xs text-gray-300 dark:text-gray-600"> / </Text>
-              <Text className="text-xs text-gray-400" numberOfLines={1}>{product.categories.name}</Text>
-            </>
-          )}
-          <Text className="text-xs text-gray-300 dark:text-gray-600"> / </Text>
-          <Text className="text-xs text-gray-700 dark:text-gray-300 font-medium" numberOfLines={1}>{product.name}</Text>
-        </View>
-
-        {/* Main image */}
-        <View
-          className="mx-3 rounded-xl overflow-hidden bg-gray-50 dark:bg-[#24252f] border border-gray-200 dark:border-[#3f4150]"
-          style={{ height: width - 24 }}
-        >
-          {images.length > 0 ? (
-            <>
-              <Image
-                source={{ uri: images[imageIndex]?.image_url }}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                contentFit="cover"
-                blurRadius={24}
-              />
-              <Image
-                source={{ uri: images[imageIndex]?.image_url }}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                contentFit="contain"
-              />
-            </>
-          ) : (
-            <View className="flex-1 items-center justify-center">
-              <Ionicons name="image-outline" size={64} color="#9CA3AF" />
-            </View>
-          )}
-        </View>
-
-        {/* Thumbnail strip */}
-        {images.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 12, gap: 8 }}>
-            {images.map((img, i) => (
-              <TouchableOpacity
-                key={img.id}
-                onPress={() => setImageIndex(i)}
-                className={`w-16 h-16 rounded-lg border-2 overflow-hidden ${i === imageIndex ? 'border-accent-500' : 'border-gray-200 dark:border-[#3f4150]'}`}
-              >
-                <Image source={{ uri: img.thumbnail_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        <View className="px-4 pt-3">
-          {/* Name */}
-          <Text
-            className="text-2xl font-black text-gray-900 dark:text-gray-100 mb-2 leading-snug"
-            style={{ fontStyle: 'italic' }}
-          >
-            {product.name}
-          </Text>
-
-          {product.brands && (
-            <Text className="text-sm text-gray-500 dark:text-gray-400 mb-0.5">
-              Brand: <Text className="font-semibold text-gray-700 dark:text-gray-300">{product.brands.name}</Text>
-            </Text>
-          )}
-          {product.sku && (
-            <Text className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-              SKU: <Text className="font-semibold text-gray-700 dark:text-gray-300">{product.sku}</Text>
-            </Text>
-          )}
-
-          {/* Variants */}
-          {variants.length > 0 && (
-            <View className="mb-4">
-              <Text className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                {product.has_variants ? 'Select Length' : 'Variants'}
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+        onLayout={e => setViewportH(e.nativeEvent.layout.height)}
+        onContentSizeChange={remeasure}
+        onScroll={e => setPastControls(buyBottom != null && e.nativeEvent.contentOffset.y >= buyBottom)}
+      >
+        <View ref={contentRef} collapsable={false}>
+          {/* Breadcrumb: category and product name collapse to "..." below sm. */}
+          <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
+            <View className="flex-row items-center gap-2">
+              <Text onPress={() => router.push('/(tabs)')} className="text-sm text-foreground-muted">
+                Home
               </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {variants.map((v) => {
-                  const isSelected = currentVariant?.id === v.id
-                  return (
-                    <TouchableOpacity
-                      key={v.id}
-                      onPress={() => setSelectedVariant(v)}
-                      disabled={!v.is_active}
-                      className={`px-4 py-2 rounded-xl border-2 ${
-                        isSelected
-                          ? 'bg-accent-500 border-accent-500'
-                          : 'border-gray-200 dark:border-[#3f4150] bg-white dark:bg-[#24252f]'
-                      } ${!v.is_active ? 'opacity-40' : ''}`}
-                    >
-                      <Text className={`text-sm font-semibold ${isSelected ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
-                        {v.variant_name}
-                      </Text>
-                    </TouchableOpacity>
-                  )
-                })}
-              </View>
-            </View>
-          )}
-
-          {/* Price block */}
-          <View className="bg-gray-50 dark:bg-[#24252f] rounded-xl p-4 mb-4 border border-gray-100 dark:border-[#3f4150]">
-            <View className="flex-row items-baseline gap-3 mb-1 flex-wrap">
-              <Text className="text-3xl font-black text-primary-500">
-                Rs. {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              <Text className="text-sm text-foreground-muted">/</Text>
+              <Text onPress={() => router.push('/(tabs)/products')} className="text-sm text-foreground-muted">
+                Products
               </Text>
-              {mrp && mrp > Number(price) && (
-                <Text className="text-lg text-gray-400 line-through">
-                  Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </Text>
-              )}
+              {product.categories ? (
+                <>
+                  <Text className="text-sm text-foreground-muted">/</Text>
+                  <Text className="text-sm text-foreground-muted">...</Text>
+                </>
+              ) : null}
             </View>
-            {discount > 0 && (
-              <View className="flex-row items-center gap-2 mb-1">
-                <View className="bg-accent-500 px-2 py-0.5 rounded-full">
-                  <Text className="text-white text-xs font-bold">{discount}% off</Text>
+          </View>
+
+          <View className="px-4 pt-4" style={{ paddingBottom: 80 + (compareCount >= 2 ? 73 : 0) }}>
+            {/* Product details card */}
+            <View className="mb-4 overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
+              <View className="gap-4 p-4">
+                <ProductImageGallery
+                  images={product.product_images || []}
+                  productName={product.name}
+                  variantImages={variantImages}
+                  discountPct={discountPct}
+                />
+
+                <View>
+                  <View className="mb-4 flex-row items-start justify-between gap-3">
+                    <Text className="flex-1 text-2xl font-bold text-foreground">{product.name}</Text>
+                    <View className="mt-1 shrink-0 flex-row items-center gap-2">
+                      <Pressable
+                        onPress={wishlist.toggle}
+                        disabled={wishlist.pending}
+                        accessibilityLabel={wishlist.inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+                        className={`h-10 w-10 items-center justify-center rounded-full border border-border-secondary bg-surface-elevated ${wishlist.pending ? 'opacity-60' : ''}`}
+                      >
+                        {wishlist.inWishlist ? (
+                          <Glyph d={P.heart} solid size={20} className="text-red-500" />
+                        ) : (
+                          <Glyph d={P.heart} size={20} className="text-foreground" />
+                        )}
+                      </Pressable>
+                      <Pressable
+                        onPress={handleShare}
+                        accessibilityLabel="Share product"
+                        className="h-10 w-10 items-center justify-center rounded-full border border-border-secondary bg-surface-elevated"
+                      >
+                        <Glyph d={P.share} size={20} className="text-foreground-secondary" />
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  <ReviewSummaryLink average={summary.average} total={summary.total} onPress={() => scrollToRef(reviewsRef)} />
+
+                  <WarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} />
+
+                  {/* Low-stock urgency, or notify-me when out of stock. */}
+                  <View className="mb-4">
+                    {product.stock_status === 'Low Stock' ? (
+                      <View className="self-start rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 dark:border-amber-700 dark:bg-amber-900/30">
+                        <Text className="text-xs font-semibold text-amber-700 dark:text-amber-400">Only a few left — order soon</Text>
+                      </View>
+                    ) : null}
+                    {product.stock_status === 'Out of Stock' ? (
+                      notifySubmitted ? (
+                        <View className="flex-row items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-700 dark:bg-green-900/20">
+                          <Glyph d={P.checkCircleSolid} viewBox="0 0 20 20" solid evenOdd size={16} className="text-green-700 dark:text-green-400" />
+                          <Text className="flex-1 text-sm text-green-700 dark:text-green-400">We'll email you when this is back in stock.</Text>
+                        </View>
+                      ) : (
+                        <View className="flex-row gap-2">
+                          <TextInput
+                            value={notifyEmail}
+                            onChangeText={setNotifyEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            placeholder="Enter your email"
+                            placeholderTextColor={t.foregroundMuted}
+                            className="min-w-0 flex-1 rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-sm text-foreground"
+                          />
+                          <Pressable onPress={handleNotifyMe} className="shrink-0 justify-center rounded-lg bg-primary-500 px-4 py-2">
+                            <Text className="text-sm font-semibold text-white">Notify Me</Text>
+                          </Pressable>
+                        </View>
+                      )
+                    ) : null}
+                  </View>
+
+                  <ProductActions
+                    p={purchase}
+                    digital={digital}
+                    alreadyOwned={vaultOwned}
+                    vaultUrl={vault?.url ?? null}
+                    isCodAllowed={!!product.is_cod_allowed}
+                    handlingDays={handlingDays}
+                    extraDeliveryDays={extraDeliveryDays}
+                    gstEnabled={gstEnabled}
+                    launchDate={product.launch_date ?? null}
+                    optionsRef={optionsRef}
+                    buyRef={buyRef}
+                  />
+
+                  <RazorpayOffers />
                 </View>
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  You save Rs. {savings.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </Text>
+
+                <View>
+                  <DeliveryInfo
+                    returnAllowed={returnAllowed}
+                    returnDays={returnDays}
+                    replacementAllowed={replacementAllowed}
+                    replacementDays={replacementDays}
+                    isCodAllowed={!!product.is_cod_allowed}
+                    freeShippingThreshold={freeThreshold && freeThreshold > 0 ? freeThreshold : 500}
+                  />
+                  <PincodeChecker />
+                </View>
               </View>
-            )}
-            {product.gst_percentage && (
-              <Text className="text-xs text-gray-400">
-                Inclusive of all taxes ({product.gst_percentage}% GST)
-              </Text>
-            )}
-          </View>
+            </View>
 
-          {/* Stock */}
-          <View className="flex-row items-center gap-2 mb-4">
-            <Ionicons
-              name={inStock ? 'checkmark-circle' : 'close-circle'}
-              size={18}
-              color={inStock ? '#7cb900' : '#EF4444'}
+            <FrequentlyBoughtTogether
+              current={currentCard}
+              launchDate={product.launch_date}
+              discontinueDate={product.discontinue_date}
+              gstEnabled={gstEnabled}
+              onChooseOptions={() => scrollToRef(optionsRef, true)}
             />
-            <Text className={`font-semibold text-sm ${inStock ? 'text-accent-600' : 'text-red-500'}`}>
-              {inStock ? `In Stock (${stockQty} available)` : 'Out of Stock'}
-            </Text>
+
+            <ProductSpecifications product={product} />
+
+            <FeaturesUseCases product={product} />
+
+            {relatedProducts.length >= 1 ? (
+              <PdpCompareSection
+                key={relatedProducts.map(r => r.id).join(',')}
+                currentProduct={compareItem(product, gstEnabled)}
+                relatedProducts={relatedProducts.slice(0, 2).map(r => compareItem(r, gstEnabled))}
+              />
+            ) : null}
+
+            {product.description ? (
+              <View className="mb-8 rounded-lg border border-border-default bg-surface-elevated p-6 shadow-sm">
+                <Text className="mb-4 text-2xl font-bold text-foreground">Product Description</Text>
+                <Text className="leading-relaxed text-foreground-secondary">{product.description}</Text>
+              </View>
+            ) : null}
+
+            <ProductReviews productId={product.id} productSlug={product.slug} sectionRef={reviewsRef} />
+
+            <CustomersAlsoViewed productId={product.id} />
+
+            <PdpRecentlyViewed excludeId={product.id} minItems={2} />
+
+            <FeaturedForYou />
+
+            {relatedProducts.length >= 4 ? (
+              <View className="mt-10">
+                <Text className="mb-6 text-2xl font-bold text-foreground">Related Products</Text>
+                <Grid cols={2} gap={16}>
+                  {relatedProducts.map(r => (
+                    <ProductCard key={r.id} product={toCard(r as any, gstEnabled)} handlingDays={Number(r.handling_days ?? 2)} />
+                  ))}
+                </Grid>
+              </View>
+            ) : null}
           </View>
-
-          {/* Quantity */}
-          <Text className="font-medium text-gray-700 dark:text-gray-300 mb-2">Quantity</Text>
-          <View className="flex-row items-center border border-gray-200 dark:border-[#3f4150] rounded-xl overflow-hidden self-start mb-6">
-            <TouchableOpacity
-              onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-              className="w-12 h-12 items-center justify-center bg-gray-50 dark:bg-[#2e303b]"
-            >
-              <Ionicons name="remove" size={20} color="#6B7280" />
-            </TouchableOpacity>
-            <Text className="w-12 text-center font-bold text-gray-900 dark:text-gray-100 text-base">{quantity}</Text>
-            <TouchableOpacity
-              onPress={() => setQuantity((q) => q + 1)}
-              className="w-12 h-12 items-center justify-center bg-gray-50 dark:bg-[#2e303b]"
-            >
-              <Ionicons name="add" size={20} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-
-          {needsVariant && (
-            <Text className="text-center text-sm text-orange-500 mb-3 font-medium">Please select a variant</Text>
-          )}
-
-          {/* Action buttons — matching website exactly */}
-          <TouchableOpacity
-            onPress={() => canAct && buyNowMutation.mutate()}
-            disabled={!canAct || buyNowMutation.isPending}
-            className={`py-4 rounded-xl items-center flex-row justify-center gap-2 mb-3 ${canAct ? 'bg-accent-500' : 'bg-gray-300 dark:bg-gray-700'}`}
-          >
-            <Ionicons name="flash-outline" size={18} color="white" />
-            <Text className="text-white font-bold text-base">
-              {buyNowMutation.isPending ? 'Processing...' : 'Buy Now'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => canAct && addToCartMutation.mutate()}
-            disabled={!canAct || addToCartMutation.isPending}
-            className={`py-4 rounded-xl items-center flex-row justify-center gap-2 mb-3 ${canAct ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-700'}`}
-          >
-            <Ionicons name="cart-outline" size={18} color="white" />
-            <Text className="text-white font-bold text-base">
-              {addToCartMutation.isPending ? 'Adding...' : 'Add to Cart'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              if (!user) { router.push('/(auth)/login'); return }
-              wishlistMutation.mutate()
-            }}
-            disabled={wishlistMutation.isPending}
-            className="py-3.5 rounded-xl items-center flex-row justify-center gap-2 mb-4 border-2 border-gray-200 dark:border-[#3f4150] bg-white dark:bg-[#24252f]"
-          >
-            <Ionicons name={isWishlisted ? 'heart' : 'heart-outline'} size={18} color={isWishlisted ? '#EF4444' : '#6B7280'} />
-            <Text className="text-gray-600 dark:text-gray-300 font-semibold">
-              {isWishlisted ? 'Saved to Wishlist' : 'Add to Wishlist'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Support */}
-          <View className="mb-3">
-            <Text className="text-sm text-gray-500 dark:text-gray-400 mb-2">Need help with your order?</Text>
-            <View className="border border-gray-200 dark:border-[#3f4150] rounded-xl py-3 px-4 flex-row items-center gap-2 mb-2 bg-white dark:bg-[#24252f]">
-              <Ionicons name="call-outline" size={16} color="#6B7280" />
-              <Text className="text-sm text-gray-600 dark:text-gray-400">Call: +91 89030 31299</Text>
-            </View>
-            <View className="border border-gray-200 dark:border-[#3f4150] rounded-xl py-3 px-4 flex-row items-center gap-2 bg-white dark:bg-[#24252f]">
-              <Ionicons name="mail-outline" size={16} color="#6B7280" />
-              <Text className="text-sm text-gray-600 dark:text-gray-400">Email Inquiry</Text>
-            </View>
-          </View>
-
-          {/* Description */}
-          {product.description && (
-            <View className="mb-6 pt-4 border-t border-gray-100 dark:border-[#3f4150]">
-              <Text className="font-bold text-gray-900 dark:text-gray-100 mb-2 text-base">Product Specifications</Text>
-              <Text className="text-gray-600 dark:text-gray-400 leading-6 text-sm">{product.description}</Text>
-            </View>
-          )}
-
-          <View className="h-8" />
         </View>
       </ScrollView>
+
+      <StickyAddToCartBar
+        action={purchase.stickyAction}
+        visible={pastControls}
+        name={product.name}
+        image={purchase.selectedVariant?.variant_images?.[0]?.thumbnail_url || primaryImage?.thumbnail_url || primaryImage?.image_url || null}
+        price={purchase.effectivePrice}
+        unitLabel={purchase.showPerUnit ? purchase.perUnitLabel : null}
+        quantity={purchase.quantity}
+        adding={digital ? purchase.isBuyingNow : purchase.isAddingToCart}
+        onAdd={digital ? purchase.handleBuyNow : purchase.handleAddToCart}
+        onChoose={() => scrollToRef(optionsRef, true)}
+        buyNow={digital}
+        aboveCompareBar={compareCount >= 2}
+      />
+      <CompareBar />
     </View>
   )
 }

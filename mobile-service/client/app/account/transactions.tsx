@@ -1,105 +1,179 @@
-import { View, Text, FlatList, TouchableOpacity } from 'react-native'
-import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { FlatList, Modal, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
-import { api } from '../../src/api/client'
-import AccountHeader from '../../src/components/account/AccountHeader'
-import Spinner from '../../src/components/ui/Spinner'
+import TopNav from '../../src/components/layout/TopNav'
+import { listTransactions, type Transaction } from '../../src/api/account'
+import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
+import HeroIcon from '../../src/components/account/HeroIcon'
+import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
+import { FilterChip, InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, Pulse, StatusPill } from '../../src/components/account/ui'
+import { useTokens } from '../../src/theme'
 
-type Transaction = {
-  id: string
-  amount: number
-  status: string
-  paymentMethod: string | null
-  paymentGateway: string | null
-  transactionId: string | null
-  createdAt: string
-  orderId: string | null
-  orderNumber: string | null
+// Mirror of controller-service components/shared/AccountTransactions.tsx (visitor).
+
+const STATUSES = ['all', 'completed', 'pending', 'failed', 'refunded'] as const
+const statusLabel = (s: string) => ({ completed: 'Completed', pending: 'Pending', failed: 'Failed', refunded: 'Refunded' })[s] ?? s
+const statusTone = (s: string) => (['completed', 'pending', 'failed', 'refunded'].includes(s) ? ORDER_STATUS_TONE[s] : NEUTRAL_TONE)
+
+function methodLabel(method: string, gateway: string) {
+  if (gateway === 'razorpay') return 'Razorpay'
+  if (method === 'cod') return 'Cash on Delivery'
+  if (method === 'bank_transfer') return 'Bank Transfer'
+  if (method === 'upi') return 'UPI'
+  return method ? method.charAt(0).toUpperCase() + method.slice(1) : 'N/A'
 }
 
-const STATUS: Record<string, { bg: string; text: string }> = {
-  completed: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
-  paid:       { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
-  success:    { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
-  pending:    { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
-  refunded:   { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-400' },
-  failed:     { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400' },
+function Skeleton() {
+  return (
+    <View className="px-4 pt-4 pb-8 gap-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <View key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4">
+          <View className="flex-row items-center justify-between mb-2">
+            <Pulse className="h-3 bg-surface-secondary rounded w-32" />
+            <Pulse className="h-5 bg-surface-secondary rounded-full w-16" />
+          </View>
+          <View className="flex-row items-center justify-between">
+            <Pulse className="h-4 bg-surface-secondary rounded w-24" />
+            <Pulse className="h-4 bg-surface-secondary rounded w-20" />
+          </View>
+        </View>
+      ))}
+    </View>
+  )
 }
 
 export default function TransactionsScreen() {
   const router = useRouter()
-  const { data, isLoading } = useQuery({
-    queryKey: ['transactions'],
-    queryFn: () => api<{ transactions: Transaction[] }>('/api/transactions'),
-  })
+  const t = useTokens()
+  const user = useRequireAuth()
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterMethod, setFilterMethod] = useState<string>('all')
+  const [methodOpen, setMethodOpen] = useState(false)
 
-  const transactions = data?.transactions || []
+  const list = useInfiniteList<Transaction>({
+    key: ['transactions', user?.id ?? null],
+    enabled: !!user,
+    pageSize: 10,
+    fetchPage: async p => {
+      const d = await listTransactions(p)
+      return { rows: d.transactions || [], total: Number(d.total ?? 0) }
+    },
+  })
+  const transactions = list.rows
+
+  const methods = useMemo(() => Array.from(new Set(transactions.map(x => methodLabel(x.paymentMethod, x.paymentGateway)))), [transactions])
+  const filtered = useMemo(
+    () =>
+      transactions.filter(x => {
+        if (filterStatus !== 'all' && x.status !== filterStatus) return false
+        if (filterMethod !== 'all' && methodLabel(x.paymentMethod, x.paymentGateway) !== filterMethod) return false
+        return true
+      }),
+    [transactions, filterStatus, filterMethod]
+  )
+
+  const header = (
+    <>
+      <AccountMobileHeader />
+      {transactions.length > 0 && (
+        <View className="px-4 pt-4 mb-4 flex-row flex-wrap items-center gap-3">
+          <View className="flex-row flex-wrap items-center gap-1.5">
+            {STATUSES.map(s => (
+              <FilterChip key={s} label={s === 'all' ? 'All' : statusLabel(s)} active={filterStatus === s} onPress={() => setFilterStatus(s)} />
+            ))}
+          </View>
+          {methods.length > 1 && (
+            <Pressable onPress={() => setMethodOpen(true)} className="flex-row items-center gap-1 px-3 py-1 rounded-full border border-border-default bg-surface-elevated">
+              <Text className="text-xs text-foreground-secondary">{filterMethod === 'all' ? 'All Methods' : filterMethod}</Text>
+              <HeroIcon name="chevronDown" size={12} color={t.foregroundSecondary} />
+            </Pressable>
+          )}
+        </View>
+      )}
+    </>
+  )
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-[#1a1b23]">
-      <AccountHeader activeTab="transactions" />
-
-      {isLoading ? (
-        <Spinner />
-      ) : transactions.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <Ionicons name="receipt-outline" size={64} color="#9CA3AF" />
-          <Text className="text-gray-900 dark:text-gray-100 text-lg font-bold mt-4">No transactions yet</Text>
-        </View>
+    <View className="flex-1 bg-surface">
+      <TopNav />
+      {!user || list.loading ? (
+        <FlatList data={[]} renderItem={null} ListHeaderComponent={<><AccountMobileHeader /><Skeleton /></>} />
       ) : (
         <FlatList
-          data={transactions}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 32 }}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => {
-            const { bg, text } = STATUS[item.status?.toLowerCase()] || { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-700 dark:text-gray-300' }
-            const gateway = item.paymentGateway || item.paymentMethod
-            return (
-              <View className="bg-white dark:bg-[#24252f] rounded-xl border border-gray-100 dark:border-[#3f4150] p-4">
-                <View className="flex-row items-center gap-2 mb-2">
-                  <View className={`px-2.5 py-0.5 rounded-full ${bg}`}>
-                    <Text className={`text-xs font-semibold capitalize ${text}`}>{item.status}</Text>
-                  </View>
-                  {gateway && (
-                    <View className="bg-gray-100 dark:bg-[#2e303b] px-2.5 py-0.5 rounded-full">
-                      <Text className="text-xs text-gray-600 dark:text-gray-400 capitalize">
-                        {gateway.replace(/_/g, ' ')}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                <View className="flex-row items-baseline gap-3 mb-1">
-                  <Text className="text-xl font-black text-gray-900 dark:text-gray-100">
-                    ₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </Text>
-                  {item.orderNumber && item.orderId && (
-                    <TouchableOpacity onPress={() => router.push(`/orders/${item.orderId}`)}>
-                      <Text className="text-accent-600 dark:text-accent-400 text-sm font-semibold" numberOfLines={1}>
-                        Order #{item.orderNumber}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {item.transactionId && (
-                  <Text className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">
-                    TXN: {item.transactionId}
-                  </Text>
-                )}
-
-                <Text className="text-xs text-gray-400 dark:text-gray-500">
-                  {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  {'  '}
-                  {new Date(item.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+          data={filtered}
+          keyExtractor={x => x.id}
+          ListHeaderComponent={header}
+          contentContainerStyle={{ paddingBottom: 32 }}
+          onEndReached={list.loadMore}
+          onEndReachedThreshold={0.5}
+          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ListEmptyComponent={
+            transactions.length === 0 ? (
+              <View className="mx-4 mt-4 bg-surface-elevated rounded-lg border border-border-default p-12 items-center">
+                <HeroIcon name="receipt" size={64} color={t.foregroundMuted} strokeWidth={1.5} />
+                <Text className="text-xl font-semibold text-foreground mb-2 mt-4">No transactions yet</Text>
+                <Text className="text-foreground-secondary mb-6 text-center">Your payment transactions will appear here once you place an order.</Text>
+                <Pressable onPress={() => router.navigate('/(tabs)/products')} className="px-6 py-3 bg-accent-500 rounded-lg">
+                  <Text className="text-white font-semibold">Browse Products</Text>
+                </Pressable>
+              </View>
+            ) : null
+          }
+          ListFooterComponent={
+            <View className="px-4">
+              <InfiniteFooter shown={transactions.length} list={list} noun="transactions" />
+            </View>
+          }
+          renderItem={({ item: txn }) => (
+            <View className="mx-4 bg-surface-elevated rounded-lg border border-border-default p-4" style={{ boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
+              <View className="flex-row flex-wrap items-center gap-2 mb-2">
+                <StatusPill tone={statusTone(txn.status)} label={statusLabel(txn.status)} />
+                <StatusPill tone={{ bg: 'bg-surface-secondary', text: 'text-foreground-secondary' }} label={methodLabel(txn.paymentMethod, txn.paymentGateway)} />
+              </View>
+              <View className="flex-row flex-wrap items-baseline" style={{ columnGap: 16, rowGap: 4 }}>
+                <Text className="text-lg font-bold text-foreground">{Number(txn.amount).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</Text>
+                <Text className="text-sm text-accent-600 dark:text-accent-400 font-medium" onPress={() => router.push(`/orders/${txn.orderId}`)}>
+                  Order #{txn.orderNumber}
                 </Text>
               </View>
-            )
-          }}
+              {!!txn.transactionId && (
+                <Text className="text-xs text-foreground-muted mt-1 font-mono" numberOfLines={1}>
+                  TXN: {txn.transactionId}
+                </Text>
+              )}
+              <View className="mt-4">
+                <Text className="text-sm text-foreground-muted">
+                  {new Date(txn.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+                <Text className="text-xs text-foreground-muted">
+                  {new Date(txn.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                </Text>
+              </View>
+            </View>
+          )}
         />
       )}
+
+      <Modal visible={methodOpen} transparent animationType="fade" onRequestClose={() => setMethodOpen(false)}>
+        <Pressable className="flex-1 bg-black/40 justify-center px-8" onPress={() => setMethodOpen(false)}>
+          <View className="bg-surface-elevated rounded-xl border border-border-default py-2">
+            {['all', ...methods].map(m => (
+              <Pressable
+                key={m}
+                onPress={() => {
+                  setFilterMethod(m)
+                  setMethodOpen(false)
+                }}
+                className={`px-4 py-3 ${filterMethod === m ? 'bg-accent-50 dark:bg-accent-900/20' : ''}`}
+              >
+                <Text className={`text-sm ${filterMethod === m ? 'text-accent-600 dark:text-accent-400 font-medium' : 'text-foreground'}`}>
+                  {m === 'all' ? 'All Methods' : m}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   )
 }

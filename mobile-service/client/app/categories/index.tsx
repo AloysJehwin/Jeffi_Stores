@@ -1,168 +1,119 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native'
+import { FlatList, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { Ionicons } from '@expo/vector-icons'
-import { listCategories } from '../../src/api/categories'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { listCategories, withDetails, type CategoryDetail } from '../../src/api/categories'
+import { countProducts } from '../../src/api/products'
+import { getHome } from '../../src/api/home'
 import TopNav from '../../src/components/layout/TopNav'
-import Spinner from '../../src/components/ui/Spinner'
-import type { Category } from '../../src/types'
+import CategoryIcon from '../../src/components/catalog/CategoryIcon'
+import CompareBar from '../../src/components/catalog/CompareBar'
+import { ChevronRightIcon } from '../../src/components/catalog/icons'
+import { Pulse } from '../../src/components/catalog/Paged'
+import { accent } from '../../src/theme'
 
-type IoniconName = React.ComponentProps<typeof Ionicons>['name']
+// Mirror of controller-service app/(storefront)/categories/page.tsx at the mobile breakpoint.
 
-const CATEGORY_ICONS: Record<string, IoniconName> = {
-  fasteners:                  'attach-outline',
-  'power-transmission':       'settings-outline',
-  'tools-equipment':          'build-outline',
-  'tools-and-equipment':      'build-outline',
-  'welding-supplies':         'flame-outline',
-  'electrical-cables':        'flash-outline',
-  'electrical-and-cables':    'flash-outline',
-  'industrial-components':    'cog-outline',
-  'material-handling':        'cube-outline',
-  abrasives:                  'disc-outline',
-  'safety-equipment':         'shield-checkmark-outline',
-  'lubricants-chemicals':     'water-outline',
-  'lubricants-and-chemicals': 'water-outline',
-  'hand-tools':               'hammer-outline',
-  'power-tools':              'battery-charging-outline',
-  'measuring-tools':          'resize-outline',
-  'cutting-tools':            'cut-outline',
-  'drill-bits':               'aperture-outline',
-  nuts:                       'ellipse-outline',
-  bolts:                      'git-commit-outline',
-  washers:                    'radio-button-off-outline',
-  screws:                     'git-commit-outline',
-  'threaded-rods':            'remove-outline',
-  'v-belts':                  'repeat-outline',
-  'timing-belts':             'repeat-outline',
-  chains:                     'link-outline',
-  couplings:                  'link-outline',
-  bearings:                   'radio-button-on-outline',
-  valves:                     'funnel-outline',
-  default:                    'layers-outline',
-}
-
-function getCategoryIcon(slug: string): IoniconName {
-  const key = slug.toLowerCase()
-  if (CATEGORY_ICONS[key]) return CATEGORY_ICONS[key]
-  for (const k of Object.keys(CATEGORY_ICONS)) {
-    if (key.includes(k) || k.includes(key)) return CATEGORY_ICONS[k]
-  }
-  return CATEGORY_ICONS.default
-}
-
-const SUBCATEGORY_LIMIT = 4
-
-export default function CategoriesScreen() {
+function CategoryCard({ category, subcategories }: { category: CategoryDetail; subcategories: CategoryDetail[] }) {
   const router = useRouter()
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['categories'],
-    queryFn: listCategories,
-    staleTime: 5 * 60 * 1000,
+  // Own products plus the subcategories' (the API counts the whole subtree).
+  const { data: total } = useQuery({
+    queryKey: ['category-count', category.slug],
+    queryFn: () => countProducts({ category: category.slug }),
+    staleTime: 5 * 60_000,
   })
-
-  const allCategories: Category[] = data || []
-
-  const parents = allCategories
-    .filter((c) => c.parent_category_id === null)
-    .sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999))
-
-  const childrenByParentId: Record<string, Category[]> = {}
-  allCategories
-    .filter((c) => c.parent_category_id !== null)
-    .forEach((c) => {
-      const pid = c.parent_category_id!
-      if (!childrenByParentId[pid]) childrenByParentId[pid] = []
-      childrenByParentId[pid].push(c)
-    })
+  const n = total ?? 0
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-[#1a1b23]">
-      <TopNav />
-
-      {/* Header */}
-      <View className="bg-white dark:bg-[#24252f] border-b border-gray-100 dark:border-[#3f4150] px-4 py-4">
-        <Text className="text-2xl font-extrabold text-gray-900 dark:text-gray-100" style={{ fontStyle: 'italic' }}>
-          All Categories
-        </Text>
-        <Text className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          Browse our complete range of product categories
-        </Text>
-      </View>
-
-      {isLoading ? (
-        <Spinner />
-      ) : parents.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <Ionicons name="layers-outline" size={64} color="#9CA3AF" />
-          <Text className="text-gray-900 dark:text-gray-100 text-lg font-bold mt-4">No categories found</Text>
+    <View className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
+      <Pressable onPress={() => router.push(`/category/${category.slug}`)} className="p-4">
+        <View className="mb-4 flex-row items-center gap-4">
+          <View className="h-16 w-16 items-center justify-center rounded-lg bg-accent-100">
+            <CategoryIcon iconName={category.icon_name} categoryName={category.name} color={accent[600]} />
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text className="text-xl font-bold text-foreground">{category.name}</Text>
+            <Text className="mt-1 text-sm text-foreground-muted">
+              {total == null ? ' ' : `${n} ${n === 1 ? 'product' : 'products'}`}
+            </Text>
+          </View>
         </View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 12, paddingBottom: 32, gap: 10 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {parents.map((cat) => {
-            const icon = getCategoryIcon(cat.slug)
-            const subcats = childrenByParentId[cat.id] || []
-            const visibleSubs = subcats.slice(0, SUBCATEGORY_LIMIT)
-            const extraCount = subcats.length - SUBCATEGORY_LIMIT
 
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                onPress={() => router.push(`/category/${cat.slug}` as any)}
-                activeOpacity={0.85}
-              >
-                <View className="bg-white dark:bg-[#24252f] rounded-xl border border-gray-200 dark:border-[#3f4150] p-4">
-                  <View className="flex-row items-center gap-4">
-                    {/* Icon square — amber bg matching website */}
-                    <View className="w-14 h-14 bg-amber-50 dark:bg-amber-900/20 rounded-xl items-center justify-center shrink-0">
-                      <Ionicons name={icon} size={28} color="#f59e0b" />
-                    </View>
+        {category.description ? (
+          <Text numberOfLines={2} className="mb-4 text-sm text-foreground-secondary">
+            {category.description}
+          </Text>
+        ) : null}
 
-                    {/* Name + subcategory chips */}
-                    <View className="flex-1">
-                      <Text className="font-bold text-gray-900 dark:text-gray-100 text-base leading-snug">
-                        {cat.name}
-                      </Text>
-
-                      {subcats.length > 0 && (
-                        <View className="flex-row flex-wrap gap-1.5 mt-2">
-                          {visibleSubs.map((sub) => (
-                            <View
-                              key={sub.id}
-                              className="bg-gray-100 dark:bg-[#2e303b] rounded-full px-2.5 py-0.5"
-                            >
-                              <Text className="text-xs text-gray-600 dark:text-gray-400">{sub.name}</Text>
-                            </View>
-                          ))}
-                          {extraCount > 0 && (
-                            <View className="bg-accent-50 dark:bg-accent-900/20 rounded-full px-2.5 py-0.5">
-                              <Text className="text-xs text-accent-600 dark:text-accent-400 font-semibold">
-                                +{extraCount} more
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                    </View>
-
-                    <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-                  </View>
-
-                  <View className="mt-3 pt-3 border-t border-gray-100 dark:border-[#3f4150]">
-                    <Text className="text-accent-600 dark:text-accent-400 text-sm font-semibold">
-                      Browse Products →
-                    </Text>
-                  </View>
+        {subcategories.length > 0 ? (
+          <View className="border-t border-border-default pt-4">
+            <Text className="mb-2 text-xs font-medium text-foreground-muted">Subcategories:</Text>
+            <View className="flex-row flex-wrap items-center gap-2">
+              {subcategories.slice(0, 5).map(sub => (
+                <View key={sub.id} className="rounded bg-surface-secondary px-2 py-1">
+                  <Text className="text-xs text-foreground-secondary">{sub.name}</Text>
                 </View>
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
-      )}
+              ))}
+              {subcategories.length > 5 ? (
+                <Text className="text-xs font-medium text-accent-600 dark:text-accent-400">+{subcategories.length - 5} more</Text>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
+        <View className="mt-4 flex-row items-center">
+          <Text className="text-sm font-semibold text-accent-500">Browse Products</Text>
+          <View className="ml-1">
+            <ChevronRightIcon color={accent[500]} />
+          </View>
+        </View>
+      </Pressable>
+    </View>
+  )
+}
+
+export default function CategoriesScreen() {
+  const insets = useSafeAreaInsets()
+  const { data, isLoading } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
+  const { data: home } = useQuery({ queryKey: ['home'], queryFn: getHome, staleTime: 120_000 })
+  const categories = withDetails(data ?? [], home?.data.mainCategories as Record<string, any>[] | undefined)
+  const main = categories.filter(c => !c.parent_category_id)
+  const subsOf = (id: string) => categories.filter(c => c.parent_category_id === id)
+
+  return (
+    <View className="flex-1 bg-surface">
+      <TopNav />
+      <FlatList
+        data={main}
+        keyExtractor={c => c.id}
+        contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}
+        ItemSeparatorComponent={() => <View className="h-4" />}
+        ListHeaderComponent={
+          <>
+            <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
+              <Text className="mb-2 text-3xl font-bold text-secondary-500 dark:text-foreground">All Categories</Text>
+              <Text className="text-foreground-secondary">Browse our complete range of product categories</Text>
+            </View>
+            <View className="h-4" />
+            {isLoading ? (
+              <View className="gap-4 px-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Pulse key={i} delay={i * 60}>
+                    <View className="h-40 rounded-lg border border-border-default bg-surface-elevated" />
+                  </Pulse>
+                ))}
+              </View>
+            ) : null}
+          </>
+        }
+        renderItem={({ item }) => (
+          <View className="px-4">
+            <CategoryCard category={item} subcategories={subsOf(item.id)} />
+          </View>
+        )}
+        showsVerticalScrollIndicator={false}
+      />
+      <CompareBar />
     </View>
   )
 }

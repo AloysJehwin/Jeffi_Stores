@@ -27,11 +27,10 @@ function AuthRehydrator() {
   useEffect(() => {
     ;(async () => {
       try {
+        // Bearer when a token is stored (the backend returns it at sign-in), else the session cookie.
         const token = await getStoredToken()
-        if (token) {
-          const user = await getMe()
-          await setAuth(user, token)
-        }
+        const user = await getMe()
+        await setAuth(user, token ?? '')
       } catch {
       } finally {
         setLoading(false)

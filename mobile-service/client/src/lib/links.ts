@@ -33,25 +33,48 @@ export function openHref(router: Router, href: string | null | undefined) {
     return
   }
   const path = url.pathname.replace(/\/+$/, '') || '/'
-  const product = path.match(/^\/products?\/([^/]+)$/)
-  if (product) return router.push(`/product/${product[1]}`)
-  const category = path.match(/^\/(?:category|categories)\/([^/]+)$/)
-  if (category) return router.push(`/category/${category[1]}`)
-  if (path === '/categories') return router.push('/categories')
-  const brand = path.match(/^\/brands\/([^/]+)$/)
-  if (brand) return router.push({ pathname: '/(tabs)/products', params: { brand: brand[1] } })
-  if (path === '/brands') return router.push('/(tabs)/products')
-  if (path === '/cart') return router.push('/(tabs)/cart')
-  if (path === '/wishlist') return router.push('/(tabs)/wishlist')
-  if (path === '/' ) return router.push('/(tabs)')
+  const m = (re: RegExp) => path.match(re)?.[1]
+  let slug: string | undefined
+  if ((slug = m(/^\/products?\/([^/]+)$/))) return router.push(`/product/${slug}`)
+  if ((slug = m(/^\/(?:category|categories)\/([^/]+)$/))) return router.push(`/category/${slug}`)
+  if ((slug = m(/^\/brands\/([^/]+)$/))) return router.push(`/brands/${slug}`)
+  if ((slug = m(/^\/(?:account\/)?orders\/([^/]+)$/)) && slug !== 'confirmation') return router.push(`/orders/${slug}`)
+  if ((slug = m(/^\/legal\/([^/]+)$/))) return router.push(`/legal/${slug}`)
+  const screens: Record<string, string> = {
+    '/': '/(tabs)',
+    '/categories': '/categories',
+    '/brands': '/brands',
+    '/cart': '/(tabs)/cart',
+    '/wishlist': '/(tabs)/wishlist',
+    '/compare': '/compare',
+    '/checkout': '/checkout/review',
+    '/checkout/review': '/checkout/review',
+    '/account': '/(tabs)/account',
+    '/account/orders': '/orders',
+    '/orders': '/orders',
+    '/account/addresses': '/account/addresses',
+    '/account/transactions': '/account/transactions',
+    '/account/referrals': '/account/referrals',
+    '/account/rewards': '/account/rewards',
+    '/account/subscriptions': '/account/subscriptions',
+    '/account/quotes': '/account/quotes',
+    '/about': '/info/about',
+    '/contact': '/info/contact',
+    '/support': '/info/support',
+    '/return-policy': '/info/return-policy',
+    '/legal': '/legal',
+    '/login': '/(auth)/login',
+    '/signup': '/(auth)/signup',
+  }
+  if (screens[path]) return router.push(screens[path] as never)
   if (path === '/products' || path.startsWith('/offers/')) {
     const params: Record<string, string> = {}
     for (const k of PRODUCT_PARAMS) {
       const v = url.searchParams.get(k)
       if (v) params[k] = v
     }
-    const offer = path.match(/^\/offers\/([^/]+)$/)
-    if (offer) params.offer = offer[1]
+    const offer = m(/^\/offers\/([^/]+)$/)
+    if (offer) params.offer = offer
     return router.push({ pathname: '/(tabs)/products', params })
   }
   Linking.openURL(url.toString())

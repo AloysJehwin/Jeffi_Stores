@@ -1,215 +1,776 @@
-import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native'
-import { Image } from 'expo-image'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import { useQuery } from '@tanstack/react-query'
-import { Ionicons } from '@expo/vector-icons'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Banknote, Check, Copy, MapPin, ShieldCheck, Truck } from 'lucide-react-native'
+import TopNav from '../../src/components/layout/TopNav'
+import Pulse from '../../src/components/cart/Pulse'
+import AiInsight from '../../src/components/cart/AiInsight'
+import AddressFormModal from '../../src/components/checkout/AddressFormModal'
+import CouponHintBanner from '../../src/components/checkout/CouponHintBanner'
+import Radio from '../../src/components/checkout/Radio'
+import { BuyNowReviewRow, CartReviewRow } from '../../src/components/checkout/CheckoutItemRow'
+import { useCheckoutStore, type PayMethod } from '../../src/components/checkout/checkoutStore'
+import { cartTax, cartTotal, digitalLinesSubtotal, isDigitalLine, money } from '../../src/components/cart/lines'
+import {
+  applyCoupon,
+  getCart,
+  getCheckoutIntent,
+  getPrimaryImage,
+  getStoreSettings,
+  type BuyNowIntent,
+  type CouponResult,
+} from '../../src/api/cart'
 import { listAddresses } from '../../src/api/addresses'
-import { getCart } from '../../src/api/cart'
-import Spinner from '../../src/components/ui/Spinner'
+import { cancelOrder } from '../../src/api/orders'
+import { api } from '../../src/api/client'
+import { useAuthStore } from '../../src/stores/authStore'
+import { useStoreConfig } from '../../src/hooks/useStoreConfig'
+import { invalidateEddCache } from '../../src/lib/edd'
+import { showToast } from '../../src/stores/toastStore'
+import { status, useTokens } from '../../src/theme'
+import type { Address } from '../../src/types'
+
+// Mirror of controller-service components/shared/CheckoutReviewPage.tsx (the storefront's /checkout/review) at the
+// mobile breakpoint. Placing the order hands off to checkout/payment, which runs Razorpay or the COD order.
+
+interface ShippingQuote {
+  charge?: number | null
+  codFee?: number | null
+  serviceable?: boolean
+  source?: string
+  freeShippingThreshold?: number
+  error?: string
+}
+
+const CARD = 'rounded-lg border border-border-default bg-surface-elevated p-4 shadow-sm'
+const PROMISES = [
+  'Orders placed before 5 PM are dispatched the same day',
+  'Tracked shipment with SMS & email updates',
+  'Secure packaging to ensure safe delivery',
+]
+
+function eddLabel(ymd: string) {
+  return new Date(ymd + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
+}
 
 export default function CheckoutReviewScreen() {
   const router = useRouter()
-  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
+  const qc = useQueryClient()
+  const t = useTokens()
+  const insets = useSafeAreaInsets()
+  const params = useLocalSearchParams<{ intent?: string; couponCode?: string; addressId?: string }>()
+  const intentToken = params.intent || null
+  const couponFromParams = params.couponCode || null
+  const user = useAuthStore(s => s.user)
+  const authLoading = useAuthStore(s => s.isLoading)
+  const { razorpayEnabled, codEnabled, gstEnabled } = useStoreConfig().flags
+  const submitError = useCheckoutStore(s => s.submitError)
+  const existingOrder = useCheckoutStore(s => s.existingOrder)
 
-  const { data: addresses, isLoading: addrLoading } = useQuery({
-    queryKey: ['addresses'],
-    queryFn: listAddresses,
+  // ── data ──
+  const intentQ = useQuery({
+    queryKey: ['checkout-intent', intentToken],
+    queryFn: () => getCheckoutIntent(intentToken!),
+    enabled: !!intentToken && !!user,
+    retry: false,
+    staleTime: Infinity,
+  })
+  const buyNow: BuyNowIntent | null = intentQ.data?.mode === 'buyNow' ? intentQ.data : null
+  const isBuyNow = !!buyNow
+  const intentPending = !!intentToken && (intentQ.isLoading || (!intentQ.data && !intentQ.isError))
+  const imageQ = useQuery({
+    queryKey: ['primary-image', buyNow?.productId, buyNow?.variantId ?? null],
+    queryFn: () => getPrimaryImage(buyNow!.productId, buyNow!.variantId),
+    enabled: !!buyNow,
+    retry: false,
   })
 
+  const cartQ = useQuery({ queryKey: ['cart'], queryFn: getCart, enabled: !!user })
+  const cartItems = cartQ.data?.items ?? []
+  const cartCount = cartItems.length
+
+  const addrQ = useQuery({ queryKey: ['addresses'], queryFn: listAddresses, enabled: !!user })
+  const addresses = addrQ.data ?? []
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null)
+  const [showAddressModal, setShowAddressModal] = useState(false)
+
+  const settingsQ = useQuery({ queryKey: ['store-settings'], queryFn: getStoreSettings, staleTime: 300_000 })
+  const minOrderAmount = typeof settingsQ.data?.minOrderAmount === 'number' ? settingsQ.data.minOrderAmount : 0
+
+  const [couponCode, setCouponCode] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponResult | null>(null)
+  const [couponError, setCouponError] = useState('')
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
+  const [notes, setNotes] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<PayMethod>(razorpayEnabled ? 'razorpay' : 'cod')
+  const [cancellingPrevious, setCancellingPrevious] = useState(false)
+
+  // Fresh visit: no stale error from an earlier attempt.
   useEffect(() => {
-    if (addresses && !selectedAddressId) {
-      const def = addresses.find((a) => a.is_default) || addresses[0]
-      if (def) setSelectedAddressId(def.id)
-    }
-  }, [addresses])
+    useCheckoutStore.getState().clearError()
+  }, [])
 
-  const { data: cartData, isLoading: cartLoading } = useQuery({
-    queryKey: ['cart'],
-    queryFn: getCart,
+  // Signed out → login, like the web's redirect.
+  const sentToLogin = useRef(false)
+  useEffect(() => {
+    if (!authLoading && !user && !sentToLogin.current) {
+      sentToLogin.current = true
+      router.push('/(auth)/login')
+    }
+  }, [authLoading, user, router])
+
+  // Default / URL-chosen address once the list arrives.
+  useEffect(() => {
+    if (!addrQ.data) return
+    setSelectedAddress(prev => {
+      if (prev && addrQ.data.some(a => a.id === prev.id)) return addrQ.data.find(a => a.id === prev.id) ?? prev
+      if (prev) return prev
+      const fromUrl = params.addressId ? addrQ.data.find(a => a.id === params.addressId) : null
+      return fromUrl || addrQ.data.find(a => a.is_default) || addrQ.data[0] || null
+    })
+  }, [addrQ.data, params.addressId])
+
+  // An expired / foreign intent goes home; an empty cart goes back to the cart (only while this screen is on top).
+  useFocusEffect(
+    useCallback(() => {
+      if (intentQ.isError) {
+        router.replace('/(tabs)')
+        return
+      }
+      if (!user || intentPending || isBuyNow || !cartQ.isSuccess) return
+      if (cartQ.data.items.length === 0) router.replace('/(tabs)/cart')
+    }, [intentQ.isError, user, intentPending, isBuyNow, cartQ.isSuccess, cartQ.data, router])
+  )
+
+  // ── money ──
+  const cartSubtotal = isBuyNow ? buyNow!.price * buyNow!.qty : cartTotal(cartItems, gstEnabled)
+  const hasDigital = isBuyNow ? !!buyNow!.isDigital : cartItems.some(isDigitalLine)
+  const allDigital = isBuyNow ? !!buyNow!.isDigital : cartItems.length > 0 && cartItems.every(isDigitalLine)
+  const physicalSubtotal = isBuyNow ? cartSubtotal : Math.max(0, cartSubtotal - digitalLinesSubtotal(cartItems, gstEnabled))
+  const businessDiscountAmount = isBuyNow && Number(buyNow!.businessDiscount) > 0 ? Math.round(Number(buyNow!.businessDiscount) * 100) / 100 : 0
+  const pin = selectedAddress?.postal_code ?? null
+
+  const shipItems = isBuyNow
+    ? [{ productId: buyNow!.productId, variantId: buyNow!.variantId, subVariantId: buyNow!.subVariantId, quantity: buyNow!.qty }]
+    : cartItems
+        .filter(i => !isDigitalLine(i))
+        .map(i => ({ productId: i.product_id, variantId: i.variant_id || null, subVariantId: i.sub_variant_id || null, quantity: parseFloat(String(i.quantity)) }))
+  const isCod = paymentMethod === 'cod'
+  const shipQ = useQuery({
+    queryKey: ['shipping-rate', pin, physicalSubtotal, isCod, JSON.stringify(shipItems)],
+    queryFn: () =>
+      api<ShippingQuote>('/api/shipping/rate', {
+        method: 'POST',
+        body: JSON.stringify({ destinationPin: pin, cartItems: shipItems, subtotal: physicalSubtotal, isCod }),
+      }),
+    enabled: !!pin && cartSubtotal > 0 && !allDigital && shipItems.length > 0,
+    retry: false,
   })
 
-  if (addrLoading || cartLoading) return <Spinner />
-
-  const items = cartData?.items || []
-  const addrList = addresses || []
-
-  const subtotal = items.reduce((sum, item) => {
-    const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
-    return sum + price * Number(item.quantity)
-  }, 0)
-
-  const handleContinue = () => {
-    if (!selectedAddressId) {
-      Alert.alert('Select Address', 'Please select a delivery address to continue.')
-      return
+  let shippingCharge: number | null = null
+  let shippingError = ''
+  let serviceable = true
+  let shippingMeta: { source?: string; freeShippingThreshold?: number } | null = null
+  const isLoadingShipping = shipQ.isFetching
+  if (pin && cartSubtotal > 0) {
+    if (allDigital) shippingCharge = 0
+    else if (shipQ.isError) shippingError = 'Could not fetch rate'
+    else if (shipQ.data) {
+      if (shipQ.data.serviceable === false) {
+        serviceable = false
+        shippingError = 'Delivery is not available to this pincode.'
+      } else if (shipQ.data.charge != null) {
+        shippingCharge = Number(shipQ.data.charge)
+        shippingMeta = { source: shipQ.data.source, freeShippingThreshold: shipQ.data.freeShippingThreshold }
+      } else shippingError = shipQ.data.error || 'Unavailable'
     }
-    router.push({ pathname: '/checkout/payment', params: { addressId: selectedAddressId } })
+  }
+  const codFee = isCod && shipQ.data?.codFee != null ? Number(shipQ.data.codFee) : 0
+
+  const physical = cartItems.filter(i => !isDigitalLine(i))
+  const extraDays = isBuyNow ? Number(buyNow!.extraDeliveryDays ?? 0) : Math.max(0, ...physical.map(i => Number(i.products?.extra_delivery_days ?? 0)))
+  const handlingDays = isBuyNow ? Number(buyNow!.handlingDays ?? 0) : Math.max(0, ...physical.map(i => Number(i.products?.handling_days ?? 0)))
+  const eddQ = useQuery({
+    queryKey: ['checkout-edd', pin, extraDays, handlingDays],
+    queryFn: () => api<{ edd?: string }>(`/api/products/edd?pin=${pin}&extraDays=${extraDays}&handlingDays=${handlingDays}`),
+    enabled: !!pin && !allDigital,
+    retry: false,
+  })
+
+  const discountAmount = appliedCoupon?.discountAmount ?? 0
+  const finalTotal = Math.max(0, cartSubtotal - discountAmount - businessDiscountAmount + (shippingCharge ?? 0) + codFee)
+  const belowMinimum = minOrderAmount > 0 && cartSubtotal > 0 && cartSubtotal < minOrderAmount
+  const tax = isBuyNow ? 0 : cartTax(cartItems, gstEnabled)
+
+  const codAvailable =
+    !hasDigital && codEnabled && (isBuyNow ? true : cartItems.length > 0 && cartItems.every(i => i.products?.is_cod_allowed !== false))
+  const noPaymentMethod = !razorpayEnabled && !codAvailable
+
+  // Keep the chosen method valid as flags / the cart change.
+  useEffect(() => {
+    if (paymentMethod === 'razorpay' && !razorpayEnabled && codAvailable) setPaymentMethod('cod')
+    else if (paymentMethod === 'cod' && !codAvailable && razorpayEnabled) setPaymentMethod('razorpay')
+  }, [paymentMethod, razorpayEnabled, codAvailable])
+
+  // ── coupon ──
+  const runApply = async (code: string) => {
+    setIsApplyingCoupon(true)
+    setCouponError('')
+    try {
+      setAppliedCoupon(await applyCoupon({ code, subtotal: cartSubtotal }))
+      setCouponError('')
+    } catch (e) {
+      setCouponError(e instanceof Error && e.message ? e.message : 'Invalid coupon')
+      setAppliedCoupon(null)
+    } finally {
+      setIsApplyingCoupon(false)
+    }
+  }
+  const handleApplyCoupon = () => {
+    if (couponCode.trim()) runApply(couponCode)
+  }
+  // The cart's coupon arrives as ?couponCode= (and the review-coupon banner applies the same way).
+  const autoApplied = useRef<string | null>(null)
+  const [hintCode, setHintCode] = useState<string | null>(null)
+  const pendingCode = hintCode || couponFromParams
+  useEffect(() => {
+    if (!pendingCode || appliedCoupon || cartSubtotal === 0 || autoApplied.current === pendingCode) return
+    autoApplied.current = pendingCode
+    setCouponCode(pendingCode)
+    applyCoupon({ code: pendingCode, subtotal: cartSubtotal })
+      .then(d => {
+        if (d.couponId) setAppliedCoupon(d)
+      })
+      .catch(() => {})
+  }, [pendingCode, appliedCoupon, cartSubtotal])
+
+  const handleCancelPrevious = async () => {
+    if (!existingOrder) return
+    setCancellingPrevious(true)
+    try {
+      await cancelOrder(existingOrder.id)
+      useCheckoutStore.getState().clearError()
+      showToast('Previous order cancelled. You can now place a new order.', 'success')
+      qc.invalidateQueries({ queryKey: ['orders'] })
+    } catch (e) {
+      useCheckoutStore.getState().fail(e instanceof Error ? e.message : 'Failed to cancel order', existingOrder)
+    } finally {
+      setCancellingPrevious(false)
+    }
   }
 
-  return (
-    <SafeAreaView className="flex-1 bg-gray-50 dark:bg-[#1a1b23]">
-      <View className="flex-row items-center px-4 py-3 border-b border-gray-100 dark:border-[#3f4150] bg-white dark:bg-[#24252f]">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#6B7280" />
-        </TouchableOpacity>
-        <Text className="flex-1 text-center font-bold text-gray-900 dark:text-gray-100 text-base">Order Review</Text>
-        <View className="w-6" />
-      </View>
+  const handleSubmit = () => {
+    useCheckoutStore.getState().clearError()
+    if (!selectedAddress) return showToast('Please select a delivery address', 'info')
+    if (belowMinimum) {
+      return showToast(`Minimum order value is ₹${minOrderAmount}. Add ${money(minOrderAmount - cartSubtotal)} more to proceed.`, 'info')
+    }
+    if (!serviceable) return showToast('Delivery is not available to this pincode. Please use a different delivery address.', 'info')
+    if (noPaymentMethod || (paymentMethod === 'razorpay' && !razorpayEnabled) || (paymentMethod === 'cod' && !codAvailable)) {
+      return showToast('No payment method is available for this order.', 'info')
+    }
+    useCheckoutStore.getState().begin({
+      mode: isBuyNow ? 'buyNow' : 'cart',
+      intent: intentToken,
+      address: selectedAddress,
+      method: paymentMethod,
+      couponId: appliedCoupon?.couponId || null,
+      discountAmount: discountAmount + businessDiscountAmount,
+      shippingAmount: shippingCharge ?? 0,
+      codFeeAmount: codFee,
+      notes,
+      total: finalTotal,
+    })
+    router.push('/checkout/payment')
+  }
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-
-        {/* Delivery Address */}
-        <View className="bg-white dark:bg-[#24252f] rounded-xl border border-gray-200 dark:border-[#3f4150] p-4 mb-4">
-          <View className="flex-row justify-between items-center mb-3">
-            <Text className="font-bold text-gray-900 dark:text-gray-100 text-base">Delivery Address</Text>
-            <TouchableOpacity onPress={() => router.push('/account/addresses')}>
-              <Text className="text-accent-500 text-sm font-semibold">+ Add New</Text>
-            </TouchableOpacity>
+  // ── render ──
+  if (!user || authLoading || cartQ.isLoading || intentPending) {
+    return (
+      <View className="flex-1 bg-surface">
+        <TopNav />
+        {!authLoading && !user ? (
+          <View className="flex-1 items-center justify-center px-8">
+            <Text className="mb-4 text-center text-foreground-secondary">Sign in to review your order</Text>
+            <Pressable onPress={() => router.push('/(auth)/login')} className="rounded-lg bg-accent-500 px-6 py-2.5">
+              <Text className="font-semibold text-white">Sign In</Text>
+            </Pressable>
           </View>
+        ) : (
+          <Pulse className="gap-4 px-4 py-8">
+            <View className="h-6 w-40 rounded bg-surface-elevated" />
+            <View className="h-32 rounded-lg bg-surface-elevated" />
+            <View className="h-48 rounded-lg bg-surface-elevated" />
+            <View className="h-24 rounded-lg bg-surface-elevated" />
+          </Pulse>
+        )}
+      </View>
+    )
+  }
 
-          {addrList.length === 0 ? (
-            <View className="py-4 items-center">
-              <Ionicons name="location-outline" size={40} color="#9CA3AF" />
-              <Text className="text-gray-500 dark:text-gray-400 mb-3 mt-2">No saved addresses</Text>
-              <TouchableOpacity
-                onPress={() => router.push('/account/addresses')}
-                className="bg-accent-500 px-5 py-2.5 rounded-xl"
-              >
-                <Text className="text-white font-semibold">Add Address</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View className="gap-3">
-              {addrList.map((addr) => (
-                <TouchableOpacity
-                  key={addr.id}
-                  onPress={() => setSelectedAddressId(addr.id)}
-                  className={`p-3.5 rounded-xl border-2 ${
-                    selectedAddressId === addr.id
-                      ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                      : 'border-gray-200 dark:border-[#3f4150]'
-                  }`}
-                >
-                  <View className="flex-row items-center gap-2 mb-1">
-                    <View className={`w-4 h-4 rounded-full border-2 items-center justify-center ${
-                      selectedAddressId === addr.id ? 'border-accent-500' : 'border-gray-300'
-                    }`}>
-                      {selectedAddressId === addr.id && (
-                        <View className="w-2 h-2 rounded-full bg-accent-500" />
-                      )}
-                    </View>
-                    <Text className="font-semibold text-gray-900 dark:text-gray-100">{addr.full_name}</Text>
-                    {addr.is_default && (
-                      <View className="bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
-                        <Text className="text-green-700 dark:text-green-400 text-[10px] font-semibold">Default</Text>
-                      </View>
-                    )}
-                    <View className="bg-gray-100 dark:bg-[#3f4150] px-2 py-0.5 rounded-full ml-auto">
-                      <Text className="text-gray-500 dark:text-gray-400 text-[10px] capitalize">{addr.address_type}</Text>
-                    </View>
-                  </View>
-                  <Text className="text-gray-600 dark:text-gray-400 text-sm ml-6">
-                    {addr.address_line1}{addr.address_line2 ? `, ${addr.address_line2}` : ''}
-                  </Text>
-                  {addr.landmark ? (
-                    <Text className="text-gray-500 dark:text-gray-400 text-xs ml-6">Landmark: {addr.landmark}</Text>
-                  ) : null}
-                  <Text className="text-gray-600 dark:text-gray-400 text-sm ml-6">
-                    {addr.city}, {addr.state} {addr.postal_code}
-                  </Text>
-                  <Text className="text-gray-500 dark:text-gray-400 text-sm ml-6">Phone: {addr.phone}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+  const placeDisabled =
+    !selectedAddress ||
+    addresses.length === 0 ||
+    belowMinimum ||
+    isLoadingShipping ||
+    !serviceable ||
+    (paymentMethod === 'cod' && !codAvailable) ||
+    (shippingCharge === null && !shippingError)
+
+  const recapItems = isBuyNow
+    ? [{ name: buyNow!.variantName ? `${buyNow!.productName} ${buyNow!.variantName}` : buyNow!.productName, category: null, brand: buyNow!.brandName ?? null, qty: buyNow!.qty }]
+    : cartItems.map(it => ({
+        name: it.variant?.variant_name ? `${it.products?.name} ${it.variant.variant_name}` : it.products?.name || 'Item',
+        category: null,
+        brand: it.products?.brand_name ?? null,
+        qty: Number(it.quantity) || 1,
+      }))
+
+  return (
+    <View className="flex-1 bg-surface">
+      <TopNav />
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: insets.bottom + 32 }}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="mb-4">
+          <Text className="text-3xl font-bold text-foreground">Order Review</Text>
+          <Text className="mt-2 text-foreground-secondary">Review your order details before placing the order</Text>
         </View>
 
-        {/* Order Items */}
-        <View className="bg-white dark:bg-[#24252f] rounded-xl border border-gray-200 dark:border-[#3f4150] p-4 mb-4">
-          <Text className="font-bold text-gray-900 dark:text-gray-100 text-base mb-3">
-            Order Items ({items.length})
-          </Text>
-          {items.map((item) => {
-            const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-            const price = isCustomQty
-              ? item.price_at_addition
-              : (item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price)
-            const qty = isCustomQty
-              ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}`
-              : String(Math.round(Number(item.quantity)))
-            const itemTotal = Number(price ?? 0) * Number(item.quantity)
-            const imgs = item.products.product_images || []
-            const img = imgs.find((i: any) => i.is_primary) || imgs[0]
+        <View className="gap-4">
+          <View className="gap-6">
+            {recapItems.length > 0 && (
+              <AiInsight
+                kind="recap"
+                className="-mb-2"
+                body={{
+                  cart: recapItems,
+                  total: Math.round((cartSubtotal || 0) * 100) / 100,
+                  itemCount: recapItems.reduce((s, c) => s + c.qty, 0),
+                }}
+              />
+            )}
 
-            return (
-              <View key={item.id} className="flex-row gap-3 py-3 border-b border-gray-100 dark:border-[#3f4150] last:border-b-0">
-                <View className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-[#2e303b] overflow-hidden border border-gray-100 dark:border-[#3f4150] shrink-0">
-                  {img?.thumbnail_url ? (
-                    <>
-                      <Image source={{ uri: img.thumbnail_url }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} contentFit="cover" blurRadius={10} />
-                      <Image source={{ uri: img.thumbnail_url }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} contentFit="contain" />
-                    </>
-                  ) : (
-                    <View className="flex-1 items-center justify-center">
-                      <Ionicons name="image-outline" size={24} color="#9CA3AF" />
-                    </View>
-                  )}
+            {/* Delivery Address */}
+            <View className={CARD}>
+              <View className="mb-4 flex-row items-center justify-between">
+                <Text className="text-xl font-bold text-foreground">Delivery Address</Text>
+                <Pressable onPress={() => setShowAddressModal(true)}>
+                  <Text className="text-sm font-medium text-accent-600 dark:text-accent-400">+ Add New Address</Text>
+                </Pressable>
+              </View>
+
+              {addrQ.isLoading ? (
+                <View className="gap-3">
+                  {[1, 2].map(i => (
+                    <Pulse key={i}>
+                      <View className="h-20 rounded-lg border border-border-default bg-surface" />
+                    </Pulse>
+                  ))}
+                </View>
+              ) : addresses.length === 0 ? (
+                <View className="items-center py-8">
+                  <View className="mb-4">
+                    <MapPin size={64} color={t.foregroundMuted} strokeWidth={1} />
+                  </View>
+                  <Text className="mb-4 text-foreground-secondary">No saved addresses found</Text>
+                  <Pressable onPress={() => setShowAddressModal(true)} className="rounded-lg bg-accent-500 px-6 py-2 active:bg-accent-600">
+                    <Text className="font-medium text-white">Add Delivery Address</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View className="gap-3">
+                  {addresses.map(address => {
+                    const selected = selectedAddress?.id === address.id
+                    return (
+                      <Pressable
+                        key={address.id}
+                        onPress={() => setSelectedAddress(address)}
+                        className={`flex-row items-start gap-4 rounded-lg border-2 p-4 ${selected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default'}`}
+                      >
+                        <Radio checked={selected} className="mt-1" />
+                        <View className="flex-1">
+                          <View className="mb-1 flex-row flex-wrap items-center gap-2">
+                            <Text className="font-semibold text-foreground">{address.full_name}</Text>
+                            {address.is_default ? (
+                              <View className="rounded bg-green-100 px-2 py-0.5 dark:bg-green-900/30">
+                                <Text className="text-xs text-green-800 dark:text-green-300">Default</Text>
+                              </View>
+                            ) : null}
+                            <View className="rounded bg-surface-secondary px-2 py-0.5">
+                              <Text className="text-xs capitalize text-foreground-secondary">{address.address_type}</Text>
+                            </View>
+                          </View>
+                          <Text className="text-sm text-foreground-secondary">
+                            {address.address_line1}
+                            {address.address_line2 ? `, ${address.address_line2}` : ''}
+                          </Text>
+                          {address.landmark ? <Text className="text-sm text-foreground-secondary">Landmark: {address.landmark}</Text> : null}
+                          <Text className="text-sm text-foreground-secondary">
+                            {address.city}, {address.state} {address.postal_code}
+                          </Text>
+                          <Text className="mt-1 text-sm text-foreground-secondary">Phone: {address.phone}</Text>
+                        </View>
+                      </Pressable>
+                    )
+                  })}
+                </View>
+              )}
+            </View>
+
+            {/* Order Items */}
+            <View className={CARD}>
+              <Text className="mb-6 text-xl font-bold text-foreground">
+                {isBuyNow ? 'Item' : `Order Items (${cartCount} ${cartCount === 1 ? 'item' : 'items'})`}
+              </Text>
+              <View className="gap-4">
+                {isBuyNow ? (
+                  <BuyNowReviewRow item={buyNow!} imageUrl={imageQ.data ?? null} gstEnabled={gstEnabled} />
+                ) : (
+                  cartItems.map((item, i) => (
+                    <CartReviewRow key={item.id} item={item} gstEnabled={gstEnabled} last={i === cartItems.length - 1} />
+                  ))
+                )}
+              </View>
+              {!isBuyNow && (
+                <Pressable onPress={() => router.navigate('/(tabs)/cart')} className="mt-4">
+                  <Text className="text-center font-medium text-accent-600 dark:text-accent-400">← Modify Cart</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Expected Delivery Date */}
+            <View className="rounded-lg border border-border-default bg-surface-elevated p-4">
+              <View className="flex-row items-start gap-4">
+                <View className="mt-0.5">
+                  <Truck size={32} color={t.accent500} strokeWidth={1.5} />
                 </View>
                 <View className="flex-1">
-                  <Text className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-snug" numberOfLines={2}>
-                    {item.products.name}
-                  </Text>
-                  {item.variant && (
-                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.variant.variant_name}</Text>
+                  {allDigital ? (
+                    <>
+                      <Text className="text-sm text-foreground-secondary">Delivery</Text>
+                      <Text className="text-lg font-semibold text-foreground">Delivered to your vault</Text>
+                      <Text className="text-sm text-foreground-muted">Available to open as soon as payment completes</Text>
+                    </>
+                  ) : !selectedAddress ? (
+                    <Text className="text-sm text-foreground-muted">Select a delivery address to see expected delivery date</Text>
+                  ) : eddQ.isLoading ? (
+                    <Pulse>
+                      <View className="h-5 w-48 rounded bg-border-default" />
+                    </Pulse>
+                  ) : eddQ.data?.edd ? (
+                    <>
+                      <Text className="text-sm text-foreground-secondary">Expected Delivery</Text>
+                      <Text className="text-lg font-semibold text-foreground">{eddLabel(eddQ.data.edd)}</Text>
+                    </>
+                  ) : (
+                    <Text className="text-sm text-foreground-muted">Delivery date unavailable for this pincode</Text>
                   )}
-                  <Text className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {qty}
-                  </Text>
-                  <Text className="text-sm font-bold text-gray-900 dark:text-gray-100 mt-1">
-                    ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </Text>
                 </View>
               </View>
-            )
-          })}
-        </View>
+            </View>
 
-        {/* Order Summary */}
-        <View className="bg-white dark:bg-[#24252f] rounded-xl border border-gray-200 dark:border-[#3f4150] p-4 mb-4">
-          <Text className="font-bold text-gray-900 dark:text-gray-100 text-base mb-3">Order Summary</Text>
-          <View className="flex-row justify-between mb-2">
-            <Text className="text-gray-500 dark:text-gray-400">Subtotal ({items.length} items)</Text>
-            <Text className="font-medium text-gray-900 dark:text-gray-100">
-              ₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </Text>
+            {/* Delivery Promise */}
+            {!allDigital && (
+              <View className="rounded-lg border border-border-default bg-surface-elevated p-4">
+                <View className="flex-row items-start gap-4">
+                  <View className="mt-0.5">
+                    <Copy size={32} color={t.accent500} strokeWidth={1.5} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="mb-2 font-semibold text-foreground">Our Delivery Promise</Text>
+                    <View className="gap-1.5">
+                      {PROMISES.map(p => (
+                        <View key={p} className="flex-row items-center gap-2">
+                          <Check size={16} color={status.success} strokeWidth={3} />
+                          <Text className="flex-1 text-sm text-foreground-secondary">{p}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
-          <View className="flex-row justify-between mb-3">
-            <Text className="text-gray-500 dark:text-gray-400">Delivery</Text>
-            <Text className="font-semibold text-green-600">FREE</Text>
-          </View>
-          <View className="flex-row justify-between pt-3 border-t border-gray-100 dark:border-[#3f4150]">
-            <Text className="font-bold text-gray-900 dark:text-gray-100 text-base">Total</Text>
-            <Text className="font-bold text-accent-500 text-base">
-              ₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </Text>
-          </View>
-          <Text className="text-xs text-gray-400 mt-1">Price inclusive of all taxes</Text>
-        </View>
 
+          {/* Order Summary */}
+          <View className={CARD}>
+            <Text className="mb-6 text-xl font-bold text-foreground">Order Summary</Text>
+
+            <View className="mb-6 gap-3">
+              <View className="flex-row justify-between">
+                <Text className="text-foreground-secondary">Subtotal{!isBuyNow ? ` (${cartCount} items)` : ''}</Text>
+                <Text className="text-foreground-secondary">{money(cartSubtotal)}</Text>
+              </View>
+              {!isBuyNow && gstEnabled && (
+                <View className="flex-row justify-between">
+                  <Text className="text-sm text-foreground-muted">Incl. GST</Text>
+                  <Text className="text-sm text-foreground-muted">{money(tax)}</Text>
+                </View>
+              )}
+              {appliedCoupon && (
+                <View className="flex-row justify-between">
+                  <Text className="text-sm font-medium text-green-600 dark:text-green-400">Coupon ({appliedCoupon.code})</Text>
+                  <Text className="text-sm font-medium text-green-600 dark:text-green-400">−{money(appliedCoupon.discountAmount)}</Text>
+                </View>
+              )}
+              {businessDiscountAmount > 0 && (
+                <View className="flex-row justify-between">
+                  <Text className="text-sm font-medium text-green-600 dark:text-green-400">Business Discount</Text>
+                  <Text className="text-sm font-medium text-green-600 dark:text-green-400">−{money(businessDiscountAmount)}</Text>
+                </View>
+              )}
+              <View className="flex-row items-center justify-between">
+                <Text className="text-foreground-secondary">Delivery Charges</Text>
+                {allDigital ? (
+                  <Text className="font-medium text-green-600 dark:text-green-400">Delivered to your vault</Text>
+                ) : isLoadingShipping ? (
+                  <Pulse>
+                    <Text className="text-sm text-foreground-muted">Calculating...</Text>
+                  </Pulse>
+                ) : shippingError ? (
+                  <Text className="text-sm text-yellow-600 dark:text-yellow-400">Unavailable</Text>
+                ) : shippingCharge != null ? (
+                  shippingCharge === 0 ? (
+                    <Text className="font-medium text-green-600 dark:text-green-400">Free</Text>
+                  ) : (
+                    <Text className="font-medium text-foreground-secondary">{money(shippingCharge)}</Text>
+                  )
+                ) : (
+                  <Text className="text-sm text-foreground-muted">Select address</Text>
+                )}
+              </View>
+              {shippingCharge === 0 && shippingMeta?.source === 'free_threshold' && shippingMeta.freeShippingThreshold ? (
+                <Text className="-mt-1 text-xs text-green-600 dark:text-green-400">
+                  Free delivery on orders above ₹{shippingMeta.freeShippingThreshold.toLocaleString('en-IN')}
+                </Text>
+              ) : null}
+              {shippingCharge === 0 && shippingMeta?.source === 'admin_disabled' ? (
+                <Text className="-mt-1 text-xs text-green-600 dark:text-green-400">Free delivery on every order</Text>
+              ) : null}
+              {isCod && codFee > 0 && (
+                <View className="flex-row justify-between">
+                  <Text className="text-sm text-foreground-secondary">COD handling fee</Text>
+                  <Text className="text-sm text-foreground-secondary">{money(codFee)}</Text>
+                </View>
+              )}
+              <View className="border-t border-border-default pt-3">
+                <View className="flex-row justify-between">
+                  <Text className="text-xl font-bold text-foreground">Total</Text>
+                  <Text className="text-xl font-bold text-foreground">{money(finalTotal)}</Text>
+                </View>
+                {gstEnabled && <Text className="mt-1 text-xs text-foreground-muted">Price inclusive of all taxes</Text>}
+              </View>
+            </View>
+
+            {/* Coupon */}
+            <View className="mb-6">
+              {appliedCoupon ? (
+                <View className="flex-row items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800 dark:bg-green-900/20">
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code}</Text>
+                    {appliedCoupon.description ? (
+                      <Text className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</Text>
+                    ) : null}
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      setAppliedCoupon(null)
+                      setCouponCode('')
+                      setCouponError('')
+                    }}
+                    className="ml-3"
+                  >
+                    <Text className="text-xs font-medium text-red-500">Remove</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View>
+                  <CouponHintBanner hidden={!!couponFromParams || !!hintCode} onApply={setHintCode} />
+                  <Text className="mb-1.5 text-sm font-medium text-foreground-secondary">Have a coupon?</Text>
+                  <View className="flex-row gap-2">
+                    <TextInput
+                      value={couponCode}
+                      onChangeText={v => {
+                        setCouponCode(v.toUpperCase())
+                        setCouponError('')
+                      }}
+                      onSubmitEditing={handleApplyCoupon}
+                      placeholder="Enter code"
+                      placeholderTextColor={t.foregroundMuted}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      className="flex-1 rounded-lg border border-border-secondary bg-surface px-3 py-2 text-sm text-foreground"
+                    />
+                    <Pressable
+                      onPress={handleApplyCoupon}
+                      disabled={isApplyingCoupon || !couponCode.trim()}
+                      className={`justify-center rounded-lg px-4 py-2 ${isApplyingCoupon || !couponCode.trim() ? 'bg-accent-300' : 'bg-accent-500 active:bg-accent-600'}`}
+                    >
+                      <Text className="text-sm font-semibold text-white">{isApplyingCoupon ? '...' : 'Apply'}</Text>
+                    </Pressable>
+                  </View>
+                  {couponError ? <Text className="mt-1 text-xs text-red-500">{couponError}</Text> : null}
+                </View>
+              )}
+            </View>
+
+            {belowMinimum && (
+              <Text className="mb-3 text-center text-xs font-medium text-red-500">
+                Minimum order ₹{minOrderAmount} — add {money(minOrderAmount - cartSubtotal)} more to proceed.
+              </Text>
+            )}
+
+            {/* Order Notes */}
+            <View className="mb-4">
+              <Text className="mb-1.5 text-sm font-medium text-foreground-secondary">Order Notes (Optional)</Text>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                placeholder="Any special instructions..."
+                placeholderTextColor={t.foregroundMuted}
+                className="min-h-[72px] w-full rounded-lg border border-border-secondary bg-surface px-3 py-2 text-sm text-foreground"
+              />
+            </View>
+
+            {/* Payment Method */}
+            <View className="mb-4 gap-2">
+              <Text className="text-sm font-medium text-foreground-secondary">Payment Method</Text>
+              {razorpayEnabled && (
+                <Pressable
+                  onPress={() => setPaymentMethod('razorpay')}
+                  className={`flex-row items-center gap-3 rounded-lg border-2 p-3 ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default'}`}
+                >
+                  <Radio checked={paymentMethod === 'razorpay'} />
+                  <View>
+                    <Text className="text-sm font-semibold text-foreground">Pay Online</Text>
+                    <Text className="text-xs text-foreground-secondary">UPI, Cards, Net Banking</Text>
+                  </View>
+                </Pressable>
+              )}
+              {codAvailable && (
+                <Pressable
+                  onPress={() => setPaymentMethod('cod')}
+                  className={`flex-row items-center gap-3 rounded-lg border-2 p-3 ${paymentMethod === 'cod' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default'}`}
+                >
+                  <Radio checked={paymentMethod === 'cod'} />
+                  <View>
+                    <Text className="text-sm font-semibold text-foreground">Cash on Delivery</Text>
+                    <Text className="text-xs text-foreground-secondary">Pay when your order arrives</Text>
+                  </View>
+                </Pressable>
+              )}
+              {noPaymentMethod && <Text className="text-xs text-red-600 dark:text-red-400">No payment method is available for this order.</Text>}
+              {!serviceable && (
+                <Text className="text-xs text-red-600 dark:text-red-400">
+                  Delivery is not available to this pincode. Please use a different delivery address.
+                </Text>
+              )}
+            </View>
+
+            {submitError ? (
+              <View className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-800 dark:bg-red-900/30">
+                <Text className="text-sm text-red-700 dark:text-red-300">{submitError}</Text>
+                {existingOrder && (
+                  <View className="mt-2 flex-row flex-wrap gap-2">
+                    <Pressable
+                      onPress={() => router.push(`/orders/${existingOrder.id}`)}
+                      className="rounded-lg bg-accent-500 px-3 py-1.5 active:bg-accent-600"
+                    >
+                      <Text className="text-xs font-medium text-white">Go to Order #{existingOrder.orderNumber}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={handleCancelPrevious}
+                      disabled={cancellingPrevious}
+                      className={`rounded-lg px-3 py-1.5 ${cancellingPrevious ? 'bg-red-300' : 'bg-red-600 active:bg-red-700'}`}
+                    >
+                      <Text className="text-xs font-medium text-white">{cancellingPrevious ? 'Cancelling...' : 'Cancel Previous Order'}</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            ) : null}
+
+            {noPaymentMethod ? (
+              <View className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-800 dark:bg-red-900/30">
+                <Text className="text-sm text-red-700 dark:text-red-300">
+                  We are unable to accept orders right now due to a technical issue. Please try again later or contact support.
+                </Text>
+              </View>
+            ) : (
+              <Pressable
+                onPress={handleSubmit}
+                disabled={placeDisabled}
+                className={`w-full flex-row items-center justify-center rounded-lg px-6 py-3 ${placeDisabled ? 'bg-gray-300 dark:bg-gray-700' : 'bg-accent-500 active:bg-accent-600'}`}
+              >
+                {isLoadingShipping ? (
+                  <>
+                    <ActivityIndicator size="small" color={status.white} />
+                    <Text className="ml-2 font-semibold text-white">Calculating delivery…</Text>
+                  </>
+                ) : paymentMethod === 'razorpay' && razorpayEnabled ? (
+                  <>
+                    <ShieldCheck size={20} color={status.white} strokeWidth={2} />
+                    <Text className="ml-2 font-semibold text-white">Pay {money(finalTotal)}</Text>
+                  </>
+                ) : paymentMethod === 'cod' ? (
+                  <>
+                    <Text className="font-semibold text-white">Place Order — Pay on Delivery</Text>
+                    <View className="ml-2">
+                      <Banknote size={20} color={status.white} strokeWidth={2} />
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text className="font-semibold text-white">Place Order</Text>
+                    <View className="ml-2">
+                      <Check size={20} color={status.white} strokeWidth={2} />
+                    </View>
+                  </>
+                )}
+              </Pressable>
+            )}
+
+            {isBuyNow ? (
+              <Pressable onPress={() => router.back()} className="mt-4">
+                <Text className="text-center font-medium text-foreground-secondary">← Go Back</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => router.navigate('/(tabs)/cart')} className="mt-4">
+                <Text className="text-center font-medium text-foreground-secondary">← Back to Cart</Text>
+              </Pressable>
+            )}
+
+            <View className="mt-6 border-t border-border-default pt-6">
+              <View className="flex-row items-center gap-2">
+                <ShieldCheck size={20} color={status.success} strokeWidth={2} />
+                <Text className="text-sm text-foreground-secondary">Secure Checkout</Text>
+              </View>
+            </View>
+          </View>
+        </View>
       </ScrollView>
 
-      <View className="bg-white dark:bg-[#24252f] border-t border-gray-100 dark:border-[#3f4150] px-4 py-4">
-        <TouchableOpacity
-          onPress={handleContinue}
-          disabled={!selectedAddressId || addrList.length === 0}
-          className="bg-accent-500 py-4 rounded-xl items-center flex-row justify-center gap-2 disabled:opacity-50"
-        >
-          <Text className="text-white font-bold text-base">Continue to Payment</Text>
-          <Ionicons name="arrow-forward" size={18} color="white" />
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      <AddressFormModal
+        isOpen={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        onSaved={address => {
+          setShowAddressModal(false)
+          setSelectedAddress(address)
+          invalidateEddCache()
+          qc.invalidateQueries({ queryKey: ['addresses'] })
+        }}
+      />
+    </View>
   )
 }
+
