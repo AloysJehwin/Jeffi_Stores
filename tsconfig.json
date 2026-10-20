@@ -23,5 +23,5 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "controller-service/.next/types/**/*.ts", "next-env.d.ts"],
-  "exclude": ["node_modules", "ai-platform", "packages", "messaging-service", "document-service", "public-api-service"]
+  "exclude": ["node_modules", "ai-platform", "packages", "messaging-service", "document-service", "public-api-service", "mobile-service"]
 }

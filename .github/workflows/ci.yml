@@ -83,7 +83,7 @@ jobs:
         name: Did this release touch the mobile app
         if: steps.mode.outputs.release == 'true'
         # A merge commit's first parent is the previous main, so this spans the whole merged PR.
-        run: echo "changed=$(git diff --quiet HEAD^1 HEAD -- mobile-service && echo false || echo true)" >> "$GITHUB_OUTPUT"
+        run: echo "changed=$(git diff --quiet HEAD^1 HEAD -- mobile-service/client && echo false || echo true)" >> "$GITHUB_OUTPUT"
       - id: notes
         name: What this release changes
         if: steps.mode.outputs.release == 'true'
@@ -124,6 +124,7 @@ jobs:
           - { app: messaging, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts messaging-service/src }
           - { app: documents, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts document-service/src }
           - { app: public-api, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts public-api-service/src }
+          - { app: mobile, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts mobile-service/src }
           - { app: ai-gateway, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts ai-platform/gateway/src ai-platform/sdk }
     steps:
       - uses: actions/checkout@v4
@@ -142,8 +143,9 @@ jobs:
           - { app: messaging, run: npm --prefix messaging-service run typecheck }
           - { app: documents, run: npm --prefix document-service run typecheck }
           - { app: public-api, run: npm --prefix public-api-service run typecheck }
+          - { app: mobile, run: npm --prefix mobile-service run typecheck }
           - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform run typecheck }
-          - { app: mobile, install: npm --prefix mobile-service ci, run: npm --prefix mobile-service run typecheck }
+          - { app: mobile-app, install: npm --prefix mobile-service/client ci, run: npm --prefix mobile-service/client run typecheck }
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -182,6 +184,7 @@ jobs:
           - { app: messaging, run: npm --prefix messaging-service test }
           - { app: documents, run: npm --prefix document-service test }
           - { app: public-api, run: npm --prefix public-api-service test -- --passWithNoTests }
+          - { app: mobile, run: npm --prefix mobile-service test -- --passWithNoTests }
           - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform test }
     steps:
       - uses: actions/checkout@v4
@@ -221,6 +224,7 @@ jobs:
           - { app: messaging, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target messaging . }
           - { app: documents, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target documents . }
           - { app: public-api, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target public-api . }
+          - { app: mobile, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target mobile . }
           - { app: ai-gateway, runner: ubuntu-24.04-arm, kind: image, args: -f ai-platform/gateway/Dockerfile ai-platform }
     steps:
       - uses: actions/checkout@v4
@@ -260,7 +264,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        service: [controller, messaging, documents, public-api]
+        service: [controller, messaging, documents, public-api, mobile]
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -386,7 +390,7 @@ jobs:
         with: { fetch-depth: 0 } # the release tag is computed from history
       - uses: ./.github/actions/release-setup
         with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
-      - name: Controller, messaging, documents, public-api and CronJobs at the release tag
+      - name: Controller, messaging, documents, public-api, mobile and CronJobs at the release tag
         run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform ${{ env.DRY_FLAG }}
 
   smoke-flagship:
@@ -491,9 +495,9 @@ jobs:
         run: bash deploy/k8s/bootstrap/smoke.sh "${TAG#local-}" tenants ${{ env.DRY_FLAG }}
 
   # ── Mobile ───────────────────────────────────────────────────────────────────────────────────
-  # The Play Store release rides the same approval as the web: after `production` is approved, EAS
+  # The Play Store app (mobile-service/client) rides the same approval as the web: after `production` is approved, EAS
   # builds the signed app bundle in Expo's cloud (versionCode auto-incremented there) and submits it
-  # to the Play internal track. Only when the merge touched mobile-service. Needs the repo secrets
+  # to the Play internal track. Only when the merge touched mobile-service/client. Needs the repo secrets
   # EXPO_TOKEN and GOOGLE_PLAY_SERVICE_ACCOUNT_JSON; without the latter it builds but does not submit.
   mobile-android:
     name: Mobile · Android
@@ -507,10 +511,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: mobile-service/package-lock.json
-      - run: npm --prefix mobile-service ci
+          cache-dependency-path: mobile-service/client/package-lock.json
+      - run: npm --prefix mobile-service/client ci
       - name: Build the app bundle and submit it to Play (internal track)
-        working-directory: mobile-service
+        working-directory: mobile-service/client
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           PLAY_SA: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}

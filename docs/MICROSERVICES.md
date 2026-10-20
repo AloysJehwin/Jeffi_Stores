@@ -9,9 +9,10 @@ Services:
 - `messaging-service` (SMS/email/WhatsApp send + templates library)
 - `document-service` (invoice/quotation/PO rendering + storage)
 - `public-api-service` (the public API gateway, `public.jeffistores.in`)
+- `mobile-service` (the mobile backend, `mobile.jeffistores.in`: the only host the Play Store app talks to; `/v1/app/*` is native, `/api/*` is forwarded to the controller in-cluster until each route gets its own handler). The Expo app itself lives in `mobile-service/client` and is built by EAS, not in an image.
 
 Each runs as its own k8s pod. The platform's are `jeffi-stores-<service>-service` (namespace `jeffi`); each store
-tenant runs `{slug}-{controller,messaging,document}-service` in `tenant-{slug}`, and public-api is shared.
+tenant runs `{slug}-{controller,messaging,document}-service` in `tenant-{slug}`; public-api and mobile are shared.
 
 Every service connects to **the same database**:
 - **Local**: `jeffi_production_ready` (port 5432)

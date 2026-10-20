@@ -12,7 +12,7 @@ st = d["Statement"] if isinstance(d["Statement"], list) else [d["Statement"]]
 acts = lambda s: s["Action"] if isinstance(s["Action"], list) else [s["Action"]]
 s = next(x for x in st if "secretsmanager:GetSecretValue" in acts(x))
 r = s["Resource"] if isinstance(s["Resource"], list) else [s["Resource"]]
-for n in ("messaging", "documents", "public-api"):
+for n in ("messaging", "documents", "public-api", "mobile"):
     a = "arn:aws:secretsmanager:us-east-1:708835965056:secret:jeffi/%s/production*" % n
     if a not in r:
         r.append(a)

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Roll a release, in phases (ci.yml runs each as its own job; no phase = all three, in order):
-#   platform   the platform (controller, messaging, document and public-api services, CronJobs)
+#   platform   the platform (controller, messaging, document, public-api and mobile services, CronJobs)
 #   tenant-db  the schema and migration files fanned out to every store tenant's database (40-tenant-fanout.sh);
 #              tenant-schema / tenant-migrations run just one half (the pipeline's separate stages)
 #   stores     every store: the controller re-applies its namespace at the release images (its controller,
@@ -12,7 +12,7 @@ TAG=${1:?tag}
 PHASE=all
 for a in "${@:2}"; do case $a in platform|tenant-db|tenant-schema|tenant-migrations|stores) PHASE=$a ;; esac; done
 REG='708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com'
-PLATFORM=($CTRL jeffi-stores-messaging-service jeffi-stores-document-service jeffi-stores-public-api-service)
+PLATFORM=($CTRL jeffi-stores-messaging-service jeffi-stores-document-service jeffi-stores-public-api-service jeffi-stores-mobile-service)
 k8s_tunnel
 manifests() { kubectl kustomize "$REPO/deploy/k8s/platform" | sed -E "s#(${REG}/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:${TAG}#g"; }
 tenants() { kubectl get ns -l jeffi.io/tier=tenant -o jsonpath='{.items[*].metadata.name}'; }

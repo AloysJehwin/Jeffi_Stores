@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build one service image (arm64) and push it to ECR; skipped when the tag is already there.
-# Usage: build-push-ecr.sh <controller|messaging|documents|public-api> <tag> [context-dir]
+# Usage: build-push-ecr.sh <controller|messaging|documents|public-api|mobile> <tag> [context-dir]
 #   context-dir defaults to the repo root (release.sh passes a `git archive` copy).
 # Only NEXT_PUBLIC_* values are read from Secrets Manager (they ship in the browser bundle anyway).
 set -euo pipefail
@@ -14,6 +14,7 @@ case $SERVICE in
   messaging)  REPO=jeffi-stores-messaging-service;  BUILD=(-f deploy/services.Dockerfile --target messaging) ;;
   documents)  REPO=jeffi-stores-document-service;   BUILD=(-f deploy/services.Dockerfile --target documents) ;;
   public-api) REPO=jeffi-stores-public-api-service; BUILD=(-f deploy/services.Dockerfile --target public-api) ;;
+  mobile)     REPO=jeffi-stores-mobile-service;     BUILD=(-f deploy/services.Dockerfile --target mobile) ;;
   *) echo "unknown service $SERVICE" >&2; exit 1 ;;
 esac
 IMAGE=$REGISTRY/$REPO:$TAG
