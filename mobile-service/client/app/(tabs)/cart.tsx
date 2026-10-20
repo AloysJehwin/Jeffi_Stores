@@ -193,8 +193,8 @@ export default function CartScreen() {
             <View className="mb-6">
               <ShoppingCart size={96} color={t.foregroundMuted} strokeWidth={1} />
             </View>
-            <Text className="mb-2 text-2xl font-bold text-foreground">Your cart is empty</Text>
-            <Text className="mb-6 text-center text-foreground-secondary">Start shopping to add items to your cart</Text>
+            <Text className="mb-2 self-stretch text-center text-2xl font-bold text-foreground">Your cart is empty</Text>
+            <Text className="mb-6 self-stretch text-center text-foreground-secondary">Start shopping to add items to your cart</Text>
             <Pressable onPress={() => openHref(router, '/products')} className="rounded-lg bg-accent-500 px-8 py-3 active:bg-accent-600">
               <Text className="font-semibold text-white">Browse Products</Text>
             </Pressable>

@@ -5,7 +5,7 @@ import { googleAuth, googleSignInIdToken, GOOGLE_WEB_CLIENT_ID, requestOtp, type
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { AuthShell, ChannelSelector, CHANNELS, GoogleButton } from '../../src/components/account/AuthShell'
 import { ErrorBox, Input, Label, PhoneInput, PrimaryButton } from '../../src/components/account/ui'
-import { useFeatureFlags, useSignOut } from '../../src/components/account/hooks'
+import { useFeatureFlags, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
 import { finishSignIn, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
 
@@ -13,6 +13,7 @@ import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
 
 export default function LoginScreen() {
   const router = useRouter()
+  useLeaveIfSignedIn()
   const config = useStoreConfig()
   const flags = useFeatureFlags()
   const signOut = useSignOut()
