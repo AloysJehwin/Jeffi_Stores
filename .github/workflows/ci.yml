@@ -63,6 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.mode.outputs.release }}
+      mobile: ${{ steps.mobile.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,6 +79,11 @@ jobs:
       - id: mode
         name: Release or checks only
         run: echo "release=${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy) }}" >> "$GITHUB_OUTPUT"
+      - id: mobile
+        name: Did this release touch the mobile app
+        if: steps.mode.outputs.release == 'true'
+        # A merge commit's first parent is the previous main, so this spans the whole merged PR.
+        run: echo "changed=$(git diff --quiet HEAD^1 HEAD -- mobile-service && echo false || echo true)" >> "$GITHUB_OUTPUT"
       - id: notes
         name: What this release changes
         if: steps.mode.outputs.release == 'true'
@@ -137,6 +143,7 @@ jobs:
           - { app: documents, run: npm --prefix document-service run typecheck }
           - { app: public-api, run: npm --prefix public-api-service run typecheck }
           - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform run typecheck }
+          - { app: mobile, install: npm --prefix mobile-service ci, run: npm --prefix mobile-service run typecheck }
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -483,10 +490,43 @@ jobs:
       - name: Every running store's health at the release commit
         run: bash deploy/k8s/bootstrap/smoke.sh "${TAG#local-}" tenants ${{ env.DRY_FLAG }}
 
+  # ── Mobile ───────────────────────────────────────────────────────────────────────────────────
+  # The Play Store release rides the same approval as the web: after `production` is approved, EAS
+  # builds the signed app bundle in Expo's cloud (versionCode auto-incremented there) and submits it
+  # to the Play internal track. Only when the merge touched mobile-service. Needs the repo secrets
+  # EXPO_TOKEN and GOOGLE_PLAY_SERVICE_ACCOUNT_JSON; without the latter it builds but does not submit.
+  mobile-android:
+    name: Mobile · Android
+    runs-on: ubuntu-latest
+    needs: checks
+    if: needs.init.outputs.release == 'true' && needs.init.outputs.mobile == 'true'
+    environment: production-release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile-service/package-lock.json
+      - run: npm --prefix mobile-service ci
+      - name: Build the app bundle and submit it to Play (internal track)
+        working-directory: mobile-service
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          PLAY_SA: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          [ -n "$EXPO_TOKEN" ] || { echo "::error::EXPO_TOKEN secret is not set"; exit 1; }
+          submit=()
+          if [ -n "$PLAY_SA" ]; then printf '%s' "$PLAY_SA" > play-service-account.json; submit=(--auto-submit); else echo "::warning::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON not set — building only; upload the .aab to Play Console by hand"; fi
+          npx eas-cli build --platform android --profile production --non-interactive "${submit[@]}" | tee build.log
+          url=$(grep -oE 'https://expo.dev/accounts/[^ ]+/builds/[0-9a-f-]+' build.log | tail -1 || true)
+          { echo "## Mobile · Android"; echo; echo "- EAS build: ${url:-see log}"; [ -n "$PLAY_SA" ] && echo "- Submitted to the Play **internal** track; promote it in Play Console." || echo "- Not submitted (no Play service account secret)."; } >> "$GITHUB_STEP_SUMMARY"
+
   post:
     name: Post
     runs-on: ubuntu-latest
-    needs: [smoke-tenants, cdn, smoke-ai-gateway]
+    needs: [smoke-tenants, cdn, smoke-ai-gateway, mobile-android]
     if: always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy))
     permissions: { actions: read, contents: read }
     steps:
