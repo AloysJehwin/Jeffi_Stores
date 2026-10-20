@@ -3,7 +3,7 @@
 import { useColorScheme } from 'nativewind'
 import tokens from '../../../packages/design-tokens'
 
-export const { primary, secondary, accent, schemes, radius } = tokens
+export const { primary, secondary, accent, schemes, status, radius } = tokens
 export type Scheme = typeof schemes.light
 
 export const fonts = { bebas: 'BebasNeue-Regular', inter: 'Inter' }

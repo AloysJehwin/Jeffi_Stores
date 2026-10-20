@@ -1,109 +1,189 @@
-import { View, Text, TouchableOpacity } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Pressable, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { addToWishlist } from '../../api/wishlist'
-import type { Product } from '../../types'
+import { Heart, ImageIcon } from 'lucide-react-native'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
+import QuickAddButton from './QuickAddButton'
+import { useStoreConfig } from '../../hooks/useStoreConfig'
+import { useWishlistToggle } from '../../hooks/useWishlist'
+import { useAuthStore } from '../../stores/authStore'
+import { resolveEdd } from '../../lib/edd'
+import { inr, shortDate } from '../../lib/format'
+import { status, useTokens } from '../../theme'
+import type { CardProduct } from '../../types/home'
 
-interface ProductCardProps {
-  product: Product
+// Mirror of controller-service components/visitor/ProductCard.tsx at the mobile breakpoint.
+
+function SaleRibbon() {
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', top: 16, right: -16, width: 80, transform: [{ rotate: '45deg' }], zIndex: 10 }}
+    >
+      <Svg width={80} height={14} style={{ position: 'absolute' }}>
+        <Defs>
+          <LinearGradient id="sale" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor={status.saleFrom} />
+            <Stop offset="1" stopColor={status.saleTo} />
+          </LinearGradient>
+        </Defs>
+        <Rect width={80} height={14} fill="url(#sale)" />
+      </Svg>
+      <Text className="text-center font-bold text-white" style={{ fontSize: 8, lineHeight: 14 }}>
+        SALE
+      </Text>
+    </View>
+  )
 }
 
-export default function ProductCard({ product }: ProductCardProps) {
+function Pill({ label, className }: { label: string; className: string }) {
+  return (
+    <View className={`rounded-full px-2 py-0.5 ${className}`}>
+      <Text className="text-xs font-semibold text-white">{label}</Text>
+    </View>
+  )
+}
+
+export default function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; handlingDays?: number }) {
   const router = useRouter()
-  const qc = useQueryClient()
+  const t = useTokens()
+  const user = useAuthStore(s => s.user)
+  const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
+  const digital = digitalProductsEnabled && product.isDigital
+  const inStock = digital || product.effectiveStock > 0
+  const { inWishlist, toggle, pending } = useWishlistToggle(product.id)
+  const [edd, setEdd] = useState<string | null>(null)
+  const img = product.primaryImage
 
-  const primaryImage = product.product_images?.find((i) => i.is_primary) || product.product_images?.[0]
-  const displayPrice = product.has_variants
-    ? (product.variant_min_price ?? product.base_price)
-    : (product.sale_price ?? product.base_price)
-  const mrp = product.mrp ? Number(product.mrp) : null
-  const discount = mrp && mrp > Number(displayPrice)
-    ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
-    : 0
-  const effectiveStock = product.has_variants
-    ? Number(product.variant_stock_total ?? 0)
-    : product.stock_quantity
-
-  const wishlistMutation = useMutation({
-    mutationFn: () => addToWishlist(product.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['wishlist'] }),
-  })
+  useEffect(() => {
+    if (digital) return
+    let live = true
+    resolveEdd(!!user, handlingDays, product.extraDeliveryDays).then(v => {
+      if (live && v) setEdd(v)
+    })
+    return () => {
+      live = false
+    }
+  }, [digital, user, handlingDays, product.extraDeliveryDays])
 
   return (
-    <TouchableOpacity
+    <Pressable
       onPress={() => router.push(`/product/${product.slug}`)}
-      className="bg-white dark:bg-[#24252f] rounded-xl border border-gray-200 dark:border-[#3f4150] overflow-hidden"
-      activeOpacity={0.85}
+      className="flex-1 flex-col overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm"
     >
-      <View className="relative">
-        <View className="aspect-[4/3] border-b border-gray-100 dark:border-[#3f4150] overflow-hidden bg-gray-50 dark:bg-[#2e303b]">
-          {primaryImage ? (
+      <View className="px-3 pt-3">
+        <View
+          className="relative w-full overflow-hidden rounded-lg border-2 border-gray-300 dark:border-gray-600"
+          style={{ aspectRatio: 5 / 3 }}
+        >
+          {img ? (
             <>
               <Image
-                source={{ uri: primaryImage.image_url || primaryImage.thumbnail_url }}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                source={{ uri: img.image_url }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  opacity: 0.6,
+                  transform: [{ scale: 1.1 }],
+                }}
                 contentFit="cover"
-                blurRadius={18}
+                blurRadius={24}
               />
               <Image
-                source={{ uri: primaryImage.image_url || primaryImage.thumbnail_url }}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                source={{ uri: img.image_url }}
+                placeholder={img.blurhash ? { blurhash: img.blurhash } : undefined}
+                style={{ width: '100%', height: '100%' }}
                 contentFit="contain"
+                transition={200}
+                accessibilityLabel={product.name}
               />
             </>
           ) : (
             <View className="flex-1 items-center justify-center">
-              <Ionicons name="image-outline" size={32} color="#9CA3AF" />
+              <ImageIcon size={48} color={t.foregroundMuted} strokeWidth={1} />
             </View>
           )}
-          {discount > 0 && (
-            <View className="absolute top-2 right-2 bg-accent-500 px-2 py-0.5 rounded">
-              <Text className="text-white text-[10px] font-bold">{discount}% off</Text>
-            </View>
-          )}
-          {effectiveStock === 0 && (
-            <View className="absolute inset-0 bg-black/40 items-center justify-center">
-              <View className="bg-white px-2 py-0.5 rounded-full">
-                <Text className="text-gray-700 text-xs font-bold">Out of Stock</Text>
-              </View>
+
+          {product.discountPct > 0 && <SaleRibbon />}
+
+          {(product.mrpDiscount > 0 || product.badge || digital) && (
+            <View className="absolute left-2 top-2 items-start gap-1">
+              {product.mrpDiscount > 0 && (
+                <Pill label={`${product.mrpDiscount}% off`} className="bg-accent-500 dark:bg-accent-600" />
+              )}
+              {digital && <Pill label="Digital" className="bg-violet-600" />}
+              {product.badge ? <Pill label={product.badge} className="bg-primary-500 dark:bg-primary-600" /> : null}
             </View>
           )}
         </View>
       </View>
 
-      <View className="p-3">
-        {(product.brands?.name) && (
-          <Text className="text-[10px] text-gray-400 dark:text-gray-500 mb-0.5">
-            Brand: {product.brands.name}
+      <View className="flex-1 flex-col p-2.5">
+        <View className="mb-1.5 flex-row items-start justify-between gap-2">
+          <Text className="mb-1.5 min-h-[40px] flex-1 text-sm font-semibold text-foreground" numberOfLines={2}>
+            {product.name}
           </Text>
-        )}
-        {(product.categories?.name) && (
-          <Text className="text-[10px] text-gray-400 dark:text-gray-500 mb-0.5">
-            Category: {product.categories.name}
-          </Text>
-        )}
-        <Text
-          className="text-xs font-semibold text-gray-900 dark:text-gray-100 leading-snug mb-2"
-          numberOfLines={2}
-        >
-          {product.name}
-        </Text>
-        <View className="flex-row items-baseline gap-1.5 flex-wrap mb-1">
-          <Text className="text-sm font-extrabold text-primary-500">
-            {product.has_variants ? 'From ' : ''}{'₹'}{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </Text>
-          {mrp && mrp > Number(displayPrice) && (
-            <Text className="text-[11px] text-gray-400 line-through">
-              {'₹'}{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </Text>
-          )}
+          <View className="mt-0.5 shrink-0 flex-row items-center gap-1.5">
+            <QuickAddButton product={product} inStock={inStock} />
+            <Pressable
+              onPress={toggle}
+              disabled={pending}
+              hitSlop={6}
+              accessibilityLabel={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+              className="h-7 w-7 items-center justify-center rounded-full border border-border-default bg-surface-secondary disabled:opacity-60"
+            >
+              <Heart
+                size={14}
+                strokeWidth={2}
+                color={inWishlist ? status.heart : t.foregroundMuted}
+                fill={inWishlist ? status.heart : 'none'}
+              />
+            </Pressable>
+          </View>
         </View>
-        <Text className={`text-[11px] font-semibold ${effectiveStock > 0 ? 'text-accent-600' : 'text-red-500'}`}>
-          {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
-        </Text>
+
+        <View className="mb-2 gap-0.5">
+          {product.brandName ? (
+            <Text className="text-xs text-foreground-muted" numberOfLines={1}>
+              Brand: {product.brandName}
+            </Text>
+          ) : null}
+          {product.categoryName ? (
+            <Text className="text-xs text-foreground-muted" numberOfLines={1}>
+              Category: {product.categoryName}
+            </Text>
+          ) : null}
+        </View>
+
+        <View className="mt-auto">
+          <View className="mb-0.5">
+            <Text className="text-base font-bold leading-tight text-primary-600 dark:text-primary-400">
+              {product.hasVariants ? 'From ' : ''}₹{inr(product.displayPrice)}
+            </Text>
+            {product.mrp && product.mrp > Number(product.displayPrice) ? (
+              <Text className="text-xs leading-tight text-foreground-muted line-through">₹{inr(product.mrp)}</Text>
+            ) : null}
+          </View>
+          {gstEnabled ? <Text className="mb-2 text-[10px] text-foreground-muted">Inclusive of all taxes</Text> : null}
+          <View className="flex-row items-center justify-between gap-1">
+            <Text className={`text-xs font-medium ${inStock ? 'text-green-600' : 'text-red-600'}`} numberOfLines={1}>
+              {digital ? 'Instant access' : inStock ? 'In Stock' : 'Out of Stock'}
+            </Text>
+            <Text className="text-xs font-semibold text-accent-500" numberOfLines={1}>
+              View Details →
+            </Text>
+          </View>
+          {edd && !digital && inStock ? (
+            <Text className="mt-0.5 text-[10px] text-foreground-muted">
+              Deliver by <Text className="font-medium text-foreground">{shortDate(edd)}</Text>
+            </Text>
+          ) : null}
+        </View>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   )
 }

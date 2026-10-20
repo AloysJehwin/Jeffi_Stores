@@ -4,6 +4,7 @@ import { Image } from 'expo-image'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { pushRecentlyViewed } from '../../src/stores/recentlyViewedStore'
 import { Ionicons } from '@expo/vector-icons'
 import { getProductBySlug } from '../../src/api/products'
 import { addToCart } from '../../src/api/cart'
@@ -34,6 +35,24 @@ export default function ProductDetailScreen() {
       const firstActive = product.product_variants.find((v) => v.is_active) ?? product.product_variants[0]
       setSelectedVariant(firstActive)
     }
+  }, [product?.id])
+
+  // Same entry the web's TrackRecentlyViewed records, feeding the home "Recently viewed" section.
+  useEffect(() => {
+    if (!product) return
+    const p = product as typeof product & Record<string, any>
+    const img = p.product_images?.find((i: any) => i.is_primary) || p.product_images?.[0]
+    pushRecentlyViewed({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      price: Number(p.has_variants && p.variant_min_price ? p.variant_min_price : p.base_price),
+      mrp: p.mrp ? Number(p.mrp) : null,
+      brand: p.brands?.name ?? null,
+      inStock: p.has_variants ? Number(p.variant_stock_total ?? 0) > 0 : p.stock_status !== 'Out of Stock',
+      image: img?.thumbnail_url || img?.image_url || null,
+      categoryId: p.category_id ?? null,
+    })
   }, [product?.id])
 
   const { data: wishlistItems } = useQuery({

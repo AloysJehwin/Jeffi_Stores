@@ -1,4 +1,5 @@
 import { TouchableOpacity, Text, ActivityIndicator, ViewStyle, TextStyle } from 'react-native'
+import { accent, status } from '../../theme'
 
 interface ButtonProps {
   label: string
@@ -12,7 +13,7 @@ interface ButtonProps {
 
 const variantClasses: Record<string, string> = {
   primary: 'bg-accent-500 active:bg-accent-600',
-  secondary: 'bg-gray-200 dark:bg-[#2e303b] active:bg-gray-300',
+  secondary: 'bg-gray-200 dark:bg-surface-secondary active:bg-gray-300',
   outline: 'border border-accent-500 bg-transparent',
   danger: 'bg-red-500 active:bg-red-600',
 }
@@ -51,7 +52,7 @@ export default function Button({
       disabled={disabled || loading}
       className={`rounded-xl items-center justify-center flex-row gap-2 ${variantClasses[variant]} ${sizeClasses[size]} ${fullWidth ? 'w-full' : ''} ${disabled || loading ? 'opacity-50' : ''}`}
     >
-      {loading && <ActivityIndicator size="small" color={variant === 'secondary' || variant === 'outline' ? '#7cb900' : '#fff'} />}
+      {loading && <ActivityIndicator size="small" color={variant === 'secondary' || variant === 'outline' ? accent[500] : status.white} />}
       <Text className={`font-semibold ${textClasses[variant]} ${textSizeClasses[size]}`}>{label}</Text>
     </TouchableOpacity>
   )

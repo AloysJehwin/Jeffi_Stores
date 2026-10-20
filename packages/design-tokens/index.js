@@ -23,6 +23,12 @@ const schemes = {
   },
 }
 
+// Tailwind defaults the storefront uses for status (stock, SALE ribbon, wishlist, digital); same values as the web.
+const status = {
+  success: '#16a34a', danger: '#dc2626', heart: '#ef4444', digital: '#7c3aed',
+  saleFrom: '#f43f5e', saleTo: '#f97316', white: '#ffffff', black: '#000000',
+}
+
 const radius = { card: 12, button: 8, pill: 999, hero: 20 }
 const fonts = { display: 'Bebas Neue', body: 'Inter' }
 
@@ -37,4 +43,4 @@ function cssVars(scheme) {
   }
 }
 
-module.exports = { primary, secondary, accent, schemes, radius, fonts, cssVars }
+module.exports = { primary, secondary, accent, schemes, status, radius, fonts, cssVars }

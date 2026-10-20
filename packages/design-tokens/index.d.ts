@@ -10,6 +10,10 @@ export const primary: Scale
 export const secondary: Scale
 export const accent: Scale
 export const schemes: { light: Scheme; dark: Scheme }
+export const status: {
+  success: string; danger: string; heart: string; digital: string
+  saleFrom: string; saleTo: string; white: string; black: string
+}
 export const radius: { card: number; button: number; pill: number; hero: number }
 export const fonts: { display: string; body: string }
 export function cssVars(scheme: 'light' | 'dark'): Record<string, string>
