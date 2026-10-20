@@ -13,6 +13,7 @@ resources:
   - 45-messaging-service.yaml
   - 46-document-service.yaml
   - 47-public-api-service.yaml
+  - 48-mobile-service.yaml
   - release.yaml
   - cronjobs.yaml
 # CRD-backed resources (issuers, Coroot) are applied after their charts settle: see bootstrap/apply-platform.sh.
@@ -25,4 +26,6 @@ images:
   - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-document-service
     newTag: set-by-rollout
   - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-public-api-service
+    newTag: set-by-rollout
+  - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-mobile-service
     newTag: set-by-rollout

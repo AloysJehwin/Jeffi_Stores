@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store'
 
-export const BASE_URL = 'https://www.jeffistores.in'
+// The mobile backend (mobile-service pod). Override for a local run: EXPO_PUBLIC_API_URL=http://<mac-ip>:3103
+export const BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://mobile.jeffistores.in').replace(/\/$/, '')
 
 const TOKEN_KEY = 'auth_token'
 

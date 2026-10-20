@@ -26,7 +26,7 @@ trust() { # <subject suffix>..., e.g. environment:production
   "StringLike":{"token.actions.githubusercontent.com:sub":[$subs]}}}]}
 JSON
 }
-repos() { for r in controller messaging document public-api; do printf '"arn:aws:ecr:%s:%s:repository/jeffi-stores-%s-service",' "$AWS_REGION" "$ACCOUNT" "$r"; done; }
+repos() { for r in controller messaging document public-api mobile; do printf '"arn:aws:ecr:%s:%s:repository/jeffi-stores-%s-service",' "$AWS_REGION" "$ACCOUNT" "$r"; done; }
 SECRET="{\"Sid\":\"ReadProductionSecret\",\"Effect\":\"Allow\",\"Action\":\"secretsmanager:GetSecretValue\",\"Resource\":\"arn:aws:secretsmanager:$AWS_REGION:$ACCOUNT:secret:jeffi/production*\"}"
 
 BUILD_TRUST=$(trust "ref:refs/heads/*")
