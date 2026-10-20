@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { listCategories, withDetails, type CategoryDetail } from '../../src/api/categories'
-import { countProducts } from '../../src/api/products'
 import { getHome } from '../../src/api/home'
 import TopNav from '../../src/components/layout/TopNav'
 import CategoryIcon from '../../src/components/catalog/CategoryIcon'
@@ -16,13 +15,8 @@ import { accent } from '../../src/theme'
 
 function CategoryCard({ category, subcategories }: { category: CategoryDetail; subcategories: CategoryDetail[] }) {
   const router = useRouter()
-  // Own products plus the subcategories' (the API counts the whole subtree).
-  const { data: total } = useQuery({
-    queryKey: ['category-count', category.slug],
-    queryFn: () => countProducts({ category: category.slug }),
-    staleTime: 5 * 60_000,
-  })
-  const n = total ?? 0
+  // The web page's total: own products plus the direct subcategories'.
+  const n = (category.product_count ?? 0) + subcategories.reduce((sum, sub) => sum + (sub.product_count ?? 0), 0)
 
   return (
     <View className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
@@ -34,7 +28,7 @@ function CategoryCard({ category, subcategories }: { category: CategoryDetail; s
           <View className="min-w-0 flex-1">
             <Text className="text-xl font-bold text-foreground">{category.name}</Text>
             <Text className="mt-1 text-sm text-foreground-muted">
-              {total == null ? ' ' : `${n} ${n === 1 ? 'product' : 'products'}`}
+              {`${n} ${n === 1 ? 'product' : 'products'}`}
             </Text>
           </View>
         </View>
