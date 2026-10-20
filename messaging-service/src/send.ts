@@ -152,22 +152,26 @@ const sysCache = new Map<string, { at: number; vars: Vars }>()
 export async function systemVars(tenantId: string): Promise<Vars> {
   const hit = sysCache.get(tenantId)
   if (hit && Date.now() - hit.at < 60_000) return hit.vars
-  const pools = await poolsForTenant(tenantId).then(p => p.pools).catch(() => null)
+  const found = await poolsForTenant(tenantId).catch(() => null)
+  // site_settings / template_variables have no tenant_id: a workspace tenant without its own store DB
+  // shares the flagship pool, and reading them there would sign its messages as the platform.
+  const own = !!found && (tenantId === tpl.PLATFORM_TENANT_ID || found.pool !== db)
   // Missing tables / DB hiccup: fall back to the defaults rather than failing the send.
-  const q = async <T>(sql: string, args: unknown[] = []) => { try { return (await pools!.tenant.query(sql, args)).rows as T[] } catch { return [] as T[] } }
+  const q = async <T>(sql: string, args: unknown[] = []) => { if (!own) return [] as T[]; try { return (await found!.pools.tenant.query(sql, args)).rows as T[] } catch { return [] as T[] } }
   const [settings, custom, tenant] = await Promise.all([
     q<{ key: string; value: string }>(`SELECT key, value FROM site_settings WHERE key IN ('business_name','business_email','business_phone','business_web')`),
     q<{ key: string; value: string }>(`SELECT key, value FROM template_variables WHERE is_enabled`),
-    db.query<{ display_name: string }>(`SELECT display_name FROM tenants WHERE id=$1`, [tenantId]).then(r => r.rows[0]).catch(() => undefined),
+    db.query<{ display_name: string; slug: string }>(`SELECT display_name, slug FROM tenants WHERE id=$1`, [tenantId]).then(r => r.rows[0]).catch(() => undefined),
   ])
   const set = Object.fromEntries(settings.map(r => [r.key, r.value]))
+  const name = set.business_name || tenant?.display_name || ''
   const vars: Vars = {
     ...Object.fromEntries(custom.map(c => [c.key, c.value ?? ''])),
-    store_name: set.business_name || tenant?.display_name || '',
-    brand_name: set.business_name || tenant?.display_name || '',
+    store_name: name,
+    brand_name: name,
     store_email: set.business_email || '',
     store_phone: set.business_phone || '',
-    store_web: set.business_web || '',
+    store_web: set.business_web || (tenant?.slug && tenantId !== tpl.PLATFORM_TENANT_ID ? `${tenant.slug}.${PLATFORM_DOMAIN}` : ''),
     current_year: String(new Date().getFullYear()),
     date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }),
     customer_first_name: 'there',
