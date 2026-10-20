@@ -29,6 +29,7 @@ import { useAuthStore } from '../../src/stores/authStore'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { invalidateEddCache } from '../../src/lib/edd'
 import { showToast } from '../../src/stores/toastStore'
+import { trackBeginCheckout } from '../../src/lib/analytics'
 import { status, useTokens } from '../../src/theme'
 import type { Address } from '../../src/types'
 
@@ -90,6 +91,40 @@ export default function CheckoutReviewScreen() {
   const cartQ = useQuery({ queryKey: ['cart'], queryFn: getCart, enabled: !!user })
   const cartItems = cartQ.data?.items ?? []
   const cartCount = cartItems.length
+
+  // begin_checkout once per visit, after the buy-now line or the cart has loaded (the web's rule).
+  const beganCheckout = useRef(false)
+  useEffect(() => {
+    if (beganCheckout.current || intentPending) return
+    if (isBuyNow) {
+      beganCheckout.current = true
+      trackBeginCheckout([
+        {
+          sku: buyNow!.sku,
+          name: buyNow!.productName,
+          price: buyNow!.price,
+          quantity: buyNow!.qty,
+          variant: buyNow!.subVariantName || buyNow!.variantName,
+        },
+      ])
+      return
+    }
+    if (!cartQ.isSuccess || cartItems.length === 0) return
+    beganCheckout.current = true
+    trackBeginCheckout(
+      cartItems.map(i => ({
+        sku: i.sub_variant?.sku || i.variant?.sku || i.products?.sku,
+        name: i.products?.name || '',
+        price: Number(
+          Number(i.price_at_addition) > 0
+            ? i.price_at_addition
+            : (i.sub_variant?.price ?? i.variant?.price ?? i.products?.base_price ?? 0)
+        ),
+        quantity: Number(i.quantity) || 1,
+        variant: i.sub_variant?.sub_variant_name || i.variant?.variant_name || null,
+      }))
+    )
+  }, [intentPending, isBuyNow, buyNow, cartQ.isSuccess, cartItems])
 
   const addrQ = useQuery({ queryKey: ['addresses'], queryFn: listAddresses, enabled: !!user })
   const addresses = addrQ.data ?? []

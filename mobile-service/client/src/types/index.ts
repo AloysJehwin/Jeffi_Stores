@@ -100,6 +100,8 @@ export interface OrderItem {
   totalPrice: number
   buyMode: string
   buyUnit: string | null
+  productSku?: string | null
+  subVariantSku?: string | null
   products: {
     slug: string
     product_images: ProductImage[]
@@ -145,6 +147,8 @@ export interface Order {
   subtotal: number
   taxAmount: number
   totalAmount: number
+  shippingAmount?: number
+  couponCode?: string | null
   notes: string | null
   createdAt: string
   updatedAt: string
