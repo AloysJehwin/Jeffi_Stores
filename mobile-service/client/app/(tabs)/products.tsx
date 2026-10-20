@@ -1,544 +1,274 @@
-import { useState, useRef, useEffect } from 'react'
-import {
-  View, Text, TextInput, FlatList, TouchableOpacity,
-  Modal, ScrollView, TouchableWithoutFeedback,
-} from 'react-native'
-import { useQuery } from '@tanstack/react-query'
-import { Ionicons } from '@expo/vector-icons'
-import { useLocalSearchParams } from 'expo-router'
-import { listProducts } from '../../src/api/products'
-import { listCategories } from '../../src/api/categories'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { FlatList, Pressable, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useColorScheme } from 'nativewind'
+import { getListing, type ListingCard, type ListingFacets } from '../../src/api/products'
 import { listBrands } from '../../src/api/brands'
 import TopNav from '../../src/components/layout/TopNav'
 import ProductCard from '../../src/components/product/ProductCard'
-import { useStoreConfig } from '../../src/hooks/useStoreConfig'
-import { toCard } from '../../src/lib/card'
-import Spinner from '../../src/components/ui/Spinner'
-import type { Category, Brand } from '../../src/types'
+import RecentlyViewed from '../../src/components/home/RecentlyViewed'
+import { useColumnWidth } from '../../src/components/home/layout'
+import CompareBar, { CompareStrip } from '../../src/components/catalog/CompareBar'
+import FilterSheet, { FiltersButton } from '../../src/components/catalog/FilterSheet'
+import ListingPromoBanner from '../../src/components/catalog/ListingPromoBanner'
+import ProductTable from '../../src/components/catalog/ProductTable'
+import { EmptyCard, InfiniteFooter, ProductGridSkeleton, type InfiniteControl } from '../../src/components/catalog/Paged'
+import { SquaresIcon, TableIcon } from '../../src/components/catalog/icons'
+import { listingKey, readListingParams, toRouteParams, type ListingParams } from '../../src/components/catalog/listing'
+import { useCompareStore } from '../../src/stores/compareStore'
+import { accent, useTokens } from '../../src/theme'
+import type { HomeSection } from '../../src/types/home'
 
+// Mirror of controller-service app/(storefront)/products/page.tsx at the mobile breakpoint: heading,
+// CompareStrip, ProductGrid's control bar (MobileFilterSheet · Group by Category · grid/table), the
+// infinite grid with the promo banner after the sixth card, and Recently viewed. Data: GET
+// /api/products/listing (the page's own model: filters, sort, paging and facets server-side).
 
-const SORT_OPTIONS = [
-  { label: 'Default',          sort: '',           order: '' },
-  { label: 'Newest First',     sort: 'created_at', order: 'desc' },
-  { label: 'Name A–Z',         sort: 'name',       order: 'asc' },
-  { label: 'Price: Low → High', sort: 'base_price', order: 'asc' },
-  { label: 'Price: High → Low', sort: 'base_price', order: 'desc' },
-]
+type Item =
+  | { type: 'pair'; key: string; rows: ListingCard[] }
+  | { type: 'promo'; key: string }
+  | { type: 'group'; key: string; name: string; slug: string; count: number; gap: boolean }
+  | { type: 'table'; key: string }
+
+const EMPTY_FACETS: ListingFacets = {
+  colors: [],
+  grades: [],
+  materials: [],
+  finishes: [],
+  compliances: [],
+  origins: [],
+  inStockCount: 0,
+  onSaleCount: 0,
+  priceMin: 0,
+  priceMax: 0,
+  variantTypes: [],
+  variantValues: [],
+  specFacets: [],
+}
+
+const RECENT: HomeSection = {
+  id: 'listing-recently-viewed',
+  type: 'recently_viewed',
+  title: null,
+  subtitle: null,
+  eyebrow: null,
+  cta_label: null,
+  cta_url: null,
+  config: { limit: 6, minItems: 2 },
+  display_order: 0,
+  layout: 'grid',
+  copy: { title: 'Recently viewed' },
+  items: null,
+}
+
+const pairs = (rows: ListingCard[], prefix: string): Item[] =>
+  Array.from({ length: Math.ceil(rows.length / 2) }, (_, i) => ({ type: 'pair' as const, key: `${prefix}${rows[i * 2].id}`, rows: rows.slice(i * 2, i * 2 + 2) }))
 
 export default function ProductsScreen() {
-  const { gstEnabled } = useStoreConfig().flags
-  const { search: searchParam, category: categoryParam, brand: brandParam } = useLocalSearchParams<{ search?: string; category?: string; brand?: string }>()
-  const searchInputRef = useRef<TextInput>(null)
+  const router = useRouter()
+  const t = useTokens()
+  const dark = useColorScheme().colorScheme === 'dark'
+  const raw = useLocalSearchParams()
+  const key = listingKey(readListingParams(raw))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const params = useMemo(() => readListingParams(raw), [key])
+  const listRef = useRef<FlatList<Item>>(null)
+  const cardW = useColumnWidth(2, 12)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [view, setView] = useState<'grid' | 'table'>('grid')
+  const grouped = params.sort === 'category'
+  const compareCount = useCompareStore(s => s.compareList.length)
 
-  const [search, setSearch] = useState(searchParam || '')
-  const [debouncedSearch, setDebouncedSearch] = useState(searchParam || '')
-  const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
-
-  const [page, setPage] = useState(1)
-  const [filterOpen, setFilterOpen] = useState(false)
-
-  const [selectedCategory, setSelectedCategory] = useState<string>('')
-  const [selectedBrand, setSelectedBrand] = useState<string>('')
-  const [selectedSort, setSelectedSort] = useState(SORT_OPTIONS[0])
-
-  const [pendingCategory, setPendingCategory] = useState<string>('')
-  const [pendingBrand, setPendingBrand] = useState<string>('')
-  const [pendingSort, setPendingSort] = useState(SORT_OPTIONS[0])
-
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
+  // Grouped by category the web shows one page and no pager.
+  const query = useInfiniteQuery({
+    queryKey: ['products', 'listing', key],
+    queryFn: ({ pageParam }) => getListing(params, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => (!grouped && pages.length * last.pageSize < last.total ? pages.length + 1 : undefined),
+    staleTime: 60_000,
+  })
+  // Brand slugs (links pass ?brand=<slug>) so the sheet can show them selected.
+  const brandSlugs = useQuery({ queryKey: ['brands'], queryFn: listBrands, staleTime: 5 * 60_000 })
 
   useEffect(() => {
-    if (searchParam) {
-      setSearch(searchParam)
-      setDebouncedSearch(searchParam)
+    listRef.current?.scrollToOffset({ offset: 0, animated: false })
+  }, [key])
+
+  const first = query.data?.pages[0]
+  const rows = useMemo(() => query.data?.pages.flatMap(p => p.products) ?? [], [query.data])
+  const loading = query.isLoading
+  const total = first?.total ?? 0
+  const control: InfiniteControl = {
+    total,
+    hasMore: !!query.hasNextPage,
+    loadingMore: query.isFetchingNextPage,
+    error: query.isError ? (query.error as Error)?.message || 'Failed to load' : null,
+    loadMore: () => {
+      if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage()
+    },
+    retry: () => (rows.length ? query.fetchNextPage() : query.refetch()),
+  }
+  const failed = !!control.error && rows.length === 0
+  const promo = first?.promoOffer ?? null
+  const sheetBrands = useMemo(
+    () => (first?.brands ?? []).map(b => ({ ...b, slug: brandSlugs.data?.find(x => x.id === b.id)?.slug })),
+    [first?.brands, brandSlugs.data]
+  )
+
+  const items = useMemo<Item[]>(() => {
+    if (loading || rows.length === 0) return []
+    if (view === 'table') return [{ type: 'table', key: 'table' }]
+    if (grouped) {
+      const groups = new Map<string, { slug: string; rows: ListingCard[] }>()
+      for (const r of rows) {
+        const name = r.categoryName ?? 'Other'
+        if (!groups.has(name)) groups.set(name, { slug: r.categorySlug ?? '', rows: [] })
+        groups.get(name)!.rows.push(r)
+      }
+      return [...groups.entries()].flatMap(([name, g], gi) => [
+        { type: 'group' as const, key: `g:${name}`, name, slug: g.slug, count: g.rows.length, gap: gi > 0 },
+        ...pairs(g.rows, `g:${name}:`),
+      ])
     }
-  }, [searchParam])
+    const out = pairs(rows, '')
+    // ProductGrid PROMO_AFTER = 6 cards (3 rows of two), page 1 only.
+    if (promo && rows.length > 6) out.splice(3, 0, { type: 'promo', key: 'promo' })
+    return out
+  }, [loading, rows, view, grouped, promo])
 
-  // Storefront links (hero slides, offers, brand tiles) arrive as ?category=<slug> / ?brand=<slug or id>.
-  useEffect(() => {
-    if (categoryParam !== undefined) {
-      setSelectedCategory(categoryParam)
-      setPage(1)
-    }
-  }, [categoryParam])
+  const apply = (next: ListingParams) => router.setParams(toRouteParams(next))
+  const toggleGrouped = () => apply({ ...params, sort: grouped ? undefined : 'category', order: undefined })
 
-  const handleSearch = (text: string) => {
-    setSearch(text)
-    if (timer) clearTimeout(timer)
-    const t = setTimeout(() => { setDebouncedSearch(text); setPage(1) }, 500)
-    setTimer(t)
-  }
+  const header = (
+    <View className="px-4 pt-6">
+      <Text className="mb-4 text-2xl font-bold text-secondary-500 dark:text-foreground">All Products</Text>
+      <CompareStrip />
+      {!loading && rows.length > 0 ? (
+        <View className="mb-6 flex-row flex-wrap items-center gap-2">
+          <FiltersButton params={params} onPress={() => setSheetOpen(true)} />
+          <Pressable
+            onPress={toggleGrouped}
+            className={`h-9 flex-row items-center gap-1.5 rounded-lg border px-3 ${grouped ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : 'border-border-default'}`}
+          >
+            <SquaresIcon size={14} color={grouped ? (dark ? accent[400] : accent[700]) : t.foregroundSecondary} />
+            <Text className={`text-xs font-medium ${grouped ? 'text-accent-700 dark:text-accent-400' : 'text-foreground-secondary'}`}>Group by Category</Text>
+          </Pressable>
+          <View className="h-9 flex-row overflow-hidden rounded-lg border border-border-default">
+            <Pressable
+              onPress={() => setView('grid')}
+              accessibilityLabel="Grid view"
+              className={`h-full justify-center px-2.5 ${view === 'grid' ? 'bg-accent-50 dark:bg-accent-900/20' : ''}`}
+            >
+              <SquaresIcon filled size={16} color={view === 'grid' ? accent[500] : t.foregroundMuted} />
+            </Pressable>
+            <Pressable
+              onPress={() => setView('table')}
+              accessibilityLabel="Table view"
+              className={`h-full justify-center border-l border-border-default px-2.5 ${view === 'table' ? 'bg-accent-50 dark:bg-accent-900/20' : ''}`}
+            >
+              <TableIcon color={view === 'table' ? accent[500] : t.foregroundMuted} />
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  )
 
-  const { data: categoriesData } = useQuery({
-    queryKey: ['categories'],
-    queryFn: listCategories,
-    staleTime: 5 * 60 * 1000,
-  })
+  const empty = loading ? (
+    <View className="px-4">
+      <ProductGridSkeleton />
+    </View>
+  ) : failed ? (
+    <View className="px-4">
+      <InfiniteFooter shown={0} control={control} />
+    </View>
+  ) : (
+    <View className="px-4">
+      <EmptyCard
+        title="No Products Found"
+        body="We couldn't find any products matching your filters. Try adjusting your search criteria."
+        cta="View All Products"
+        onPress={() => apply({})}
+      />
+    </View>
+  )
 
-  const { data: brandsData } = useQuery({
-    queryKey: ['brands'],
-    queryFn: listBrands,
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const allCategories: Category[] = categoriesData || []
-  const parents = allCategories
-    .filter((c) => c.parent_category_id === null)
-    .sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999))
-  const childrenByParent: Record<string, Category[]> = {}
-  allCategories.filter((c) => c.parent_category_id !== null).forEach((c) => {
-    const pid = c.parent_category_id!
-    if (!childrenByParent[pid]) childrenByParent[pid] = []
-    childrenByParent[pid].push(c)
-  })
-
-  const brands: Brand[] = brandsData || []
-
-  useEffect(() => {
-    if (!brandParam) return
-    const match = brands.find(b => b.id === brandParam || b.slug === brandParam)
-    if (match) {
-      setSelectedBrand(match.id)
-      setPage(1)
-    }
-  }, [brandParam, brandsData])
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['products', 'list', debouncedSearch, selectedCategory, selectedBrand, selectedSort.sort, selectedSort.order, page],
-    queryFn: () => listProducts({
-      search: debouncedSearch,
-      category: selectedCategory || undefined,
-      brand: selectedBrand || undefined,
-      sort: selectedSort.sort || undefined,
-      order: selectedSort.order || undefined,
-      page,
-    }),
-  })
-
-  const products = data?.products || []
-  const total = data?.total ?? 0
-  const totalPages = data?.totalPages ?? 1
-
-  const activeFilterCount =
-    (selectedCategory ? 1 : 0) +
-    (selectedBrand ? 1 : 0) +
-    (selectedSort !== SORT_OPTIONS[0] ? 1 : 0)
-
-  const openFilter = () => {
-    setPendingCategory(selectedCategory)
-    setPendingBrand(selectedBrand)
-    setPendingSort(selectedSort)
-    setFilterOpen(true)
-  }
-
-  const applyFilters = () => {
-    setSelectedCategory(pendingCategory)
-    setSelectedBrand(pendingBrand)
-    setSelectedSort(pendingSort)
-    setPage(1)
-    setFilterOpen(false)
-  }
-
-  const clearFilters = () => {
-    setPendingCategory('')
-    setPendingBrand('')
-    setPendingSort(SORT_OPTIONS[0])
-  }
-
-  const resetAll = () => {
-    setSelectedCategory('')
-    setSelectedBrand('')
-    setSelectedSort(SORT_OPTIONS[0])
-    setPage(1)
-  }
-
-  const selectedCategoryName = selectedCategory
-    ? allCategories.find((c) => c.slug === selectedCategory)?.name
-    : null
-  const selectedBrandName = selectedBrand
-    ? brands.find((b) => b.id === selectedBrand)?.name
-    : null
+  const footer = (
+    <View>
+      {!loading && rows.length > 0 && !grouped ? (
+        <View className="px-4">
+          <InfiniteFooter shown={rows.length} control={control} />
+        </View>
+      ) : null}
+      <RecentlyViewed section={RECENT} data={undefined as never} />
+      <View style={{ height: compareCount >= 2 ? 96 : 24 }} />
+    </View>
+  )
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-[#1a1b23]">
-      <TopNav onSearchPress={() => searchInputRef.current?.focus()} />
-
-      <View className="bg-white dark:bg-[#24252f] border-b border-gray-100 dark:border-[#3f4150] px-4 pt-3 pb-2">
-        <View className="flex-row items-center justify-between mb-2">
-          <View>
-            <Text className="text-2xl font-extrabold text-gray-900 dark:text-gray-100" style={{ fontStyle: 'italic' }} numberOfLines={1}>
-              All Products
-            </Text>
-            {total > 0 && (
-              <Text className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {total} product{total !== 1 ? 's' : ''}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        <View className="flex-row gap-2">
-          <View className="flex-1 flex-row items-center bg-gray-50 dark:bg-[#1a1b23] rounded-xl px-3 py-2.5 border border-gray-200 dark:border-[#3f4150]">
-            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
-            <TextInput
-              ref={searchInputRef}
-              value={search}
-              onChangeText={handleSearch}
-              placeholder="Search products..."
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 ml-2 text-gray-900 dark:text-gray-100 text-sm"
-              returnKeyType="search"
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => { setSearch(''); setDebouncedSearch(''); setPage(1) }}>
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <TouchableOpacity
-            onPress={openFilter}
-            className={`flex-row items-center gap-1.5 px-3.5 rounded-xl border ${
-              activeFilterCount > 0
-                ? 'bg-accent-500 border-accent-500'
-                : 'bg-gray-50 dark:bg-[#1a1b23] border-gray-200 dark:border-[#3f4150]'
-            }`}
-          >
-            <Ionicons
-              name="options-outline"
-              size={18}
-              color={activeFilterCount > 0 ? '#fff' : '#6B7280'}
-            />
-            <Text className={`text-sm font-semibold ${activeFilterCount > 0 ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`}>
-              Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeFilterCount > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2" contentContainerStyle={{ gap: 6 }}>
-            {selectedCategoryName && (
-              <TouchableOpacity
-                onPress={() => { setSelectedCategory(''); setPage(1) }}
-                className="flex-row items-center gap-1 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-800 rounded-full px-3 py-1"
-              >
-                <Text className="text-accent-700 dark:text-accent-400 text-xs font-medium">{selectedCategoryName}</Text>
-                <Ionicons name="close" size={12} color="#7cb900" />
-              </TouchableOpacity>
-            )}
-            {selectedBrandName && (
-              <TouchableOpacity
-                onPress={() => { setSelectedBrand(''); setPage(1) }}
-                className="flex-row items-center gap-1 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-800 rounded-full px-3 py-1"
-              >
-                <Text className="text-accent-700 dark:text-accent-400 text-xs font-medium">{selectedBrandName}</Text>
-                <Ionicons name="close" size={12} color="#7cb900" />
-              </TouchableOpacity>
-            )}
-            {selectedSort !== SORT_OPTIONS[0] && (
-              <TouchableOpacity
-                onPress={() => { setSelectedSort(SORT_OPTIONS[0]); setPage(1) }}
-                className="flex-row items-center gap-1 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-800 rounded-full px-3 py-1"
-              >
-                <Text className="text-accent-700 dark:text-accent-400 text-xs font-medium">{selectedSort.label}</Text>
-                <Ionicons name="close" size={12} color="#7cb900" />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              onPress={resetAll}
-              className="flex-row items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full px-3 py-1"
-            >
-              <Text className="text-red-600 dark:text-red-400 text-xs font-medium">Clear All</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        )}
-      </View>
-
-      {isLoading ? (
-        <Spinner />
-      ) : products.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <Ionicons name="search-outline" size={56} color="#9CA3AF" />
-          <Text className="text-gray-900 dark:text-gray-100 mt-3 text-base font-bold">No products found</Text>
-          <Text className="text-gray-400 text-sm mt-1 text-center">Try adjusting your search or filters</Text>
-          {activeFilterCount > 0 && (
-            <TouchableOpacity onPress={resetAll} className="mt-4 bg-accent-500 px-6 py-2.5 rounded-xl">
-              <Text className="text-white font-semibold text-sm">Clear Filters</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        <FlatList
-          data={products}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          contentContainerStyle={{ padding: 12, paddingBottom: 8 }}
-          columnWrapperStyle={{ gap: 12, marginBottom: 12 }}
-          renderItem={({ item }) => (
-            <View style={{ width: '47.5%' }}>
-              <ProductCard product={toCard(item, gstEnabled)} />
-            </View>
-          )}
-          showsVerticalScrollIndicator={false}
-          ListFooterComponent={
-            totalPages > 1 ? (
-              <View className="flex-row items-center justify-center gap-2 py-4">
-                <TouchableOpacity
-                  onPress={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className={`flex-row items-center gap-1 px-4 py-2.5 rounded-xl border ${
-                    page === 1
-                      ? 'border-gray-200 dark:border-[#3f4150] opacity-40'
-                      : 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                  }`}
-                >
-                  <Ionicons name="chevron-back" size={16} color={page === 1 ? '#9CA3AF' : '#7cb900'} />
-                  <Text className={`text-sm font-semibold ${page === 1 ? 'text-gray-400' : 'text-accent-600 dark:text-accent-400'}`}>
-                    Prev
-                  </Text>
-                </TouchableOpacity>
-
-                <View className="flex-row items-center gap-1">
-                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                    let pageNum: number
-                    if (totalPages <= 5) {
-                      pageNum = i + 1
-                    } else if (page <= 3) {
-                      pageNum = i + 1
-                    } else if (page >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i
-                    } else {
-                      pageNum = page - 2 + i
-                    }
-                    return (
-                      <TouchableOpacity
-                        key={pageNum}
-                        onPress={() => setPage(pageNum)}
-                        className={`w-9 h-9 rounded-xl items-center justify-center border ${
-                          pageNum === page
-                            ? 'bg-accent-500 border-accent-500'
-                            : 'border-gray-200 dark:border-[#3f4150] bg-white dark:bg-[#24252f]'
-                        }`}
-                      >
-                        <Text className={`text-sm font-bold ${pageNum === page ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
-                          {pageNum}
-                        </Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-
-                <TouchableOpacity
-                  onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className={`flex-row items-center gap-1 px-4 py-2.5 rounded-xl border ${
-                    page === totalPages
-                      ? 'border-gray-200 dark:border-[#3f4150] opacity-40'
-                      : 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                  }`}
-                >
-                  <Text className={`text-sm font-semibold ${page === totalPages ? 'text-gray-400' : 'text-accent-600 dark:text-accent-400'}`}>
-                    Next
-                  </Text>
-                  <Ionicons name="chevron-forward" size={16} color={page === totalPages ? '#9CA3AF' : '#7cb900'} />
-                </TouchableOpacity>
+    <View className="flex-1 bg-surface">
+      <TopNav />
+      <FlatList
+        ref={listRef}
+        data={items}
+        keyExtractor={it => it.key}
+        renderItem={({ item }) => {
+          if (item.type === 'promo') {
+            return (
+              <View className="mb-3 px-4">
+                <ListingPromoBanner offer={promo!} />
               </View>
-            ) : null
+            )
           }
-        />
-      )}
-
-      {/* Filter bottom sheet */}
-      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
-        <TouchableWithoutFeedback onPress={() => setFilterOpen(false)}>
-          <View className="flex-1 bg-black/50 justify-end">
-            <TouchableWithoutFeedback>
-              <View className="bg-white dark:bg-[#24252f] rounded-t-2xl" style={{ maxHeight: '85%' }}>
-                <View className="flex-row items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 dark:border-[#3f4150]">
-                  <Text className="text-lg font-bold text-gray-900 dark:text-gray-100">Filters & Sort</Text>
-                  <View className="flex-row items-center gap-3">
-                    <TouchableOpacity onPress={clearFilters}>
-                      <Text className="text-accent-600 dark:text-accent-400 text-sm font-semibold">Clear</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setFilterOpen(false)}>
-                      <Ionicons name="close" size={22} color="#6B7280" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-
-                  {/* Sort */}
-                  <View className="px-5 pt-4 pb-2">
-                    <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Sort By</Text>
-                    <View className="gap-2">
-                      {SORT_OPTIONS.map((opt) => (
-                        <TouchableOpacity
-                          key={opt.label}
-                          onPress={() => setPendingSort(opt)}
-                          className={`flex-row items-center justify-between px-4 py-3 rounded-xl border ${
-                            pendingSort.label === opt.label
-                              ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                              : 'border-gray-200 dark:border-[#3f4150] bg-gray-50 dark:bg-[#1a1b23]'
-                          }`}
-                        >
-                          <Text className={`text-sm font-medium ${
-                            pendingSort.label === opt.label
-                              ? 'text-accent-700 dark:text-accent-400'
-                              : 'text-gray-700 dark:text-gray-300'
-                          }`}>
-                            {opt.label}
-                          </Text>
-                          {pendingSort.label === opt.label && (
-                            <Ionicons name="checkmark-circle" size={18} color="#7cb900" />
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-
-                  {/* Categories */}
-                  {parents.length > 0 && (
-                    <View className="px-5 pt-4 pb-2 border-t border-gray-100 dark:border-[#3f4150] mt-2">
-                      <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Category</Text>
-
-                      <TouchableOpacity
-                        onPress={() => setPendingCategory('')}
-                        className={`flex-row items-center justify-between px-4 py-3 rounded-xl border mb-2 ${
-                          pendingCategory === ''
-                            ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                            : 'border-gray-200 dark:border-[#3f4150] bg-gray-50 dark:bg-[#1a1b23]'
-                        }`}
-                      >
-                        <Text className={`text-sm font-medium ${pendingCategory === '' ? 'text-accent-700 dark:text-accent-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                          All Categories
-                        </Text>
-                        {pendingCategory === '' && <Ionicons name="checkmark-circle" size={18} color="#7cb900" />}
-                      </TouchableOpacity>
-
-                      {parents.map((cat) => {
-                        const children = childrenByParent[cat.id] || []
-                        const expanded = expandedCategories[cat.id]
-                        const isSelected = pendingCategory === cat.slug || children.some((c) => c.slug === pendingCategory)
-
-                        return (
-                          <View key={cat.id} className="mb-1">
-                            <View className="flex-row items-center gap-2">
-                              <TouchableOpacity
-                                onPress={() => setPendingCategory(cat.slug)}
-                                className={`flex-1 flex-row items-center justify-between px-4 py-3 rounded-xl border ${
-                                  pendingCategory === cat.slug
-                                    ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                                    : isSelected
-                                    ? 'border-accent-300 dark:border-accent-700 bg-accent-50/50 dark:bg-accent-900/10'
-                                    : 'border-gray-200 dark:border-[#3f4150] bg-gray-50 dark:bg-[#1a1b23]'
-                                }`}
-                              >
-                                <Text className={`text-sm font-medium ${
-                                  pendingCategory === cat.slug
-                                    ? 'text-accent-700 dark:text-accent-400'
-                                    : 'text-gray-700 dark:text-gray-300'
-                                }`}>
-                                  {cat.name}
-                                </Text>
-                                {pendingCategory === cat.slug && <Ionicons name="checkmark-circle" size={18} color="#7cb900" />}
-                              </TouchableOpacity>
-                              {children.length > 0 && (
-                                <TouchableOpacity
-                                  onPress={() => setExpandedCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}
-                                  className="w-10 h-10 items-center justify-center"
-                                >
-                                  <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#9CA3AF" />
-                                </TouchableOpacity>
-                              )}
-                            </View>
-
-                            {expanded && children.length > 0 && (
-                              <View className="ml-4 mt-1 gap-1">
-                                {children.map((sub) => (
-                                  <TouchableOpacity
-                                    key={sub.id}
-                                    onPress={() => setPendingCategory(sub.slug)}
-                                    className={`flex-row items-center justify-between px-4 py-2.5 rounded-xl border ${
-                                      pendingCategory === sub.slug
-                                        ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                                        : 'border-gray-200 dark:border-[#3f4150] bg-gray-50 dark:bg-[#1a1b23]'
-                                    }`}
-                                  >
-                                    <Text className={`text-sm ${
-                                      pendingCategory === sub.slug
-                                        ? 'text-accent-700 dark:text-accent-400 font-medium'
-                                        : 'text-gray-600 dark:text-gray-400'
-                                    }`}>
-                                      {sub.name}
-                                    </Text>
-                                    {pendingCategory === sub.slug && <Ionicons name="checkmark-circle" size={18} color="#7cb900" />}
-                                  </TouchableOpacity>
-                                ))}
-                              </View>
-                            )}
-                          </View>
-                        )
-                      })}
-                    </View>
-                  )}
-
-                  {/* Brands */}
-                  {brands.length > 0 && (
-                    <View className="px-5 pt-4 pb-2 border-t border-gray-100 dark:border-[#3f4150] mt-2">
-                      <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Brand</Text>
-
-                      <TouchableOpacity
-                        onPress={() => setPendingBrand('')}
-                        className={`flex-row items-center justify-between px-4 py-3 rounded-xl border mb-2 ${
-                          pendingBrand === ''
-                            ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                            : 'border-gray-200 dark:border-[#3f4150] bg-gray-50 dark:bg-[#1a1b23]'
-                        }`}
-                      >
-                        <Text className={`text-sm font-medium ${pendingBrand === '' ? 'text-accent-700 dark:text-accent-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                          All Brands
-                        </Text>
-                        {pendingBrand === '' && <Ionicons name="checkmark-circle" size={18} color="#7cb900" />}
-                      </TouchableOpacity>
-
-                      {brands.map((brand) => (
-                        <TouchableOpacity
-                          key={brand.id}
-                          onPress={() => setPendingBrand(brand.id)}
-                          className={`flex-row items-center justify-between px-4 py-3 rounded-xl border mb-1 ${
-                            pendingBrand === brand.id
-                              ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                              : 'border-gray-200 dark:border-[#3f4150] bg-gray-50 dark:bg-[#1a1b23]'
-                          }`}
-                        >
-                          <Text className={`text-sm font-medium ${
-                            pendingBrand === brand.id
-                              ? 'text-accent-700 dark:text-accent-400'
-                              : 'text-gray-700 dark:text-gray-300'
-                          }`}>
-                            {brand.name}
-                          </Text>
-                          {pendingBrand === brand.id && <Ionicons name="checkmark-circle" size={18} color="#7cb900" />}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </ScrollView>
-
-                <View className="px-5 pt-3 pb-6 border-t border-gray-100 dark:border-[#3f4150]">
-                  <TouchableOpacity
-                    onPress={applyFilters}
-                    className="bg-accent-500 py-4 rounded-xl items-center"
-                  >
-                    <Text className="text-white font-bold text-base">Apply Filters</Text>
-                  </TouchableOpacity>
-                </View>
+          if (item.type === 'table') {
+            return (
+              <View className="px-4">
+                <ProductTable products={rows} />
               </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+            )
+          }
+          if (item.type === 'group') {
+            return (
+              <View className={`mb-4 flex-row items-center gap-3 px-4 ${item.gap ? 'mt-5' : ''}`}>
+                <Pressable onPress={() => (item.slug ? router.push(`/category/${item.slug}`) : apply({}))}>
+                  <Text className="text-sm font-bold text-foreground">{item.name}</Text>
+                </Pressable>
+                <View className="h-px flex-1 bg-border-default" />
+                <Text className="text-xs text-foreground-muted">{item.count} products</Text>
+              </View>
+            )
+          }
+          return (
+            <View className="mb-3 flex-row gap-3 px-4">
+              {item.rows.map(r => (
+                <View key={r.id} style={{ width: cardW }}>
+                  <ProductCard product={r} handlingDays={r.handlingDays} />
+                </View>
+              ))}
+            </View>
+          )
+        }}
+        ListHeaderComponent={header}
+        ListEmptyComponent={empty}
+        ListFooterComponent={footer}
+        onEndReached={() => {
+          if (!grouped && control.hasMore && !control.loadingMore && !control.error) control.loadMore()
+        }}
+        onEndReachedThreshold={0.6}
+        showsVerticalScrollIndicator={false}
+      />
+      <FilterSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        params={params}
+        categories={first?.categories ?? []}
+        brands={sheetBrands}
+        facets={first?.facets ?? EMPTY_FACETS}
+        offers={first?.offers ?? []}
+        onApply={apply}
+      />
+      <CompareBar inTabs />
     </View>
   )
 }

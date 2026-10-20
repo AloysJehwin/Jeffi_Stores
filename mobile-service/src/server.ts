@@ -4,6 +4,7 @@
 // so order creation, payments and auth keep one implementation. Endpoints move off the proxy one at a
 // time as they get a native handler here.
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
+import { Readable } from 'node:stream'
 import rateLimit from '@fastify/rate-limit'
 import Redis from 'ioredis'
 import { request as undici } from 'undici'
@@ -26,6 +27,9 @@ function db(): pg.Pool {
 }
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' }, genReqId: () => randomUUID(), trustProxy: true })
+
+// Anything that isn't JSON (multipart uploads, form posts) is forwarded untouched as a stream.
+app.addContentTypeParser('*', (_req, payload, done) => done(null, payload))
 
 // Accept an empty JSON body (DELETE / body-less POST with Content-Type: application/json).
 app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
@@ -77,16 +81,36 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
   headers['x-forwarded-for'] = req.ip
   headers['x-request-id'] = req.id
   headers['x-jeffi-client'] = 'mobile'
+  // Auth responses are rewritten below (token injection), so ask for them uncompressed.
+  if (req.url.startsWith('/api/auth/')) delete headers['accept-encoding']
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
   const res = await undici(CONTROLLER_URL + req.url, {
     method: req.method as any,
     headers,
-    body: hasBody ? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {})) : undefined,
+    body: !hasBody
+      ? undefined
+      : req.body instanceof Readable
+        ? req.body
+        : typeof req.body === 'string'
+          ? req.body
+          : JSON.stringify(req.body ?? {}),
     headersTimeout: 30_000,
     bodyTimeout: 120_000,
   })
-  for (const [k, v] of Object.entries(res.headers)) if (v && !HOP.has(k) && k !== 'set-cookie') reply.header(k, v as string)
-  if (res.headers['set-cookie']) reply.header('set-cookie', res.headers['set-cookie'] as string[])
+  const cookies = ([] as string[]).concat((res.headers['set-cookie'] as string | string[] | undefined) ?? [])
+  // Sign-in responses carry the session only as a cookie; the app keeps it as a bearer token instead
+  // (the controller accepts `Authorization: Bearer <sid>`), so copy it into the JSON body as `token`.
+  const sid = cookies.map(c => /^user_sid=([^;]+)/.exec(c)?.[1]).find(v => v && v !== 'deleted')
+  const json = String(res.headers['content-type'] ?? '').includes('application/json')
+  for (const [k, v] of Object.entries(res.headers)) {
+    if (v && !HOP.has(k) && k !== 'set-cookie' && !(sid && json && k === 'content-encoding')) reply.header(k, v as string)
+  }
+  if (cookies.length) reply.header('set-cookie', cookies)
+  if (sid && json) {
+    const body = await res.body.json().catch(() => null)
+    if (body && typeof body === 'object' && !Array.isArray(body)) return reply.code(res.statusCode).send({ ...body, token: decodeURIComponent(sid) })
+    return reply.code(res.statusCode).send(body)
+  }
   return reply.code(res.statusCode).send(res.body)
 }
 app.all('/api/*', forward)

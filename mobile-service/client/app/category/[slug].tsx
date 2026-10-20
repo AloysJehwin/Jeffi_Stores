@@ -1,93 +1,121 @@
-import { View, Text, FlatList, TouchableOpacity } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { Ionicons } from '@expo/vector-icons'
-import { listProducts } from '../../src/api/products'
-import { listCategories } from '../../src/api/categories'
+import { Pressable, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useQuery } from '@tanstack/react-query'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { listCategories, withDetails, type CategoryDetail } from '../../src/api/categories'
+import { getHome } from '../../src/api/home'
 import TopNav from '../../src/components/layout/TopNav'
-import ProductCard from '../../src/components/product/ProductCard'
-import { useStoreConfig } from '../../src/hooks/useStoreConfig'
-import { toCard } from '../../src/lib/card'
+import CategoryIcon from '../../src/components/catalog/CategoryIcon'
+import CompareBar from '../../src/components/catalog/CompareBar'
+import PagedProductGrid from '../../src/components/catalog/PagedProductGrid'
+import { Breadcrumb, EmptyCard } from '../../src/components/catalog/Paged'
+import { Grid } from '../../src/components/home/layout'
 import Spinner from '../../src/components/ui/Spinner'
+import { accent } from '../../src/theme'
 
-const PAGE_SIZE = 21
+// Mirror of controller-service app/(storefront)/categories/[slug]/page.tsx at the mobile breakpoint.
 
-export default function CategoryScreen() {
-  const { gstEnabled } = useStoreConfig().flags
-  const { slug } = useLocalSearchParams<{ slug: string }>()
+const PAGE_SIZE = 24
+
+function SubcategoryTile({ category }: { category: CategoryDetail }) {
   const router = useRouter()
-
-  const { data: categoriesData } = useQuery({
-    queryKey: ['categories'],
-    queryFn: listCategories,
-    staleTime: 5 * 60 * 1000,
-  })
-  const category = categoriesData?.find((c) => c.slug === slug)
-
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
-    queryKey: ['products', 'category', slug],
-    queryFn: ({ pageParam = 1 }) => listProducts({ category: slug, page: pageParam as number }),
-    getNextPageParam: (lastPage, pages) => {
-      if (pages.length * PAGE_SIZE < lastPage.total) return pages.length + 1
-      return undefined
-    },
-    initialPageParam: 1,
-  })
-
-  const products = data?.pages.flatMap((p) => p.products) || []
-  const total = data?.pages[0]?.total ?? 0
-
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-[#1a1b23]">
-      <TopNav />
-
-      {/* Category header */}
-      <View className="bg-white dark:bg-[#24252f] border-b border-gray-100 dark:border-[#3f4150] px-4 py-3">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="flex-row items-center gap-1 mb-2"
-        >
-          <Ionicons name="arrow-back" size={16} color="#9CA3AF" />
-          <Text className="text-sm text-gray-400">Categories</Text>
-        </TouchableOpacity>
-        <Text className="text-2xl font-extrabold text-gray-900 dark:text-gray-100" style={{ fontStyle: 'italic' }}>
-          {category?.name || slug}
-        </Text>
-        {total > 0 && (
-          <Text className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {total} product{total !== 1 ? 's' : ''}
-          </Text>
-        )}
-      </View>
-
-      {isLoading ? (
-        <Spinner />
-      ) : products.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <Ionicons name="cube-outline" size={64} color="#9CA3AF" />
-          <Text className="text-gray-900 dark:text-gray-100 text-lg font-bold mt-4">No products found</Text>
-          <Text className="text-gray-500 dark:text-gray-400 text-sm mt-1 text-center">
-            No products in this category yet.
+    <Pressable onPress={() => router.push(`/category/${category.slug}`)} className="flex-1">
+      <View className="flex-1 items-center gap-1.5 rounded-xl border border-border-default bg-surface-elevated p-2 shadow-sm">
+        <View className="h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-100">
+          <CategoryIcon iconName={category.icon_name} categoryName={category.name} size={20} color={accent[600]} />
+        </View>
+        <View className="min-h-[32px] items-center justify-center">
+          <Text numberOfLines={2} className="text-center text-[11px] font-semibold text-foreground" style={{ lineHeight: 13.75 }}>
+            {category.name}
           </Text>
         </View>
-      ) : (
-        <FlatList
-          data={products}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          contentContainerStyle={{ padding: 12, paddingBottom: 32 }}
-          columnWrapperStyle={{ gap: 12, marginBottom: 12 }}
-          renderItem={({ item }) => (
-            <View style={{ width: '47.5%' }}>
-              <ProductCard product={toCard(item, gstEnabled)} />
-            </View>
-          )}
-          onEndReached={() => hasNextPage && fetchNextPage()}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={isFetchingNextPage ? <Spinner /> : null}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      </View>
+    </Pressable>
+  )
+}
+
+export default function CategoryScreen() {
+  const { slug } = useLocalSearchParams<{ slug: string }>()
+  const router = useRouter()
+  const insets = useSafeAreaInsets()
+  const { data: all, isLoading } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
+  const { data: home } = useQuery({ queryKey: ['home'], queryFn: getHome, staleTime: 120_000 })
+  const categories = withDetails(all ?? [], home?.data.mainCategories as Record<string, any>[] | undefined)
+  const category = categories.find(c => c.slug === slug)
+  const subcategories = category
+    ? categories.filter(c => c.parent_category_id === category.id).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    : []
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-surface">
+        <TopNav />
+        <Spinner />
+      </View>
+    )
+  }
+
+  if (!category) {
+    return (
+      <View className="flex-1 bg-surface">
+        <TopNav />
+        <View className="p-4">
+          <EmptyCard title="Category not found" body="This category doesn't exist or is no longer available." />
+        </View>
+      </View>
+    )
+  }
+
+  const header = (total: number | null) => (
+    <>
+      <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
+        <View className="mb-4">
+          <Breadcrumb
+            items={[
+              { label: 'Home', onPress: () => router.navigate('/(tabs)') },
+              { label: 'Categories', onPress: () => router.push('/categories') },
+              { label: category.name },
+            ]}
+          />
+        </View>
+        <Text className="mb-2 text-3xl font-bold text-secondary-500 dark:text-foreground">{category.name}</Text>
+        {category.description ? <Text className="text-foreground-secondary">{category.description}</Text> : null}
+      </View>
+
+      <View className="px-4 pt-4">
+        {subcategories.length > 0 ? (
+          <View className="mb-8">
+            <Text className="mb-4 text-xl font-bold text-foreground">Subcategories</Text>
+            <Grid cols={4} gap={8}>
+              {subcategories.map(sub => (
+                <SubcategoryTile key={sub.id} category={sub} />
+              ))}
+            </Grid>
+          </View>
+        ) : null}
+        <View className="mb-6 flex-row items-center justify-between">
+          <Text className="text-xl font-bold text-foreground">Products ({total ?? 0})</Text>
+        </View>
+      </View>
+    </>
+  )
+
+  return (
+    <View className="flex-1 bg-surface">
+      <TopNav />
+      <PagedProductGrid
+        base={{ category: category.slug }}
+        pageSize={PAGE_SIZE}
+        cols={2}
+        gap={12}
+        header={header}
+        bottomInset={insets.bottom}
+        empty={
+          <EmptyCard title="No Products Yet" body="We're working on adding products to this category. Check back soon!" />
+        }
+      />
+      <CompareBar />
     </View>
   )
 }

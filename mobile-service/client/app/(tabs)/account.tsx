@@ -1,304 +1,256 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, Switch, ScrollView, TextInput, Alert } from 'react-native'
+import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
-import { useMutation } from '@tanstack/react-query'
-import { useAuthStore } from '../../src/stores/authStore'
-import { logout } from '../../src/api/auth'
-import { useCartStore } from '../../src/stores/cartStore'
-import { useThemeStore } from '../../src/stores/themeStore'
-import { useQueryClient } from '@tanstack/react-query'
-import { api } from '../../src/api/client'
+import { useColorScheme } from 'nativewind'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import TopNav from '../../src/components/layout/TopNav'
+import { clearSearchHistory, getDashboard, getSearchHistory } from '../../src/api/account'
+import { useStoreConfig } from '../../src/hooks/useStoreConfig'
+import { openHref } from '../../src/lib/links'
+import { accent, status, useTokens } from '../../src/theme'
+import HeroIcon from '../../src/components/account/HeroIcon'
+import Gradient from '../../src/components/account/Gradient'
+import ProfileCard from '../../src/components/account/ProfileCard'
+import BuyAgainRow from '../../src/components/account/BuyAgainRow'
+import { AccountMobileTabBar } from '../../src/components/account/AccountMobileHeader'
+import { useAccountUser, useSignOut } from '../../src/components/account/hooks'
+import { NEUTRAL_TONE, ORDER_STATUS_TONE, StatusPill } from '../../src/components/account/ui'
 
-type Tab = 'profile' | 'orders' | 'transactions' | 'addresses' | 'wishlist'
+// Mirror of controller-service app/(storefront)/account/page.tsx at the mobile breakpoint.
 
-const TABS: { key: Tab; label: string; icon: string; route?: string }[] = [
-  { key: 'profile', label: 'Profile', icon: 'person-outline' },
-  { key: 'orders', label: 'My Orders', icon: 'bag-outline', route: '/orders' },
-  { key: 'transactions', label: 'Transactions', icon: 'receipt-outline', route: '/account/transactions' },
-  { key: 'addresses', label: 'Addresses', icon: 'location-outline', route: '/account/addresses' },
-  { key: 'wishlist', label: 'Wishlist', icon: 'heart-outline', route: '/(tabs)/wishlist' },
-]
+const DASH_LABEL: Record<string, string> = {
+  cancel_requested: 'Cancel Requested',
+  out_for_delivery: 'Out for Delivery',
+  granted: 'Access granted',
+  return_requested: 'Return Requested',
+  return_approved: 'Return Approved',
+  return_received: 'Return Received',
+  return_rejected: 'Return Rejected',
+}
+// The dashboard's own colour map (smaller than the orders page's).
+const DASH_TONE_KEYS = ['pending', 'confirmed', 'shipped', 'out_for_delivery', 'delivered', 'granted', 'cancelled', 'cancel_requested', 'return_requested', 'returned']
+const dashTone = (s: string) => (DASH_TONE_KEYS.includes(s) ? ORDER_STATUS_TONE[s] : NEUTRAL_TONE)
+const dashLabel = (s: string) => DASH_LABEL[s] ?? s.charAt(0).toUpperCase() + s.slice(1)
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function SignedOut() {
+  const router = useRouter()
+  const config = useStoreConfig()
   return (
-    <View className="flex-row items-center justify-between py-3 border-b border-gray-100 dark:border-[#3f4150]">
-      <Text className="text-sm text-gray-500 dark:text-gray-400">{label}</Text>
-      <Text className="text-sm font-medium text-gray-900 dark:text-gray-100 text-right max-w-[60%]" numberOfLines={1}>
-        {value}
-      </Text>
+    <View className="flex-1 bg-surface">
+      <TopNav />
+      <View className="flex-1 justify-center px-4">
+        <View className="bg-surface-elevated rounded-lg p-4" style={{ boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)' }}>
+          <Text className="text-3xl font-bold text-foreground text-center">Welcome Back</Text>
+          <Text className="mt-2 text-sm text-foreground-secondary text-center">Login to your {config.identity.name || 'Jeffi Stores'} account</Text>
+          <Pressable onPress={() => router.push('/(auth)/login')} className="mt-8 bg-accent-500 rounded-lg py-3 items-center">
+            <Text className="text-white font-semibold">Sign In</Text>
+          </Pressable>
+          <Text className="mt-6 text-center text-sm text-foreground-secondary">
+            Don&apos;t have an account?{' '}
+            <Text className="text-accent-600 dark:text-accent-400 font-medium" onPress={() => router.push('/(auth)/signup')}>
+              Create one
+            </Text>
+          </Text>
+        </View>
+      </View>
     </View>
   )
 }
 
 export default function AccountScreen() {
   const router = useRouter()
-  const { user, clearAuth, setAuth, token } = useAuthStore()
-  const { reset: resetCart } = useCartStore()
-  const { colorScheme, toggle } = useThemeStore()
+  const t = useTokens()
   const qc = useQueryClient()
+  const { colorScheme } = useColorScheme()
+  const dark = colorScheme === 'dark'
+  const user = useAccountUser()
+  const signOut = useSignOut()
 
-  const [activeTab, setActiveTab] = useState<Tab>('profile')
-  const [isEditing, setIsEditing] = useState(false)
-  const [firstName, setFirstName] = useState(user?.firstName || '')
-  const [lastName, setLastName] = useState(user?.lastName || '')
-  const [phone, setPhone] = useState((user?.phone || '').replace(/^\+91/, ''))
+  const { data: dashboard } = useQuery({ queryKey: ['account-dashboard', user?.id ?? null], queryFn: getDashboard, enabled: !!user })
+  const historyKey = ['search-history', user?.id ?? null]
+  const { data: searchHistory = [] } = useQuery({ queryKey: historyKey, queryFn: getSearchHistory, enabled: !!user })
 
-  const handleLogout = async () => {
-    await logout()
-    await clearAuth()
-    resetCart()
-    qc.clear()
-  }
+  if (!user) return <SignedOut />
 
-  const updateMutation = useMutation({
-    mutationFn: () => api('/api/user/profile', {
-      method: 'PUT',
-      body: JSON.stringify({ firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() }),
-    }),
-    onSuccess: async (data: any) => {
-      await setAuth(data.user, token!)
-      setIsEditing(false)
-      Alert.alert('Success', 'Profile updated successfully.')
-    },
-    onError: (err: any) => Alert.alert('Error', err.message || 'Failed to update profile'),
-  })
-
-  const handleTabPress = (tab: typeof TABS[number]) => {
-    if (tab.route) {
-      router.push(tab.route as any)
-    } else {
-      setActiveTab(tab.key)
-      setIsEditing(false)
-    }
-  }
-
-  if (!user) {
-    return (
-      <View className="flex-1 bg-gray-50 dark:bg-[#1a1b23]">
-        <TopNav />
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="w-24 h-24 rounded-full bg-gray-100 dark:bg-[#24252f] items-center justify-center mb-4">
-            <Ionicons name="person-outline" size={48} color="#9CA3AF" />
-          </View>
-          <Text className="text-gray-900 dark:text-gray-100 text-xl font-bold">Welcome Back</Text>
-          <Text className="text-gray-400 dark:text-gray-500 text-sm mt-1 text-center">
-            Login to your Jeffi Stores account
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/login')}
-            className="mt-6 bg-accent-500 py-4 rounded-xl w-full items-center"
-          >
-            <Text className="text-white font-bold text-base">Sign In</Text>
-          </TouchableOpacity>
-          <Text className="text-gray-500 dark:text-gray-400 text-sm mt-4">
-            Don&apos;t have an account?{' '}
-            <Text className="text-accent-500 font-semibold" onPress={() => router.push('/(auth)/login')}>
-              Create one
-            </Text>
-          </Text>
-        </View>
-      </View>
-    )
-  }
-
-  const memberSince = user.createdAt
-    ? new Date(user.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
-    : '—'
-
-  const displayPhone = user.phone
-    ? (user.phone.startsWith('+91') ? user.phone : `+91 ${user.phone}`)
-    : '—'
+  const spent = dashboard ? `₹${Number(dashboard.stats.total_spent).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—'
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-[#1a1b23]">
+    <View className="flex-1 bg-surface">
       <TopNav />
-
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Green header — matches website accent-500 */}
-        <View className="bg-accent-500 pt-6 pb-14 px-4">
-          <Text className="text-white/80 text-sm font-semibold mb-4">My Account</Text>
+        {/* Hero header */}
+        <View className="px-4 pt-8 pb-14">
+          <Gradient from={dark ? accent[700] : accent[600]} to={dark ? accent[600] : accent[500]} />
           <View className="flex-row items-center gap-4">
-            <View className="w-16 h-16 rounded-full bg-white/20 items-center justify-center">
-              <Text className="text-white text-2xl font-black">
-                {user.firstName?.[0]?.toUpperCase() || user.email[0]?.toUpperCase()}
-              </Text>
-            </View>
-            <View className="flex-1">
-              <Text className="text-xl font-bold text-white" numberOfLines={1}>
-                {user.firstName} {user.lastName}
-              </Text>
-              <Text className="text-sm text-white/70 mt-0.5" numberOfLines={1}>{user.email}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Horizontal tab nav — overlapping the header */}
-        <View className="mx-4 -mt-8 mb-4 z-10">
-          <View className="bg-white dark:bg-[#24252f] rounded-xl shadow-md border border-gray-100 dark:border-[#3f4150] overflow-hidden">
-            <View className="flex-row">
-              {TABS.map((tab) => {
-                const isActive = activeTab === tab.key && !tab.route
-                return (
-                  <TouchableOpacity
-                    key={tab.key}
-                    onPress={() => handleTabPress(tab)}
-                    className={`flex-1 items-center py-3 gap-1 border-b-2 ${
-                      isActive
-                        ? 'border-accent-500'
-                        : 'border-transparent'
-                    }`}
-                  >
-                    <Ionicons
-                      name={tab.icon as any}
-                      size={18}
-                      color={isActive ? '#7cb900' : '#9CA3AF'}
-                    />
-                    <Text
-                      className={`text-center font-medium ${isActive ? 'text-accent-600 dark:text-accent-400' : 'text-gray-400 dark:text-gray-500'}`}
-                      style={{ fontSize: 9, lineHeight: 13 }}
-                      numberOfLines={2}
-                    >
-                      {tab.label}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
-            </View>
-          </View>
-        </View>
-
-        {/* Profile content */}
-        <View className="mx-4">
-          <View className="bg-white dark:bg-[#24252f] rounded-xl border border-gray-100 dark:border-[#3f4150] p-4">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-base font-bold text-gray-900 dark:text-gray-100">Profile Information</Text>
-              {!isEditing && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setFirstName(user.firstName || '')
-                    setLastName(user.lastName || '')
-                    setPhone((user.phone || '').replace(/^\+91/, ''))
-                    setIsEditing(true)
-                  }}
-                  className="px-3 py-1 rounded-lg border border-accent-200 dark:border-accent-800"
-                >
-                  <Text className="text-sm text-accent-600 dark:text-accent-400 font-medium">Edit</Text>
-                </TouchableOpacity>
+            <View className="w-16 h-16 rounded-2xl overflow-hidden">
+              {user.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+              ) : (
+                <View className="w-full h-full bg-white/20 items-center justify-center">
+                  <Text className="text-2xl font-bold text-white">{user.firstName?.[0]?.toUpperCase() || 'U'}</Text>
+                </View>
               )}
             </View>
-
-            {!isEditing ? (
-              <View>
-                <InfoRow label="Email" value={user.email} />
-                <InfoRow label="First Name" value={user.firstName || '—'} />
-                <InfoRow label="Last Name" value={user.lastName || '—'} />
-                <InfoRow label="Phone" value={displayPhone} />
-                <View className="flex-row items-center justify-between py-3">
-                  <Text className="text-sm text-gray-500 dark:text-gray-400">Member Since</Text>
-                  <Text className="text-sm font-medium text-gray-900 dark:text-gray-100">{memberSince}</Text>
-                </View>
+            <View className="flex-1">
+              <Text className="text-lg font-bold text-white leading-tight" numberOfLines={1}>
+                {user.firstName} {user.lastName}
+              </Text>
+              <Text className="text-sm text-white/70" numberOfLines={1}>
+                {user.email}
+              </Text>
+            </View>
+            <Pressable onPress={signOut} accessibilityLabel="Sign out" className="p-2 rounded-xl bg-white/10 active:bg-white/20">
+              <HeroIcon name="logout" size={16} color="rgba(255,255,255,0.8)" />
+            </Pressable>
+          </View>
+          <View className="flex-row gap-2 mt-5">
+            {[
+              { value: String(dashboard?.stats.total_orders ?? '—'), label: 'Total Orders', big: true },
+              { value: spent, label: 'Total Spent', big: false },
+              { value: String(dashboard?.stats.active_orders ?? '—'), label: 'Active', big: true },
+            ].map(s => (
+              <View key={s.label} className="flex-1 bg-white/15 rounded-xl p-3 items-center">
+                <Text className={`font-bold text-white ${s.big ? 'text-lg' : 'text-sm leading-tight'}`}>{s.value}</Text>
+                <Text className="text-white/70 mt-0.5" style={{ fontSize: 10 }}>
+                  {s.label}
+                </Text>
               </View>
-            ) : (
-              <View className="gap-4">
-                <View>
-                  <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</Text>
-                  <View className="border border-gray-200 dark:border-[#3f4150] rounded-xl px-4 py-3 bg-gray-100 dark:bg-[#2e303b]">
-                    <Text className="text-gray-400">{user.email}</Text>
-                  </View>
-                  <Text className="text-xs text-gray-400 mt-1">Email cannot be changed</Text>
-                </View>
+            ))}
+          </View>
+        </View>
 
-                <View className="flex-row gap-3">
-                  <View className="flex-1">
-                    <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">First Name *</Text>
-                    <TextInput
-                      value={firstName}
-                      onChangeText={setFirstName}
-                      placeholder="First name"
-                      placeholderTextColor="#9CA3AF"
-                      autoCapitalize="words"
-                      className="border border-gray-200 dark:border-[#3f4150] rounded-xl px-4 py-3 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-[#24252f]"
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Last Name</Text>
-                    <TextInput
-                      value={lastName}
-                      onChangeText={setLastName}
-                      placeholder="Last name"
-                      placeholderTextColor="#9CA3AF"
-                      autoCapitalize="words"
-                      className="border border-gray-200 dark:border-[#3f4150] rounded-xl px-4 py-3 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-[#24252f]"
-                    />
-                  </View>
-                </View>
+        <View className="z-10 -mt-12">
+          <AccountMobileTabBar />
+        </View>
 
-                <View>
-                  <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Phone Number</Text>
-                  <View className="flex-row">
-                    <View className="border border-gray-200 dark:border-[#3f4150] border-r-0 rounded-l-xl px-3 py-3 bg-gray-100 dark:bg-[#2e303b] items-center justify-center">
-                      <Text className="text-gray-600 dark:text-gray-400 text-sm font-medium">+91</Text>
-                    </View>
-                    <TextInput
-                      value={phone}
-                      onChangeText={(v) => setPhone(v.replace(/\D/g, ''))}
-                      placeholder="98765 43210"
-                      placeholderTextColor="#9CA3AF"
-                      keyboardType="phone-pad"
-                      maxLength={10}
-                      className="flex-1 border border-gray-200 dark:border-[#3f4150] rounded-r-xl px-4 py-3 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-[#24252f]"
-                    />
-                  </View>
-                </View>
-
-                <View className="flex-row gap-3 pt-1">
-                  <TouchableOpacity
-                    onPress={() => updateMutation.mutate()}
-                    disabled={updateMutation.isPending}
-                    className="flex-1 py-3 bg-accent-500 rounded-xl items-center disabled:opacity-50"
+        <View className="px-4 pb-8">
+          <View className="pt-2 pb-4 gap-4">
+            {/* Recent searches */}
+            {searchHistory.length > 0 && (
+              <View className="bg-surface-elevated rounded-xl border border-border-default p-4">
+                <View className="flex-row items-center justify-between mb-3">
+                  <Text className="text-sm font-semibold text-foreground">Recent Searches</Text>
+                  <Text
+                    className="text-xs text-foreground-muted"
+                    onPress={() => {
+                      clearSearchHistory()
+                      qc.setQueryData(historyKey, [])
+                    }}
                   >
-                    <Text className="text-white font-semibold">
-                      {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setIsEditing(false)}
-                    disabled={updateMutation.isPending}
-                    className="flex-1 py-3 bg-gray-100 dark:bg-[#2e303b] rounded-xl items-center"
-                  >
-                    <Text className="text-gray-600 dark:text-gray-300 font-semibold">Cancel</Text>
-                  </TouchableOpacity>
+                    Clear all
+                  </Text>
+                </View>
+                <View className="flex-row flex-wrap gap-2">
+                  {searchHistory.map(q => (
+                    <Pressable
+                      key={q}
+                      onPress={() => openHref(router, `/products?search=${encodeURIComponent(q)}`)}
+                      className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-border-secondary"
+                    >
+                      <HeroIcon name="search" size={12} color={t.foregroundSecondary} />
+                      <Text className="text-xs text-foreground-secondary">{q}</Text>
+                    </Pressable>
+                  ))}
                 </View>
               </View>
             )}
-          </View>
 
-          {/* Dark mode toggle */}
-          <View className="mt-3 bg-white dark:bg-[#24252f] rounded-xl overflow-hidden border border-gray-100 dark:border-[#3f4150]">
-            <View className="flex-row items-center px-4 py-4">
-              <View className="w-9 h-9 rounded-full bg-gray-100 dark:bg-[#2e303b] items-center justify-center mr-3">
-                <Ionicons name="moon-outline" size={18} color="#f59e0b" />
+            <ProfileCard />
+
+            {/* Default address */}
+            <View className="bg-surface-elevated rounded-xl border border-border-default p-4">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-sm font-semibold text-foreground">Default Address</Text>
+                <Pressable onPress={() => router.push('/account/addresses')} className="px-2.5 py-1 rounded-lg border border-accent-200 dark:border-accent-800">
+                  <Text className="text-xs text-accent-600 dark:text-accent-400 font-medium">Manage</Text>
+                </Pressable>
               </View>
-              <Text className="flex-1 text-gray-800 dark:text-gray-200 font-medium">Dark Mode</Text>
-              <Switch
-                value={colorScheme === 'dark'}
-                onValueChange={toggle}
-                trackColor={{ false: '#E5E7EB', true: '#7cb900' }}
-                thumbColor="#ffffff"
-              />
+              {dashboard?.defaultAddress ? (
+                <View className="gap-1">
+                  <Text className="font-semibold text-foreground text-sm">{dashboard.defaultAddress.full_name}</Text>
+                  <Text className="text-xs text-foreground-secondary">{dashboard.defaultAddress.address_line1}</Text>
+                  {!!dashboard.defaultAddress.address_line2 && <Text className="text-xs text-foreground-secondary">{dashboard.defaultAddress.address_line2}</Text>}
+                  {!!dashboard.defaultAddress.landmark && <Text className="text-xs text-foreground-muted">Near {dashboard.defaultAddress.landmark}</Text>}
+                  <Text className="text-xs text-foreground-secondary">
+                    {dashboard.defaultAddress.city}, {dashboard.defaultAddress.state} — {dashboard.defaultAddress.postal_code}
+                  </Text>
+                  <Text className="text-xs text-foreground-muted pt-1">{dashboard.defaultAddress.phone}</Text>
+                </View>
+              ) : (
+                <View className="h-24 items-center justify-center">
+                  <Text className="text-xs text-foreground-muted mb-2">No default address saved</Text>
+                  <Text className="text-xs text-accent-600 dark:text-accent-400 font-medium underline" onPress={() => router.push('/account/addresses')}>
+                    Add an address
+                  </Text>
+                </View>
+              )}
             </View>
-          </View>
 
-          {/* Sign out */}
-          <TouchableOpacity
-            onPress={handleLogout}
-            className="mt-3 mb-8 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-800 px-4 py-4 flex-row items-center justify-center gap-2"
-          >
-            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            <Text className="text-red-600 font-semibold">Sign Out</Text>
-          </TouchableOpacity>
+            {/* Recent orders */}
+            <View className="bg-surface-elevated rounded-xl border border-border-default p-4">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-sm font-semibold text-foreground">Recent Orders</Text>
+                <Text className="text-xs text-accent-600 dark:text-accent-400 font-medium" onPress={() => router.push('/orders')}>
+                  View all
+                </Text>
+              </View>
+              {!dashboard || dashboard.recentOrders.length === 0 ? (
+                <View className="items-center py-6">
+                  <Text className="text-sm text-foreground-muted mb-3">No orders yet</Text>
+                  <Text className="text-xs text-accent-600 dark:text-accent-400 font-medium underline" onPress={() => router.navigate('/(tabs)/products')}>
+                    Start shopping
+                  </Text>
+                </View>
+              ) : (
+                <View className="gap-2">
+                  {dashboard.recentOrders.map(order => (
+                    <Pressable key={order.id} onPress={() => router.push(`/orders/${order.id}`)} className="flex-row items-center gap-3 p-3 rounded-xl active:bg-surface">
+                      <View className="flex-row">
+                        {order.items.slice(0, 3).map((item, i) => (
+                          <View
+                            key={i}
+                            className="w-10 h-10 rounded-lg border-2 border-border-default overflow-hidden bg-surface items-center justify-center"
+                            style={{ marginLeft: i === 0 ? 0 : -8 }}
+                          >
+                            {item.thumbnail_url ? (
+                              <Image source={{ uri: item.thumbnail_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                            ) : (
+                              <HeroIcon name="photo" size={20} color={t.foregroundMuted} strokeWidth={1.5} />
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-xs font-mono text-foreground-muted">#{order.order_number}</Text>
+                        <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+                          {order.items[0]?.product_name}
+                          {order.items.length > 1 && <Text className="text-foreground-muted"> +{order.items.length - 1} more</Text>}
+                        </Text>
+                        <Text className="text-xs text-foreground-muted">
+                          {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </Text>
+                      </View>
+                      <View className="items-end gap-1">
+                        <Text className="text-sm font-semibold text-foreground">₹{Number(order.total_amount).toLocaleString('en-IN')}</Text>
+                        <StatusPill tone={dashTone(order.status)} label={dashLabel(order.status)} className="px-2 py-0.5" textClass="text-[10px] font-medium" />
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <BuyAgainRow />
+
+            {/* Sign out */}
+            <Pressable
+              onPress={signOut}
+              className="w-full flex-row items-center justify-center gap-2 py-3 rounded-xl border border-red-200 dark:border-red-900/40 active:bg-red-50"
+            >
+              <HeroIcon name="logout" size={16} color={dark ? status.heart : status.danger} />
+              <Text className="text-red-600 dark:text-red-400 text-sm font-medium">Sign Out</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </View>

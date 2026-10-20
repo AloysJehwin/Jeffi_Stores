@@ -25,12 +25,21 @@ that affects the mobile viewport lands here too, in the same PR.
 | 1 | Shell: header (logo, search, cart badge, drawer), bottom tabs, drawer menu | `visitor/Header.tsx`, `MobileDrawer.tsx` | `components/layout/TopNav`, `(tabs)/_layout` | done 2026-10-20 (header, search overlay, drawer) |
 | 2 | Home: hero carousel (Top Picks), perks strip, offer slider, Shop by Category, Featured Products, brands row, New Arrivals, Explore categories with product tiles | `HeroCarousel`, `OfferSlider`, `FeaturedProducts`, `FeaturedForYou`, `(storefront)/page.tsx` | `(tabs)/index.tsx` + `components/home/*` | done 2026-10-20: `GET /api/home` serves the page's model (`lib/catalog/homepage-model.ts`); every section type has an RN twin |
 | 3 | ProductCard: discount badge, SALE ribbon, brand/category lines, "From ₹", strike price, "Inclusive of all taxes", stock + "View Details →", "Deliver by", round add/wishlist buttons | `visitor/ProductCard.tsx`, `QuickAddButton` | `components/product/ProductCard.tsx` | done 2026-10-20 |
-| 4 | Product list + categories: search bar, Filters sheet, pagination, category tiles with tag chips | `ProductGrid`, `FilterSidebar`/`MobileFilterSheet`, `ListPagination`, `categories/page` | `(tabs)/products`, `categories/*`, `category/[slug]` | |
-| 5 | PDP: breadcrumb, gallery + thumbs, SALE ribbon, variant chips, price block (you save, incl. taxes), qty stepper with min/max, Buy Now / Add to Cart, bank offers strip, perks grid, pincode check, specifications, compare strip, description, sticky bottom bar | `ProductDetailClient`, `ProductImageGallery`, `ProductActions`, `PdpCompareSection` | `product/[slug].tsx` + `components/pdp/*` | |
-| 6 | Cart, wishlist, compare | `(storefront)/cart`, `wishlist`, `CompareBar` | `(tabs)/cart`, `(tabs)/wishlist` | |
-| 7 | Auth + account: email OTP sign-in, Google, account home, orders, addresses, transactions, referrals/rewards | `(storefront)/account/*`, `AccountMobileHeader`, `AccountSidebar` | `(auth)/*`, `account/*`, `orders/*` | |
-| 8 | Checkout: review, payment (Razorpay from server key, COD), order placed | `(storefront)/checkout` | `checkout/*` | |
+| 4 | Product list + categories: search bar, Filters sheet, pagination, category tiles with tag chips | `ProductGrid`, `FilterSidebar`/`MobileFilterSheet`, `ListPagination`, `categories/page` | `(tabs)/products`, `categories/*`, `category/[slug]`, `brands/*`, `compare` | done 2026-10-20: `GET /api/products/listing` serves the page's model (`lib/catalog/listing-model.ts`) |
+| 5 | PDP: breadcrumb, gallery + thumbs, SALE ribbon, variant chips, price block (you save, incl. taxes), qty stepper with min/max, Buy Now / Add to Cart, bank offers strip, perks grid, pincode check, specifications, compare strip, description, sticky bottom bar | `ProductDetailClient`, `ProductImageGallery`, `ProductActions`, `PdpCompareSection` | `product/[slug].tsx` + `components/pdp/*` | done 2026-10-20 (review writing opens the web) |
+| 6 | Cart, wishlist, compare | `(storefront)/cart`, `wishlist`, `CompareBar` | `(tabs)/cart`, `(tabs)/wishlist` | done 2026-10-20 |
+| 7 | Auth + account: email OTP sign-in, Google, account home, orders, addresses, transactions, referrals/rewards | `(storefront)/account/*`, `AccountMobileHeader`, `AccountSidebar` | `(auth)/*`, `account/*`, `orders/*` | done 2026-10-20 (Google needs the Android OAuth client) |
+| 8 | Checkout: review, payment (Razorpay from server key, COD), order placed | `(storefront)/checkout` | `checkout/*` | done 2026-10-20 (Razorpay draft flow like the web; COD fixed) |
 | 9 | Business (B2B) storefront: business price badge, quotation request | `components/business/*` | `components/business/*` | |
+
+## Info pages
+
+`(marketing)` about / support / legal / return-policy → `info/*`, `legal/*` (`/contact` and `/return-policy` redirect like the web).
+
+## Sessions
+
+Sign-in sets the `user_sid` cookie; mobile-service copies it into the JSON body as `token`, the app stores it in
+SecureStore and sends `Authorization: Bearer <sid>` (the controller reads the bearer before the cookie).
 
 ## Home data contract
 
