@@ -253,14 +253,38 @@ END
 $jeffi$;"""
 
 
+# migra adds every CHECK as NOT VALID, so on the next run live (NOT VALID) differs from desired
+# (valid) and all of them come back: ~90 ALTER TABLEs taking AccessExclusiveLock on most of the
+# schema inside one transaction, every release. That deadlocked against live traffic. Only
+# touch a CHECK whose definition actually differs from what is on the table.
+def _check_adopt(_tbl, _con, _check, _add):
+    _want = _check.replace("'", "''")
+    _add = _add.replace("'", "''")
+    return f"""DO $jeffi$
+DECLARE v_have text;
+BEGIN
+  SELECT regexp_replace(pg_get_constraintdef(c.oid), '\\s+NOT VALID$', '') INTO v_have
+    FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
+   WHERE n.nspname = 'public' AND t.relname = '{_tbl}' AND c.conname = '{_con}' AND c.contype = 'c';
+  IF v_have IS NOT NULL AND lower(regexp_replace(v_have, '\\s+', ' ', 'g')) = lower(regexp_replace('{_want}', '\\s+', ' ', 'g')) THEN
+    RETURN;
+  END IF;
+  EXECUTE 'ALTER TABLE public.{_tbl} DROP CONSTRAINT IF EXISTS {_con}';
+  EXECUTE '{_add}';
+  RAISE NOTICE 'check {_con} on public.{_tbl} %', CASE WHEN v_have IS NULL THEN 'added' ELSE 'updated' END;
+END
+$jeffi$;"""
+
+
 _healed = []
 for _stmt in '\n'.join(output).split(';'):
     _s = _stmt.strip()
     if not _s:
         continue
-    _m = _re.match(r'(?is)^\s*alter\s+table\s+(?:only\s+)?(\S+)\s+add\s+constraint\s+(\S+)\s+check\b', _s)
+    _m = _re.match(r'(?is)^\s*alter\s+table\s+(?:only\s+)?(\S+)\s+add\s+constraint\s+(\S+)\s+(check\b.*?)(?:\s+not\s+valid)?\s*$', _s)
     if _m:
-        _healed.append(f'ALTER TABLE {_m.group(1)} DROP CONSTRAINT IF EXISTS {_m.group(2)};')
+        _healed.append(_check_adopt(_m.group(1).split('.')[-1].strip('"'), _m.group(2).strip('"'), _m.group(3), _s))
+        continue
     _pk = _re.match(r'(?is)^\s*alter\s+table\s+(?:only\s+)?(\S+)\s+add\s+constraint\s+(\S+)\s+primary\s+key\b', _s)
     if _pk:
         _healed.append(_pk_adopt(_pk.group(1).split('.')[-1].strip('"'), _pk.group(2).strip('"')))
