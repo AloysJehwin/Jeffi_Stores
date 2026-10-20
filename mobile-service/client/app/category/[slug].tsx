@@ -20,7 +20,7 @@ const PAGE_SIZE = 24
 function SubcategoryTile({ category }: { category: CategoryDetail }) {
   const router = useRouter()
   return (
-    <Pressable onPress={() => router.push(`/category/${category.slug}`)} className="flex-1">
+    <Pressable onPress={() => router.push(`/category/${category.slug}`)} className="grow">
       <View className="flex-1 items-center gap-1.5 rounded-xl border border-border-default bg-surface-elevated p-2 shadow-sm">
         <View className="h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-100">
           <CategoryIcon iconName={category.icon_name} categoryName={category.name} size={20} color={accent[600]} />
