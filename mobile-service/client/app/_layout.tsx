@@ -1,6 +1,6 @@
 import '../global.css'
 import { useEffect } from 'react'
-import { Stack } from 'expo-router'
+import { Stack, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -11,6 +11,7 @@ import { getStoredToken } from '../src/api/client'
 import { getMe } from '../src/api/auth'
 import { getCart } from '../src/api/cart'
 import Toast from '../src/components/ui/Toast'
+import { trackScreen } from '../src/lib/analytics'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +21,16 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+/** GA4 screen_view per route pattern (the web gets page_view from the Google tag). */
+function ScreenTracker() {
+  const segments = useSegments() as string[]
+  const screen = segments.filter(s => !s.startsWith('(')).join('/') || 'home'
+  useEffect(() => {
+    trackScreen(screen)
+  }, [screen])
+  return null
+}
 
 function AuthRehydrator() {
   const { setAuth, setLoading } = useAuthStore()
@@ -76,6 +87,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthRehydrator />
+          <ScreenTracker />
           <CartRehydrator />
           <StatusBar style="auto" />
           <Stack screenOptions={{ headerShown: false }}>

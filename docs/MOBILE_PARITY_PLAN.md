@@ -41,6 +41,14 @@ that affects the mobile viewport lands here too, in the same PR.
 Sign-in sets the `user_sid` cookie; mobile-service copies it into the JSON body as `token`, the app stores it in
 SecureStore and sends `Authorization: Bearer <sid>` (the controller reads the bearer before the cookie).
 
+## Analytics
+
+The web's Google tag events (`controller-service/src/lib/client/analytics.ts`) are mirrored by
+`client/src/lib/analytics.ts` through Firebase Analytics (project `jeffi-stores-215e5`, `client/google-services.json`),
+with the same names and `item_id` (SKU sanitised like Merchant's offerId): `view_item`, `add_to_cart`,
+`begin_checkout`, `purchase`, plus `screen_view` per route pattern. A new web event gets its app twin in the same PR.
+The Firebase project must be linked to the web's GA4 property so both streams report together.
+
 ## Home data contract
 
 - The web page and the app read one model: `buildHomeModel()` in `controller-service/src/lib/catalog/homepage-model.ts`.

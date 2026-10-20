@@ -6,6 +6,7 @@ import { addPdpToCart, startBuyNow, type CartLine, type PdpProduct, type PdpVari
 import { useAuthStore } from '../../stores/authStore'
 import { showToast } from '../../stores/toastStore'
 import { num, pickUnitPrice, round2, stickyBarAction } from './pdp'
+import { trackAddToCart, trackViewItem } from '../../lib/analytics'
 
 // State and pricing of the web's ProductActions, lifted into a hook so the sticky bar can live outside the scroll view.
 
@@ -317,6 +318,14 @@ export function useProductPurchase(
     setQuantityRaw(isContinuous ? Number(qtyMin.toFixed(6)).toString() : String(qtyMin))
   }, [effectiveUnitKey])
 
+  const optionName = selectedSubVariant?.sub_variant_name || selectedVariant?.variant_name || null
+  const viewedSku = useRef<string | null>(null)
+  useEffect(() => {
+    if (!displaySku || viewedSku.current === displaySku) return
+    viewedSku.current = displaySku
+    trackViewItem({ sku: displaySku, name: product.name, price: effectivePrice, variant: optionName })
+  }, [displaySku, product.name, effectivePrice, optionName])
+
   const needsSub = !!selectedVariant?.sub_variants?.length && !selectedSubVariantId
 
   const handleAddToCart = async () => {
@@ -340,6 +349,7 @@ export function useProductPurchase(
         subVariantId: selectedSubVariantId,
       })
       qc.invalidateQueries({ queryKey: ['cart'] })
+      trackAddToCart({ sku: displaySku, name: product.name, price: effectivePrice, quantity, variant: optionName })
       showToast('Item added to cart!', 'success')
     } catch (e) {
       showToast(e instanceof Error && e.message ? e.message : 'Failed to add to cart', 'error')

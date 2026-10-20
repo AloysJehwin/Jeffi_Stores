@@ -10,6 +10,7 @@ import OrderCelebration from '../../src/components/checkout/OrderCelebration'
 import RecommendedProducts from '../../src/components/checkout/RecommendedProducts'
 import { money, qtyText, unitText } from '../../src/components/cart/lines'
 import { getOrder } from '../../src/api/orders'
+import { trackPurchase } from '../../src/lib/analytics'
 
 // Mirror of controller-service app/(storefront)/account/orders/confirmation/page.tsx (the order placed page).
 
@@ -51,6 +52,24 @@ export default function OrderConfirmationScreen() {
   useEffect(() => {
     if (!orderId) router.replace('/orders')
   }, [orderId, router])
+
+  useEffect(() => {
+    if (!order || order.status === 'cancelled') return
+    trackPurchase({
+      orderNumber: order.orderNumber,
+      totalAmount: order.totalAmount,
+      taxAmount: order.taxAmount,
+      shippingAmount: order.shippingAmount,
+      couponCode: order.couponCode,
+      items: order.items.map(i => ({
+        sku: i.subVariantSku || i.productSku,
+        name: i.productName,
+        price: i.unitPrice,
+        quantity: Number(i.quantity),
+        variant: i.variantName,
+      })),
+    })
+  }, [order])
 
   if (isLoading || !orderId) {
     return (
