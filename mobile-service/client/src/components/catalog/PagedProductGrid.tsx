@@ -86,6 +86,9 @@ export default function PagedProductGrid({
       }
       onEndReached={control.loadMore}
       onEndReachedThreshold={0.6}
+      initialNumToRender={6}
+      maxToRenderPerBatch={6}
+      windowSize={11}
       showsVerticalScrollIndicator={false}
     />
   )

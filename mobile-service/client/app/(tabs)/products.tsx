@@ -256,6 +256,9 @@ export default function ProductsScreen() {
           if (!grouped && control.hasMore && !control.loadingMore && !control.error) control.loadMore()
         }}
         onEndReachedThreshold={0.6}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={11}
         showsVerticalScrollIndicator={false}
       />
       <FilterSheet
