@@ -114,8 +114,8 @@ export function EmptyCard({
   return (
     <View className="items-center rounded-lg border border-border-default bg-surface-elevated p-12 shadow-sm">
       <View className="mb-4">{icon ?? <InboxIcon size={96} strokeWidth={1} color={t.foregroundMuted} />}</View>
-      <Text className="mb-2 text-center text-xl font-semibold text-foreground">{title}</Text>
-      <Text className="mb-6 text-center text-foreground-secondary">{body}</Text>
+      <Text className="mb-2 self-stretch text-center text-xl font-semibold text-foreground">{title}</Text>
+      <Text className="mb-6 self-stretch text-center text-foreground-secondary">{body}</Text>
       <Pressable
         onPress={onPress ?? (() => router.navigate({ pathname: '/(tabs)/products', params: {} }))}
         className="rounded-lg bg-accent-500 px-6 py-3 active:bg-accent-600"

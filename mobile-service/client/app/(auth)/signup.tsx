@@ -17,7 +17,7 @@ import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { showToast } from '../../src/stores/toastStore'
 import { AuthShell, ChannelSelector, CHANNELS, GoogleButton, OtpField, SentNote } from '../../src/components/account/AuthShell'
 import { DobInput, ErrorBox, Input, isValidDob, Label, PhoneInput, PolicyConsent, PrimaryButton } from '../../src/components/account/ui'
-import { useFeatureFlags, useSignOut } from '../../src/components/account/hooks'
+import { useFeatureFlags, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
 import { finishSignIn, getPendingGoogle, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
 
@@ -34,6 +34,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 export default function SignupScreen() {
   const router = useRouter()
+  useLeaveIfSignedIn()
   const params = useLocalSearchParams<{ email?: string; from?: string; google?: string }>()
   const fromLogin = params.from === 'login'
   const prefillEmail = params.email || ''

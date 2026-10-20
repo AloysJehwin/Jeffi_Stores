@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'expo-router'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getFeatureFlags, getMeFull, type AccountUser, type FeatureFlags } from '../../api/account'
@@ -9,6 +9,21 @@ import { useStoreConfig } from '../../hooks/useStoreConfig'
 import type { HeroIconName } from './HeroIcon'
 
 const OFF: FeatureFlags = { smsEnabled: true, whatsappEnabled: true, loyaltyEnabled: false, birthdayEnabled: false, referralEnabled: false }
+
+/** The web's /login and /signup send a signed-in visitor back to the store. Checked once, when the saved
+ *  session has been restored, so a sign-in finishing on the screen keeps its own flow. */
+export function useLeaveIfSignedIn() {
+  const router = useRouter()
+  const isLoading = useAuthStore(s => s.isLoading)
+  const checked = useRef(false)
+  useEffect(() => {
+    if (isLoading || checked.current) return
+    checked.current = true
+    if (!useAuthStore.getState().user) return
+    if (router.canDismiss()) router.dismissAll()
+    else router.replace('/(tabs)')
+  }, [isLoading, router])
+}
 
 /** /api/feature-flags, shared like the web's useStoreFlag. */
 export function useFeatureFlags(): FeatureFlags {
