@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryMany } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
+import { listBrandsWithCounts } from '@/lib/catalog/storefront-counts'
 
 export async function GET(request: NextRequest) {
   try {
+    // ?counts=1: the /brands page's rows (description, logo, active product count) for the app.
+    if (new URL(request.url).searchParams.get('counts') === '1') {
+      const rows = await listBrandsWithCounts()
+      return NextResponse.json({ brands: rows.map(b => ({ ...b, product_count: parseInt(b.product_count, 10) || 0 })) })
+    }
     const brands = await queryMany('SELECT id, name, slug FROM brands WHERE is_active = true ORDER BY name ASC', [])
     return NextResponse.json({ brands: brands || [] })
   } catch (error: any) {

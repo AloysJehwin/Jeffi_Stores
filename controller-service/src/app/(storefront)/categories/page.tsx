@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { queryMany } from '@/lib/shared/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
+import { categoryProductCounts } from '@/lib/catalog/storefront-counts'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,22 +9,9 @@ async function getAllCategories() {
   return queryMany('SELECT * FROM categories WHERE is_active = true ORDER BY display_order ASC')
 }
 
-async function getCategoryProductCounts() {
-  const rows = await queryMany<{ category_id: string; count: string }>(
-    'SELECT category_id, COUNT(*) as count FROM products WHERE is_active = true GROUP BY category_id'
-  )
-
-  const counts: Record<string, number> = {}
-  rows.forEach(row => {
-    counts[row.category_id] = parseInt(row.count, 10)
-  })
-
-  return counts
-}
-
 export default async function CategoriesPage() {
   const categories = await getAllCategories()
-  const productCounts = await getCategoryProductCounts()
+  const productCounts = await categoryProductCounts()
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
   const getSubcategories = (parentId: string) => categories.filter(c => c.parent_category_id === parentId)

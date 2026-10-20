@@ -2,7 +2,7 @@ import { api } from './client'
 import type { Category } from '../types'
 
 export async function listCategories(): Promise<Category[]> {
-  const data = await api<{ categories: Category[] }>('/api/categories', { token: null })
+  const data = await api<{ categories: Category[] }>('/api/categories?counts=1', { token: null })
   return data.categories
 }
 
@@ -14,6 +14,6 @@ export function withDetails(categories: Category[], homeMain: Record<string, any
   const extra = new Map((homeMain ?? []).map(c => [String(c.id), c]))
   return categories.map(c => {
     const e = extra.get(c.id)
-    return e ? { ...c, description: e.description ?? null, icon_name: e.icon_name ?? null } : c
+    return e ? { ...c, description: c.description ?? e.description ?? null, icon_name: c.icon_name ?? e.icon_name ?? null } : c
   })
 }

@@ -15,7 +15,8 @@ export default function BuyAgainRow() {
   const { data: products = [] } = useQuery({ queryKey: ['buy-again', user?.id ?? null], queryFn: getBuyAgain, enabled: !!user })
 
   if (products.length === 0) return null
-  const item = Math.floor(width * 0.45)
+  // 45% like the web, but no narrower than the home carousels' cards: below that a name word breaks mid-word.
+  const item = Math.max(160, Math.floor(width * 0.45))
 
   return (
     <View className="bg-surface-elevated rounded-xl border border-border-default p-4">

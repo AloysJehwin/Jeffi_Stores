@@ -39,12 +39,6 @@ export async function listProducts(params: ProductQuery): Promise<ProductsRespon
   return api(`/api/products?${productsQs(params)}`, { token: null })
 }
 
-/** Total active products for a category slug or brand id (one-row page). */
-export async function countProducts(params: { category?: string; brand?: string }): Promise<number> {
-  const res = await listProducts({ ...params, limit: 1 })
-  return res.total
-}
-
 /** A listing product (GET /api/products/listing): card props plus the grouped/table view fields. */
 export interface ListingCard extends CardProduct {
   categoryId: string | null

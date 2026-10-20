@@ -24,6 +24,10 @@ export interface Category {
   parent_category_id: string | null
   image_url: string | null
   display_order?: number
+  /** With /api/categories?counts=1: description, icon and own active product count. */
+  description?: string | null
+  icon_name?: string | null
+  product_count?: number
 }
 
 export interface Brand {

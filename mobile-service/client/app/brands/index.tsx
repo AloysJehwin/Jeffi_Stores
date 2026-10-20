@@ -3,26 +3,20 @@ import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { listBrands, type BrandDetail } from '../../src/api/brands'
-import { countProducts } from '../../src/api/products'
+import { listBrandsWithCounts, type BrandWithCount } from '../../src/api/brands'
 import TopNav from '../../src/components/layout/TopNav'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRightIcon, TagIcon } from '../../src/components/catalog/icons'
-import { EmptyCard, Pulse } from '../../src/components/catalog/Paged'
+import { EmptyCard, InfiniteFooter, Pulse } from '../../src/components/catalog/Paged'
 import { absUrl } from '../../src/lib/links'
 import { accent, useTokens } from '../../src/theme'
 
 // Mirror of controller-service app/(storefront)/brands/page.tsx at the mobile breakpoint.
 
-function BrandCard({ brand }: { brand: BrandDetail }) {
+function BrandCard({ brand }: { brand: BrandWithCount }) {
   const router = useRouter()
   const t = useTokens()
-  const { data: total } = useQuery({
-    queryKey: ['brand-count', brand.id],
-    queryFn: () => countProducts({ brand: brand.id }),
-    staleTime: 5 * 60_000,
-  })
-  const n = total ?? 0
+  const n = brand.product_count
   const logo = absUrl(brand.logo_url)
 
   return (
@@ -38,7 +32,7 @@ function BrandCard({ brand }: { brand: BrandDetail }) {
           </View>
           <View className="min-w-0 flex-1">
             <Text className="text-xl font-bold text-foreground">{brand.name}</Text>
-            <Text className="mt-1 text-sm text-foreground-muted">{total == null ? ' ' : `${n} ${n === 1 ? 'product' : 'products'}`}</Text>
+            <Text className="mt-1 text-sm text-foreground-muted">{`${n} ${n === 1 ? 'product' : 'products'}`}</Text>
           </View>
         </View>
 
@@ -62,8 +56,8 @@ function BrandCard({ brand }: { brand: BrandDetail }) {
 export default function BrandsScreen() {
   const insets = useSafeAreaInsets()
   const t = useTokens()
-  const { data, isLoading } = useQuery({ queryKey: ['brands'], queryFn: listBrands, staleTime: 5 * 60_000 })
-  const brands: BrandDetail[] = data ?? []
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['brands', 'counts'], queryFn: listBrandsWithCounts, staleTime: 5 * 60_000 })
+  const brands = data ?? []
 
   return (
     <View className="flex-1 bg-surface">
@@ -92,7 +86,14 @@ export default function BrandsScreen() {
           </>
         }
         ListEmptyComponent={
-          isLoading ? null : (
+          isLoading ? null : error ? (
+            <View className="px-4">
+              <InfiniteFooter
+                shown={0}
+                control={{ hasMore: false, loadingMore: false, error: error.message || 'Failed to load', loadMore: refetch, retry: refetch }}
+              />
+            </View>
+          ) : (
             <View className="px-4">
               <EmptyCard title="No Brands Yet" body="Check back soon!" icon={<TagIcon size={96} strokeWidth={1} color={t.foregroundMuted} />} />
             </View>
