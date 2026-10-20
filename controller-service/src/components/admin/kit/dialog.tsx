@@ -73,6 +73,11 @@ export interface DialogProps {
   dismissible?: boolean
 }
 
+// Portals land on <body>, outside the ecom layout's `.ecom-scope`, whose CSS restyles the accent
+// classes; carry the scope so a dialog on the ecom host looks like the page that opened it.
+const portalScope = () => (document.querySelector('.ecom-scope') ? ' ecom-scope' : '')
+const portalStyle = { backgroundColor: 'transparent' } // .ecom-scope paints a surface; the backdrop child does the dimming
+
 /** Centred modal: backdrop click and Esc close it, focus is trapped and page scroll locked. */
 export function Dialog({ open, onClose, title, description, size = 'md', footer, children, onKeyDown, hideClose, zIndex = 'z-[1000]', dismissible = true }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null)
@@ -82,7 +87,8 @@ export function Dialog({ open, onClose, title, description, size = 'md', footer,
   if (!open || typeof document === 'undefined') return null
   return createPortal(
     <div
-      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4`}
+      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4${portalScope()}`}
+      style={portalStyle}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -194,7 +200,8 @@ export function Sheet({ open, onClose, title, description, footer, children }: S
   if (!open || typeof document === 'undefined') return null
   return createPortal(
     <div
-      className="fixed inset-0 z-[1000] flex items-end justify-center sm:items-center sm:p-4"
+      className={`fixed inset-0 z-[1000] flex items-end justify-center sm:items-center sm:p-4${portalScope()}`}
+      style={portalStyle}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
