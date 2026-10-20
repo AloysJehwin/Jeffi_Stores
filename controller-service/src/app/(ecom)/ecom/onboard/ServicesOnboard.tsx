@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Eyebrow, Display, Pill } from '../_ui'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { PhoneInput, isValidPhone } from '../_ui/phone'
+import { trackSaasEvent } from '@/lib/client/analytics'
 
 // Short onboarding for messaging/documents-only customers: no plan, warehouse or bank step.
 type Form = {
@@ -60,6 +61,7 @@ export default function ServicesOnboard({ services, ownerName, onBack }: { servi
       setBusy(false)
       return
     }
+    trackSaasEvent('saas_workspace_created', { services: services.join('+'), slug: f.slug }, `ws:${f.slug}`)
     router.push('/dashboard/api-keys')
     router.refresh()
   }

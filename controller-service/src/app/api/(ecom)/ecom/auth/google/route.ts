@@ -13,11 +13,13 @@ export async function POST(request: NextRequest) {
 
     const name = identity.name || [identity.given_name, identity.family_name].filter(Boolean).join(' ') || null
     const signals = extractSessionSignals(request)
-    const { sid, owner } = await issueOwnerSession({ email: identity.email, name, signals })
+    const { sid, owner, isNew } = await issueOwnerSession({ email: identity.email, name, signals })
 
     const res = NextResponse.json({
       message: 'Signed in',
       owner: { id: owner.id, email: owner.email, name: owner.name },
+      // True only on the first sign-in for this email; the signup form reports it as a sign_up.
+      isNew,
     })
     return setOwnerCookie(res, sid)
   } catch {

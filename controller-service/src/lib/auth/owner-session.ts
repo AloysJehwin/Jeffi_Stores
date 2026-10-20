@@ -17,8 +17,8 @@ export async function issueOwnerSession(args: {
   email: string
   name?: string | null
   signals?: SessionSignals
-}): Promise<{ sid: string; owner: Owner }> {
-  const owner = await findOrCreateOwner(args.email.toLowerCase(), args.name ?? null)
+}): Promise<{ sid: string; owner: Owner; isNew: boolean }> {
+  const { isNew, ...owner } = await findOrCreateOwner(args.email.toLowerCase(), args.name ?? null)
   const { sid } = await createSession({
     principalType: 'owner',
     principalId: owner.id,
@@ -29,7 +29,7 @@ export async function issueOwnerSession(args: {
     uaPlatform: args.signals?.uaPlatform,
     fpHash: args.signals?.fpHash,
   })
-  return { sid, owner }
+  return { sid, owner, isNew }
 }
 
 /** Resolve an owner from the owner_sid cookie, or null. Enriches from control plane. */

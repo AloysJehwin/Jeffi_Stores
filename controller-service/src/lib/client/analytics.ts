@@ -71,20 +71,20 @@ export const trackViewItem = (item: AnalyticsItem) => send('view_item', [item])
 export const trackAddToCart = (item: AnalyticsItem) => send('add_to_cart', [item])
 export const trackBeginCheckout = (items: AnalyticsItem[]) => send('begin_checkout', items)
 
-function alreadyTracked(orderNumber: string): boolean {
+function alreadyTracked(key: string, storageKey = PURCHASED_KEY): boolean {
   try {
-    const list = JSON.parse(localStorage.getItem(PURCHASED_KEY) || '[]')
-    return Array.isArray(list) && list.includes(orderNumber)
+    const list = JSON.parse(localStorage.getItem(storageKey) || '[]')
+    return Array.isArray(list) && list.includes(key)
   } catch {
     return false
   }
 }
 
-function markTracked(orderNumber: string): void {
+function markTracked(key: string, storageKey = PURCHASED_KEY): void {
   try {
-    const raw = JSON.parse(localStorage.getItem(PURCHASED_KEY) || '[]')
+    const raw = JSON.parse(localStorage.getItem(storageKey) || '[]')
     const list: string[] = Array.isArray(raw) ? raw : []
-    localStorage.setItem(PURCHASED_KEY, JSON.stringify([...list, orderNumber].slice(-PURCHASED_CAP)))
+    localStorage.setItem(storageKey, JSON.stringify([...list, key].slice(-PURCHASED_CAP)))
   } catch {
     /* storage unavailable: at worst a reload re-sends; GA dedupes on transaction_id */
   }
@@ -109,5 +109,23 @@ export function trackPurchase(order: PurchaseOrder): boolean {
     g('event', 'conversion', { send_to: sendTo, value, currency: CURRENCY, transaction_id: order.orderNumber })
   }
   markTracked(order.orderNumber)
+  return true
+}
+
+// ---- Jeffi Commerce (ecom.jeffistores.in) funnel ----
+// The SaaS signup → workspace → paid-subscription funnel on the platform tag. These are GA4 events,
+// not the storefront purchase conversion (window.jeffiAds is the flagship store's purchase label and
+// must not count subscriptions). Mark them as key events in GA4 and import them into Google Ads as
+// conversions — see docs/marketing/GOOGLE_ADS_SAAS_CAMPAIGN.md. `onceKey` dedupes across reloads.
+
+export type SaasEvent = 'sign_up' | 'saas_workspace_created' | 'saas_subscription_paid'
+const SAAS_TRACKED_KEY = 'jeffi_saas_tracked'
+
+export function trackSaasEvent(event: SaasEvent, params: Record<string, unknown> = {}, onceKey?: string): boolean {
+  const g = gtag()
+  if (!g) return false
+  if (onceKey && alreadyTracked(onceKey, SAAS_TRACKED_KEY)) return false
+  g('event', event, params)
+  if (onceKey) markTracked(onceKey, SAAS_TRACKED_KEY)
   return true
 }
