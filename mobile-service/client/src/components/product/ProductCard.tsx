@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
@@ -45,7 +45,7 @@ function Pill({ label, className }: { label: string; className: string }) {
   )
 }
 
-export default function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; handlingDays?: number }) {
+function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; handlingDays?: number }) {
   const router = useRouter()
   const t = useTokens()
   const user = useAuthStore(s => s.user)
@@ -70,7 +70,7 @@ export default function ProductCard({ product, handlingDays = 2 }: { product: Ca
   return (
     <Pressable
       onPress={() => router.push(`/product/${product.slug}`)}
-      className="flex-1 flex-col overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm"
+      className="grow flex-col overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm"
     >
       <View className="px-3 pt-3">
         <View
@@ -92,6 +92,8 @@ export default function ProductCard({ product, handlingDays = 2 }: { product: Ca
                 }}
                 contentFit="cover"
                 blurRadius={24}
+                cachePolicy="memory-disk"
+                recyclingKey={img.image_url}
               />
               <Image
                 source={{ uri: img.image_url }}
@@ -99,6 +101,8 @@ export default function ProductCard({ product, handlingDays = 2 }: { product: Ca
                 style={{ width: '100%', height: '100%' }}
                 contentFit="contain"
                 transition={200}
+                cachePolicy="memory-disk"
+                recyclingKey={img.image_url}
                 accessibilityLabel={product.name}
               />
             </>
@@ -122,7 +126,7 @@ export default function ProductCard({ product, handlingDays = 2 }: { product: Ca
         </View>
       </View>
 
-      <View className="flex-1 flex-col p-2.5">
+      <View className="grow flex-col p-2.5">
         <View className="mb-1.5 flex-row items-start justify-between gap-2">
           <Text className="mb-1.5 min-h-[40px] flex-1 text-sm font-semibold text-foreground" numberOfLines={2}>
             {product.name}
@@ -187,3 +191,5 @@ export default function ProductCard({ product, handlingDays = 2 }: { product: Ca
     </Pressable>
   )
 }
+
+export default memo(ProductCard)
