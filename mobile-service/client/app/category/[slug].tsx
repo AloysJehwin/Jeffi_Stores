@@ -8,7 +8,7 @@ import TopNav from '../../src/components/layout/TopNav'
 import CategoryIcon from '../../src/components/catalog/CategoryIcon'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import PagedProductGrid from '../../src/components/catalog/PagedProductGrid'
-import { Breadcrumb, EmptyCard } from '../../src/components/catalog/Paged'
+import { Breadcrumb, EmptyCard, InfiniteFooter } from '../../src/components/catalog/Paged'
 import { Grid } from '../../src/components/home/layout'
 import Spinner from '../../src/components/ui/Spinner'
 import { accent } from '../../src/theme'
@@ -39,7 +39,7 @@ export default function CategoryScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { data: all, isLoading } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
+  const { data: all, isLoading, error, refetch } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
   const { data: home } = useQuery({ queryKey: ['home'], queryFn: getHome, staleTime: 120_000 })
   const categories = withDetails(all ?? [], home?.data.mainCategories as Record<string, any>[] | undefined)
   const category = categories.find(c => c.slug === slug)
@@ -52,6 +52,20 @@ export default function CategoryScreen() {
       <View className="flex-1 bg-surface">
         <TopNav />
         <Spinner />
+      </View>
+    )
+  }
+
+  if (error && !all) {
+    return (
+      <View className="flex-1 bg-surface">
+        <TopNav />
+        <View className="p-4">
+          <InfiniteFooter
+            shown={0}
+            control={{ hasMore: false, loadingMore: false, error: error.message || 'Failed to load', loadMore: refetch, retry: refetch }}
+          />
+        </View>
       </View>
     )
   }

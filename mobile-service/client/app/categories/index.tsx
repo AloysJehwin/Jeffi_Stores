@@ -9,7 +9,7 @@ import TopNav from '../../src/components/layout/TopNav'
 import CategoryIcon from '../../src/components/catalog/CategoryIcon'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRightIcon } from '../../src/components/catalog/icons'
-import { Pulse } from '../../src/components/catalog/Paged'
+import { InfiniteFooter, Pulse } from '../../src/components/catalog/Paged'
 import { accent } from '../../src/theme'
 
 // Mirror of controller-service app/(storefront)/categories/page.tsx at the mobile breakpoint.
@@ -74,7 +74,7 @@ function CategoryCard({ category, subcategories }: { category: CategoryDetail; s
 
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets()
-  const { data, isLoading } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
   const { data: home } = useQuery({ queryKey: ['home'], queryFn: getHome, staleTime: 120_000 })
   const categories = withDetails(data ?? [], home?.data.mainCategories as Record<string, any>[] | undefined)
   const main = categories.filter(c => !c.parent_category_id)
@@ -102,6 +102,13 @@ export default function CategoriesScreen() {
                     <View className="h-40 rounded-lg border border-border-default bg-surface-elevated" />
                   </Pulse>
                 ))}
+              </View>
+            ) : error && !data ? (
+              <View className="px-4">
+                <InfiniteFooter
+                  shown={0}
+                  control={{ hasMore: false, loadingMore: false, error: error.message || 'Failed to load', loadMore: refetch, retry: refetch }}
+                />
               </View>
             ) : null}
           </>
