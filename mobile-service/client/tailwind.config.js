@@ -1,45 +1,31 @@
+// Same palette and semantic classes as the web (controller-service/tailwind.config.ts): both read
+// packages/design-tokens, so the app never carries its own copy of a colour. Semantic colours are CSS
+// variables set on :root / .dark (NativeWind resolves var() at runtime), exactly like the site.
+const plugin = require('tailwindcss/plugin')
+const tokens = require('../../packages/design-tokens')
+
 module.exports = {
-  content: [
-    './app/**/*.{js,jsx,ts,tsx}',
-    './src/**/*.{js,jsx,ts,tsx}',
-  ],
+  content: ['./app/**/*.{js,jsx,ts,tsx}', './src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        primary: {
-          50:  '#fffbeb',
-          100: '#fef3c7',
-          200: '#fde68a',
-          300: '#fcd34d',
-          400: '#fbbf24',
-          500: '#f59e0b',
-          600: '#d97706',
-          700: '#b45309',
-          800: '#92400e',
-          900: '#78350f',
-        },
-        accent: {
-          50:  '#f2f7e8',
-          100: '#e4f0d1',
-          200: '#c9e1a3',
-          300: '#aed275',
-          400: '#93c347',
-          500: '#7cb900',
-          600: '#5a8a00',
-          700: '#3d5e00',
-          800: '#203200',
-          900: '#2b4200',
-        },
-        secondary: {
-          500: '#363948',
-        },
+        primary: tokens.primary,
+        secondary: tokens.secondary,
+        accent: tokens.accent,
+        surface: 'var(--color-surface)',
+        'surface-elevated': 'var(--color-surface-elevated)',
+        'surface-secondary': 'var(--color-surface-secondary)',
+        foreground: 'var(--color-foreground)',
+        'foreground-secondary': 'var(--color-foreground-secondary)',
+        'foreground-muted': 'var(--color-foreground-muted)',
+        'border-default': 'var(--color-border)',
+        'border-secondary': 'var(--color-border-secondary)',
       },
-      fontFamily: {
-        bebas: ['BebasNeue-Regular'],
-        inter: ['Inter'],
-      },
+      borderRadius: { card: `${tokens.radius.card}px`, button: `${tokens.radius.button}px`, hero: `${tokens.radius.hero}px` },
+      fontFamily: { bebas: ['BebasNeue-Regular'], inter: ['Inter'] },
     },
   },
-  plugins: [],
+  plugins: [plugin(({ addBase }) => addBase({ ':root': tokens.cssVars('light'), '.dark': tokens.cssVars('dark') }))],
 }
