@@ -3,7 +3,7 @@
 // Idempotent: skips templates whose live Twilio Content body already matches the current platform
 // body — safe to re-run. OTP/verify slugs are untouched (Meta pins AUTHENTICATION bodies).
 // A per-template failure is logged and the loop continues; prior submissions are not rolled back.
-// Run after `npm run seed:catalog`. Meta soak is 24-72h; `npm run wa:sync` promotes approvals to live.
+// Dry run by default (prints what it would submit); --apply submits. Run after `npm run seed:catalog`. Meta soak is 24-72h; `npm run wa:sync` promotes approvals to live.
 import { db } from '../src/db.js'
 import { PLATFORM_TENANT_ID, findById } from '../src/templates-v2.js'
 import * as twContent from '../src/providers/twilio-content.js'
@@ -11,6 +11,8 @@ import { renumberForSubmit, submit } from '../src/wa-approval.js'
 import { metaSamples } from '@jeffi/api-contracts'
 
 type Row = { template_id: string; slug: string }
+const APPLY = process.argv.includes('--apply')
+
 const rows = (await db.query<Row>(
   `SELECT t.id AS template_id, f.slug
      FROM template t
@@ -46,6 +48,7 @@ for (const r of rows) {
       }
     } catch { /* dangling or inaccessible SID — fall through to submit */ }
   }
+  if (!APPLY) { console.log(`${r.slug}: WOULD submit (old ${oldSid ?? '-'})`); submitted++; continue }
   try {
     const res = await submit(db, PLATFORM_TENANT_ID, 'platform', r.template_id)
     if (oldSid) await db.query(`UPDATE template_variant SET deprecated_provider_ref=$2 WHERE id=$1`, [full.variant.id, oldSid])
@@ -57,5 +60,5 @@ for (const r of rows) {
     failed++
   }
 }
-console.log(JSON.stringify({ submitted, skipped, failed, total: rows.length }))
+console.log(JSON.stringify({ mode: APPLY ? 'apply' : 'dry-run', submitted, skipped, failed, total: rows.length }))
 await db.end()
