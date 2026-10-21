@@ -30,6 +30,8 @@ const CSP = [
   `media-src 'self' blob: ${VAULT_ORIGINS}`,
   `img-src 'self' data: blob: https://*.jeffistores.in https://*.razorpay.com https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com https://lh3.googleusercontent.com https://maps.gstatic.com https://maps.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://td.doubleclick.net ${ADSENSE_IMG}`,
   `frame-src data: https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://www.googletagmanager.com https://td.doubleclick.net ${ADSENSE_FRAME}`,
+  // Protected Audience (remarketing) ads render in fenced frames, which Chrome loads only when https: is allowed.
+  'fenced-frame-src https:',
   'child-src https://*.razorpay.com blob:',
   "worker-src 'self' blob: https://dm9rri2wgl1e.cloudfront.net",
   "object-src 'none'",
