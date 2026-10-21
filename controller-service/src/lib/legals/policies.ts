@@ -122,7 +122,7 @@ export const policies: Policy[] = [
     slug: 'privacy-policy',
     title: 'Privacy Policy',
     description: 'What we collect, why we collect it, how long we keep it, and your rights over your data.',
-    lastUpdated: '14 Jun 2026',
+    lastUpdated: '21 Oct 2026',
     sections: [
       {
         heading: '1. The short version',
@@ -152,7 +152,8 @@ export const policies: Policy[] = [
         body: [
           'Cart and browsing: products you view, items in your cart, search queries, and category filters — used to keep your session, recover an abandoned cart, and personalise recommendations.',
           'Device and connection: IP address, user-agent, approximate location (city-level), referrer, and the time of each visit — used for security and fraud detection.',
-          'Cookies and similar: a session cookie for sign-in, a session id cookie for guest carts, and a theme preference. We do not run advertising trackers.',
+          'Cookies and similar: a session cookie for sign-in, a session id cookie for guest carts, and a theme preference. Google Analytics and Google AdSense set their own cookies only when you allow them in Cookie settings.',
+          'Advertising: stores on our platform may show ads served by Google AdSense. With your consent to marketing cookies, Google and its partners use cookies to show ads based on your visits to this and other websites; without it, ads are not personalised. You can turn off personalised ads at https://adssettings.google.com and read how Google uses this data at https://policies.google.com/technologies/partner-sites.',
           'Analytics: aggregated page views, conversion events, and click events via Google Analytics 4 / Google Tag Manager. We do not use Analytics for cross-site advertising.',
           'AI assistant: the prompt you type, the products our model retrieves to answer it, and a thumbs-up / thumbs-down rating if you give one. We do not link these prompts to your name in our analytics dashboards.',
         ],
@@ -186,7 +187,7 @@ export const policies: Policy[] = [
           'Razorpay (payments): order amount, your name, email, phone, and the order id. Razorpay is PCI-DSS Level 1 — they store your card data, not us.',
           'Delhivery (shipping): the recipient name, full shipping address, phone, and weight/dimensions of the package.',
           'Amazon Web Services (hosting): all of our application data sits in AWS RDS, S3, and EC2 in their us-east-1 region. AWS is bound by their Data Processing Addendum.',
-          'Google (sign-in, Maps autocomplete, Analytics): your email and Google id when you choose Google sign-in; address autocomplete queries when you type in an address field.',
+          'Google (sign-in, Maps autocomplete, Analytics, AdSense): your email and Google id when you choose Google sign-in; address autocomplete queries when you type in an address field; and, for ads, the pages you view and the cookie or device identifiers Google uses to serve and measure them.',
           'OpenAI / our self-hosted models (AI assistant): the prompt you type. We do not send your account email or phone to the model.',
           'SES (email): the recipient address and the email body. Standard email delivery.',
           'Tax authorities: invoice and GSTIN data when filing GSTR-1 / GSTR-3B / e-invoicing.',
@@ -210,7 +211,7 @@ export const policies: Policy[] = [
       },
       {
         heading: '10. Cookies',
-        body: 'We use only first-party functional cookies (session, cart, theme) plus Google Analytics. We do not run advertising or cross-site cookies. You can clear cookies in your browser; some features (sign-in, cart) will need to be re-set.',
+        body: 'We use first-party functional cookies (session, cart, theme), Google Analytics cookies, and Google AdSense advertising cookies. Analytics and advertising cookies are set only if you allow them; change your choice anytime from Cookie settings at the foot of every page. You can also clear cookies in your browser; some features (sign-in, cart) will need to be re-set.',
       },
       {
         heading: '11. Google account data (product-import integration)',
