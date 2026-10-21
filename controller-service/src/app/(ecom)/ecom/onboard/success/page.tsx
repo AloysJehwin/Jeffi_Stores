@@ -6,6 +6,7 @@ import { getOwnerTenants, setSubscriptionStatus } from '@/lib/tenant-registry'
 import { getSubscription } from '@/lib/payments/razorpay-subscriptions'
 import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
 import { CheckMark } from '@/app/(ecom)/ecom/Shapes'
+import PurchaseBeacon from './PurchaseBeacon'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,11 +31,13 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
   const tenants = await getOwnerTenants(owner.id)
   const tenant = tenantSlug ? tenants.find(t => t.slug === tenantSlug) : tenants[0]
 
+  let paidNow = false
   if (tenant && tenant.razorpay_subscription_id && tenant.status !== 'active' && tenant.status !== 'provisioning') {
     const sub = await getSubscription(tenant.razorpay_subscription_id).catch(() => null)
     // Razorpay subscription statuses that mean payment was collected
     const paid = sub && ['active', 'authenticated', 'charged'].includes(sub.status)
     if (paid) {
+      paidNow = true
       // Payment confirmed → flip to 'provisioning' and kick the engine (only place provisioning
       // starts). Do NOT set 'active' — only the engine's activate step does, after infra exists.
       // Reliable local path (no webhook) + webhook fallback; enqueueProvisioning is idempotent.
@@ -54,6 +57,12 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
 
   return (
     <div className="min-h-[calc(100vh-56px)] flex items-center justify-center bg-surface-secondary px-4">
+      {paidNow && tenant && (
+        <PurchaseBeacon
+          subscriptionId={tenant.razorpay_subscription_id!}
+          plan={{ slug: tenant.plan ?? 'basic', monthlyPrice: tenant.monthly_price_inr, interval: tenant.billing_interval }}
+        />
+      )}
       <div className="max-w-md w-full rounded-[2rem] org-sage p-10 text-center">
         <span className="inline-flex items-center justify-center w-14 h-14 rounded-full ecom-accent-bg text-white mx-auto mb-5">
           <CheckMark className="w-7 h-7" />
