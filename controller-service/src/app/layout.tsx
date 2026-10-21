@@ -8,7 +8,7 @@ import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 import { appFromHost } from '@/lib/tenant-registry'
 import type { StoreConfig } from '@/contexts/StoreConfigContext'
 import { resolveGoogleTag, gtagBootstrapScript } from '@/lib/analytics/google-tag'
-import { adsenseClient } from '@/lib/analytics/adsense'
+import { adsenseClient, adsenseInitScript, adsenseScriptSrc } from '@/lib/analytics/adsense'
 import AdSense from '@/components/visitor/AdSense'
 import { storeIsAdFree } from '@/lib/billing/ad-free'
 
@@ -137,6 +137,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <script id="gtag-init" dangerouslySetInnerHTML={{ __html: gtagBootstrapScript(consentBootstrap, cookieConsent) }} />
         )}
         {showAds && <meta name="google-adsense-account" content={adClient!} />}
+        {showAds && <script id="adsense-init" dangerouslySetInnerHTML={{ __html: adsenseInitScript() }} />}
+        {/* defer, not async: React hoists async scripts above this init, and the init must run first. */}
+        {showAds && <script defer src={adsenseScriptSrc(adClient!)} crossOrigin="anonymous" />}
       </head>
       <body
         className={`antialiased m-0 p-0 ${isVaultSubdomain ? 'bg-neutral-950 text-neutral-100' : 'bg-surface text-foreground'}`}
@@ -149,7 +152,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             strategy="afterInteractive"
           />
         )}
-        {showAds && <AdSense client={adClient!} />}
+        {showAds && <AdSense />}
         <ConditionalLayout
           initialStoreConfig={initialStoreConfig}
           isFormsSubdomain={isFormsSubdomain}
