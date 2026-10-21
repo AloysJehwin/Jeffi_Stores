@@ -91,6 +91,7 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
             ownerEmail={owner.email}
             ownerName={owner.name}
             planName={t.plan ?? 'Basic'}
+            plan={{ slug: t.plan ?? 'basic', monthlyPrice: t.monthly_price_inr, interval: t.billing_interval }}
             razorpayKeyId={process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? ''}
           />
         </SidebarLayout>
