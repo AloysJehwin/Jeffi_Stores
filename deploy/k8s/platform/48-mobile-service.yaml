@@ -1,0 +1,72 @@
+# The mobile backend (mobile.jeffistores.in): the host the Play Store app talks to. Same DB as everything
+# else; forwards the storefront API to the controller in-cluster. Flagship only; never provisioned per tenant.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-mobile-service
+  namespace: jeffi
+  labels: { app: mobile-service, jeffi.io/service: mobile, jeffi.io/tenant: jeffi-stores }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: mobile-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: mobile-service, jeffi.io/service: mobile, jeffi.io/tenant: jeffi-stores }
+    spec:
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-mobile-service:latest
+          ports: [{ name: http, containerPort: 3103 }]
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/mobile/production }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=192 }
+            - { name: CONTROLLER_URL, value: 'http://jeffi-stores-controller-service.jeffi.svc.cluster.local:3000' }
+            - { name: PUBLIC_SITE_URL, value: 'https://jeffistores.in' }
+            - { name: MIN_APP_VERSION, value: '1.0.0' }
+            - { name: DB_IAM_AUTH, value: 'true' }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
+          resources:
+            requests: { cpu: 25m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 24 }
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
+          lifecycle:
+            preStop: { exec: { command: [sleep, '5'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          configMap: { name: rds-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-mobile-service, namespace: jeffi }
+spec:
+  selector: { app: mobile-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3103, targetPort: http }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: jeffi-stores-mobile-service, namespace: jeffi }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`mobile.jeffistores.in`)
+      priority: 100
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-mobile-service, port: 3103 }]
+  tls: {}

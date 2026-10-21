@@ -8,6 +8,9 @@ import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 import { appFromHost } from '@/lib/tenant-registry'
 import type { StoreConfig } from '@/contexts/StoreConfigContext'
 import { resolveGoogleTag, gtagBootstrapScript } from '@/lib/analytics/google-tag'
+import { adsenseClient } from '@/lib/analytics/adsense'
+import AdSense from '@/components/visitor/AdSense'
+import { storeIsAdFree } from '@/lib/billing/ad-free'
 
 export async function generateMetadata() {
   const identity = await getStoreIdentity()
@@ -58,7 +61,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const c = await getSiteControls()
   const aiStorefrontEnabled = await storefrontAiAllowed().catch(() => false)
   const { resolveTenant } = await import('@/lib/tenancy/tenant-context')
-  const storeSlug = (await resolveTenant().catch(() => null))?.slug ?? null
+  const tenant = await resolveTenant().catch(() => null)
+  const storeSlug = tenant?.slug ?? null
   // Each store loads its own tag; tenants without one load nothing (never the flagship's).
   const googleTag = isVaultSubdomain
     ? null
@@ -78,7 +82,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     !isEcomSubdomain &&
     !isCertPortalSubdomain &&
     !isVaultSubdomain
-  const cookieConsent = hasGoogleTag && isStorefrontHost
+  // Platform AdSense on every store unless its tenant paid to remove ads (lib/billing/ad-free.ts).
+  const adClient = isStorefrontHost ? adsenseClient() : null
+  const showAds =
+    !!adClient && !(await storeIsAdFree(tenant?.tenantId))
+  const cookieConsent = (hasGoogleTag || showAds) && isStorefrontHost
+  const consentBootstrap = hasGoogleTag ? googleTag! : showAds ? { tagIds: [], conversionSendTo: null } : null
   const initialStoreConfig: StoreConfig = {
     slug: storeSlug,
     identity: {
@@ -124,9 +133,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
         {/* Consent defaults must reach dataLayer before gtag.js loads, so this runs inline in <head>. */}
-        {hasGoogleTag && (
-          <script id="gtag-init" dangerouslySetInnerHTML={{ __html: gtagBootstrapScript(googleTag!, cookieConsent) }} />
+        {consentBootstrap && (
+          <script id="gtag-init" dangerouslySetInnerHTML={{ __html: gtagBootstrapScript(consentBootstrap, cookieConsent) }} />
         )}
+        {showAds && <meta name="google-adsense-account" content={adClient!} />}
       </head>
       <body
         className={`antialiased m-0 p-0 ${isVaultSubdomain ? 'bg-neutral-950 text-neutral-100' : 'bg-surface text-foreground'}`}
@@ -139,6 +149,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             strategy="afterInteractive"
           />
         )}
+        {showAds && <AdSense client={adClient!} />}
         <ConditionalLayout
           initialStoreConfig={initialStoreConfig}
           isFormsSubdomain={isFormsSubdomain}

@@ -6,6 +6,7 @@ import { CheckMark } from '@/app/(ecom)/ecom/Shapes'
 import { ChoiceCards, ChoiceChips, Segmented, focusRing } from '../_ui'
 import { useToast } from '@/contexts/ToastContext'
 import { PhoneInput } from '../_ui/phone'
+import { trackStoreApplication } from '@/lib/client/ecom-analytics'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -459,6 +460,7 @@ export default function OnboardWizard({
         showToast(data.error || 'Submission failed', 'error')
         return
       }
+      trackStoreApplication({ slug: planSlug, name: selectedPlan?.name, monthlyPrice: monthly, interval })
       // Application submitted → tenant is pending_approval (NOT paid/live). Stay in the onboard
       // flow, which shows the 'under review' → payment states. Only a live store goes to /dashboard.
       router.push(upgrade ? '/dashboard/add-store' : '/onboard')

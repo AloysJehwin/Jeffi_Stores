@@ -1,29 +1,10 @@
 import Link from 'next/link'
-import { queryMany } from '@/lib/shared/db'
+import { listBrandsWithCounts } from '@/lib/catalog/storefront-counts'
 
 export const dynamic = 'force-dynamic'
 
-async function getBrandsWithCounts() {
-  return queryMany<{
-    id: string
-    name: string
-    slug: string
-    description: string | null
-    logo_url: string | null
-    product_count: string
-  }>(`
-    SELECT b.id, b.name, b.slug, b.description, b.logo_url,
-      COUNT(p.id) FILTER (WHERE p.is_active = true) AS product_count
-    FROM brands b
-    LEFT JOIN products p ON p.brand_id = b.id
-    WHERE b.is_active = true
-    GROUP BY b.id
-    ORDER BY b.name ASC
-  `)
-}
-
 export default async function BrandsPage() {
-  const brands = await getBrandsWithCounts()
+  const brands = await listBrandsWithCounts()
 
   return (
     <div className="bg-surface min-h-screen">

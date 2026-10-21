@@ -44,6 +44,7 @@ export type WalletCategory =
   | 'whatsapp'
   | 'email'
   | 'media'
+  | 'ad_free'
   | 'adjustment'
 
 export interface TenantWallet {
@@ -589,6 +590,8 @@ export async function debitWallet(opts: {
   note: string
   // Minimum balance to leave after the charge. Defaults to the Rs 500 shipping floor; messaging passes 0.
   floorInr?: number
+  // Runs in the debit's transaction, only when this call charged; a throw rolls the debit back.
+  onCharged?: (client: PoolClient) => Promise<void>
 }): Promise<{ ok: true; charged: boolean; balance: number } | { ok: false; error: string }> {
   if (isFlagshipTenant(opts.tenantId)) return { ok: true, charged: false, balance: 0 }
   if (!(opts.amountInr > 0)) return { ok: false, error: 'Debit amount must be positive.' }
@@ -609,7 +612,9 @@ export async function debitWallet(opts: {
          VALUES ($1, 'debit', $2, $3, $4, $5)`,
         [opts.tenantId, opts.category, -amount, opts.externalRef, opts.note]
       )
-      return { ok: true as const, charged: true, balance: await moveBalance(client, opts.tenantId, -amount) }
+      const after = await moveBalance(client, opts.tenantId, -amount)
+      if (opts.onCharged) await opts.onCharged(client)
+      return { ok: true as const, charged: true, balance: after }
     })
   } catch (e: any) {
     return { ok: false, error: e?.message || 'Wallet debit failed.' }

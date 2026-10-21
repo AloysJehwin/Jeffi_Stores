@@ -107,8 +107,10 @@ export async function GET(request: NextRequest) {
       params
     )
 
+    // Public route: never return the store's cost price, supplier link or search index.
+    const publicRows = (products || []).map(({ cost_price: _c, supplier_id: _s, search_vector: _v, ...rest }: any) => rest)
     return NextResponse.json({
-      products: products || [],
+      products: publicRows,
       total,
       page,
       totalPages: Math.ceil(total / limit),

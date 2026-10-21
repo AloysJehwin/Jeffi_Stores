@@ -129,6 +129,7 @@
     "messaging-service",
     "document-service",
     "public-api-service",
+    "mobile-service",
     "packages/*"
   ]
 }

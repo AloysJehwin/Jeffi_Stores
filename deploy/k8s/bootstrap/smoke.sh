@@ -25,7 +25,7 @@ check() { # check <url> [require-commit]
 if [ "$SCOPE" != tenants ]; then
   say "Flagship"
   check https://jeffistores.in/api/health commit
-  for u in https://jeffistores.in/ https://business.jeffistores.in/ https://ecom.jeffistores.in/ https://public.jeffistores.in/healthz; do check "$u"; done
+  for u in https://jeffistores.in/ https://business.jeffistores.in/ https://ecom.jeffistores.in/ https://public.jeffistores.in/healthz https://mobile.jeffistores.in/healthz; do check "$u"; done
 fi
 
 if [ "$SCOPE" != flagship ]; then
