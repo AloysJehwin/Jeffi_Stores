@@ -5530,8 +5530,8 @@
     "semantic_hash": ""
   },
   "controller-service/next.config.js": {
-    "mtime": 1792556159.0008872,
-    "ast_hash": "6083a11561760a1b19c7ad437cead295",
+    "mtime": 1792571175.6775196,
+    "ast_hash": "9ec78d6b0c19b552822e2d6ddd27596a",
     "semantic_hash": ""
   },
   "controller-service/postcss.config.js": {
@@ -11930,8 +11930,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/layout.tsx": {
-    "mtime": 1792556834.9363575,
-    "ast_hash": "16aee748f58323c614c4121c39e3604a",
+    "mtime": 1792571299.9372811,
+    "ast_hash": "31721d868984861042b878a21de97c6b",
     "semantic_hash": ""
   },
   "controller-service/src/components/ConditionalLayout.tsx": {
@@ -22145,13 +22145,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/AdSense.tsx": {
-    "mtime": 1792556883.098914,
-    "ast_hash": "c6bd65a4a7f91fa7b2499c4ff5e2d0f8",
+    "mtime": 1792571175.640277,
+    "ast_hash": "6c913db9c0cba82657c5b644cf63037d",
     "semantic_hash": ""
   },
   "controller-service/src/lib/analytics/adsense.ts": {
-    "mtime": 1792556844.2827706,
-    "ast_hash": "e10ed60ad5c607d0fea9e07d28a2ea25",
+    "mtime": 1792571175.63151,
+    "ast_hash": "f27334535297d085270ff176921d8f8e",
     "semantic_hash": ""
   },
   "controller-service/src/lib/billing/ad-free.ts": {
