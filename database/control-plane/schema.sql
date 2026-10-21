@@ -968,3 +968,11 @@ ALTER TABLE ONLY public.platform_provider_settings ADD CONSTRAINT platform_provi
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_platform_provider_settings_scope_key ON public.platform_provider_settings
     USING btree ((COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid)), key);
+
+--
+-- Ad-free add-on. Every store shows the platform's Google AdSense ads; a tenant pays Rs 500 a month
+-- from its wallet to remove them (lib/billing/ad-free.ts). Ads return once ad_free_until passes.
+-- ad_free_renew: the daily ad_free_renew cron charges the next month before the current one ends.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS ad_free_until timestamp with time zone;
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS ad_free_renew boolean NOT NULL DEFAULT false;

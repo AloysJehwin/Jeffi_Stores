@@ -137,6 +137,18 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    // Platform job: one run walks every tenant on auto-renew (charges are control-plane wallet debits).
+    id: 'ad_free_renew',
+    name: 'Renew ad-free add-on',
+    path: '/api/cron/ad-free-renew',
+    method: 'POST',
+    intervalMs: DAY,
+    intervalLabel: 'every 24 h',
+    startDelayMs: 240 * SEC,
+    lockTtlMs: HOUR,
+    tenantScope: null,
+  },
+  {
     id: 'publish_social_posts',
     name: 'Publish social posts',
     path: '/api/cron/publish-social-posts',
@@ -432,6 +444,8 @@ const DAILY_AT_IST: Record<string, string> = {
   google_ads_sync: '30 4',
   // After the nightly sync, so lists are built from the same day's orders.
   google_ads_audiences: '0 6',
+  // Early morning IST, so a lapsing month is charged before most store traffic.
+  ad_free_renew: '0 5',
 }
 
 // Weekly jobs: minute hour * * day-of-week (IST).

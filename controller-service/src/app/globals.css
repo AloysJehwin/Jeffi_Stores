@@ -326,3 +326,9 @@ textarea.field-xs {
     transform: translateY(0);
   }
 }
+
+/* AdSense Auto ads, anchors and vignettes stay hidden on pages that carry no ads (components/visitor/AdSense.tsx). */
+html[data-no-ads] ins.adsbygoogle,
+html[data-no-ads] .google-auto-placed {
+  display: none !important;
+}

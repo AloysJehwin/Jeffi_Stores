@@ -258,6 +258,13 @@ Each signed-up tenant gets a dedicated `db.t4g.micro` RDS Postgres instance + an
 - Public API: `public.jeffistores.in` → `public-api-service/`; keys in control-plane `api_keys` / `api_key_usage_daily`. See `docs/MICROSERVICES_PLAN.md` addendum.
 - Hosts: `public.` is served by the gateway, not the Next app (`deploy/k8s/platform/47-public-api-service.yaml`).
 
+## Platform ads and the ad-free add-on (added 2026-10-21)
+
+- Every store host (flagship, `{slug}.jeffistores.in`, custom domains) loads the platform's Google AdSense account `ca-pub-3028325011384102` as Auto ads (`components/visitor/AdSense.tsx`, mounted in `app/layout.tsx`). Never on admin, ecom, business, forms, document, certificate or vault hosts, and not on login, signup, cart, checkout, account, review, subscribe or staff pages (`lib/analytics/adsense.ts` `adsAllowedOn`). `/ads.txt` is served on every host. `ADSENSE_DISABLED=1` switches ads off platform-wide.
+- Without marketing-cookie consent only non-personalised ads are requested; the consent banner now shows on any store with ads, even one without its own Google tag.
+- **Remove ads: Rs 500 / month** from the tenant wallet (top-ups already carry GST). Owner console → Billing → "Ads on your store" (`/api/ecom/billing/ad-free`, `lib/billing/ad-free.ts`). Stored on `tenants.ad_free_until` / `ad_free_renew`; the charge and the date extension run in one transaction, keyed `ad_free:<tenant>:<period start>`. The platform cron `ad_free_renew` (daily 05:00 IST) renews a day before the month ends and retries a short wallet for a week; ads come back as soon as `ad_free_until` passes (storefront cache 60 s).
+- Custom domains need their own AdSense site approval before ads serve on them.
+
 ## Invoices / quotations / purchase orders live in document-service (added 2026-10-13)
 
 - **Tenant document hosts** `invoice-{slug}.`, `quotation-{slug}.`, `purchaseorder-{slug}.jeffistores.in` are served by `document-service/` (`controller-service/src/tenant/public.tsx`: HTML viewer, `/<token>/json`, `/<token>/pdf`; also reachable as `/t/:app/:token`). The Next app no longer has `(business)/{invoice,quotation,purchaseorder}` pages or `api/public/{invoice,quotation,purchaseorder}` routes. Dev: middleware rewrites those hosts to `DOCUMENTS_URL`. Prod: the store's `documents` IngressRoute sends them to `{slug}-document-service`; the platform's own `invoice.`/`quotation.`/`purchaseorder.` hosts go to `jeffi-stores-document-service`.
