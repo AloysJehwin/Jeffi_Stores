@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/shared/db'
 import { currentBrandNameAsync } from '@/lib/catalog/brand'
+import { getSiteControls } from '@/lib/catalog/site-controls'
+import { resolveGoogleTag, gtagBootstrapScript } from '@/lib/analytics/google-tag'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
 
 export const dynamic = 'force-dynamic'
+
+// The store's Google tag under the storefront's Consent Mode: this page is on the store host, so the
+// visitor's cookie choice applies.
+async function tagHead(ok: boolean, campaign: string | null): Promise<string> {
+  const [c, tenant] = await Promise.all([getSiteControls(), resolveTenant().catch(() => null)])
+  const tag = resolveGoogleTag({
+    tagId: c.marketing.googleTagId,
+    conversionId: c.marketing.googleAdsConversionId,
+    conversionLabel: c.marketing.googleAdsConversionLabel,
+    isTenant: tenant != null,
+  })
+  if (!tag.tagIds.length) return ''
+  const event = ok ? `gtag('event','unsubscribe',${JSON.stringify({ campaign: campaign || 'all' }).replace(/</g, '\\u003c')});` : ''
+  return `<script>${gtagBootstrapScript(tag, true)}${event}</script><script async src="https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(tag.tagIds[0])}"></script>`
+}
 
 async function unsubscribe(token: string, campaignKind: string | null): Promise<{ ok: boolean; email?: string }> {
   const user = await queryOne<{ id: string; email: string }>(
@@ -36,12 +54,14 @@ export async function GET(req: NextRequest) {
 
   const result = await unsubscribe(token, campaign)
   const brand = await currentBrandNameAsync()
+  const head = await tagHead(result.ok, campaign).catch(() => '')
   const html = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>Unsubscribed — ${brand}</title>
+  ${head}
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 480px; margin: 80px auto; padding: 24px; color: #18181b; text-align: center; }
     h1 { font-size: 24px; margin-bottom: 12px; }
