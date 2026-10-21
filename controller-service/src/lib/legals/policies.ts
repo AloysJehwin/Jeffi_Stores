@@ -152,7 +152,7 @@ export const policies: Policy[] = [
         body: [
           'Cart and browsing: products you view, items in your cart, search queries, and category filters — used to keep your session, recover an abandoned cart, and personalise recommendations.',
           'Device and connection: IP address, user-agent, approximate location (city-level), referrer, and the time of each visit — used for security and fraud detection.',
-          'Cookies and similar: a session cookie for sign-in, a session id cookie for guest carts, and a theme preference. Google Analytics and Google AdSense set their own cookies only when you allow them in Cookie settings.',
+          'Cookies and similar: a session cookie for sign-in, a session id cookie for guest carts, and a theme preference. On the store, Google Analytics and Google AdSense set their own cookies only when you allow them in Cookie settings. Pages outside the store (invoice, quotation and purchase-order links, the business portal, forms) use Google Analytics for basic measurement only and set no advertising cookies.',
           'Advertising: stores on our platform may show ads served by Google AdSense. With your consent to marketing cookies, Google and its partners use cookies to show ads based on your visits to this and other websites; without it, ads are not personalised. You can turn off personalised ads at https://adssettings.google.com and read how Google uses this data at https://policies.google.com/technologies/partner-sites.',
           'Analytics: aggregated page views, conversion events, and click events via Google Analytics 4 / Google Tag Manager. We do not use Analytics for cross-site advertising.',
           'AI assistant: the prompt you type, the products our model retrieves to answer it, and a thumbs-up / thumbs-down rating if you give one. We do not link these prompts to your name in our analytics dashboards.',
@@ -211,7 +211,7 @@ export const policies: Policy[] = [
       },
       {
         heading: '10. Cookies',
-        body: 'We use first-party functional cookies (session, cart, theme), Google Analytics cookies, and Google AdSense advertising cookies. Analytics and advertising cookies are set only if you allow them; change your choice anytime from Cookie settings at the foot of every page. You can also clear cookies in your browser; some features (sign-in, cart) will need to be re-set.',
+        body: 'We use first-party functional cookies (session, cart, theme), Google Analytics cookies, and Google AdSense advertising cookies. On the store, analytics and advertising cookies are set only if you allow them; change your choice anytime from Cookie settings at the foot of the store’s pages. Pages outside the store use analytics cookies for basic measurement and no advertising cookies. You can also clear cookies in your browser; some features (sign-in, cart) will need to be re-set.',
       },
       {
         heading: '11. Google account data (product-import integration)',

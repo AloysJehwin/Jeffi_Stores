@@ -8,6 +8,7 @@ import { signServiceToken } from '@jeffi/service-auth'
 import { priceList, toPaise } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import type { ApiScope } from '@jeffi/api-contracts'
+import { FLAGSHIP_GOOGLE_TAG_ID, gtagHeadSnippet } from '@jeffi/api-contracts'
 import { lookupKey, touchKey, type ApiKeyRow } from './keys.js'
 import { buildOpenApi } from './openapi.js'
 
@@ -44,9 +45,14 @@ await app.register(apiReference, {
   },
 })
 // The browser tab reads the HTML <title>. Scalar's default ("Scalar API Reference") is rewritten
-// to Jeffi's here so both the /docs 301-served HTML and /docs/ match. (Favicon left as-is.)
+// to Jeffi's here so both the /docs 301-served HTML and /docs/ match, and the platform Google tag
+// goes in the head so docs visits show up next to ecom.jeffistores.in. (Favicon left as-is.)
+const DOCS_GTAG = gtagHeadSnippet(FLAGSHIP_GOOGLE_TAG_ID, { contentGroup: 'api_docs' })
 const brandDocHtml = (html: string) =>
-  html.replace(/<title>[^<]*<\/title>/i, '<title>Jeffi API Reference</title>')
+  html
+    .replace(/<title>[^<]*<\/title>/i, '<title>Jeffi API Reference</title>')
+    // /docs re-renders /docs/ through this hook, so skip HTML that already has the tag.
+    .replace(/<\/head>/i, m => (html.includes('googletagmanager.com/gtag/js') ? m : `${DOCS_GTAG}</head>`))
 
 // Scalar's /docs → /docs/ 301 bounces with Next's trailingSlash:false (which 308s /docs/ back
 // to /docs), creating an infinite redirect loop behind the public.* Next rewrite. Serve

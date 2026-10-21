@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { readFileSync } from 'node:fs'
-import { resolveTenantFromHost, runWithTenant, runAsPlatform, appFromHost, slugFromHost, type TenantContext } from '@jeffi/tenancy'
+import { resolveTenantFromHost, runWithTenant, runAsPlatform, appFromHost, slugFromHost, queryOne, type TenantContext } from '@jeffi/tenancy'
+import { FLAGSHIP_GOOGLE_TAG_ID, googleTagId, gtagHeadSnippet } from '@jeffi/api-contracts'
 import { loadInvoice, invoicePdf, loadQuotation, quotationPdf, loadPurchaseOrder, purchaseOrderPdf } from './loaders'
 import InvoiceView from './views/InvoiceView'
 import QuotationView from './views/QuotationView'
@@ -14,8 +15,15 @@ const TITLES: Record<App, string> = { invoice: 'Invoice', quotation: 'Quotation'
 // Tailwind compiled from the view components at build time (npm run build:css) and inlined: the pages
 // must not depend on a CDN (tenant CSP) or on a static-file route.
 const CSS = readFileSync(new URL('./views/styles.css', import.meta.url), 'utf8')
-function page(title: string, body: string) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>${CSS}body{margin:0;background:#f3f4f6}</style></head><body>${body}</body></html>`
+function page(title: string, body: string, head = '') {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>${head}<style>${CSS}body{margin:0;background:#f3f4f6}</style></head><body>${body}</body></html>`
+}
+
+// The store's own Google tag (site_settings.google_tag_id); the platform store falls back to the flagship tag,
+// a tenant without one loads nothing — same rule as the storefront.
+async function storeTagId(isTenant: boolean): Promise<string | null> {
+  const row = await queryOne<{ value: string }>(`SELECT value FROM site_settings WHERE key = 'google_tag_id'`).catch(() => null)
+  return googleTagId(row?.value) ?? (isTenant ? null : FLAGSHIP_GOOGLE_TAG_ID)
 }
 
 // Host: invoice-{slug}.<root> (Traefik in prod) or x-forwarded-host (Next dev rewrite).
@@ -62,7 +70,9 @@ export async function publicRoutes(app: FastifyInstance) {
         : docApp === 'quotation' ? <QuotationView qt={data.qt} items={data.items} settings={data.settings} token={token} />
         : <PurchaseOrderView po={data.po} items={data.items} settings={data.settings} token={token} grns={data.grns} />
       const number = data.order?.invoice_number ?? data.qt?.quote_number ?? data.po?.po_number ?? ''
-      return reply.type('text/html; charset=utf-8').send(page(`${TITLES[docApp]} ${number}`, renderToStaticMarkup(el)))
+      const tagId = await storeTagId(!!t.tenant)
+      const head = tagId ? gtagHeadSnippet(tagId, { contentGroup: 'documents', event: { name: 'view_document', params: { document_type: docApp } } }) : ''
+      return reply.type('text/html; charset=utf-8').send(page(`${TITLES[docApp]} ${number}`, renderToStaticMarkup(el), head))
     })
   }
   for (const prefix of ['/t/:app', '']) {

@@ -1,7 +1,9 @@
 // Per-store Google tag / Ads conversion settings and the inline gtag bootstrap (Consent Mode v2).
 // Pure and isomorphic: used by the root layout, the settings API and the admin form.
 
-export const FLAGSHIP_GOOGLE_TAG_ID = 'GT-NM2C3M85'
+import { FLAGSHIP_GOOGLE_TAG_ID } from '@jeffi/api-contracts'
+
+export { FLAGSHIP_GOOGLE_TAG_ID }
 export const CONSENT_COOKIE = 'jeffi_consent'
 
 export const GOOGLE_TAG_SETTING_KEYS = [
