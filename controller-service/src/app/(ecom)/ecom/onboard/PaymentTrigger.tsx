@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { trackSubscriptionCheckout, type PlanInfo } from '@/lib/client/ecom-analytics'
 
 interface Props {
   subscriptionId: string
@@ -12,6 +13,7 @@ interface Props {
   ownerEmail: string
   ownerName: string | null
   planName: string
+  plan: PlanInfo
   razorpayKeyId: string
 }
 
@@ -23,6 +25,7 @@ export default function PaymentTrigger({
   ownerEmail,
   ownerName,
   planName,
+  plan,
   razorpayKeyId,
 }: Props) {
   const router = useRouter()
@@ -78,6 +81,7 @@ export default function PaymentTrigger({
       setBusy(false)
     })
     rzp.open()
+    trackSubscriptionCheckout(plan)
   }
 
   return (

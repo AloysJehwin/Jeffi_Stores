@@ -9,7 +9,7 @@ source "$(dirname "$0")/../db/lib.sh"
 WORK=${RELEASE_WORK_DIR:-${TMPDIR:-/tmp}/jeffi-release}
 cd "$REPO"
 
-[ -z "$(git status --porcelain -- controller-service messaging-service document-service public-api-service packages deploy database package.json package-lock.json vendor)" ] ||
+[ -z "$(git status --porcelain -- controller-service messaging-service document-service public-api-service mobile-service packages deploy database package.json package-lock.json vendor)" ] ||
   { echo "Uncommitted changes — commit first so the release is reproducible." >&2; exit 1; }
 SHA=$(image_sha); TAG=local-$SHA
 mkdir -p "$WORK"
@@ -23,7 +23,7 @@ else
   echo "== 1/3 Images at $TAG (HEAD $(git rev-parse --short HEAD); logs in $WORK)"
   rm -rf "$WORK" && mkdir -p "$WORK/src"
   git archive HEAD | tar x -C "$WORK/src"
-  for s in controller messaging documents public-api; do
+  for s in controller messaging documents public-api mobile; do
     printf '   %-11s' "$s"
     bash deploy/k8s/bootstrap/build-push-ecr.sh "$s" "$TAG" "$WORK/src" > "$WORK/build-$s.log" 2>&1 ||
       { echo failed; tail -30 "$WORK/build-$s.log"; exit 1; }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "547714650610",
+    "project_id": "jeffi-stores-215e5",
+    "storage_bucket": "jeffi-stores-215e5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:547714650610:android:3ddb56668e25bcd72adb6b",
+        "android_client_info": {
+          "package_name": "com.jeffistores.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGjWgGoRtTjDqL0c2_nU6yHeUm529w2vQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -21,7 +21,7 @@ Rules:
 
 ## Microservices — services split, DB unified
 
-**Today only the services are segregated (controller-service — the Next app — plus messaging-service, document-service and public-api-service). They ALL connect to the same DB** — `jeffi_production_ready` locally, `jeffi_stores` in prod (the control plane merges into it at go-live). Every entity (control-plane, messaging, documents, templates library, business tables) lives in that one DB. See `docs/MICROSERVICES.md`.
+**Today only the services are segregated (controller-service — the Next app — plus messaging-service, document-service, public-api-service and mobile-service; the Expo app is `mobile-service/client`, built by EAS and released from the same main-merge pipeline). They ALL connect to the same DB** — `jeffi_production_ready` locally, `jeffi_stores` in prod (the control plane merges into it at go-live). Every entity (control-plane, messaging, documents, templates library, business tables) lives in that one DB. See `docs/MICROSERVICES.md`.
 
 - Do NOT create new DBs. `jeffi_control_plane`, `jeffi_messaging`, `jeffi_documents` are legacy from an earlier design and are deprecated.
 - New tables for any service go in the main `database/*.sql` pipeline (topic file + `constraints.sql` + `indexes.sql`), applied to `jeffi_production_ready` locally.

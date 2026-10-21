@@ -48,7 +48,7 @@ export default function CookieConsentBanner() {
         </h2>
         <p className="mt-1 text-sm text-foreground-secondary">
           We use essential cookies to run the store. With your permission we also use analytics cookies to understand
-          how the store is used and advertising cookies to measure our ads. See our{' '}
+          how the store is used and advertising cookies to personalise and measure ads. See our{' '}
           <Link href="/legal/privacy-policy" className="text-accent-600 hover:underline">
             privacy policy
           </Link>
@@ -79,7 +79,7 @@ export default function CookieConsentBanner() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-foreground">Advertising</p>
-                <p className="text-xs text-foreground-muted">Ad conversion measurement and remarketing (Google Ads).</p>
+                <p className="text-xs text-foreground-muted">Personalised ads (Google AdSense), ad measurement and remarketing (Google Ads).</p>
               </div>
               <Toggle
                 checked={choice.ads}
