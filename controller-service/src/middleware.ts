@@ -728,5 +728,7 @@ async function handle(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|screenshots|icon.png|apple-icon.png).*)'],
+  // auth/google/callback is static HTML: skipping middleware keeps it instant (in dev it otherwise waits on
+  // every middleware recompile, leaving a blank tab on the callback URL).
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|screenshots|icon.png|apple-icon.png|auth/google/callback).*)'],
 }

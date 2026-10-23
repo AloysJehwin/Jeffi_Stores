@@ -19,6 +19,8 @@ export const CALLBACK_SCRIPT = `
       else { var u = new URL(c); if ((u.protocol === 'https:' || u.protocol === 'http:') && own(u.hostname)) back = u.origin + u.pathname + u.search; }
     }
   } catch (e) {}
+  var leaving = false;
+  if (window.addEventListener) window.addEventListener('beforeunload', function () { leaving = true; });
   var go = function () {
     if (!back) {
       document.getElementById('m').textContent = 'This sign-in link is incomplete. Close this tab and sign in again.';
@@ -26,15 +28,17 @@ export const CALLBACK_SCRIPT = `
     }
     var target = back + '#' + hash;
     location.replace(target);
-    // Safety net: some browsers drop a script navigation on a page reached by a cross-site redirect.
-    // Still here after a moment: try again, then offer a link so the tab never sits on this page.
+    // Some browsers drop a script navigation on a page reached by a cross-site redirect: retry only if this
+    // page never started unloading, since re-navigating while a slow page loads restarts that load.
     setTimeout(function () {
-      try { location.assign(target); } catch (e) {}
+      if (!leaving) { try { location.assign(target); } catch (e) {} }
+    }, 1500);
+    setTimeout(function () {
       var m = document.getElementById('m');
       if (m) m.innerHTML = 'Still here? <a id="c" href="#">Continue signing in</a>';
       var c = document.getElementById('c');
       if (c) c.setAttribute('href', target);
-    }, 1500);
+    }, 4000);
   };
   if (state.slice(0, 2) === 'p.' && window.opener && !window.opener.closed) {
     try {
