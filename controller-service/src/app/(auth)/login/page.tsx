@@ -8,6 +8,8 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
+import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
+import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 
 export default function LoginPageWrapper() {
@@ -27,6 +29,7 @@ function LoginPage() {
   const { refreshCart } = useCart()
   const { showToast } = useToast()
   const config = useStoreConfig()
+  const { leaving, go } = useLeaveTo()
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [identifier, setIdentifier] = useState('')
@@ -48,9 +51,9 @@ function LoginPage() {
 
   useEffect(() => {
     if (!authLoading && user && !showPhoneModal) {
-      router.replace(redirect)
+      go(redirect, 'replace')
     }
-  }, [user, authLoading, showPhoneModal])
+  }, [user, authLoading, showPhoneModal, go, redirect])
 
   // Hash fallback: when the popup was blocked, the callback page redirects back
   // here with the access_token in the URL hash. Pick it up and complete sign-in.
@@ -82,7 +85,7 @@ function LoginPage() {
         if (needsPhone || needsPolicy) {
           setPhoneRequiresPolicy(needsPolicy)
           setShowPhoneModal(true)
-        } else router.push(redirect)
+        } else go(redirect)
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
       .finally(() => setGoogleLoading(false))
@@ -125,7 +128,7 @@ function LoginPage() {
         setPhoneRequiresPolicy(needsPolicy)
         setShowPhoneModal(true)
       } else {
-        router.push(redirect)
+        go(redirect)
       }
     } catch (err: any) {
       setError(err.message)
@@ -141,7 +144,7 @@ function LoginPage() {
     try {
       sessionStorage.setItem('google_signup', JSON.stringify({ accessToken, profile }))
     } catch {}
-    router.push(`/signup?google=1&from=login${redirect !== '/' ? `&redirect=${encodeURIComponent(redirect)}` : ''}`)
+    go(`/signup?google=1&from=login${redirect !== '/' ? `&redirect=${encodeURIComponent(redirect)}` : ''}`)
   }
 
   const handleSendOTP = async (e: React.FormEvent) => {
@@ -228,7 +231,7 @@ function LoginPage() {
           ...(channel !== 'email' && loginPhone.length === 10 ? { phone: loginPhone } : {}),
         }),
       }).catch(() => {})
-      router.push(redirect)
+      go(redirect)
     } catch (err: any) {
       setError(err.message)
       setOtp('')
@@ -341,12 +344,18 @@ function LoginPage() {
   const channelOptions = allChannelOptions.filter(o => o.enabled)
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full">
-        <div className="bg-surface-elevated rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-foreground">Welcome Back</h2>
-            <p className="mt-2 text-sm text-foreground-secondary">Login to your {config.identity.name} account</p>
+    <AuthSplitShell
+      brandName={config.identity.name}
+      logoUrl={config.identity.logoUrl}
+      headline={`Welcome back to ${config.identity.name}`}
+      points={AUTH_POINTS.store}
+      footnote="Secure sign-in with a one-time code. No passwords to remember."
+      theme={AUTH_THEMES.store}
+      busy={leaving ? 'Signing you in…' : googleLoading ? 'Signing you in with Google…' : null}
+    >
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-foreground">Welcome back</h1>
+            <p className="mt-2 text-sm text-foreground-secondary">Sign in to your {config.identity.name} account</p>
           </div>
 
           {error && (
@@ -609,8 +618,6 @@ function LoginPage() {
               Create one
             </Link>
           </div>
-        </div>
-      </div>
 
       {showPhoneModal && (
         <PhoneVerifyModal
@@ -618,7 +625,7 @@ function LoginPage() {
           title={phoneRequiresPolicy ? 'Almost there' : undefined}
           onVerified={() => {
             setShowPhoneModal(false)
-            router.push(redirect)
+            go(redirect)
           }}
           onCancel={() => {
             setShowPhoneModal(false)
@@ -626,6 +633,6 @@ function LoginPage() {
           }}
         />
       )}
-    </div>
+    </AuthSplitShell>
   )
 }

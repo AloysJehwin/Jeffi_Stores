@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import type { GoogleOAuthResult } from '@/lib/client/google-oauth-popup'
 import { trackOwnerAuth } from '@/lib/client/ecom-analytics'
+import { AuthBusyOverlay } from '@/components/auth/AuthSplitShell'
+import { useLeaveTo } from '@/components/auth/useLeaveTo'
 
 // OTP + Google auth form for ecom owners. mode 'signup' collects a name; 'signin'
 // doesn't. Both hit the same ecom auth endpoints (findOrCreateOwner upserts).
@@ -16,9 +18,10 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
   const [name, setName] = useState('')
   const [otp, setOtp] = useState('')
   const [busy, setBusy] = useState(false)
+  const { leaving, go } = useLeaveTo()
 
-  const input =
-    'w-full rounded-xl bg-surface-elevated px-4 py-3 text-sm text-foreground ecom-field border-transparent'
+  const field = 'w-full rounded-xl bg-surface-elevated px-4 py-3 text-foreground ecom-field border-transparent'
+  const input = `${field} text-[16px] sm:text-sm`
 
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault()
@@ -55,7 +58,7 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
       }
       trackOwnerAuth(mode, 'email')
       // New owner → onboarding wizard; returning → dashboard.
-      router.push(mode === 'signup' ? '/onboard' : '/dashboard')
+      go(mode === 'signup' ? '/onboard' : '/dashboard')
       router.refresh()
     } catch {
       showToast('Network error', 'error')
@@ -66,11 +69,12 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
 
   return (
     <div className="w-full max-w-sm mx-auto">
+      {leaving && <AuthBusyOverlay text="Signing you in…" />}
       <div>
-        <h1 className="font-display font-black text-4xl text-foreground">
+        <h1 className="font-display font-black text-3xl sm:text-4xl text-foreground text-center sm:text-left">
           {mode === 'signup' ? 'Create your store account' : 'Welcome back'}
         </h1>
-        <p className="text-sm text-foreground-muted mt-2">
+        <p className="text-sm text-foreground-muted mt-2 text-center sm:text-left">
           {mode === 'signup' ? 'Start selling on your own Jeffi-powered store.' : 'Sign in to your store dashboard.'}
         </p>
 
@@ -102,11 +106,11 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
           </form>
         ) : (
           <form onSubmit={verify} className="mt-6 space-y-4">
-            <p className="text-sm text-foreground-secondary">
+            <p className="text-sm text-foreground-secondary break-words">
               Enter the 6-digit code sent to <span className="font-medium">{email}</span>
             </p>
             <input
-              className={`${input} tracking-[0.4em] text-center text-lg`}
+              className={`${field} tracking-[0.4em] text-center text-lg`}
               inputMode="numeric"
               maxLength={6}
               placeholder="••••••"
@@ -123,7 +127,7 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
             <button
               type="button"
               onClick={() => setStep('email')}
-              className="w-full text-sm text-foreground-muted hover:text-foreground"
+              className="w-full min-h-11 sm:min-h-0 text-sm text-foreground-muted hover:text-foreground"
             >
               ← Use a different email
             </button>
@@ -140,14 +144,14 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
           {mode === 'signup' ? (
             <>
               Already have an account?{' '}
-              <a href="/signin" className="org-brown font-semibold hover:underline">
+              <a href="/signin" className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
                 Sign in
               </a>
             </>
           ) : (
             <>
               New to Jeffi Commerce?{' '}
-              <a href="/signup" className="org-brown font-semibold hover:underline">
+              <a href="/signup" className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
                 Get started
               </a>
             </>
@@ -164,9 +168,11 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
 function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (m: string) => void }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
+  const { leaving, go } = useLeaveTo()
 
   // Back from Google in this tab: finish sign-in with the returned token.
   useEffect(() => {
+    if (/(^|[#&])access_token=/.test(window.location.hash)) setBusy(true)
     import('@/lib/client/google-oauth-popup').then(m => {
       const r = m.consumeGoogleRedirect()
       if (r) start(r)
@@ -199,7 +205,7 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
         return
       }
       trackOwnerAuth(mode, 'google')
-      router.push(mode === 'signup' ? '/onboard' : '/dashboard')
+      go(mode === 'signup' ? '/onboard' : '/dashboard')
       router.refresh()
     } catch {
       onError('Network error')
@@ -209,27 +215,30 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
   }
 
   return (
-    <button
-      onClick={() => start()}
-      disabled={busy}
-      className="org-sand org-sand-hover w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-foreground transition-colors disabled:opacity-50"
-    >
-      <svg className="w-4 h-4" viewBox="0 0 24 24">
-        <path
-          fill="#4285F4"
-          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-        />
-        <path
-          fill="#34A853"
-          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"
-        />
-        <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" />
-        <path
-          fill="#EA4335"
-          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"
-        />
-      </svg>
-      {busy ? 'Signing in…' : 'Continue with Google'}
-    </button>
+    <>
+      {(busy || leaving) && <AuthBusyOverlay text="Signing you in with Google…" />}
+      <button
+        onClick={() => start()}
+        disabled={busy || leaving}
+        className="org-sand org-sand-hover w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-foreground transition-colors disabled:opacity-50"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24">
+          <path
+            fill="#4285F4"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+          />
+          <path
+            fill="#34A853"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"
+          />
+          <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" />
+          <path
+            fill="#EA4335"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"
+          />
+        </svg>
+        {busy || leaving ? 'Signing in…' : 'Continue with Google'}
+      </button>
+    </>
   )
 }

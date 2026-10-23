@@ -8,6 +8,8 @@ import { openGoogleOAuthPopup, consumeGoogleRedirect, type GoogleOAuthResult } f
 import AdminSelect from '@/components/admin/AdminSelect'
 import { bp } from '@/lib/shared/business-path'
 import DatePicker from '@/components/ui/DatePicker'
+import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
+import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 import { isValidDob } from '@/lib/shared/format'
 
@@ -23,6 +25,7 @@ function BusinessSignUpPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const config = useStoreConfig()
+  const { leaving, go } = useLeaveTo()
 
   const [step, setStep] = useState<'email' | 'otp' | 'details'>('email')
   const [email, setEmail] = useState(searchParams.get('email') || '')
@@ -274,10 +277,10 @@ function BusinessSignUpPage() {
         return
       }
       if (data.approvalStatus === 'pending') {
-        router.push(bp('/business/pending'))
+        go(bp('/business/pending'))
         return
       }
-      router.push(bp('/business/dashboard'))
+      go(bp('/business/dashboard'))
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -380,7 +383,7 @@ function BusinessSignUpPage() {
         }
         throw new Error(data.error || 'Signup failed')
       }
-      router.push(bp('/business/pending'))
+      go(bp('/business/pending'))
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -408,9 +411,17 @@ function BusinessSignUpPage() {
 
   return (
     <>
-      <div className="relative min-h-screen grid lg:grid-cols-2">
-        {/* Top-right switch action (the public header is intentionally hidden on the auth pages) */}
-        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 flex items-center gap-3">
+      <AuthSplitShell
+        brandName={config.identity.name}
+        logoUrl={config.identity.logoUrl}
+        headline="Become a business partner"
+        sub="Apply once for trade pricing, bulk quotes and GST invoicing in your company's name."
+        points={AUTH_POINTS.business}
+        footnote="Applications are reviewed within 24–48 hours."
+        theme={AUTH_THEMES.business}
+        busy={leaving ? 'Submitting your application…' : googleLoading ? 'Signing you in with Google…' : null}
+        corner={
+          <>
           <span className="hidden sm:inline-flex items-center text-sm text-foreground-secondary bg-surface/90 backdrop-blur px-3 py-2 rounded-lg border border-border-default">
             Already have an account?
           </span>
@@ -420,10 +431,9 @@ function BusinessSignUpPage() {
           >
             Sign in
           </Link>
-        </div>
-        {/* Left — form */}
-        <div className="flex items-center justify-center px-6 py-12 bg-surface">
-          <div className="w-full max-w-sm">
+          </>
+        }
+      >
             <div className="mb-8">
               <Link
                 href="/"
@@ -864,45 +874,7 @@ function BusinessSignUpPage() {
                 </p>
               </form>
             )}
-          </div>
-        </div>
-
-        {/* Right — hero */}
-        <div className="hidden lg:flex flex-col justify-center px-12 bg-gradient-to-br from-secondary-600 to-secondary-800 text-white">
-          <div className="max-w-md">
-            <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-8">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-3xl font-bold mb-4 leading-tight">Become a {config.identity.name} Business Partner</h2>
-            <p className="text-white/70 text-base leading-relaxed mb-8">
-              Get exclusive B2B pricing, dedicated support, and streamlined bulk ordering for your business.
-            </p>
-            <div className="space-y-4">
-              {[
-                { step: '1', title: 'Fill your details', desc: 'Company info, GST, and industry' },
-                { step: '2', title: 'Admin review', desc: 'Our team approves within 24–48 hours' },
-                { step: '3', title: 'Access partner portal', desc: 'Discounts and RFQ tools unlocked' },
-              ].map(item => (
-                <div key={item.step} className="flex items-start gap-4">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0 text-sm font-bold">
-                    {item.step}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white text-sm">{item.title}</p>
-                    <p className="text-white/60 text-xs mt-0.5">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      </AuthSplitShell>
 
       {showPhoneVerify && (
         <PhoneVerifyModal
@@ -911,7 +883,7 @@ function BusinessSignUpPage() {
           title="Verify your mobile number"
           onVerified={() => {
             setShowPhoneVerify(false)
-            router.push(bp('/business/pending'))
+            go(bp('/business/pending'))
           }}
           onCancel={() => {
             setShowPhoneVerify(false)

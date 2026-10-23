@@ -53,6 +53,8 @@ export default function ConditionalLayout({
   const isEcomPage = isEcomSubdomain || pathname?.startsWith('/ecom')
   const isCertPortalPage = isCertPortalSubdomain || pathname?.startsWith('/certportal')
   const isStaffPage = pathname?.startsWith('/staff')
+  // Sign-in and sign-up pages carry their own brand panel (components/auth/AuthSplitShell), never the top nav.
+  const isAuthPage = pathname === '/login' || pathname === '/signup' || !!pathname?.startsWith('/auth/')
 
   if (isAdminPage || isFormsPage || isDocumentPage || isBusinessPage || isEcomPage || isCertPortalPage || isStaffPage) {
     return (
@@ -84,8 +86,8 @@ export default function ConditionalLayout({
                     <NumberInputWheelGuard />
                     <div className="flex flex-col min-h-[100dvh] bg-surface">
                       <PageTracker />
-                      <Header />
-                      <main className="flex-1 bg-surface pt-16 lg:pt-20">{children}</main>
+                      {!isAuthPage && <Header />}
+                      <main className={`flex-1 bg-surface ${isAuthPage ? '' : 'pt-16 lg:pt-20'}`}>{children}</main>
                       {cookieConsent && <StorefrontFooterBar />}
                     </div>
                     <CompareBar />
