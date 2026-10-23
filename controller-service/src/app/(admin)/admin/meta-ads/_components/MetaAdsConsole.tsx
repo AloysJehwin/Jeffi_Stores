@@ -294,8 +294,8 @@ function ConnectPanel({
               disabled={!canWrite || busy}
               onClick={() => post({ adAccountId: a.id }, 'Meta Ads connected. Use Sync now to pull the last 30 days.')}
             >
-              <span>{a.name}</span>
-              <span className="text-xs text-foreground-muted">
+              <span className="min-w-0 truncate">{a.name}</span>
+              <span className="shrink-0 text-xs text-foreground-muted">
                 {a.id} · {a.currency}
               </span>
             </button>
@@ -326,7 +326,7 @@ function ConnectPanel({
             )}
           </div>
           <div className="space-y-2">
-            <div className="grid gap-2 md:grid-cols-3 items-end">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3 items-end">
               <label className="text-xs text-foreground-muted md:col-span-2">
                 Or a system user access token (Business Settings, does not expire)
                 <input
@@ -605,7 +605,7 @@ function CapiView({ d, status, onChanged }: { d: any; status: any; onChanged: ()
           cookies.
         </p>
         {canWrite ? (
-          <div className="grid gap-2 md:grid-cols-3 items-end">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3 items-end">
             <label className="text-xs text-foreground-muted">
               Pixel (dataset) id
               <input className={inputCls} value={pixel} onChange={e => setPixel(e.target.value.trim())} />

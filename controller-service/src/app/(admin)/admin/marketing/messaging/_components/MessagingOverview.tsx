@@ -102,7 +102,7 @@ export default function MessagingOverview() {
 
           <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <Section title="Messages by channel">
                 <TrendChart
@@ -161,7 +161,7 @@ export default function MessagingOverview() {
             />
           </Section>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Section
               title="Broadcasts sent"
               action={

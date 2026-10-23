@@ -66,9 +66,9 @@ export default function TileListEditor({
 
   return (
     <div className="sm:col-span-2">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <label className={`${LABEL_CLASS} mb-0`}>{label}</label>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {!usingDefaults &&
             tiles.length > 0 &&
             !!defaults?.length &&

@@ -279,7 +279,7 @@ export default function Composer({
 
       <Section title="Content">
         <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className={lbl}>Product (optional)</label>
               <AdminTypeahead
@@ -467,7 +467,7 @@ export default function Composer({
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <div className="mb-1 flex items-center justify-between">
                 <label className={lbl}>Image URL</label>

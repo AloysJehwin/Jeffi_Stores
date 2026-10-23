@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode, type ComponentType } from 'react'
+import { useState, Fragment, type ReactNode, type ComponentType } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import clsx from 'clsx'
 import { Check } from 'lucide-react'
@@ -41,9 +41,38 @@ export function AppDemoShell({
   children: ReactNode
 }) {
   const idx = steps.findIndex(s => s.id === step)
+  const cur = steps[Math.max(0, idx)]
+  const CurIcon = cur.icon
   return (
     <div className="w-full">
-      <div className="flex gap-2 overflow-x-auto pb-3 h-14">
+      <div className="sm:hidden pb-2">
+        <div className="flex items-center justify-between gap-3">
+          <span className="min-w-0 inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+            <CurIcon className="w-4 h-4 shrink-0 ecom-accent-text" />
+            <span className="truncate">{cur.label}</span>
+          </span>
+          <span className="shrink-0 text-xs font-medium tabular-nums text-foreground-muted">{idx + 1} of {steps.length}</span>
+        </div>
+        <div className="flex gap-1.5">
+          {steps.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onStep(s.id)}
+              aria-label={s.label}
+              aria-current={i === idx ? 'step' : undefined}
+              className="flex-1 h-11 flex items-center"
+            >
+              <span
+                className={clsx('h-1.5 w-full rounded-full', i === idx ? 'ecom-accent-bg' : i > idx && 'bg-surface-elevated')}
+                style={i < idx ? { background: 'var(--org-apricot)' } : undefined}
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="hidden sm:flex gap-2 overflow-x-auto pb-3 h-14">
         {steps.map((s, i) => {
           const Icon = s.icon
           const active = i === idx
@@ -66,7 +95,7 @@ export function AppDemoShell({
       </div>
 
       <BrowserFrame alt={caption} caption={caption} className="w-full">
-        <div className="h-[520px] overflow-hidden p-4 sm:p-6">
+        <div className="grid grid-cols-1 min-h-80 overflow-hidden p-3 sm:block sm:h-[520px] sm:min-h-0 sm:p-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -74,7 +103,7 @@ export function AppDemoShell({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.25 }}
-              className="h-full"
+              className="h-full min-w-0"
             >
               {children}
             </motion.div>
@@ -82,12 +111,12 @@ export function AppDemoShell({
         </div>
       </BrowserFrame>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => onStep(steps[Math.max(0, idx - 1)].id)}
           disabled={idx === 0}
-          className="org-sand org-sand-hover rounded-full px-5 py-2 text-sm font-semibold text-foreground disabled:opacity-40"
+          className="flex-1 sm:flex-initial min-h-11 sm:min-h-0 org-sand org-sand-hover rounded-full px-5 py-2 text-sm font-semibold text-foreground disabled:opacity-40"
         >
           Back
         </button>
@@ -95,7 +124,7 @@ export function AppDemoShell({
           type="button"
           onClick={() => onStep(steps[Math.min(steps.length - 1, idx + 1)].id)}
           disabled={idx === steps.length - 1}
-          className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          className="flex-1 sm:flex-initial min-h-11 sm:min-h-0 ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
         >
           Next step
         </button>
@@ -115,7 +144,7 @@ export const TONE: Record<string, string> = {
 }
 
 export function Tag({ tone = 'neutral', children }: { tone?: keyof typeof TONE; children: ReactNode }) {
-  return <span className={clsx('inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap', TONE[tone])}>{children}</span>
+  return <span className={clsx('inline-flex max-w-full sm:max-w-none rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-normal sm:whitespace-nowrap', TONE[tone])}>{children}</span>
 }
 
 export function Field({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
@@ -123,7 +152,7 @@ export function Field({ label, value, hint }: { label: string; value: ReactNode;
     <label className="block min-w-0">
       <span className="text-xs font-medium text-foreground-muted">{label}</span>
       <div className="mt-1 flex items-center justify-between rounded-xl bg-surface-elevated px-3 py-2 text-sm text-foreground">
-        <span className="truncate">{value}</span>
+        <span className="min-w-0 break-words sm:truncate">{value}</span>
         {hint && <span className="ml-2 shrink-0 text-[11px] text-foreground-muted">{hint}</span>}
       </div>
     </label>
@@ -134,12 +163,12 @@ export function Panel({ title, action, children, className = '' }: { title?: str
   return (
     <div className={clsx('h-full flex flex-col min-h-0', className)}>
       {(title || action) && (
-        <div className="flex items-center justify-between shrink-0 mb-3">
-          {title && <h3 className="font-display font-black text-lg text-foreground">{title}</h3>}
+        <div className="flex flex-wrap items-center justify-between gap-2 shrink-0 mb-3 sm:flex-nowrap sm:gap-0">
+          {title && <h3 className="min-w-0 font-display font-black text-lg text-foreground">{title}</h3>}
           {action}
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
+      <div className="flex-1 min-h-0 sm:overflow-hidden">{children}</div>
     </div>
   )
 }
@@ -151,7 +180,7 @@ export function Btn({ children, onClick, disabled, tone = 'solid' }: { children:
       onClick={onClick}
       disabled={disabled}
       className={clsx(
-        'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-40 transition-colors',
+        'inline-flex items-center gap-1.5 rounded-full min-h-11 sm:min-h-0 px-4 py-2 text-sm font-semibold disabled:opacity-40 transition-colors',
         tone === 'solid' ? 'ecom-accent-bg text-white' : 'org-sand org-sand-hover text-foreground'
       )}
     >
@@ -161,35 +190,57 @@ export function Btn({ children, onClick, disabled, tone = 'solid' }: { children:
 }
 
 export function Table({ cols, rows }: { cols: string[]; rows: ReactNode[][] }) {
+  const stack = cols.length > 2
   return (
-    <div className="h-full overflow-hidden rounded-2xl bg-surface-elevated">
-      <table className="w-full text-sm">
-        <thead className="org-sand text-foreground-secondary">
-          <tr>
-            {cols.map(h => (
-              <th key={h} className="px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border-default">
+    <>
+      {stack && (
+        <div className="sm:hidden space-y-2">
           {rows.map((r, i) => (
-            <tr key={i}>
-              {r.map((c, j) => (
-                <td key={j} className={clsx('px-3 py-2.5 whitespace-nowrap', j === 0 ? 'font-medium text-foreground' : 'text-foreground-secondary')}>{c}</td>
+            <div key={i} className="rounded-2xl bg-surface-elevated px-3 py-2.5">
+              <div className="break-words text-sm font-medium text-foreground">{r[0]}</div>
+              <dl className="mt-1.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+                {cols.slice(1).map((h, j) =>
+                  r[j + 1] === '' || r[j + 1] == null ? null : (
+                    <Fragment key={j}>
+                      <dt className="text-foreground-muted">{h}</dt>
+                      <dd className="min-w-0 break-words text-right text-foreground-secondary">{r[j + 1]}</dd>
+                    </Fragment>
+                  )
+                )}
+              </dl>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className={clsx('h-full overflow-hidden rounded-2xl bg-surface-elevated', stack && 'hidden sm:block')}>
+        <table className="w-full text-sm">
+          <thead className="org-sand text-foreground-secondary">
+            <tr>
+              {cols.map(h => (
+                <th key={h} className="px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">{h}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-border-default">
+            {rows.map((r, i) => (
+              <tr key={i}>
+                {r.map((c, j) => (
+                  <td key={j} className={clsx('px-3 py-2.5 whitespace-normal break-words sm:whitespace-nowrap', j === 0 ? 'font-medium text-foreground' : 'text-foreground-secondary')}>{c}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
 export function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: 'accent' }) {
   return (
-    <div className="rounded-2xl org-sand p-4">
-      <div className="text-[11px] uppercase tracking-widest text-foreground-muted">{label}</div>
-      <div className={clsx('mt-1 font-display font-black text-2xl tabular-nums', tone === 'accent' ? 'ecom-accent-text' : 'text-foreground')}>{value}</div>
+    <div className="min-w-0 rounded-2xl org-sand p-3 sm:p-4">
+      <div className="text-[11px] uppercase tracking-wider text-foreground-muted sm:tracking-widest">{label}</div>
+      <div className={clsx('mt-1 font-display font-black text-xl tabular-nums sm:text-2xl', tone === 'accent' ? 'ecom-accent-text' : 'text-foreground')}>{value}</div>
     </div>
   )
 }

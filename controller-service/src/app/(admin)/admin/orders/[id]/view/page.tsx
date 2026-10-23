@@ -301,7 +301,7 @@ export default async function OrderDetailsPage({
                         <div className="w-14 h-14 rounded-lg bg-surface-secondary border border-border-default shrink-0 flex items-center justify-center"><ImageIcon className="h-6 w-6 text-foreground-muted" /></div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-foreground">
+                        <h3 className="font-medium text-foreground break-words">
                           {item.product_id ? (
                             <Link
                               href={ap(`/admin/products/${item.product_id}`, host)}
@@ -314,7 +314,7 @@ export default async function OrderDetailsPage({
                             item.product_name || item.products?.name || 'Product'
                           )}
                         </h3>
-                        <p className="text-sm text-foreground-muted mt-1">
+                        <p className="text-sm text-foreground-muted mt-1 break-words">
                           SKU: {item.product_sku || item.products?.sku}
                           {(item.product_sku || item.products?.sku) && (
                             <CopySku sku={item.product_sku || item.products?.sku} className="ml-1" />
@@ -530,7 +530,7 @@ export default async function OrderDetailsPage({
                                 item.product_name
                               )}
                             </p>
-                            <p className="text-xs text-foreground-muted mt-0.5">
+                            <p className="text-xs text-foreground-muted mt-0.5 break-words">
                               SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}
                               {(item.sub_variant?.sku || item.variant?.sku || item.product_sku) && (
                                 <CopySku
@@ -858,9 +858,9 @@ export default async function OrderDetailsPage({
                           <span className="text-foreground capitalize">{p.payment_method}</span>
                         </div>
                         {p.transaction_id && (
-                          <div className="flex justify-between text-sm">
+                          <div className="flex justify-between gap-3 text-sm">
                             <span className="text-foreground-secondary">Transaction ID</span>
-                            <span className="text-foreground font-mono text-xs">{p.transaction_id}</span>
+                            <span className="min-w-0 text-right text-foreground font-mono text-xs [overflow-wrap:anywhere]">{p.transaction_id}</span>
                           </div>
                         )}
                         {p.payment_gateway && (
@@ -891,9 +891,9 @@ export default async function OrderDetailsPage({
                               Partial refund{r.purpose === 'order_adjustment' ? ' · order changes' : r.purpose === 'variant_change' ? ' · variant change' : ''}
                               {r.at ? <span className="block text-[11px] text-foreground-muted">{new Date(r.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span> : null}
                             </span>
-                            <span className="text-right">
+                            <span className="min-w-0 text-right">
                               <span className="block font-semibold tabular-nums text-red-600 dark:text-red-400">− Rs. {Number(r.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              <span className="block text-foreground-muted font-mono text-[11px]">{r.id}</span>
+                              <span className="block text-foreground-muted font-mono text-[11px] [overflow-wrap:anywhere]">{r.id}</span>
                             </span>
                           </div>
                         ))}
@@ -906,9 +906,9 @@ export default async function OrderDetailsPage({
                           </div>
                         )}
                         {refunded?.id && (
-                          <div className="flex justify-between text-sm">
+                          <div className="flex justify-between gap-3 text-sm">
                             <span className="text-foreground-secondary">Refund</span>
-                            <span className="text-foreground font-mono text-xs">
+                            <span className="min-w-0 text-right text-foreground font-mono text-xs [overflow-wrap:anywhere]">
                               {refunded.id}
                               {refunded.amount ? ` · Rs. ${(Number(refunded.amount) / 100).toFixed(2)}` : ''}
                             </span>

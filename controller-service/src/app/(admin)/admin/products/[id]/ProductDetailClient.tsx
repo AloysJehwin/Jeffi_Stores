@@ -260,7 +260,7 @@ function Field({ label, value, mono }: { label: string; value?: any; mono?: bool
   return (
     <div className="flex justify-between gap-4 text-sm">
       <span className="text-foreground-secondary shrink-0">{label}</span>
-      <span className={`text-foreground text-right ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
+      <span className={`min-w-0 break-words text-foreground text-right ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
     </div>
   )
 }
@@ -428,9 +428,9 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                     {data.primarySupplier.contact_name && (
                       <p className="text-xs text-foreground-secondary">{data.primarySupplier.contact_name}</p>
                     )}
-                    <div className="flex gap-3 text-xs text-foreground-muted">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-foreground-muted">
                       {data.primarySupplier.phone && <span>{data.primarySupplier.phone}</span>}
-                      {data.primarySupplier.email && <span>{data.primarySupplier.email}</span>}
+                      {data.primarySupplier.email && <span className="min-w-0 [overflow-wrap:anywhere]">{data.primarySupplier.email}</span>}
                     </div>
                   </div>
                 ) : (
@@ -1243,7 +1243,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
                 {Object.entries(p.specifications).map(([k, v]) => (
                   <div key={k} className="flex justify-between text-sm border-b border-border-default/40 pb-1">
                     <span className="text-foreground-secondary">{k}</span>
-                    <span className="text-foreground font-mono text-xs">{String(v)}</span>
+                    <span className="min-w-0 break-words text-foreground font-mono text-xs">{String(v)}</span>
                   </div>
                 ))}
               </div>
@@ -1374,7 +1374,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             </CollapsibleCard>
           )}
 
-          <div className="flex gap-4 text-xs text-foreground-muted">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-foreground-muted">
             <span>Created {formatDate(p.created_at)}</span>
             <span>Updated {formatDate(p.updated_at)}</span>
           </div>

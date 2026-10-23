@@ -138,7 +138,7 @@ function ExperimentCard({
           )}
         </div>
         {canManage && live && !confirm && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {(['promote', 'graduate', 'end'] as const).map(a => (
               <button key={a} type="button" className={btnGhost} disabled={!!busy} onClick={() => setConfirm(a)}>
                 {humanize(a)}
@@ -271,7 +271,7 @@ function NewExperiment({ campaigns, onCreated }: { campaigns: CampaignOption[]; 
           The trial is a copy of the campaign with another bid strategy or target, on a share of its traffic and budget. Budgets
           cannot differ between the arms (they share the campaign&apos;s budget); graduating a trial gives it its own.
         </p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <AdminSelect
             label="Campaign (Search or Display)"
             value={campaignId}
@@ -301,7 +301,7 @@ function NewExperiment({ campaigns, onCreated }: { campaigns: CampaignOption[]; 
           <Field label="Trial share of traffic (%)">
             <input className={inputCls} inputMode="numeric" value={split} onChange={e => setSplit(e.target.value)} />
           </Field>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Field label="Start (optional)">
               <DatePicker value={startDate} min={today} clearable onChange={v => setStartDate(v)} placeholder="Now" />
             </Field>
@@ -318,7 +318,7 @@ function NewExperiment({ campaigns, onCreated }: { campaigns: CampaignOption[]; 
             ))}
           </ul>
         )}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button type="button" className={btnGhost} disabled={!!busy || problems.length > 0} onClick={() => send(true)}>
             {busy === 'preview' && <Loader2 className="w-4 h-4 animate-spin" />} Check with Google
           </button>

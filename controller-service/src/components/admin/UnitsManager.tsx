@@ -772,7 +772,7 @@ export default function UnitsManager({
                 <label className="block text-[10px] text-foreground-muted mb-0.5">Dimension</label>
                 <div className={lockedCls} title="Same as the default selling unit">{extraDimension}</div>
               </div>
-              <div className="grid grid-cols-4 gap-x-2 items-end">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-2 items-end">
                 <div>
                   <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
                   {isCustomExtra ? (
@@ -835,7 +835,7 @@ export default function UnitsManager({
                 </div>
                 <div className="invisible" aria-hidden />
               </div>
-              <div className="grid grid-cols-3 gap-x-2 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-2 gap-y-2 items-end">
                 <div>
                   <label className="block text-[10px] text-foreground-muted mb-0.5">Min qty *</label>
                   <input

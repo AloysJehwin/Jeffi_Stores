@@ -43,7 +43,7 @@ export function PageLinks({ page, total, pageSize = PAGE_SIZE, base, params = {}
   return (
     <nav className={PAGE_CLS.wrap} aria-label="Pagination">
       <span className={PAGE_CLS.info}>{first}–{Math.min(page * pageSize, total)} of {total.toLocaleString('en-IN')}</span>
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Link href={href(page - 1)} aria-label="Previous page" className={page <= 1 ? PAGE_CLS.disabled : PAGE_CLS.btn}><ChevronLeft className="w-4 h-4" /></Link>
         {pageWindow(page, pages).map((p, i) =>
           p === '…'

@@ -41,7 +41,7 @@ function CustomerRow({ c, large }: { c: Customer; large?: boolean }) {
     >
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-foreground truncate">{fmtName(c)}</p>
-        <p className="text-[11px] text-foreground-muted">
+        <p className="text-[11px] text-foreground-muted break-words">
           {c.email}
           {c.lifetime_value > 0 && ` · ₹${Math.round(c.lifetime_value).toLocaleString('en-IN')} LTV`}
           {c.order_count > 0 && ` · ${c.order_count} order${c.order_count !== 1 ? 's' : ''}`}
@@ -219,9 +219,9 @@ export default function SegmentsCard({ segments }: { segments: Record<string, nu
                     color,
                   })
                 }
-                className={`group rounded-xl border px-4 py-3 text-left transition-all hover:shadow-md hover:-translate-y-0.5 ${color}`}
+                className={`group rounded-xl border px-4 py-3 text-left transition-all hover:shadow-md hover:-translate-y-0.5 last:col-span-2 sm:last:col-span-1 ${color}`}
               >
-                <div className="flex items-baseline justify-between gap-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 sm:flex-nowrap">
                   <span className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</span>
                   <span className="text-2xl font-bold tabular-nums">{count.toLocaleString('en-IN')}</span>
                 </div>

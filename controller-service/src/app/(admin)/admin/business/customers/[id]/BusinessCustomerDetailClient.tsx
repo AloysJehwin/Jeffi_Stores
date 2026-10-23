@@ -224,7 +224,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
             {discounts.length > 0 ? (
               <div className="divide-y divide-border-default">
                 {discounts.map(d => (
-                  <div key={d.category_id} className="flex items-center justify-between gap-4 py-3">
+                  <div key={d.category_id} className="flex flex-wrap items-center justify-between gap-4 py-3">
                     <span className="flex-1 text-sm font-medium text-foreground">{d.category_name}</span>
                     <div className="flex items-center gap-2">
                       <input

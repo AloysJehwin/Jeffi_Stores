@@ -195,7 +195,7 @@ function Body({
   ]
 
   const sectionActions = canWrite ? (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       {eligible.length > 0 && (
         <label className="flex items-center gap-1.5 text-xs text-foreground-muted">
           <input type="checkbox" checked={allChecked} onChange={e => toggleAll(e.target.checked)} />

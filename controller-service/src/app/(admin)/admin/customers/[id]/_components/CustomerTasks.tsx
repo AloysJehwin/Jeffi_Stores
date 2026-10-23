@@ -299,7 +299,7 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p
-                        className={`text-sm font-medium ${completed ? 'line-through text-foreground-muted' : 'text-foreground'}`}
+                        className={`min-w-0 break-words text-sm font-medium ${completed ? 'line-through text-foreground-muted' : 'text-foreground'}`}
                       >
                         {t.title}
                       </p>

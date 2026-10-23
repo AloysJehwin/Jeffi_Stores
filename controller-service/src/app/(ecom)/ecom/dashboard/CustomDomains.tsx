@@ -136,7 +136,7 @@ export default function CustomDomains({
             </button>
           </div>
           <p className="text-xs text-foreground-secondary">
-            Point a CNAME record to <span className="font-mono text-foreground">{cnameTarget}</span>, then click Verify.
+            Point a CNAME record to <span className="font-mono text-foreground break-all">{cnameTarget}</span>, then click Verify.
           </p>
         </div>
       )}

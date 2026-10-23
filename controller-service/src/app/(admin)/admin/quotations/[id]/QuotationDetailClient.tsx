@@ -103,7 +103,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
       header={
         <DetailHeader
           back={{ href: ap('/admin/quotations'), label: 'Quotations' }}
-          title={<span className="font-mono">{q.quote_number}</span>}
+          title={<span className="font-mono [overflow-wrap:anywhere]">{q.quote_number}</span>}
           status={<StatusBadge status={q.status} map={QUOTATION_STATUS} />}
           identifiers={[{ label: 'Date', value: formatDate(q.quote_date || q.created_at) }]}
           secondary={secondary}
@@ -126,7 +126,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
                 <div key={idx} className="space-y-1 px-4 py-3 text-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-medium text-foreground">{item.description}</div>
+                      <div className="font-medium text-foreground break-words">{item.description}</div>
                       {!item.product_id && <span className={badgeCls('amber')}>Custom – not in inventory</span>}
                     </div>
                     <span className="shrink-0 whitespace-nowrap text-right font-semibold tabular-nums text-foreground">{formatINR(parseFloat(item.amount))}</span>
@@ -192,7 +192,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           </Card>
           {q.notes && (
             <Card title="Notes">
-              <p className="text-sm text-foreground">{q.notes}</p>
+              <p className="text-sm text-foreground break-words">{q.notes}</p>
             </Card>
           )}
         </>

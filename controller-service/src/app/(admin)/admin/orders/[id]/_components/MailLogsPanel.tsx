@@ -120,14 +120,14 @@ export default function MailLogsPanel({ orderId }: Props) {
                       <div className="flex items-center gap-2 flex-wrap">
                         <StatusBadge status={log.status} />
                         {log.template_name && (
-                          <span className="text-[11px] px-2 py-0.5 rounded bg-surface-secondary text-foreground-muted font-mono">
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-surface-secondary text-foreground-muted font-mono [overflow-wrap:anywhere]">
                             {log.template_name}
                           </span>
                         )}
                         <span className="text-[11px] text-foreground-muted">{formatDate(log.sent_at)}</span>
                       </div>
                       <p className="text-sm font-medium text-foreground mt-1 truncate">{log.subject}</p>
-                      <p className="text-xs text-foreground-muted mt-0.5">To: {log.email}</p>
+                      <p className="text-xs text-foreground-muted mt-0.5 break-words">To: {log.email}</p>
                       {log.status === 'failed' && log.error && (
                         <p className="text-xs text-red-500 mt-1 line-clamp-2">{log.error}</p>
                       )}

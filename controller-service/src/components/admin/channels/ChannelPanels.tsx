@@ -63,7 +63,7 @@ export function ChannelAlerts({ channel, params }: { channel: Channel; params?: 
         <ul className="space-y-2">
           {open.map(a => (
             <li key={a.id} className={`rounded-lg border px-3 py-2 text-sm flex items-start gap-2 ${SEV[a.severity] ?? SEV.info}`}>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0 break-words">
                 <p className="font-medium">{a.title}</p>
                 {a.message && <p className="text-xs text-foreground-muted">{a.message}</p>}
                 <p className="text-[11px] text-foreground-muted mt-0.5">Since {when(a.first_seen_at)}</p>
@@ -124,7 +124,7 @@ function AlertSettings({
   const set = (rule: string, key: string, value: number | boolean) => setConfig(c => ({ ...c, [rule]: { ...c[rule], [key]: value } }))
   return (
     <div className="mt-4 border-t border-border-default pt-4 space-y-3">
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {Object.keys(config).map(rule => {
           const r = config[rule]
           return (

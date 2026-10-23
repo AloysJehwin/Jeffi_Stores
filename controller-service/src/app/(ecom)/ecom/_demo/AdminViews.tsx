@@ -28,7 +28,7 @@ import {
 
 const PANEL = 'bg-surface-elevated rounded-xl border border-border-default'
 const BTN =
-  'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white ecom-accent-bg disabled:opacity-40 disabled:cursor-not-allowed'
+  'inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-11 sm:min-h-0 rounded-xl text-sm font-semibold text-white ecom-accent-bg disabled:opacity-40 disabled:cursor-not-allowed'
 export const rupees = (n: number) => 'Rs. ' + Math.round(n).toLocaleString('en-IN')
 
 const STOCK_TONE: Record<string, string> = {
@@ -60,19 +60,31 @@ function Chip({ label, tone }: { label: string; tone: string }) {
 function Head({ icon, title, right }: { icon: ReactNode; title: string; right?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 shrink-0">
-      <div className="flex items-center gap-2">
-        <span className="ecom-accent-text">{icon}</span>
-        <p className="text-sm font-semibold text-foreground">{title}</p>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="ecom-accent-text shrink-0">{icon}</span>
+        <p className="text-sm font-semibold text-foreground min-w-0 break-words">{title}</p>
       </div>
-      {right}
+      {right ? <div className="flex shrink-0">{right}</div> : null}
     </div>
   )
 }
-export function Kv({ label, value, strong }: { label: string; value: ReactNode; strong?: boolean }) {
+export function Kv({
+  label,
+  value,
+  strong,
+  className,
+}: {
+  label: string
+  value: ReactNode
+  strong?: boolean
+  className?: string
+}) {
   return (
-    <div className="bg-surface-secondary rounded-xl border border-border-default p-3">
+    <div className={clsx('bg-surface-secondary rounded-xl border border-border-default p-3 min-w-0', className)}>
       <p className="text-xs text-foreground-muted">{label}</p>
-      <p className={clsx('text-sm text-foreground mt-0.5', strong ? 'font-bold tracking-wide' : 'font-medium')}>
+      <p
+        className={clsx('text-sm text-foreground mt-0.5 break-words', strong ? 'font-bold tracking-wide' : 'font-medium')}
+      >
         {value}
       </p>
     </div>
@@ -92,14 +104,39 @@ export function DataTable({
   cols,
   rows,
   keyOf,
+  phone,
 }: {
   cols: Col[]
   rows: Record<string, unknown>[]
   keyOf: (r: Record<string, unknown>) => string
+  phone?: { title?: number; aside?: number }
 }) {
+  const ti = phone?.title ?? 0
+  const ai = phone?.aside
+  const meta = cols.filter((_, i) => i !== ti && i !== ai)
   return (
     <div className="flex-1 min-h-0 overflow-hidden">
-      <table className="w-full text-sm">
+      <ul className="sm:hidden border-t border-border-default divide-y divide-border-default">
+        {rows.map(r => (
+          <li key={keyOf(r)} className="py-1.5 min-w-0">
+            <div className="flex items-start justify-between gap-2 text-sm">
+              <div className="min-w-0 break-words">{cols[ti].cell(r)}</div>
+              {ai !== undefined ? <div className="flex shrink-0">{cols[ai].cell(r)}</div> : null}
+            </div>
+            {meta.length ? (
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                {meta.map(c => (
+                  <span key={c.head} className="inline-flex items-center gap-1 text-foreground-muted">
+                    {c.head}
+                    {c.cell(r)}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <table className="hidden sm:table w-full text-sm">
         <thead>
           <tr className="text-xs text-foreground-secondary uppercase tracking-wider border-b border-border-default">
             {cols.map(c => (
@@ -148,7 +185,7 @@ export function InventoryView() {
   const value = STOCK_ROWS.reduce((s, r) => s + r.onHand, 0)
   const low = STOCK_ROWS.filter(r => r.status !== 'In Stock').length
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <Head
         icon={<Boxes className="w-4 h-4" />}
         title="Inventory"
@@ -157,6 +194,7 @@ export function InventoryView() {
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
           keyOf={r => r.id as string}
+          phone={{ title: 1, aside: 4 }}
           rows={STOCK_ROWS as unknown as Record<string, unknown>[]}
           cols={[
             {
@@ -196,20 +234,21 @@ export function PoView() {
   const po = PURCHASE_ORDER
   const total = po.lines.reduce((s, l) => s + l.ordered * l.rate, 0)
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <Head
         icon={<ClipboardList className="w-4 h-4" />}
         title={`Purchase order ${po.poNumber}`}
         right={<Chip label={raised ? 'sent' : 'draft'} tone={raised ? STAGE_TONE.sent : STAGE_TONE.draft} />}
       />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 shrink-0">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mt-3 shrink-0">
         <Kv label="Supplier" value={SUPPLIER.name} strong />
-        <Kv label="GSTIN" value={SUPPLIER.gstin} />
+        <Kv label="GSTIN" value={SUPPLIER.gstin} className="col-span-2 order-last sm:col-span-1 sm:order-none" />
         <Kv label="Terms" value={`${SUPPLIER.terms} days`} />
       </div>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
           keyOf={r => r.name as string}
+          phone={{ aside: 3 }}
           rows={po.lines as unknown as Record<string, unknown>[]}
           cols={[
             { head: 'Item', cell: r => <span className="text-foreground">{r.name as string}</span> },
@@ -240,7 +279,7 @@ export function PoView() {
         <span className="tabular-nums">{rupees(total)}</span>
       </div>
       {!raised ? (
-        <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.raisePo}>
+        <button className={clsx(BTN, 'self-stretch sm:self-start mt-3 shrink-0')} onClick={actions.raisePo}>
           <ClipboardList className="w-4 h-4" /> Raise PO
         </button>
       ) : (
@@ -255,7 +294,7 @@ export function GrnView() {
   const received = world.goodsReceived
   const po = PURCHASE_ORDER
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <Head
         icon={<PackageCheck className="w-4 h-4" />}
         title={`Goods receipt · ${po.poNumber}`}
@@ -288,7 +327,7 @@ export function GrnView() {
       {received ? (
         <p className="text-sm org-sage-text font-medium mt-2 shrink-0">Stock restored and back on shelf.</p>
       ) : (
-        <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.receiveGoods}>
+        <button className={clsx(BTN, 'self-stretch sm:self-start mt-3 shrink-0')} onClick={actions.receiveGoods}>
           <PackageCheck className="w-4 h-4" /> Receive goods
         </button>
       )}
@@ -306,7 +345,7 @@ export function SettlementView() {
     { label: `${s.gateway} gateway fee`, value: -s.gatewayFee, tone: 'text-foreground-secondary' },
   ]
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <Head
         icon={<Wallet className="w-4 h-4" />}
         title="Settlement"
@@ -320,7 +359,7 @@ export function SettlementView() {
       </div>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden space-y-1.5 text-sm">
         {rows.map(r => (
-          <div key={r.label} className="flex justify-between">
+          <div key={r.label} className="flex justify-between gap-3">
             <span className="text-foreground-secondary">{r.label}</span>
             <span className={clsx('tabular-nums', r.tone)}>{rupees(r.value)}</span>
           </div>
@@ -331,7 +370,7 @@ export function SettlementView() {
         <span className="tabular-nums">{rupees(s.tenantShare)}</span>
       </div>
       {!settled ? (
-        <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.settle}>
+        <button className={clsx(BTN, 'self-stretch sm:self-start mt-3 shrink-0')} onClick={actions.settle}>
           <Wallet className="w-4 h-4" /> Settle
         </button>
       ) : (
@@ -363,7 +402,7 @@ export function GstInvoiceView() {
     { label: 'SGST (9%)', value: inv.sgst },
   ]
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <div className="flex items-start justify-between gap-3 shrink-0">
         <div>
           <p className="text-xs text-foreground-muted uppercase tracking-wider">Tax invoice</p>
@@ -404,11 +443,12 @@ export function ReportsView() {
   const b2bTotal = b2b.reduce((s, r) => s + r.amount, 0)
   const b2cTotal = RECEIVABLES.filter(r => r.customer === INVOICE.buyer).reduce((s, r) => s + r.amount, 0)
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <Head icon={<LineChart className="w-4 h-4" />} title="Receivables & GSTR-1" />
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
           keyOf={r => r.id as string}
+          phone={{ title: 1, aside: 3 }}
           rows={RECEIVABLES as unknown as Record<string, unknown>[]}
           cols={[
             {
@@ -445,7 +485,7 @@ export function ReturnView() {
   const steps: World['returnStage'][] = ['pending_approval', 'approved', 'received', 'completed']
   const idx = steps.indexOf(stage)
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <Head
         icon={<RotateCcw className="w-4 h-4" />}
         title={`Return · Order #${rr.order}`}
@@ -462,7 +502,7 @@ export function ReturnView() {
         <Steps steps={steps} idx={idx} />
       </div>
       {!done ? (
-        <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.advanceReturn}>
+        <button className={clsx(BTN, 'self-stretch sm:self-start mt-3 shrink-0')} onClick={actions.advanceReturn}>
           <RotateCcw className="w-4 h-4" /> Advance return
         </button>
       ) : (
@@ -479,13 +519,13 @@ export function QuoteView() {
   const net = q.lines.reduce((s, l) => s + l.qty * l.rate * (1 - l.discount / 100), 0)
   const gst = net * (q.gstRate / 100)
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <Head
         icon={<FileSpreadsheet className="w-4 h-4" />}
         title={`Quotation ${q.number}`}
         right={<Chip label={final ? 'final' : 'draft'} tone={final ? STAGE_TONE.final : STAGE_TONE.draft} />}
       />
-      <p className="text-xs text-foreground-muted mt-1 shrink-0">
+      <p className="text-xs text-foreground-muted mt-1 shrink-0 break-words">
         {q.buyer} · GSTIN {q.buyerGstin}
       </p>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -531,7 +571,7 @@ export function QuoteView() {
         </div>
       </div>
       {!final ? (
-        <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.finalizeQuote}>
+        <button className={clsx(BTN, 'self-stretch sm:self-start mt-3 shrink-0')} onClick={actions.finalizeQuote}>
           <FileSpreadsheet className="w-4 h-4" /> Finalize & send
         </button>
       ) : (
@@ -549,13 +589,13 @@ export function RfqView() {
   const steps: World['rfqStage'][] = ['negotiating', 'offer_accepted', 'converted']
   const idx = steps.indexOf(stage)
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <Head
         icon={<Handshake className="w-4 h-4" />}
         title={`RFQ ${r.number}`}
         right={<Chip label={stage.replace('_', ' ')} tone={STAGE_TONE[stage]} />}
       />
-      <p className="text-xs text-foreground-muted mt-1 shrink-0">
+      <p className="text-xs text-foreground-muted mt-1 shrink-0 break-words">
         {r.company} · GSTIN {r.gstin}
       </p>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -588,7 +628,7 @@ export function RfqView() {
         </div>
       </div>
       {!done ? (
-        <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.advanceRfq}>
+        <button className={clsx(BTN, 'self-stretch sm:self-start mt-3 shrink-0')} onClick={actions.advanceRfq}>
           <Handshake className="w-4 h-4" /> Advance deal
         </button>
       ) : (

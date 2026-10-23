@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
+import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
+import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 type Step = 'identity' | 'verify' | 'enroll'
@@ -11,7 +13,8 @@ type Step = 'identity' | 'verify' | 'enroll'
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
 
 export default function AdminLogin() {
-  const { name: storeName, web: storeWeb } = useStoreConfig().identity
+  const { name: storeName, web: storeWeb, logoUrl } = useStoreConfig().identity
+  const { leaving, go } = useLeaveTo()
   const searchParams = useSearchParams()
   const requested = searchParams.get('callbackUrl') || ''
   // Same-site paths only; a full URL here would turn the login page into an open redirect.
@@ -251,7 +254,7 @@ export default function AdminLogin() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Verification failed')
-      window.location.href = callbackUrl
+      go(callbackUrl, 'hard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed')
       setLoading(false)
@@ -283,11 +286,18 @@ export default function AdminLogin() {
   if (checkingSession) return null
 
   return (
-    <div className="min-h-screen bg-surface-secondary flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md rounded-xl border border-border-default bg-surface-elevated p-6 sm:p-8 shadow-sm">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">{storeName}</h1>
-          <h2 className="text-lg font-semibold text-foreground mb-1">Admin Panel</h2>
+    <AuthSplitShell
+      brandName={storeName}
+      logoUrl={logoUrl}
+      headline={`Run ${storeName} from one place`}
+      sub="The admin panel for orders, catalogue, customers and accounts."
+      points={AUTH_POINTS.admin}
+      footnote="Authorized personnel only. All access is logged and monitored."
+      theme={AUTH_THEMES.admin}
+      busy={leaving ? 'Opening the admin panel…' : googleLoading ? 'Signing you in with Google…' : null}
+    >
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-foreground mb-1">Admin Panel</h1>
           <p className="text-sm text-foreground-muted">
             {step === 'identity' && 'Sign in to access the dashboard'}
             {step === 'verify' && 'Enter the 6-digit code from your authenticator app'}
@@ -448,7 +458,7 @@ export default function AdminLogin() {
               <form onSubmit={handleVerifyOtp} className="space-y-6">
                 <div>
                   <label htmlFor="otp" className="block text-sm font-medium text-foreground mb-1.5">
-                    Enter the 6-digit code sent to <span className="text-foreground font-semibold">{email}</span>
+                    Enter the 6-digit code sent to <span className="text-foreground font-semibold break-words">{email}</span>
                   </label>
                   <input
                     type="text"
@@ -625,7 +635,7 @@ export default function AdminLogin() {
             <button
               type="button"
               onClick={() => {
-                window.location.href = callbackUrl
+                go(callbackUrl, 'hard')
               }}
               className="control-md w-full bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
             >
@@ -657,7 +667,6 @@ export default function AdminLogin() {
             <span>All access is logged and monitored</span>
           </div>
         </div>
-      </div>
-    </div>
+    </AuthSplitShell>
   )
 }

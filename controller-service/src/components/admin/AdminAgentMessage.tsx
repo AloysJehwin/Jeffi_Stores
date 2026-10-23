@@ -237,7 +237,7 @@ function parseBlocks(src: string): Block[] {
 export default function AdminAgentMessage({ text }: { text: string }) {
   const blocks = parseBlocks(text)
   return (
-    <div className="space-y-2 text-sm leading-relaxed">
+    <div className="space-y-2 text-sm leading-relaxed break-words">
       {blocks.map((b, idx) => {
         const k = `b${idx}`
         switch (b.type) {

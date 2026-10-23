@@ -148,7 +148,7 @@ function Filter<T extends string>({ options, value, onChange, label }: { options
   return (
     <div className="flex items-center gap-1">
       <span className="text-xs text-foreground-muted">{label}</span>
-      <div className="flex gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg">
+      <div className="flex flex-wrap gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg">
         {options.map(o => (
           <button
             key={o.id}

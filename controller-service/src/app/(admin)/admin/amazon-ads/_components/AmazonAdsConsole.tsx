@@ -243,7 +243,7 @@ function ConnectPanel({
           <p className="text-sm font-medium text-foreground">
             {status.profileName} <span className="text-foreground-muted">({status.countryCode})</span>
           </p>
-          <p className="text-xs text-foreground-muted">
+          <p className="text-xs text-foreground-muted break-words">
             Profile {status.profileId} · {status.connectedVia === 'manual' ? 'entered manually' : 'Amazon sign-in'}
             {status.ownApp ? ` · own app ${status.clientId}` : ' · platform app'}
           </p>
@@ -274,13 +274,13 @@ function ConnectPanel({
                 disabled={!canWrite || busy}
                 onClick={() => post({ profileId: p.profileId }, 'Amazon Ads connected. Use Sync now to pull campaigns.')}
               >
-                <span>
+                <span className="min-w-0 truncate">
                   {p.name}{' '}
                   <span className="text-xs text-foreground-muted">
                     ({p.countryCode}, {p.type})
                   </span>
                 </span>
-                <span className="text-xs text-foreground-muted">{p.profileId}</span>
+                <span className="shrink-0 text-xs text-foreground-muted">{p.profileId}</span>
               </button>
             ))}
           </div>
@@ -313,7 +313,7 @@ function ConnectPanel({
             <p className="text-xs font-medium text-foreground-secondary">
               Or enter by hand{needApp ? ' (your own Amazon Ads API app)' : ''}
             </p>
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               <label className="text-xs text-foreground-muted">
                 App Client ID{needApp ? '' : ' (optional, your own app)'}
                 <input

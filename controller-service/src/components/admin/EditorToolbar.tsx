@@ -51,7 +51,7 @@ export default function EditorToolbar({
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <AutosaveStatusPill status={autosaveStatus} />
       {!hideCancel && (
         <button

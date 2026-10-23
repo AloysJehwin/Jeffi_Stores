@@ -98,7 +98,7 @@ export default function PreviewApply({
         ) : null}
         {result?.ok && <p className="text-sm text-foreground-muted">Applied. The change is in the change history.</p>}
         {shown && (shown.before !== undefined || shown.after !== undefined) && (
-          <div className="grid gap-3 md:grid-cols-2 text-sm">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 text-sm break-words">
             <div>
               <p className="text-xs text-foreground-muted uppercase mb-1">Before</p>
               <Value v={shown.before} />

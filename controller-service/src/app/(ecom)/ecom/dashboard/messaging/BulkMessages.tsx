@@ -114,7 +114,7 @@ export default function BulkMessages({ prices, balance }: { prices: Record<strin
           <div className="mb-2 text-sm font-semibold">Template</div>
           {tpl ? (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border-default px-3 py-2">
-              <span className="text-sm font-medium">{tpl.name}</span><span className="font-mono text-xs text-foreground-muted">{tpl.slug}</span>
+              <span className="text-sm font-medium">{tpl.name}</span><span className="min-w-0 font-mono text-xs text-foreground-muted [overflow-wrap:anywhere]">{tpl.slug}</span>
               <button type="button" onClick={() => { setTpl(null); setFile(null) }} className="ml-auto text-xs font-semibold org-brown">Change</button>
             </div>
           ) : (
@@ -125,7 +125,7 @@ export default function BulkMessages({ prices, balance }: { prices: Record<strin
               <div className="max-h-56 overflow-y-auto">
                 {templates === null ? <p className="p-3 text-xs text-foreground-muted">Loading…</p> : shown.length === 0 ? <p className="p-3 text-xs text-foreground-muted">No templates.</p> : shown.map(t => (
                   <button key={t.slug} type="button" onClick={() => pickTemplate(t)} className={`flex w-full items-center gap-3 rounded-none px-3 py-2 text-left text-sm ecom-hover ${focusRing}`}>
-                    <span>{t.name || t.slug}</span><span className="ml-auto font-mono text-[11px] text-foreground-muted">{t.slug}</span>
+                    <span>{t.name || t.slug}</span><span className="ml-auto min-w-0 font-mono text-[11px] text-foreground-muted [overflow-wrap:anywhere]">{t.slug}</span>
                   </button>
                 ))}
               </div>
@@ -148,7 +148,7 @@ export default function BulkMessages({ prices, balance }: { prices: Record<strin
         ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-semibold">{file.name}</span>
+              <span className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">{file.name}</span>
               <span className="text-xs text-foreground-muted">{parsed!.recipients.length} recipients</span>
               <button type="button" aria-label="Remove file" onClick={() => setFile(null)} className="ml-auto rounded-full p-1.5 text-foreground-muted hover:bg-surface-secondary"><X className="w-4 h-4" /></button>
             </div>

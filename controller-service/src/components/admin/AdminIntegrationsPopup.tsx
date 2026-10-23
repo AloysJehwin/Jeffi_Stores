@@ -201,7 +201,7 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null
   return (
     <div className="text-xs text-foreground-muted">
-      {label}: <span className="text-foreground font-medium font-mono">{value}</span>
+      {label}: <span className="text-foreground font-medium font-mono break-all">{value}</span>
     </div>
   )
 }
@@ -297,7 +297,7 @@ function EnableMerchantApiButton({ setToast }: { setToast: SetToast }) {
         value={email}
         onChange={e => setEmail(e.target.value)}
         placeholder="Email of an admin on this Merchant Center account"
-        className="flex-1 min-w-[16rem] h-control rounded-lg border border-border-default bg-surface px-3 text-sm"
+        className="flex-1 min-w-[12rem] sm:min-w-[16rem] h-control rounded-lg border border-border-default bg-surface px-3 text-sm"
       />
       <button type="button" onClick={run} disabled={busy || !email.trim()} className={btnSecondary}>
         {busy ? 'Enabling…' : 'Enable'}

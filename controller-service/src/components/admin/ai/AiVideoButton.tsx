@@ -229,7 +229,7 @@ function VideoDialog({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-foreground-secondary">From this image (optional)</label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <input
                 value={imageUrl}
                 onChange={e => setImageUrl(e.target.value)}
@@ -253,7 +253,7 @@ function VideoDialog({
               </button>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground-secondary">Aspect</label>
               <Select<AiVideoAspect>

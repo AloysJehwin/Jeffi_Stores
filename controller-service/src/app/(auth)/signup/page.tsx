@@ -10,6 +10,8 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { Suspense } from 'react'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
+import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
+import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import DatePicker from '@/components/ui/DatePicker'
 import { isValidDob } from '@/lib/shared/format'
 
@@ -104,6 +106,7 @@ function SignupPage() {
   const { refreshCart } = useCart()
   const { showToast } = useToast()
   const config = useStoreConfig()
+  const { leaving, go } = useLeaveTo()
 
   const [step, setStep] = useState<'details' | 'otp'>('details')
   const [email, setEmail] = useState(prefillEmail)
@@ -180,7 +183,7 @@ function SignupPage() {
       setPolicyAccepted(false)
       setShowPhoneVerify(true)
     } else {
-      router.push(redirectTo)
+      go(redirectTo)
     }
   }
 
@@ -344,7 +347,7 @@ function SignupPage() {
         dateOfBirth: dob,
       })
       await refreshCart()
-      router.push(redirectTo)
+      go(redirectTo)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred')
       setOtp('')
@@ -402,11 +405,18 @@ function SignupPage() {
   const otpDestination = channel === 'email' ? email : `+91 ••••• ${phone.slice(-4)}`
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full">
-        <div className="bg-surface-elevated rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-foreground">Create Account</h2>
+    <AuthSplitShell
+      brandName={config.identity.name}
+      logoUrl={config.identity.logoUrl}
+      headline={`Join ${config.identity.name}`}
+      sub="Create your account in under a minute."
+      points={AUTH_POINTS.store}
+      footnote="Secure sign-up with a one-time code. No passwords to remember."
+      theme={AUTH_THEMES.store}
+      busy={leaving ? 'Setting up your account…' : googleLoading ? 'Signing you in with Google…' : null}
+    >
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-foreground">Create account</h1>
             <p className="mt-2 text-sm text-foreground-secondary">Join {config.identity.name} for exclusive deals</p>
           </div>
 
@@ -859,8 +869,6 @@ function SignupPage() {
               Login here
             </Link>
           </div>
-        </div>
-      </div>
 
       {showPhoneVerify && (
         <PhoneVerifyModal
@@ -877,7 +885,7 @@ function SignupPage() {
           }
           onVerified={() => {
             setShowPhoneVerify(false)
-            router.push(redirectTo)
+            go(redirectTo)
           }}
           onCancel={() => {
             setShowPhoneVerify(false)
@@ -885,6 +893,6 @@ function SignupPage() {
           }}
         />
       )}
-    </div>
+    </AuthSplitShell>
   )
 }

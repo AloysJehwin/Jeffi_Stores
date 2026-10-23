@@ -47,7 +47,7 @@ export function LimitedInput({
   return (
     <div className="flex items-center gap-2">
       <input
-        className={`${inputCls} ${over ? 'border-red-500 focus:ring-red-500/40' : ''}`}
+        className={`${inputCls} min-w-0 ${over ? 'border-red-500 focus:ring-red-500/40' : ''}`}
         value={value}
         placeholder={placeholder}
         aria-label={ariaLabel}
@@ -93,7 +93,7 @@ export function TextList({
       </div>
       {items.map((v, i) => (
         <div key={i} className="flex items-center gap-2">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <LimitedInput value={v} max={max} placeholder={placeholder} ariaLabel={`${label} ${i + 1}`} onChange={nv => onChange(items.map((x, j) => (j === i ? nv : x)))} />
           </div>
           <button type="button" aria-label={`Remove ${label} ${i + 1}`} onClick={() => onChange(items.filter((_, j) => j !== i))} className="p-1.5 text-foreground-muted hover:text-red-500">

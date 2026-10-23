@@ -91,7 +91,7 @@ export function ImageAdEditor({
         </Field>
       )}
       <TextList label="Description" items={a.descriptions} onChange={v => upd({ descriptions: v })} max={LIMITS.description} min={descCount[0]} maxItems={descCount[1]} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Business name">
           <LimitedInput value={a.businessName} max={LIMITS.businessName} onChange={v => upd({ businessName: v })} />
         </Field>

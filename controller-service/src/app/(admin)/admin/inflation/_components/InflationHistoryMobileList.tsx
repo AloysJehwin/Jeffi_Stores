@@ -108,8 +108,8 @@ export default function InflationHistoryMobileList({ logs, canWrite, rollingBack
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
-              <span>{log.product_count} products</span>
-              <span>{log.applied_by}</span>
+              <span className="shrink-0">{log.product_count} products</span>
+              <span className="min-w-0 truncate">{log.applied_by}</span>
             </div>
             <div className="text-xs text-foreground-muted">{dateTime(log.applied_at)}</div>
           </div>
@@ -136,9 +136,9 @@ export default function InflationHistoryMobileList({ logs, canWrite, rollingBack
         {active && (
           <div className="px-5 py-4 space-y-4 text-sm">
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-foreground-secondary">Applied by</span>
-                <span className="text-foreground">{active.applied_by}</span>
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-foreground-secondary">Applied by</span>
+                <span className="min-w-0 text-right text-foreground [overflow-wrap:anywhere]">{active.applied_by}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-foreground-secondary">Date</span>
@@ -159,7 +159,7 @@ export default function InflationHistoryMobileList({ logs, canWrite, rollingBack
                 <p className="text-xs font-medium text-foreground-secondary uppercase tracking-wide">Price changes</p>
                 {active.snapshot.map(p => (
                   <div key={p.id} className="rounded-lg border border-border-default p-3 space-y-1.5">
-                    <p className="font-medium text-foreground">{p.name}</p>
+                    <p className="font-medium text-foreground break-words">{p.name}</p>
                     {p.has_variants && p.variants.length > 0 ? (
                       p.variants.map(v => (
                         <div key={v.id} className="flex items-center justify-between gap-2 text-xs">

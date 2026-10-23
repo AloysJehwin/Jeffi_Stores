@@ -52,9 +52,9 @@ export function MoneyTiles({
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {tiles.map(t => (
-        <div key={t.label} className="rounded-2xl border border-border-default bg-surface-elevated p-5">
+        <div key={t.label} className="rounded-2xl border border-border-default bg-surface-elevated p-4 sm:p-5">
           <div className="text-xs text-foreground-muted uppercase tracking-widest mb-2">{t.label}</div>
-          <div className={`font-display text-2xl lg:text-3xl font-black tabular-nums ${t.accent ? 'ecom-accent-text' : 'text-foreground'}`}>
+          <div className={`font-display text-lg sm:text-2xl lg:text-3xl font-black tabular-nums [overflow-wrap:anywhere] sm:[overflow-wrap:normal] ${t.accent ? 'ecom-accent-text' : 'text-foreground'}`}>
             {t.value}
           </div>
         </div>

@@ -57,7 +57,7 @@ export function EditSessionActions({
     : 'Editing a draft. The live record is unchanged until you publish.'
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {autosaveStatus !== 'idle' && <AutosaveStatusPill status={autosaveStatus} />}
       {localNewer && (
         <button

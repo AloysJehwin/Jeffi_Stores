@@ -54,7 +54,7 @@ export default function ServiceApprovals({ tenantId, services, approvals }: { te
             </div>
             {rejecting === a.service && (
               <div className="mt-3 flex gap-2">
-                <input value={note} onChange={e => setNote(e.target.value)} placeholder="Reason (sent to the owner)" className="field-md flex-1 border border-border-default bg-surface text-foreground" />
+                <input value={note} onChange={e => setNote(e.target.value)} placeholder="Reason (sent to the owner)" className="field-md min-w-0 flex-1 border border-border-default bg-surface text-foreground" />
                 <button disabled={!note.trim() || !!busy} onClick={() => decide(a.service, 'rejected')} className="control-sm text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">Send rejection</button>
               </div>
             )}

@@ -192,7 +192,7 @@ function ReviewCard({ row, onDecide }: { row: ReviewRow; onDecide: (r: ReviewRow
       </div>
       {rejecting && (
         <div className="mb-4 flex gap-2">
-          <input value={note} onChange={e => setNote(e.target.value)} placeholder="What should they change? (shown to the customer)" className="h-9 flex-1 rounded-lg border border-border-default bg-surface px-3 text-sm" />
+          <input value={note} onChange={e => setNote(e.target.value)} placeholder="What should they change? (shown to the customer)" className="h-9 min-w-0 flex-1 rounded-lg border border-border-default bg-surface px-3 text-sm" />
           <AIEnrichButton placement="inline" fieldLabel="Review note to the customer" value={note} onChange={setNote} scope="mailer:write" format="plain" maxLength={300} write context={`Jeffi is rejecting a customer's ${row.channel} template "${row.name}" (slug ${row.slug}). Proposed text: "${(row.proposed_body ?? '').replace(/<[^>]+>/g, ' ').slice(0, 300)}". Write a polite, specific one- or two-sentence note telling them what to change.`} />
           <button disabled={!note.trim()} className={`${btn} bg-red-600 text-white`} onClick={() => onDecide(row, 'rejected', note)}>Send</button>
         </div>
@@ -240,7 +240,7 @@ function TemplatesPanel({ base, storeName, onChanged }: { base: string; storeNam
 
   const shown = (items ?? []).filter(i => `${i.name} ${i.slug}`.toLowerCase().includes(q.toLowerCase()))
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
       <div className={`${card} p-0`}>
         <div className="flex gap-1 border-b border-border-default p-2">{CHANNELS.map(c => <button key={c} className={tabCls(channel === c)} onClick={() => { setChannel(c); setSelected(null) }}>{LABEL[c]}</button>)}</div>
         <div className="flex items-center gap-2 border-b border-border-default p-2">
@@ -262,7 +262,7 @@ function TemplatesPanel({ base, storeName, onChanged }: { base: string; storeNam
           <>
             <div className="mb-4 flex flex-wrap items-center gap-3">
               {!selected.id ? (
-                <input value={selected.slug} onChange={e => setSelected({ ...selected, slug: e.target.value })} placeholder="slug, e.g. order/confirmed" className="h-9 w-72 rounded-lg border border-border-default bg-surface px-3 text-sm" />
+                <input value={selected.slug} onChange={e => setSelected({ ...selected, slug: e.target.value })} placeholder="slug, e.g. order/confirmed" className="h-9 w-full sm:w-72 rounded-lg border border-border-default bg-surface px-3 text-sm" />
               ) : <span className="font-mono text-xs text-foreground-muted">{selected.slug}</span>}
               {selected.id && <button className={`${btn} ml-auto border border-border-default`} onClick={archive}>Archive customer copy</button>}
             </div>

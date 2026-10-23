@@ -145,7 +145,7 @@ function PromotionForm({ onSubmit }: { onSubmit: (p: Record<string, unknown>) =>
   const [f, setF] = useState({ title: '', kind: 'PERCENT_OFF', value: '10', code: '', minimumPurchase: '', days: '7' })
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF(s => ({ ...s, [k]: e.target.value }))
   return (
-    <div className="rounded-lg border border-border-default p-3 mb-4 grid gap-3 md:grid-cols-3">
+    <div className="rounded-lg border border-border-default p-3 mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
       <label className="text-xs text-foreground-muted md:col-span-3">
         Title shown on Google (max 60)
         <input className={inputCls} maxLength={60} value={f.title} onChange={set('title')} placeholder="10% off all power tools" />

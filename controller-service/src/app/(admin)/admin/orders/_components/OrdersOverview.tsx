@@ -128,7 +128,7 @@ function Body({ d }: { d: Data }) {
         />
       </KpiGrid>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AttentionList items={withAp(d.attention)} />
         <Section title="Open orders now">
           <div className="grid grid-cols-3 gap-2 mb-4 text-center">
@@ -179,7 +179,7 @@ function Body({ d }: { d: Data }) {
         />
       </Section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Section title="Payment mix">
           {c.cod + c.prepaid ? (
             <DonutSplit

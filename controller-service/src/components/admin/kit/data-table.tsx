@@ -324,7 +324,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
             />
           </div>
         )}
-        {toolbar && <div className="ml-auto flex items-center gap-2">{toolbar}</div>}
+        {toolbar && <div className="ml-auto flex flex-wrap items-center gap-2">{toolbar}</div>}
       </div>
     )
   ) : null
@@ -434,7 +434,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
     )
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3">
       {toolbarNode}
       {selectable && bulkActions && selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent-500/40 bg-accent-500/5 px-3 py-2 text-sm">

@@ -48,7 +48,7 @@ import {
 
 const PANEL = 'bg-surface-elevated rounded-xl border border-border-default'
 const BTN =
-  'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white ecom-accent-bg disabled:opacity-40 disabled:cursor-not-allowed'
+  'inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-11 sm:min-h-0 rounded-xl text-sm font-semibold text-white ecom-accent-bg disabled:opacity-40 disabled:cursor-not-allowed'
 const statusPill = (s: string) => STATUS_CLASSES[s] ?? 'org-peach org-brown'
 const resolveOrder = (world: World): Order | null => world.order ?? world.orders[0] ?? null
 
@@ -66,7 +66,9 @@ const SHIP_STAGE: Record<string, string> = {
 }
 
 function Pill({ status }: { status: string }) {
-  return <span className={clsx('px-2 py-0.5 text-xs font-semibold rounded-full', statusPill(status))}>{status}</span>
+  return (
+    <span className={clsx('px-2 py-0.5 text-xs font-semibold rounded-full shrink-0', statusPill(status))}>{status}</span>
+  )
 }
 function Stat({ value, label }: { value: ReactNode; label: string }) {
   return (
@@ -144,25 +146,28 @@ function DashboardView({ reducedMotion }: { reducedMotion: boolean }) {
     { label: '1 open return', tone: 'org-sand org-brown' },
   ]
   return (
-    <div className="h-full min-h-0 flex flex-col gap-3">
+    <div className="h-full min-h-0 flex flex-col gap-2 sm:gap-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 shrink-0">
         {cards.map(c => (
-          <div key={c.label} className="bg-surface-secondary rounded-xl border border-border-default p-2.5">
+          <div
+            key={c.label}
+            className="bg-surface-secondary rounded-xl border border-border-default p-2 sm:p-2.5 min-w-0 last:col-span-2 sm:last:col-span-1"
+          >
             <p className="text-[11px] text-foreground-secondary">{c.label}</p>
-            <p className="text-sm sm:text-base font-bold text-foreground mt-1 tabular-nums">{c.node}</p>
+            <p className="text-sm sm:text-base font-bold text-foreground mt-0.5 sm:mt-1 tabular-nums">{c.node}</p>
           </div>
         ))}
       </div>
       <div className="flex flex-wrap gap-2 shrink-0">
         {attention.map(a => (
-          <span key={a.label} className={clsx('px-2.5 py-1 text-xs font-semibold rounded-full', a.tone)}>
+          <span key={a.label} className={clsx('px-2 py-1 text-[11px] sm:px-2.5 sm:text-xs font-semibold rounded-full', a.tone)}>
             {a.label}
           </span>
         ))}
       </div>
-      <div className={clsx(PANEL, 'p-4 shrink-0')}>
-        <p className="text-sm font-semibold text-foreground mb-3">Revenue trend</p>
-        <div className="flex items-end gap-1 h-16">
+      <div className={clsx(PANEL, 'p-3 sm:p-4 shrink-0')}>
+        <p className="text-sm font-semibold text-foreground mb-2 sm:mb-3">Revenue trend</p>
+        <div className="flex items-end gap-1 h-10 sm:h-16">
           {DASHBOARD_BARS.map((h, i) => (
             <motion.div
               key={i}
@@ -175,16 +180,16 @@ function DashboardView({ reducedMotion }: { reducedMotion: boolean }) {
           ))}
         </div>
       </div>
-      <div className={clsx(PANEL, 'p-4 flex-1 min-h-0 overflow-hidden')}>
-        <div className="flex items-center gap-2 mb-3">
+      <div className={clsx(PANEL, 'p-3 sm:p-4 flex-1 min-h-0 overflow-hidden')}>
+        <div className="flex items-center gap-2 mb-2 sm:mb-3">
           <Activity className="w-4 h-4 ecom-accent-text" />
           <p className="text-sm font-semibold text-foreground">Live activity</p>
         </div>
-        <ul className="space-y-2">
+        <ul className="space-y-1.5 sm:space-y-2">
           {world.activity.slice(0, 4).map(row => (
             <li key={row.id} className="flex items-start gap-2.5">
               <span className="mt-0.5 ecom-accent-text shrink-0">{activityIcon(row.kind)}</span>
-              <span className="text-sm text-foreground leading-snug">
+              <span className="min-w-0 break-words text-xs sm:text-sm text-foreground leading-snug sm:leading-snug">
                 {row.label}
                 <span className="text-foreground-muted text-xs ml-1">· {row.at}</span>
               </span>
@@ -202,11 +207,11 @@ function OrderView() {
   if (!order) return <Empty message="No live order yet. Complete checkout to bring an order here." />
   const canConfirm = order.status === 'pending'
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <div className="flex items-start justify-between gap-3 shrink-0">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">Order #{order.number}</p>
-          <p className="text-xs text-foreground-muted mt-0.5">
+          <p className="text-xs text-foreground-muted mt-0.5 break-words">
             {order.customer} · {order.placedAt} · Razorpay
           </p>
         </div>
@@ -214,11 +219,11 @@ function OrderView() {
       </div>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden divide-y divide-border-default border-y border-border-default">
         {order.items.map(it => (
-          <div key={it.productId} className="flex items-center justify-between py-2 text-sm">
-            <span className="text-foreground">
+          <div key={it.productId} className="flex items-center justify-between gap-3 py-2 text-sm">
+            <span className="text-foreground min-w-0">
               {it.name} <span className="text-foreground-muted">x{it.qty}</span>
             </span>
-            <span className="text-foreground tabular-nums">{rupees(it.price * it.qty)}</span>
+            <span className="text-foreground tabular-nums shrink-0">{rupees(it.price * it.qty)}</span>
           </div>
         ))}
       </div>
@@ -226,7 +231,11 @@ function OrderView() {
         <span>Order total</span>
         <span className="tabular-nums">{rupees(order.total)}</span>
       </div>
-      <button className={clsx(BTN, 'self-start shrink-0')} disabled={!canConfirm} onClick={actions.markProcessing}>
+      <button
+        className={clsx(BTN, 'self-stretch sm:self-start shrink-0')}
+        disabled={!canConfirm}
+        onClick={actions.markProcessing}
+      >
         <Package className="w-4 h-4" /> Mark processing
       </button>
       <p className="text-[11px] text-foreground-muted mt-3 shrink-0">Demo only. No real email or SMS is sent.</p>
@@ -241,9 +250,9 @@ function ShipmentView({ reducedMotion }: { reducedMotion: boolean }) {
   const stage = SHIP_STAGE[order.status] ?? 'created'
   const notShipped = order.status === 'pending' || order.status === 'processing'
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <div className="flex items-start justify-between gap-3 shrink-0">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">Shipment · Order #{order.number}</p>
           <p className="text-xs text-foreground-muted mt-0.5">{order.customer}</p>
         </div>
@@ -251,7 +260,7 @@ function ShipmentView({ reducedMotion }: { reducedMotion: boolean }) {
       </div>
       {notShipped ? (
         <button
-          className={clsx(BTN, 'self-start mt-3 shrink-0')}
+          className={clsx(BTN, 'self-stretch sm:self-start mt-3 shrink-0')}
           disabled={order.status !== 'processing'}
           onClick={actions.ship}
         >
@@ -271,15 +280,39 @@ function DocsView() {
   if (!order) return <Empty message="No order to document yet." />
   return (
     <div className="h-full min-h-0 grid grid-rows-[1fr_auto] gap-3">
-      <div className={clsx(PANEL, 'min-h-0 p-4 flex flex-col overflow-hidden')}>
-        <div className="flex items-center justify-between shrink-0">
+      <div className={clsx(PANEL, 'min-h-0 p-3 sm:p-4 flex flex-col overflow-hidden')}>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 shrink-0">
           <p className="text-sm font-semibold text-foreground">GST packing slip</p>
           <span className="text-xs text-foreground-muted">
             GSTIN {INVOICE.buyerGstin === '-' ? '29ABCDE1234F1Z5' : INVOICE.buyerGstin}
           </span>
         </div>
         <div className="mt-3 flex-1 min-h-0 overflow-hidden">
-          <table className="w-full text-sm">
+          <ul className="sm:hidden border-t border-border-default divide-y divide-border-default">
+            {order.items.map(it => (
+              <li key={it.productId} className="py-2">
+                <div className="flex items-start justify-between gap-3 text-sm">
+                  <span className="min-w-0 break-words text-foreground">{it.name}</span>
+                  <span className="shrink-0 text-foreground tabular-nums">{rupees(it.price * it.qty)}</span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-foreground-muted">
+                  <span>
+                    HSN/SAC <span className="font-mono text-foreground-secondary">{INVOICE.hsn}</span>
+                  </span>
+                  <span>
+                    GST <span className="text-foreground-secondary tabular-nums">18%</span>
+                  </span>
+                  <span>
+                    Qty <span className="text-foreground-secondary tabular-nums">{it.qty}</span>
+                  </span>
+                  <span>
+                    Rate <span className="text-foreground-secondary tabular-nums">{rupees(it.price)}</span>
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <table className="hidden sm:table w-full text-sm">
             <thead>
               <tr className="text-[11px] text-foreground-secondary uppercase tracking-wider border-b border-border-default">
                 <th className="text-left font-semibold py-1.5">Product</th>
@@ -306,10 +339,10 @@ function DocsView() {
         </div>
       </div>
       {order.awb ? (
-        <div className={clsx(PANEL, 'p-3 flex items-center justify-between shrink-0')}>
-          <div className="flex items-center gap-2">
-            <Printer className="w-4 h-4 ecom-accent-text" />
-            <div>
+        <div className={clsx(PANEL, 'p-3 flex flex-wrap items-center justify-between gap-2 shrink-0')}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Printer className="w-4 h-4 ecom-accent-text shrink-0" />
+            <div className="min-w-0">
               <p className="text-xs text-foreground-muted uppercase tracking-wider">Shipping label · Delhivery</p>
               <p className="text-sm font-semibold text-foreground">To {order.customer}</p>
             </div>
@@ -319,7 +352,7 @@ function DocsView() {
           </span>
         </div>
       ) : (
-        <button className={clsx(BTN, 'self-start shrink-0')} onClick={actions.generateInvoice}>
+        <button className={clsx(BTN, 'self-stretch sm:self-start shrink-0')} onClick={actions.generateInvoice}>
           <FileText className="w-4 h-4" /> Generate docs
         </button>
       )}
@@ -331,7 +364,7 @@ function CampaignView() {
   const { world, actions } = useDemo()
   const sent = world.campaignSent
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <div className="flex items-center gap-2 shrink-0">
         <Megaphone className="w-4 h-4 ecom-accent-text" />
         <p className="text-sm font-semibold text-foreground">Email campaign</p>
@@ -354,7 +387,7 @@ function CampaignView() {
         ) : null}
       </div>
       {!sent ? (
-        <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.sendCampaign}>
+        <button className={clsx(BTN, 'self-stretch sm:self-start mt-3 shrink-0')} onClick={actions.sendCampaign}>
           <Megaphone className="w-4 h-4" /> Send campaign
         </button>
       ) : null}
@@ -368,7 +401,7 @@ function CouponView() {
   const created = world.couponCreated
   const pct = Math.min(100, Math.round((COUPON.used / COUPON.cap) * 100))
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <div className="flex items-center gap-2 shrink-0">
         <BadgePercent className="w-4 h-4 ecom-accent-text" />
         <p className="text-sm font-semibold text-foreground">Discount coupon</p>
@@ -399,7 +432,7 @@ function CouponView() {
         ) : null}
       </div>
       {!created ? (
-        <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.createCoupon}>
+        <button className={clsx(BTN, 'self-stretch sm:self-start mt-3 shrink-0')} onClick={actions.createCoupon}>
           <Tag className="w-4 h-4" /> Create coupon
         </button>
       ) : null}
@@ -410,7 +443,7 @@ function CouponView() {
 function CrmView() {
   const rows = CUSTOMERS.slice(0, 5)
   return (
-    <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
+    <div className={clsx(PANEL, 'h-full min-h-0 p-3 sm:p-4 flex flex-col')}>
       <div className="flex items-center gap-2 shrink-0">
         <Users className="w-4 h-4 ecom-accent-text" />
         <p className="text-sm font-semibold text-foreground">Customers & CRM</p>
@@ -418,6 +451,7 @@ function CrmView() {
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
           keyOf={r => r.id as string}
+          phone={{ aside: 4 }}
           rows={rows as unknown as Record<string, unknown>[]}
           cols={[
             { head: 'Customer', cell: c => <span className="text-foreground">{c.name as string}</span> },
@@ -479,9 +513,10 @@ export default function AdminSurface() {
   const { chapter, reducedMotion } = useDemo()
   const focus = chapter.focus ?? 'dashboard'
   const active = TABS.find(t => t.focus === focus) ?? TABS[0]
+  const ActiveIcon = active.icon
   return (
     <div
-      className=" bg-surface text-foreground h-full w-full flex flex-col overflow-hidden rounded-xl p-4"
+      className=" bg-surface text-foreground h-full w-full flex flex-col overflow-hidden rounded-xl p-3 sm:p-4"
       style={{ ['--accent' as string]: ACCENT }}
     >
       <div className="flex items-center justify-between gap-3 shrink-0 h-12">
@@ -489,7 +524,10 @@ export default function AdminSurface() {
           <p className="text-xs text-foreground-muted uppercase tracking-widest">Store admin</p>
           <h3 className="text-base font-bold text-foreground mt-0.5 truncate">{active.label}</h3>
         </div>
-        <nav className="flex items-center gap-1 flex-nowrap overflow-x-auto max-w-[70%] shrink-0">
+        <span className="sm:hidden inline-flex items-center justify-center w-9 h-9 rounded-xl ecom-accent-bg text-white shrink-0">
+          <ActiveIcon className="w-4 h-4" />
+        </span>
+        <nav className="hidden sm:flex items-center gap-1 flex-nowrap overflow-x-auto max-w-[70%] shrink-0">
           {TABS.map(t => {
             const Icon = t.icon
             const on = t.focus === focus
@@ -508,7 +546,7 @@ export default function AdminSurface() {
           })}
         </nav>
       </div>
-      <div className="mt-4 flex-1 min-h-0">
+      <div className="mt-3 sm:mt-4 flex-1 min-h-0">
         <View id={focus} reducedMotion={reducedMotion}>
           {active.render(reducedMotion)}
         </View>

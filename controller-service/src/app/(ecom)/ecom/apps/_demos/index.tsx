@@ -45,6 +45,6 @@ export function hasDemo(slug: string) {
 
 export default function AppDemo({ slug }: { slug: string }) {
   const Demo = DEMOS[slug]
-  if (!Demo) return <p className="text-sm text-foreground-secondary py-20 text-center">Walkthrough coming soon.</p>
+  if (!Demo) return <p className="text-sm text-foreground-secondary py-12 sm:py-20 text-center">Walkthrough coming soon.</p>
   return <Demo />
 }

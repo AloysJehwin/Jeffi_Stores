@@ -21,7 +21,26 @@ const STEPS = [
 
 function SidebarLayout({ currentStep, children }: { currentStep: number; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-[calc(100vh-56px)] bg-surface-secondary">
+    <div className="flex flex-col md:flex-row min-h-[calc(100vh-56px)] bg-surface-secondary">
+      <div className="md:hidden px-4 py-3 border-b border-border-default bg-surface-elevated">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <span className="shrink-0 text-xs text-foreground-muted">
+            Step {currentStep + 1} of {STEPS.length}
+          </span>
+          <span className="min-w-0 truncate text-xs font-semibold text-foreground">
+            {STEPS[currentStep].label}{' '}
+            <span className="font-normal text-foreground-muted">— {STEPS[currentStep].desc}</span>
+          </span>
+        </div>
+        <div className="flex gap-1">
+          {STEPS.map(s => (
+            <div
+              key={s.id}
+              className={`h-1 flex-1 rounded-full ${s.id < currentStep ? 'ecom-accent-bg' : s.id === currentStep ? 'ecom-sel' : 'bg-surface-secondary'}`}
+            />
+          ))}
+        </div>
+      </div>
       <aside className="hidden lg:flex flex-col w-72 xl:w-80 bg-surface-elevated border-r border-border-default p-8 flex-shrink-0">
         <div className="mb-10">
           <h2 className="text-xl font-bold text-foreground">Launch your store</h2>
@@ -54,7 +73,9 @@ function SidebarLayout({ currentStep, children }: { currentStep: number; childre
           })}
         </nav>
       </aside>
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-10">{children}</main>
+      <main className="flex-1 min-w-0 flex flex-col items-center justify-start sm:justify-center px-4 py-8 sm:px-6 sm:py-10">
+        {children}
+      </main>
     </div>
   )
 }
@@ -102,13 +123,13 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
     if (t.status === 'awaiting_payment') {
       return (
         <SidebarLayout currentStep={7}>
-          <div className="max-w-lg w-full rounded-2xl border border-[var(--org-apricot)] org-peach p-8 text-center">
+          <div className="max-w-lg w-full rounded-2xl border border-[var(--org-apricot)] org-peach p-6 sm:p-8 text-center">
             <p className="text-sm org-brown font-medium">
               Payment link is being generated — please refresh in a moment.
             </p>
             <a
               href="/onboard"
-              className="inline-block mt-4 px-5 py-2.5 rounded-xl border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
+              className="block w-full sm:inline-block sm:w-auto mt-4 px-5 py-3 sm:py-2.5 rounded-xl border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               Refresh
             </a>
@@ -121,16 +142,16 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
     if (t.status === 'provisioning') {
       return (
         <SidebarLayout currentStep={7}>
-          <div className="max-w-lg w-full rounded-2xl border border-border-default org-sand p-8 text-center">
+          <div className="max-w-lg w-full rounded-2xl border border-border-default org-sand p-6 sm:p-8 text-center">
             <div className="w-10 h-10 border-2 border-border-default border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <h1 className="text-lg font-bold org-brown">Setting up your store</h1>
-            <p className="text-sm org-brown mt-2">
+            <p className="text-sm org-brown mt-2 break-words">
               Payment confirmed — we&apos;re provisioning <span className="font-semibold">{t.slug}.jeffistores.in</span>
               . This takes a few minutes; you&apos;ll be emailed when it&apos;s live.
             </p>
             <a
               href="/dashboard"
-              className="inline-block mt-5 px-5 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors"
+              className="block w-full sm:inline-block sm:w-auto mt-5 px-5 py-3 sm:py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors"
             >
               Go to dashboard →
             </a>
@@ -142,7 +163,7 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
     if (t.status === 'rejected') {
       return (
         <SidebarLayout currentStep={6}>
-          <div className="max-w-lg w-full rounded-2xl border border-[#e0a89c] bg-[#f2d4cd] p-8 text-center">
+          <div className="max-w-lg w-full rounded-2xl border border-[#e0a89c] bg-[#f2d4cd] p-6 sm:p-8 text-center">
             <div className="w-12 h-12 rounded-full bg-[#f2d4cd] flex items-center justify-center mx-auto mb-4">
               <svg
                 className="w-6 h-6 text-[#8a2e1f]"
@@ -160,7 +181,7 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
             </p>
             <a
               href="mailto:support@jeffistores.in"
-              className="inline-block mt-5 px-5 py-2.5 rounded-xl org-sand hover:org-sand text-white text-sm font-semibold transition-colors"
+              className="block w-full sm:inline-block sm:w-auto mt-5 px-5 py-3 sm:py-2.5 rounded-xl org-sand hover:org-sand text-white text-sm font-semibold transition-colors"
             >
               Contact support
             </a>
@@ -172,7 +193,7 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
     // pending_approval — under review
     return (
       <SidebarLayout currentStep={6}>
-        <div className="max-w-lg w-full rounded-2xl border border-[var(--org-apricot)] org-peach p-8 text-center">
+        <div className="max-w-lg w-full rounded-2xl border border-[var(--org-apricot)] org-peach p-6 sm:p-8 text-center">
           <div className="w-12 h-12 rounded-full org-peach flex items-center justify-center mx-auto mb-4">
             <svg
               className="w-6 h-6 org-brown"
@@ -185,7 +206,7 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
             </svg>
           </div>
           <h1 className="text-lg font-bold org-brown">Under review</h1>
-          <p className="text-sm org-brown mt-2">
+          <p className="text-sm org-brown mt-2 break-words">
             We&apos;re verifying your GST certificate for <span className="font-semibold">{t.display_name}</span> (
             {t.slug}.jeffistores.in). This usually takes 1–2 business days. You&apos;ll receive an email once approved.
           </p>

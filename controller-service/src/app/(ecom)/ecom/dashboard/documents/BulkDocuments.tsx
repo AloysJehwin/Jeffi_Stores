@@ -137,7 +137,7 @@ export default function BulkDocuments({ seller, prices, balance }: { seller: Sel
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-semibold">{file.name}</span>
+            <span className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">{file.name}</span>
             <span className="text-xs text-foreground-muted">{file.rows.length} rows → {parsed!.docs.length} documents</span>
             <button type="button" aria-label="Remove file" onClick={() => { setFile(null); setServerErrors([]) }} className="ml-auto rounded-full p-1.5 text-foreground-muted hover:bg-surface-secondary"><X className="w-4 h-4" /></button>
           </div>

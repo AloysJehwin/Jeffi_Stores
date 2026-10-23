@@ -130,7 +130,7 @@ function Body({ d }: { d: ReturnsData }) {
         <Kpi label="Open now" value={count(s.open)} sub={`${count(c.rejected)} rejected in period`} />
       </KpiGrid>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AttentionList items={withAp(d.attention)} />
         <Section title="Open returns by stage">
           <ul className="divide-y divide-border-default text-sm">
@@ -156,7 +156,7 @@ function Body({ d }: { d: ReturnsData }) {
         />
       </Section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section title="By reason">
           <BreakdownBars rows={d.byReason.map(r => ({ label: r.label, value: r.count, sub: money(r.value) }))} />
         </Section>
@@ -177,7 +177,7 @@ function Body({ d }: { d: ReturnsData }) {
         </Section>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section title="Most returned products">
           <Table
             rows={d.topProducts}

@@ -240,7 +240,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
 
 function KpiRowSkeleton() {
   return (
-    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
+    <div className="grid gap-3 grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
       {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
       ))}

@@ -32,7 +32,7 @@ export default function HoverCard({
   function computePos() {
     if (!triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
-    const widthPx = parseInt(width) || 300
+    const widthPx = Math.min(parseInt(width) || 300, window.innerWidth - 16)
     let left =
       align === 'right'
         ? rect.right - widthPx
@@ -84,6 +84,7 @@ export default function HoverCard({
               bottom: pos.openUp ? window.innerHeight - pos.top : undefined,
               left: pos.left,
               width,
+              maxWidth: 'calc(100vw - 16px)',
             }}
             onMouseEnter={cancelHide}
             onMouseLeave={hide}

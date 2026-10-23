@@ -323,7 +323,7 @@ function Toolbar({
               <Redo2 className="w-4 h-4" />
             </ToolBtn>
           </Group>
-          <Group label="Text style" className="gap-1.5">
+          <Group label="Text style" className="gap-1.5 flex-wrap">
             <AdminSelect
               sm
               className="w-32"
@@ -793,7 +793,7 @@ function VariablePicker({
               className="w-full text-left px-2 py-1.5 rounded hover:bg-surface-secondary focus:bg-surface-secondary focus:outline-none transition-colors"
             >
               <div className="flex items-center justify-between gap-2">
-                <code className="text-xs text-violet-600 dark:text-violet-400 font-mono">{`{${v.key}}`}</code>
+                <code className="min-w-0 [overflow-wrap:anywhere] text-xs text-violet-600 dark:text-violet-400 font-mono">{`{${v.key}}`}</code>
                 <span className="text-[10px] text-foreground-muted shrink-0">{v.label}</span>
               </div>
               <p className="text-[11px] text-foreground-muted mt-0.5 truncate">

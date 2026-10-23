@@ -96,7 +96,7 @@ export default function DraftRowActions({
   return (
     <div className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
       <Link href={editHref} className="flex-1 min-w-0 mr-4">
-        <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{name}</p>
+        <p className="text-sm font-medium text-amber-900 dark:text-amber-200 break-words">{name}</p>
         {subtitle && <p className="text-xs text-amber-600 dark:text-amber-400">{subtitle}</p>}
         {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
       </Link>

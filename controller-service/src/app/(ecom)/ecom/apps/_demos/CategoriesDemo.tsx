@@ -46,8 +46,8 @@ export default function CategoriesDemo() {
             {PRODUCTS.map(p => {
               const on = assigned.includes(p)
               return (
-                <li key={p} className="flex items-center justify-between rounded-2xl bg-surface-elevated px-4 py-3">
-                  <span className="text-sm font-medium text-foreground">{p}</span>
+                <li key={p} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-elevated px-3 py-3 sm:px-4">
+                  <span className="min-w-0 text-sm font-medium text-foreground">{p}</span>
                   <Btn tone={on ? 'sand' : 'solid'} onClick={() => setAssigned(a => (on ? a.filter(x => x !== p) : [...a, p]))}>{on ? 'Assigned' : 'Assign'}</Btn>
                 </li>
               )
@@ -57,13 +57,13 @@ export default function CategoriesDemo() {
       )}
       {s.step === 'live' && (
         <div className="h-full flex flex-col">
-          <div className="flex gap-6 border-b border-border-default pb-3 text-sm font-semibold">
+          <div className="flex flex-wrap gap-x-4 gap-y-2 sm:flex-nowrap sm:gap-6 border-b border-border-default pb-3 text-sm font-semibold">
             {TREE.map((t, i) => <span key={t} className={i === 0 ? 'ecom-accent-text' : 'text-foreground-secondary'}>{t}</span>)}
           </div>
-          <div className="mt-4 flex gap-2">{SUBS.slice(0, subs).map(x => <Tag key={x} tone="warn">{x}</Tag>)}</div>
+          <div className="mt-4 flex flex-wrap gap-2 sm:flex-nowrap">{SUBS.slice(0, subs).map(x => <Tag key={x} tone="warn">{x}</Tag>)}</div>
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
             {(assigned.length ? assigned : PRODUCTS.slice(0, 2)).map(p => (
-              <div key={p} className="rounded-2xl org-sand p-3"><div className="aspect-square rounded-xl org-peach mb-2" /><p className="text-xs font-medium text-foreground truncate">{p}</p></div>
+              <div key={p} className="rounded-2xl org-sand p-3"><div className="aspect-square rounded-xl org-peach mb-2" /><p className="text-xs font-medium text-foreground break-words sm:truncate">{p}</p></div>
             ))}
           </div>
         </div>

@@ -646,7 +646,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
 
                       {/* Main content */}
                       <div className="flex-1 min-w-0 p-4">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                           <div className="flex-1 min-w-0">
                             {/* Description (what the customer typed) */}
                             <p className="font-semibold text-foreground text-sm leading-snug">{item.description}</p>
@@ -959,7 +959,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           </div>
                           {/* Bubble */}
                           <div
-                            className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${isAdmin ? 'bg-accent-500/10 border border-accent-500/30 text-foreground rounded-br-sm' : 'bg-surface border border-border-default text-foreground rounded-bl-sm'}`}
+                            className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm [overflow-wrap:anywhere] ${isAdmin ? 'bg-accent-500/10 border border-accent-500/30 text-foreground rounded-br-sm' : 'bg-surface border border-border-default text-foreground rounded-bl-sm'}`}
                           >
                             {msg.message}
                           </div>

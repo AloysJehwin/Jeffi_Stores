@@ -98,7 +98,7 @@ export function DetailLink({ href, children }: { href: string; children: React.R
 /** Label/value pair used by every tenant detail section. */
 export function Field({ label, value, wide }: { label: string; value: React.ReactNode; wide?: boolean }) {
   return (
-    <div className={wide ? 'col-span-2' : undefined}>
+    <div className={wide ? 'col-span-full sm:col-span-2' : undefined}>
       <dt className="text-xs text-foreground-muted">{label}</dt>
       <dd className="text-sm text-foreground mt-0.5 min-w-0 break-words">{value ?? '-'}</dd>
     </div>

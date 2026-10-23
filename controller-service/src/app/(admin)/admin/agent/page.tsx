@@ -1034,7 +1034,7 @@ export default function AdminAgentPage() {
         <div className="flex flex-1 min-h-0">
           {/* History sidebar */}
           {showHistory && (
-            <aside className="hidden md:flex md:w-56 lg:w-64 border-r border-border-default bg-surface-secondary/50 flex-col shrink-0">
+            <aside className="flex w-full md:w-56 lg:w-64 md:border-r border-border-default bg-surface-secondary/50 flex-col shrink-0">
               <div className="px-3 py-2 border-b border-border-default flex items-center justify-between">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Chat history</p>
                 <button
@@ -1053,7 +1053,7 @@ export default function AdminAgentPage() {
                   <button
                     key={c.id}
                     onClick={() => loadConversation(c.id)}
-                    className={`w-full text-left px-2 py-1.5 rounded transition-colors text-xs ${
+                    className={`w-full text-left px-2 py-2.5 md:py-1.5 rounded transition-colors text-sm md:text-xs ${
                       c.id === conversationId
                         ? 'bg-accent-500/10 border border-accent-500/30'
                         : 'hover:bg-surface-secondary'
@@ -1071,8 +1071,8 @@ export default function AdminAgentPage() {
             </aside>
           )}
 
-          {/* Main chat area */}
-          <div className="flex-1 flex flex-col min-w-0">
+          {/* Main chat area; on phones the open history panel takes its place */}
+          <div className={`${showHistory ? 'hidden md:flex' : 'flex'} flex-1 flex-col min-w-0`}>
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3 min-h-0">
               {turns.length === 0 && !loading && (
                 <div className="text-center py-16">
@@ -1094,7 +1094,7 @@ export default function AdminAgentPage() {
                     }`}
                   >
                     {turn.role === 'user' ? (
-                      <p className="whitespace-pre-wrap leading-relaxed">{turn.content}</p>
+                      <p className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">{turn.content}</p>
                     ) : (
                       <>
                         {turn.content && <AdminAgentMessage text={turn.content} />}
@@ -1126,7 +1126,7 @@ export default function AdminAgentPage() {
                         </summary>
                         <ul className="mt-1 space-y-0.5">
                           {turn.toolCalls.map((tc, i) => (
-                            <li key={i} className="font-mono">
+                            <li key={i} className="font-mono [overflow-wrap:anywhere]">
                               {tc.isError ? '[err] ' : '[ok] '}
                               {tc.tool}({Object.keys(tc.input).join(',')})
                             </li>
@@ -1214,7 +1214,7 @@ export default function AdminAgentPage() {
                               </p>
                             )}
                             {action.status === 'failed' && (
-                              <p className="text-xs text-red-500">
+                              <p className="text-xs text-red-500 [overflow-wrap:anywhere]">
                                 Failed: {action.error || 'unknown'}
                               </p>
                             )}
@@ -1228,8 +1228,8 @@ export default function AdminAgentPage() {
               {loading && (
                 <div className="animate-pulse space-y-1">
                   <div className="max-w-[85%] rounded-lg px-3 py-2 bg-surface-secondary space-y-2">
-                    <div className="h-3 w-48 bg-surface-elevated rounded" style={{ animationDelay: '0ms' }} />
-                    <div className="h-3 w-64 bg-surface-elevated rounded" style={{ animationDelay: '50ms' }} />
+                    <div className="h-3 w-48 max-w-full bg-surface-elevated rounded" style={{ animationDelay: '0ms' }} />
+                    <div className="h-3 w-64 max-w-full bg-surface-elevated rounded" style={{ animationDelay: '50ms' }} />
                     <div className="h-3 w-40 bg-surface-elevated rounded" style={{ animationDelay: '100ms' }} />
                   </div>
                 </div>

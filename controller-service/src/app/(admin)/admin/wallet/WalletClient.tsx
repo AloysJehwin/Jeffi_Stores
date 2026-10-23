@@ -278,7 +278,7 @@ export default function WalletClient({
           <div className="w-52">
             <AdminSelect label="Category" value={cat} onChange={setCat} options={categoryOptions} sm />
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex flex-wrap items-end gap-2">
             <FormField label="From">
               <DatePicker className="w-36" value={from} onChange={setFrom} />
             </FormField>

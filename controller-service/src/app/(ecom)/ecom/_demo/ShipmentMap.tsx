@@ -68,7 +68,7 @@ export default function ShipmentMap({ stage, timeline, awb, reduced }: ShipmentM
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-3 shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 shrink-0">
         <div className="flex items-center gap-2">
           <span className="ecom-accent-bg inline-flex h-7 items-center rounded-md px-2 text-xs font-semibold text-white">
             Delhivery
@@ -82,7 +82,7 @@ export default function ShipmentMap({ stage, timeline, awb, reduced }: ShipmentM
         ) : null}
       </div>
 
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-[1.4fr_1fr]">
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] gap-2 sm:grid-rows-none sm:grid-cols-[1.4fr_1fr] sm:gap-4">
         <div className="relative min-h-0 overflow-hidden rounded-xl border border-border-default bg-gradient-to-br from-slate-50 to-white">
           <svg
             viewBox="0 0 400 200"
@@ -173,7 +173,7 @@ export default function ShipmentMap({ stage, timeline, awb, reduced }: ShipmentM
                     <span className="w-0.5 flex-1" style={{ backgroundColor: i < currentIdx ? ACCENT : TRACK }} />
                   ) : null}
                 </div>
-                <div className="pb-2">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 pb-1 sm:block sm:pb-2">
                   <p className="text-sm font-semibold leading-tight" style={{ color: done ? '#0f172a' : IDLE }}>
                     {step.label}
                   </p>

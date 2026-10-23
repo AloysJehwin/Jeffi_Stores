@@ -125,7 +125,7 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
                 <Link href={ap(`/admin/customers/${customer.id}`, host)} className="font-medium text-accent-500 hover:underline">
                   {customer.name}
                 </Link>
-                {customer.email && <p className="text-foreground-secondary">{customer.email}</p>}
+                {customer.email && <p className="text-foreground-secondary break-words">{customer.email}</p>}
                 {customer.phone && <p className="text-foreground-secondary">{customer.phone}</p>}
               </div>
             ) : (

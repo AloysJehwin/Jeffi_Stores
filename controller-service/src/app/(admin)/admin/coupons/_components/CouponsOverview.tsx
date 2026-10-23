@@ -97,7 +97,7 @@ export default function CouponsOverview() {
 
           <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <Section title="Redemptions and discount">
                 <TrendChart
@@ -160,7 +160,7 @@ export default function CouponsOverview() {
             />
           </Section>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Section title="Expiring within 7 days">
               <Table
                 rows={data.expiring}

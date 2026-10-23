@@ -142,9 +142,9 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
             placeholder="Search by name…"
             value={search}
             onChange={e => onSearch(e.target.value)}
-            className={`flex-1 ${PANEL_INPUT}`}
+            className={`flex-1 min-w-0 ${PANEL_INPUT}`}
           />
-          <div className="w-48 shrink-0">
+          <div className="w-36 sm:w-48 shrink-0">
             <AdminSelect
               value={category}
               onChange={onCategory}

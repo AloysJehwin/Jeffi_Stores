@@ -196,7 +196,7 @@ function AiMediaDialog({
               placeholder="A clean studio shot of ..."
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground-secondary">Size</label>
               <Select className="w-full" aria-label="Size" value={sizeKey} onChange={setSizeKey} options={sizes.map(s => ({ value: s.key, label: s.label }))} />
@@ -224,7 +224,7 @@ function AiMediaDialog({
           {error && <p className="text-xs text-red-600">{error}</p>}
           {results && (
             <div className="space-y-2">
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {results.map((img, i) => (
                   <button
                     key={i}

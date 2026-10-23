@@ -384,7 +384,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                       ? 'Loading products…'
                       : `${selectedProductIds.size} of ${productList.length} product${productList.length !== 1 ? 's' : ''} selected`}
                   </p>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     {!productListLoading && availableBrands.length > 1 && (
                       <div className="w-48">
                         <AdminSelect
@@ -436,7 +436,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                           onChange={() => toggleProduct(p.id)}
                           className="w-4 h-4 accent-accent-500 rounded"
                         />
-                        <span className="text-sm text-foreground">{p.name}</span>
+                        <span className="min-w-0 break-words text-sm text-foreground">{p.name}</span>
                         {p.brand_name && <span className="text-xs text-foreground-muted ml-auto">{p.brand_name}</span>}
                       </label>
                     ))}
@@ -475,7 +475,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
 
           {preview && preview.length > 0 && (
             <div className="bg-surface-elevated rounded-xl border border-border-default">
-              <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center justify-between">
+              <div className="px-4 sm:px-6 py-4 border-b border-border-default flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Preview — {selectedCategory?.name}</h2>
                 <span className="text-xs text-foreground-muted bg-surface px-2.5 py-1 rounded-full border border-border-default">
                   +{percentage}% on MRP (Ex. GST)

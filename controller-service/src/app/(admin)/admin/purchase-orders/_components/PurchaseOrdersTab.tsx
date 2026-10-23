@@ -1320,8 +1320,8 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                         const taxRate = parseFloat(gi.tax_rate ?? matchItem?.tax_rate ?? '0')
                         const costPerPu = gi.unit_cost ? parseFloat(gi.unit_cost) * factor * (1 + taxRate / 100) : null
                         return (
-                          <div key={idx} className="flex items-center justify-between px-4 py-2 text-sm">
-                            <span className="text-foreground-secondary">{productLabel}</span>
+                          <div key={idx} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+                            <span className="min-w-0 break-words text-foreground-secondary">{productLabel}</span>
                             <div className="flex items-center gap-4 text-right">
                               <span className="text-foreground font-medium">
                                 {recvPu}

@@ -122,7 +122,7 @@ export function OverviewView({ d, currency }: { d: OverviewData; currency: strin
         <TrendChart points={points} series={SERIES} ariaLabel="Ad spend, value and clicks over time" />
       </Section>
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <Section title="By network">
           <DonutSplit
             segments={d.byNetwork.map((r, i) => ({ label: humanize(r.network), value: Math.round(r.cost), color: PALETTE[i % PALETTE.length] }))}
@@ -347,7 +347,7 @@ export function ProductsView({ d, currency }: { d: { items: ProductRow[]; bestse
   const flagged = d.items.filter(i => i.flags.some(f => f !== 'unmatched'))
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Kpi label="Spend on out-of-stock items" value={money(d.items.filter(i => i.flags.includes('out_of_stock')).reduce((s, i) => s + i.cost, 0), currency)} />
         <Kpi label="Spend on loss-making items" value={money(d.items.filter(i => i.flags.includes('negative_margin') || i.flags.includes('unprofitable')).reduce((s, i) => s + i.cost, 0), currency)} />
         <Kpi label="Flagged items" value={count(flagged.length)} />

@@ -73,7 +73,7 @@ export function StepCampaign({ d, set, b, demandGenMinimum }: { d: Draft; set: P
       >
         <input className={inputCls} inputMode="decimal" value={d.dailyBudget} onChange={e => set({ dailyBudget: e.target.value })} />
       </Field>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <AdminSelect
           label="Bid strategy"
           value={d.strategy}
@@ -96,7 +96,7 @@ export function StepCampaign({ d, set, b, demandGenMinimum }: { d: Draft; set: P
           </Field>
         )}
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Field label="Start date (optional)">
           <DatePicker value={d.startDate} min={today} clearable onChange={v => set({ startDate: v })} placeholder="Today" />
         </Field>

@@ -421,7 +421,7 @@ export function SerialPicker({
                             onChange={() => toggle(s.serial_number)}
                             className="accent-secondary-500 shrink-0"
                           />
-                          <span className="text-sm font-mono text-foreground flex-1">{s.serial_number}</span>
+                          <span className="text-sm font-mono text-foreground flex-1 min-w-0 break-all">{s.serial_number}</span>
                         </label>
                       )
                     })}

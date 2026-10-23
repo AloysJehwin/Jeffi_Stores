@@ -97,7 +97,7 @@ export default function ProvidersCard() {
       ) : tab === 'default' ? (
         <>
           <Section title="Messaging">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {(['sms_provider', 'whatsapp_provider'] as const).map(k => (
                 <MessagingField
                   key={k}
@@ -114,7 +114,7 @@ export default function ProvidersCard() {
           </Section>
           <Section title="AI">
             {!data.gateway && <p className="text-xs text-foreground-muted mb-3">The AI gateway did not answer; configured state is unknown.</p>}
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               {(['ai_text_providers', 'ai_image_providers', 'ai_video_providers'] as const).map(k => (
                 <OrderEditor
                   key={k}
@@ -197,7 +197,7 @@ function MessagingField({
       <span className="block text-xs text-foreground-muted mb-1">{KEY_LABEL[k]}</span>
       <div className="flex gap-2 items-center">
         <Select
-          className="flex-1"
+          className="flex-1 min-w-0"
           aria-label={KEY_LABEL[k]}
           value={value ?? ''}
           disabled={disabled}
@@ -326,7 +326,7 @@ function AddOverride({ data, onCancel, onSave }: { data: Data; onCancel: () => v
   const cap = capOf(key)
   return (
     <Section title="New store override">
-      <div className="grid gap-4 md:grid-cols-2 mb-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mb-4">
         <div>
           <span className="block text-xs text-foreground-muted mb-1">Store</span>
           <Select

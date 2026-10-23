@@ -20,7 +20,7 @@ export default function OrdersDemo() {
     <AppDemoShell steps={STEPS} step={s.step} onStep={s.go} caption="admin - orders">
       {s.step === 'lands' && (
         <div className="h-full flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-3"><Stat label="New today" value={7} tone="accent" /><Stat label="Pending" value={3} /><Stat label="Revenue" value={rs(18240)} /></div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1"><Stat label="New today" value={7} tone="accent" /><Stat label="Pending" value={3} /><Stat label="Revenue" value={rs(18240)} /></div>
           <Table cols={['Order', 'Customer', 'Total', 'Method', 'Status']} rows={[['#1043', 'Alex Morgan', rs(2499), 'UPI', <Tag key="t" tone="warn">New</Tag>], ['#1042', 'Priya S.', rs(1198), 'COD', <Tag key="t" tone="neutral">Processing</Tag>], ['#1041', 'Rahul K.', rs(3199), 'Card', <Tag key="t" tone="ok">Shipped</Tag>]]} />
         </div>
       )}
