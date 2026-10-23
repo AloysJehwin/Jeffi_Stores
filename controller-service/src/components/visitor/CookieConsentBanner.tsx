@@ -139,8 +139,8 @@ export function CookieSettingsLink({ className }: { className?: string }) {
 export function StorefrontFooterBar() {
   const link = 'hover:text-accent-500 transition-colors'
   return (
-    <footer className="border-t border-border-default bg-surface">
-      <div className="container mx-auto px-4 py-4 pb-20 md:pb-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-foreground-muted">
+    <footer data-footer-strip className="border-t border-border-default bg-surface">
+      <div className="container mx-auto px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-foreground-muted">
         <Link href="/legal" className={link}>
           Policies
         </Link>

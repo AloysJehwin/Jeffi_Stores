@@ -64,6 +64,7 @@ export default function StickyAddToCartBar({
     <div
       role="region"
       aria-label={buyNow ? 'Quick buy' : 'Quick add to cart'}
+      data-bottom-bar="cart"
       className={`fixed inset-x-0 ${position} z-30 bg-surface-elevated border-t border-border-default shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.25)] animate-slide-up motion-reduce:animate-none`}
     >
       <div className="container mx-auto px-4 py-2 flex items-center gap-3">
