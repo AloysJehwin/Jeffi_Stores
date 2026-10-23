@@ -87,7 +87,7 @@
     "twilio": "^6.0.2",
     "unicode-emoji-json": "^0.8.0",
     "xlsx": "file:vendor/xlsx-0.20.3.tgz",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

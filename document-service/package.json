@@ -33,7 +33,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "sharp": "^0.35.4",
-    "zod": "^4.4.3",
+    "zod": "^4.6.7",
     "tsx": "^4.19.2",
     "@aws-sdk/client-secrets-manager": "^3.1110.0"
   },
