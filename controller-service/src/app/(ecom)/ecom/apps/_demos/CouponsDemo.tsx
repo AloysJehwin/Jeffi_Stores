@@ -35,7 +35,7 @@ export default function CouponsDemo() {
       {s.step === 'stats' && (
         <Panel title="FESTIVE15 · 7 days">
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3"><Stat label="Redeemed" value={86} tone="accent" /><Stat label="Orders" value={rs(1.4e5)} /><Stat label="Avg discount" value={rs(342)} /></div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1"><Stat label="Redeemed" value={86} tone="accent" /><Stat label="Orders" value={rs(1.4e5)} /><Stat label="Avg discount" value={rs(342)} /></div>
             <div><div className="flex justify-between text-xs text-foreground-muted mb-1"><span>86 / 200 used</span><span>43%</span></div><Progress value={43} /></div>
             <Table cols={['Order', 'Customer', 'Discount']} rows={[['#1051', 'Nisha R.', rs(375)], ['#1049', 'Dev P.', rs(500)]]} />
           </div>

@@ -8,33 +8,33 @@ export default function ApiServices() {
   const p = priceList()
   const docFrom = Math.min(...Object.values(p.documents))
   return (
-    <section id="apis" className="mx-auto max-w-7xl px-6 py-24">
+    <section id="apis" className="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-24 max-sm:scroll-mt-16">
       <Eyebrow>Not just stores</Eyebrow>
-      <Display className="mt-3 max-w-3xl text-4xl lg:text-5xl">Messaging and documents, as an API</Display>
+      <Display className="mt-3 max-w-3xl text-3xl sm:text-4xl lg:text-5xl">Messaging and documents, as an API</Display>
       <p className="mt-4 max-w-2xl text-foreground-secondary">
         The same engine that runs our stores, on its own. Send WhatsApp, SMS and email, and render GST-ready invoices and documents from your own app. Pay per use from a prepaid wallet, no plan needed.
       </p>
 
-      <div className="mt-12 grid gap-6 lg:grid-cols-2">
-        <SandCard className="flex flex-col">
+      <div className="mt-8 sm:mt-12 grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
+        <SandCard className="flex min-w-0 flex-col max-sm:p-5">
           <div className="text-xs font-bold uppercase tracking-[0.18em] org-brown">Messaging API</div>
-          <h3 className="mt-2 font-display text-2xl font-black text-foreground">Reach customers where they read</h3>
+          <h3 className="mt-2 font-display text-xl sm:text-2xl font-black text-foreground">Reach customers where they read</h3>
           <Points items={MESSAGING_POINTS} />
           <WhatsAppPreview className="mt-6" />
           <Prices items={[['WhatsApp', p.messages.whatsapp], ['SMS', p.messages.sms], ['Email', p.messages.email], ['Image hosting', p.media]]} unit="per send" />
         </SandCard>
-        <SandCard className="flex flex-col">
+        <SandCard className="flex min-w-0 flex-col max-sm:p-5">
           <div className="text-xs font-bold uppercase tracking-[0.18em] org-brown">Documents API</div>
-          <h3 className="mt-2 font-display text-2xl font-black text-foreground">Invoices that add up, every time</h3>
+          <h3 className="mt-2 font-display text-xl sm:text-2xl font-black text-foreground">Invoices that add up, every time</h3>
           <Points items={DOCUMENT_POINTS} />
           <InvoicePreview className="mt-6" />
           <Prices items={[['Invoice', p.documents.invoice], ['Quotation', p.documents.quotation], ['Receipt', p.documents.receipt], ['Label', p.documents.label]]} unit="per document" />
         </SandCard>
       </div>
 
-      <div className="mt-10 flex flex-wrap items-center gap-4">
-        <Pill href="/signup" className="px-8 py-4 text-base">Get an API key</Pill>
-        <span className="text-sm text-foreground-secondary">Documents from {rupees(docFrom)}. Live in minutes, no store required.</span>
+      <div className="mt-8 flex flex-col items-stretch gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+        <Pill href="/signup" className="w-full sm:w-auto px-8 py-4 text-base">Get an API key</Pill>
+        <span className="text-center sm:text-left text-sm text-foreground-secondary">Documents from {rupees(docFrom)}. Live in minutes, no store required.</span>
       </div>
     </section>
   )

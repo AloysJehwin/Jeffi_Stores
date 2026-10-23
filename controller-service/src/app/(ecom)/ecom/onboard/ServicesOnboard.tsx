@@ -39,7 +39,7 @@ function Field({ label, children, hint }: { label: string; children: React.React
     </label>
   )
 }
-const input = 'w-full rounded-xl bg-surface-elevated px-4 py-3 text-sm text-foreground ecom-field border-transparent'
+const input = 'w-full rounded-xl bg-surface-elevated px-4 py-3 text-[16px] sm:text-sm text-foreground ecom-field border-transparent'
 
 export default function ServicesOnboard({ services, ownerName, onBack }: { services: ('messaging' | 'documents')[]; ownerName: string | null; onBack: () => void }) {
   const router = useRouter()
@@ -66,15 +66,15 @@ export default function ServicesOnboard({ services, ownerName, onBack }: { servi
 
   return (
     <div className="max-w-2xl">
-      <button onClick={onBack} className="org-square text-sm org-brown hover:underline mb-6">← Change services</button>
+      <button onClick={onBack} className="org-square min-h-11 sm:min-h-0 text-sm org-brown hover:underline mb-4 sm:mb-6">← Change services</button>
       <Eyebrow>{services.map(s => (s === 'messaging' ? 'Messaging API' : 'Documents API')).join(' + ')}</Eyebrow>
-      <Display as="h1" className="mt-3 text-4xl">Set up your workspace</Display>
+      <Display as="h1" className="mt-3 text-3xl sm:text-4xl">Set up your workspace</Display>
       <p className="mt-3 text-foreground-secondary">Takes about two minutes. Your workspace is live the moment you submit — no approval wait.</p>
 
       <div className="mt-8 space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Workspace name"><input className={input} value={f.displayName} onChange={e => { set('displayName', e.target.value); if (!f.slug || f.slug === slugify(f.displayName)) set('slug', slugify(e.target.value)) }} placeholder="Nova Retail" /></Field>
-          <Field label="Workspace handle" hint="Becomes your store address if you add one later"><div className="flex items-center gap-2"><input className={input} value={f.slug} onChange={e => set('slug', slugify(e.target.value))} placeholder="nova" /><span className="text-xs text-foreground-muted whitespace-nowrap">.jeffistores.in</span></div></Field>
+          <Field label="Workspace handle" hint="Becomes your store address if you add one later"><div className="flex items-center gap-2"><input className={`${input} min-w-0`} value={f.slug} onChange={e => set('slug', slugify(e.target.value))} placeholder="nova" /><span className="shrink-0 text-xs text-foreground-muted whitespace-nowrap">.jeffistores.in</span></div></Field>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Legal business name"><input className={input} value={f.businessName} onChange={e => set('businessName', e.target.value)} /></Field>
@@ -92,7 +92,7 @@ export default function ServicesOnboard({ services, ownerName, onBack }: { servi
           <span>I agree to the Jeffi Commerce terms of service and acceptable-use policy for messaging.</span>
         </label>
         {error && <p className="text-sm text-[#8a2e1f] org-peach rounded-xl px-4 py-3">{error}</p>}
-        <Pill onClick={submit} disabled={!valid || busy} className="px-8 py-4 text-base disabled:opacity-40">{busy ? 'Creating…' : 'Create workspace'}</Pill>
+        <Pill onClick={submit} disabled={!valid || busy} className="w-full sm:w-auto px-8 py-4 text-base disabled:opacity-40">{busy ? 'Creating…' : 'Create workspace'}</Pill>
       </div>
     </div>
   )

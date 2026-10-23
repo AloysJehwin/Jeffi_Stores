@@ -26,13 +26,13 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
   return (
     <>
       {/* Interval toggle */}
-      <div className="flex justify-center mb-10">
+      <div className="flex justify-center mb-8 sm:mb-10">
         <Segmented<Interval> ariaLabel="Billing interval" value={interval} onChange={setInterval}
           options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: <span className="px-2 py-0.5 rounded-full text-[10px] font-bold org-sage org-sage-text">2 months free</span> }]} />
       </div>
 
       {/* Plan cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-5 w-full">
         {ordered.map(p => {
           const featured = p.slug === 'growth'
           const monthly = Number(p.monthly_price_inr)
@@ -42,10 +42,10 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
           return (
             <div
               key={p.slug}
-              className={`relative rounded-[2rem] p-7 flex flex-col ${featured ? 'org-peach' : 'org-sand'}`}
+              className={`relative min-w-0 rounded-3xl sm:rounded-[2rem] p-6 sm:p-7 flex flex-col ${featured ? 'org-peach' : 'org-sand'}`}
             >
               {featured && (
-                <span className="ecom-accent-bg absolute -top-3 left-7 px-3 py-1 rounded-full text-white text-xs font-bold">
+                <span className="ecom-accent-bg absolute -top-3 left-6 sm:left-7 px-3 py-1 rounded-full text-white text-xs font-bold">
                   Most popular
                 </span>
               )}
@@ -70,7 +70,7 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
 
               <Link
                 href={`/signup?plan=${p.slug}&interval=${interval}`}
-                className={`mt-6 text-center px-4 py-2.5 rounded-full text-sm font-display font-bold transition-colors ${featured ? 'ecom-accent-bg text-white' : 'bg-surface-elevated text-foreground hover:bg-surface'}`}
+                className={`mt-6 text-center px-4 py-3 sm:py-2.5 rounded-full text-sm font-display font-bold transition-colors ${featured ? 'ecom-accent-bg text-white' : 'bg-surface-elevated text-foreground hover:bg-surface'}`}
               >
                 Choose {p.name}
               </Link>

@@ -53,7 +53,7 @@ const BUSINESS_TYPES = [
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const inp =
-  'w-full rounded-xl border border-border-default bg-surface px-4 py-3 text-sm text-foreground placeholder:text-foreground-muted ecom-field'
+  'w-full rounded-xl border border-border-default bg-surface px-4 py-3 text-[16px] sm:text-sm text-foreground placeholder:text-foreground-muted ecom-field'
 const lbl = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
 function slugify(s: string) {
@@ -579,17 +579,17 @@ export default function OnboardWizard({
       </aside>
 
       {/* ── Main content ── */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 min-w-0 flex flex-col">
         {/* Mobile step indicator */}
-        <div className="lg:hidden px-5 py-3 border-b border-border-default bg-surface-elevated">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-foreground-muted">
+        <div className="lg:hidden sticky top-14 z-10 md:static px-4 sm:px-5 py-3 border-b border-border-default bg-surface-elevated">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="shrink-0 text-xs text-foreground-muted">
               Step {step + 1} of {STEPS.length}
             </span>
-            <span className="text-xs font-semibold text-foreground">
+            <span className="min-w-0 truncate text-xs font-semibold text-foreground">
               {STEPS[step].label} <span className="font-normal text-foreground-muted">— {STEPS[step].desc}</span>
             </span>
-            {saving && <span className="text-[10px] text-foreground-muted">Saving…</span>}
+            {saving && <span className="shrink-0 text-[10px] text-foreground-muted">Saving…</span>}
           </div>
           <div className="flex gap-1">
             {STEPS.map(s => (
@@ -601,10 +601,10 @@ export default function OnboardWizard({
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col items-center px-5 sm:px-8 lg:px-16 py-8 lg:py-10 lg:justify-center">
+        <div className="flex-1 flex flex-col items-center px-4 sm:px-8 lg:px-16 py-6 sm:py-8 lg:py-10 lg:justify-center">
           {/* ── Restore banner (returning owner with a prior backup) ── */}
           {restoreBackup && step <= 1 && (
-            <div className="w-full max-w-3xl mb-6 rounded-2xl border border-accent-300 bg-accent-50 p-5">
+            <div className="w-full max-w-3xl mb-6 rounded-2xl border border-accent-300 bg-accent-50 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <div className="flex-1">
                   <div className="font-semibold text-foreground">We found a backup of your previous store</div>
@@ -629,10 +629,10 @@ export default function OnboardWizard({
           {/* ── Step 0: Plan ── */}
           {step === 0 && (
             <div className="w-full max-w-3xl">
-              <h1 className="text-3xl font-bold text-foreground mb-1">Choose your plan</h1>
-              <p className="text-foreground-muted mb-8">All plans include the full storefront. Cancel anytime.</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Choose your plan</h1>
+              <p className="text-foreground-muted mb-6 sm:mb-8">All plans include the full storefront. Cancel anytime.</p>
               {reusingPreviousDetails && (
-                <div className="mb-8 rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
+                <div className="mb-6 sm:mb-8 rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
                   <p className="text-sm text-foreground">
                     We have carried over your business details, warehouse and bank account.
                   </p>
@@ -641,9 +641,9 @@ export default function OnboardWizard({
                   </p>
                 </div>
               )}
-              <Segmented<Interval> ariaLabel="Billing interval" className="mb-8" value={interval} onChange={setInterval}
+              <Segmented<Interval> ariaLabel="Billing interval" className="mb-6 sm:mb-8" value={interval} onChange={setInterval}
                 options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: '2 months free' }]} />
-              <ChoiceCards ariaLabel="Plan" columns="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" cardClassName="bg-surface-elevated p-5" value={planSlug} onChange={setPlanSlug}
+              <ChoiceCards ariaLabel="Plan" columns="grid-cols-2 xl:grid-cols-4" cardClassName="bg-surface-elevated p-4 sm:p-5" value={planSlug} onChange={setPlanSlug}
                 options={plans.map(p => {
                   const m = Number(p.monthly_price_inr)
                   const pr = interval === 'yearly' ? m * 10 : m
@@ -667,8 +667,8 @@ export default function OnboardWizard({
           {/* ── Step 1: Store ── */}
           {step === 1 && (
             <div className="w-full max-w-xl">
-              <h1 className="text-3xl font-bold text-foreground mb-1">Name your store</h1>
-              <p className="text-foreground-muted mb-8">This is what your customers will see.</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Name your store</h1>
+              <p className="text-foreground-muted mb-6 sm:mb-8">This is what your customers will see.</p>
               <div className="space-y-5">
                 <div>
                   <label className={lbl}>Store name</label>
@@ -683,7 +683,7 @@ export default function OnboardWizard({
                   <label className={lbl}>Subdomain</label>
                   <div className="flex items-center gap-2">
                     <input
-                      className={`${inp} ${upgrade ? 'opacity-70 cursor-not-allowed' : ''}`}
+                      className={`${inp} min-w-0 ${upgrade ? 'opacity-70 cursor-not-allowed' : ''}`}
                       value={effectiveSlug}
                       readOnly={!!upgrade}
                       onChange={e => {
@@ -692,7 +692,7 @@ export default function OnboardWizard({
                       }}
                       placeholder="acme"
                     />
-                    <span className="text-sm text-foreground-muted whitespace-nowrap font-mono">.jeffistores.in</span>
+                    <span className="shrink-0 text-sm text-foreground-muted whitespace-nowrap font-mono">.jeffistores.in</span>
                   </div>
                   {upgrade && (
                     <p className="text-xs text-foreground-muted mt-1">Your workspace&apos;s subdomain — already reserved for your store.</p>
@@ -730,8 +730,8 @@ export default function OnboardWizard({
           {/* ── Step 2: Business ── */}
           {step === 2 && (
             <div className="w-full max-w-xl">
-              <h1 className="text-3xl font-bold text-foreground mb-1">Business details</h1>
-              <p className="text-foreground-muted mb-8">Legal information for compliance and invoicing.</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Business details</h1>
+              <p className="text-foreground-muted mb-6 sm:mb-8">Legal information for compliance and invoicing.</p>
               <div className="space-y-5">
                 <div>
                   <label className={lbl}>Legal business name</label>
@@ -773,8 +773,8 @@ export default function OnboardWizard({
           {/* ── Step 3: GST ── */}
           {step === 3 && (
             <div className="w-full max-w-xl">
-              <h1 className="text-3xl font-bold text-foreground mb-1">GST details</h1>
-              <p className="text-foreground-muted mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">GST details</h1>
+              <p className="text-foreground-muted mb-6 sm:mb-8">
                 Only if your business is GST-registered. Leave blank if it is not.
               </p>
               <div className="space-y-5">
@@ -812,7 +812,7 @@ export default function OnboardWizard({
                           setGstS3Key('')
                           setGstFilename('')
                         }}
-                        className="text-xs text-foreground-muted hover:text-foreground"
+                        className="shrink-0 min-h-11 px-2 sm:min-h-0 sm:px-0 text-xs text-foreground-muted hover:text-foreground"
                       >
                         Remove
                       </button>
@@ -848,8 +848,8 @@ export default function OnboardWizard({
           {/* ── Step 4: Warehouse ── */}
           {step === 4 && (
             <div className="w-full max-w-xl">
-              <h1 className="text-3xl font-bold text-foreground mb-1">Pickup warehouse</h1>
-              <p className="text-foreground-muted mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Pickup warehouse</h1>
+              <p className="text-foreground-muted mb-6 sm:mb-8">
                 Where Delhivery will pick up your orders. You can edit this later.
               </p>
               <div className="space-y-4">
@@ -962,8 +962,8 @@ export default function OnboardWizard({
           {/* ── Step 5: Bank ── */}
           {step === 5 && (
             <div className="w-full max-w-xl">
-              <h1 className="text-3xl font-bold text-foreground mb-1">Payout bank account</h1>
-              <p className="text-foreground-muted mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Payout bank account</h1>
+              <p className="text-foreground-muted mb-6 sm:mb-8">
                 Where your sales will be settled. We verify instantly via a ₹1 bank check.
               </p>
               <div className="space-y-4">
@@ -987,7 +987,7 @@ export default function OnboardWizard({
                         setBankMsg(null)
                         setBank({ accountNumber: '', ifsc: '', holderName: '' })
                       }}
-                      className="mt-3 text-xs font-semibold text-foreground-secondary hover:text-foreground underline"
+                      className="mt-3 min-h-11 sm:min-h-0 text-xs font-semibold text-foreground-secondary hover:text-foreground underline"
                     >
                       Use a different account
                     </button>
@@ -1044,7 +1044,7 @@ export default function OnboardWizard({
                     type="button"
                     onClick={verifyBank}
                     disabled={busy || !bank.holderName || bank.accountNumber.length < 9 || bank.ifsc.length !== 11}
-                    className="px-5 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                    className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
                   >
                     {busy ? 'Saving…' : 'Save account'}
                   </button>
@@ -1058,7 +1058,7 @@ export default function OnboardWizard({
                         setBankNameConfirmed(false)
                         setBankMsg(null)
                       }}
-                      className="ml-2 text-xs text-foreground-muted hover:text-foreground font-normal"
+                      className="ml-2 min-h-11 px-2 sm:min-h-0 sm:px-0 text-xs text-foreground-muted hover:text-foreground font-normal"
                     >
                       Change
                     </button>
@@ -1138,8 +1138,8 @@ export default function OnboardWizard({
           {/* ── Step 6: Review ── */}
           {step === 6 && (
             <div className="w-full max-w-xl">
-              <h1 className="text-3xl font-bold text-foreground mb-1">Branding & legals</h1>
-              <p className="text-foreground-muted mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Branding & legals</h1>
+              <p className="text-foreground-muted mb-6 sm:mb-8">
                 Your logo and seal appear on your storefront and legal documents.
               </p>
 
@@ -1244,8 +1244,8 @@ export default function OnboardWizard({
 
           {step === 7 && (
             <div className="w-full max-w-xl">
-              <h1 className="text-3xl font-bold text-foreground mb-1">Review & submit</h1>
-              <p className="text-foreground-muted mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Review & submit</h1>
+              <p className="text-foreground-muted mb-6 sm:mb-8">
                 We&apos;ll review your GST certificate and notify you when your store is approved.
               </p>
               <div className="rounded-2xl border border-border-default bg-surface-elevated divide-y divide-border-default/60 overflow-hidden mb-6">
@@ -1280,9 +1280,9 @@ export default function OnboardWizard({
                       ]
                     : []),
                 ].map(([k, v]) => (
-                  <div key={k} className="flex items-start justify-between px-5 py-3 text-sm gap-4">
+                  <div key={k} className="flex items-start justify-between px-4 sm:px-5 py-3 text-sm gap-4">
                     <span className="text-foreground-muted flex-shrink-0 w-24">{k}</span>
-                    <span className="text-foreground font-medium text-right">{v}</span>
+                    <span className="min-w-0 break-words text-foreground font-medium text-right">{v}</span>
                   </div>
                 ))}
               </div>
@@ -1326,7 +1326,7 @@ export default function OnboardWizard({
                         className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.ok ? 'ecom-accent-bg' : 'bg-foreground-muted/20'}`}
                       />
                       <span className="w-20 flex-shrink-0 not-italic text-[10px] text-foreground-muted">{s.label}</span>
-                      {s.url}
+                      <span className="min-w-0 break-all">{s.url}</span>
                     </div>
                   ))}
                 </div>
@@ -1347,12 +1347,12 @@ export default function OnboardWizard({
 
           {/* ── Navigation ── */}
           {!isLast && (
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border-default w-full max-w-xl">
+            <div className="flex items-center justify-between gap-3 mt-6 pt-5 sm:mt-8 sm:pt-6 border-t border-border-default w-full max-w-xl">
               <button
                 type="button"
                 onClick={() => goTo((step - 1) as StepIdx)}
                 disabled={step === 0}
-                className="px-5 py-2.5 rounded-xl text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 text-sm font-medium transition-colors"
+                className="px-4 py-3 sm:px-5 sm:py-2.5 rounded-xl text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 text-sm font-medium transition-colors"
               >
                 ← Back
               </button>
@@ -1360,7 +1360,7 @@ export default function OnboardWizard({
                 type="button"
                 onClick={() => canNext() && goTo((step + 1) as StepIdx)}
                 disabled={!canNext()}
-                className="px-6 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+                className="flex-1 sm:flex-none px-6 py-3 sm:py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
               >
                 Continue →
               </button>
@@ -1371,7 +1371,7 @@ export default function OnboardWizard({
               <button
                 type="button"
                 onClick={() => goTo(6 as StepIdx)}
-                className="px-5 py-2.5 rounded-xl text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
+                className="px-5 py-3 sm:py-2.5 rounded-xl text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
               >
                 ← Back
               </button>

@@ -63,12 +63,12 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
           plan={{ slug: tenant.plan ?? 'basic', monthlyPrice: tenant.monthly_price_inr, interval: tenant.billing_interval }}
         />
       )}
-      <div className="max-w-md w-full rounded-[2rem] org-sage p-10 text-center">
+      <div className="max-w-md w-full rounded-3xl sm:rounded-[2rem] org-sage p-6 sm:p-10 text-center">
         <span className="inline-flex items-center justify-center w-14 h-14 rounded-full ecom-accent-bg text-white mx-auto mb-5">
           <CheckMark className="w-7 h-7" />
         </span>
         <h1 className="text-2xl font-bold font-display font-black org-sage-text">Payment confirmed!</h1>
-        <p className="text-sm text-foreground-secondary mt-3">
+        <p className="text-sm text-foreground-secondary mt-3 break-words">
           {tenantSlug ? (
             <>
               Your store <span className="font-semibold">{tenantSlug}.jeffistores.in</span> is being set up.
@@ -80,7 +80,7 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
         </p>
         <Link
           href="/dashboard"
-          className="inline-block mt-7 w-full px-5 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors"
+          className="inline-block mt-7 w-full px-5 py-3 sm:py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors"
         >
           Go to dashboard →
         </Link>

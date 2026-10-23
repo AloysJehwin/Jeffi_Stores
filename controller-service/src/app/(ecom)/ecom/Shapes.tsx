@@ -15,7 +15,7 @@ export function PhoneMock({
   className?: string
 }) {
   return (
-    <div className={`relative mx-auto w-[190px] ${className}`}>
+    <div className={`relative mx-auto w-[190px] max-w-full ${className}`}>
       <div
         className={`rounded-[2.5rem] border-[5px] border-[#3d3a35] bg-[#f8f3ea] overflow-hidden ${src ? 'aspect-[390/844]' : 'aspect-[9/19]'}`}
       >

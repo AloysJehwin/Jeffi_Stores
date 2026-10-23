@@ -32,6 +32,7 @@ export default async function PricingPage() {
   }
 
   const groups = Array.from(new Set(COMPARISON_ROWS.map(r => r.group)))
+  const cols = { gridTemplateColumns: `repeat(${ordered.length}, minmax(0, 1fr))` }
 
   return (
     <div className="text-foreground">
@@ -39,11 +40,11 @@ export default async function PricingPage() {
       <section className="relative overflow-hidden">
         <div
           aria-hidden
-          className="org-sage absolute -top-40 -right-24 -z-10 w-[520px] h-[520px] rounded-full opacity-70"
+          className="org-sage absolute -top-28 -right-32 -z-10 w-[300px] h-[300px] sm:-top-40 sm:-right-24 sm:w-[520px] sm:h-[520px] rounded-full opacity-70"
         />
-        <div className="w-full px-6 lg:px-12 pt-20 pb-10">
+        <div className="w-full px-4 sm:px-6 lg:px-12 pt-12 pb-8 sm:pt-20 sm:pb-10">
           <h1 className="font-display font-black text-5xl lg:text-7xl tracking-tight">Pricing</h1>
-          <p className="mt-5 text-lg text-foreground-secondary max-w-2xl">
+          <p className="mt-4 sm:mt-5 text-lg text-foreground-secondary max-w-2xl">
             Every plan includes the complete storefront. As you grow, unlock more of the admin platform. Monthly or
             yearly — cancel anytime.
           </p>
@@ -51,14 +52,83 @@ export default async function PricingPage() {
       </section>
 
       {/* Interactive plan cards with monthly/yearly toggle */}
-      <section className="w-full px-6 lg:px-12 pb-16">
+      <section className="w-full px-4 sm:px-6 lg:px-12 pb-12 sm:pb-16">
         <PricingCards plans={plans} />
       </section>
 
       {/* Detailed comparison table */}
-      <section className="w-full px-6 lg:px-12 pb-24">
-        <h2 className="font-display font-black text-3xl lg:text-4xl mb-10">Compare every feature</h2>
-        <div className="w-full overflow-x-auto rounded-[2rem] bg-surface-elevated">
+      <section className="w-full px-4 sm:px-6 lg:px-12 pb-16 sm:pb-24">
+        <h2 className="font-display font-black text-3xl lg:text-4xl mb-6 sm:mb-10">Compare every feature</h2>
+        <div className="md:hidden">
+          <div style={cols} className="sticky top-14 z-10 grid rounded-2xl bg-surface-secondary px-2 py-2.5 shadow-sm">
+            {ordered.map(p => (
+              <div
+                key={p.slug}
+                className={`min-w-0 px-0.5 text-center text-[11px] leading-tight font-semibold break-words ${p.slug === 'growth' ? 'ecom-accent-text' : 'text-foreground'}`}
+              >
+                {p.name}
+                <div className="mt-0.5 text-[10px] font-normal text-foreground-muted">
+                  ₹{Number(p.monthly_price_inr).toLocaleString('en-IN')}/mo
+                </div>
+              </div>
+            ))}
+          </div>
+          {groups.map(group => (
+            <div key={group} className="mt-6">
+              <div className="px-1 text-xs font-semibold uppercase tracking-widest text-foreground-muted">{group}</div>
+              <ul className="mt-2 rounded-2xl bg-surface-elevated divide-y divide-border-default/60">
+                {COMPARISON_ROWS.filter(r => r.group === group).map(row => (
+                  <li key={row.label} className="px-2 py-3">
+                    <div className="px-1 text-sm text-foreground-secondary">{row.label}</div>
+                    <div style={cols} className="mt-2 grid">
+                      {ordered.map(p => (
+                        <div key={p.slug} className="flex justify-center">
+                          {has(p.slug, row.scopeKey) ? <Check /> : <Dash />}
+                        </div>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <div className="mt-6">
+            <div className="px-1 text-xs font-semibold uppercase tracking-widest text-foreground-muted">Add-ons</div>
+            <ul className="mt-2 rounded-2xl bg-surface-elevated divide-y divide-border-default/60">
+              <li className="px-2 py-3">
+                <div className="px-1 text-sm text-foreground-secondary">Custom domain</div>
+                <div style={cols} className="mt-2 grid">
+                  {ordered.map(p => (
+                    <div key={p.slug} className="min-w-0 text-center text-xs text-foreground-muted break-words">
+                      {p.slug === 'enterprise' ? 'Included' : 'Add-on'}
+                    </div>
+                  ))}
+                </div>
+              </li>
+              <li className="px-2 py-3">
+                <div className="px-1 text-sm text-foreground-secondary">Daily payouts</div>
+                <div style={cols} className="mt-2 grid">
+                  {ordered.map(p => (
+                    <div key={p.slug} className="text-center text-xs text-foreground-muted">
+                      +5%
+                    </div>
+                  ))}
+                </div>
+              </li>
+              <li className="px-2 py-3">
+                <div className="px-1 text-sm text-foreground-secondary">Dedicated database & infra</div>
+                <div style={cols} className="mt-2 grid">
+                  {ordered.map(p => (
+                    <div key={p.slug} className="flex justify-center">
+                      {['pro', 'enterprise'].includes(p.slug) ? <Check /> : <Dash />}
+                    </div>
+                  ))}
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div className="hidden md:block w-full overflow-x-auto rounded-[2rem] bg-surface-elevated">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="sticky top-0">
               <tr className="bg-surface-secondary">
@@ -134,10 +204,10 @@ export default async function PricingPage() {
             </tbody>
           </table>
         </div>
-        <div className="text-center mt-10">
+        <div className="text-center mt-8 sm:mt-10">
           <Link
             href="/signup"
-            className="ecom-accent-bg inline-block px-8 py-4 rounded-full text-white font-display font-bold text-lg transition-colors"
+            className="ecom-accent-bg block w-full sm:inline-block sm:w-auto px-8 py-4 rounded-full text-white font-display font-bold text-lg transition-colors"
           >
             Start your store
           </Link>
@@ -145,8 +215,8 @@ export default async function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="w-full px-6 lg:px-12 pb-24 pt-8">
-        <h2 className="font-display font-black text-3xl lg:text-4xl mb-10">Frequently asked</h2>
+      <section className="w-full px-4 sm:px-6 lg:px-12 pb-16 sm:pb-24 pt-4 sm:pt-8">
+        <h2 className="font-display font-black text-3xl lg:text-4xl mb-6 sm:mb-10">Frequently asked</h2>
         <div className="max-w-3xl mx-auto space-y-4">
           {[
             [
@@ -174,10 +244,10 @@ export default async function PricingPage() {
               'Compliant GST invoices are generated automatically on every order, quotation and cash sale.',
             ],
           ].map(([q, a]) => (
-            <details key={q} className="group rounded-[2rem] org-sand px-8 py-5">
-              <summary className="flex items-center justify-between cursor-pointer font-display font-black text-lg text-foreground list-none">
+            <details key={q} className="group rounded-3xl sm:rounded-[2rem] org-sand px-5 py-4 sm:px-8 sm:py-5">
+              <summary className="flex items-center justify-between gap-4 cursor-pointer font-display font-black text-lg text-foreground list-none">
                 {q}
-                <span className="text-foreground-muted group-open:rotate-45 transition-transform text-xl leading-none">
+                <span className="shrink-0 text-foreground-muted group-open:rotate-45 transition-transform text-xl leading-none">
                   +
                 </span>
               </summary>
