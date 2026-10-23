@@ -2,6 +2,8 @@
 // names and item_id (the SKU sanitised like Merchant sync's offerId), so web and app report into one GA4
 // property and Ads joins items to the feed. No-ops on a build without the native Firebase module.
 
+import { TurboModuleRegistry } from 'react-native'
+
 type FirebaseAnalytics = typeof import('@react-native-firebase/analytics')
 type Instance = ReturnType<FirebaseAnalytics['getAnalytics']>
 
@@ -29,7 +31,11 @@ let firebase: FirebaseAnalytics | null | undefined
 function run(fn: (m: FirebaseAnalytics, a: Instance) => unknown): void {
   if (firebase === undefined) {
     try {
-      firebase = require('@react-native-firebase/analytics') as FirebaseAnalytics
+      // Check for the native module first: on a dev client built before Firebase was added, requiring the
+      // JS package throws inside Metro's loader, which LogBox reports even when caught.
+      firebase = TurboModuleRegistry.get('NativeRNFBTurboApp')
+        ? (require('@react-native-firebase/analytics') as FirebaseAnalytics)
+        : null
     } catch {
       firebase = null
     }
