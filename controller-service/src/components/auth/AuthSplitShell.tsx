@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 
-// Shared sign-in / sign-up layout (the ecom AuthSplit pattern): a themed brand panel beside the form on
+// Sign-in / sign-up layout for business, admin and ecom (the ecom AuthSplit pattern): a themed brand panel beside the form on
 // desktop; on phones a compact brand header, the form, then the value points. No top nav on auth pages.
 
 export interface AuthPanelTheme {
@@ -27,7 +27,6 @@ export interface AuthSplitShellProps {
   /** Corner action, e.g. the "Sign up" switch. */
   corner?: ReactNode
   /** Full-page "signing you in" overlay while a sign-in completes or the next page loads. */
-  busy?: string | null
   children: ReactNode
 }
 
@@ -61,19 +60,6 @@ function Check({ cls }: { cls: string }) {
   )
 }
 
-export function AuthBusyOverlay({ text }: { text: string }) {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-surface/80 backdrop-blur-sm"
-    >
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent-500 border-t-transparent" />
-      <p className="text-sm font-medium text-foreground">{text}</p>
-    </div>
-  )
-}
-
 export default function AuthSplitShell({
   brandName,
   logoUrl,
@@ -84,7 +70,6 @@ export default function AuthSplitShell({
   footnote,
   theme,
   corner,
-  busy,
   children,
 }: AuthSplitShellProps) {
   return (
@@ -136,19 +121,11 @@ export default function AuthSplitShell({
           </ul>
         </div>
       </main>
-
-      {busy && <AuthBusyOverlay text={busy} />}
     </div>
   )
 }
 
 export const AUTH_THEMES = {
-  store: {
-    panel: 'bg-gradient-to-br from-accent-600 to-accent-800 text-white',
-    chip: 'bg-white/20 text-white',
-    check: 'bg-white/20 text-white',
-    accent: 'bg-accent-500/15 text-accent-600 dark:text-accent-400',
-  },
   business: {
     panel: 'bg-gradient-to-br from-secondary-600 to-secondary-800 text-white',
     chip: 'bg-white/15 text-white',
@@ -164,11 +141,6 @@ export const AUTH_THEMES = {
 } satisfies Record<string, AuthPanelTheme>
 
 export const AUTH_POINTS = {
-  store: [
-    'Track orders, invoices and returns',
-    'Saved addresses for a faster checkout',
-    'Wishlist, rewards and member offers',
-  ],
   business: [
     'Custom discount rates on your categories',
     'Request for Quote (RFQ) on any product',
@@ -180,4 +152,35 @@ export const AUTH_POINTS = {
     'Customers, campaigns and reports',
     'Signed-in devices and certificates you control',
   ],
+}
+
+/** loading.tsx placeholder with the same split as AuthSplitShell, so the page doesn't jump when it loads. */
+export function AuthSplitSkeleton({ theme }: { theme: AuthPanelTheme }) {
+  return (
+    <div className="grid min-h-[100dvh] grid-cols-1 bg-surface lg:grid-cols-2">
+      <aside className={`hidden flex-col justify-between p-12 lg:flex ${theme.panel}`}>
+        <div className="h-9 w-40 animate-pulse rounded-lg bg-white/20" />
+        <div className="space-y-4">
+          <div className="h-10 w-3/4 animate-pulse rounded-lg bg-white/20" />
+          <div className="h-10 w-1/2 animate-pulse rounded-lg bg-white/20" />
+          <div className="space-y-3 pt-4">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="h-4 w-2/3 animate-pulse rounded bg-white/15" />
+            ))}
+          </div>
+        </div>
+        <div className="h-4 w-1/2 animate-pulse rounded bg-white/15" />
+      </aside>
+      <main className="flex flex-col justify-center px-4 pb-10 pt-20 sm:px-12 sm:py-16">
+        <div className="mx-auto w-full max-w-sm animate-pulse space-y-4">
+          <div className="h-8 w-48 rounded bg-surface-secondary" />
+          <div className="h-4 w-64 rounded bg-surface-secondary opacity-60" />
+          <div className="h-11 rounded-lg bg-surface-secondary" />
+          <div className="h-3 w-24 rounded bg-surface-secondary" />
+          <div className="h-11 rounded-lg bg-surface-secondary" />
+          <div className="h-11 rounded-lg bg-surface-secondary" />
+        </div>
+      </main>
+    </div>
+  )
 }

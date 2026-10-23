@@ -8,7 +8,6 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
-import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 
@@ -30,6 +29,8 @@ function LoginPage() {
   const { showToast } = useToast()
   const config = useStoreConfig()
   const { leaving, go } = useLeaveTo()
+  // Which button started the sign-in, so that one keeps its spinner until the next page opens.
+  const via = useRef<'google' | 'form' | null>(null)
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [identifier, setIdentifier] = useState('')
@@ -71,6 +72,7 @@ function LoginPage() {
       return
     }
     setError('')
+    via.current = 'google'
     setGoogleLoading(true)
     googleLoginWithAccessToken(accessToken)
       .then(async result => {
@@ -105,6 +107,7 @@ function LoginPage() {
       setError('Google sign-in is not configured')
       return
     }
+    via.current = 'google'
     setGoogleLoading(true)
     const result = await openGoogleOAuthPopup({ clientId, returnTo: '/login' })
     if (!result.accessToken) {
@@ -166,6 +169,7 @@ function LoginPage() {
       setError('Enter a valid 10-digit mobile number')
       return
     }
+    via.current = 'form'
     setIsLoading(true)
     setChannel(selectedChannel)
     try {
@@ -217,6 +221,7 @@ function LoginPage() {
     if (requiresPolicy && !policyAccepted) return
     submittedOtpRef.current = otpValue
     setError('')
+    via.current = 'form'
     setIsLoading(true)
     try {
       await login(email, otpValue, requiresPolicy ? policyAccepted : undefined)
@@ -259,6 +264,7 @@ function LoginPage() {
     setError('')
     setOtp('')
     submittedOtpRef.current = ''
+    via.current = 'form'
     setIsLoading(true)
     try {
       const response = await fetch('/api/auth/send-otp', {
@@ -343,19 +349,16 @@ function LoginPage() {
   ]
   const channelOptions = allChannelOptions.filter(o => o.enabled)
 
+  const googleBusy = googleLoading || (leaving && via.current === 'google')
+  const formBusy = isLoading || (leaving && via.current === 'form')
+
   return (
-    <AuthSplitShell
-      brandName={config.identity.name}
-      logoUrl={config.identity.logoUrl}
-      headline={`Welcome back to ${config.identity.name}`}
-      points={AUTH_POINTS.store}
-      footnote="Secure sign-in with a one-time code. No passwords to remember."
-      theme={AUTH_THEMES.store}
-      busy={leaving ? 'Signing you in…' : googleLoading ? 'Signing you in with Google…' : null}
-    >
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground">Welcome back</h1>
-            <p className="mt-2 text-sm text-foreground-secondary">Sign in to your {config.identity.name} account</p>
+    <div className="min-h-screen bg-surface flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full">
+        <div className="bg-surface-elevated rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-foreground">Welcome Back</h2>
+            <p className="mt-2 text-sm text-foreground-secondary">Login to your {config.identity.name} account</p>
           </div>
 
           {error && (
@@ -369,10 +372,10 @@ function LoginPage() {
               <button
                 type="button"
                 onClick={handleGoogleButtonClick}
-                disabled={googleLoading}
+                disabled={googleBusy}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary transition-colors text-sm font-medium text-foreground disabled:opacity-60 disabled:cursor-not-allowed mb-4"
               >
-                {googleLoading ? (
+                {googleBusy ? (
                   <div className="w-5 h-5 border-2 border-foreground-muted border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -394,7 +397,7 @@ function LoginPage() {
                     />
                   </svg>
                 )}
-                {googleLoading ? 'Signing in…' : 'Continue with Google'}
+                {googleBusy ? 'Signing in…' : 'Continue with Google'}
               </button>
               <div className="relative mb-6">
                 <div className="absolute inset-0 flex items-center">
@@ -479,10 +482,10 @@ function LoginPage() {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={formBusy}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                {isLoading ? (
+                {formBusy ? (
                   <>
                     <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
                     Sending OTP...
@@ -544,7 +547,7 @@ function LoginPage() {
                 <button
                   type="button"
                   onClick={handleResendOTP}
-                  disabled={isLoading || resendCooldown > 0}
+                  disabled={formBusy || resendCooldown > 0}
                   className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
@@ -594,10 +597,10 @@ function LoginPage() {
               )}
               <button
                 type="submit"
-                disabled={otp.length !== 6 || isLoading || (requiresPolicy && !policyAccepted)}
+                disabled={otp.length !== 6 || formBusy || (requiresPolicy && !policyAccepted)}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                {isLoading ? (
+                {formBusy ? (
                   <>
                     <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
                     Logging in...
@@ -618,6 +621,8 @@ function LoginPage() {
               Create one
             </Link>
           </div>
+        </div>
+      </div>
 
       {showPhoneModal && (
         <PhoneVerifyModal
@@ -633,6 +638,6 @@ function LoginPage() {
           }}
         />
       )}
-    </AuthSplitShell>
+    </div>
   )
 }
