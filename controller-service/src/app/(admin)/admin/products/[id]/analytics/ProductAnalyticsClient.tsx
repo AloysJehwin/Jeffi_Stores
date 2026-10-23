@@ -459,7 +459,7 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
 function ReferrerRow({ r }: { r: { referrer: string; sessions: number } }) {
   return (
     <div className="flex items-center justify-between text-sm gap-2">
-      <span className="text-foreground truncate flex-1 text-xs font-mono">{r.referrer}</span>
+      <span className="text-foreground truncate flex-1 min-w-0 text-xs font-mono">{r.referrer}</span>
       <span className="text-foreground-secondary tabular-nums text-xs shrink-0">{r.sessions.toLocaleString()}</span>
     </div>
   )

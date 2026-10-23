@@ -7,16 +7,8 @@ import { AlertTriangle, Star } from 'lucide-react'
 import { Kpi, KpiGrid, Section, Badge, Banner, Empty, api, count, pct, change } from '@/components/admin/channels/ui'
 import { TrendChart, type ChartPoint, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { ap } from '@/lib/shared/admin-path'
-import DatePicker from '@/components/ui/DatePicker'
-import {
-  PERIOD_PRESETS,
-  istToday,
-  matchPreset,
-  parsePeriod,
-  presetRange,
-  runningAverage,
-  type Period,
-} from '@/lib/reviews/overview-period'
+import { PeriodBar } from '@/components/admin/kit/period'
+import { istToday, parsePeriod, runningAverage, type Period } from '@/lib/reviews/overview-period'
 
 interface Stats {
   reviews: number
@@ -114,49 +106,6 @@ const BAR_TONE: Record<number, string> = {
   3: 'bg-amber-400',
   2: 'bg-orange-500',
   1: 'bg-red-500',
-}
-
-function PeriodPicker({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
-  const today = istToday()
-  const active = matchPreset(value, today)
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg">
-        {PERIOD_PRESETS.map(p => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => onChange(presetRange(p.id, today))}
-            className={`h-full px-2.5 text-xs font-medium rounded-md whitespace-nowrap ${
-              active === p.id ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span aria-label="From">
-          <DatePicker
-            aria-label="From"
-            value={value.from}
-            max={value.to}
-            onChange={v => v && onChange({ ...value, from: v })}
-          />
-        </span>
-        <span className="text-xs text-foreground-muted">to</span>
-        <span aria-label="To">
-          <DatePicker
-            aria-label="To"
-            value={value.to}
-            min={value.from}
-            max={today}
-            onChange={v => v && onChange({ ...value, to: v })}
-          />
-        </span>
-      </div>
-    </div>
-  )
 }
 
 function Distribution({ rows, total }: { rows: { rating: number; count: number }[]; total: number }) {
@@ -325,7 +274,7 @@ export default function ReviewsOverview() {
     return t.map((d, i) => ({ label: d.day, avg: run[i] ?? 0, daily: d.avgRating ?? 0 }))
   }, [data])
 
-  const header = <PeriodPicker value={period} onChange={setPeriod} />
+  const header = <PeriodBar value={period} onChange={setPeriod} />
 
   if (error)
     return (
@@ -444,7 +393,7 @@ export default function ReviewsOverview() {
         </p>
       </Section>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Section title="Reviews per day">
             <TrendChart points={trendPoints} series={TREND_SERIES} height={220} ariaLabel="Reviews per day" />
@@ -519,7 +468,7 @@ export default function ReviewsOverview() {
         )}
       </Section>
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         <Section title="Top rated products">
           <ProductList
             rows={data.products.top}

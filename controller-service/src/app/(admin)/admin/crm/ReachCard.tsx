@@ -39,7 +39,7 @@ export default function ReachCard({ reach }: { reach: Reach }) {
       </div>
 
       <p className="text-[11px] uppercase tracking-wide text-foreground-muted font-medium mb-2">Contactability</p>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         <CompactStat
           label="Has email"
           value={pctStr(emailPct, 0)}

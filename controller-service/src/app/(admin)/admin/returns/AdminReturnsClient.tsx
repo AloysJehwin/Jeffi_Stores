@@ -139,7 +139,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
           <div>
             <p className="text-foreground-secondary text-xs mb-0.5">Customer</p>
             <p className="font-medium text-foreground">{customerName(row)}</p>
-            <p className="text-foreground-muted text-xs">{row.user_email || row.customer_email || ''}</p>
+            <p className="text-foreground-muted text-xs break-words">{row.user_email || row.customer_email || ''}</p>
           </div>
           <div>
             <p className="text-foreground-secondary text-xs mb-0.5">Reason</p>
@@ -159,7 +159,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
           {row.return_tracking_number && (
             <div>
               <p className="text-foreground-secondary text-xs mb-0.5">Return tracking</p>
-              <p className="font-mono text-sm text-foreground">{row.return_tracking_number}</p>
+              <p className="font-mono text-sm text-foreground break-words">{row.return_tracking_number}</p>
             </div>
           )}
           {row.received_at && (
@@ -202,7 +202,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
         {row.description && (
           <div>
             <p className="text-xs text-foreground-secondary mb-1">Customer description</p>
-            <p className="text-sm text-foreground bg-surface-secondary rounded-lg border border-border-default px-3 py-2">
+            <p className="text-sm text-foreground bg-surface-secondary rounded-lg border border-border-default px-3 py-2 break-words">
               {row.description}
             </p>
           </div>
@@ -250,7 +250,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
 
                 {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {CONDITION_OPTIONS.map(opt => (
                     <button
                       key={opt.value}
@@ -348,13 +348,13 @@ export default function AdminReturnsClient() {
     <div className="space-y-4">
       {/* Tabs */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex h-control items-stretch gap-1 rounded-lg border border-border-default bg-surface-secondary p-0.5">
+        <div className="flex h-control max-w-full items-stretch gap-1 overflow-x-auto rounded-lg border border-border-default bg-surface-secondary p-0.5 sm:overflow-visible">
           {STATUS_TABS.map(tab => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`rounded-md px-3 text-sm font-medium transition-colors ${
+              className={`shrink-0 rounded-md px-3 text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? 'bg-surface-elevated text-foreground shadow-sm'
                   : 'text-foreground-secondary hover:text-foreground'

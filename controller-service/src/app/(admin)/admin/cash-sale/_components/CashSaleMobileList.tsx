@@ -170,7 +170,7 @@ export default function CashSaleMobileList({ sales, canWrite, cancellingId, paym
             {active.notes && (
               <div className="border-t border-border-default pt-3">
                 <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Notes</p>
-                <p className="text-foreground">{active.notes}</p>
+                <p className="text-foreground break-words">{active.notes}</p>
               </div>
             )}
           </div>

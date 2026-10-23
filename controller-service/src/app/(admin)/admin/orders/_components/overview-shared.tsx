@@ -90,14 +90,14 @@ export function OverviewPanel<T extends StripData>({
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 animate-pulse">
+        <div className="grid grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-5 gap-3 animate-pulse">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-20 rounded-xl bg-surface-elevated border border-border-default" />
           ))}
         </div>
       ) : data ? (
         <>
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid gap-3 grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-5">
             {data.kpis.map(k => (
               <Kpi
                 key={k.key}
@@ -109,7 +109,7 @@ export function OverviewPanel<T extends StripData>({
               />
             ))}
           </div>
-          <div className={`grid gap-3 ${extra ? 'lg:grid-cols-2' : ''}`}>
+          <div className={`grid grid-cols-1 gap-3 ${extra ? 'lg:grid-cols-2' : ''}`}>
             <AttentionList items={withAp(data.attention)} />
             {extra?.(data)}
           </div>

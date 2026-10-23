@@ -70,7 +70,7 @@ export default function CustomersOverview() {
             />
             <Kpi label="Revenue" value={money(c.revenue)} delta={delta(c.revenue, p.revenue)} />
           </KpiGrid>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
             <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">

@@ -226,7 +226,7 @@ export default function CustomerNotes({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   {n.title && <p className="text-sm font-semibold text-foreground">{n.title}</p>}
-                  {n.body && <p className="text-sm text-foreground-secondary whitespace-pre-wrap">{n.body}</p>}
+                  {n.body && <p className="text-sm text-foreground-secondary whitespace-pre-wrap break-words">{n.body}</p>}
                   <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                     {n.tags.map(t => (
                       <span

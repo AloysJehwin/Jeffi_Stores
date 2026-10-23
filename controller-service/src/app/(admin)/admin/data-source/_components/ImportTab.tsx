@@ -73,7 +73,7 @@ export default function ImportTab({ refreshKey, onQueued }: { refreshKey: number
   const disabled = !canWrite || busy
 
   return (
-    <div className="grid gap-4 md:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
       <div className="md:col-span-3 space-y-4">
         <Section title="Upload a file">
           <div

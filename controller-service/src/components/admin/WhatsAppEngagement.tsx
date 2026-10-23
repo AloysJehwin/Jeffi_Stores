@@ -201,7 +201,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
         thread.map(msg => (
           <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+              className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
                 msg.direction === 'outbound'
                   ? 'bg-accent-500 text-white rounded-br-sm'
                   : 'bg-surface-elevated border border-border-default text-foreground rounded-bl-sm'
@@ -290,7 +290,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
                 }
               }}
               placeholder="Free text message…"
-              className="flex-1 px-3.5 h-control rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+              className="flex-1 min-w-0 px-3.5 h-control rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
             />
             <button
               onClick={handleSendFreeText}
@@ -335,9 +335,9 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
     <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
       <button
         onClick={() => setIsOpen(v => !v)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-secondary transition-colors"
+        className="w-full flex items-center justify-between gap-2 px-5 py-4 hover:bg-surface-secondary transition-colors"
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
           <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
           <MessageCircle className="w-4 h-4 text-foreground-secondary" />
           <span className="font-semibold text-foreground">WhatsApp Engagement</span>

@@ -60,7 +60,7 @@ function PeriodPicker({
 }) {
   const active = matchPreset(value, today)
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+    <div className="flex max-w-[calc(100vw-2rem)] flex-col gap-2 sm:max-w-none sm:flex-row sm:items-center sm:flex-wrap">
       <div className="flex h-control w-fit max-w-full overflow-x-auto gap-1 rounded-lg border border-border-default bg-surface-elevated p-0.5">
         {PERIOD_PRESETS.map(p => (
           <button
@@ -68,7 +68,7 @@ function PeriodPicker({
             type="button"
             disabled={disabled}
             onClick={() => onChange(presetPeriod(p.key, today))}
-            className={`h-full px-2.5 text-xs font-medium rounded-md disabled:opacity-50 ${
+            className={`h-full shrink-0 px-2.5 text-xs font-medium rounded-md disabled:opacity-50 ${
               active === p.key ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'
             }`}
           >

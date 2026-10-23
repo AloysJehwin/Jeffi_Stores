@@ -152,7 +152,7 @@ export default function ProductAdjustments({ orderId, items }: { orderId: string
                     <p className={`text-sm font-medium truncate ${l.action === 'remove' ? 'line-through text-foreground-muted' : 'text-foreground'}`}>{it.productName}</p>
                     <p className="text-xs text-foreground-muted">{it.quantity}{it.unit ? ` ${it.unit}` : ''} × {inr(it.unitPrice)} = {inr(it.totalPrice)}</p>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1">
                     {(['keep', 'switch', 'quantity', 'remove'] as Action[])
                       .filter(a => !it.isDigital || a === 'keep' || a === 'remove')
                       .map(a => (

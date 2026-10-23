@@ -366,7 +366,7 @@ function Tile({ label, value, sub, alert }: { label: string; value: string; sub?
 function AccessNote({ auth, canWrite }: { auth: ConversionAuth; canWrite: boolean }) {
   if (auth.dataManager === 'unknown' && auth.connectedVia === 'manual') {
     return (
-      <p className="text-xs text-foreground-secondary">
+      <p className="text-xs text-foreground-secondary break-words">
         Uploads use the refresh token entered by hand, which needs the Data Manager permission (scope
         https://www.googleapis.com/auth/datamanager). If uploads report a permission error, reconnect with Google sign-in.
       </p>
@@ -430,7 +430,7 @@ function ApiChoice({
         <p className="text-xs text-foreground-muted">Uploads through the {label(api)}.</p>
       )}
       {api === 'ads_api' && (
-        <p className="text-xs text-amber-700 dark:text-amber-400">
+        <p className="text-xs text-amber-700 dark:text-amber-400 break-words">
           Since 15 June 2026 Google only accepts Google Ads API click-conversion uploads from developer tokens that uploaded
           offline conversions before then; others are refused (CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE). Keep this only if the
           platform&apos;s token is one of them.

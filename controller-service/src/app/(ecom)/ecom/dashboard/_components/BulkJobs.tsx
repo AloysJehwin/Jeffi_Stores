@@ -136,7 +136,7 @@ function JobDetail({ base, job, columns, row, onBack, onAct }: {
         <button type="button" onClick={onBack} className={btn}><ArrowLeft className="w-3.5 h-3.5" /> All jobs</button>
         <Pill s={job.status} />
         {LIVE.has(job.status) && <Loader2 className="w-4 h-4 animate-spin text-foreground-muted" />}
-        <span className="text-sm text-foreground-secondary">{job.reference ?? job.id}</span>
+        <span className="min-w-0 text-sm text-foreground-secondary [overflow-wrap:anywhere]">{job.reference ?? job.id}</span>
         <div className="ml-auto flex flex-wrap gap-2">
           {job.zip_url && job.succeeded > 0 && <a href={`${base}/${job.id}/zip`} className={btn}><Download className="w-3.5 h-3.5" /> Download ZIP</a>}
           {['partial', 'failed', 'cancelled'].includes(job.status) && job.failed + job.skipped > 0 && <button type="button" onClick={() => onAct(job, 'retry')} className={btn}><RotateCcw className="w-3.5 h-3.5" /> Retry {job.failed + job.skipped}</button>}
@@ -146,7 +146,7 @@ function JobDetail({ base, job, columns, row, onBack, onAct }: {
       <Card>
         <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
           {[['Total', job.total], ['Done', job.succeeded], ['Failed', job.failed], ['Skipped', job.skipped], ['Spent', fmt(job.spent_inr)]].map(([k, v]) => (
-            <div key={k as string}><div className="text-xs text-foreground-muted">{k}</div><div className="text-lg font-semibold tabular-nums">{v}</div></div>
+            <div key={k as string} className="last:col-span-2 sm:last:col-span-1"><div className="text-xs text-foreground-muted">{k}</div><div className="text-lg font-semibold tabular-nums">{v}</div></div>
           ))}
         </div>
         <Progress j={job} />

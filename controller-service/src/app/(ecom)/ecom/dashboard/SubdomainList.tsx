@@ -96,7 +96,7 @@ export default function SubdomainList({
             <span
               className={`w-2 h-2 rounded-full flex-shrink-0 ${s.available ? 'ecom-accent-bg' : 'bg-foreground-muted/50'}`}
             />
-            <span className="text-foreground-secondary w-28 flex-shrink-0 text-xs font-medium">{s.label}</span>
+            <span className="text-foreground-secondary w-20 sm:w-28 flex-shrink-0 text-xs font-medium">{s.label}</span>
             <span
               className={`font-mono text-xs truncate ${s.available ? 'text-foreground' : 'text-foreground-secondary'}`}
             >

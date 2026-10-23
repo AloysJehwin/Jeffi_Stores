@@ -121,15 +121,15 @@ export default function CreateAdminForm({
         <div className="space-y-3">
           <div>
             <p className="text-sm text-green-700 dark:text-green-400">Admin</p>
-            <p className="font-mono font-bold text-green-900 dark:text-green-200">
+            <p className="font-mono font-bold text-green-900 dark:text-green-200 [overflow-wrap:anywhere]">
               {certInfo.fullName || certInfo.email}
             </p>
-            <p className="text-xs text-green-700 dark:text-green-400">{certInfo.email}</p>
+            <p className="text-xs text-green-700 dark:text-green-400 [overflow-wrap:anywhere]">{certInfo.email}</p>
           </div>
           {certInfo.p12Password && (
             <div>
               <p className="text-sm text-green-700 dark:text-green-400">Certificate Password (one-time view)</p>
-              <p className="font-mono font-bold text-green-900 dark:text-green-200 bg-green-100 dark:bg-green-800/50 px-3 py-2 rounded select-all">
+              <p className="font-mono font-bold text-green-900 dark:text-green-200 bg-green-100 dark:bg-green-800/50 px-3 py-2 rounded select-all break-all">
                 {certInfo.p12Password}
               </p>
             </div>
@@ -137,7 +137,7 @@ export default function CreateAdminForm({
           {certInfo.serialNumber && (
             <div>
               <p className="text-sm text-green-700 dark:text-green-400">Certificate Serial</p>
-              <p className="font-mono text-xs text-green-800 dark:text-green-300">{certInfo.serialNumber}</p>
+              <p className="font-mono text-xs text-green-800 dark:text-green-300 break-all">{certInfo.serialNumber}</p>
             </div>
           )}
           {certInfo.expiresAt && (

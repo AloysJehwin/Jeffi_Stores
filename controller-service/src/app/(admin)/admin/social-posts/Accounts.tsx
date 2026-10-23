@@ -73,14 +73,14 @@ export default function Accounts({
                 {n.status !== 'not_connected' && n.via === 'manual' && (
                   <Badge>{n.ownApp ? 'manual, own app' : 'manual'}</Badge>
                 )}
-                {n.target && <span className="text-sm text-foreground-secondary">{n.target}</span>}
+                {n.target && <span className="min-w-0 text-sm text-foreground-secondary [overflow-wrap:anywhere]">{n.target}</span>}
                 {n.tokenExpiry && <span className="text-xs text-foreground-muted">expires {when(n.tokenExpiry)}</span>}
                 <span className="text-xs text-foreground-muted">
                   {[n.features.insights && 'insights', n.features.inbox && 'inbox', n.features.reply && 'replies']
                     .filter(Boolean)
                     .join(', ')}
                 </span>
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex flex-wrap items-center gap-2">
                   {meta ? (
                     <span className="text-xs text-foreground-muted">
                       Connect or change with the Facebook and Instagram button at the top of the page.
@@ -360,7 +360,7 @@ function TargetPicker({
       ) : (
         <div className="flex gap-2 flex-wrap">
           <Select
-            className="w-full max-w-sm"
+            className="w-full min-w-0 max-w-sm"
             aria-label="Target"
             value={id}
             onChange={setId}

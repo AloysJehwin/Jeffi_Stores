@@ -62,10 +62,10 @@ export default function ExtensionTokenCard() {
               readOnly
               value={token}
               onFocus={e => e.currentTarget.select()}
-              className="flex-1 bg-transparent outline-none"
+              className="flex-1 min-w-0 bg-transparent outline-none"
             />
           ) : (
-            <span className="flex-1 truncate">eyJ••••••••••••••••••••••••••••••</span>
+            <span className="flex-1 min-w-0 truncate">eyJ••••••••••••••••••••••••••••••</span>
           )}
         </div>
         {error && <p className="text-sm text-red-500">{error}</p>}

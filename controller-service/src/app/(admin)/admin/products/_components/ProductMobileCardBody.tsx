@@ -51,8 +51,8 @@ export default function ProductMobileCardBody({ product }: Props) {
           )}
         </div>
       </div>
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
           {product.has_variants ? (
             <div className="flex items-baseline gap-1.5">
               <span className="text-sm font-semibold text-foreground">

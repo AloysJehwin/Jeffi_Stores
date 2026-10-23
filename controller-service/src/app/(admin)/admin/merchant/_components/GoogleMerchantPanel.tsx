@@ -198,7 +198,7 @@ export default function GoogleMerchantPanel() {
             <span className="text-xs text-foreground-muted">Not refreshed yet</span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <RequireWrite scope="merchant_sync:write">
             <button
               onClick={syncNow}
@@ -247,7 +247,7 @@ export default function GoogleMerchantPanel() {
               Search
             </button>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {['all', 'approved', 'pending', 'disapproved'].map(st => (
               <button
                 key={st}

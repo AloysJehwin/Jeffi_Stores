@@ -233,7 +233,7 @@ export default function OfferProductPicker({
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <BulkAssign
               label="Assign by category"
               placeholder="Choose a category"

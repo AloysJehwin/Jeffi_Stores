@@ -159,7 +159,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
 
         <div className="mt-4">
           <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-2">Scenario default parameters</p>
-          <div className="p-3 bg-surface-secondary rounded-lg font-mono text-xs space-y-0.5">
+          <div className="p-3 bg-surface-secondary rounded-lg font-mono text-xs space-y-0.5 break-words">
             {Object.entries(scenario.default_parameters).map(([k, v]) => {
               const def = scenario.param_schema[k]
               return (
@@ -333,7 +333,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                       })}
                     </div>
 
-                    <div className="mt-3 flex items-center gap-2">
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <RequireWrite scope="campaigns:write">
                         <button
                           type="button"

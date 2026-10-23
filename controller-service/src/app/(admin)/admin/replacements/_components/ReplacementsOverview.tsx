@@ -21,7 +21,7 @@ export default function ReplacementsOverview() {
         <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
       ) : data && c && p ? (
         <>
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid gap-3 grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-5">
             <Kpi label="Requests" value={count(c.requests)} delta={delta(c.requests, p.requests)} invert />
             <Kpi
               label="Replacement rate"
@@ -38,7 +38,7 @@ export default function ReplacementsOverview() {
             <Kpi label="Closed" value={count(c.completed)} delta={delta(c.completed, p.completed)} />
             <Kpi label="Time to close" value={fmtDays(c.closeDays)} delta={delta(c.closeDays, p.closeDays)} invert />
           </div>
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <AttentionList items={withAp(data.attention)} />
             <Section title="By reason">
               <BreakdownBars rows={data.byReason.map(r => ({ label: r.label, value: r.count }))} />

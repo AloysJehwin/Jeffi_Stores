@@ -83,7 +83,7 @@ export default function AiPricingClient() {
       />
 
       {adding && canWrite && (
-        <div className="bg-surface-elevated border border-border-default rounded-xl p-4 grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-end">
+        <div className="bg-surface-elevated border border-border-default rounded-xl p-4 grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-end">
           <Field label="Capability">
             <Select
               aria-label="Capability"

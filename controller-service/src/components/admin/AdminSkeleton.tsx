@@ -55,9 +55,9 @@ export default function AdminSkeleton({ variant = 'list', rows = 6, showStats = 
           <div className="bg-zinc-800 dark:bg-zinc-900 rounded-2xl p-6 animate-pulse">
             <div className="flex items-start gap-4">
               <div className="w-14 h-14 rounded-xl bg-zinc-600/40 shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="h-6 w-48 bg-zinc-600/40 rounded" />
-                <div className="h-4 w-64 bg-zinc-600/30 rounded" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="h-6 w-48 max-w-full bg-zinc-600/40 rounded" />
+                <div className="h-4 w-64 max-w-full bg-zinc-600/30 rounded" />
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">

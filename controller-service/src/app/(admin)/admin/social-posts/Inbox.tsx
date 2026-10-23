@@ -107,7 +107,7 @@ export default function Inbox({ reloadKey }: { reloadKey: number }) {
                 {it.kind === 'review' && it.rating != null && <Stars n={it.rating} />}
                 <span className="text-xs text-foreground-muted ml-auto">{when(it.created_at)}</span>
               </div>
-              {it.text && <p className="text-sm whitespace-pre-line">{it.text}</p>}
+              {it.text && <p className="text-sm whitespace-pre-line break-words">{it.text}</p>}
               {it.post_caption && (
                 <p className="text-xs text-foreground-muted truncate">
                   On: {it.post_caption}
@@ -124,7 +124,7 @@ export default function Inbox({ reloadKey }: { reloadKey: number }) {
                 </p>
               )}
               {it.replied_at ? (
-                <p className="text-xs text-green-700 dark:text-green-400">
+                <p className="text-xs text-green-700 dark:text-green-400 break-words">
                   Replied {when(it.replied_at)}
                   {it.reply_by ? ` by ${it.reply_by}` : ''}
                   {it.reply_text ? `: ${it.reply_text}` : ''}

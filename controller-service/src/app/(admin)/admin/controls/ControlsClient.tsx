@@ -826,7 +826,7 @@ export default function ControlsClient({
               {products.map(p => (
                 <label
                   key={p.id}
-                  className="flex items-start gap-3 px-4 py-2.5 cursor-pointer hover:bg-surface transition-colors"
+                  className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-2.5 cursor-pointer hover:bg-surface transition-colors"
                 >
                   <input
                     type="checkbox"
@@ -838,7 +838,7 @@ export default function ControlsClient({
                     <span className="text-sm text-foreground">{p.name}</span>
                     {p.grade && <span className="ml-2 text-xs text-foreground-muted">Grade: {p.grade}</span>}
                   </div>
-                  <div className="text-right shrink-0 space-y-0.5">
+                  <div className="w-full sm:w-auto text-right shrink-0 space-y-0.5">
                     <p className="text-xs text-foreground-muted">
                       {p.category_name ?? '—'} {p.brand_name ? `· ${p.brand_name}` : ''}
                     </p>
@@ -961,7 +961,7 @@ export default function ControlsClient({
                 return (
                   <div className="bg-surface border border-border-default rounded-lg p-3 space-y-3">
                     {/* Row 1: Dimension / Unit / Factor / Label */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                       <div>
                         <label className="block text-[10px] text-foreground-muted mb-0.5">Dimension</label>
                         <AdminSelect
@@ -1100,7 +1100,7 @@ export default function ControlsClient({
                     {suIsCustom && suDimension !== 'count' && (
                       <div className="border border-dashed border-border-secondary rounded p-2 space-y-1">
                         <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Measurements</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
                           <div>
                             <label className="block text-[10px] text-foreground-muted mb-0.5">Unit</label>
                             <AdminSelect
@@ -1165,7 +1165,7 @@ export default function ControlsClient({
                     )}
 
                     {/* Inherit toggle */}
-                    <div className="flex items-center gap-3 pt-1 border-t border-border-default">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 border-t border-border-default">
                       <label className="flex items-center gap-2 cursor-pointer select-none">
                         <input
                           type="checkbox"
@@ -1540,7 +1540,7 @@ export default function ControlsClient({
                                 <p className="font-medium text-foreground">{row.name || row.id}</p>
                                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-foreground-muted">
                                   {Object.entries(row.before).map(([k, v]) => (
-                                    <span key={k}>
+                                    <span key={k} className="[overflow-wrap:anywhere]">
                                       <span className="text-foreground-secondary">{k}:</span>{' '}
                                       {v == null ? '—' : String(v)}
                                     </span>

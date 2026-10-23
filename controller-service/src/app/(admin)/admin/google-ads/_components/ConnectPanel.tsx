@@ -30,7 +30,7 @@ export function NotConfigured({ status }: { status: AdsConnectionStatus }) {
         <AlertCircle className="w-5 h-5" />
         <h2 className="font-semibold">Google Ads is not configured on this platform</h2>
       </div>
-      <ul className="text-sm text-foreground-secondary space-y-1">
+      <ul className="text-sm text-foreground-secondary space-y-1 break-words">
         <li>
           Developer token (GOOGLE_ADS_DEVELOPER_TOKEN): {status.env.developerToken ? 'set' : <b>missing</b>}
         </li>
@@ -173,7 +173,7 @@ export default function ConnectPanel({
               )}
               <ul className="divide-y divide-border-default rounded-lg border border-border-default">
                 {(accounts ?? []).map(a => (
-                  <li key={`${a.loginCustomerId ?? ''}${a.customerId}`} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <li key={`${a.loginCustomerId ?? ''}${a.customerId}`} className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 px-3 py-2">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">
                         {a.name || 'Unnamed account'} <span className="text-foreground-muted">{formatCid(a.customerId)}</span>
@@ -208,7 +208,7 @@ export default function ConnectPanel({
                 </details>
               )}
               {canWrite && (
-                <button type="button" disabled={busy} className={btnGhost} onClick={useAnotherAccount}>
+                <button type="button" disabled={busy} className={`${btnGhost} !h-auto py-1.5 !whitespace-normal sm:!h-control sm:py-0 sm:!whitespace-nowrap`} onClick={useAnotherAccount}>
                   <Link2 className="w-4 h-4" /> Sign in with a different Google account
                 </button>
               )}
@@ -434,7 +434,7 @@ function CreateAccount({ status, onDone }: { status: AdsConnectionStatus; onDone
           <input className={input} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@gmail.com" />
         </label>
       </div>
-      <button type="submit" className={btnPrimary} disabled={busy || !name.trim()}>
+      <button type="submit" className={`${btnPrimary} !h-auto py-1.5 !whitespace-normal sm:!h-control sm:py-0 sm:!whitespace-nowrap`} disabled={busy || !name.trim()}>
         {busy && <Loader2 className="w-4 h-4 animate-spin" />} Create a Google Ads account for this store
       </button>
       {error && (

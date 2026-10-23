@@ -288,7 +288,7 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
                     {allocated} / {item.required_qty}
                   </div>
                 </div>
-                <div className="border border-border-default rounded-lg overflow-hidden">
+                <div className="border border-border-default rounded-lg overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-surface border-b border-border-default">
                       <tr>

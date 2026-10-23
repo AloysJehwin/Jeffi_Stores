@@ -656,8 +656,8 @@ export default function ShelvingClient() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border-default bg-surface shrink-0">
-                  <div>
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-3 border-b border-border-default bg-surface shrink-0">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-bold text-accent-500 text-base">
                         {activeLocation.display_code}
@@ -672,7 +672,7 @@ export default function ShelvingClient() {
                       <p className="text-xs text-foreground-muted mt-0.5">{activeLocation.notes}</p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {/* Location actions: label, edit, delete */}
                     {selectedLocation && !activeLocation.is_open_shelf && canWrite && (
                       <>
@@ -1122,7 +1122,7 @@ function LabelsTab({
       </div>
 
       <div className="flex flex-col flex-1 bg-surface-secondary lg:overflow-hidden">
-        <div className="px-5 py-3 border-b border-border-default bg-surface shrink-0 flex items-center justify-between gap-4">
+        <div className="px-5 py-3 border-b border-border-default bg-surface shrink-0 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Selected</span>
             {labelSelections.length > 0 && (
@@ -1131,7 +1131,7 @@ function LabelsTab({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">Copies each</label>
               <input

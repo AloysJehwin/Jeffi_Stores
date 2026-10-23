@@ -285,7 +285,7 @@ export default function GSTPage() {
       <PageHeader title="GST Compliance" description="GSTR-1 · GSTR-3B · e-Invoice status · ITC Ledger" />
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="inline-flex h-control items-center rounded-lg border border-border-default bg-surface-elevated p-0.5">
+        <div className="inline-flex h-control max-w-full items-center overflow-x-auto rounded-lg border border-border-default bg-surface-elevated p-0.5">
           {[
             { key: 'this_month', label: 'This Month' },
             { key: 'last_month', label: 'Last Month' },
@@ -296,7 +296,7 @@ export default function GSTPage() {
               key={p.key}
               type="button"
               onClick={() => applyPreset(p.key)}
-              className={`h-full rounded-md px-3 text-sm font-medium transition-colors ${preset === p.key ? 'bg-accent-500 text-white' : 'text-foreground-secondary hover:text-foreground'}`}
+              className={`h-full shrink-0 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors ${preset === p.key ? 'bg-accent-500 text-white' : 'text-foreground-secondary hover:text-foreground'}`}
             >
               {p.label}
             </button>
@@ -424,7 +424,7 @@ export default function GSTPage() {
             mobileCard={r => (
               <div className="space-y-1 rounded-xl border border-border-default bg-surface-elevated px-4 py-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="font-medium text-foreground">{r.invoice_number}</span>
+                  <span className="min-w-0 break-words font-medium text-foreground">{r.invoice_number}</span>
                   <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-foreground">{money(r.total_amount)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-foreground-secondary">

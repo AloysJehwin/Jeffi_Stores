@@ -342,9 +342,9 @@ export default function CategoryForm({
               <div className="w-14 h-14 rounded-lg bg-accent-500/10 flex items-center justify-center border-2 border-accent-500/40 shrink-0">
                 <IconPreview name={selectedIcon} className="w-7 h-7 text-accent-500" />
               </div>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 min-w-0">
                 <p className="text-sm font-semibold text-foreground">{selectedIcon}</p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <RequireAi scope="categories:write">
                     <button
                       type="button"

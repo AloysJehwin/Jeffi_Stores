@@ -37,14 +37,14 @@ export function PageHeader({ title, description, back, badges, actions, meta, me
           {media}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+              <h1 className="min-w-0 break-words text-2xl font-bold text-foreground">{title}</h1>
               {badges}
             </div>
             {description && <p className="mt-0.5 text-sm text-foreground-muted">{description}</p>}
             {meta && <div className="mt-1 text-xs text-foreground-muted">{meta}</div>}
           </div>
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+        {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </header>
   )
@@ -90,7 +90,7 @@ export function EntityPage({ header, tabs, notices, kpis, attention, main, aside
 /** A card with an uppercase title; the server-safe twin of Section with an optional hint. */
 export function Card({ title, hint, action, children, flush }: { title?: ReactNode; hint?: ReactNode; action?: ReactNode; children: ReactNode; flush?: boolean }) {
   return (
-    <section className="rounded-xl border border-border-default bg-surface-elevated">
+    <section className="min-w-0 rounded-xl border border-border-default bg-surface-elevated">
       {(title || action) && (
         <div className={`flex flex-wrap items-center justify-between gap-3 ${flush ? 'px-5 pt-4 pb-3' : 'px-5 pt-5 pb-3'}`}>
           <div className="min-w-0">
@@ -117,7 +117,7 @@ const isEmpty = (v: ReactNode) => v == null || v === '' || v === false
 /** One label/value pair; empty values render as '-'. `copy` adds a copy button for that text. */
 export function Field({ label, value, hint, copy, mono, span }: { label: ReactNode; value: ReactNode; hint?: ReactNode; copy?: string; mono?: boolean; span?: 1 | 2 | 3 }) {
   return (
-    <div className={span === 3 ? 'sm:col-span-2 lg:col-span-3' : span === 2 ? 'sm:col-span-2' : ''}>
+    <div className={`min-w-0 ${span === 3 ? 'sm:col-span-2 lg:col-span-3' : span === 2 ? 'sm:col-span-2' : ''}`}>
       <dt className="text-xs text-foreground-muted">{label}</dt>
       <dd className={`mt-0.5 flex min-w-0 items-center gap-1 text-sm text-foreground break-words ${mono ? 'font-mono text-xs' : ''}`}>
         <span className="min-w-0">{isEmpty(value) ? '-' : value}</span>

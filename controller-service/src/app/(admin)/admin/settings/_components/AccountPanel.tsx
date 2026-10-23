@@ -48,7 +48,7 @@ export default async function AccountPanel() {
               <h2 className="text-sm font-semibold text-foreground">Account</h2>
             </div>
             {adminInfo && (
-              <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+              <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                 <div>
                   <p className="text-foreground-muted text-xs mb-0.5">Name</p>
                   <p className="font-medium text-foreground">
@@ -59,7 +59,7 @@ export default async function AccountPanel() {
                 </div>
                 <div>
                   <p className="text-foreground-muted text-xs mb-0.5">Email</p>
-                  <p className="font-medium text-foreground">{adminInfo.email}</p>
+                  <p className="font-medium text-foreground break-words">{adminInfo.email}</p>
                 </div>
                 <div>
                   <p className="text-foreground-muted text-xs mb-0.5">Role</p>
@@ -79,7 +79,7 @@ export default async function AccountPanel() {
                       : 'Never'}
                   </p>
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <p className="text-foreground-muted text-xs mb-1.5">Scopes</p>
                   <div className="flex flex-wrap gap-1.5">
                     {isSuperAdmin ? (

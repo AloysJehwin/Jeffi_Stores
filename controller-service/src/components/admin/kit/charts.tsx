@@ -23,8 +23,8 @@ function bucketLabel(iso: string, g: Granularity, full = false): string {
 
 export function ChartCard({ title, hint, children, action }: { title: string; hint?: string; children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
-      <div className="flex items-baseline justify-between gap-2 mb-3">
+    <div className="min-w-0 bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <span className="flex items-center gap-2">
           {hint && <span className="text-xs text-foreground-muted">{hint}</span>}
@@ -701,7 +701,7 @@ function SeriesChip({
       type="button"
       onClick={onClick}
       aria-pressed={activeState}
-      className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
+      className={`inline-flex shrink-0 items-center px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
         activeState ? '' : 'border-transparent text-foreground-muted opacity-55 hover:opacity-100'
       }`}
       style={activeState ? { background: bg, borderColor: color, color } : undefined}
@@ -910,9 +910,9 @@ export function FunnelBar({ counts, hrefFor }: { counts: Record<string, number>;
           )
         })}
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
         {FUNNEL_STAGES.map(st => (
-          <Link key={st.key} href={hrefFor(st.key)} className="group rounded-lg px-2 py-1.5 hover:bg-surface-secondary transition-colors">
+          <Link key={st.key} href={hrefFor(st.key)} className="group min-w-0 rounded-lg px-2 py-1.5 hover:bg-surface-secondary transition-colors">
             <div className="flex items-center gap-1.5">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${st.dot}`} />
               <span className="text-xs text-foreground-muted truncate group-hover:text-foreground transition-colors">{st.label}</span>

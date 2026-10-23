@@ -231,7 +231,7 @@ export default function BaseUnitForm({
         {baseUnit && !inherited ? 'Edit unit' : 'Set unit'}
       </p>
 
-      <div className="grid grid-cols-4 gap-x-2 items-end">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-2 items-end">
         <div>
           <label className="block text-[10px] text-foreground-muted mb-0.5">Dimension</label>
           <AdminSelect
@@ -313,7 +313,7 @@ export default function BaseUnitForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-x-2 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-2 gap-y-2 items-end">
         <div>
           <label className="block text-[10px] text-foreground-muted mb-0.5">Min qty *</label>
           <input
@@ -364,7 +364,7 @@ export default function BaseUnitForm({
       {isCustomUnit && draftDimension !== 'count' && (
         <div className="border border-dashed border-border-secondary rounded p-2 space-y-1">
           <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Measurements</p>
-          <div className="grid grid-cols-4 gap-2 items-end">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
             <div>
               <label className="block text-[10px] text-foreground-muted mb-0.5">Unit</label>
               <AdminSelect

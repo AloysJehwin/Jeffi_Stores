@@ -270,7 +270,7 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
           {result && !result.ok && (result.problems?.length ?? 0) > 1 && (
             <div className="rounded-lg border border-red-500/40 bg-red-500/5 p-3 text-sm" role="status">
               <p className="font-medium text-red-600 dark:text-red-400 mb-1">Google also reported:</p>
-              <ul className="list-disc pl-5 space-y-0.5 text-xs">
+              <ul className="list-disc pl-5 space-y-0.5 text-xs break-words">
                 {result.problems!.slice(1, 10).map((p, i) => (
                   <li key={i}>{p.where ? `${p.where}: ${p.message}` : p.message}</li>
                 ))}

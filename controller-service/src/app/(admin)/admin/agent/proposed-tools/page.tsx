@@ -121,7 +121,7 @@ export default function ProposedToolsPage() {
                   ) : (
                     <Mail className="w-4 h-4 text-amber-500" />
                   )}
-                  <p className="text-sm font-mono font-semibold text-foreground">{item.name}</p>
+                  <p className="min-w-0 text-sm font-mono font-semibold text-foreground [overflow-wrap:anywhere]">{item.name}</p>
                 </div>
                 <p className="text-sm text-foreground">{item.description}</p>
                 <p className="text-[10px] text-foreground-muted mt-1">
@@ -177,7 +177,7 @@ export default function ProposedToolsPage() {
                     <strong>Recipient arg:</strong>{' '}
                     <code className="font-mono">{item.email_template.recipientArg}</code>
                   </p>
-                  <pre className="font-mono whitespace-pre-wrap text-[11px] mt-2">{item.email_template.body}</pre>
+                  <pre className="font-mono whitespace-pre-wrap [overflow-wrap:anywhere] text-[11px] mt-2">{item.email_template.body}</pre>
                 </div>
               </details>
             )}

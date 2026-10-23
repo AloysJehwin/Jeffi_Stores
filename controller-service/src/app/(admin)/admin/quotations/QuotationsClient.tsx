@@ -1212,21 +1212,21 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                         }
                         return (
                           <div key={item.order_item_id}>
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <p className="font-semibold text-foreground text-sm">
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-foreground text-sm break-words">
                                   {item.product_name}
                                   {item.variant_name ? ` / ${item.variant_name}` : ''}
                                 </p>
                                 <p className="text-xs text-foreground-muted">Required: {item.required_qty} units</p>
                               </div>
                               <div
-                                className={`text-sm font-semibold px-2 py-0.5 rounded ${isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : isFull ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
+                                className={`shrink-0 text-sm font-semibold px-2 py-0.5 rounded ${isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : isFull ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
                               >
                                 {allocated} / {item.required_qty}
                               </div>
                             </div>
-                            <div className="border border-border-default rounded-lg overflow-hidden">
+                            <div className="border border-border-default rounded-lg overflow-hidden overflow-x-auto">
                               <table className="w-full text-sm">
                                 <thead className="bg-surface border-b border-border-default">
                                   <tr>
@@ -1743,14 +1743,14 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 onChange={e => setCCity(e.target.value)}
                 placeholder="City"
                 disabled={isFinal}
-                className={inputCls}
+                className={inputCls + ' min-w-0'}
               />
               <input
                 value={cState}
                 onChange={e => setCState(e.target.value)}
                 placeholder="State"
                 disabled={isFinal}
-                className={inputCls}
+                className={inputCls + ' min-w-0'}
               />
             </div>
             <div className="flex gap-2">
@@ -1863,14 +1863,14 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                   onChange={e => setBCity(e.target.value)}
                   placeholder="City"
                   disabled={isFinal}
-                  className={inputCls}
+                  className={inputCls + ' min-w-0'}
                 />
                 <input
                   value={bState}
                   onChange={e => setBState(e.target.value)}
                   placeholder="State"
                   disabled={isFinal}
-                  className={inputCls}
+                  className={inputCls + ' min-w-0'}
                 />
               </div>
               <div className="flex gap-2">
@@ -2121,21 +2121,21 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                       }
                       return (
                         <div key={item.order_item_id}>
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <p className="font-semibold text-foreground text-sm">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-foreground text-sm break-words">
                                 {item.product_name}
                                 {item.variant_name ? ` / ${item.variant_name}` : ''}
                               </p>
                               <p className="text-xs text-foreground-muted">Required: {item.required_qty} units</p>
                             </div>
                             <div
-                              className={`text-sm font-semibold px-2 py-0.5 rounded ${isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : isFull ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
+                              className={`shrink-0 text-sm font-semibold px-2 py-0.5 rounded ${isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : isFull ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
                             >
                               {allocated} / {item.required_qty}
                             </div>
                           </div>
-                          <div className="border border-border-default rounded-lg overflow-hidden">
+                          <div className="border border-border-default rounded-lg overflow-hidden overflow-x-auto">
                             <table className="w-full text-sm">
                               <thead className="bg-surface border-b border-border-default">
                                 <tr>
@@ -2502,7 +2502,7 @@ function QuotationDetailModal({ q: maybe, onClose }: { q: Quotation | null; onCl
               <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Consignee</p>
               <p className="text-sm font-semibold text-foreground">{q.consignee_name}</p>
               {q.consignee_phone && <p className="text-xs text-foreground-secondary mt-0.5">{q.consignee_phone}</p>}
-              {q.consignee_email && <p className="text-xs text-foreground-secondary mt-0.5">{q.consignee_email}</p>}
+              {q.consignee_email && <p className="text-xs text-foreground-secondary mt-0.5 break-words">{q.consignee_email}</p>}
               {[q.consignee_addr1, q.consignee_addr2, q.consignee_city, q.consignee_state, q.consignee_pincode].filter(
                 Boolean
               ).length > 0 && (
@@ -2530,7 +2530,7 @@ function QuotationDetailModal({ q: maybe, onClose }: { q: Quotation | null; onCl
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-surface-secondary">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-lg bg-surface-secondary">
             <div>
               <p className="text-xs text-foreground-muted">Subtotal</p>
               <p className="text-sm font-semibold text-foreground">₹{fmt2(Number(q.subtotal || 0))}</p>
@@ -2543,7 +2543,7 @@ function QuotationDetailModal({ q: maybe, onClose }: { q: Quotation | null; onCl
                   : '—'}
               </p>
             </div>
-            <div>
+            <div className="col-span-2 sm:col-span-1">
               <p className="text-xs text-foreground-muted">Total</p>
               <p className="text-sm font-bold text-foreground">₹{fmt2(Number(q.total_amount))}</p>
             </div>

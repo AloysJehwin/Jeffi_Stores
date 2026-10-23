@@ -98,7 +98,7 @@ function DiffRow({ row }: { row: Row }) {
         </span>
       </button>
       {open && (
-        <div className="grid gap-2 border-t border-border-default p-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 border-t border-border-default p-3 sm:grid-cols-2">
           <DiffCell label="Current" value={row.before} tone={changed ? 'before' : 'muted'} cls={cellBase} />
           <DiffCell label="Proposed" value={row.after} tone={changed ? 'after' : 'muted'} cls={cellBase} />
         </div>

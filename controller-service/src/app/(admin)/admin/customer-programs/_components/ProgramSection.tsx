@@ -5,7 +5,7 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default p-4 min-w-0">
       <p className="text-xs font-medium text-foreground-muted uppercase tracking-wide">{label}</p>
-      <p className="mt-1 text-xl font-bold tabular-nums text-foreground truncate">{value}</p>
+      <p className="mt-1 text-lg sm:text-xl font-bold tabular-nums text-foreground break-words sm:truncate">{value}</p>
       {hint && <p className="mt-0.5 text-xs text-foreground-secondary">{hint}</p>}
     </div>
   )

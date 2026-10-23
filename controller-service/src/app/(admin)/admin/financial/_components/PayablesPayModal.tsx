@@ -75,7 +75,7 @@ export function PayablesPayModal({
     >
       <div className="space-y-4">
         {(hasBank || hasUpi) && (
-          <div className="rounded-lg bg-surface-secondary px-3 py-2 text-xs space-y-0.5">
+          <div className="rounded-lg bg-surface-secondary px-3 py-2 text-xs space-y-0.5 break-words">
             {payModal.supplier_bank_name && (
               <p className="text-foreground-secondary">
                 Bank: <span className="text-foreground">{payModal.supplier_bank_name}</span>
