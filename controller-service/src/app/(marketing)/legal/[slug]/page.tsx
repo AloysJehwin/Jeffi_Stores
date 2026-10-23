@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getPolicyBySlug, policies } from '@/lib/legals/policies'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
+import AccountDeletionPanel from '@/components/visitor/account/AccountDeletionPanel'
 
 export async function generateStaticParams() {
   return policies.map(p => ({ slug: p.slug }))
@@ -87,6 +88,8 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
               )}
             </div>
           ))}
+
+          {policy.slug === 'account-deletion' && <AccountDeletionPanel />}
 
           <div className="bg-surface-elevated rounded-xl border border-border-default p-6 text-center">
             <p className="text-xs text-foreground-muted mb-3">Have questions about our policies?</p>
