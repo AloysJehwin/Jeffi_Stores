@@ -28,7 +28,7 @@ function Row({ c, large }: { c: DormantEntry; large?: boolean }) {
     >
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
-        <p className="text-[11px] text-foreground-muted">
+        <p className="text-[11px] text-foreground-muted break-words">
           <span className="hover:underline">{c.email}</span>
           {' · '}Last order {fmtDate(c.lastOrderAt)} · LTV ₹{Math.round(c.ltv).toLocaleString('en-IN')}
         </p>

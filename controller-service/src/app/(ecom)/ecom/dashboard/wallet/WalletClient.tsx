@@ -46,7 +46,7 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[['Balance', fmt(initial.balance), true], ['Spent today', fmt(spentToday)], ['Entries', String(initial.ledger.length)]].map(([l, v, a]) => (
-          <div key={l as string} className="rounded-2xl org-sand p-5"><div className="text-xs text-foreground-muted uppercase tracking-widest mb-2">{l}</div><div className={`font-display font-black text-2xl lg:text-3xl tabular-nums ${a ? 'ecom-accent-text' : ''}`}>{v}</div></div>
+          <div key={l as string} className="rounded-2xl org-sand p-4 last:col-span-2 sm:p-5 sm:last:col-span-1"><div className="text-xs text-foreground-muted uppercase tracking-widest mb-2">{l}</div><div className={`font-display font-black text-lg sm:text-2xl lg:text-3xl tabular-nums [overflow-wrap:anywhere] sm:[overflow-wrap:normal] ${a ? 'ecom-accent-text' : ''}`}>{v}</div></div>
         ))}
       </div>
       <Card title="Top up">

@@ -896,7 +896,7 @@ export default function TemplateEditor({
                     Header media type{' '}
                     {mediaLocked && <span className="text-xs text-foreground-muted">(locked after approval)</span>}
                   </label>
-                  <div className="flex gap-2 items-center">
+                  <div className="flex flex-wrap gap-2 items-center">
                     <AdminSelect
                       className="w-48"
                       disabled={mediaLocked}
@@ -1111,7 +1111,7 @@ export default function TemplateEditor({
                             {card.media_url ? 'Replace media' : 'Add media'}
                           </button>
                           {card.media_url && (
-                            <span className="text-xs text-foreground-secondary truncate flex-1">{card.media_url}</span>
+                            <span className="min-w-0 text-xs text-foreground-secondary truncate flex-1">{card.media_url}</span>
                           )}
                         </div>
                       </div>

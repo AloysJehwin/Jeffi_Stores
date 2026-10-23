@@ -63,7 +63,7 @@ export default function Calendar({ reloadKey }: { reloadKey: number }) {
     <Section
       title={month.toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
       action={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <IconButton icon={ChevronLeft} label="Previous month" onClick={() => shift(-1)} />
           <button type="button" className={btnGhost} onClick={() => setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>
             Today

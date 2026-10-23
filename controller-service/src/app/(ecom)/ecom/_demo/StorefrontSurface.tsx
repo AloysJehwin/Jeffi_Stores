@@ -87,16 +87,16 @@ function CatalogueView({ products, onOpen }: { products: Product[]; onOpen: (id:
         </div>
         <span className="text-xs text-foreground-muted">{products.length} items</span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 flex-1 min-h-0 content-start">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 flex-1 min-h-0 content-start">
         {visible.map(p => {
           const off = discountPct(p.price, p.mrp)
           return (
             <button
               key={p.id}
               onClick={() => onOpen(p.id)}
-              className="group text-left org-sand rounded-2xl overflow-hidden flex flex-col hover:-translate-y-0.5 transition"
+              className="group text-left org-sand rounded-2xl overflow-hidden flex flex-col min-w-0 hover:-translate-y-0.5 transition"
             >
-              <div className="relative aspect-[4/3] org-sand overflow-hidden grid place-items-center p-5">
+              <div className="relative aspect-[4/3] org-sand overflow-hidden grid place-items-center p-4 sm:p-5">
                 <ProductArt category={p.category} className="h-full w-auto max-w-full rounded-2xl" />
                 {off !== null && (
                   <span className="ecom-accent-bg absolute top-2.5 left-2.5 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -104,7 +104,7 @@ function CatalogueView({ products, onOpen }: { products: Product[]; onOpen: (id:
                   </span>
                 )}
               </div>
-              <div className="p-3.5 flex flex-col gap-1.5 flex-1">
+              <div className="p-3 sm:p-3.5 flex flex-col gap-1.5 flex-1 min-w-0">
                 <span className="text-[10px] font-medium uppercase tracking-wide text-foreground-muted">
                   {p.category}
                 </span>
@@ -113,7 +113,7 @@ function CatalogueView({ products, onOpen }: { products: Product[]; onOpen: (id:
                   <Stars rating={p.rating} />
                   <span className="text-[10px] text-foreground-muted">({p.reviews})</span>
                 </div>
-                <div className="flex items-baseline gap-2 mt-auto pt-1">
+                <div className="flex flex-wrap items-baseline gap-x-2 mt-auto pt-1">
                   <span className="text-base font-black text-foreground">{formatRs(p.price)}</span>
                   {p.mrp && <span className="text-[11px] text-foreground-muted line-through">{formatRs(p.mrp)}</span>}
                 </div>
@@ -129,21 +129,21 @@ function CatalogueView({ products, onOpen }: { products: Product[]; onOpen: (id:
 function ProductView({ product, onAdd }: { product: Product; onAdd: () => void }) {
   const off = discountPct(product.price, product.mrp)
   return (
-    <div className="flex-1 min-h-0 grid md:grid-cols-2 gap-6 items-center">
-      <div className="h-full max-h-[360px] rounded-2xl bg-surface-secondary border border-border-default overflow-hidden flex items-center justify-center p-6">
+    <div className="flex-1 min-h-0 grid md:grid-cols-2 gap-4 sm:gap-6 items-center">
+      <div className="h-44 sm:h-full max-h-[360px] rounded-2xl bg-surface-secondary border border-border-default overflow-hidden flex items-center justify-center p-6">
         <ProductArt category={product.category} className="w-full h-full max-w-[300px]" />
       </div>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 min-w-0">
         <span className="text-xs text-foreground-muted">{product.category}</span>
-        <h2 className="text-2xl font-black tracking-tight text-foreground leading-tight">{product.name}</h2>
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight text-foreground leading-tight sm:leading-tight">{product.name}</h2>
         <div className="flex items-center gap-2">
           <Stars rating={product.rating} />
           <span className="text-xs text-foreground-muted">
             {product.rating} · {product.reviews} reviews
           </span>
         </div>
-        <div className="flex items-baseline gap-3">
-          <span className="text-3xl font-black text-foreground">{formatRs(product.price)}</span>
+        <div className="flex flex-wrap items-baseline gap-x-3">
+          <span className="text-2xl sm:text-3xl font-black text-foreground">{formatRs(product.price)}</span>
           {product.mrp && <span className="text-base text-foreground-muted line-through">{formatRs(product.mrp)}</span>}
           {off !== null && <span className="ecom-accent-text text-sm font-bold">{off}% off</span>}
         </div>
@@ -280,9 +280,9 @@ export default function StorefrontSurface() {
   const checkoutTotal = world.order ? world.order.total : cartTotal
 
   return (
-    <div className=" h-full w-full flex flex-col overflow-hidden bg-surface text-foreground p-4 sm:p-5">
+    <div className=" h-full w-full flex flex-col overflow-hidden bg-surface text-foreground p-3 sm:p-5">
       <StoreHeader cartCount={world.cart.length} />
-      <div className="flex-1 min-h-0 mt-4 relative">
+      <div className="flex-1 min-h-0 mt-3 sm:mt-4 relative">
         <AnimatePresence mode="wait" initial={false}>
           <View key={focus} focusKey={focus} reduced={reducedMotion}>
             {focus === 'product' ? (

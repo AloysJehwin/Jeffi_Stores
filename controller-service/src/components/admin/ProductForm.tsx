@@ -4361,7 +4361,7 @@ export default function ProductForm({
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-5 gap-3 pt-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
                       <Toggle id="fragile" checked={fragile} onChange={setFragile} label="Fragile" />
                       <Toggle id="hazardous" checked={hazardous} onChange={setHazardous} label="Hazardous" />
                       <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
@@ -4524,7 +4524,7 @@ export default function ProductForm({
                                       <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">
                                         Batch Details
                                       </p>
-                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                                         <div>
                                           <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
                                             Expiry Date <span className="text-red-500">*</span>
@@ -4547,7 +4547,7 @@ export default function ProductForm({
                                           <div className="flex gap-1">
                                             <input
                                               type="text"
-                                              className="field-compact border border-border-default bg-surface text-foreground flex-1 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                              className="field-compact border border-border-default bg-surface text-foreground flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
                                               value={entry.lot}
                                               onChange={e => patchEntry(g, { lot: e.target.value })}
                                             />
@@ -4585,7 +4585,7 @@ export default function ProductForm({
 
                                   {isSelected && _serializedPending && (
                                     <div className="rounded-lg border border-blue-500/40 bg-blue-500/5 p-3">
-                                      <div className="flex items-center justify-between mb-3">
+                                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                                         <div>
                                           <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">
                                             Serial Numbers

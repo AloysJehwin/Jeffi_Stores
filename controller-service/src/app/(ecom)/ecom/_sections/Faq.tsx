@@ -44,24 +44,24 @@ const FAQS: QA[] = [
 export default function Faq() {
   const [open, setOpen] = useState<number | null>(0)
   return (
-    <section className="w-full px-6 lg:px-12 py-20">
+    <section className="w-full px-4 sm:px-6 lg:px-12 py-12 sm:py-20">
       <Eyebrow>Questions</Eyebrow>
-      <Display className="mt-3 text-4xl lg:text-5xl max-w-xl">Frequently asked questions</Display>
-      <div className="mt-10 max-w-3xl space-y-3">
+      <Display className="mt-3 text-3xl sm:text-4xl lg:text-5xl max-w-xl">Frequently asked questions</Display>
+      <div className="mt-8 sm:mt-10 max-w-3xl space-y-3">
         {FAQS.map((item, i) => {
           const isOpen = open === i
           return (
-            <div key={item.q} className="org-sand rounded-[2rem] overflow-hidden">
+            <div key={item.q} className="org-sand rounded-3xl sm:rounded-[2rem] overflow-hidden">
               <button
                 type="button"
                 aria-expanded={isOpen}
                 onClick={() => setOpen(isOpen ? null : i)}
-                className="org-square flex w-full items-center justify-between gap-4 px-8 py-5 text-left"
+                className="org-square flex w-full items-center justify-between gap-4 px-5 py-4 sm:px-8 sm:py-5 text-left"
               >
-                <span className="font-display font-black text-lg text-foreground">{item.q}</span>
+                <span className="min-w-0 font-display font-black text-lg text-foreground">{item.q}</span>
                 <ChevronDown aria-hidden className={clsx('h-5 w-5 shrink-0 text-foreground transition-transform', isOpen && 'rotate-180')} />
               </button>
-              <div className={clsx('px-8 pb-6 text-base text-foreground-secondary leading-relaxed max-w-2xl', !isOpen && 'hidden')}>{item.a}</div>
+              <div className={clsx('px-5 pb-5 sm:px-8 sm:pb-6 text-base text-foreground-secondary leading-relaxed max-w-2xl', !isOpen && 'hidden')}>{item.a}</div>
             </div>
           )
         })}

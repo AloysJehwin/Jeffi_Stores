@@ -5,6 +5,8 @@ import {
   CopyObjectCommand,
   HeadObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
 } from '@aws-sdk/client-s3'
 import sharp from 'sharp'
 import { encode as encodeBlurhash } from 'blurhash'
@@ -586,4 +588,23 @@ export async function putObjectBuffer(canonicalKey: string, body: Buffer, conten
 export async function deleteObjectKey(canonicalKey: string): Promise<void> {
   const BUCKET_NAME = await resolveBucket()
   await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${canonicalKey}` }))
+}
+
+/** Deletes every object under a canonical prefix (e.g. `reviews/<id>/`). Returns how many were removed. */
+export async function deleteObjectsUnder(canonicalPrefix: string): Promise<number> {
+  const Bucket = await resolveBucket()
+  let deleted = 0
+  let ContinuationToken: string | undefined
+  do {
+    const page = await s3Client.send(
+      new ListObjectsV2Command({ Bucket, Prefix: `${KEY_PREFIX}${canonicalPrefix}`, ContinuationToken })
+    )
+    const keys = (page.Contents || []).map(o => o.Key).filter((k): k is string => !!k)
+    if (keys.length) {
+      await s3Client.send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: keys.map(Key => ({ Key })), Quiet: true } }))
+      deleted += keys.length
+    }
+    ContinuationToken = page.IsTruncated ? page.NextContinuationToken : undefined
+  } while (ContinuationToken)
+  return deleted
 }

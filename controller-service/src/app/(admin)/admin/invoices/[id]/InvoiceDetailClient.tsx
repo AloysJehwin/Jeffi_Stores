@@ -232,7 +232,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         header={
           <DetailHeader
             back={{ href: ap('/admin/invoices'), label: 'Invoices' }}
-            title={<span className="font-mono">Invoice #{o.invoice_number}</span>}
+            title={<span className="font-mono [overflow-wrap:anywhere]">Invoice #{o.invoice_number}</span>}
             status={
               <>
                 {isVoided && <Badge tone="red">{o.status}</Badge>}
@@ -257,7 +257,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         }
         notices={
           amendDraft && (
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-blue-500/40 bg-blue-500/5 px-4 py-3 text-sm text-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-blue-500/40 bg-blue-500/5 px-4 py-3 text-sm text-foreground">
               <span>An amendment draft is pending for this invoice.</span>
               <a href={ap(`/admin/invoices/${amendDraft.id}/view`)} className="shrink-0 font-semibold text-accent-500 hover:underline">
                 View draft ({amendDraft.order_number})
@@ -273,7 +273,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                   <div key={idx} className="space-y-1 px-4 py-3 text-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="font-medium text-foreground">{item.product_name}</div>
+                        <div className="font-medium text-foreground break-words">{item.product_name}</div>
                         {!item.product_id && <span className={badgeCls('amber')}>Custom – not in inventory</span>}
                         {variantLabel(item) && <div className="text-xs text-foreground-secondary">{variantLabel(item)}</div>}
                         {item.product_sku && (
@@ -361,7 +361,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             </Card>
             {o.notes && (
               <Card title="Notes">
-                <p className="text-sm text-foreground">{o.notes}</p>
+                <p className="text-sm text-foreground break-words">{o.notes}</p>
               </Card>
             )}
           </>

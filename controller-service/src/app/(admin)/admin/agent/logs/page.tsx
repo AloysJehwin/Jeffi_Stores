@@ -133,7 +133,7 @@ export default function AgentLogsPage() {
                               ) : (
                                 <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
                               )}
-                              <span className="text-xs font-semibold font-mono text-foreground">{tc.tool}</span>
+                              <span className="min-w-0 text-xs font-semibold font-mono text-foreground [overflow-wrap:anywhere]">{tc.tool}</span>
                             </div>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-[11px]">
                               <div>

@@ -100,15 +100,15 @@ export function DetailHeader({ title, subtitle, status, identifiers, media, back
           {media}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+              <h1 className="min-w-0 break-words text-2xl font-bold text-foreground">{title}</h1>
               {status}
             </div>
             {subtitle && <p className="mt-0.5 text-sm text-foreground-muted">{subtitle}</p>}
             {identifiers && identifiers.length > 0 && (
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-foreground-muted">
                 {identifiers.map(id => (
-                  <span key={id.label} className="inline-flex items-center gap-1">
-                    {id.label} <span className="font-mono text-foreground">{id.value}</span>
+                  <span key={id.label} className="inline-flex min-w-0 items-center gap-1">
+                    {id.label} <span className="font-mono text-foreground [overflow-wrap:anywhere]">{id.value}</span>
                     {id.copy && <CopyValue value={id.value} />}
                   </span>
                 ))}
@@ -117,7 +117,7 @@ export function DetailHeader({ title, subtitle, status, identifiers, media, back
           </div>
         </div>
         {(primary || secondary?.length || actions) && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
             {secondary?.map(a => <ActionButton key={a.key ?? a.label} action={a} />)}
             {actions}
             {primary && <ActionButton action={primary} variant="primary" />}

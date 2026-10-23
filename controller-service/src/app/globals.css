@@ -332,3 +332,11 @@ html[data-no-ads] ins.adsbygoogle,
 html[data-no-ads] .google-auto-placed {
   display: none !important;
 }
+
+/* The storefront footer strip makes room for a fixed bottom bar only while one is on screen. */
+body:has([data-bottom-bar]) [data-footer-strip] {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+body:has([data-bottom-bar='cart']):has([data-bottom-bar='compare']) [data-footer-strip] {
+  padding-bottom: calc(10rem + env(safe-area-inset-bottom));
+}

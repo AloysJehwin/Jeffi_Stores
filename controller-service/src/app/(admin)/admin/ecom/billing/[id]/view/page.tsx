@@ -38,7 +38,7 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
   const tile = (label: string, value: string, tone = 'text-foreground') => (
     <div className="rounded-xl border border-border-default p-4 bg-surface-elevated">
       <div className="text-xs text-foreground-muted uppercase tracking-wide font-medium">{label}</div>
-      <div className={`text-xl font-bold tabular-nums ${tone}`}>{value}</div>
+      <div className={`text-lg sm:text-xl font-bold tabular-nums break-words ${tone}`}>{value}</div>
     </div>
   )
 
@@ -46,7 +46,7 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
     <div className="p-4 sm:p-6 space-y-5">
       <PageHeader back={{ href: '/admin/ecom/billing', label: 'Billing' }} title={`${t.display_name}: Billing`} badges={<StatusPill status={t.status} />} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         {tile('Settlement balance', inr(balance), balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}
         {tile('GMV', inr(totals.gross))}
         {tile('Tenant share', inr(totals.tenantShare))}

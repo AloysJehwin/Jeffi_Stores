@@ -16,7 +16,7 @@ import { fmt } from './finance'
 interface Key { id: string; name: string; key_prefix: string; scopes: string[]; status: string }
 interface Party { name: string; gstin?: string; address?: string; phone?: string; email?: string; state?: string }
 type Item = { description: string; quantity: string; unit_price: string; gst_rate: string; discount_pct: string }
-const ITEM_GRID = 'grid grid-cols-[1fr_3.5rem_5.5rem_3.5rem_3.5rem_auto] items-center gap-2'
+const ITEM_GRID = 'grid min-w-[30rem] grid-cols-[1fr_3.5rem_5.5rem_3.5rem_3.5rem_auto] items-center gap-2 sm:min-w-0'
 const NEW_ITEM: Item = { description: '', quantity: '1', unit_price: '', gst_rate: '18', discount_pct: '' }
 
 export const DOC_TYPES = [
@@ -208,7 +208,7 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
               </Field>
               {missing === null && <div className="h-9 animate-pulse rounded-lg org-sand" />}
               {varNames.length > 0 && (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {varNames.map(k => (
                     <Field key={k} label={/^\d+$/.test(k) ? `{{${k}}}` : k}>
                       <input className={input} value={vars[k] ?? ''} placeholder={fields?.variables?.[k] ?? ''} onChange={e => setVars(v => ({ ...v, [k]: e.target.value }))} />
@@ -236,7 +236,7 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
               <Field label="Document type">
                 <AdminSelect value={type} onChange={setType} options={DOC_TYPES.map(t => ({ value: t.key, label: t.label }))} />
               </Field>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Seller name"><input className={input} value={sell.name} onChange={e => setSell({ ...sell, name: e.target.value })} /></Field>
                 <Field label="Seller GSTIN"><input className={input} value={sell.gstin ?? ''} onChange={e => setSell({ ...sell, gstin: e.target.value })} /></Field>
                 <Field label="Seller address"><input className={input} value={sell.address ?? ''} onChange={e => setSell({ ...sell, address: e.target.value })} /></Field>
@@ -244,7 +244,7 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
                 <Field label="Buyer name"><input className={input} value={buyer.name} onChange={e => setBuyer({ ...buyer, name: e.target.value })} /></Field>
                 <Field label="Buyer email"><input className={input} type="email" value={buyer.email ?? ''} onChange={e => setBuyer({ ...buyer, email: e.target.value })} /></Field>
               </div>
-              <div>
+              <div className="overflow-x-auto sm:overflow-visible">
                 <div className={`${ITEM_GRID} mb-1 text-xs font-medium text-foreground-secondary`}><span>Items</span><span>Qty</span><span>Price</span><span>GST %</span><span>Disc %</span><span /></div>
                 <div className="space-y-2">
                   {items.map((it, i) => (
@@ -260,7 +260,7 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
                 </div>
                 <button type="button" onClick={() => setItems(list => [...list, NEW_ITEM])} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-foreground-secondary hover:text-foreground"><Plus className="w-3.5 h-3.5" /> Add item</button>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Discount on the total (optional)" hint="Applied before GST, across all items">
                   <div className="flex gap-2">
                     <input className={`${input} min-w-0 flex-1`} type="number" min="0" placeholder="0" value={disc.value} onChange={e => setDisc({ ...disc, value: e.target.value })} />
@@ -274,7 +274,7 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
               <label className="flex items-center gap-2 text-sm text-foreground-secondary">
                 <input type="checkbox" className="accent-accent-600" checked={roundOff} onChange={e => setRoundOff(e.target.checked)} /> Round the total to the nearest rupee
               </label>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Number (optional)" hint="Left blank, the next number in your series is used"><input className={input} value={number} onChange={e => setNumber(e.target.value)} /></Field>
                 <Field label="Date (optional)"><DatePicker className="w-full" value={date} onChange={setDate} clearable placeholder="Today" triggerClassName={input} /></Field>
               </div>
@@ -304,14 +304,14 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
           {ok && target.kind === 'message' && (
             <div className="rounded-xl org-sage px-4 py-3 text-sm">
               <div className="font-semibold capitalize">{result.body.status ?? 'queued'}</div>
-              <div className="mt-0.5 font-mono text-xs">{result.body.id}</div>
+              <div className="mt-0.5 font-mono text-xs break-all">{result.body.id}</div>
               {result.body.error && <div className="mt-1 text-[#8a2e1f]">{result.body.error}</div>}
             </div>
           )}
           {ok && target.kind === 'document' && result.body.pdf_url && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold">{result.body.number ?? 'Rendered'}</span>
+                <span className="min-w-0 break-words font-semibold">{result.body.number ?? 'Rendered'}</span>
                 <a href={result.body.pdf_url} target="_blank" rel="noreferrer" download className="inline-flex items-center gap-1 text-xs font-semibold ecom-accent-text"><Download className="w-3.5 h-3.5" /> Open PDF</a>
               </div>
               <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-border-default bg-zinc-100 p-3"><PdfPreview url={result.body.pdf_url} /></div>

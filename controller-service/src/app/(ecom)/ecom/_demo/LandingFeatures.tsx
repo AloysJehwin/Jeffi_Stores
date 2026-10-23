@@ -28,18 +28,20 @@ function scrub(index: number) {
 
 export default function LandingFeatures() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
       {FEATURES.map((f, i) => (
         <button
           key={f.title}
           type="button"
           onClick={() => scrub(f.chapter)}
-          className={`org-square text-left rounded-[2rem] p-7 transition hover:-translate-y-0.5 ${i === 0 ? 'org-peach' : 'org-sand org-sand-hover'}`}
+          className={`org-square text-left min-w-0 rounded-3xl sm:rounded-[2rem] p-5 sm:p-7 transition hover:-translate-y-0.5 ${i === 0 ? 'org-peach' : 'org-sand org-sand-hover'}`}
         >
-          <span className="font-display font-black text-2xl org-brown">{String(i + 1).padStart(2, '0')}</span>
-          <h3 className="font-display font-black text-2xl text-foreground mt-4">{f.title}</h3>
+          <div className="flex items-baseline gap-3 sm:block">
+            <span className="font-display font-black text-xl sm:text-2xl org-brown">{String(i + 1).padStart(2, '0')}</span>
+            <h3 className="font-display font-black text-xl sm:text-2xl text-foreground min-w-0 sm:mt-4">{f.title}</h3>
+          </div>
           <p className="mt-2 text-base text-foreground-secondary leading-relaxed">{f.copy}</p>
-          <span className="org-brown mt-5 inline-block text-sm font-semibold">See it in the demo →</span>
+          <span className="org-brown mt-3 sm:mt-5 inline-block text-sm font-semibold">See it in the demo →</span>
         </button>
       ))}
     </div>

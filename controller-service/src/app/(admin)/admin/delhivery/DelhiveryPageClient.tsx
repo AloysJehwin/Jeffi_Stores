@@ -748,7 +748,7 @@ export default function DelhiveryPageClient({
 
             <InfiniteFooter shown={pagedOrders.length} control={ordersMore} noun="orders" className="px-6 pb-3" />
 
-            <div className="px-6 py-4 border-t border-border-default flex items-center justify-between gap-3">
+            <div className="px-6 py-4 border-t border-border-default flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-foreground-secondary">
                 {selected.size} of {orders.length} selected
               </p>

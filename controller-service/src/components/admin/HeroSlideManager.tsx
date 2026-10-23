@@ -318,7 +318,7 @@ function SlideCard({
           {/* Image — upload or AI generate */}
           <div>
             <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Banner image — desktop</label>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex flex-wrap items-center gap-3 mb-2">
               <input
                 ref={fileRef}
                 type="file"
@@ -353,7 +353,7 @@ function SlideCard({
             {/* The storefront swaps to this below 1024px. Optional — it falls back to the
                 desktop image, which crops badly on a narrow screen. */}
             <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Banner image — mobile</label>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex flex-wrap items-center gap-3 mb-2">
               <input
                 ref={fileMobileRef}
                 type="file"
@@ -514,7 +514,7 @@ function SlideCard({
           </div>
 
           {/* Badge */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-foreground-secondary mb-1">Badge text</label>
               <AIEnrichButton
@@ -561,7 +561,7 @@ function SlideCard({
               automatically.
             </p>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] text-foreground-muted mb-1">Category</label>
                 <AdminSelect
@@ -670,7 +670,7 @@ function SlideCard({
             </div>
 
             <p className="text-[11px] text-foreground-muted">
-              Links to: <span className="font-mono text-accent-600 dark:text-accent-400">{href}</span>
+              Links to: <span className="font-mono text-accent-600 dark:text-accent-400 [overflow-wrap:anywhere]">{href}</span>
             </p>
           </div>
 

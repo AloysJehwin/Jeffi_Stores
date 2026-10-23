@@ -131,7 +131,7 @@ export default function OfferDetailClient({
         status={<StatusBadge status={String(isActive)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] items-start">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)] items-start">
         <div className="space-y-4 min-w-0">
           <div className="space-y-5 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Offer details</h2>
@@ -149,7 +149,7 @@ export default function OfferDetailClient({
               />
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
               <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Launch date</label>
                 <DatePicker

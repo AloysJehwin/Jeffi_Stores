@@ -135,7 +135,7 @@ export default function ProductSupplierList({ suppliers, value, onChange, note }
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="flex items-center gap-2 mt-1.5 pl-0.5">
+                <div className="flex flex-wrap items-center gap-2 mt-1.5 pl-0.5">
                   <input
                     type="number"
                     step="0.01"

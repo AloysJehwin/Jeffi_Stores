@@ -36,7 +36,7 @@ export default async function BirthdayProgram({ host }: { host: string }) {
       offNote="Birthday rewards are switched off. Customers aren't asked for a birthday and no birthday emails go out."
       siteControlsHref={ap('/admin/settings/site-controls', host)}
     >
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
         <Stat
           label="Birthdays on file"
           value={number(stats.withBirthday)}

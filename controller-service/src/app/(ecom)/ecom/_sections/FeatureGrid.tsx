@@ -32,16 +32,18 @@ const FEATURES: Feature[] = [
 
 export default function FeatureGrid() {
   return (
-    <section className="w-full px-6 lg:px-12 py-20">
+    <section className="w-full px-4 sm:px-6 lg:px-12 py-12 sm:py-20">
       <Eyebrow>Everything included</Eyebrow>
-      <Display className="mt-3 text-4xl lg:text-5xl max-w-xl">No add-ons, no surprises</Display>
-      <p className="text-foreground-secondary mt-4 text-lg">Every capability below ships on day one.</p>
-      <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
+      <Display className="mt-3 text-3xl sm:text-4xl lg:text-5xl max-w-xl">No add-ons, no surprises</Display>
+      <p className="text-foreground-secondary mt-4 text-base sm:text-lg">Every capability below ships on day one.</p>
+      <div className="mt-8 sm:mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
         {FEATURES.map(f => (
-          <SandCard key={f.title}>
-            <Dot tone="terracotta" />
-            <h3 className="font-display font-black text-xl text-foreground mt-5">{f.title}</h3>
-            <p className="mt-2 text-base text-foreground-secondary leading-relaxed">{f.copy}</p>
+          <SandCard key={f.title} className="max-sm:flex max-sm:items-start max-sm:gap-4 max-sm:rounded-3xl max-sm:p-5">
+            <Dot tone="terracotta" className="max-sm:mt-1.5 max-sm:shrink-0" />
+            <div className="min-w-0">
+              <h3 className="font-display font-black text-xl text-foreground sm:mt-5">{f.title}</h3>
+              <p className="mt-1 sm:mt-2 text-base text-foreground-secondary leading-relaxed">{f.copy}</p>
+            </div>
           </SandCard>
         ))}
       </div>

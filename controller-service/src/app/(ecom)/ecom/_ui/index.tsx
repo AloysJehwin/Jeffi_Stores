@@ -6,7 +6,7 @@ export function Eyebrow({ children, className = '' }: { children: ReactNode; cla
 }
 
 export function Display({ as: Tag = 'h2', children, className = '' }: { as?: 'h1' | 'h2' | 'h3'; children: ReactNode; className?: string }) {
-  return <Tag className={`font-display font-black text-foreground leading-[1.05] tracking-tight ${className}`}>{children}</Tag>
+  return <Tag className={`font-display font-black text-foreground leading-[1.05] tracking-tight break-words ${className}`}>{children}</Tag>
 }
 
 type PillTone = 'solid' | 'sand' | 'ghost'
@@ -16,7 +16,7 @@ const PILL: Record<PillTone, string> = {
   ghost: 'org-brown hover:underline px-0',
 }
 export function Pill({ tone = 'solid', href, className = '', children, ...rest }: { tone?: PillTone; href?: string; className?: string; children: ReactNode } & Omit<ComponentProps<'button'>, 'children'>) {
-  const cls = `inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-display font-bold transition-colors ${PILL[tone]} ${className}`
+  const cls = `inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-center text-sm font-display font-bold transition-colors ${PILL[tone]} ${className}`
   if (href) return <Link href={href} className={cls}>{children}</Link>
   return <button className={cls} {...rest}>{children}</button>
 }

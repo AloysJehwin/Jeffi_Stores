@@ -517,3 +517,15 @@ export interface Rfq {
 }
 
 export const listRfqs = (page: number) => api<{ rfqs: Rfq[]; total: number }>(`/api/business/rfqs?page=${page}`)
+
+// ── Account deletion ──
+
+export interface DeletionBlocker {
+  kind: string
+  count: number
+  message: string
+}
+export const checkAccountDeletion = () =>
+  api<{ blockers: DeletionBlocker[]; retainedOrders: number }>('/api/account/delete')
+export const deleteAccount = () =>
+  postJson<{ deleted?: boolean; blockers?: DeletionBlocker[] }>('/api/account/delete', { confirm: 'DELETE' })

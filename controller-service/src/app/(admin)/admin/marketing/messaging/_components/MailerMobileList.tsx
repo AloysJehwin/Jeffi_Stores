@@ -158,7 +158,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
             </div>
             {statusBadge(c.status)}
           </div>
-          <p className="text-xs text-foreground-muted mt-2">
+          <p className="text-xs text-foreground-muted mt-2 break-words">
             {channelLabel(c, templateLabels)} · {c.audience_type.replace('_', ' ')}
           </p>
           {c.recipient_count != null && (
@@ -190,7 +190,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
             </div>
             <div className="flex items-center justify-between gap-3">
               <dt className="text-foreground-muted">Template</dt>
-              <dd className="text-foreground text-right">{channelLabel(selected, templateLabels)}</dd>
+              <dd className="min-w-0 text-foreground text-right break-words">{channelLabel(selected, templateLabels)}</dd>
             </div>
             <div className="flex items-center justify-between gap-3">
               <dt className="text-foreground-muted">Audience</dt>

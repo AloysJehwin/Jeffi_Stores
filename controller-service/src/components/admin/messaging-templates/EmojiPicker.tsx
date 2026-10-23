@@ -61,7 +61,7 @@ export default function EmojiPicker({ onPick, onClose }: { onPick: (e: string) =
   }
 
   return (
-    <div ref={ref} className="absolute z-30 mt-2 w-80 bg-surface-elevated border border-border-default rounded-xl shadow-xl animate-fade-in">
+    <div ref={ref} className="absolute z-30 mt-2 w-full sm:w-80 bg-surface-elevated border border-border-default rounded-xl shadow-xl animate-fade-in">
       <div className="p-2 border-b border-border-default">
         <div className="relative">
           <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted" />

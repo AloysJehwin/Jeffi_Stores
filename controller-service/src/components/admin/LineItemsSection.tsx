@@ -972,9 +972,9 @@ export default function LineItemsSection({
 
   return (
     <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h2 className="text-sm font-semibold text-foreground">Line Items</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => setScanEnabled(v => !v)}
@@ -1041,7 +1041,7 @@ export default function LineItemsSection({
               <div className="relative">
                 {custom ? (
                   <div className="px-3 py-2 bg-surface-secondary rounded-lg border border-dashed border-amber-500/60 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
                         Custom – not in inventory
                       </span>
@@ -1086,7 +1086,7 @@ export default function LineItemsSection({
                           {variantLabel({ variant_name: item.variant_name, sub_variant_name: item.sub_variant_name })}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
                         {item.product_sku && (
                           <p className="text-xs text-foreground-muted font-mono">
                             <span className="inline-flex items-center gap-1">
@@ -1152,7 +1152,7 @@ export default function LineItemsSection({
                   </div>
                 ) : (
                   <>
-                    <div className="flex gap-1 mb-2 p-1 bg-surface-secondary rounded-lg w-fit">
+                    <div className="flex flex-wrap gap-1 mb-2 p-1 bg-surface-secondary rounded-lg w-fit max-w-full">
                       {(['name', 'sku', 'category', 'scanner'] as SearchMode[]).map(m => (
                         <button
                           key={m}
@@ -1265,7 +1265,7 @@ export default function LineItemsSection({
 
                     {mode === 'category' && (
                       <div className="flex gap-2">
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <AdminSelect
                             value={categoryIds[item.id] ?? ''}
                             onChange={v => setCategoryIds(p => ({ ...p, [item.id]: v }))}
@@ -1311,7 +1311,7 @@ export default function LineItemsSection({
                               fillScanLine(item.id, scanInputs[item.id] ?? '')
                             }
                           }}
-                          className="flex-1 bg-transparent border-none outline-none text-sm text-foreground placeholder:text-foreground-muted"
+                          className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm text-foreground placeholder:text-foreground-muted"
                           placeholder="Scan a SKU / lot / serial…"
                           autoComplete="off"
                           spellCheck={false}
@@ -1323,7 +1323,7 @@ export default function LineItemsSection({
                 )}
               </div>
 
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                 <div>
                   <label className={labelCls}>HSN Code</label>
                   <input

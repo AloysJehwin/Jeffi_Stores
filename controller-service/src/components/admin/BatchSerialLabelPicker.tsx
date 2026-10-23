@@ -547,7 +547,7 @@ export default function BatchSerialLabelPicker({
                             {p.product_name}
                             {p.variant_name ? ` — ${p.variant_name}` : ''}
                           </p>
-                          <p className="text-[11px] text-foreground-muted font-mono">
+                          <p className="text-[11px] text-foreground-muted font-mono [overflow-wrap:anywhere]">
                             <span className="inline-flex items-center gap-1">
                               {p.sku}
                               {p.sku && <CopySku sku={p.sku} />}

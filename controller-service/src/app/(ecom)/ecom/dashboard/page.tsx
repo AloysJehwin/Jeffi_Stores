@@ -122,8 +122,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           <Card title="Recent transactions">
             <div className="-mx-6 -mb-6 border-t border-border-default">
               {billing.transactions.slice(0, 5).map((t, i) => (
-                <div key={t.id} className={`flex items-center justify-between px-6 py-3 text-sm ${i > 0 ? 'border-t border-border-default/60' : ''}`}>
-                  <div>
+                <div key={t.id} className={`flex items-center justify-between gap-3 px-6 py-3 text-sm ${i > 0 ? 'border-t border-border-default/60' : ''}`}>
+                  <div className="min-w-0 break-words">
                     <span className="font-medium text-foreground">{t.order_ref ?? t.id.slice(0, 8)}</span>
                     <span className="ml-2 text-xs text-foreground-secondary">{t.is_cod ? 'COD' : t.gateway}</span>
                   </div>

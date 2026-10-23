@@ -267,7 +267,7 @@ export function NewAdDialog({ onClose, onDone }: { onClose: () => void; onDone: 
       <Field label="Primary text" counter={<Counter n={f.message.length} max={TEXT_LIMITS.message.max} recommended={TEXT_LIMITS.message.recommended} />}>
         <textarea className={inputCls} aria-label="Primary text" rows={3} maxLength={TEXT_LIMITS.message.max} value={f.message} onChange={e => set('message', e.target.value)} />
       </Field>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Field label="Headline" counter={<Counter n={f.headline.length} max={TEXT_LIMITS.headline} />}>
           <input className={inputCls} aria-label="Headline" maxLength={TEXT_LIMITS.headline} value={f.headline} onChange={e => set('headline', e.target.value)} />
         </Field>

@@ -27,7 +27,7 @@ export function OverviewView({ d }: { d: any }) {
         <Kpi label="Avg margin / unit" value={money(d.margin.average)} sub={`${count(d.margin.known)} SKUs with a cost price`} />
         <Kpi label="Selling at a loss" value={count(d.margin.negative)} highlight={d.margin.negative > 0} />
       </KpiGrid>
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         <Section title="Last listing push">
           {d.lastPush ? (
             <p className="text-sm">
@@ -255,7 +255,7 @@ export function RepricerView({ d, onChanged }: { d: any; onChanged: () => void }
           ]}
         />
         {canPrice && (
-          <div className="grid gap-2 grid-cols-2 md:grid-cols-4 xl:grid-cols-7 items-end mt-4 rounded-lg border border-border-default p-3">
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7 items-end mt-4 rounded-lg border border-border-default p-3">
             <label className="text-xs text-foreground-muted">
               SKU (empty = all)
               <input className={inputCls} value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} />

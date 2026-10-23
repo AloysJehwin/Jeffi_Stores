@@ -1250,7 +1250,7 @@ export default function AdminAuditClient() {
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-foreground-muted mt-0.5 font-mono">{job.path}</p>
+                        <p className="text-[11px] text-foreground-muted mt-0.5 font-mono break-all">{job.path}</p>
                         {job.inPlan && job.lastRun && (
                           <p className="text-[11px] text-foreground-muted mt-0.5">
                             Last run: {new Date(job.lastRun).toLocaleString('en-IN')}
@@ -1262,7 +1262,7 @@ export default function AdminAuditClient() {
                         )}
                       </div>
                       {job.inPlan && (
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <button
                           type="button"
                           disabled={cronTriggeringId === job.id}
@@ -1315,7 +1315,7 @@ export default function AdminAuditClient() {
                             <div className="flex-1 min-w-0">
                               <span className="text-foreground-muted">{new Date(entry.t).toLocaleString('en-IN')}</span>
                               {!entry.ok && entry.err && (
-                                <span className="ml-2 text-red-500 font-mono">{entry.err}</span>
+                                <span className="ml-2 text-red-500 font-mono break-words">{entry.err}</span>
                               )}
                               {entry.detail !== undefined && (
                                 <pre className="mt-1 text-[10px] font-mono bg-surface-secondary rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all text-foreground-muted leading-relaxed">
@@ -1502,8 +1502,8 @@ export default function AdminAuditClient() {
                             }
                             return (
                               <div key={child.id} className="text-[11px]">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono uppercase text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-mono uppercase text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded break-all">
                                     {child.entity_type}.{child.action}
                                   </span>
                                   <span className="text-foreground-muted">{relTime(child.created_at)}</span>
@@ -1642,8 +1642,8 @@ export default function AdminAuditClient() {
                             .filter(c => c.id !== repr.id)
                             .map(child => (
                               <div key={child.id} className="text-[11px]">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono uppercase text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-mono uppercase text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded break-all">
                                     {child.entity_type}.{child.action}
                                   </span>
                                   <span className="text-foreground-muted">{relTime(child.created_at)}</span>

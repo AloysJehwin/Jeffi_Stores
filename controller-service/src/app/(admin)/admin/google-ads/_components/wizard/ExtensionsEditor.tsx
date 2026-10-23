@@ -133,12 +133,12 @@ export default function ExtensionsEditor({
           const upd = (patch: Partial<SitelinkSpec>) => set('sitelinks', draft.sitelinks.map((x, j) => (j === i ? { ...x, ...patch } : x)))
           return (
             <div key={i} className="rounded-lg border border-border-default p-3 space-y-2">
-              <label className="flex items-center gap-2 text-xs text-foreground-muted">
+              <label className="flex items-center gap-2 text-xs text-foreground-muted [overflow-wrap:anywhere]">
                 <input type="checkbox" checked={s.on} onChange={e => set('sitelinks', draft.sitelinks.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))} />
                 {s.finalUrl}
               </label>
               <LimitedInput value={s.linkText} max={LIMITS.sitelinkText} ariaLabel={`Sitelink ${i + 1} text`} onChange={v => upd({ linkText: v })} />
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <LimitedInput value={s.description1 ?? ''} max={LIMITS.sitelinkDescription} placeholder="Description line 1 (optional)" onChange={v => upd({ description1: v })} />
                 <LimitedInput value={s.description2 ?? ''} max={LIMITS.sitelinkDescription} placeholder="Description line 2" onChange={v => upd({ description2: v })} />
               </div>
@@ -150,11 +150,11 @@ export default function ExtensionsEditor({
 
       <Group title="Callouts from store policies" count={draft.callouts.filter(c => c.on).length}>
         {canAi && <AiButton busy={aiBusy === 'callouts'} onClick={() => ai('callouts')} label="Suggest more with AI" />}
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {draft.callouts.map((c, i) => (
             <div key={i} className="flex items-center gap-2">
               <input type="checkbox" aria-label={`Use callout ${i + 1}`} checked={c.on} onChange={e => set('callouts', draft.callouts.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))} />
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <LimitedInput value={c.text} max={LIMITS.callout} ariaLabel={`Callout ${i + 1}`} onChange={v => set('callouts', draft.callouts.map((x, j) => (j === i ? { ...x, text: v } : x)))} />
               </div>
             </div>
@@ -194,7 +194,7 @@ export default function ExtensionsEditor({
               const updO = (patch: Partial<PriceSpec['offerings'][number]>) =>
                 set('prices', draft.prices.map((x, j) => (j === i ? { ...x, offerings: x.offerings.map((y, m) => (m === k ? { ...y, ...patch } : y)) } : x)))
               return (
-                <div key={k} className="grid gap-2 sm:grid-cols-[1fr_1fr_7rem]">
+                <div key={k} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_7rem]">
                   <LimitedInput value={o.header} max={LIMITS.priceHeader} ariaLabel={`Price item ${k + 1} header`} onChange={v => updO({ header: v })} />
                   <LimitedInput value={o.description} max={LIMITS.priceDescription} ariaLabel={`Price item ${k + 1} description`} onChange={v => updO({ description: v })} />
                   <input className={inputCls} aria-label={`Price item ${k + 1} price`} value={String(o.price)} onChange={e => updO({ price: Number(e.target.value) || 0 })} />

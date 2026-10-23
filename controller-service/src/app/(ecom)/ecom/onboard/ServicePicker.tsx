@@ -19,26 +19,28 @@ export default function ServicePicker({ initial = [], onContinue }: { initial?: 
       <Eyebrow>Get started</Eyebrow>
       <Display as="h1" className="mt-3 text-4xl lg:text-5xl">What do you need?</Display>
       <p className="mt-4 text-lg text-foreground-secondary max-w-2xl">Pick one or more. You can add the others any time from your dashboard — they all share one wallet.</p>
-      <ChoiceCards multiple ariaLabel="Services" className="mt-10 gap-5" columns="grid-cols-1 md:grid-cols-3" cardClassName="rounded-[2rem] p-7 bg-surface-elevated" value={picked} onChange={setPicked}
+      <ChoiceCards multiple ariaLabel="Services" className="mt-6 sm:mt-10 gap-4 sm:gap-5" columns="grid-cols-1 md:grid-cols-3" cardClassName="rounded-3xl sm:rounded-[2rem] p-5 sm:p-7 bg-surface-elevated" value={picked} onChange={setPicked}
         options={OPTIONS.map(o => {
           const on = picked.includes(o.id)
           const Icon = o.icon
           return {
             value: o.id, label: o.title,
             content: (
-              <>
-                <span className={`grid place-items-center w-12 h-12 rounded-full ${on ? 'ecom-sel' : 'org-sage org-sage-text'}`}>
+              <div className="flex items-start gap-4 md:block">
+                <span className={`grid shrink-0 place-items-center w-12 h-12 rounded-full ${on ? 'ecom-sel' : 'org-sage org-sage-text'}`}>
                   <Icon className="w-5 h-5" />
                 </span>
-                <h3 className="font-display font-black text-2xl mt-5">{o.title}</h3>
-                <p className="mt-2 text-base text-foreground-secondary leading-relaxed">{o.copy}</p>
-                {o.tag && <span className="inline-block mt-4 rounded-full org-sand px-3 py-1 text-xs font-semibold text-foreground-secondary">{o.tag}</span>}
-              </>
+                <div className="min-w-0 pr-6 md:pr-0">
+                  <h3 className="font-display font-black text-xl sm:text-2xl md:mt-5">{o.title}</h3>
+                  <p className="mt-1.5 md:mt-2 text-base text-foreground-secondary leading-relaxed">{o.copy}</p>
+                  {o.tag && <span className="inline-block mt-3 md:mt-4 rounded-full org-sand px-3 py-1 text-xs font-semibold text-foreground-secondary">{o.tag}</span>}
+                </div>
+              </div>
             ),
           }
         })} />
-      <div className="mt-10">
-        <Pill onClick={() => onContinue(picked)} disabled={picked.length === 0} className="px-8 py-4 text-base disabled:opacity-40">
+      <div className="mt-8 sm:mt-10">
+        <Pill onClick={() => onContinue(picked)} disabled={picked.length === 0} className="w-full sm:w-auto px-8 py-4 text-base disabled:opacity-40">
           Continue
         </Pill>
       </div>

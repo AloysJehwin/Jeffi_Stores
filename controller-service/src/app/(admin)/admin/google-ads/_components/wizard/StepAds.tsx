@@ -171,7 +171,7 @@ function AdGroupCard({
   return (
     <div className="rounded-xl border border-border-default p-4 space-y-3">
       <div className="flex items-start gap-3">
-        <div className="grid flex-1 gap-3 sm:grid-cols-2">
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Ad group name">
             <input className={inputCls} value={g.name} onChange={e => update({ name: e.target.value })} placeholder="e.g. Cordless drills" />
           </Field>
@@ -216,7 +216,7 @@ function AdGroupCard({
         action={canAi ? <AiButton busy={aiBusy} onClick={writeAd} /> : undefined}
       />
       <TextList label="Description" items={g.descriptions} onChange={v => update({ descriptions: v })} max={LIMITS.description} min={COUNTS.rsaDescriptions[0]} maxItems={COUNTS.rsaDescriptions[1]} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Display path 1 (optional)">
           <LimitedInput value={g.path1} max={LIMITS.path} onChange={v => update({ path1: v })} />
         </Field>

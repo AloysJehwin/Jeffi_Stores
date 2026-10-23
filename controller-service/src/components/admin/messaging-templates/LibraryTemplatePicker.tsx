@@ -174,7 +174,7 @@ export default function LibraryTemplatePicker({
       {picked && (
         <div className="rounded-lg border border-border-default bg-surface-secondary/40 p-3 text-xs space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-medium text-foreground truncate">{picked.name}</span>
+            <span className="min-w-0 font-medium text-foreground truncate">{picked.name}</span>
             <Link
               href={`${ap('/admin/marketing/messaging-templates', host)}?channel=${channel}&slug=${encodeURIComponent(picked.slug)}`}
               target="_blank"

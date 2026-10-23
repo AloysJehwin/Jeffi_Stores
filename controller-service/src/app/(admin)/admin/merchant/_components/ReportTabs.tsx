@@ -39,7 +39,7 @@ export function OverviewView({ d }: { d: any }) {
       <Section title="Clicks by day">
         {d.daily.length ? <TrendChart points={d.daily.map((x: any) => ({ label: x.date, organic: x.organic, ads: x.ads, impressions: x.impressions }))} series={SERIES} ariaLabel="Merchant clicks by day" /> : <Empty msg="No performance data yet. Refresh reports (top right)." />}
       </Section>
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <Section title="Account">
           <p className="text-sm">
             {d.accountIssues ? <Badge tone="red">{d.accountIssues} account issue(s)</Badge> : <Badge tone="green">No account issues</Badge>}

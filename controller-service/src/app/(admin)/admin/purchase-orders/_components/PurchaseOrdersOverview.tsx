@@ -85,7 +85,7 @@ export default function PurchaseOrdersOverview() {
               ariaLabel="PO value raised and goods received"
             />
           </Section>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Section title="Open POs by status">
               {data.by_status.every(s => !s.count) ? (
                 <p className="text-sm text-foreground-muted">No open purchase orders.</p>
@@ -111,7 +111,7 @@ export default function PurchaseOrdersOverview() {
               />
             </Section>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Section title="Overdue deliveries">
               {data.overdue.length === 0 ? (
                 <p className="text-sm text-foreground-muted">No open PO is past its expected date.</p>

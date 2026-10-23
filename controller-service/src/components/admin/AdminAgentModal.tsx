@@ -489,7 +489,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
           {tab === 'chat' && (
             <div className="flex flex-1 min-h-0">
               {showHistory && (
-                <aside className="w-64 border-r border-border-default bg-surface-secondary/50 flex flex-col shrink-0">
+                <aside className="w-40 sm:w-64 border-r border-border-default bg-surface-secondary/50 flex flex-col shrink-0">
                   <div className="px-3 py-2 border-b border-border-default flex items-center justify-between">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
                       Chat history
@@ -545,7 +545,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                         }`}
                       >
                         {turn.role === 'user' ? (
-                          <p className="whitespace-pre-wrap leading-relaxed">{turn.content}</p>
+                          <p className="whitespace-pre-wrap break-words leading-relaxed">{turn.content}</p>
                         ) : (
                           <>
                             {turn.content && <AdminAgentMessage text={turn.content} />}
@@ -578,7 +578,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                             </summary>
                             <ul className="mt-1 space-y-0.5">
                               {turn.toolCalls.map((tc, i) => (
-                                <li key={i} className="font-mono">
+                                <li key={i} className="font-mono [overflow-wrap:anywhere]">
                                   {tc.isError ? '[err] ' : '[ok] '}
                                   {tc.tool}({Object.keys(tc.input).join(',')})
                                 </li>
@@ -682,7 +682,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                   {pendingFile && (
                     <div className="flex items-center gap-2 px-2 py-1.5 bg-surface-secondary rounded-lg text-xs">
                       <Paperclip className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
-                      <span className="truncate flex-1 text-foreground">{pendingFile.name}</span>
+                      <span className="truncate flex-1 min-w-0 text-foreground">{pendingFile.name}</span>
                       <span className="text-[10px] text-foreground-muted shrink-0">
                         {(pendingFile.size / 1024).toFixed(0)} KB
                       </span>
@@ -717,7 +717,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                       placeholder={
                         pendingFile ? 'Add an instruction (optional) and send' : 'Ask anything about the store'
                       }
-                      className="flex-1 px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none"
+                      className="flex-1 min-w-0 px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none"
                     />
                     <button
                       type="button"

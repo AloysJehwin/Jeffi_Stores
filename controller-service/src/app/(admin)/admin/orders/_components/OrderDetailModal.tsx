@@ -134,7 +134,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
             />
           </Fields>
 
-          <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-secondary p-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-secondary p-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 sm:grid-cols-4">
             <div>
               <p className="text-xs text-foreground-muted">Subtotal</p>
               <p className="text-sm font-semibold tabular-nums text-foreground">{inr(o.subtotal)}</p>
@@ -167,7 +167,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
             <div>
               <p className="mb-2 text-xs uppercase tracking-wide text-foreground-muted">Items ({items.length})</p>
               <div className="overflow-x-auto rounded-lg border border-border-default">
-                <table className="w-full table-fixed text-sm">
+                <table className="w-full min-w-[540px] table-fixed text-sm sm:min-w-0">
                   <thead>
                     <tr className="border-b border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
                       <th className="w-[45%] px-3 py-2 text-left font-medium">Product</th>

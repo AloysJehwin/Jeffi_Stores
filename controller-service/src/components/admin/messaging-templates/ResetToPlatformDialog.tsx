@@ -124,12 +124,12 @@ export default function ResetToPlatformDialog({ open, onClose, onConfirm, busy, 
     <div className="space-y-4">
       <Banner>{bannerBody}</Banner>
       {subjectChanged && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <MonoBlock title="Current subject" text={current.subject ?? ''} tone="current" />
           <MonoBlock title="Platform subject" text={platform.subject ?? ''} tone="platform" />
         </div>
       )}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <MonoBlock title="Current body" text={current.body} tone="current" />
         <MonoBlock title="Platform body" text={platform.body} tone="platform" />
       </div>

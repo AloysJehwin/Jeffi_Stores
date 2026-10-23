@@ -720,7 +720,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
       }
       description={product.name}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-foreground-muted">
             {selected.size} item{selected.size !== 1 ? 's' : ''} · {totalLabels} label{totalLabels !== 1 ? 's' : ''}
           </p>
@@ -779,7 +779,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <div className="flex-1">
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Format</p>
               <div className="flex gap-1.5">
@@ -819,7 +819,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
             </div>
           </div>
 
-          <div className="flex gap-4 items-start">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">

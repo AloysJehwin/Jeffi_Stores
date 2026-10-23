@@ -166,11 +166,11 @@ export default function DigitalFilesPanel({ productId }: Props) {
       ) : (
         <ul className="divide-y divide-border-default border border-border-default rounded">
           {files.map(f => (
-            <li key={f.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+            <li key={f.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3 px-3 py-2 text-sm">
               <span className="shrink-0 uppercase text-[10px] px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted">
                 {f.kind}
               </span>
-              <span className="flex-1 truncate text-foreground" title={f.display_name}>
+              <span className="flex-1 min-w-0 truncate text-foreground" title={f.display_name}>
                 {f.display_name}
               </span>
               <span className="shrink-0 text-xs text-foreground-muted">{fmtBytes(Number(f.size_bytes))}</span>

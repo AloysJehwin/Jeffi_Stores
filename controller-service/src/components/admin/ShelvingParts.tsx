@@ -432,7 +432,7 @@ export function StockRow({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground truncate">{row.product_name}</p>
           {row.variant_name && <p className="text-xs text-foreground-secondary truncate mt-0.5">{row.variant_name}</p>}
-          <p className="text-xs font-mono text-foreground-muted mt-0.5">
+          <p className="text-xs font-mono text-foreground-muted mt-0.5 [overflow-wrap:anywhere]">
             <span className="inline-flex items-center gap-1">
               {row.sku}
               {row.sku && <CopySku sku={row.sku} />}
@@ -510,7 +510,7 @@ export function StockRow({
       </div>
 
       {(row.perishable || row.serialized) && batchesOpen && batches.length > 0 && (
-        <div className="mt-2 rounded-lg border border-border-default overflow-hidden">
+        <div className="mt-2 rounded-lg border border-border-default overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-surface border-b border-border-default">
               <tr>
@@ -609,7 +609,7 @@ export function StockRow({
 
           {isPerishableWithBatches ? (
             /* Batch picker for perishable products */
-            <div className="rounded-lg border border-border-default overflow-hidden">
+            <div className="rounded-lg border border-border-default overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-surface border-b border-border-default">
                   <tr>

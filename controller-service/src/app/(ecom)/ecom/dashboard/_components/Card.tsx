@@ -13,7 +13,7 @@ export function Row({ label, value, mono = false }: { label: string; value: Reac
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
       <span className="text-foreground-secondary flex-shrink-0">{label}</span>
-      <span className={`text-foreground text-right ${mono ? 'font-mono text-xs break-all' : 'font-medium'}`}>{value}</span>
+      <span className={`min-w-0 break-words text-foreground text-right ${mono ? 'font-mono text-xs break-all' : 'font-medium'}`}>{value}</span>
     </div>
   )
 }

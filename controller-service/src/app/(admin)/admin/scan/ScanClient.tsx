@@ -423,12 +423,12 @@ export default function ScanClient() {
 
           <div className="rounded-2xl border border-border-default bg-surface-elevated p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-foreground-muted mb-0.5">Order Number</p>
-                <p className="font-mono font-semibold text-foreground">#{order.order_number}</p>
+                <p className="font-mono font-semibold text-foreground [overflow-wrap:anywhere]">#{order.order_number}</p>
               </div>
               <span
-                className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-surface-secondary text-foreground-secondary'}`}
+                className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-surface-secondary text-foreground-secondary'}`}
               >
                 {statusLabel(order.status)}
               </span>
@@ -484,7 +484,7 @@ export default function ScanClient() {
             <div className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground text-base leading-snug">{product.name}</p>
+                  <p className="font-semibold text-foreground text-base leading-snug break-words">{product.name}</p>
                   {product.variant_name && <p className="text-foreground-muted text-sm mt-0.5">{product.variant_name}</p>}
                 </div>
                 <span
@@ -494,7 +494,7 @@ export default function ScanClient() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-surface-secondary rounded-xl p-3">
                   <p className="text-xs text-foreground-muted mb-0.5">SKU</p>
                   <p className="font-mono text-sm text-foreground break-all inline-flex items-center gap-1">
@@ -640,7 +640,7 @@ export default function ScanClient() {
           </div>
           <div>
             <p className="text-2xl font-bold text-foreground">Done!</p>
-            <p className="text-foreground-secondary mt-2">
+            <p className="text-foreground-secondary mt-2 [overflow-wrap:anywhere]">
               <span className="font-mono">#{order.order_number}</span>
             </p>
             <p className="text-foreground-muted text-sm mt-1">

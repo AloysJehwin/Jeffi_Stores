@@ -81,7 +81,7 @@ export default function RfqsOverview() {
             ))}
           </KpiGrid>
           <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <Section title="RFQs received and converted">
                 <TrendChart
@@ -112,7 +112,7 @@ export default function RfqsOverview() {
               )}
             </Section>
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Section title="Top B2B customers">
               <Table
                 rows={data.top_customers}

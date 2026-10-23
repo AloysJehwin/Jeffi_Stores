@@ -163,7 +163,7 @@ export default function ReviewFormsMobileList({ forms, backUrl, formsBase }: Pro
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               <div>
                 <p className="text-xs text-foreground-muted">Coupon</p>
-                <p className="text-sm text-foreground font-medium">{selected.coupon_code || 'None'}</p>
+                <p className="text-sm text-foreground font-medium break-words">{selected.coupon_code || 'None'}</p>
               </div>
               <div>
                 <p className="text-xs text-foreground-muted">Submissions</p>

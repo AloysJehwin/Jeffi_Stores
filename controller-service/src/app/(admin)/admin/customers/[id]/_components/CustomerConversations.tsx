@@ -204,10 +204,10 @@ function FeedItem({ item, phone }: { item: ConversationItem; phone: string | nul
           )}
         </div>
         {item.subject && item.channel === 'email' && (
-          <p className="text-sm font-semibold text-foreground mt-1">{item.subject}</p>
+          <p className="text-sm font-semibold text-foreground mt-1 break-words">{item.subject}</p>
         )}
         {item.subject && item.channel !== 'email' && (
-          <p className="text-xs text-foreground-secondary mt-1">{item.subject}</p>
+          <p className="text-xs text-foreground-secondary mt-1 break-words">{item.subject}</p>
         )}
         {item.body && <ItemBody body={item.body} />}
         {item.attachments.length > 0 && <NoteAttachments attachments={toNoteAttachments(item.attachments)} size="sm" />}

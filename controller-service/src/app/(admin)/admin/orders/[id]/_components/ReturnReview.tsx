@@ -264,7 +264,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
             type="button"
             onClick={confirmVariantPick}
             disabled={isSubmitting}
-            className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:opacity-50"
+            className="control-md h-auto py-1.5 bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:opacity-50 sm:h-control sm:py-0"
           >
             Confirm replacement with selected variant(s)
           </button>
@@ -308,7 +308,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       {description && (
         <div>
           <p className="text-sm text-foreground-secondary mb-1">Customer description</p>
-          <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2">
+          <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2 break-words">
             {description}
           </p>
         </div>
@@ -317,7 +317,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       {admin_notes && (
         <div>
           <p className="text-sm text-foreground-secondary mb-1">Admin notes</p>
-          <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2">
+          <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2 break-words">
             {admin_notes}
           </p>
         </div>
@@ -404,17 +404,17 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                 )}
               </div>
             ) : canWrite ? (
-              <div className="flex items-stretch gap-2">
+              <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap">
                 <button
                   type="button"
                   onClick={handleCreateRVP}
                   disabled={isSubmitting}
-                  className="control-md flex-1 justify-center bg-accent-500 hover:bg-accent-600 font-semibold text-white disabled:opacity-50"
+                  className="control-md flex-1 basis-full justify-center sm:basis-0 bg-accent-500 hover:bg-accent-600 font-semibold text-white disabled:opacity-50"
                 >
                   {isSubmitting ? 'Creating...' : 'Create RVP Pickup (Delhivery QC)'}
                 </button>
                 {warehouses.length > 0 && (
-                  <div className="w-44 shrink-0" title="Warehouse the return is picked up to">
+                  <div className="w-full shrink-0 sm:w-44" title="Warehouse the return is picked up to">
                     <AdminSelect value={pickupLocation} onChange={setPickupLocation} options={warehouses} />
                   </div>
                 )}

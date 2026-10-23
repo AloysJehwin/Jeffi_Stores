@@ -166,7 +166,7 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
       )}
 
       {/* Mode tabs */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button type="button" className={tabClass('search')} onClick={() => setMode('search')}>
           Search
         </button>

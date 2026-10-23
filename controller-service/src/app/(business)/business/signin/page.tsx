@@ -7,6 +7,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import { bp } from '@/lib/shared/business-path'
+import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
+import { useLeaveTo } from '@/components/auth/useLeaveTo'
 
 export default function BusinessSignInWrapper() {
   return (
@@ -21,17 +23,18 @@ function BusinessSignInPage() {
   const searchParams = useSearchParams()
   const { user, isLoading: authLoading } = useAuth()
   const config = useStoreConfig()
+  const { leaving, go } = useLeaveTo()
 
   const callbackUrl = searchParams.get('callbackUrl')
 
   useEffect(() => {
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'approved') {
-      router.replace(callbackUrl || bp('/business/products'))
+      go(callbackUrl || bp('/business/products'), 'replace')
     }
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'pending') {
-      router.replace(bp('/business/pending'))
+      go(bp('/business/pending'), 'replace')
     }
-  }, [user, authLoading])
+  }, [user, authLoading, go, callbackUrl])
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [email, setEmail] = useState('')
@@ -104,10 +107,10 @@ function BusinessSignInPage() {
           return
         }
         if (data.approvalStatus === 'pending') {
-          router.push(bp('/business/pending'))
+          go(bp('/business/pending'))
           return
         }
-        router.push(bp('/business/dashboard'))
+        go(bp('/business/dashboard'))
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
       .finally(() => setGoogleLoading(false))
@@ -183,7 +186,7 @@ function BusinessSignInPage() {
       }
 
       if (data.approvalStatus === 'pending') {
-        router.push(bp('/business/pending'))
+        go(bp('/business/pending'))
         return
       }
       if (data.approvalStatus === 'rejected') {
@@ -200,7 +203,7 @@ function BusinessSignInPage() {
         body: JSON.stringify({ notificationChannel: channel }),
       }).catch(() => {})
       // Redirect to business portal
-      window.location.href = callbackUrl || bp('/business/products')
+      go(callbackUrl || bp('/business/products'), 'hard')
     } catch (err: any) {
       setError(err.message)
       setOtp('')
@@ -277,7 +280,7 @@ function BusinessSignInPage() {
         return
       }
       if (data.approvalStatus === 'pending') {
-        router.push(bp('/business/pending'))
+        go(bp('/business/pending'))
         return
       }
       // Fetch business profile to know if policy acceptance is needed
@@ -299,7 +302,7 @@ function BusinessSignInPage() {
         setShowPhoneModal(true)
         return
       }
-      window.location.href = callbackUrl || bp('/business/products')
+      go(callbackUrl || bp('/business/products'), 'hard')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -338,7 +341,7 @@ function BusinessSignInPage() {
           body: JSON.stringify({}),
         }).catch(() => {})
       }
-      window.location.href = bp('/business/products')
+      go(bp('/business/products'), 'hard')
     } catch (err: any) {
       setPhoneError(err.message)
     } finally {
@@ -390,9 +393,17 @@ function BusinessSignInPage() {
 
   return (
     <>
-      <div className="relative min-h-screen grid lg:grid-cols-2">
-        {/* Top-right switch action (the public header is intentionally hidden on the auth pages) */}
-        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 flex items-center gap-3">
+      <AuthSplitShell
+        brandName={config.identity.name}
+        logoUrl={config.identity.logoUrl}
+        headline="Your exclusive B2B partner portal"
+        sub="Access custom pricing, request quotes on bulk orders, and manage your business purchases, all in one place."
+        points={AUTH_POINTS.business}
+        footnote="Business accounts are reviewed before trade pricing is unlocked."
+        theme={AUTH_THEMES.business}
+        busy={leaving ? 'Signing you in…' : googleLoading ? 'Signing you in with Google…' : null}
+        corner={
+          <>
           <span className="hidden sm:inline-flex items-center text-sm text-foreground-secondary bg-surface/90 backdrop-blur px-3 py-2 rounded-lg border border-border-default">
             New business partner?
           </span>
@@ -402,10 +413,9 @@ function BusinessSignInPage() {
           >
             Sign up
           </Link>
-        </div>
-        {/* Left — form */}
-        <div className="flex items-center justify-center px-6 py-12 bg-surface">
-          <div className="w-full max-w-sm">
+          </>
+        }
+      >
             <div className="mb-8">
               <Link
                 href="/"
@@ -687,54 +697,7 @@ function BusinessSignInPage() {
                 Apply for access
               </Link>
             </p>
-          </div>
-        </div>
-
-        {/* Right — hero */}
-        <div className="hidden lg:flex flex-col justify-center px-12 bg-gradient-to-br from-secondary-600 to-secondary-800 text-white">
-          <div className="max-w-md">
-            <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-8">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-3xl font-bold mb-4 leading-tight">Your exclusive B2B partner portal</h2>
-            <p className="text-white/70 text-base leading-relaxed mb-8">
-              Access custom pricing, request quotes on bulk orders, and manage your business purchases — all in one
-              place.
-            </p>
-            <ul className="space-y-3">
-              {[
-                'Custom discount rates on your categories',
-                'Request for Quote (RFQ) on any product',
-                'Dedicated support for bulk orders',
-                'Full order history and invoices',
-              ].map(item => (
-                <li key={item} className="flex items-center gap-3 text-sm text-white/80">
-                  <svg
-                    className="w-5 h-5 text-accent-300 shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
+      </AuthSplitShell>
 
       {showPhoneModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">

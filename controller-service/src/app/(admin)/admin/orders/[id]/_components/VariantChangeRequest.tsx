@@ -280,7 +280,7 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
                         className={`w-full text-left p-2.5 rounded-lg border text-sm ${isSel ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
                       >
                         <div className="flex justify-between gap-2">
-                          <span className="font-medium text-foreground">
+                          <span className="min-w-0 break-words font-medium text-foreground">
                             {c.kind === 'sub' && c.parent_variant_name ? `${c.parent_variant_name} / ` : ''}
                             {c.name || c.sku}
                             {!c.name && c.sku && <CopySku sku={c.sku} />}
@@ -367,7 +367,7 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
 
             {error && <p className="text-sm text-red-600">{error}</p>}
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={submit}
                 disabled={!selected || submitting}

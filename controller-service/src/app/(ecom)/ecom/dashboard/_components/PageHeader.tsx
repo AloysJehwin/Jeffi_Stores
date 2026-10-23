@@ -15,10 +15,10 @@ export default function PageHeader({
     <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
       <div className="min-w-0">
         {eyebrow && <div className="text-xs font-semibold uppercase tracking-widest text-foreground-muted mb-1">{eyebrow}</div>}
-        <h1 className="font-display text-3xl sm:text-4xl font-black text-foreground leading-tight">{title}</h1>
+        <h1 className="font-display text-3xl sm:text-4xl font-black text-foreground leading-tight break-words">{title}</h1>
         {description && <p className="text-sm text-foreground-secondary mt-2 max-w-2xl">{description}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
+      {actions && <div className="flex max-w-full flex-wrap items-center gap-2 flex-shrink-0">{actions}</div>}
     </div>
   )
 }

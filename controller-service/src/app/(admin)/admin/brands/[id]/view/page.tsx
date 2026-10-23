@@ -142,7 +142,7 @@ export default async function BrandViewPageDetail({
                       <Link href={ap(`/admin/products/${p.id}`, host)} className="block font-medium text-accent-500 hover:underline truncate">
                         {p.name}
                       </Link>
-                      <div className="mt-1 flex items-center gap-2 text-xs text-foreground-muted font-mono">
+                      <div className="mt-1 flex items-center gap-2 text-xs text-foreground-muted font-mono break-all">
                         {p.sku}
                         {p.sku && <CopySku sku={p.sku} />}
                       </div>

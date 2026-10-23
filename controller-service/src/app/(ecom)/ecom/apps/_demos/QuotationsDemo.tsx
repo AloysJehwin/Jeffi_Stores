@@ -27,7 +27,7 @@ export default function QuotationsDemo() {
       )}
       {s.step === 'accept' && (
         <div className="h-full grid place-items-center text-center">
-          <div className="max-w-sm rounded-[2rem] org-sage p-8">
+          <div className="max-w-sm rounded-[2rem] org-sage p-6 sm:p-8">
             <p className="text-xs uppercase tracking-widest org-sage-text">Buyer response</p>
             <p className="font-display font-black text-2xl mt-2">Accepted</p>
             <p className="text-sm text-foreground-secondary mt-2">Meridian Cafés accepted QT-0017 for {rs(46816)}.</p>

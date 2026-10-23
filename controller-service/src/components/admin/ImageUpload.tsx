@@ -215,7 +215,7 @@ export default function ImageUpload({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
         <div>
           <h3 className="text-sm font-medium text-foreground-secondary">Product Images</h3>
           <p className="text-xs text-foreground-muted mt-1">
@@ -223,7 +223,7 @@ export default function ImageUpload({
           </p>
         </div>
         {canUploadMore && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={openGallery}

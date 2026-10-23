@@ -264,7 +264,7 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
             }}
             placeholder="All Statuses"
           />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <DatePicker
               className="w-36"
               value={fromDate}
@@ -293,7 +293,7 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
       )}
 
       <div className="bg-surface-elevated rounded-xl border border-border-default">
-        <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-border-default flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-foreground">
             Orders
             <span className="ml-2 text-sm font-normal text-foreground-muted">

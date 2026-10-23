@@ -42,7 +42,7 @@ export default function AgentOverview() {
               />
             ))}
           </KpiGrid>
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
             <Section title="Tools used">
               <Table

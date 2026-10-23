@@ -140,7 +140,7 @@ function Body({ d }: { d: ProductsOverviewData }) {
         />
       </KpiGrid>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AttentionList items={withAp(d.attention)} />
         <Section title="Product sales">
           {d.series.some(s => s.sales > 0) ? (
@@ -163,9 +163,9 @@ function Body({ d }: { d: ProductsOverviewData }) {
             <Badge>{count(h.inactive)} inactive</Badge>
             {h.drafts > 0 && <Badge tone="blue">{count(h.drafts)} drafts</Badge>}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {ISSUES.map(i => (
-              <div key={i.id} className="rounded-lg border border-border-default bg-surface p-3">
+              <div key={i.id} className="min-w-0 rounded-lg border border-border-default bg-surface p-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-xs text-foreground-muted">{i.label}</p>
                   <p
@@ -195,7 +195,7 @@ function Body({ d }: { d: ProductsOverviewData }) {
         </Section>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section title="Top sellers">
           <Table
             rows={d.topSellers}
@@ -237,7 +237,7 @@ function Body({ d }: { d: ProductsOverviewData }) {
         </Section>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div id="never-sold">
           <Section title={`Never sold (${count(d.neverSold.total)})`}>
             <p className="text-xs text-foreground-muted mb-2">
