@@ -2116,7 +2116,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice | null; onClose: ()
             />
             <Field label="Order" value={inv.order_number} mono />
           </Fields>
-          <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-secondary p-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-secondary p-3 sm:grid-cols-4 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
             <Field label="Taxable" value={<span className="font-semibold tabular-nums">{money(inv.taxable_amount)}</span>} />
             {parseFloat(inv.cgst_amount) > 0 && (
               <Field
@@ -2186,7 +2186,7 @@ function DraftStockPill({ draft }: { draft: any }) {
       {/* Hover popup — hidden (removed from layout) until hover, so it never reserves vertical
           space inside the table's scroll container. Shown below the pill to avoid top clipping. */}
       <span
-        className="pointer-events-none hidden group-hover:block absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
+        className="pointer-events-none hidden group-hover:block absolute top-full left-0 md:left-1/2 md:-translate-x-1/2 mt-2 z-50
         w-72 rounded-lg border border-border-default bg-surface shadow-lg p-2"
       >
         <span className="block text-xs font-semibold text-foreground mb-1.5">Stock breakdown</span>

@@ -20,9 +20,9 @@ export const btnGhost =
 
 export function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
+    <div className="min-w-0 bg-surface-elevated border border-border-default rounded-xl p-4 sm:p-5">
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">{title}</h2>
+        <h2 className="min-w-0 break-words text-sm font-semibold text-foreground uppercase tracking-wide">{title}</h2>
         {action}
       </div>
       {children}
@@ -56,14 +56,14 @@ export function Kpi({
   icon?: React.ReactNode
 }) {
   const good = delta == null ? null : invert ? delta < 0 : delta > 0
-  const cls = `bg-surface-elevated border rounded-xl p-4 flex flex-col gap-1 ${highlight ? 'border-accent-500/50' : 'border-border-default'} ${href ? 'hover:border-accent-400 transition-colors' : ''}`
+  const cls = `min-w-0 bg-surface-elevated border rounded-xl p-3 sm:p-4 flex flex-col gap-1 ${highlight ? 'border-accent-500/50' : 'border-border-default'} ${href ? 'hover:border-accent-400 transition-colors' : ''}`
   const inner = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-foreground-muted uppercase tracking-wide font-medium truncate">{label}</p>
+        <p className="min-w-0 text-xs text-foreground-muted uppercase tracking-wide font-medium leading-tight break-words">{label}</p>
         {icon && <span className="shrink-0 text-foreground-muted [&_svg]:w-4 [&_svg]:h-4">{icon}</span>}
       </div>
-      <p className={`text-xl font-bold tabular-nums ${highlight ? 'text-accent-500' : 'text-foreground'}`}>{value}</p>
+      <p className={`text-lg sm:text-xl font-bold tabular-nums [overflow-wrap:anywhere] ${highlight ? 'text-accent-500' : 'text-foreground'}`}>{value}</p>
       {delta != null && (
         <p className={`text-xs flex items-center gap-1 ${good ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
           {delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -83,7 +83,12 @@ export function Kpi({
 }
 
 export function KpiGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-3 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))]">{children}</div>
+  // On phones an odd last card spans both columns so the grid has no hole.
+  return (
+    <div className="grid gap-3 grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] sm:[&>*:last-child:nth-child(odd)]:col-span-1">
+      {children}
+    </div>
+  )
 }
 
 export type { Tone }
@@ -304,7 +309,7 @@ export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows:
   const { shown, control } = useReveal(sorted, pageSize, `${sortKey}|${desc}`)
   if (!rows.length) return <Empty msg={empty} />
   return (
-    <div>
+    <div className="min-w-0">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

@@ -56,7 +56,7 @@ export default function ApiKeysClient({ services, docsUrl }: { services: { messa
       {noService && (
         <Card title="Request a service">
           <p className="text-sm text-foreground-secondary mb-4">Your workspace has no API services yet. Request one — it uses the same wallet as your store and starts after a quick review.</p>
-          <div className="flex gap-3">{(['messaging', 'documents'] as const).map(s => <button key={s} onClick={() => setConfirm(s)} className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white">Request {LABEL[s]} API</button>)}</div>
+          <div className="flex flex-wrap gap-3">{(['messaging', 'documents'] as const).map(s => <button key={s} onClick={() => setConfirm(s)} className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white">Request {LABEL[s]} API</button>)}</div>
           {confirm && confirmBox(confirm)}
         </Card>
       )}

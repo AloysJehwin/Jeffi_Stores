@@ -85,7 +85,7 @@ export default function PostGroup({ posts, onChange }: { posts: Post[]; onChange
               </div>
               {metrics && <p className="text-xs text-foreground-muted tabular-nums">{metrics}</p>}
               {p.last_error && (p.status === 'failed' || (p.status === 'pending' && p.attempts > 0)) && (
-                <p className="text-xs text-red-500">
+                <p className="text-xs text-red-500 break-words">
                   {p.last_error}
                   {p.status === 'pending' && p.next_attempt_at ? ` - retry ${p.attempts + 1} at ${when(p.next_attempt_at)}` : ''}
                 </p>
@@ -151,7 +151,7 @@ function EditPost({ post, onDone }: { post: Post; onDone: (saved: boolean) => vo
         <label className={lbl}>Hashtags</label>
         <input className={inputCls} value={hashtags} onChange={e => setHashtags(e.target.value)} />
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {TITLE_PLATFORMS.includes(post.platform) && (
           <div>
             <label className={lbl}>Title</label>

@@ -173,7 +173,7 @@ function Body({ d }: { d: Data }) {
         />
       </KpiGrid>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AttentionList items={withAp(d.attention)} />
         <Section title="Pickups not yet collected">
           <p className="text-xs text-foreground-muted mb-3">

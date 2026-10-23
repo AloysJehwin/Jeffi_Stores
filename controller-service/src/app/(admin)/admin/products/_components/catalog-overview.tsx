@@ -63,7 +63,7 @@ export function OverviewTab<T extends { attention?: AttentionItem[] }>({
         {data => (
           <div className="space-y-4">
             <KpiGrid>{kpis(data)}</KpiGrid>
-            <div className={extra ? 'grid gap-4 lg:grid-cols-2' : ''}>
+            <div className={extra ? 'grid grid-cols-1 gap-4 lg:grid-cols-2' : ''}>
               <AttentionList items={withAp(data.attention)} />
               {extra?.(data)}
             </div>

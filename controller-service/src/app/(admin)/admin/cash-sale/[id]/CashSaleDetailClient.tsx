@@ -143,7 +143,7 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
           </Card>
           {s.notes && (
             <Card title="Notes">
-              <p className="text-sm text-foreground">{s.notes}</p>
+              <p className="text-sm text-foreground break-words">{s.notes}</p>
             </Card>
           )}
         </>

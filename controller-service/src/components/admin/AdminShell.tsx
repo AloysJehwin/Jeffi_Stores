@@ -74,7 +74,7 @@ export default function AdminShell({
         {/* Top bar — full width, spans above sidebar + content */}
         <div className="flex items-center px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0 gap-3">
           {/* Mobile hamburger */}
-          <div className="lg:hidden flex items-center gap-2">
+          <div className="lg:hidden flex min-w-0 items-center gap-2">
             <AdminMobileNav navLinks={allNavLinks} username={displayName} role={role} />
             <span className="font-bold text-white text-sm truncate max-w-[9rem]">{brandName}</span>
           </div>
@@ -103,7 +103,7 @@ export default function AdminShell({
           </div>
 
           {/* Right side: avatar + name + role + theme + logout */}
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold shrink-0">
                 {usernameInitial}

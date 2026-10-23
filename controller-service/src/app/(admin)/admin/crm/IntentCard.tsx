@@ -16,13 +16,13 @@ export default function IntentCard({ intent, topSearches }: { intent: Intent; to
       <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Purchase Intent</h2>
 
       <p className="text-[11px] uppercase tracking-wide text-foreground-muted font-medium mb-2">Abandoned carts</p>
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         {intent.abandoned.map(a => (
           <CompactStat key={a.label} label={a.label} value={numStr(a.count)} sub={rsCompact(a.value)} />
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         <CompactStat label="Saved for later" value={numStr(intent.savedForLater)} />
         <CompactStat label="Wishlist items" value={numStr(intent.wishlistItems)} />
         <CompactStat label="Wishlist in stock" value={numStr(intent.wishlistInStock)} />

@@ -66,7 +66,7 @@ export default function B2bCustomersOverview() {
           <Section title="B2B sales">
             <TrendChart points={data.series} bucket={data.bucket} series={SERIES} ariaLabel="B2B sales and orders" />
           </Section>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <Section title="Top B2B customers">
                 <Table

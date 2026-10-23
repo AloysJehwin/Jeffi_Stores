@@ -111,7 +111,7 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
       <div className="md:col-span-3 space-y-4">
         <Section
           title="Connection"

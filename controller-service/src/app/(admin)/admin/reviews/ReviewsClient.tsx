@@ -338,9 +338,9 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
                       </div>
 
                       {/* Review text */}
-                      {review.title && <p className="font-semibold text-sm text-foreground mb-0.5">{review.title}</p>}
+                      {review.title && <p className="font-semibold text-sm text-foreground mb-0.5 break-words">{review.title}</p>}
                       <p
-                        className={`text-sm text-foreground-secondary leading-relaxed whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}
+                        className={`text-sm text-foreground-secondary leading-relaxed whitespace-pre-wrap break-words ${!isExpanded ? 'line-clamp-3' : ''}`}
                       >
                         {review.comment}
                       </p>

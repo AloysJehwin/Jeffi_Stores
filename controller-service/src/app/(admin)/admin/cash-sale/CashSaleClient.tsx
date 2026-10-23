@@ -469,10 +469,10 @@ export default function CashSaleClient() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-border-default flex items-start justify-between">
-              <div>
+            <div className="px-5 py-4 border-b border-border-default flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-xs text-foreground-muted uppercase tracking-wide">Receipt No</p>
-                <p className="text-xl font-bold text-foreground font-mono mt-0.5">
+                <p className="text-xl font-bold text-foreground font-mono mt-0.5 [overflow-wrap:anywhere]">
                   {receipt.invoiceNumber || 'Pending'}
                 </p>
               </div>
@@ -523,7 +523,7 @@ export default function CashSaleClient() {
 
             {receipt.notes && (
               <div className="px-5 py-3 border-t border-border-default">
-                <p className="text-xs text-foreground-muted">Notes: {receipt.notes}</p>
+                <p className="text-xs text-foreground-muted break-words">Notes: {receipt.notes}</p>
               </div>
             )}
           </div>
@@ -1188,7 +1188,7 @@ function SaleDetailModal({
           <Field label="Customer" value="Walk-in Customer" />
           <Field label="Order" value={sale.order_number} mono />
         </Fields>
-        <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-secondary p-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-secondary p-3 sm:grid-cols-4 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
           <Field label="Taxable" value={`₹${inr2(sale.taxable_amount)}`} />
           {parseFloat(sale.cgst_amount) > 0 && <Field label="CGST + SGST" value={`₹${inr2(sale.cgst_amount)} + ₹${inr2(sale.sgst_amount)}`} />}
           <Field label="Total" value={<span className="font-bold">₹{inr2(sale.total_amount)}</span>} />

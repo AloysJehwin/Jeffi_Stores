@@ -43,7 +43,7 @@ export default function AuditOverview() {
               />
             ))}
           </KpiGrid>
-          <div className="grid gap-3 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
             <Section title="By member">
               <ul className="space-y-1.5 text-sm">

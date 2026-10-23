@@ -29,7 +29,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-2 border-b border-border-default last:border-b-0">
       <span className="text-xs text-foreground-muted">{label}</span>
-      <span className="text-sm text-foreground text-right">{value}</span>
+      <span className="text-sm text-foreground text-right min-w-0 break-words">{value}</span>
     </div>
   )
 }

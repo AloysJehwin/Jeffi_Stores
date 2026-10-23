@@ -37,7 +37,7 @@ function Row({ c, large }: { c: ChurnRisk; large?: boolean }) {
     >
       <div className="min-w-0 flex-1">
         <p className="text-foreground truncate font-medium">{c.name}</p>
-        <p className="text-[10px] text-foreground-muted">
+        <p className="text-[10px] text-foreground-muted break-words">
           <span className="hover:underline">{c.email}</span>
           {' · '}₹{Math.round(c.ltv).toLocaleString('en-IN')} lifetime
           {c.daysSinceLastOrder != null && ` · ${c.daysSinceLastOrder}d quiet`}

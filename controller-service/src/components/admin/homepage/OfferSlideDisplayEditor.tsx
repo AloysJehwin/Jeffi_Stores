@@ -218,7 +218,7 @@ export default function OfferSlideDisplayEditor({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-foreground-secondary mb-1">Badge text</label>
           <input

@@ -220,7 +220,7 @@ function renderBlock(
           : b.weight === 'muted'
             ? 'text-xs text-foreground-muted'
             : 'text-sm text-foreground'
-      return <p className={`${cls} whitespace-pre-wrap`}>{b.value}</p>
+      return <p className={`${cls} whitespace-pre-wrap break-words`}>{b.value}</p>
     }
     case 'heading': {
       const lvl = b.level ?? 2
@@ -238,7 +238,7 @@ function renderBlock(
           {b.pairs.map((p, i) => (
             <div key={i} className="contents">
               <dt className="text-foreground-muted">{p.key}</dt>
-              <dd className="text-foreground">{p.value}</dd>
+              <dd className="text-foreground min-w-0 [overflow-wrap:anywhere]">{p.value}</dd>
             </div>
           ))}
         </dl>
@@ -417,7 +417,7 @@ function renderBlock(
       return (
         <div className={`rounded-lg border p-3 flex items-start gap-2 text-xs ${cls}`}>
           <Icon className="w-4 h-4 mt-0.5 shrink-0" />
-          <div>
+          <div className="min-w-0 break-words">
             {b.title && <p className="font-semibold mb-0.5">{b.title}</p>}
             <p>{b.message}</p>
           </div>

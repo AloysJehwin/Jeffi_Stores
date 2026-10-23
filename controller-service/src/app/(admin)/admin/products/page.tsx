@@ -132,8 +132,6 @@ async function ProductsStats() {
             />
             <Kpi label="Total products" value={totalCount.toLocaleString('en-IN')} />
             <Kpi label="Active" value={activeCount.toLocaleString('en-IN')} />
-          </KpiGrid>
-          <KpiGrid>
             <Kpi label="Featured" value={`${featuredCount}/6`} sub="Shown on the storefront home" />
             <Kpi label="Categories" value={categoryCount.toLocaleString('en-IN')} />
             <Kpi label="Inactive" value={(totalCount - activeCount).toLocaleString('en-IN')} />
@@ -174,7 +172,7 @@ async function ProductsStats() {
                       />
                     ) : (
                       <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
-                        <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
+                        <p className="min-w-0 text-sm font-medium text-foreground truncate">{d.name}</p>
                         <p className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
                           {d.sku}
                           {d.sku && <CopySku sku={d.sku} />}
@@ -198,7 +196,7 @@ async function ProductsStats() {
                       />
                     ) : (
                       <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
-                        <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
+                        <p className="min-w-0 text-sm font-medium text-foreground truncate">{d.name}</p>
                         <p className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
                           {d.sku}
                           {d.sku && <CopySku sku={d.sku} />}

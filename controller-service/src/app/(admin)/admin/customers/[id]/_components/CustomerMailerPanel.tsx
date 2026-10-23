@@ -773,7 +773,7 @@ export default function CustomerMailerPanel({
               />
               {selectedProduct ? (
                 <div className="mt-1.5 flex items-center justify-between px-3 py-2 bg-surface-secondary rounded-lg text-xs">
-                  <span className="font-semibold text-foreground">{selectedProduct.name}</span>
+                  <span className="min-w-0 break-words font-semibold text-foreground">{selectedProduct.name}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -823,7 +823,7 @@ export default function CustomerMailerPanel({
             <>
               <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">
                 <span className="text-foreground-muted">To:</span>{' '}
-                <span className="font-semibold text-foreground">{customerEmail}</span>
+                <span className="font-semibold text-foreground break-words">{customerEmail}</span>
               </div>
               <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">
                 <span className="text-foreground-muted">Subject:</span>{' '}

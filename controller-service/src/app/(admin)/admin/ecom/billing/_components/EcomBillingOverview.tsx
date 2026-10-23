@@ -138,7 +138,7 @@ export default function EcomBillingOverview() {
                       ['cancelled', 'Cancelled', 'muted'],
                     ] as const
                   ).map(([k, l, tone]) => (
-                    <div key={k} className="rounded-lg bg-surface-secondary p-2">
+                    <div key={k} className="rounded-lg bg-surface-secondary p-2 last:col-span-2 sm:last:col-span-1">
                       <p className="text-lg font-semibold text-foreground tabular-nums">{count(d.subscriptions[k])}</p>
                       <Badge tone={tone}>{l}</Badge>
                     </div>

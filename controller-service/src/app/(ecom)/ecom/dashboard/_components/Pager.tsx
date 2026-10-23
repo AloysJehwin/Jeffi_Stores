@@ -16,7 +16,7 @@ export default function Pager({ page, onPage, total, pageSize = 20, hasNext }: {
       <span className={PAGE_CLS.info}>
         {total != null ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total.toLocaleString('en-IN')}` : `Page ${page}`}
       </span>
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button type="button" onClick={() => onPage(page - 1)} disabled={page <= 1} aria-label="Previous page" className={page <= 1 ? PAGE_CLS.disabled : PAGE_CLS.btn}><ChevronLeft className="w-4 h-4" /></button>
         {pages != null && pageWindow(page, pages).map((p, i) =>
           p === '…'

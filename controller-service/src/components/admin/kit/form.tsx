@@ -253,7 +253,7 @@ export function FormFooter({
         {dirty && !autosaveNode && <span>Unsaved changes</span>}
         {secondary}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {discard && (
           <button type="button" onClick={() => void discard()} className={ghostCls}>
             Discard draft

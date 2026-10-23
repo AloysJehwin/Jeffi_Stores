@@ -23,7 +23,7 @@ export default function TeamOverview() {
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading && <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />}
       {data && (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="grid grid-cols-2 gap-3">
             {data.kpis.map(k => (
               <Kpi

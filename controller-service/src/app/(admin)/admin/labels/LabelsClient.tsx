@@ -276,7 +276,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
       {labelTab === 'serial' && <BatchSerialLabels mode="serial" labelSizes={labelSizes} />}
 
       {labelTab === 'product' && (
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 sm:items-start">
           {/* ── Left panel ── */}
           <div className="flex-1 min-w-0 space-y-4">
             {/* Size selector */}
@@ -536,7 +536,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                           {p.variant_name && (
                             <div className="text-xs text-foreground-secondary truncate">{p.variant_name}</div>
                           )}
-                          <div className="text-xs text-foreground-muted">
+                          <div className="text-xs text-foreground-muted [overflow-wrap:anywhere]">
                             <span className="inline-flex items-center gap-1">
                               {p.sku}
                               {p.sku && <CopySku sku={p.sku} />}
@@ -581,7 +581,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-foreground truncate leading-tight">{p.name}</div>
                         {p.variant_name && <div className="text-xs text-foreground-secondary">{p.variant_name}</div>}
-                        <div className="text-xs text-foreground-muted">
+                        <div className="text-xs text-foreground-muted [overflow-wrap:anywhere]">
                           <span className="inline-flex items-center gap-1">
                             {p.sku}
                             {p.sku && <CopySku sku={p.sku} />}

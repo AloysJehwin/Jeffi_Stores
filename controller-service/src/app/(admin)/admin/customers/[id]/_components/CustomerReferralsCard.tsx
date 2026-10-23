@@ -57,7 +57,7 @@ export default async function CustomerReferralsCard({
         </p>
       )}
       {referredBy && (
-        <p className="text-sm text-foreground-secondary">
+        <p className="text-sm text-foreground-secondary break-words">
           Referred by{' '}
           <Link
             href={ap(`/admin/customers/${referredBy.id}/view`, host)}

@@ -122,7 +122,7 @@ export function Dialog({ open, onClose, title, description, size = 'md', footer,
           )}
         </div>
         {children != null && <div className={size === 'full' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto p-5'}>{children}</div>}
-        {footer && <div className="flex items-center justify-end gap-2 border-t border-border-default px-5 py-3">{footer}</div>}
+        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border-default px-5 py-3">{footer}</div>}
       </div>
     </div>,
     document.body
@@ -229,7 +229,7 @@ export function Sheet({ open, onClose, title, description, footer, children }: S
           </button>
         </div>
         {children != null && <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>}
-        {footer && <div className="flex items-center justify-end gap-2 border-t border-border-default px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>}
+        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border-default px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>}
       </div>
     </div>,
     document.body

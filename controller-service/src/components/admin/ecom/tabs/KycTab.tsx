@@ -34,7 +34,7 @@ export default function KycTab({ tenant: t, kyc, approvals = [] }: { tenant: Ten
     <div className="space-y-6">
     <section className={`rounded-xl border p-5 bg-surface-elevated min-w-0 ${BORDER[kyc.status] || BORDER.rejected}`}>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-semibold text-foreground">KYC / GST Verification</h2>
           <span
             className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BADGE[kyc.status] || BADGE.rejected}`}

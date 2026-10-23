@@ -34,7 +34,7 @@ function PaymentCard({ p }: { p: any }) {
         <span className="font-semibold text-foreground text-sm tabular-nums">{formatINR(parseFloat(p.amount))}</span>
       </div>
       <div className="text-xs text-foreground-secondary">{METHOD_LABELS[p.payment_method] || p.payment_method}</div>
-      {(p.reference || p.payout_id) && <div className="text-xs text-foreground-secondary font-mono">{p.payout_id || p.reference}</div>}
+      {(p.reference || p.payout_id) && <div className="text-xs text-foreground-secondary font-mono break-words">{p.payout_id || p.reference}</div>}
       {p.payout_status && payoutBadge(p.payout_status)}
     </div>
   )

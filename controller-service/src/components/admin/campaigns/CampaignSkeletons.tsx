@@ -32,9 +32,9 @@ export function CampaignDetailSkeleton() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className={`${card} p-5 space-y-4`}>
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 space-y-2">
-              <div className={`h-6 w-48 ${bar}`} />
-              <div className={`h-4 w-64 ${bar} opacity-70`} />
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className={`h-6 w-48 max-w-full ${bar}`} />
+              <div className={`h-4 w-64 max-w-full ${bar} opacity-70`} />
             </div>
             <div className={`h-5 w-20 ${bar}`} />
           </div>

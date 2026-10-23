@@ -72,8 +72,8 @@ export default function ConnectionsGear({
             className="w-full max-w-2xl rounded-2xl border border-border-default bg-surface-elevated shadow-xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-border-default px-6 py-4">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2 border-b border-border-default px-4 py-4 sm:px-6">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <span className={`w-2.5 h-2.5 rounded-full ${DOT[state]}`} aria-hidden />
                 <h2 className="text-base font-bold text-foreground">{title}</h2>
                 <span className="text-xs text-foreground-muted">{STATE_TEXT[state]}</span>
@@ -87,7 +87,7 @@ export default function ConnectionsGear({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-4 p-6">
+            <div className="space-y-4 p-4 sm:p-6">
               {!canWrite && (
                 <p className="text-xs text-foreground-muted">
                   View only. An admin with write access to this integration can change the connection.

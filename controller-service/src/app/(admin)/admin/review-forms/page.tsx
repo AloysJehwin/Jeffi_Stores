@@ -118,7 +118,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
 
   return (
     <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
-      <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
+      <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 min-h-11 py-2 sm:h-11 sm:py-0">
         <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
           <svg
             className="w-4 h-4 transition-transform group-open:rotate-90"

@@ -152,8 +152,8 @@ export default async function TeamPanel() {
                       <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">{groupName}</p>
                       <div className="space-y-2.5">
                         {groupScopes.map(scope => (
-                          <div key={scope.key} className="flex items-start gap-2.5">
-                            <span className="shrink-0 mt-px px-1.5 py-0.5 rounded text-xs font-semibold bg-surface-secondary border border-border-default text-foreground-secondary font-mono leading-tight">
+                          <div key={scope.key} className="flex flex-wrap items-start gap-2.5 sm:flex-nowrap">
+                            <span className="shrink-0 max-w-full sm:max-w-none mt-px px-1.5 py-0.5 rounded text-xs font-semibold bg-surface-secondary border border-border-default text-foreground-secondary font-mono leading-tight">
                               {scope.label}
                             </span>
                             <span className="text-xs text-foreground-muted leading-relaxed">{scope.description}</span>

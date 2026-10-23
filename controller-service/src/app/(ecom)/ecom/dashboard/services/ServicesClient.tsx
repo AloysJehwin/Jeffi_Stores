@@ -19,7 +19,7 @@ export default function ServicesClient({ states, prices, compact = false }: { st
   const services = (['messaging', 'documents'] as const).filter(s => !compact || states[s].status !== 'live')
   if (!services.length) return null
   return (
-    <div className={`grid gap-4 ${services.length > 1 ? 'lg:grid-cols-2' : ''}`}>
+    <div className={`grid grid-cols-1 gap-4 ${services.length > 1 ? 'lg:grid-cols-2' : ''}`}>
       {services.map(s => <ServiceCard key={s} service={s} state={states[s]} prices={prices} compact={compact} />)}
     </div>
   )
@@ -45,7 +45,7 @@ function ServiceCard({ service, state, prices, compact }: { service: ApiService;
 
   return (
     <section className="flex flex-col rounded-2xl border border-border-default bg-surface-elevated p-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full org-sand"><Icon className="h-5 w-5 text-foreground" /></span>
           <div>

@@ -144,7 +144,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
           No submissions yet
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {submissions.map(s => (
             <div key={s.id} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
               <a
@@ -194,7 +194,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
                                 />
                               </a>
                             ) : (
-                              <p className="text-xs text-foreground">{val}</p>
+                              <p className="text-xs text-foreground break-words">{val}</p>
                             )}
                           </div>
                         )

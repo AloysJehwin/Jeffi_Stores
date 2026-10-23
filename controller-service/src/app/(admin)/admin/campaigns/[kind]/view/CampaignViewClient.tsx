@@ -225,7 +225,7 @@ export default function CampaignViewClient({
           {smsPreview && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
               <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">SMS</h3>
-              <div className="rounded-lg bg-surface-secondary p-3 text-sm text-foreground whitespace-pre-line">
+              <div className="rounded-lg bg-surface-secondary p-3 text-sm text-foreground whitespace-pre-line break-words">
                 {smsPreview}
               </div>
             </div>

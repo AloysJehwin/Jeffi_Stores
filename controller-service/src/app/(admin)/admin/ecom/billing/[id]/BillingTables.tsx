@@ -32,7 +32,7 @@ export function TransactionsTable({ rows }: { rows: TenantTransaction[] }) {
       mobileCard={tx => (
         <div className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-foreground">{tx.order_ref || '-'}</span>
+            <span className="text-sm font-medium text-foreground min-w-0 break-words">{tx.order_ref || '-'}</span>
             <StatusPill status={tx.status} />
           </div>
           <div className="flex justify-between text-xs text-foreground-muted">
