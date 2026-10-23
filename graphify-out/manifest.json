@@ -10715,8 +10715,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/suggest/route.ts": {
-    "mtime": 1790931251.2251618,
-    "ast_hash": "40b2e9c7a94b67801c7dd9c454405f8b",
+    "mtime": 1792796775.97808,
+    "ast_hash": "2e4efbe75c6ef557a072de90e1369dc9",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/suppliers/[id]/draft/route.ts": {
@@ -14810,8 +14810,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/queries/catalog.ts": {
-    "mtime": 1791397683.4107199,
-    "ast_hash": "e82714db4141b9d6827c02dde9049186",
+    "mtime": 1792796756.5806136,
+    "ast_hash": "03a72ae2415ca5dcdb99a611fc464fd8",
     "semantic_hash": ""
   },
   "controller-service/src/lib/queries/customers.ts": {
