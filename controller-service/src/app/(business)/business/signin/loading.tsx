@@ -1,5 +1,5 @@
-import VisitorSkeleton from '@/components/visitor/VisitorSkeleton'
+import { AUTH_THEMES, AuthSplitSkeleton } from '@/components/auth/AuthSplitShell'
 
 export default function Loading() {
-  return <VisitorSkeleton variant="form" />
+  return <AuthSplitSkeleton theme={AUTH_THEMES.business} />
 }

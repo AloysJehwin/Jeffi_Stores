@@ -24,6 +24,8 @@ function BusinessSignInPage() {
   const { user, isLoading: authLoading } = useAuth()
   const config = useStoreConfig()
   const { leaving, go } = useLeaveTo()
+  // Which button started the sign-in, so that one keeps its spinner until the next page opens.
+  const via = useRef<'google' | 'form' | null>(null)
 
   const callbackUrl = searchParams.get('callbackUrl')
 
@@ -92,6 +94,7 @@ function BusinessSignInPage() {
     if (!accessToken) return
     window.history.replaceState(null, '', window.location.pathname + window.location.search)
     setError('')
+    via.current = 'google'
     setGoogleLoading(true)
     fetch('/api/business/google', {
       method: 'POST',
@@ -124,6 +127,7 @@ function BusinessSignInPage() {
       setError('Enter a valid 10-digit mobile number')
       return
     }
+    via.current = 'form'
     setIsLoading(true)
     setChannel(selectedChannel)
     try {
@@ -168,6 +172,7 @@ function BusinessSignInPage() {
     if (requiresPolicy && !policyAccepted) return
     submittedOtpRef.current = otpValue
     setError('')
+    via.current = 'form'
     setIsLoading(true)
     try {
       const res = await fetch('/api/business/login', {
@@ -229,6 +234,7 @@ function BusinessSignInPage() {
     setError('')
     setOtp('')
     submittedOtpRef.current = ''
+    via.current = 'form'
     setIsLoading(true)
     try {
       const res = await fetch('/api/auth/send-otp', {
@@ -258,6 +264,7 @@ function BusinessSignInPage() {
       setError('Google sign-in is not configured')
       return
     }
+    via.current = 'google'
     setGoogleLoading(true)
     const result = await openGoogleOAuthPopup({ clientId, returnTo: '/business/signin' })
     if (!result.accessToken) {
@@ -391,6 +398,9 @@ function BusinessSignInPage() {
     },
   ] as const
 
+  const googleBusy = googleLoading || (leaving && via.current === 'google')
+  const formBusy = isLoading || (leaving && via.current === 'form')
+
   return (
     <>
       <AuthSplitShell
@@ -401,7 +411,6 @@ function BusinessSignInPage() {
         points={AUTH_POINTS.business}
         footnote="Business accounts are reviewed before trade pricing is unlocked."
         theme={AUTH_THEMES.business}
-        busy={leaving ? 'Signing you in…' : googleLoading ? 'Signing you in with Google…' : null}
         corner={
           <>
           <span className="hidden sm:inline-flex items-center text-sm text-foreground-secondary bg-surface/90 backdrop-blur px-3 py-2 rounded-lg border border-border-default">
@@ -453,10 +462,10 @@ function BusinessSignInPage() {
                 <button
                   type="button"
                   onClick={handleGoogleSignIn}
-                  disabled={googleLoading}
+                  disabled={googleBusy}
                   className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary transition-colors text-sm font-medium text-foreground disabled:opacity-60 mb-5"
                 >
-                  {googleLoading ? (
+                  {googleBusy ? (
                     <div className="w-5 h-5 border-2 border-foreground-muted border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -478,7 +487,7 @@ function BusinessSignInPage() {
                       />
                     </svg>
                   )}
-                  {googleLoading ? 'Signing in…' : 'Continue with Google'}
+                  {googleBusy ? 'Signing in…' : 'Continue with Google'}
                 </button>
                 <div className="relative mb-5">
                   <div className="absolute inset-0 flex items-center">
@@ -560,10 +569,10 @@ function BusinessSignInPage() {
 
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={formBusy}
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center"
                 >
-                  {isLoading ? (
+                  {formBusy ? (
                     <>
                       <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
                       Sending…
@@ -623,7 +632,7 @@ function BusinessSignInPage() {
                   <button
                     type="button"
                     onClick={handleResendOTP}
-                    disabled={isLoading || resendCooldown > 0}
+                    disabled={formBusy || resendCooldown > 0}
                     className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium disabled:opacity-50"
                   >
                     {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
@@ -673,10 +682,10 @@ function BusinessSignInPage() {
                 )}
                 <button
                   type="submit"
-                  disabled={otp.length !== 6 || isLoading || (requiresPolicy && !policyAccepted)}
+                  disabled={otp.length !== 6 || formBusy || (requiresPolicy && !policyAccepted)}
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center"
                 >
-                  {isLoading ? (
+                  {formBusy ? (
                     <>
                       <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
                       Signing in…
