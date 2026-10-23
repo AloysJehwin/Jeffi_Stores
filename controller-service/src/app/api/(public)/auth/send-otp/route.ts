@@ -5,6 +5,7 @@ import { sendOTPSMS } from '@/lib/shared/sms'
 import { sendOTPWhatsApp } from '@/lib/shared/whatsapp'
 import { queryOne } from '@/lib/shared/db'
 import { POLICY_VERSION } from '@/lib/legals/policies'
+import { reviewLoginCode } from '@/lib/auth/review-login'
 
 function normalizeIndianPhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, '')
@@ -101,11 +102,14 @@ export async function POST(request: NextRequest) {
       requiresPolicyAcceptance = existingUser.policies_accepted_version !== POLICY_VERSION
     }
 
-    const otp = generateOTP()
+    const reviewCode = userType === 'business' ? null : reviewLoginCode(email)
+    const otp = reviewCode ?? generateOTP()
     await storeOTP(email, otp)
 
     let sendResult: { success: boolean }
-    if (resolvedChannel === 'sms') {
+    if (reviewCode) {
+      sendResult = { success: true }
+    } else if (resolvedChannel === 'sms') {
       const ok = await sendOTPSMS({ phone: deliveryPhone, otp })
       sendResult = { success: ok }
     } else if (resolvedChannel === 'whatsapp') {
