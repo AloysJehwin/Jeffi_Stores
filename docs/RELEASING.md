@@ -1,48 +1,33 @@
 # Releasing
 
-Versions are `MAJOR.MINOR.PATCH`, starting at `1.0.0`. The version is derived from
-commit messages; you approve it before anything is tagged.
+Versions are `MAJOR.MINOR.PATCH`. Every push to `main` tags the next version and publishes a
+GitHub Release automatically (`.github/workflows/release.yml`). There is no release PR to merge.
 
 ## How it works
 
 ```
-commits land on main
+PR merged to main
         |
-  Release Please opens / updates ONE PR:  "chore(release): 1.1.0"
-    - bumps package.json
-    - writes CHANGELOG.md
+  release.yml reads the commits since the last v* tag
         |
-  you review the version + changelog in the PR diff
-        |
-      merge
-        |
-  tag v1.1.0  +  GitHub Release published
+  highest bump wins  ->  tag vX.Y.Z on that commit + GitHub Release with grouped notes
 ```
 
-Nothing is tagged until you merge. If no releasable commits have landed, no PR appears.
+If nothing release-worthy landed, no tag is made.
 
 ## What sets the version
 
-The **PR title** is what matters — this repo squash-merges, so the title becomes the
-commit subject on `main`.
+Each commit's subject (merges are skipped, so the commits on the branch count):
 
-| PR title starts with | Bump | 1.0.0 becomes |
+| Commit starts with | Bump | 1.3.0 becomes |
 |---|---|---|
-| `fix:` | patch | 1.0.1 |
-| `feat:` | minor | 1.1.0 |
+| `fix:` `perf:` | patch | 1.3.1 |
+| `feat:` | minor | 1.4.0 |
 | `feat!:` / `BREAKING CHANGE:` in body | major | 2.0.0 |
-| `chore:` `docs:` `test:` `ci:` `build:` | none | no release |
+| `refactor:` `revert:` `chore:` `docs:` `test:` `ci:` `build:` | none | no release |
 
-Scopes are free-form: `fix(tenant):`, `fix(scopes,oauth):` both work.
-
-The highest bump in the range wins — one `feat:` among ten `fix:` gives a minor.
-
-## Cutting a release
-
-1. Merge work to `main` as usual.
-2. A release PR appears (or updates) within a minute.
-3. Check the proposed version and changelog.
-4. Merge it. The tag and GitHub Release are created automatically.
+Scopes are free-form: `fix(tenant):`, `fix(scopes,oauth):` both work. One `feat:` among ten `fix:`
+gives a minor. Keep PR titles in the same format; the "PR Title" check flags ones that aren't.
 
 ## Forcing a major
 
@@ -56,24 +41,12 @@ BREAKING CHANGE: /api/orders no longer accepts the v1 shape.
 
 ## Fixing a wrong version
 
-The release PR is regenerated from commits — don't hand-edit it. Instead fix the
-source: amend the offending commit's message (if unpushed), or land a follow-up
-with the right prefix. The PR updates itself.
+Delete the tag and its release (`gh release delete vX.Y.Z --cleanup-tag`), land a follow-up commit
+with the right prefix, or tag by hand: `gh release create vX.Y.Z --target <sha> --generate-notes`.
+To re-run the release for the current `main`: Actions → Release → Run workflow.
 
-## When no release PR appears
+## Notes
 
-- Every commit since the last tag was `chore:`/`docs:`/`ci:` — nothing to release
-- A PR title was malformed, so its squashed commit isn't recognised — check the
-  "PR Title" workflow on that PR
-
-## When the release PR won't merge
-
-If required checks show "Expected — Waiting for status" and never run, the
-`RELEASE_TOKEN` secret is missing or expired. A PR opened with the default token
-does not trigger CI. Re-create the secret and close/reopen the PR.
-
-## Files you should not hand-edit
-
-- `CHANGELOG.md` — generated
-- `package.json` `version` — bumped by the release PR
-- `.github/.release-please-manifest.json` — tracks the current version
+- The release notes live on the GitHub Release. `CHANGELOG.md` holds history up to v1.2.0 and is
+  no longer updated; `package.json` `version` is not bumped (the tag is the version).
+- Deploys are separate: the pipeline (`ci.yml`) deploys every push to `main` after approval.
