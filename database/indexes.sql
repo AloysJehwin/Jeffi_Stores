@@ -753,6 +753,14 @@ CREATE INDEX idx_expenses_status ON public.expenses USING btree (status);
 
 
 --
+-- Name: idx_account_deletions_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_deletions_user ON public.account_deletions USING btree (user_id);
+
+
+
+--
 -- Name: idx_failed_login_email_time; Type: INDEX; Schema: public; Owner: -
 --
 

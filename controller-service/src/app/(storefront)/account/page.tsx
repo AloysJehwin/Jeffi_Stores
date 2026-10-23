@@ -7,6 +7,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { AccountMobileTabBar } from '@/components/visitor/AccountMobileHeader'
 import BuyAgainRow from '@/components/visitor/account/BuyAgainRow'
+import DeleteAccountCard from '@/components/visitor/account/DeleteAccountCard'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 import DatePicker from '@/components/ui/DatePicker'
 import { isValidDob } from '@/lib/shared/format'
@@ -828,6 +829,8 @@ export default function AccountPage() {
           </div>
 
           <BuyAgainRow />
+
+          <DeleteAccountCard />
 
           {/* Sign out — mobile only (desktop handled by sidebar) */}
           <div className="lg:hidden">

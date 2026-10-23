@@ -625,6 +625,24 @@ ALTER TABLE ONLY public.expenses
 
 
 --
+-- Name: account_deletions account_deletions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_deletions
+    ADD CONSTRAINT account_deletions_pkey PRIMARY KEY (id);
+
+
+
+--
+-- Name: account_deletions account_deletions_requested_via_check; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_deletions
+    ADD CONSTRAINT account_deletions_requested_via_check CHECK (requested_via IN ('app', 'web', 'admin'));
+
+
+
+--
 -- Name: failed_login_attempts failed_login_attempts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
