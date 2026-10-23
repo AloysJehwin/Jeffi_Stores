@@ -24,6 +24,7 @@ import { isFulfilledStatus } from '@/lib/orders/fulfilled-status'
 import { getHost } from '@/lib/tenancy/get-host'
 import { hasScope } from '@/lib/auth/scopes'
 import CustomerActionButton from '@/app/(admin)/admin/customers/[id]/_components/CustomerActionButton'
+import EraseCustomerButton from '@/app/(admin)/admin/customers/[id]/_components/EraseCustomerButton'
 import CustomerMailerPanel from '@/app/(admin)/admin/customers/[id]/_components/CustomerMailerPanel'
 import CustomerEngagementChips from '@/app/(admin)/admin/customers/[id]/_components/CustomerEngagementChips'
 import CustomerTags from '@/app/(admin)/admin/customers/[id]/_components/CustomerTags'
@@ -168,12 +169,15 @@ export default async function CustomerDetailPage({
 
       <Card title="Account actions">
         {canWrite ? (
-          <CustomerActionButton
-            customerId={customer.id}
-            customerName={fullName}
-            isActive={customer.is_active}
-            isFlagged={customer.is_flagged}
-          />
+          <>
+            <CustomerActionButton
+              customerId={customer.id}
+              customerName={fullName}
+              isActive={customer.is_active}
+              isFlagged={customer.is_flagged}
+            />
+            <EraseCustomerButton customerId={customer.id} customerName={fullName} />
+          </>
         ) : (
           <p className="text-xs text-foreground-muted">Read-only access — cannot modify account.</p>
         )}
@@ -430,9 +434,9 @@ export default async function CustomerDetailPage({
           {customer.is_flagged && customer.flag_reason && (
             <div className="flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/5 px-4 py-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-red-600 dark:text-red-400">Account Flagged</p>
-                <p className="mt-0.5 text-sm text-foreground">{customer.flag_reason}</p>
+                <p className="mt-0.5 text-sm text-foreground break-words">{customer.flag_reason}</p>
               </div>
             </div>
           )}
@@ -457,7 +461,7 @@ export default async function CustomerDetailPage({
                   }) => (
                     <div
                       key={c.id}
-                      className="flex items-center gap-2 rounded-lg border border-border-default bg-surface-elevated px-3 py-1.5 text-xs"
+                      className="flex flex-wrap items-center gap-2 rounded-lg border border-border-default bg-surface-elevated px-3 py-1.5 text-xs"
                     >
                       <span className="font-mono font-bold text-foreground">{c.code}</span>
                       <span className="text-foreground-muted">

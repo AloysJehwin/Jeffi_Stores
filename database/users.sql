@@ -28,6 +28,24 @@ CREATE TABLE public.addresses (
 
 
 --
+-- Name: account_deletions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_deletions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    requested_via character varying(20) NOT NULL,
+    performed_by_admin_id uuid,
+    reason text,
+    summary jsonb DEFAULT '{}'::jsonb NOT NULL,
+    deleted_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+COMMENT ON TABLE public.account_deletions IS 'Proof of each customer account erasure. Holds no personal data; user_id points at the anonymised users row.';
+
+
+
+--
 -- Name: admin_certificates; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -171,7 +189,8 @@ CREATE TABLE public.users (
     notification_channel character varying(20) DEFAULT 'email'::character varying NOT NULL,
     phone_verified boolean DEFAULT false NOT NULL,
     phone_verified_at timestamp with time zone,
-    date_of_birth date
+    date_of_birth date,
+    deleted_at timestamp with time zone
 );
 
 UPDATE public.admins a SET role = 'administrator'

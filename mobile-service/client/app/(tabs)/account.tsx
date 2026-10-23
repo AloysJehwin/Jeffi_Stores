@@ -250,6 +250,9 @@ export default function AccountScreen() {
               <HeroIcon name="logout" size={16} color={dark ? status.heart : status.danger} />
               <Text className="text-red-600 dark:text-red-400 text-sm font-medium">Sign Out</Text>
             </Pressable>
+            <Pressable onPress={() => router.push('/account/delete')} className="items-center py-2">
+              <Text className="text-foreground-muted text-xs">Delete account</Text>
+            </Pressable>
           </View>
         </View>
       </ScrollView>
