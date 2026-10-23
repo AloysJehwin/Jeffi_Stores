@@ -33,7 +33,7 @@ export default function InventoryDemo() {
       )}
       {s.step === 'alert' && (
         <div className="h-full flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-3"><Stat label="Low stock" value={1} tone="accent" /><Stat label="Out of stock" value={1} /><Stat label="SKUs tracked" value={ROWS.length} /></div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1"><Stat label="Low stock" value={1} tone="accent" /><Stat label="Out of stock" value={1} /><Stat label="SKUs tracked" value={ROWS.length} /></div>
           <div className="rounded-2xl org-peach p-5">
             <p className="font-display font-black text-lg text-foreground">Clay mug set is running low</p>
             <p className="text-sm text-foreground-secondary mt-1">3 left, minimum is 8. Alert sent to WhatsApp and email.</p>

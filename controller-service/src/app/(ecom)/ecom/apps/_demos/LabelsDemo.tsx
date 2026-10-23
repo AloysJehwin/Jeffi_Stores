@@ -20,7 +20,7 @@ export default function LabelsDemo() {
       {s.step === 'label' && <Done icon={TagIcon} title="Shipping label" copy="4×6 thermal label with AWB barcode, sorting code and return address." done={gen} onAction={() => setGen(true)} actionLabel="Generate label" doneLabel="Label ready" action={<Tag tone="ok">LB-1043.pdf</Tag>} />}
       {(s.step === 'print' || s.step === 'scan') && (
         <div className="h-full grid place-items-center">
-          <div className="w-72 rounded-2xl bg-surface-elevated p-5 space-y-3">
+          <div className="w-full max-w-72 sm:w-72 rounded-2xl bg-surface-elevated p-5 space-y-3">
             <p className="font-display font-black">Delhivery · Surface</p>
             <div className="h-14 bg-[repeating-linear-gradient(90deg,#1b1714_0_2px,transparent_2px_5px)] rounded" />
             <p className="font-mono text-sm">1349 2211 0087</p>

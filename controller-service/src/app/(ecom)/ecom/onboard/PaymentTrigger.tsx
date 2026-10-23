@@ -86,7 +86,7 @@ export default function PaymentTrigger({
 
   return (
     <div className="w-full max-w-lg text-center">
-      <div className="rounded-2xl border border-accent-200 bg-surface-elevated p-10 shadow-lg">
+      <div className="rounded-2xl border border-accent-200 bg-surface-elevated p-6 sm:p-10 shadow-lg">
         <div className="w-14 h-14 rounded-full bg-accent-100 flex items-center justify-center mx-auto mb-5">
           <svg
             className="w-7 h-7 text-accent-600"
@@ -103,7 +103,7 @@ export default function PaymentTrigger({
           </svg>
         </div>
         <h1 className="text-xl font-bold text-foreground">Application approved!</h1>
-        <p className="text-sm text-foreground-secondary mt-3">
+        <p className="text-sm text-foreground-secondary mt-3 break-words">
           Your GST certificate has been verified. Complete your subscription payment to launch{' '}
           <span className="font-semibold">{displayName}</span> ({slug}.jeffistores.in).
         </p>

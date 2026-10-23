@@ -20,7 +20,7 @@ export default function EnrichmentDemo() {
     <AppDemoShell steps={STEPS} step={s.step} onStep={s.go} caption="admin - enrichment">
       {s.step === 'pick' && (
         <Panel title="Products missing descriptions">
-          <ul className="space-y-2">{ITEMS.map(p => { const on = picked.includes(p); return <li key={p} className="flex items-center justify-between rounded-2xl bg-surface-elevated px-4 py-3"><span className="text-sm font-medium">{p}</span><Btn tone={on ? 'sand' : 'solid'} onClick={() => setPicked(a => on ? a.filter(x => x !== p) : [...a, p])}>{on ? 'Selected' : 'Select'}</Btn></li> })}</ul>
+          <ul className="space-y-2">{ITEMS.map(p => { const on = picked.includes(p); return <li key={p} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-elevated px-3 py-3 sm:px-4"><span className="min-w-0 text-sm font-medium">{p}</span><Btn tone={on ? 'sand' : 'solid'} onClick={() => setPicked(a => on ? a.filter(x => x !== p) : [...a, p])}>{on ? 'Selected' : 'Select'}</Btn></li> })}</ul>
         </Panel>
       )}
       {s.step === 'fill' && (

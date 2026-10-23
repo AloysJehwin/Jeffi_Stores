@@ -21,7 +21,7 @@ export default function GstDemo() {
       {s.step === 'invoice' && <Done icon={ReceiptText} title="Generate tax invoice" copy="Sequential invoice number, your GSTIN, HSN per line and the buyer's GSTIN if B2B." done={inv} onAction={() => setInv(true)} actionLabel="Generate" doneLabel="INV-2024-0177" action={<Tag tone="ok">Emailed to customer</Tag>} />}
       {s.step === 'split' && (
         <div className="h-full flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-3"><Stat label="CGST 9%" value={rs(190.5)} /><Stat label="SGST 9%" value={rs(190.5)} /><Stat label="IGST" value={rs(0)} /></div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1"><Stat label="CGST 9%" value={rs(190.5)} /><Stat label="SGST 9%" value={rs(190.5)} /><Stat label="IGST" value={rs(0)} /></div>
           <Table cols={['Line', 'HSN', 'Taxable', 'Rate', 'Tax']} rows={[['Wireless Headphones', '85183000', rs(2118), '18%', rs(381)]]} />
           <p className="text-sm text-foreground-secondary">Intra-state order → CGST + SGST. Inter-state would switch to IGST automatically.</p>
         </div>

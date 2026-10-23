@@ -25,9 +25,9 @@ export default function ProductsDemo() {
   return (
     <AppDemoShell steps={STEPS} step={s.step} onStep={s.go} caption={s.step === 'live' ? 'novastore.jeffistores.in' : 'admin - products'}>
       {s.step === 'details' && (
-        <div className="h-full flex flex-col sm:flex-row gap-6">
+        <div className="h-full flex flex-col sm:flex-row gap-4 sm:gap-6">
           <div className="shrink-0 w-full sm:w-56 rounded-2xl org-sand p-4 grid place-items-center">
-            <ProductArt category="Electronics" className="w-40 h-40" />
+            <ProductArt category="Electronics" className="w-28 h-28 sm:w-40 sm:h-40" />
           </div>
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 content-start">
             <div className="sm:col-span-2"><Field label="Product name" value="Wireless Headphones" /></div>
@@ -46,7 +46,7 @@ export default function ProductsDemo() {
         </Panel>
       )}
       {s.step === 'media' && (
-        <div className="h-full grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="h-full grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <div className="grid grid-cols-3 gap-3 content-start">
             {['var(--org-peach)', 'var(--org-sage)', 'var(--org-apricot)', 'var(--org-sand)', 'var(--org-sage)', 'var(--org-peach)'].map((c, i) => (
               <div key={i} className="aspect-square rounded-2xl grid place-items-center" style={{ background: c }}>{i === 0 && <ProductArt category="Electronics" className="w-16 h-16" />}</div>

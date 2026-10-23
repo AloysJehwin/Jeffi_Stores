@@ -47,7 +47,7 @@ function FlowTabs() {
               onClick={() => actions.setFlow(f.id)}
               aria-current={active ? 'true' : undefined}
               className={clsx(
-                'shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors',
+                'shrink-0 whitespace-nowrap rounded-full px-4 py-2 min-h-11 sm:min-h-0 text-sm font-semibold transition-colors',
                 active ? 'ecom-accent-bg text-white' : 'org-sand org-sand-hover text-foreground'
               )}
             >
@@ -60,7 +60,7 @@ function FlowTabs() {
         type="button"
         onClick={isPlaying ? actions.pause : actions.play}
         aria-label={isPlaying ? 'Pause demo' : 'Play demo'}
-        className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full org-sand org-sand-hover ecom-accent-text"
+        className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-10 sm:h-10 rounded-full org-sand org-sand-hover ecom-accent-text"
       >
         {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
       </button>
@@ -75,14 +75,19 @@ function Stepper() {
   const activePos = steps.findIndex(c => c.id === chapter.id)
   const slots = Array.from({ length: 4 }, (_, i) => steps[i] ?? null)
   return (
-    <div className="grid grid-cols-4 h-16 items-start">
+    <div className="grid grid-cols-4 h-[4.5rem] sm:h-16 items-start">
       {slots.map((c, i) => {
         if (!c) return <div key={`empty-${i}`} />
         const globalIndex = chapters.findIndex(x => x.id === c.id)
         const active = i === activePos
         const done = i < activePos
         return (
-          <button key={c.id} type="button" onClick={() => actions.goToChapter(globalIndex)} className="group text-left min-w-0">
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => actions.goToChapter(globalIndex)}
+            className="group text-left min-w-0 min-h-11 sm:min-h-0"
+          >
             <div className="relative h-4 flex items-center">
               <span className="absolute inset-x-0 h-px bg-border-secondary" />
               <span
@@ -92,7 +97,12 @@ function Stepper() {
                 )}
               />
             </div>
-            <div className={clsx('mt-2 text-sm truncate pr-3', active ? 'font-bold text-foreground' : 'text-foreground-muted')}>
+            <div
+              className={clsx(
+                'mt-2 text-xs break-words pr-1 sm:text-sm sm:truncate sm:pr-3',
+                active ? 'font-bold text-foreground' : 'text-foreground-muted'
+              )}
+            >
               {c.title}
             </div>
           </button>
@@ -123,7 +133,7 @@ function StageInner() {
       <FlowTabs />
 
       <BrowserFrame alt={chapter.title} caption={caption} className="w-full relative mt-2">
-        <div className="h-[520px] sm:h-[560px] lg:h-[620px] overflow-hidden">
+        <div className="h-[560px] lg:h-[620px] overflow-hidden">
           <SurfaceFade surfaceKey={chapter.surface} reduced={reducedMotion}>
             {isStorefront ? <StorefrontSurface /> : <AdminSurface />}
           </SurfaceFade>
@@ -133,7 +143,7 @@ function StageInner() {
       <div className="mt-6">
         <Stepper />
       </div>
-      <p className="h-6 text-base text-foreground-secondary truncate">
+      <p className="mt-1 min-h-[2.5rem] text-sm text-foreground-secondary break-words sm:mt-0 sm:h-6 sm:min-h-0 sm:text-base sm:truncate">
         <span className="font-semibold text-foreground">{chapter.title}</span> — {chapter.blurb}
       </p>
     </div>

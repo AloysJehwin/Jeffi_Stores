@@ -56,7 +56,7 @@ export default async function AuthSplit({ mode }: { mode: 'signup' | 'signin' })
       </div>
 
       {/* Form panel */}
-      <div className="flex flex-col justify-center px-6 py-12 sm:px-12 bg-surface">
+      <div className="flex flex-col justify-center px-4 py-10 sm:px-12 sm:py-12 bg-surface">
         {/* mobile brand */}
         <Link href="/" className="lg:hidden flex items-center gap-2 font-display font-black text-xl text-foreground mb-8 self-center">
           <span className="ecom-accent-bg inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-display font-black">
@@ -65,6 +65,21 @@ export default async function AuthSplit({ mode }: { mode: 'signup' | 'signin' })
           Jeffi Commerce
         </Link>
         <OwnerAuthForm mode={mode} />
+        <div className="md:hidden mt-10 w-full max-w-sm mx-auto rounded-3xl org-sand p-5">
+          <p className="font-display font-black text-lg leading-snug text-foreground">
+            Everything you need to sell online — in one place.
+          </p>
+          <ul className="mt-4 space-y-2.5">
+            {points.map(p => (
+              <li key={p} className="flex items-start gap-3 text-sm text-foreground-secondary">
+                <span className="mt-0.5 inline-flex shrink-0 items-center justify-center w-5 h-5 rounded-full org-sage">
+                  <CheckMark className="w-3 h-3 org-sage-text" />
+                </span>
+                <span className="min-w-0">{p}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   )

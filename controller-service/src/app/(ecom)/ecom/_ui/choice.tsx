@@ -68,7 +68,7 @@ export function Segmented<T extends string>({ options, value, onChange, ariaLabe
   className?: string
 }) {
   const { refs, onKeyDown } = useRoving(options, onChange)
-  const pad = size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-1.5 text-sm'
+  const pad = size === 'sm' ? 'px-3 py-1.5 text-xs max-sm:min-h-10' : 'px-4 py-1.5 text-sm max-sm:min-h-11'
   return (
     <div role="tablist" aria-label={ariaLabel}
       className={`ecom-scroll-x inline-flex max-w-full snap-x gap-0.5 overflow-x-auto rounded-full org-sand p-1 ${className}`}>
@@ -93,7 +93,7 @@ export function Segmented<T extends string>({ options, value, onChange, ariaLabe
 /** Toggle chips (single or multi): ink + ✓ when on, outline + sand hover when off. */
 export function ChoiceChips<T extends string>(props: { options: Choice<T>[]; ariaLabel?: string; size?: 'sm' | 'md'; className?: string } & Selection<T>) {
   const { options, ariaLabel, size = 'sm', className = '' } = props
-  const pad = size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'
+  const pad = size === 'sm' ? 'px-3 py-1.5 text-xs max-sm:min-h-10' : 'px-4 py-2 text-sm max-sm:min-h-11'
   return (
     <div role="group" aria-label={ariaLabel} className={`flex flex-wrap gap-2 ${className}`}>
       {options.map(o => {
