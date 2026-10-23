@@ -15,7 +15,7 @@ export default function CompareBar() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-30 bg-surface-elevated border-t border-border-default shadow-2xl">
+    <div data-bottom-bar="compare" className="fixed bottom-0 left-0 right-0 z-30 bg-surface-elevated border-t border-border-default shadow-2xl">
       <div className="container mx-auto px-4 py-3 flex items-center gap-3">
         {/* Product thumbnails */}
         <div className="flex-1 flex items-center gap-2 overflow-x-auto min-w-0">
