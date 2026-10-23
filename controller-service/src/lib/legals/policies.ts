@@ -577,6 +577,52 @@ export const policies: Policy[] = [
     ],
   },
   {
+    slug: 'account-deletion',
+    title: 'Delete Your Account',
+    description: 'How to delete your Jeffi Stores account (website and Android app) and what happens to your data.',
+    lastUpdated: '23 Oct 2026',
+    sections: [
+      {
+        heading: '1. Who this applies to',
+        body: 'This page is for customers of Jeffi Stores who have an account on jeffistores.in or in the Jeffi Stores app for Android (com.jeffistores.app). It is one account for both, so deleting it removes your access to the website and the app.',
+      },
+      {
+        heading: '2. How to request deletion',
+        body: [
+          'Email support@jeffistores.in from the email address registered on your account, with the subject "Delete my account".',
+          'If you signed up with your mobile number only, include that number; we will confirm the request by a one-time code sent to it.',
+          'We confirm receipt within 2 business days and complete the deletion within 30 days.',
+          'Before you ask, cancel any active subscription and wait for open orders, returns or refunds to finish; we cannot delete an account while an order is still in progress.',
+        ],
+      },
+      {
+        heading: '3. What we delete',
+        body: [
+          'Your profile: name, email, phone number, avatar and sign-in details, including Google sign-in.',
+          'Your saved addresses, wishlist, cart, product reviews, reward points and referral codes.',
+          'Your marketing preferences and notification tokens. You will receive no further emails, SMS or WhatsApp messages from us.',
+          'App analytics linked to your account are deleted or anonymised.',
+        ],
+      },
+      {
+        heading: '4. What we keep, and for how long',
+        body: [
+          'Order history and tax invoices: 8 financial years from the order date, as required by the GST rules. These are kept only for tax and legal purposes and are no longer linked to an active account.',
+          'Payment references (Razorpay ids, last 4 digits of a card): 18 months, for chargebacks and refunds.',
+          'Backups: removed automatically within 7 days of the deletion.',
+        ],
+      },
+      {
+        heading: '5. Deleting part of your data',
+        body: 'You can remove saved addresses, wishlist items and marketing consent yourself in Account settings, or email support@jeffistores.in to ask us to delete specific data without closing your account.',
+      },
+      {
+        heading: '6. Questions',
+        body: 'See our Privacy Policy for how we handle your data, or contact our Grievance Officer (Grievance Redressal page) if a request is not handled in time.',
+      },
+    ],
+  },
+  {
     slug: 'grievance-redressal',
     title: 'Grievance Redressal',
     description:
