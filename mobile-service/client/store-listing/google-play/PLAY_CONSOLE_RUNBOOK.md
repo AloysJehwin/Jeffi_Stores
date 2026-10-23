@@ -52,7 +52,7 @@ Written for a browser agent finishing the Play Console setup. Status as of 24 Oc
 2. **Never** change the developer account type, transfer the app, delete the app, or delete a track or release.
 3. **Never** enter payment details, buy anything, or accept a paid add-on or upgrade.
 4. **Never** tick a **financial feature**. A personal account plus any financial feature gets flagged ("Violation of Play Console Requirements"). The answer is "My app doesn't provide any financial features".
-5. **Never** invent sign-in details. The review login is **not built yet** (Task 6). Do not type test credentials into "Sign-in details" until the owner gives them.
+5. **Never** invent sign-in details. The review login is built but only works once it is deployed and the owner has set its email and code (see Part 5 → App access). Use only the code the owner gives you.
 6. **Never** mark images as AI-generated, and never replace the provided images.
 7. If a form asks something this file doesn't cover, or a field already holds a different value, **stop and ask**. Don't guess.
 8. A Play Console error like "An unexpected error has occurred (5DECEF30)" is transient.
@@ -140,14 +140,16 @@ When all three hold: **Publishing overview** → **Send changes for review**. Re
 ### App access / Sign-in details
 "Is any part of your app restricted?" → **Yes** (checkout, orders and account need sign-in).
 
-**PENDING the owner.** The app uses OTP-only sign-in, which reviewers can't receive. The owner must first approve and deploy a dedicated review login (one email that accepts a fixed 6-digit code). Until then, **leave this section for the owner**.
+The app uses OTP-only sign-in, which reviewers can't receive, so one review email accepts a fixed 6-digit code instead of an emailed one (`lib/auth/review-login.ts`). It works only when both are true:
+- The release containing it is deployed to production.
+- The owner has added `REVIEW_LOGIN_EMAIL` (`playreview@jeffistores.in`) and `REVIEW_LOGIN_CODE` to the `jeffi/production` secret in AWS Secrets Manager (us-east-1) and the controller pods have restarted. The owner has set up the `playreview@jeffistores.in` customer account once on jeffistores.in: sign up with that email and the code, then verify a mobile number they control that is not on any other customer account (a spare SIM). The app asks for a verified phone after sign-in, so without this step reviewers get stuck on an SMS code.
 
-Once the owner provides the details, the instruction text (500 chars max) is:
+Check it yourself in the app before saving: sign in with the email and code. Instruction text (500 chars max), with `<CODE>` replaced by the owner's code:
 
 > Sign in with email OTP. On the login screen enter the email above and tap Send OTP, then enter the code <CODE>. No code is sent; this account always accepts this fixed code. Browsing products and the cart work without signing in; checkout, orders and account pages need sign-in. Payments use Razorpay; please don't complete a real payment.
 
 - Name: `Customer account`.
-- Username: the review email from the owner.
+- Username: `playreview@jeffistores.in`.
 - Password: leave blank.
 
 ### Ads
@@ -336,6 +338,6 @@ Upload the phone screenshots in number order (1 to 6).
 ## Part 8 — Owner to-do (not for the agent)
 
 - Merge GitHub PR #564 and approve the production deploy. This makes the account deletion page live.
-- Decide on the review login, then give its email and code for **App access**.
+- Add `REVIEW_LOGIN_EMAIL` and `REVIEW_LOGIN_CODE` to the `jeffi/production` secret, deploy, create the `playreview@jeffistores.in` account, then give the code for **App access**.
 - Add 2–3 more testers (target 15).
 - After 14 days with 12+ testers: Dashboard → **Apply for production**.
