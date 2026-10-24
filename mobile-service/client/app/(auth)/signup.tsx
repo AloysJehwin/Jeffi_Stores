@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Pressable, Text, TextInput, View } from 'react-native'
+import { Text, TextInput, View, type TextInputProps } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -15,27 +15,60 @@ import {
 import { referralLookup } from '../../src/api/account'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { showToast } from '../../src/stores/toastStore'
-import { AuthShell, ChannelSelector, CHANNELS, GoogleButton, OtpField, SentNote } from '../../src/components/account/AuthShell'
-import { DobInput, ErrorBox, Input, isValidDob, Label, PhoneInput, PolicyConsent, PrimaryButton } from '../../src/components/account/ui'
-import { useFeatureFlags, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
+import { AuthScreen, BigButton, FieldError, Frame, GoogleRow, Note, TermsNote, TextAction } from '../../src/components/account/AuthScreen'
+import { ChannelChips } from '../../src/components/account/ChannelChips'
+import { OtpBoxes } from '../../src/components/account/OtpBoxes'
+import { isValidDob, PolicyConsent, useDobField } from '../../src/components/account/ui'
+import { useFeatureFlags, useLeaveAuth, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
 import { finishSignIn, getPendingGoogle, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
+import { useTokens } from '../../src/theme'
 
-// Mirror of controller-service app/(auth)/signup/page.tsx.
+// Same flow as controller-service app/(auth)/signup/page.tsx (details → OTP → account; Google completes
+// with phone + DOB), in the app's sheet.
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, error, className = '' }: { label: string; children: ReactNode; error?: string; className?: string }) {
   return (
-    <View>
-      <Label>{label}</Label>
+    <View className={className}>
+      <Text className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-foreground-muted">{label}</Text>
       {children}
+      {error ? <FieldError message={error} /> : null}
     </View>
   )
+}
+
+function TextField({ prefix, locked, ...props }: TextInputProps & { prefix?: string; locked?: boolean }) {
+  const t = useTokens()
+  const [focus, setFocus] = useState(false)
+  return (
+    <Frame focused={focus} className={locked ? 'bg-surface-secondary' : ''}>
+      {prefix ? (
+        <>
+          <Text className="text-base font-semibold text-foreground">{prefix}</Text>
+          <View className="mx-3 h-6 w-px bg-border-secondary" />
+        </>
+      ) : null}
+      <TextInput
+        placeholderTextColor={t.foregroundMuted}
+        editable={!locked}
+        onFocus={() => setFocus(true)}
+        onBlur={() => setFocus(false)}
+        className={`flex-1 text-base font-semibold ${locked ? 'text-foreground-muted' : 'text-foreground'}`}
+        {...props}
+      />
+    </Frame>
+  )
+}
+
+function DobField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { text, handle } = useDobField(value, onChange)
+  return <TextField value={text} onChangeText={handle} keyboardType="number-pad" maxLength={10} placeholder="dd/mm/yyyy" />
 }
 
 export default function SignupScreen() {
   const router = useRouter()
   useLeaveIfSignedIn()
-  const params = useLocalSearchParams<{ email?: string; from?: string; google?: string }>()
+  const params = useLocalSearchParams<{ email?: string; phone?: string; from?: string; google?: string }>()
   const fromLogin = params.from === 'login'
   const prefillEmail = params.email || ''
   const isGoogleMode = params.google === '1'
@@ -45,8 +78,8 @@ export default function SignupScreen() {
   const signOut = useSignOut()
   const { data: invitedBy } = useQuery({ queryKey: ['referral-lookup'], queryFn: referralLookup, staleTime: 60_000 })
 
-  const channelOptions = CHANNELS.filter(
-    o => o.id === 'email' || (o.id === 'sms' && flags.smsEnabled) || (o.id === 'whatsapp' && flags.whatsappEnabled)
+  const channels = (['email', 'sms', 'whatsapp'] as const).filter(
+    c => c === 'email' || (c === 'sms' && flags.smsEnabled) || (c === 'whatsapp' && flags.whatsappEnabled)
   )
 
   const [step, setStep] = useState<'details' | 'otp'>('details')
@@ -54,13 +87,14 @@ export default function SignupScreen() {
   const [otp, setOtp] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState((params.phone || '').replace(/\D/g, '').slice(-10))
   const [dob, setDob] = useState('')
   const [channel, setChannel] = useState<OtpChannel>('email')
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [error, setError] = useState('')
+  const [shake, setShake] = useState(0)
   const [policyAccepted, setPolicyAccepted] = useState(false)
   const [phoneRequiresPolicy, setPhoneRequiresPolicy] = useState(false)
   const [phoneRequiresDob, setPhoneRequiresDob] = useState(false)
@@ -95,7 +129,7 @@ export default function SignupScreen() {
     if (phone.length === 0 && (channel === 'sms' || channel === 'whatsapp')) setChannel('email')
   }, [phone, channel])
 
-  const done = () => router.dismissAll()
+  const done = useLeaveAuth()
 
   async function handleGoogle() {
     setError('')
@@ -164,7 +198,7 @@ export default function SignupScreen() {
         setResendCooldown(res.data.retryAfter)
         if (!isResend) setStep('otp')
       }
-      throw new Error(res.data.error || (isResend ? 'Failed to resend OTP' : 'Failed to send OTP'))
+      throw new Error(res.data.error || (isResend ? 'Failed to resend the code' : 'Failed to send the code'))
     }
     return res.data
   }
@@ -172,6 +206,7 @@ export default function SignupScreen() {
   async function handleSendOTP() {
     setError('')
     if (!firstName.trim()) return setError('First name is required')
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Enter a valid email address')
     if (phone.length > 0 && phone.length !== 10) return setError('Enter a valid 10-digit mobile number')
     if (!isValidDob(dob)) return setError('Enter a valid date of birth')
     setIsLoading(true)
@@ -194,7 +229,7 @@ export default function SignupScreen() {
     setIsLoading(true)
     try {
       const verify = await verifyEmailOtp(email, otpValue)
-      if (!verify.ok) throw new Error(verify.data.error || 'Invalid OTP')
+      if (!verify.ok) throw new Error(verify.data.error || 'Invalid code')
       const result = await signup({
         email,
         otp: otpValue,
@@ -207,6 +242,7 @@ export default function SignupScreen() {
       done()
     } catch (err: any) {
       setError(err?.message || 'An error occurred')
+      setShake(n => n + 1)
       setOtp('')
       submittedOtpRef.current = ''
       setTimeout(() => otpInputRef.current?.focus(), 0)
@@ -229,7 +265,7 @@ export default function SignupScreen() {
     try {
       const data = await sendCode(true)
       setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 60)
-      showToast('OTP sent successfully!', 'success')
+      showToast('New code sent', 'success')
       setTimeout(() => otpInputRef.current?.focus(), 0)
     } catch (err: any) {
       setError(err?.message || 'An error occurred')
@@ -238,137 +274,125 @@ export default function SignupScreen() {
     }
   }
 
-  const otpDestination = channel === 'email' ? email : `+91 ••••• ${phone.slice(-4)}`
+  const otpDestination = channel === 'email' ? email : `+91 ••••• ${phone.slice(-4)} on ${channel === 'sms' ? 'SMS' : 'WhatsApp'}`
+  const title = step === 'otp' ? 'Enter the code' : googleMode ? 'Almost there' : 'Create your account'
+  const subtitle =
+    step === 'otp'
+      ? `We sent a 6-digit code to ${otpDestination}.`
+      : googleMode
+        ? 'Add a mobile number and date of birth to finish signing up.'
+        : `Join ${storeName} for faster checkout, order tracking and member deals.`
 
   return (
-    <AuthShell title="Create Account" subtitle={`Join ${storeName} for exclusive deals`}>
-      {!!invitedBy && (
-        <View className="mb-6 rounded-lg border border-accent-200 dark:border-accent-800 bg-accent-50 dark:bg-accent-900/20 p-3">
-          <Text className="text-center text-sm text-accent-700 dark:text-accent-300">
-            {invitedBy} invited you to {storeName}.
-          </Text>
-        </View>
+    <AuthScreen title={title} subtitle={subtitle}>
+      {step === 'details' && !!invitedBy && <Note>{invitedBy} invited you to {storeName}.</Note>}
+      {step === 'details' && googleMode && (
+        <Note>
+          No account found for <Text className="font-bold">{email}</Text>. Confirm your details to continue.
+        </Note>
+      )}
+      {step === 'details' && !googleMode && fromLogin && (!!prefillEmail || phone.length === 10) && (
+        <Note>
+          No account found for <Text className="font-bold">{prefillEmail || `+91 ${phone}`}</Text>. Create one to continue.
+        </Note>
       )}
 
-      {googleMode && step === 'details' && (
-        <SentNote>
-          No account found for <Text className="font-bold">{email}</Text>. Confirm your details and add a mobile number and date of
-          birth to finish signing up.
-        </SentNote>
-      )}
-      {fromLogin && !googleMode && step === 'details' && !!prefillEmail && (
-        <SentNote>
-          No account found for <Text className="font-bold">{prefillEmail}</Text>. Create one to continue.
-        </SentNote>
-      )}
-
-      <ErrorBox message={error} />
-
-      {step === 'details' && !googleMode && !!GOOGLE_WEB_CLIENT_ID && (
-        <GoogleButton
-          label="Sign up with Google"
-          loadingLabel="Signing up…"
-          loading={googleLoading}
-          onPress={handleGoogle}
-          dividerText="or sign up with email"
-        />
-      )}
-
-      {step === 'details' && !googleMode && (
-        <View className="gap-5">
-          <View className="gap-4">
-            <Field label="First Name *">
-              <Input value={firstName} onChangeText={setFirstName} placeholder="John" autoCapitalize="words" autoFocus />
+      {step === 'details' && (
+        <View className="gap-4">
+          <View className="flex-row gap-3">
+            <Field label="First name" className="flex-1">
+              <TextField value={firstName} onChangeText={setFirstName} placeholder="First" autoCapitalize="words" autoComplete="given-name" autoFocus={!googleMode} />
             </Field>
-            <Field label="Last Name">
-              <Input value={lastName} onChangeText={setLastName} placeholder="Doe" autoCapitalize="words" />
+            <Field label="Last name" className="flex-1">
+              <TextField value={lastName} onChangeText={setLastName} placeholder="Last" autoCapitalize="words" autoComplete="family-name" />
             </Field>
           </View>
-          <Field label="Email Address *">
-            <Input value={email} onChangeText={setEmail} placeholder="your@email.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+          <Field label="Email">
+            <TextField
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              locked={googleMode}
+            />
           </Field>
-          <Field label="Mobile Number *">
-            <PhoneInput value={phone} onChange={setPhone} />
-            {phone.length > 0 && phone.length !== 10 && <Text className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</Text>}
+          <Field label={googleMode ? 'Mobile number' : 'Mobile number (optional)'} error={phone.length > 0 && phone.length !== 10 ? 'Enter a valid 10-digit mobile number' : ''}>
+            <TextField
+              prefix="+91"
+              value={phone}
+              onChangeText={v => setPhone(v.replace(/\D/g, '').slice(0, 10))}
+              placeholder="Mobile number"
+              keyboardType="number-pad"
+              maxLength={10}
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+            />
           </Field>
-          <Field label="Date of Birth *">
-            <DobInput value={dob} onChange={setDob} />
-            {dob.length > 0 && !isValidDob(dob) && <Text className="mt-1 text-xs text-red-500">Enter a valid date of birth</Text>}
+          <Field label="Date of birth" error={dob.length > 0 && !isValidDob(dob) ? 'Enter a valid date of birth' : ''}>
+            <DobField value={dob} onChange={setDob} />
           </Field>
-          <View>
-            <Text className="text-sm font-medium text-foreground-secondary mb-2">How would you like to receive your OTP?</Text>
-            <ChannelSelector
-              options={channelOptions}
+
+          {!googleMode && channels.length > 1 ? (
+            <ChannelChips
+              label="Send my code on"
+              options={channels}
               value={channel}
               onChange={setChannel}
               isDisabled={c => (c === 'sms' || c === 'whatsapp') && phone.length !== 10}
             />
-          </View>
-          <PrimaryButton label="Send Verification Code" loadingLabel="Sending OTP..." loading={isLoading} onPress={handleSendOTP} />
-        </View>
-      )}
+          ) : null}
+          {googleMode ? <PolicyConsent checked={policyAccepted} onChange={setPolicyAccepted} /> : null}
 
-      {step === 'details' && googleMode && (
-        <View className="gap-5">
-          <View className="gap-4">
-            <Field label="First Name *">
-              <Input value={firstName} onChangeText={setFirstName} placeholder="John" autoCapitalize="words" />
-            </Field>
-            <Field label="Last Name">
-              <Input value={lastName} onChangeText={setLastName} placeholder="Doe" autoCapitalize="words" />
-            </Field>
-          </View>
-          <Field label="Email Address">
-            <Input value={email} editable={false} muted />
-          </Field>
-          <Field label="Mobile Number *">
-            <PhoneInput value={phone} onChange={setPhone} />
-            {phone.length > 0 && phone.length !== 10 && <Text className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</Text>}
-          </Field>
-          <Field label="Date of Birth *">
-            <DobInput value={dob} onChange={setDob} />
-            {dob.length > 0 && !isValidDob(dob) && <Text className="mt-1 text-xs text-red-500">Enter a valid date of birth</Text>}
-          </Field>
-          <PolicyConsent checked={policyAccepted} onChange={setPolicyAccepted} />
-          <PrimaryButton
-            label="Continue"
-            loadingLabel="Creating Account..."
-            loading={isLoading}
-            disabled={phone.length !== 10 || !isValidDob(dob) || !policyAccepted}
-            onPress={handleGoogleSubmit}
-          />
+          <FieldError message={error} />
+          {googleMode ? (
+            <BigButton
+              label="Continue"
+              loadingLabel="Creating account…"
+              loading={isLoading}
+              disabled={phone.length !== 10 || !isValidDob(dob) || !policyAccepted}
+              onPress={handleGoogleSubmit}
+            />
+          ) : (
+            <BigButton label="Send code" loadingLabel="Sending code…" loading={isLoading} onPress={handleSendOTP} />
+          )}
+
+          {!googleMode && !!GOOGLE_WEB_CLIENT_ID && <GoogleRow label="Sign up with Google" loading={googleLoading} onPress={handleGoogle} />}
+          <TermsNote />
         </View>
       )}
 
       {step === 'otp' && (
-        <View className="gap-6">
-          <SentNote>
-            We&apos;ve sent a 6-digit verification code to <Text className="font-bold">{otpDestination}</Text>
-          </SentNote>
+        <View className="gap-5">
           <View>
-            <Label>Verification Code</Label>
-            <OtpField value={otp} onChange={setOtp} inputRef={otpInputRef} />
+            <OtpBoxes value={otp} onChange={setOtp} inputRef={otpInputRef} shake={shake} />
+            <FieldError message={error} />
           </View>
           <View className="flex-row items-center justify-between">
-            <Pressable onPress={handleResendOTP} disabled={isLoading || resendCooldown > 0}>
-              <Text className={`text-sm font-medium text-accent-600 dark:text-accent-400 ${isLoading || resendCooldown > 0 ? 'opacity-50' : ''}`}>
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
-              </Text>
-            </Pressable>
-            <Pressable
+            <TextAction
+              label={resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+              muted={resendCooldown > 0 || isLoading}
+              onPress={() => {
+                if (!isLoading && resendCooldown <= 0) handleResendOTP()
+              }}
+            />
+            <TextAction
+              label="Change details"
+              muted
               onPress={() => {
                 setStep('details')
                 setOtp('')
+                setError('')
                 submittedOtpRef.current = ''
               }}
-            >
-              <Text className="text-sm text-foreground-secondary">Change details</Text>
-            </Pressable>
+            />
           </View>
           <PolicyConsent checked={policyAccepted} onChange={setPolicyAccepted} />
-          <PrimaryButton
-            label="Verify & Create Account"
-            loadingLabel="Creating Account..."
+          <BigButton
+            label="Create account"
+            loadingLabel="Creating account…"
             loading={isLoading}
             disabled={otp.length !== 6 || !policyAccepted}
             onPress={() => otp.length === 6 && submitVerifyAndSignup(otp)}
@@ -378,8 +402,8 @@ export default function SignupScreen() {
 
       <Text className="mt-6 text-center text-sm text-foreground-secondary">
         Already have an account?{' '}
-        <Text className="text-accent-600 dark:text-accent-400 font-medium" onPress={() => router.replace('/(auth)/login')}>
-          Login here
+        <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/login')}>
+          Log in
         </Text>
       </Text>
 
@@ -400,6 +424,6 @@ export default function SignupScreen() {
           }}
         />
       )}
-    </AuthShell>
+    </AuthScreen>
   )
 }

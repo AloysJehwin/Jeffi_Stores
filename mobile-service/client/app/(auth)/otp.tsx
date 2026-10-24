@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, Text, TextInput, View } from 'react-native'
+import { Text, TextInput, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { loginWithOtp, requestOtp, type OtpChannel } from '../../src/api/auth'
 import { updateProfile } from '../../src/api/account'
-import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { showToast } from '../../src/stores/toastStore'
-import { AuthShell, OtpField, SentNote } from '../../src/components/account/AuthShell'
-import { ErrorBox, Label, PolicyConsent, PrimaryButton } from '../../src/components/account/ui'
+import { AuthScreen, BigButton, FieldError, TextAction } from '../../src/components/account/AuthScreen'
+import { OtpBoxes } from '../../src/components/account/OtpBoxes'
+import { PolicyConsent } from '../../src/components/account/ui'
 import { finishSignIn } from '../../src/components/account/authFlow'
+import { useLeaveAuth } from '../../src/components/account/hooks'
 
-// Mirror of the code step of controller-service app/(auth)/login/page.tsx.
+// The code step of controller-service app/(auth)/login/page.tsx.
 
 export default function OtpScreen() {
   const router = useRouter()
-  const config = useStoreConfig()
+  const done = useLeaveAuth()
   const params = useLocalSearchParams<{ email: string; channel?: string; phone?: string; requiresPolicy?: string; cooldown?: string; error?: string }>()
   const email = params.email
   const channel = (params.channel as OtpChannel) || 'email'
@@ -23,6 +24,7 @@ export default function OtpScreen() {
   const [otp, setOtp] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(params.error || '')
+  const [shake, setShake] = useState(0)
   const [policyAccepted, setPolicyAccepted] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(Number(params.cooldown) || 0)
   const inputRef = useRef<TextInput>(null)
@@ -53,9 +55,10 @@ export default function OtpScreen() {
         notificationChannel: channel,
         ...(channel !== 'email' && loginPhone.length === 10 ? { phone: loginPhone } : {}),
       }).catch(() => {})
-      router.dismissAll()
+      done()
     } catch (err: any) {
-      setError(err?.message || 'Invalid OTP. Please try again.')
+      setError(err?.message || 'Invalid code. Please try again.')
+      setShake(n => n + 1)
       setOtp('')
       submittedRef.current = ''
       setTimeout(() => inputRef.current?.focus(), 0)
@@ -80,68 +83,57 @@ export default function OtpScreen() {
       const res = await requestOtp({ email, phone: loginPhone ? `+91${loginPhone}` : undefined, channel, isSignup: false })
       if (!res.ok) {
         if (res.status === 429 && typeof res.data.retryAfter === 'number') setResendCooldown(res.data.retryAfter)
-        throw new Error(res.data.error || 'Failed to resend OTP')
+        throw new Error(res.data.error || 'Failed to resend the code')
       }
       setResendCooldown(typeof res.data.nextCooldown === 'number' ? res.data.nextCooldown : 60)
-      showToast('New OTP sent! Check your inbox for the latest code.', 'success')
+      showToast('New code sent', 'success')
       setTimeout(() => inputRef.current?.focus(), 0)
     } catch (err: any) {
-      setError(err?.message || 'Failed to resend OTP')
+      setError(err?.message || 'Failed to resend the code')
     } finally {
       setIsLoading(false)
     }
   }
 
-  return (
-    <AuthShell title="Welcome Back" subtitle={`Login to your ${config.identity.name || 'Jeffi Stores'} account`}>
-      <ErrorBox message={error} />
-      <View className="gap-6">
-        <SentNote>
-          {channel === 'email' ? (
-            <>
-              We&apos;ve sent a 6-digit verification code to <Text className="font-bold">{email}</Text>
-            </>
-          ) : (
-            <>
-              We&apos;ve sent a 6-digit verification code via {channel === 'sms' ? 'SMS' : 'WhatsApp'} to{' '}
-              <Text className="font-bold">+91 ••••• {loginPhone.slice(-4)}</Text>
-            </>
-          )}
-        </SentNote>
+  const where =
+    channel === 'email' ? email : `+91 ••••• ${loginPhone.slice(-4)} on ${channel === 'sms' ? 'SMS' : 'WhatsApp'}`
 
+  return (
+    <AuthScreen title="Enter the code" subtitle={`We sent a 6-digit code to ${where}.`}>
+      <View className="gap-5">
         <View>
-          <Label>Verification Code</Label>
-          <OtpField value={otp} onChange={setOtp} inputRef={inputRef} />
+          <OtpBoxes value={otp} onChange={setOtp} inputRef={inputRef} shake={shake} />
+          <FieldError message={error} />
         </View>
 
         <View className="flex-row items-center justify-between">
-          <Pressable onPress={handleResend} disabled={isLoading || resendCooldown > 0}>
-            <Text className={`text-sm font-medium text-accent-600 dark:text-accent-400 ${isLoading || resendCooldown > 0 ? 'opacity-50' : ''}`}>
-              {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
-            </Text>
-          </Pressable>
-          <Pressable onPress={() => router.back()}>
-            <Text className="text-sm text-foreground-secondary">Change Channel</Text>
-          </Pressable>
+          <TextAction
+            label={resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+            muted={resendCooldown > 0 || isLoading}
+            onPress={() => {
+              if (!isLoading && resendCooldown <= 0) handleResend()
+            }}
+          />
+          <TextAction label={channel === 'email' ? 'Change email' : 'Change number'} muted onPress={() => router.back()} />
         </View>
 
         {requiresPolicy && <PolicyConsent checked={policyAccepted} onChange={setPolicyAccepted} />}
 
-        <PrimaryButton
-          label="Login"
-          loadingLabel="Logging in..."
+        <BigButton
+          label="Verify"
+          loadingLabel="Verifying…"
           loading={isLoading}
           disabled={otp.length !== 6 || (requiresPolicy && !policyAccepted)}
           onPress={() => otp.length === 6 && submitLogin(otp)}
         />
-      </View>
 
-      <Text className="mt-6 text-center text-sm text-foreground-secondary">
-        Don&apos;t have an account?{' '}
-        <Text className="text-accent-600 dark:text-accent-400 font-medium" onPress={() => router.replace('/(auth)/signup')}>
-          Create one
+        <Text className="text-center text-sm text-foreground-secondary">
+          New here?{' '}
+          <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/signup')}>
+            Create an account
+          </Text>
         </Text>
-      </Text>
-    </AuthShell>
+      </View>
+    </AuthScreen>
   )
 }

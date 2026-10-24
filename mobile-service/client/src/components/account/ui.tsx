@@ -75,9 +75,8 @@ export function PhoneInput({ value, onChange, dense, autoFocus }: { value: strin
 }
 
 
-/** The web's DatePicker for a date of birth: types as dd/mm/yyyy, reports YYYY-MM-DD ('' until complete). */
-export function DobInput({ value, onChange, dense }: { value: string; onChange: (v: string) => void; dense?: boolean }) {
-  const t = useTokens()
+/** A date of birth typed as dd/mm/yyyy, reported as YYYY-MM-DD ('' until complete). */
+export function useDobField(value: string, onChange: (v: string) => void) {
   const toDisplay = (iso: string) => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
     return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
@@ -94,6 +93,13 @@ export function DobInput({ value, onChange, dense }: { value: string; onChange: 
     setText(parts.join('/'))
     onChange(digits.length === 8 ? `${digits.slice(4, 8)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}` : '')
   }
+  return { text, handle }
+}
+
+/** The web's DatePicker for a date of birth. */
+export function DobInput({ value, onChange, dense }: { value: string; onChange: (v: string) => void; dense?: boolean }) {
+  const t = useTokens()
+  const { text, handle } = useDobField(value, onChange)
   return (
     <View className="relative">
       <TextInput
