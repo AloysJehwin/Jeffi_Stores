@@ -393,6 +393,15 @@ CREATE INDEX idx_coupons_generated_for ON public.coupons USING btree (generated_
 
 
 --
+-- Name: reward_game_plays_game_user_period_key; Type: INDEX; Schema: public; Owner: -
+-- The play limit: one row per user per game per period, enforced by ON CONFLICT DO NOTHING.
+--
+
+CREATE UNIQUE INDEX reward_game_plays_game_user_period_key ON public.reward_game_plays USING btree (game_key, user_id, period_key);
+
+
+
+--
 -- Name: idx_custom_scenarios_enabled; Type: INDEX; Schema: public; Owner: -
 --
 

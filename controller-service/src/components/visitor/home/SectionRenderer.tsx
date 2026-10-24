@@ -21,6 +21,7 @@ import ValueStats from './ValueStats'
 import MotionHero from './MotionHero'
 import Stories from './Stories'
 import ProductSpotlight from './ProductSpotlight'
+import RewardsGame from './RewardsGame'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import {
   sectionLayout,
@@ -30,6 +31,7 @@ import {
   launchedWithin,
   motionHeroIntervalMs,
   motionHeroSlides,
+  rewardsGamePublic,
   safeHref,
   spotlightConfig,
   storyGroups,
@@ -362,6 +364,12 @@ export default function SectionRenderer({
           ctaLabel={section.cta_label}
         />
       )
+    }
+
+    case 'rewards_game': {
+      const game = rewardsGamePublic(section)
+      if (!game) return null
+      return <RewardsGame game={game} eyebrow={section.eyebrow} title={section.title} ctaLabel={section.cta_label} />
     }
 
     default:

@@ -435,6 +435,15 @@ ALTER TABLE ONLY public.coupons
 
 
 --
+-- Name: reward_game_plays reward_game_plays_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reward_game_plays
+    ADD CONSTRAINT reward_game_plays_pkey PRIMARY KEY (id);
+
+
+
+--
 -- Name: custom_scenarios custom_scenarios_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1695,6 +1704,24 @@ ALTER TABLE ONLY public.wishlist_items
 
 ALTER TABLE ONLY public.addresses
     ADD CONSTRAINT addresses_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+
+--
+-- Name: reward_game_plays reward_game_plays_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reward_game_plays
+    ADD CONSTRAINT reward_game_plays_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+
+--
+-- Name: reward_game_plays reward_game_plays_coupon_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reward_game_plays
+    ADD CONSTRAINT reward_game_plays_coupon_id_fkey FOREIGN KEY (coupon_id) REFERENCES public.coupons(id) ON DELETE SET NULL;
 
 
 
