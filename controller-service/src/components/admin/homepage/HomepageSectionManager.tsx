@@ -50,8 +50,15 @@ export default function HomepageSectionManager({
   const [copying, setCopying] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
-  const usedSingletons = new Set(sections.filter(s => SECTION_META[s.type]?.singleton).map(s => s.type))
+  const usedTypes = new Set(sections.map(s => s.type))
   const pickable = sectionTypesFor(surface)
+  // Why a type can't be added right now, or null when it can.
+  const blockedReason = (type: SectionType): string | null => {
+    const meta = SECTION_META[type]
+    if (meta.singleton && usedTypes.has(type)) return 'Already on the page'
+    const clash = meta.excludes?.find(e => usedTypes.has(e))
+    return clash ? `Can't be combined with ${SECTION_META[clash].label}` : null
+  }
 
   // "Start from the website layout": copies the website's sections and slides onto the app surface with
   // new ids, then reloads so both managers (and the hero editor inside the Hero row) pick up the rows.
@@ -231,19 +238,17 @@ export default function HomepageSectionManager({
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
               {pickable.map(type => {
                 const meta = SECTION_META[type]
-                const taken = meta.singleton && usedSingletons.has(type)
+                const blocked = blockedReason(type)
                 return (
                   <button
                     key={type}
                     type="button"
-                    disabled={taken}
+                    disabled={!!blocked}
                     onClick={() => addSection(type)}
                     className="text-left p-3 rounded-lg border border-border-default hover:border-accent-400 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <span className="block text-sm font-medium text-foreground">{meta.label}</span>
-                    <span className="block text-xs text-foreground-muted mt-0.5">
-                      {taken ? 'Already on the page' : meta.description}
-                    </span>
+                    <span className="block text-xs text-foreground-muted mt-0.5">{blocked ?? meta.description}</span>
                   </button>
                 )
               })}

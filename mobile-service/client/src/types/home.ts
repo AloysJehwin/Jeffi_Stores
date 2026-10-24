@@ -5,6 +5,7 @@ export type SectionType =
   | 'category_showcase' | 'deal_of_the_day' | 'promo_banner' | 'featured_for_you' | 'benefits'
   | 'why_us' | 'about' | 'business_cta' | 'countdown_deal' | 'testimonials' | 'recently_viewed'
   | 'category_tabs' | 'bundle_spotlight' | 'back_in_stock' | 'blog_teaser' | 'social_strip' | 'value_stats'
+  | 'motion_hero' | 'stories' | 'product_spotlight' | 'rewards_game'
 
 export interface SectionCopy {
   eyebrow?: string
@@ -117,6 +118,50 @@ export interface ValueStat {
 export interface CountdownDeal {
   product: CardProduct
   endsAt: string | null
+}
+
+// extras[section.id] for the app-first sections (homepage-sections.ts motionHeroSlides / storyGroups / spotlightConfig).
+
+export interface MotionHeroSlide {
+  bgImage: string
+  fgImage: string | null
+  eyebrow: string | null
+  headline: string
+  sub: string | null
+  ctaLabel: string | null
+  url: string | null
+}
+
+export interface MotionHeroData {
+  slides: MotionHeroSlide[]
+  intervalMs: number
+}
+
+export interface StorySlide {
+  id: string
+  image: string
+  caption: string | null
+  ctaLabel: string | null
+  url: string | null
+  /** How long the slide shows, 2–15 s. */
+  seconds: number
+}
+
+export interface StoryGroup {
+  id: string
+  title: string
+  cover: string
+  slides: StorySlide[]
+}
+
+export interface StoriesData {
+  groups: StoryGroup[]
+}
+
+export interface SpotlightData {
+  product: CardProduct
+  headline: string | null
+  callouts: string[]
 }
 
 export interface HomeData {

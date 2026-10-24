@@ -8,8 +8,10 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: NextRequest) {
-  const surface = req.nextUrl.searchParams.get('surface') === 'app' ? 'app' : 'web'
-  const model = toHomeModelJson(await buildHomeModel({ surface }))
+  const requested = req.nextUrl.searchParams.get('surface')
+  const surface = requested === 'app' ? 'app' : 'web'
+  // No parameter at all is an app build from before per-surface layouts (see LEGACY_APP_HIDDEN_TYPES).
+  const model = toHomeModelJson(await buildHomeModel({ surface, legacyClient: requested === null }))
   return NextResponse.json(model, {
     headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
   })

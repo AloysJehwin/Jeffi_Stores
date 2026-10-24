@@ -20,7 +20,7 @@ export default async function HomePage() {
             data={data}
           />
         )
-        if (section.type === 'hero') return rendered
+        if (section.type === 'hero' || section.type === 'motion_hero') return rendered
         return (
           <Reveal key={section.id} disabled={i <= 1}>
             {rendered}
