@@ -149,6 +149,19 @@ describe('buildTenantSchemaSql — column reconciliation ordering', () => {
     expect(partialIdx).toBeGreaterThan(addSource)
   })
 
+  it('reconciles the homepage surface columns before the CHECKs that reference them', () => {
+    for (const [table, check] of [
+      ['homepage_sections', 'homepage_sections_surface_check'],
+      ['hero_slides', 'hero_slides_surface_check'],
+    ]) {
+      const addSurface = sql.indexOf(`ALTER TABLE public.${table} ADD COLUMN IF NOT EXISTS surface `)
+      expect(addSurface, table).toBeGreaterThan(-1)
+      expect(sql.indexOf(`ADD CONSTRAINT ${check}`), check).toBeGreaterThan(addSurface)
+    }
+    // The type CHECK must be re-applied (constraints.sql), not frozen inside CREATE TABLE IF NOT EXISTS.
+    expect(sql).toContain('DROP CONSTRAINT IF EXISTS homepage_sections_type_check')
+  })
+
   it('does not leave a trailing end-of-script reconciliation block', () => {
     expect(sql).not.toContain('reconcile columns on pre-existing tables')
   })

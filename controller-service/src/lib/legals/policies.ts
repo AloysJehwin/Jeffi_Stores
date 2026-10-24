@@ -6,6 +6,8 @@ export type Policy = {
   description: string
   lastUpdated: string
   sections: Section[]
+  /** Reachable by its URL only: left out of the Legal & Policies list. */
+  unlisted?: boolean
 }
 
 // Bump this version (and the lastUpdated date on relevant policies) whenever
@@ -578,6 +580,7 @@ export const policies: Policy[] = [
   },
   {
     slug: 'account-deletion',
+    unlisted: true,
     title: 'Delete Your Account',
     description: 'How to delete your Jeffi Stores account (website and Android app) and what happens to your data.',
     lastUpdated: '24 Oct 2026',
@@ -590,7 +593,7 @@ export const policies: Policy[] = [
         heading: '2. How to delete your account',
         body: [
           'In the app: open Account, tap "Delete account" under Sign Out, type DELETE and confirm.',
-          'On the website: sign in at jeffistores.in, open My Account, choose "Delete my account", type DELETE and confirm.',
+          'On the website: sign in at jeffistores.in, come back to this page, choose "Delete my account" at the bottom, type DELETE and confirm.',
           'Deletion happens straight away and signs you out on every device. It cannot be undone.',
           'If you cannot sign in, email support@jeffistores.in from the email address on your account with the subject "Delete my account". We confirm within 2 business days and complete it within 30 days.',
           'An account cannot be deleted while an order, return or refund is still in progress, or while a subscription is active. The delete screen tells you which; cancel the subscription and wait for the rest to finish.',

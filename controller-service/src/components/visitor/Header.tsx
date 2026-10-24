@@ -38,8 +38,15 @@ export default function Header() {
             {/* Logo */}
             <Link href="/" className="flex items-center shrink-0">
               <div className="flex items-center gap-2 sm:gap-3">
-                {identity.logoUrl && (
+                {identity.logoUrl ? (
                   <img src={identity.logoUrl} alt={`${identity.name} Logo`} className="h-8 sm:h-10 lg:h-12 w-auto" />
+                ) : (
+                  <span
+                    aria-hidden
+                    className="inline-flex h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-white text-base sm:text-lg lg:text-xl font-black"
+                  >
+                    {identity.name.trim().charAt(0).toUpperCase() || 'S'}
+                  </span>
                 )}
                 <div>
                   <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400">

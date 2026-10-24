@@ -115,7 +115,7 @@ describe('withHomepageDraft', () => {
     const [writeSql, writeParams] = mockClientQuery.mock.calls[2]
     expect(writeSql).toContain('UPDATE homepage_drafts')
     expect(JSON.parse(writeParams[0])[0].title).toBe('Changed')
-    expect(JSON.parse(writeParams[1])).toEqual([slide('s', 0)])
+    expect(JSON.parse(writeParams[1])).toEqual([slide('s', 0, { surface: 'web' })])
     expect(writeParams[2]).toBe(ADMIN_ID)
     expect(sqlCalls().some(s => /^(INSERT INTO|UPDATE|DELETE FROM) (homepage_sections|hero_slides)\b/.test(s))).toBe(
       false
@@ -169,7 +169,12 @@ describe('getEditableHomepage', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ sections: [section('a', 0)], hero_slides: [slide('s', 0)] })
     const editable = await getEditableHomepage()
-    expect(editable).toEqual({ sections: [section('a', 0)], heroSlides: [slide('s', 0)], draft: null })
+    // Rows from before the surface column existed read as web.
+    expect(editable).toEqual({
+      sections: [section('a', 0, { surface: 'web' })],
+      heroSlides: [slide('s', 0, { surface: 'web' })],
+      draft: null,
+    })
     expect(mockQueryOne.mock.calls[1][0]).toContain('FROM homepage_sections t')
   })
 
@@ -258,10 +263,15 @@ describe('getHomepageDraftSummary', () => {
     expect(mockQueryOne).toHaveBeenCalledTimes(1)
   })
 
-  it('counts added, removed, edited and reordered rows by id', async () => {
+  it('counts added, removed, edited and reordered rows by id, overall and per surface', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        sections: [section('c', 0, { title: 'Edited' }), section('a', 1), section('n', 2)],
+        sections: [
+          section('c', 0, { title: 'Edited' }),
+          section('a', 1),
+          section('n', 2),
+          section('m', 3, { surface: 'app' }),
+        ],
         hero_slides: [slide('s1', 0, { image_url: 'https://cdn/new.png' }), slide('s2', 1)],
         updated_at: '2026-09-26T10:00:00Z',
         updated_by_name: null,
@@ -270,12 +280,20 @@ describe('getHomepageDraftSummary', () => {
         sections: [section('a', 0), section('b', 1), section('c', 2)],
         hero_slides: [slide('s1', 0), slide('s2', 1)],
       })
+    const none = { added: 0, removed: 0, edited: 0, reordered: false }
     expect(await getHomepageDraftSummary()).toEqual({
       hasDraft: true,
       updatedAt: '2026-09-26T10:00:00.000Z',
       updatedBy: null,
-      sections: { added: 1, removed: 1, edited: 1, reordered: true },
+      sections: { added: 2, removed: 1, edited: 1, reordered: true },
       slides: { added: 0, removed: 0, edited: 1, reordered: false },
+      bySurface: {
+        web: {
+          sections: { added: 1, removed: 1, edited: 1, reordered: true },
+          slides: { added: 0, removed: 0, edited: 1, reordered: false },
+        },
+        app: { sections: { ...none, added: 1 }, slides: none },
+      },
     })
   })
 

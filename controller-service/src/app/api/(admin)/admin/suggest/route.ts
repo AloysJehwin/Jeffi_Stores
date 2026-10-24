@@ -232,7 +232,7 @@ async function suggestProducts(q: string): Promise<SuggestItem[]> {
     id: r.id,
     label: r.name,
     sublabel: r.sku,
-    href: `/admin/products?search=${encodeURIComponent(q)}`,
+    href: `/admin/products?search=${encodeURIComponent(r.name)}`,
   }))
 }
 
@@ -247,7 +247,7 @@ async function suggestOrders(q: string): Promise<SuggestItem[]> {
     id: r.id,
     label: r.order_number,
     sublabel: r.customer_name,
-    href: `/admin/orders?search=${encodeURIComponent(q)}`,
+    href: `/admin/orders?search=${encodeURIComponent(r.order_number)}`,
   }))
 }
 
@@ -271,7 +271,7 @@ async function suggestCustomers(q: string): Promise<SuggestItem[]> {
       id: r.id,
       label: name,
       sublabel: r.phone || r.email,
-      href: `/admin/customers?search=${encodeURIComponent(q)}`,
+      href: `/admin/customers?search=${encodeURIComponent(r.email)}`,
     }
   })
 }

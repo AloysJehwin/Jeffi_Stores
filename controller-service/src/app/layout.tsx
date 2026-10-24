@@ -84,8 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     !isVaultSubdomain
   // Platform AdSense on every store unless its tenant paid to remove ads (lib/billing/ad-free.ts).
   const adClient = isStorefrontHost ? adsenseClient() : null
-  const showAds =
-    !!adClient && !(await storeIsAdFree(tenant?.tenantId))
+  const showAds = !!adClient && !(await storeIsAdFree(tenant?.tenantId))
   const cookieConsent = (hasGoogleTag || showAds) && isStorefrontHost
   const consentBootstrap = hasGoogleTag ? googleTag! : showAds ? { tagIds: [], conversionSendTo: null } : null
   const initialStoreConfig: StoreConfig = {
@@ -134,12 +133,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
         {/* Consent defaults must reach dataLayer before gtag.js loads, so this runs inline in <head>. */}
         {consentBootstrap && (
-          <script id="gtag-init" dangerouslySetInnerHTML={{ __html: gtagBootstrapScript(consentBootstrap, cookieConsent) }} />
+          <script
+            id="gtag-init"
+            dangerouslySetInnerHTML={{ __html: gtagBootstrapScript(consentBootstrap, cookieConsent) }}
+          />
         )}
         {showAds && <meta name="google-adsense-account" content={adClient!} />}
         {showAds && <script id="adsense-init" dangerouslySetInnerHTML={{ __html: adsenseInitScript() }} />}
-        {/* defer, not async: React hoists async scripts above this init, and the init must run first. */}
-        {showAds && <script defer src={adsenseScriptSrc(adClient!)} crossOrigin="anonymous" />}
       </head>
       <body
         className={`antialiased m-0 p-0 ${isVaultSubdomain ? 'bg-neutral-950 text-neutral-100' : 'bg-surface text-foreground'}`}
@@ -150,6 +150,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Script
             src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleTag!.tagIds[0])}`}
             strategy="afterInteractive"
+          />
+        )}
+        {/* After hydration: loaded from <head> it inserts its own script there first, React's head no longer
+            matches the server's, and every page was thrown away and redrawn blank on the client. The
+            google-adsense-account meta tag above is what site verification reads. */}
+        {showAds && (
+          <Script
+            id="adsbygoogle"
+            src={adsenseScriptSrc(adClient!)}
+            strategy="afterInteractive"
+            crossOrigin="anonymous"
           />
         )}
         {showAds && <AdSense />}

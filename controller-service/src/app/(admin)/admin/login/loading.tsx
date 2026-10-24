@@ -1,5 +1,5 @@
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import { AUTH_THEMES, AuthSplitSkeleton } from '@/components/auth/AuthSplitShell'
 
 export default function Loading() {
-  return <AdminSkeleton variant="form" />
+  return <AuthSplitSkeleton theme={AUTH_THEMES.admin} />
 }

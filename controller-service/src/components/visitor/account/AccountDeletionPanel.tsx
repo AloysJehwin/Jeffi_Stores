@@ -2,17 +2,37 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { usePrompt } from '@/contexts/ConfirmContext'
 
-// Self-service account deletion (Google Play requires it in-app and on the web). lib/account/delete-account.ts.
-export default function DeleteAccountCard() {
-  const { logout } = useAuth()
+// Web self-service deletion (Google Play wants it in the app and on the web). It lives only at the bottom of
+// /legal/account-deletion, an unlisted page, so it isn't a click away on My Account. lib/account/delete-account.ts.
+export default function AccountDeletionPanel() {
+  const { user, isLoading, logout } = useAuth()
   const { showToast } = useToast()
   const prompt = usePrompt()
+  const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [blocked, setBlocked] = useState<string[]>([])
+
+  if (isLoading) return null
+
+  if (!user) {
+    return (
+      <p className="px-1 text-xs text-foreground-muted">
+        To delete your account on the website,{' '}
+        <Link
+          href="/login?redirect=%2Flegal%2Faccount-deletion"
+          className="text-accent-600 hover:text-accent-700 dark:text-accent-400"
+        >
+          sign in
+        </Link>{' '}
+        and come back to this page.
+      </p>
+    )
+  }
 
   async function start() {
     setBusy(true)
@@ -47,6 +67,7 @@ export default function DeleteAccountCard() {
       }
       showToast('Your account has been deleted', 'success')
       await logout()
+      router.replace('/')
     } catch {
       showToast('Network error', 'error')
     } finally {
@@ -55,25 +76,20 @@ export default function DeleteAccountCard() {
   }
 
   return (
-    <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
-      <h2 className="text-sm font-semibold text-foreground">Delete account</h2>
-      <p className="mt-1 text-xs text-foreground-muted">
-        Permanently remove your account and personal data.{' '}
-        <Link href="/legal/account-deletion" className="text-accent-600 hover:text-accent-700 dark:text-accent-400">
-          What gets deleted
-        </Link>
-      </p>
+    <div className="px-1 text-xs text-foreground-muted">
       {blocked.length > 0 && (
-        <ul className="mt-3 space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+        <ul className="mb-3 space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-amber-700 dark:text-amber-400">
           {blocked.map(m => (
             <li key={m}>{m}</li>
           ))}
         </ul>
       )}
+      Signed in as {user.email}.{' '}
       <button
+        type="button"
         onClick={start}
         disabled={busy}
-        className="mt-3 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-900/20"
+        className="font-medium text-red-600 underline-offset-2 hover:underline disabled:opacity-50 dark:text-red-400"
       >
         {busy ? 'Checking…' : 'Delete my account'}
       </button>

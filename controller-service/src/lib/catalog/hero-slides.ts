@@ -1,4 +1,4 @@
-import { queryMany } from '@/lib/shared/db'
+import type { HomepageSurface } from '@/lib/catalog/homepage-sections'
 
 export interface HeroSlide {
   id: string
@@ -22,6 +22,8 @@ export interface HeroSlide {
   filter_on_sale: boolean
   display_order: number
   is_active: boolean
+  /** Absent on rows saved before the column existed; read it through rowSurface(). */
+  surface?: HomepageSurface | null
   created_at: string
   updated_at: string
 }
@@ -56,16 +58,4 @@ export function heroSlideHref(slide: {
 
   const qs = params.toString()
   return `/products${qs ? `?${qs}` : ''}`
-}
-
-/** Active hero slides for the homepage carousel, ordered for display. */
-export async function getActiveHeroSlides(): Promise<HeroSlide[]> {
-  return queryMany<HeroSlide>(
-    `SELECT * FROM hero_slides WHERE is_active = true ORDER BY display_order ASC, created_at ASC`
-  )
-}
-
-/** All hero slides (admin management view). */
-export async function getAllHeroSlides(): Promise<HeroSlide[]> {
-  return queryMany<HeroSlide>(`SELECT * FROM hero_slides ORDER BY display_order ASC, created_at ASC`)
 }

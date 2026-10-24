@@ -1,25 +1,34 @@
 import { queryMany } from '@/lib/shared/db'
 import {
+  forSurface,
   productRowKey,
   productSource,
   sectionLimit,
   visibleSections,
   withDefaults,
   type HomepageSection,
+  type HomepageSurface,
   type ProductSource,
 } from '@/lib/catalog/homepage-sections'
 
-export async function getConfiguredSections(): Promise<HomepageSection[]> {
+/**
+ * `surface` is read through to_jsonb rather than named: a tenant whose schema fan-out has not
+ * added the column yet then keeps its layout (NULL reads as web) instead of failing over to the
+ * built-in one. Same reason the surface filter is applied in JS.
+ */
+export const SURFACE_COLUMN_SQL = (alias: string) => `to_jsonb(${alias}) ->> 'surface' AS surface`
+
+export async function getConfiguredSections(surface: HomepageSurface = 'web'): Promise<HomepageSection[]> {
   try {
     const rows = await queryMany<HomepageSection>(
       `SELECT id, type, title, subtitle, eyebrow, cta_label, cta_url, config,
-              display_order, is_active, starts_at, ends_at
-       FROM homepage_sections
+              display_order, is_active, starts_at, ends_at, ${SURFACE_COLUMN_SQL('s')}
+       FROM homepage_sections s
        ORDER BY display_order ASC, created_at ASC`
     )
     // Window filtering happens in JS, never SQL: a SQL NOW() would be baked into the
     // page's ISR cache entry and never re-evaluate.
-    return visibleSections(withDefaults(rows))
+    return visibleSections(withDefaults(forSurface(rows, surface)))
   } catch {
     // Table missing or unreachable — fall back to the built-in layout rather than an empty page.
     return visibleSections(withDefaults([]))
@@ -116,12 +125,13 @@ export function planProductRows(
 }
 
 /** The non-product data each enabled section type needs. Nothing else is fetched. */
-export function planDataNeeds(sections: HomepageSection[]) {
+export function planDataNeeds(sections: HomepageSection[], surface: HomepageSurface = 'web') {
   const types = new Set(sections.map(s => s.type))
   return {
     heroSlides: types.has('hero'),
     offerSlider: types.has('offer_slider'),
-    mainCategories: types.has('category_grid'),
+    // The app's category screens read mainCategories from the home payload too.
+    mainCategories: surface === 'app' || types.has('category_grid'),
     topBrands: types.has('brand_carousel'),
     categoryShowcase: types.has('category_showcase'),
     dealOfTheDay: types.has('deal_of_the_day'),

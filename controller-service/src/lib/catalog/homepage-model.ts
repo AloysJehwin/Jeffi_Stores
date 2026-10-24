@@ -8,9 +8,16 @@ import {
 } from '@/lib/queries'
 import { getHost } from '@/lib/tenancy/get-host'
 import { getStorefrontContent, getFeatureFlags, getStoreIdentity } from '@/lib/catalog/site-controls'
-import { getConfiguredSections, buildProductRowSql, planDataNeeds, planProductRows } from '@/lib/catalog/homepage-data'
+import {
+  SURFACE_COLUMN_SQL,
+  getConfiguredSections,
+  buildProductRowSql,
+  planDataNeeds,
+  planProductRows,
+} from '@/lib/catalog/homepage-data'
 import { loadSectionExtras } from '@/lib/catalog/homepage-extras'
 import {
+  forSurface,
   productRowKey,
   sectionLimit,
   defaultAboutCopy,
@@ -22,6 +29,7 @@ import {
   launchedWithin,
   SECTION_TILE_DEFAULTS,
   type HomepageSection,
+  type HomepageSurface,
   type ProductSource,
   type SectionCopy,
   type SectionLayout,
@@ -85,11 +93,16 @@ async function getMainCategories() {
   `)
 }
 
-async function getHeroSlides() {
-  // Admin-managed hero_slides first; each carries its own copy, image and CTA link.
-  const managed = await queryMany<any>(
-    `SELECT * FROM hero_slides WHERE is_active = true ORDER BY display_order ASC, created_at ASC`
+async function getHeroSlides(surface: HomepageSurface) {
+  // Admin-managed hero_slides first; each carries its own copy, image and CTA link. Active is
+  // filtered after the surface is picked so an app with only paused slides doesn't borrow the web's.
+  const slides = await queryMany<any>(
+    `SELECT id, title, subtitle, badge_text, badge_color, image_url, image_url_mobile, blurhash, blurhash_mobile,
+            cta_url, filter_category, filter_brand, filter_grade, filter_material, filter_min_price,
+            filter_max_price, filter_in_stock, filter_on_sale, is_active, ${SURFACE_COLUMN_SQL('h')}
+       FROM hero_slides h ORDER BY display_order ASC, created_at ASC`
   )
+  const managed = forSurface(slides, surface).filter(s => s.is_active)
   if (managed.length > 0) {
     return managed.map(s => ({
       id: s.id,
@@ -215,7 +228,7 @@ async function getCategoryShowcase() {
 }
 
 /** Everything the storefront home renders: the configured sections plus the data each one needs. */
-export async function buildHomeModel(): Promise<HomeModel> {
+export async function buildHomeModel({ surface = 'web' }: { surface?: HomepageSurface } = {}): Promise<HomeModel> {
   const storefront = await getStorefrontContent()
   const { gstEnabled } = await getFeatureFlags()
 
@@ -224,12 +237,12 @@ export async function buildHomeModel(): Promise<HomeModel> {
   const identity = await getStoreIdentity()
   const aboutCopy = defaultAboutCopy(storefront.aboutCopy, identity.name)
 
-  const allSections = await getConfiguredSections()
+  const allSections = await getConfiguredSections(surface)
   // The Business CTA promotes the B2B portal, which only exists on plans that sell it (Pro+).
   const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
   const businessAllowed = (await currentTenantPlanGate('business_customers:read').catch(() => ({ allowed: false }))).allowed
   const sections = businessAllowed ? allSections : allSections.filter(s => s.type !== 'business_cta')
-  const needs = planDataNeeds(sections)
+  const needs = planDataNeeds(sections, surface)
   const rowPlan = planProductRows(sections)
 
   // Honor the offer-slider section's picked offers (config.offerIds); fall back to all active.
@@ -243,7 +256,7 @@ export async function buildHomeModel(): Promise<HomeModel> {
   const [mainCategories, heroSlides, offers, categoryShowcase, topBrands, dealOfTheDay, freeShippingThreshold] =
     await Promise.all([
       needs.mainCategories ? getMainCategories() : Promise.resolve([]),
-      needs.heroSlides ? getHeroSlides() : Promise.resolve([]),
+      needs.heroSlides ? getHeroSlides(surface) : Promise.resolve([]),
       needs.offerSlider
         ? pickedOfferIds.length > 0
           ? listOffersByIds(pickedOfferIds)
