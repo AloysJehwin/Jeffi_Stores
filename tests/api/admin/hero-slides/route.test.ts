@@ -178,6 +178,12 @@ describe('POST /api/admin/hero-slides', () => {
     })
   })
 
+  it('creates a slide on the app surface, numbered within that surface', async () => {
+    const res = await POST(req('POST', { title: 'App slide', surface: 'app' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).slide).toMatchObject({ surface: 'app', display_order: 0, title: 'App slide' })
+  })
+
   it('starts at display order 0 when there are no slides', async () => {
     fake.reset()
     const { slide } = await (await POST(req('POST', { title: 'First' }))).json()

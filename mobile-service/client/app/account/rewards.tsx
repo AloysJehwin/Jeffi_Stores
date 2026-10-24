@@ -174,7 +174,11 @@ function CouponList({ list }: { list: InfiniteList<RewardCoupon> }) {
             <View className="flex-1">
               <Text className="font-mono font-semibold text-foreground">{c.code}</Text>
               <Text className="text-xs text-foreground-secondary">
-                {formatMoney(c.value)} off orders of {formatMoney(c.minPurchase)} or more
+                {c.discountType === 'percentage'
+                  ? `${c.value}% off${c.maxDiscount ? ` (up to ${formatMoney(c.maxDiscount)})` : ''}`
+                  : `${formatMoney(c.value)} off`}
+                {c.minPurchase > 0 ? ` orders of ${formatMoney(c.minPurchase)} or more` : ''}
+                {c.validUntil ? ` · valid till ${new Date(c.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
               </Text>
             </View>
             <Pressable onPress={() => copy(c.code)} className="px-3 py-1.5 rounded-lg border border-border-default">

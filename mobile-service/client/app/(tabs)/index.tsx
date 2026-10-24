@@ -1,7 +1,9 @@
-import { RefreshControl, ScrollView, Text, View } from 'react-native'
+import { RefreshControl, Text, View } from 'react-native'
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 import { useQuery } from '@tanstack/react-query'
 import TopNav from '../../src/components/layout/TopNav'
 import SectionRenderer from '../../src/components/home/SectionRenderer'
+import { HomeScrollContext } from '../../src/components/home/scroll-context'
 import Spinner from '../../src/components/ui/Spinner'
 import { getHome } from '../../src/api/home'
 
@@ -11,6 +13,11 @@ export default function HomeScreen() {
     queryKey: ['home'],
     queryFn: getHome,
     staleTime: 120_000,
+  })
+  // Shared with sections that animate as they scroll into view (ProductSpotlight).
+  const scrollY = useSharedValue(0)
+  const onScroll = useAnimatedScrollHandler(e => {
+    scrollY.value = e.contentOffset.y
   })
 
   return (
@@ -23,19 +30,23 @@ export default function HomeScreen() {
           <Text className="text-center text-foreground-muted">Couldn't load the store. Pull down to try again.</Text>
         </View>
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
-        >
-          {data.sections.map((section, i) => (
-            <SectionRenderer
-              key={section.id}
-              section={section}
-              data={data.data}
-              rowIndex={data.sections.slice(0, i).filter(s => s.type === 'product_row').length}
-            />
-          ))}
-        </ScrollView>
+        <HomeScrollContext.Provider value={scrollY}>
+          <Animated.ScrollView
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+          >
+            {data.sections.map((section, i) => (
+              <SectionRenderer
+                key={section.id}
+                section={section}
+                data={data.data}
+                rowIndex={data.sections.slice(0, i).filter(s => s.type === 'product_row').length}
+              />
+            ))}
+          </Animated.ScrollView>
+        </HomeScrollContext.Provider>
       )}
     </View>
   )

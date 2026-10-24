@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
-import { rowSurface, type HomepageSection, type HomepageSurface } from '@/lib/catalog/homepage-sections'
+import { randomUUID } from 'crypto'
+import { rowSurface, withDefaults, type HomepageSection, type HomepageSurface } from '@/lib/catalog/homepage-sections'
 import type { HeroSlide } from '@/lib/catalog/hero-slides'
 
 export type DraftSection = HomepageSection & { created_at: string; updated_at: string }
@@ -215,6 +216,51 @@ export function applyDraftOrder<T extends DraftRow>(rows: T[], order: unknown[])
     if (next !== undefined) applyDraftPatch(row, { display_order: next })
   }
   return sortByDisplayOrder(rows)
+}
+
+export class SurfaceNotEmpty extends Error {
+  constructor(public surface: HomepageSurface) {
+    super(`The ${surface} layout already has its own sections or slides`)
+  }
+}
+
+export type CopySurfaceResult = { sections: number; slides: number; replaced: number }
+
+/**
+ * Copies one surface's layout onto another so it can be edited apart from the source. Rows get fresh
+ * ids (publish upserts by id, so reusing them would move the originals) and `created_at` is now, so
+ * the copies sort after nothing from before. A source with no saved sections contributes the built-in
+ * default layout, which is what that surface is showing. Refuses to overwrite unless `replace`.
+ */
+export function copySurfaceLayout(
+  draft: HomepageDraftState,
+  from: HomepageSurface,
+  to: HomepageSurface,
+  opts: { replace?: boolean; now?: string; newId?: () => string } = {}
+): CopySurfaceResult {
+  if (from === to) throw new Error('Source and target surface are the same')
+  const now = opts.now ?? new Date().toISOString()
+  const newId = opts.newId ?? randomUUID
+  const onTarget = (r: { surface?: string | null }) => rowSurface(r) === to
+  const replaced = draft.sections.filter(onTarget).length + draft.heroSlides.filter(onTarget).length
+  if (replaced > 0 && !opts.replace) throw new SurfaceNotEmpty(to)
+
+  const sourceSections = sortByDisplayOrder(draft.sections.filter(r => rowSurface(r) === from))
+  const sections: DraftSection[] = withDefaults(sourceSections).map((s, i) => ({
+    ...s,
+    id: newId(),
+    surface: to,
+    display_order: i,
+    created_at: now,
+    updated_at: now,
+  }))
+  const slides: DraftHeroSlide[] = sortByDisplayOrder(draft.heroSlides.filter(r => rowSurface(r) === from)).map(
+    (s, i) => ({ ...s, id: newId(), surface: to, display_order: i, created_at: now, updated_at: now })
+  )
+
+  draft.sections = [...draft.sections.filter(r => !onTarget(r)), ...sections]
+  draft.heroSlides = [...draft.heroSlides.filter(r => !onTarget(r)), ...slides]
+  return { sections: sections.length, slides: slides.length, replaced }
 }
 
 export function endsBeforeStart(startsAt: unknown, endsAt: unknown): boolean {

@@ -18,6 +18,10 @@ import CategoryTabs from './CategoryTabs'
 import BlogTeaser, { type BlogTeaserItem } from './BlogTeaser'
 import SocialStrip, { type SocialStripItem } from './SocialStrip'
 import ValueStats from './ValueStats'
+import MotionHero from './MotionHero'
+import Stories from './Stories'
+import ProductSpotlight from './ProductSpotlight'
+import RewardsGame from './RewardsGame'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import {
   sectionLayout,
@@ -25,13 +29,24 @@ import {
   configNumber,
   justLandedDays,
   launchedWithin,
+  motionHeroIntervalMs,
+  motionHeroSlides,
+  rewardsGamePublic,
   safeHref,
+  spotlightConfig,
+  storyGroups,
   SECTION_COPY_DEFAULTS,
   type HomepageSection,
 } from '@/lib/catalog/homepage-sections'
 import { cardPropsFor } from '@/lib/catalog/product-card-props'
 import type { SectionData } from '@/lib/catalog/homepage-model'
-import type { CategoryTab, CountdownDealData, Testimonial, ValueStat } from '@/lib/catalog/homepage-extras'
+import type {
+  CategoryTab,
+  CountdownDealData,
+  SpotlightData,
+  Testimonial,
+  ValueStat,
+} from '@/lib/catalog/homepage-extras'
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 
 export type { SectionData } from '@/lib/catalog/homepage-model'
@@ -322,6 +337,39 @@ export default function SectionRenderer({
       const stats = (extra as ValueStat[] | undefined) ?? []
       if (stats.length === 0) return null
       return <ValueStats stats={stats} eyebrow={section.eyebrow} title={section.title} />
+    }
+
+    case 'motion_hero': {
+      const slides = motionHeroSlides(section)
+      if (slides.length === 0) return null
+      return <MotionHero slides={slides} intervalMs={motionHeroIntervalMs(section)} />
+    }
+
+    case 'stories': {
+      const groups = storyGroups(section)
+      if (groups.length === 0) return null
+      return <Stories groups={groups} eyebrow={section.eyebrow} title={section.title} />
+    }
+
+    case 'product_spotlight': {
+      const spot = extra as SpotlightData | null | undefined
+      if (!spot?.product) return null
+      const { headline, callouts } = spotlightConfig(section)
+      return (
+        <ProductSpotlight
+          product={cardPropsFor([spot.product], data.gstEnabled)[0]}
+          headline={headline}
+          callouts={callouts}
+          eyebrow={section.eyebrow}
+          ctaLabel={section.cta_label}
+        />
+      )
+    }
+
+    case 'rewards_game': {
+      const game = rewardsGamePublic(section)
+      if (!game) return null
+      return <RewardsGame game={game} eyebrow={section.eyebrow} title={section.title} ctaLabel={section.cta_label} />
     }
 
     default:

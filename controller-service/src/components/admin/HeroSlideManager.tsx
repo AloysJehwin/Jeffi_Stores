@@ -11,6 +11,7 @@ import AiMediaButton from '@/components/admin/ai/AiMediaButton'
 import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { notifyHomepageDraftChanged } from '@/components/admin/homepage/draft-events'
+import type { HomepageSurface } from '@/lib/catalog/homepage-sections'
 
 export interface HeroSlideRow {
   id: string
@@ -43,6 +44,8 @@ interface Option {
 
 interface Props {
   initialSlides: HeroSlideRow[]
+  /** Which layout the slides belong to; new slides are created on it. */
+  surface?: HomepageSurface
   categoryOptions: Option[]
   brandOptions: Option[]
   gradeOptions: Option[]
@@ -694,6 +697,7 @@ function SlideCard({
 
 export default function HeroSlideManager({
   initialSlides,
+  surface = 'web',
   categoryOptions,
   brandOptions,
   gradeOptions,
@@ -711,7 +715,7 @@ export default function HeroSlideManager({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ title: 'New slide', badgeColor: 'bg-primary-500' }),
+        body: JSON.stringify({ title: 'New slide', badgeColor: 'bg-primary-500', surface }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.slide) {

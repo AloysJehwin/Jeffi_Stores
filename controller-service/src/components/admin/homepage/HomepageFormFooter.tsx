@@ -13,6 +13,16 @@ import { HOMEPAGE_DRAFT_CHANGED } from './draft-events'
 
 const hasChanges = (d: DraftDiff) => d.added > 0 || d.removed > 0 || d.edited > 0 || d.reordered
 
+const SURFACE_LABEL = { web: 'website', app: 'mobile app' } as const
+
+/** Which layouts the draft touches: "website", "mobile app" or "website + mobile app". */
+function touchedSurfaces(summary: HomepageDraftSummary): string {
+  const names = (['web', 'app'] as const)
+    .filter(s => hasChanges(summary.bySurface[s].sections) || hasChanges(summary.bySurface[s].slides))
+    .map(s => SURFACE_LABEL[s])
+  return names.join(' + ')
+}
+
 interface Props {
   adminId: string
   initialSummary: HomepageDraftSummary
@@ -63,6 +73,7 @@ export default function HomepageFormFooter({ adminId, initialSummary, cancelHref
   }, [refresh])
 
   const pending = summary.hasDraft && (hasChanges(summary.sections) || hasChanges(summary.slides))
+  const touched = pending ? touchedSurfaces(summary) : ''
 
   async function handleDiscard() {
     const ok = await showConfirm({
@@ -95,7 +106,7 @@ export default function HomepageFormFooter({ adminId, initialSummary, cancelHref
   async function handlePublish() {
     const ok = await showConfirm({
       title: 'Publish the homepage?',
-      message: 'Every draft change goes live on the storefront at once.',
+      message: `Every draft change goes live at once${touched ? ` on the ${touched}` : ''}.`,
       confirmText: 'Publish',
       type: 'info',
     })
@@ -154,7 +165,7 @@ export default function HomepageFormFooter({ adminId, initialSummary, cancelHref
     <FormFooter
       sticky
       autosave={autosave !== 'idle' ? <AutosaveStatusPill status={autosave} /> : null}
-      draftBadge={pending ? <Badge tone="amber">Draft pending</Badge> : null}
+      draftBadge={pending ? <Badge tone="amber">Draft pending{touched ? ` · ${touched}` : ''}</Badge> : null}
       discard={pending ? handleDiscard : undefined}
       cancel={edit.sessionId ? handleCancel : undefined}
       cancelHref={edit.sessionId ? undefined : cancelHref}

@@ -11,8 +11,15 @@ import {
   configId,
   friendlyCount,
   safeHref,
+  motionHeroSlides,
+  storyGroups,
+  spotlightConfig,
   SECTION_TYPES,
   SECTION_COPY_DEFAULTS,
+  HOMEPAGE_SURFACES,
+  forSurface,
+  rowSurface,
+  type HomepageSurface,
   type SectionType,
   type HomepageSection,
   type PreviewItem,
@@ -22,6 +29,7 @@ import {
   getBundles,
   getCategoryTabs,
   getCountdownDeal,
+  getSpotlightProduct,
   getTestimonials,
   getValueStats,
 } from '@/lib/catalog/homepage-extras'
@@ -40,7 +48,17 @@ export const dynamic = 'force-dynamic'
 const PREVIEW_LIMIT = 8
 
 type PreviewKind =
-  'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'
+  | 'products'
+  | 'categories'
+  | 'brands'
+  | 'hero'
+  | 'offers'
+  | 'about'
+  | 'reviews'
+  | 'links'
+  | 'stats'
+  | 'stories'
+  | 'none'
 
 interface PreviewResult {
   kind: PreviewKind
@@ -52,6 +70,7 @@ interface PreviewResult {
 const querySchema = z.object({
   type: z.enum(SECTION_TYPES as [string, ...string[]]),
   config: z.string().max(8000).optional(),
+  surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
 })
 
 function parseConfig(raw: string | undefined): Record<string, unknown> {
@@ -161,9 +180,10 @@ async function topBrands(): Promise<PreviewItem[]> {
   return rows.map(r => ({ id: r.id, name: r.name, image_url: null }))
 }
 
-async function heroItems(): Promise<PreviewItem[]> {
+// The slides the surface would show: its own, or the website's when it has none (as the live model does).
+async function heroItems(surface: HomepageSurface): Promise<PreviewItem[]> {
   const { heroSlides } = await getEditableHomepage()
-  return heroSlides
+  return forSurface(heroSlides, surface)
     .filter(s => s.is_active)
     .slice(0, PREVIEW_LIMIT)
     .map(s => ({
@@ -229,6 +249,34 @@ async function withGst<T>(load: (gstEnabled: boolean) => Promise<T>): Promise<T>
   return load((await getFeatureFlags()).gstEnabled)
 }
 
+async function productSpotlight(config: Record<string, unknown>): Promise<PreviewResult> {
+  if (!spotlightConfig({ config }).productId)
+    return { kind: 'products', items: [], note: 'Pick a product to preview this spotlight.' }
+  const data = await withGst(gst => getSpotlightProduct(shape('product_spotlight', config), gst))
+  return data
+    ? { kind: 'products', items: [productItem(data.product)] }
+    : { kind: 'products', items: [], note: 'This product is no longer live, so the spotlight is hidden.' }
+}
+
+// Admin-authored media sections draw straight from the (validated) config; no DB involved.
+function motionHero(config: Record<string, unknown>): PreviewResult {
+  const items = motionHeroSlides({ config }).map((s, i) => ({ id: String(i), name: s.headline, image_url: s.bgImage }))
+  return items.length > 0
+    ? { kind: 'hero', items }
+    : { kind: 'hero', items, note: 'Add a slide with a background image and a headline to preview this hero.' }
+}
+
+function stories(config: Record<string, unknown>): PreviewResult {
+  const items = storyGroups({ config }).map(g => ({ id: g.id, name: g.title, image_url: g.cover }))
+  return items.length > 0
+    ? { kind: 'stories', items }
+    : {
+        kind: 'stories',
+        items,
+        note: 'Add a story with a title, a cover image and at least one slide to preview this row.',
+      }
+}
+
 function tileItems(config: Record<string, unknown>, titleKey: string, fallback: string): PreviewItem[] {
   const raw = Array.isArray(config.items) ? config.items : []
   return raw
@@ -242,14 +290,17 @@ function tileItems(config: Record<string, unknown>, titleKey: string, fallback: 
     }))
 }
 
-const RESOLVERS: Partial<Record<SectionType, (config: Record<string, unknown>) => Promise<PreviewResult>>> = {
+type PreviewContext = { surface: HomepageSurface }
+const RESOLVERS: Partial<
+  Record<SectionType, (config: Record<string, unknown>, ctx: PreviewContext) => Promise<PreviewResult>>
+> = {
   product_row: async c => ({ kind: 'products', items: await productRow(c) }),
   featured_for_you: async () => ({ kind: 'products', items: await productRow({ source: 'featured' }) }),
   deal_of_the_day: async () => ({ kind: 'products', items: await dealOfTheDay() }),
   category_grid: async () => ({ kind: 'categories', items: await mainCategories() }),
   category_showcase: async () => ({ kind: 'categories', items: await showcaseCategories() }),
   brand_carousel: async () => ({ kind: 'brands', items: await topBrands() }),
-  hero: async () => ({ kind: 'hero', items: await heroItems() }),
+  hero: async (_c, ctx) => ({ kind: 'hero', items: await heroItems(ctx.surface) }),
   offer_slider: async c => ({ kind: 'offers', items: await offerItems(c) }),
   about: async c => ({ kind: 'about', items: await aboutItems(c) }),
   countdown_deal: countdownDeal,
@@ -289,6 +340,9 @@ const RESOLVERS: Partial<Record<SectionType, (config: Record<string, unknown>) =
   }),
   blog_teaser: async c => ({ kind: 'links', items: tileItems(c, 'title', 'Article') }),
   social_strip: async c => ({ kind: 'links', items: tileItems(c, 'caption', 'Post') }),
+  motion_hero: async c => motionHero(c),
+  stories: async c => stories(c),
+  product_spotlight: productSpotlight,
   value_stats: async c => ({
     kind: 'stats',
     items: (await getValueStats(shape('value_stats', c))).map(s => ({
@@ -311,6 +365,7 @@ export async function GET(request: NextRequest) {
   const parsed = querySchema.safeParse({
     type: searchParams.get('type') ?? undefined,
     config: searchParams.get('config') ?? undefined,
+    surface: searchParams.get('surface') ?? undefined,
   })
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid preview request' }, { status: 400 })
@@ -322,7 +377,7 @@ export async function GET(request: NextRequest) {
 
   const config = parseConfig(parsed.data.config)
   try {
-    const { kind, items, note } = await resolver(config)
+    const { kind, items, note } = await resolver(config, { surface: rowSurface({ surface: parsed.data.surface }) })
     return NextResponse.json({ kind, items, ...(note ? { note } : {}) })
   } catch (err) {
     console.error('[homepage-preview]', type, err)

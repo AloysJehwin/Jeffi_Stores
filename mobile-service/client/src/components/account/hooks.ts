@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useRouter } from 'expo-router'
+import { useNavigation, useRouter } from 'expo-router'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getFeatureFlags, getMeFull, type AccountUser, type FeatureFlags } from '../../api/account'
 import { logout } from '../../api/auth'
@@ -10,25 +10,44 @@ import type { HeroIconName } from './HeroIcon'
 
 const OFF: FeatureFlags = { smsEnabled: true, whatsappEnabled: true, loyaltyEnabled: false, birthdayEnabled: false, referralEnabled: false }
 
+/**
+ * Closes the sign-in modal from any of its screens. router.dismissAll() is a POP_TO_TOP on the nearest
+ * stack, so from the OTP screen it only went back to login; popping the root stack closes the whole group.
+ */
+export function useLeaveAuth() {
+  const router = useRouter()
+  const navigation = useNavigation()
+  return () => {
+    const root = navigation.getParent()
+    if (root?.canGoBack()) root.goBack()
+    else router.replace('/(tabs)')
+  }
+}
+
 /** The web's /login and /signup send a signed-in visitor back to the store. Checked once, when the saved
  *  session has been restored, so a sign-in finishing on the screen keeps its own flow. */
 export function useLeaveIfSignedIn() {
-  const router = useRouter()
+  const leave = useLeaveAuth()
   const isLoading = useAuthStore(s => s.isLoading)
   const checked = useRef(false)
   useEffect(() => {
     if (isLoading || checked.current) return
     checked.current = true
-    if (!useAuthStore.getState().user) return
-    if (router.canDismiss()) router.dismissAll()
-    else router.replace('/(tabs)')
-  }, [isLoading, router])
+    if (useAuthStore.getState().user) leave()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading])
 }
 
 /** /api/feature-flags, shared like the web's useStoreFlag. */
 export function useFeatureFlags(): FeatureFlags {
-  const { data } = useQuery({ queryKey: ['feature-flags'], queryFn: getFeatureFlags, staleTime: 5 * 60_000 })
-  return data ?? OFF
+  return useFeatureFlagsState().flags
+}
+
+/** The flags plus whether they have actually arrived: the fallback assumes every OTP channel is on. */
+export function useFeatureFlagsState(): { flags: FeatureFlags; loaded: boolean } {
+  const { data, isPending } = useQuery({ queryKey: ['feature-flags'], queryFn: getFeatureFlags, staleTime: 5 * 60_000 })
+  // A failed request still settles, so the form shows with the fallback instead of waiting forever.
+  return { flags: data ?? OFF, loaded: !isPending }
 }
 
 export function useAccountUser(): AccountUser | null {

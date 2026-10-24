@@ -57,6 +57,14 @@ describe('new homepage sections', () => {
     }
   })
 
+  it('hides the motion hero, stories and spotlight until they have content', () => {
+    for (const type of ['motion_hero', 'stories', 'product_spotlight'] as const) {
+      const { container } = draw(section(type))
+      expect(`${type}:${container.innerHTML}`).toBe(`${type}:`)
+      cleanup()
+    }
+  })
+
   it('shows testimonials with the default heading', () => {
     draw(
       section('testimonials'),
