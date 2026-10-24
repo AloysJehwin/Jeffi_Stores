@@ -296,9 +296,12 @@ export async function getFilteredProducts(filters: {
 
   if (filters.search) {
     const rk = buildProductSearchRank(filters.search, 'p.name', 'p.search_vector', i)
-    rankExpr = rk.rank
     params.push(...rk.params)
     i = rk.nextIdx
+    // An exact name or SKU (what picking a suggestion searches for) always leads.
+    params.push(filters.search.trim())
+    rankExpr = `CASE WHEN lower(p.name) = lower($${i}) OR lower(p.sku) = lower($${i}) THEN 0 ELSE 1 END, ${rk.rank}`
+    i++
   }
 
   const limit = filters.limit || 25
