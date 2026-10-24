@@ -3,6 +3,7 @@ import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Glyph, P } from './Glyph'
 import QuantityInput, { InCartQtyHint } from './QuantityInput'
+import { OptionChips } from './OptionChips'
 import { MODE_LABELS, type ProductPurchase } from './useProductPurchase'
 import { unitText } from './pdp'
 import { listAddresses } from '../../api/addresses'
@@ -15,71 +16,6 @@ import { status } from '../../theme'
 import type { Address } from '../../types'
 
 // Mirror of controller-service components/visitor/ProductActions.tsx at the mobile breakpoint.
-
-const VARIANT_COLLAPSE_LIMIT = 12
-
-interface Option {
-  id: string
-  name: string
-  stock_status: string
-}
-
-function Chips({
-  options,
-  selectedId,
-  onSelect,
-  showAll,
-  onToggle,
-}: {
-  options: Option[]
-  selectedId: string | null
-  onSelect: (id: string) => void
-  showAll: boolean
-  onToggle: () => void
-}) {
-  const selectedIndex = options.findIndex(o => o.id === selectedId)
-  const mustExpand = !showAll && selectedIndex >= VARIANT_COLLAPSE_LIMIT
-  const collapsed = !showAll && !mustExpand && options.length > VARIANT_COLLAPSE_LIMIT
-  const visible = collapsed ? options.slice(0, VARIANT_COLLAPSE_LIMIT) : options
-  return (
-    <>
-      <View className="flex-row flex-wrap gap-2">
-        {visible.map(o => {
-          const selected = o.id === selectedId
-          const oos = o.stock_status === 'Out of Stock'
-          return (
-            <Pressable
-              key={o.id}
-              onPress={() => onSelect(o.id)}
-              className={`rounded-lg border px-4 py-2 ${
-                selected
-                  ? 'border-accent-500 bg-accent-500'
-                  : !oos
-                    ? 'border-border-secondary bg-surface-elevated'
-                    : 'border-dashed border-border-default bg-surface-secondary'
-              }`}
-            >
-              <Text className={`text-sm font-medium ${selected ? 'text-white' : !oos ? 'text-foreground-secondary' : 'text-foreground-muted'}`}>
-                {o.name}
-                {oos ? ' (Out of Stock)' : ''}
-              </Text>
-            </Pressable>
-          )
-        })}
-      </View>
-      {options.length > VARIANT_COLLAPSE_LIMIT ? (
-        <Pressable onPress={onToggle} className="mt-2 flex-row items-center gap-1 self-start">
-          <Text className="text-sm font-medium text-accent-600 dark:text-accent-400">
-            {showAll ? 'Show fewer' : `Show all ${options.length} options`}
-          </Text>
-          <View style={{ transform: [{ rotate: showAll ? '180deg' : '0deg' }] }}>
-            <Glyph d={P.chevronDown} size={16} className="text-accent-600 dark:text-accent-400" />
-          </View>
-        </Pressable>
-      ) : null}
-    </>
-  )
-}
 
 function PrimaryButton({
   onPress,
@@ -213,7 +149,7 @@ export default function ProductActions({
 
           <View>
             <Text className="mb-2 text-sm font-medium text-foreground-secondary">{selectLabel}</Text>
-            <Chips
+            <OptionChips
               options={p.modeVariants.map(v => ({ id: v.id, name: v.variant_name, stock_status: v.stock_status }))}
               selectedId={p.selectedVariantId}
               onSelect={p.setSelectedVariantId}
@@ -225,7 +161,7 @@ export default function ProductActions({
           {subs.length > 0 ? (
             <View>
               <Text className="mb-2 text-sm font-medium text-foreground-secondary">Select {p.subVariantType || 'Sub-Variant'}</Text>
-              <Chips
+              <OptionChips
                 options={subs.map(s => ({ id: s.id, name: s.sub_variant_name, stock_status: s.stock_status }))}
                 selectedId={p.selectedSubVariantId}
                 onSelect={p.setSelectedSubVariantId}

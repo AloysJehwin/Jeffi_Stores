@@ -70,9 +70,18 @@ export const MODE_LABELS: Record<string, string> = { unit: 'By Piece' }
 
 export function useProductPurchase(
   product: PdpProduct,
-  opts: { gstEnabled: boolean; digital: boolean; alreadyOwned: boolean; initialSku?: string }
+  opts: {
+    gstEnabled: boolean
+    digital: boolean
+    alreadyOwned: boolean
+    initialSku?: string
+    /** Off for the quick-add sheet: opening it is not a product view. */
+    trackView?: boolean
+    /** Called before navigating away (sign-in, checkout) so a sheet can close first. */
+    onLeave?: () => void
+  }
 ) {
-  const { gstEnabled, digital, alreadyOwned, initialSku } = opts
+  const { gstEnabled, digital, alreadyOwned, initialSku, trackView = true, onLeave } = opts
   const router = useRouter()
   const qc = useQueryClient()
   const user = useAuthStore(s => s.user)
@@ -321,22 +330,31 @@ export function useProductPurchase(
   const optionName = selectedSubVariant?.sub_variant_name || selectedVariant?.variant_name || null
   const viewedSku = useRef<string | null>(null)
   useEffect(() => {
-    if (!displaySku || viewedSku.current === displaySku) return
+    if (!trackView || !displaySku || viewedSku.current === displaySku) return
     viewedSku.current = displaySku
     trackViewItem({ sku: displaySku, name: product.name, price: effectivePrice, variant: optionName })
-  }, [displaySku, product.name, effectivePrice, optionName])
+  }, [trackView, displaySku, product.name, effectivePrice, optionName])
 
   const needsSub = !!selectedVariant?.sub_variants?.length && !selectedSubVariantId
 
-  const handleAddToCart = async () => {
-    if (!user) return router.push('/(auth)/login')
+  const leaveTo = (href: Parameters<typeof router.push>[0]) => {
+    onLeave?.()
+    router.push(href)
+  }
+
+  /** Resolves true when the line was added (failures are toasted here). */
+  const handleAddToCart = async (): Promise<boolean> => {
+    if (!user) {
+      leaveTo('/(auth)/login')
+      return false
+    }
     if (addBlocked) {
       showToast(unitCapError(qtyMax, cartCap.inCart, quantity) ?? 'Max quantity already in cart', 'error')
-      return
+      return false
     }
     if (needsSub) {
       showToast(`Please select a ${subVariantType || 'sub-variant'}`, 'error')
-      return
+      return false
     }
     setIsAddingToCart(true)
     try {
@@ -351,15 +369,17 @@ export function useProductPurchase(
       qc.invalidateQueries({ queryKey: ['cart'] })
       trackAddToCart({ sku: displaySku, name: product.name, price: effectivePrice, quantity, variant: optionName })
       showToast('Item added to cart!', 'success')
+      return true
     } catch (e) {
       showToast(e instanceof Error && e.message ? e.message : 'Failed to add to cart', 'error')
+      return false
     } finally {
       setIsAddingToCart(false)
     }
   }
 
   const handleBuyNow = async () => {
-    if (!user) return router.push('/(auth)/login')
+    if (!user) return leaveTo('/(auth)/login')
     if (needsSub) {
       showToast(`Please select a ${subVariantType || 'sub-variant'}`, 'error')
       return
@@ -378,7 +398,7 @@ export function useProductPurchase(
       showToast(r.error, 'error')
       return
     }
-    router.push({ pathname: '/checkout/review', params: { intent: r.intent } })
+    leaveTo({ pathname: '/checkout/review', params: { intent: r.intent } })
   }
 
   const stickyAction = stickyBarAction({

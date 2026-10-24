@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router'
 import { Heart, ImageIcon } from 'lucide-react-native'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import QuickAddButton from './QuickAddButton'
+import * as Haptics from 'expo-haptics'
+import { openQuickAdd } from '../../stores/quickAddStore'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { useWishlistToggle } from '../../hooks/useWishlist'
 import { useAuthStore } from '../../stores/authStore'
@@ -70,6 +72,11 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
   return (
     <Pressable
       onPress={() => router.push(`/product/${product.slug}`)}
+      onLongPress={() => {
+        if (!inStock) return
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+        openQuickAdd(product)
+      }}
       className="grow flex-col overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm"
     >
       <View className="px-3 pt-3">
