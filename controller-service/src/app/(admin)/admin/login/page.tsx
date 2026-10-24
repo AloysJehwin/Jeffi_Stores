@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
@@ -15,6 +15,8 @@ const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
 export default function AdminLogin() {
   const { name: storeName, web: storeWeb, logoUrl } = useStoreConfig().identity
   const { leaving, go } = useLeaveTo()
+  // Which button started the sign-in, so that one keeps its spinner until the next page opens.
+  const via = useRef<'google' | 'form' | null>(null)
   const searchParams = useSearchParams()
   const requested = searchParams.get('callbackUrl') || ''
   // Same-site paths only; a full URL here would turn the login page into an open redirect.
@@ -90,6 +92,7 @@ export default function AdminLogin() {
     e.preventDefault()
     setError('')
     setIsCertError(false)
+    via.current = 'form'
     setLoading(true)
     try {
       const res = await fetch('/api/admin/auth/email-otp/start', {
@@ -116,6 +119,7 @@ export default function AdminLogin() {
     e.preventDefault()
     setError('')
     setIsCertError(false)
+    via.current = 'form'
     setLoading(true)
     try {
       const res = await fetch('/api/admin/auth/email-otp/verify', {
@@ -157,6 +161,7 @@ export default function AdminLogin() {
   const handleGoogle = async () => {
     setError('')
     setIsCertError(false)
+    via.current = 'google'
     setGoogleLoading(true)
     try {
       const { accessToken, error: gErr } = await openGoogleOAuthPopup({
@@ -199,6 +204,7 @@ export default function AdminLogin() {
     if (accessToken) {
       setError('')
       setIsCertError(false)
+      via.current = 'google'
       setGoogleLoading(true)
       exchangeGoogleToken(accessToken)
         .catch(err => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
@@ -218,6 +224,7 @@ export default function AdminLogin() {
     if (resendCooldown > 0 || loading) return
     setError('')
     setIsCertError(false)
+    via.current = 'form'
     setLoading(true)
     try {
       const res = await fetch('/api/admin/auth/email-otp/start', {
@@ -244,6 +251,7 @@ export default function AdminLogin() {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    via.current = 'form'
     setLoading(true)
     try {
       const res = await fetch('/api/admin/mfa/verify', {
@@ -265,6 +273,7 @@ export default function AdminLogin() {
     e.preventDefault()
     if (!enrollData) return
     setError('')
+    via.current = 'form'
     setLoading(true)
     try {
       const res = await fetch('/api/admin/mfa/enroll-confirm', {
@@ -285,6 +294,9 @@ export default function AdminLogin() {
 
   if (checkingSession) return null
 
+  const googleBusy = googleLoading || (leaving && via.current === 'google')
+  const formBusy = loading || (leaving && via.current === 'form')
+
   return (
     <AuthSplitShell
       brandName={storeName}
@@ -294,7 +306,6 @@ export default function AdminLogin() {
       points={AUTH_POINTS.admin}
       footnote="Authorized personnel only. All access is logged and monitored."
       theme={AUTH_THEMES.admin}
-      busy={leaving ? 'Opening the admin panel…' : googleLoading ? 'Signing you in with Google…' : null}
     >
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-foreground mb-1">Admin Panel</h1>
@@ -392,10 +403,10 @@ export default function AdminLogin() {
                 <button
                   type="button"
                   onClick={handleGoogle}
-                  disabled={googleLoading || loading}
+                  disabled={googleBusy || formBusy}
                   className="control-md w-full gap-3 border border-border-default bg-surface-elevated hover:bg-surface-secondary transition-colors font-medium text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {googleLoading ? (
+                  {googleBusy ? (
                     <div className="w-5 h-5 border-2 border-foreground-muted border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -417,7 +428,7 @@ export default function AdminLogin() {
                       />
                     </svg>
                   )}
-                  {googleLoading ? 'Signing in…' : 'Continue with Google'}
+                  {googleBusy ? 'Signing in…' : 'Continue with Google'}
                 </button>
                 <div className="flex items-center gap-3 text-foreground-muted text-sm">
                   <div className="flex-1 h-px bg-border-default" />
@@ -448,10 +459,10 @@ export default function AdminLogin() {
                 </div>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={formBusy}
                   className="control-md w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
                 >
-                  {loading ? 'Sending code…' : 'Send verification code'}
+                  {formBusy ? 'Sending code…' : 'Send verification code'}
                 </button>
               </form>
             ) : (
@@ -476,10 +487,10 @@ export default function AdminLogin() {
                 </div>
                 <button
                   type="submit"
-                  disabled={loading || otp.length !== 6}
+                  disabled={formBusy || otp.length !== 6}
                   className="control-md w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
                 >
-                  {loading ? 'Verifying…' : 'Continue'}
+                  {formBusy ? 'Verifying…' : 'Continue'}
                 </button>
                 <div className="flex items-center justify-between text-sm">
                   <button
@@ -496,7 +507,7 @@ export default function AdminLogin() {
                   <button
                     type="button"
                     onClick={handleResendOtp}
-                    disabled={resendCooldown > 0 || loading}
+                    disabled={resendCooldown > 0 || formBusy}
                     className="text-foreground-muted hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
@@ -532,10 +543,10 @@ export default function AdminLogin() {
             </div>
             <button
               type="submit"
-              disabled={loading || (!useRecovery && code.length !== 6)}
+              disabled={formBusy || (!useRecovery && code.length !== 6)}
               className="control-md w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
             >
-              {loading ? 'Verifying...' : 'Verify and Continue'}
+              {formBusy ? 'Verifying...' : 'Verify and Continue'}
             </button>
             <div className="flex items-center justify-between text-sm">
               <button
@@ -602,10 +613,10 @@ export default function AdminLogin() {
               </div>
               <button
                 type="submit"
-                disabled={loading || code.length !== 6}
+                disabled={formBusy || code.length !== 6}
                 className="control-md w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
               >
-                {loading ? 'Confirming...' : 'Confirm and Finish Setup'}
+                {formBusy ? 'Confirming...' : 'Confirm and Finish Setup'}
               </button>
             </form>
           </div>

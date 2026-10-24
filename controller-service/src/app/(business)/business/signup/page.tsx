@@ -26,6 +26,8 @@ function BusinessSignUpPage() {
   const searchParams = useSearchParams()
   const config = useStoreConfig()
   const { leaving, go } = useLeaveTo()
+  // Which button started the sign-in, so that one keeps its spinner until the next page opens.
+  const via = useRef<'google' | 'form' | null>(null)
 
   const [step, setStep] = useState<'email' | 'otp' | 'details'>('email')
   const [email, setEmail] = useState(searchParams.get('email') || '')
@@ -138,6 +140,7 @@ function BusinessSignUpPage() {
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    via.current = 'form'
     setIsLoading(true)
     try {
       const res = await fetch('/api/auth/send-otp', {
@@ -173,6 +176,7 @@ function BusinessSignUpPage() {
     if (!policyAccepted) return
     submittedOtpRef.current = otpValue
     setError('')
+    via.current = 'form'
     setIsLoading(true)
     try {
       const res = await fetch('/api/auth/verify-otp', {
@@ -209,6 +213,7 @@ function BusinessSignUpPage() {
     setError('')
     setOtp('')
     submittedOtpRef.current = ''
+    via.current = 'form'
     setIsLoading(true)
     try {
       const res = await fetch('/api/auth/send-otp', {
@@ -245,6 +250,7 @@ function BusinessSignUpPage() {
       setError('Google sign-in is not configured')
       return
     }
+    via.current = 'google'
     setGoogleLoading(true)
     const result = returned ?? (await openGoogleOAuthPopup({ clientId, returnTo: '/business/signup' }))
     if (!result.accessToken) {
@@ -324,6 +330,7 @@ function BusinessSignUpPage() {
       return
     }
     const businessAddress = buildBusinessAddress()
+    via.current = 'form'
     setIsLoading(true)
     try {
       if (isGoogleFlow) {
@@ -409,6 +416,9 @@ function BusinessSignUpPage() {
   const inputCls =
     'w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500'
 
+  const googleBusy = googleLoading || (leaving && via.current === 'google')
+  const formBusy = isLoading || (leaving && via.current === 'form')
+
   return (
     <>
       <AuthSplitShell
@@ -419,7 +429,6 @@ function BusinessSignUpPage() {
         points={AUTH_POINTS.business}
         footnote="Applications are reviewed within 24–48 hours."
         theme={AUTH_THEMES.business}
-        busy={leaving ? 'Submitting your application…' : googleLoading ? 'Signing you in with Google…' : null}
         corner={
           <>
           <span className="hidden sm:inline-flex items-center text-sm text-foreground-secondary bg-surface/90 backdrop-blur px-3 py-2 rounded-lg border border-border-default">
@@ -465,10 +474,10 @@ function BusinessSignUpPage() {
                     <button
                       type="button"
                       onClick={() => handleGoogleSignUp()}
-                      disabled={googleLoading}
+                      disabled={googleBusy}
                       className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary transition-colors text-sm font-medium text-foreground disabled:opacity-60 mb-5"
                     >
-                      {googleLoading ? (
+                      {googleBusy ? (
                         <div className="w-5 h-5 border-2 border-foreground-muted border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -490,7 +499,7 @@ function BusinessSignUpPage() {
                           />
                         </svg>
                       )}
-                      {googleLoading ? 'Please wait…' : 'Continue with Google'}
+                      {googleBusy ? 'Please wait…' : 'Continue with Google'}
                     </button>
                     <div className="relative mb-5">
                       <div className="absolute inset-0 flex items-center">
@@ -516,10 +525,10 @@ function BusinessSignUpPage() {
                   </div>
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={formBusy}
                     className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center"
                   >
-                    {isLoading ? (
+                    {formBusy ? (
                       <>
                         <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
                         Sending…
@@ -575,7 +584,7 @@ function BusinessSignUpPage() {
                   <button
                     type="button"
                     onClick={handleResendOTP}
-                    disabled={isLoading || resendCooldown > 0}
+                    disabled={formBusy || resendCooldown > 0}
                     className="text-accent-600 dark:text-accent-400 font-medium disabled:opacity-50"
                   >
                     {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
@@ -623,10 +632,10 @@ function BusinessSignUpPage() {
                 </label>
                 <button
                   type="submit"
-                  disabled={otp.length !== 6 || isLoading || !policyAccepted}
+                  disabled={otp.length !== 6 || formBusy || !policyAccepted}
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center"
                 >
-                  {isLoading ? (
+                  {formBusy ? (
                     <>
                       <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
                       Verifying…
@@ -856,10 +865,10 @@ function BusinessSignUpPage() {
 
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={formBusy}
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center mt-2"
                 >
-                  {isLoading ? (
+                  {formBusy ? (
                     <>
                       <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
                       Submitting…

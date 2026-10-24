@@ -972,6 +972,39 @@ ALTER TABLE ONLY public.homepage_drafts
     ADD CONSTRAINT homepage_drafts_singleton CHECK (id);
 
 
+--
+-- Name: homepage_sections homepage_sections_type_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+-- Kept out of CREATE TABLE so existing tenants pick up new section types (see catalog.sql).
+--
+
+ALTER TABLE ONLY public.homepage_sections
+    ADD CONSTRAINT homepage_sections_type_check CHECK ((type = ANY (ARRAY[
+        'hero'::text, 'offer_slider'::text, 'trust_strip'::text, 'category_grid'::text, 'brand_carousel'::text,
+        'product_row'::text, 'category_showcase'::text, 'deal_of_the_day'::text,
+        'promo_banner'::text, 'featured_for_you'::text, 'benefits'::text,
+        'why_us'::text, 'about'::text, 'business_cta'::text,
+        'countdown_deal'::text, 'testimonials'::text, 'recently_viewed'::text, 'category_tabs'::text,
+        'bundle_spotlight'::text, 'back_in_stock'::text, 'blog_teaser'::text, 'social_strip'::text,
+        'value_stats'::text])));
+
+
+--
+-- Name: homepage_sections homepage_sections_surface_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+-- IS NOT NULL is spelled out: the fan-out adds the column to existing tables without NOT NULL.
+--
+
+ALTER TABLE ONLY public.homepage_sections
+    ADD CONSTRAINT homepage_sections_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'app'::text])));
+
+
+--
+-- Name: hero_slides hero_slides_surface_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hero_slides
+    ADD CONSTRAINT hero_slides_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'app'::text])));
+
+
 
 
 --
