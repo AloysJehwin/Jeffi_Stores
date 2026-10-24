@@ -20,10 +20,16 @@ import TestimonialWall from './TestimonialWall'
 import BlogTeaser from './BlogTeaser'
 import SocialStrip from './SocialStrip'
 import ValueStats from './ValueStats'
+import MotionHero from './MotionHero'
+import Stories from './Stories'
+import ProductSpotlight from './ProductSpotlight'
 
 // Mirror of controller-service components/visitor/home/SectionRenderer.tsx.
 const SIMPLE = {
   hero: HeroCarousel,
+  motion_hero: MotionHero,
+  stories: Stories,
+  product_spotlight: ProductSpotlight,
   offer_slider: OfferSlider,
   trust_strip: TrustStrip,
   promo_banner: PromoBanner,
@@ -75,6 +81,8 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
         />
       )
     }
+    case 'rewards_game':
+      return null // not in the app yet
     default: {
       const Component = SIMPLE[section.type]
       return Component ? <Component section={section} data={data} /> : null

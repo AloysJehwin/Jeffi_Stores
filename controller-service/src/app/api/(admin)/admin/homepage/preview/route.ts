@@ -11,6 +11,9 @@ import {
   configId,
   friendlyCount,
   safeHref,
+  motionHeroSlides,
+  storyGroups,
+  spotlightConfig,
   SECTION_TYPES,
   SECTION_COPY_DEFAULTS,
   HOMEPAGE_SURFACES,
@@ -26,6 +29,7 @@ import {
   getBundles,
   getCategoryTabs,
   getCountdownDeal,
+  getSpotlightProduct,
   getTestimonials,
   getValueStats,
 } from '@/lib/catalog/homepage-extras'
@@ -44,7 +48,17 @@ export const dynamic = 'force-dynamic'
 const PREVIEW_LIMIT = 8
 
 type PreviewKind =
-  'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'
+  | 'products'
+  | 'categories'
+  | 'brands'
+  | 'hero'
+  | 'offers'
+  | 'about'
+  | 'reviews'
+  | 'links'
+  | 'stats'
+  | 'stories'
+  | 'none'
 
 interface PreviewResult {
   kind: PreviewKind
@@ -235,6 +249,34 @@ async function withGst<T>(load: (gstEnabled: boolean) => Promise<T>): Promise<T>
   return load((await getFeatureFlags()).gstEnabled)
 }
 
+async function productSpotlight(config: Record<string, unknown>): Promise<PreviewResult> {
+  if (!spotlightConfig({ config }).productId)
+    return { kind: 'products', items: [], note: 'Pick a product to preview this spotlight.' }
+  const data = await withGst(gst => getSpotlightProduct(shape('product_spotlight', config), gst))
+  return data
+    ? { kind: 'products', items: [productItem(data.product)] }
+    : { kind: 'products', items: [], note: 'This product is no longer live, so the spotlight is hidden.' }
+}
+
+// Admin-authored media sections draw straight from the (validated) config; no DB involved.
+function motionHero(config: Record<string, unknown>): PreviewResult {
+  const items = motionHeroSlides({ config }).map((s, i) => ({ id: String(i), name: s.headline, image_url: s.bgImage }))
+  return items.length > 0
+    ? { kind: 'hero', items }
+    : { kind: 'hero', items, note: 'Add a slide with a background image and a headline to preview this hero.' }
+}
+
+function stories(config: Record<string, unknown>): PreviewResult {
+  const items = storyGroups({ config }).map(g => ({ id: g.id, name: g.title, image_url: g.cover }))
+  return items.length > 0
+    ? { kind: 'stories', items }
+    : {
+        kind: 'stories',
+        items,
+        note: 'Add a story with a title, a cover image and at least one slide to preview this row.',
+      }
+}
+
 function tileItems(config: Record<string, unknown>, titleKey: string, fallback: string): PreviewItem[] {
   const raw = Array.isArray(config.items) ? config.items : []
   return raw
@@ -298,6 +340,9 @@ const RESOLVERS: Partial<
   }),
   blog_teaser: async c => ({ kind: 'links', items: tileItems(c, 'title', 'Article') }),
   social_strip: async c => ({ kind: 'links', items: tileItems(c, 'caption', 'Post') }),
+  motion_hero: async c => motionHero(c),
+  stories: async c => stories(c),
+  product_spotlight: productSpotlight,
   value_stats: async c => ({
     kind: 'stats',
     items: (await getValueStats(shape('value_stats', c))).map(s => ({

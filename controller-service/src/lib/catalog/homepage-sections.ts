@@ -22,6 +22,10 @@ export type SectionType =
   | 'blog_teaser'
   | 'social_strip'
   | 'value_stats'
+  | 'motion_hero'
+  | 'stories'
+  | 'product_spotlight'
+  | 'rewards_game'
 
 export const SECTION_TYPES: SectionType[] = [
   'hero',
@@ -47,7 +51,23 @@ export const SECTION_TYPES: SectionType[] = [
   'blog_teaser',
   'social_strip',
   'value_stats',
+  'motion_hero',
+  'stories',
+  'product_spotlight',
+  'rewards_game',
 ]
+
+/**
+ * Types an app build from before per-surface layouts never sees: a GET /api/home with no ?surface
+ * is such a build, and it renders nothing for a type it doesn't know, so these are left out of its
+ * payload rather than loaded for nothing.
+ */
+export const LEGACY_APP_HIDDEN_TYPES: ReadonlySet<SectionType> = new Set<SectionType>([
+  'motion_hero',
+  'stories',
+  'product_spotlight',
+  'rewards_game',
+])
 
 /** Which query backs a product_row. Collapses the separate featured/new/best-seller fetches. */
 export type ProductSource = 'featured' | 'new_arrivals' | 'best_sellers' | 'on_sale' | 'category'
@@ -97,6 +117,8 @@ export interface SectionMeta {
   singleton?: boolean
   /** Surfaces that can use the type; absent means both. */
   surfaces?: HomepageSurface[]
+  /** Types this one cannot share a layout with (two auto-advancing heroes, say). */
+  excludes?: SectionType[]
 }
 
 /** The types the picker offers on a surface. */
@@ -108,7 +130,12 @@ export function sectionTypesFor(surface: HomepageSurface): SectionType[] {
 }
 
 export const SECTION_META: Record<SectionType, SectionMeta> = {
-  hero: { label: 'Hero slides', description: 'Full-width rotating banner at the top of the page.', singleton: true },
+  hero: {
+    label: 'Hero slides',
+    description: 'Full-width rotating banner at the top of the page.',
+    singleton: true,
+    excludes: ['motion_hero'],
+  },
   offer_slider: {
     label: 'Offer slider',
     description: 'Centered offer cards with left and right peek, each linking to its filtered products.',
@@ -172,6 +199,26 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     description: 'Animated live numbers: orders shipped, products, cities served, customers.',
     singleton: true,
   },
+  motion_hero: {
+    label: 'Animated hero',
+    description: 'Layered slides with a foreground image that drifts over the background and a headline that reveals itself.',
+    singleton: true,
+    excludes: ['hero'],
+  },
+  stories: {
+    label: 'Stories',
+    description: 'A row of tappable rings that open full-screen image stories with a Shop button.',
+    singleton: true,
+  },
+  product_spotlight: {
+    label: 'Product spotlight',
+    description: 'One product, large, with callouts that appear as the visitor scrolls past.',
+  },
+  rewards_game: {
+    label: 'Rewards game',
+    description: 'A spin-the-wheel or scratch card that gives signed-in customers a coupon.',
+    singleton: true,
+  },
 }
 
 export interface SectionCopy {
@@ -217,6 +264,9 @@ export const SECTION_COPY_DEFAULTS = {
   blog_teaser: { eyebrow: 'Guides', title: 'Tips and how-tos' },
   social_strip: { eyebrow: 'Follow along', title: 'Find us on social', ctaLabel: 'Follow us' },
   value_stats: { eyebrow: 'By the numbers', title: 'Trusted by our customers' },
+  stories: { eyebrow: 'Fresh today', title: 'Stories' },
+  product_spotlight: { eyebrow: 'Spotlight', ctaLabel: 'Shop now' },
+  rewards_game: { eyebrow: 'Your reward', title: 'Spin to win', ctaLabel: 'Play now' },
 } satisfies Partial<Record<SectionType, SectionCopy>>
 
 export function sectionCopyDefaults(type: SectionType): SectionCopy {
@@ -360,6 +410,192 @@ export function safeHref(url: string | null | undefined): string | null {
 export function configId(section: Pick<HomepageSection, 'config'>, key: string): string | null {
   const raw = section.config?.[key]
   return typeof raw === 'string' && GUID.test(raw) ? raw : null
+}
+
+const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null)
+const objects = (raw: unknown): Record<string, unknown>[] =>
+  Array.isArray(raw) ? raw.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object') : []
+
+// Animated hero: `config.slides`, each with a background image and a headline at least.
+export interface MotionHeroSlide {
+  bgImage: string
+  fgImage: string | null
+  eyebrow: string | null
+  headline: string
+  sub: string | null
+  ctaLabel: string | null
+  url: string | null
+}
+
+export function motionHeroSlides(section: Pick<HomepageSection, 'config'>): MotionHeroSlide[] {
+  const slides: MotionHeroSlide[] = []
+  for (const r of objects(section.config?.slides)) {
+    const bgImage = safeHref(str(r.bgImage))
+    const headline = str(r.headline)
+    if (!bgImage || !headline) continue
+    slides.push({
+      bgImage,
+      fgImage: safeHref(str(r.fgImage)),
+      eyebrow: str(r.eyebrow),
+      headline,
+      sub: str(r.sub),
+      ctaLabel: str(r.ctaLabel),
+      url: safeHref(str(r.url)),
+    })
+    if (slides.length === 8) break
+  }
+  return slides
+}
+
+/** Seconds a slide stays before the next one; the editor stores `intervalSeconds`. */
+export function motionHeroIntervalMs(section: Pick<HomepageSection, 'config'>): number {
+  return Math.max(3, configNumber(section, 'intervalSeconds', 6, 20)) * 1000
+}
+
+// Stories: `config.groups`, each a titled ring with a cover and image slides.
+export interface StorySlide {
+  id: string
+  image: string
+  caption: string | null
+  ctaLabel: string | null
+  url: string | null
+  /** How long the slide shows, 2–15 s. */
+  seconds: number
+}
+
+export interface StoryGroup {
+  id: string
+  title: string
+  cover: string
+  slides: StorySlide[]
+}
+
+export function storyGroups(section: Pick<HomepageSection, 'config'>): StoryGroup[] {
+  const groups: StoryGroup[] = []
+  objects(section.config?.groups).forEach((g, gi) => {
+    const title = str(g.title)
+    const cover = safeHref(str(g.cover))
+    if (!title || !cover) return
+    const slides: StorySlide[] = []
+    objects(g.slides).forEach((s, si) => {
+      const image = safeHref(str(s.image))
+      if (!image) return
+      const secs = typeof s.seconds === 'number' ? s.seconds : parseFloat(String(s.seconds ?? ''))
+      slides.push({
+        id: str(s.id) ?? `${gi}-${si}`,
+        image,
+        caption: str(s.caption),
+        ctaLabel: str(s.ctaLabel),
+        url: safeHref(str(s.url)),
+        seconds: Number.isFinite(secs) ? Math.min(15, Math.max(2, secs)) : 5,
+      })
+    })
+    if (slides.length === 0) return
+    groups.push({ id: str(g.id) ?? `group-${gi}`, title, cover, slides: slides.slice(0, 12) })
+  })
+  return groups.slice(0, 12)
+}
+
+// Product spotlight: one picked product with short callouts.
+export interface SpotlightConfig {
+  productId: string | null
+  headline: string | null
+  callouts: string[]
+}
+
+export function spotlightConfig(section: Pick<HomepageSection, 'config'>): SpotlightConfig {
+  const raw = section.config?.callouts
+  const callouts = Array.isArray(raw) ? raw.map(str).filter((c): c is string => !!c).slice(0, 4) : []
+  return { productId: configId(section, 'productId'), headline: str(section.config?.headline), callouts }
+}
+
+// Rewards game: the admin saves any JSON, so the server re-validates on every play.
+export type RewardPrizeKind = 'percent' | 'fixed' | 'none'
+export type RewardPlayLimit = 'once' | 'daily' | 'weekly'
+export type RewardGameMode = 'wheel' | 'scratch'
+
+export interface RewardPrize {
+  id: string
+  label: string
+  kind: RewardPrizeKind
+  /** Percent off (1–90) or rupees off; 0 for a no-win segment. */
+  value: number
+  minPurchase: number
+  maxDiscount: number | null
+  /** Days the coupon stays valid, 1–365. */
+  validDays: number
+  /** Relative chance, > 0. */
+  weight: number
+}
+
+export interface RewardsGameConfig {
+  /** Minted by the editor; stable across publishes and layout copies so play limits hold. */
+  gameKey: string | null
+  mode: RewardGameMode
+  playLimit: RewardPlayLimit
+  prizes: RewardPrize[]
+}
+
+const num = (v: unknown, fallback: number): number => {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''))
+  return Number.isFinite(n) ? n : fallback
+}
+
+export function rewardsGameConfig(section: Pick<HomepageSection, 'config'>): RewardsGameConfig {
+  const cfg = section.config ?? {}
+  const prizes: RewardPrize[] = []
+  for (const r of objects(cfg.prizes)) {
+    const id = str(r.id)
+    const label = str(r.label)
+    const kind: RewardPrizeKind = r.kind === 'percent' || r.kind === 'fixed' || r.kind === 'none' ? r.kind : 'none'
+    if (!id || !label) continue
+    const value = kind === 'none' ? 0 : num(r.value, 0)
+    if (kind === 'percent' && (value < 1 || value > 90)) continue
+    if (kind === 'fixed' && value <= 0) continue
+    const maxDiscount = kind === 'percent' ? num(r.maxDiscount, 0) : 0
+    const weight = num(r.weight, 1)
+    prizes.push({
+      id: id.slice(0, 64),
+      label: label.slice(0, 120),
+      kind,
+      value: Math.round(value * 100) / 100,
+      minPurchase: Math.max(0, num(r.minPurchase, 0)),
+      maxDiscount: maxDiscount > 0 ? maxDiscount : null,
+      validDays: Math.min(365, Math.max(1, Math.round(num(r.validDays, 30)))),
+      weight: weight > 0 ? weight : 1,
+    })
+    if (prizes.length === 12) break
+  }
+  return {
+    gameKey: configId(section, 'gameKey'),
+    mode: cfg.mode === 'scratch' ? 'scratch' : 'wheel',
+    playLimit: cfg.playLimit === 'daily' || cfg.playLimit === 'weekly' ? cfg.playLimit : 'once',
+    prizes,
+  }
+}
+
+/** A game needs its key and at least two prizes before anyone can play it. */
+export function rewardsGamePlayable(game: RewardsGameConfig): boolean {
+  return !!game.gameKey && game.prizes.length >= 2
+}
+
+export interface RewardsGamePublic {
+  gameKey: string
+  mode: RewardGameMode
+  playLimit: RewardPlayLimit
+  prizes: { id: string; label: string; kind: RewardPrizeKind }[]
+}
+
+/** What a client may know about a game: never the weights or the coupon terms. Null when unplayable. */
+export function rewardsGamePublic(section: Pick<HomepageSection, 'config'>): RewardsGamePublic | null {
+  const game = rewardsGameConfig(section)
+  if (!rewardsGamePlayable(game) || !game.gameKey) return null
+  return {
+    gameKey: game.gameKey,
+    mode: game.mode,
+    playLimit: game.playLimit,
+    prizes: game.prizes.map(p => ({ id: p.id, label: p.label, kind: p.kind })),
+  }
 }
 
 /** Days a product row badges products as new, or null when its Just Landed treatment is off. */

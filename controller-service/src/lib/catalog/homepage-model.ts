@@ -27,6 +27,12 @@ import {
   safeHref,
   justLandedDays,
   launchedWithin,
+  motionHeroIntervalMs,
+  motionHeroSlides,
+  rewardsGamePublic,
+  spotlightConfig,
+  storyGroups,
+  LEGACY_APP_HIDDEN_TYPES,
   SECTION_TILE_DEFAULTS,
   type HomepageSection,
   type HomepageSurface,
@@ -37,7 +43,7 @@ import {
 } from '@/lib/catalog/homepage-sections'
 import { listActiveOffers, listOffersByIds } from '@/lib/catalog/product-offers'
 import { cardPropsFor, type CardProps } from '@/lib/catalog/product-card-props'
-import type { CategoryTab, CountdownDealData } from '@/lib/catalog/homepage-extras'
+import type { CategoryTab, CountdownDealData, SpotlightData } from '@/lib/catalog/homepage-extras'
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 
 /** What each home section reads (SectionRenderer's data prop). */
@@ -228,7 +234,14 @@ async function getCategoryShowcase() {
 }
 
 /** Everything the storefront home renders: the configured sections plus the data each one needs. */
-export async function buildHomeModel({ surface = 'web' }: { surface?: HomepageSurface } = {}): Promise<HomeModel> {
+export async function buildHomeModel({
+  surface = 'web',
+  legacyClient = false,
+}: {
+  surface?: HomepageSurface
+  /** An app build from before per-surface layouts: it gets the website layout minus the types it can't render. */
+  legacyClient?: boolean
+} = {}): Promise<HomeModel> {
   const storefront = await getStorefrontContent()
   const { gstEnabled } = await getFeatureFlags()
 
@@ -238,10 +251,19 @@ export async function buildHomeModel({ surface = 'web' }: { surface?: HomepageSu
   const aboutCopy = defaultAboutCopy(storefront.aboutCopy, identity.name)
 
   const allSections = await getConfiguredSections(surface)
-  // The Business CTA promotes the B2B portal, which only exists on plans that sell it (Pro+).
+  // The Business CTA promotes the B2B portal, which only exists on plans that sell it (Pro+); the
+  // rewards game issues coupons, a customer-programs feature on the same footing.
   const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
   const businessAllowed = (await currentTenantPlanGate('business_customers:read').catch(() => ({ allowed: false }))).allowed
-  const sections = businessAllowed ? allSections : allSections.filter(s => s.type !== 'business_cta')
+  const programsAllowed = allSections.some(s => s.type === 'rewards_game')
+    ? await (await import('@/lib/loyalty/settings')).customerProgramsAllowed()
+    : false
+  const sections = allSections.filter(
+    s =>
+      (businessAllowed || s.type !== 'business_cta') &&
+      (programsAllowed || s.type !== 'rewards_game') &&
+      !(legacyClient && LEGACY_APP_HIDDEN_TYPES.has(s.type))
+  )
   const needs = planDataNeeds(sections, surface)
   const rowPlan = planProductRows(sections)
 
@@ -394,9 +416,21 @@ export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
       case 'back_in_stock':
         extras[s.id] = cards(value as any[], () => 'Back in stock')
         break
+      case 'product_spotlight': {
+        const spot = value as SpotlightData | null
+        const { headline, callouts } = spotlightConfig(s)
+        extras[s.id] = spot ? { product: cards([spot.product])[0], headline, callouts } : null
+        break
+      }
       default:
         extras[s.id] = value
     }
+  }
+  // Config-only sections: the app reads the validated shape instead of raw admin JSON.
+  for (const s of sections) {
+    if (s.type === 'motion_hero') extras[s.id] = { slides: motionHeroSlides(s), intervalMs: motionHeroIntervalMs(s) }
+    if (s.type === 'stories') extras[s.id] = { groups: storyGroups(s) }
+    if (s.type === 'rewards_game') extras[s.id] = rewardsGamePublic(s)
   }
   const sectionsJson: HomeSectionJson[] = sections.map(s => {
     const d = sectionCopyDefaults(s.type)
