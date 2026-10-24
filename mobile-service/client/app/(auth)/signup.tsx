@@ -18,11 +18,13 @@ import { showToast } from '../../src/stores/toastStore'
 import { AuthScreen, BigButton, FieldError, Frame, GoogleRow, Note, TermsNote, TextAction } from '../../src/components/account/AuthScreen'
 import { ChannelChips } from '../../src/components/account/ChannelChips'
 import { OtpBoxes } from '../../src/components/account/OtpBoxes'
-import { isValidDob, PolicyConsent, useDobField } from '../../src/components/account/ui'
+import { dobRange, isValidDob, PolicyConsent } from '../../src/components/account/ui'
+import HeroIcon from '../../src/components/account/HeroIcon'
+import { DateField, formatDate } from '../../src/components/ui/DatePickerSheet'
 import { useFeatureFlags, useLeaveAuth, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
 import { finishSignIn, getPendingGoogle, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
-import { useTokens } from '../../src/theme'
+import { accent, useTokens } from '../../src/theme'
 
 // Same flow as controller-service app/(auth)/signup/page.tsx (details → OTP → account; Google completes
 // with phone + DOB), in the app's sheet.
@@ -61,8 +63,20 @@ function TextField({ prefix, locked, ...props }: TextInputProps & { prefix?: str
 }
 
 function DobField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const { text, handle } = useDobField(value, onChange)
-  return <TextField value={text} onChangeText={handle} keyboardType="number-pad" maxLength={10} placeholder="dd/mm/yyyy" />
+  const t = useTokens()
+  const { min, max, initial } = dobRange()
+  return (
+    <DateField value={value} onChange={onChange} title="Date of birth" min={min} max={max} defaultView={initial} startWith="year">
+      {open => (
+        <Frame focused={open}>
+          <Text className={`flex-1 text-base font-semibold ${value ? 'text-foreground' : 'text-foreground-muted'}`}>
+            {value ? formatDate(value) : 'Select your date of birth'}
+          </Text>
+          <HeroIcon name="calendar" size={20} color={open ? accent[500] : t.foregroundMuted} />
+        </Frame>
+      )}
+    </DateField>
+  )
 }
 
 export default function SignupScreen() {

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import Animated, { Easing, SlideInDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { CheckCircleIcon, ChevronDownIcon, CloseIcon, FunnelIcon, TickIcon } from './icons'
 import { SORT_OPTIONS, activeFilterCount, humanizeLabel, splitList, type ListingParams } from './listing'
 import type { ListingFacetValue as FacetValue, ListingFacets as FilterFacets } from '../../api/products'
@@ -266,7 +267,7 @@ export default function FilterSheet({
 
   return (
     <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <View className="flex-1 justify-end">
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable className="absolute inset-0 bg-black/50" onPress={onClose} accessibilityLabel="Close filters" />
         <Animated.View
           entering={SlideInDown.duration(280).easing(Easing.bezier(0.32, 0.72, 0, 1))}
@@ -518,7 +519,7 @@ export default function FilterSheet({
             </Pressable>
           </View>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

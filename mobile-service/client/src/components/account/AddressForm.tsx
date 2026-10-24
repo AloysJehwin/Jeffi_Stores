@@ -1,5 +1,6 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native'
+import { KeyboardScroll } from '../ui/KeyboardScroll'
 import { createAddress, lookupPincode } from '../../api/addresses'
 import type { Address } from '../../types'
 import { showToast } from '../../stores/toastStore'
@@ -215,21 +216,19 @@ export function AddressFormModal({
   return (
     <Modal visible={isOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View className="flex-1 bg-surface">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingTop: 24 }}>
-            <AddressForm
-              formData={formData}
-              setFormData={setFormData}
-              editing={false}
-              isSaving={isSaving}
-              pinLookupState={pin.pinLookupState}
-              localities={pin.localities}
-              onPincodeChange={pin.handlePincodeChange}
-              onSubmit={submit}
-              onCancel={onClose}
-            />
-          </ScrollView>
-        </KeyboardAvoidingView>
+        <KeyboardScroll contentContainerStyle={{ padding: 16, paddingTop: 24 }}>
+          <AddressForm
+            formData={formData}
+            setFormData={setFormData}
+            editing={false}
+            isSaving={isSaving}
+            pinLookupState={pin.pinLookupState}
+            localities={pin.localities}
+            onPincodeChange={pin.handlePincodeChange}
+            onSubmit={submit}
+            onCancel={onClose}
+          />
+        </KeyboardScroll>
       </View>
     </Modal>
   )
