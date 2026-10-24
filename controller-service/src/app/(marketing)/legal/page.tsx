@@ -69,6 +69,7 @@ const icons: Record<string, React.ReactNode> = {
 }
 
 export default function LegalIndexPage() {
+  const listed = policies.filter(p => !p.unlisted)
   return (
     <div className="bg-surface min-h-screen">
       <div className="bg-surface-elevated border-b border-border-default">
@@ -85,7 +86,7 @@ export default function LegalIndexPage() {
       <div className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-6xl mx-auto space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {policies.map(policy => (
+            {listed.map(policy => (
               <div
                 key={policy.slug}
                 className="group bg-surface-elevated rounded-xl border border-border-default hover:border-primary-400 hover:shadow-md transition-all duration-200 flex gap-3 items-start"
