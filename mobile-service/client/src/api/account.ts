@@ -440,6 +440,10 @@ export interface RewardCoupon {
   value: number
   minPurchase: number
   createdAt: string
+  discountType?: 'fixed' | 'percentage'
+  maxDiscount?: number | null
+  validUntil?: string | null
+  source?: 'loyalty' | 'game'
 }
 
 interface Paged<T> {

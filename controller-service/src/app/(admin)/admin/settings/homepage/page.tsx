@@ -8,11 +8,26 @@ import HeroSlideManager from '@/components/admin/HeroSlideManager'
 import HomepageSectionManager from '@/components/admin/homepage/HomepageSectionManager'
 import HomepageFormFooter from '@/components/admin/homepage/HomepageFormFooter'
 import { getStorefrontContent, getStoreIdentity } from '@/lib/catalog/site-controls'
-import { defaultAboutCopy, resolveAboutStats } from '@/lib/catalog/homepage-sections'
-import { getEditableHomepage, getHomepageDraftSummary } from '@/lib/catalog/homepage-draft'
+import { defaultAboutCopy, resolveAboutStats, rowSurface, type HomepageSurface } from '@/lib/catalog/homepage-sections'
+import { getEditableHomepage, getHomepageDraftSummary, type DraftDiff } from '@/lib/catalog/homepage-draft'
 import type { SectionOptions } from '@/components/admin/homepage/editors/fields'
-import { Badge, PageHeader } from '@/components/admin/kit'
+import { Badge, PageHeader, TabLinks } from '@/components/admin/kit'
 import { resnapshotHomepageSession } from './actions'
+
+const SURFACE_COPY: Record<HomepageSurface, { tab: string; description: string }> = {
+  web: {
+    tab: 'Website',
+    description:
+      'Everything on the website homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish.',
+  },
+  app: {
+    tab: 'Mobile app',
+    description:
+      'The mobile app\'s own homepage. Until it has sections of its own the app shows the website layout. Start from a copy of the website layout or add sections here; one publish covers both the website and the app.',
+  },
+}
+
+const changed = (d: DraftDiff) => d.added + d.removed + d.edited + (d.reordered ? 1 : 0) > 0
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -85,10 +100,11 @@ async function loadSectionOptions(
   }
 }
 
-export default async function HomepagePage() {
+export default async function HomepagePage({ searchParams }: { searchParams: Promise<{ surface?: string }> }) {
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
   const host = await getHost()
+  const surface: HomepageSurface = (await searchParams).surface === 'app' ? 'app' : 'web'
 
   const admin = await queryOne<{ role: string; scopes: string[] }>(`SELECT role, scopes FROM admins WHERE id = $1`, [
     adminId,
@@ -103,19 +119,15 @@ export default async function HomepagePage() {
     getHomepageDraftSummary(),
   ])
   const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
-  const hasChangedSections =
-    draftSummary.sections.added +
-      draftSummary.sections.removed +
-      draftSummary.sections.edited +
-      (draftSummary.sections.reordered ? 1 : 0) >
-    0
-  const hasChangedSlides =
-    draftSummary.slides.added +
-      draftSummary.slides.removed +
-      draftSummary.slides.edited +
-      (draftSummary.slides.reordered ? 1 : 0) >
-    0
-  const draftPending = draftSummary.hasDraft && (hasChangedSections || hasChangedSlides)
+  const draftPending = draftSummary.hasDraft && (changed(draftSummary.sections) || changed(draftSummary.slides))
+  const sections = editable.sections.filter(s => rowSurface(s) === surface)
+  const heroSlides = editable.heroSlides.filter(s => rowSurface(s) === surface)
+  const base = ap('/admin/settings/homepage', host)
+  // Pending-change counts per tab come from the server render; the footer keeps the live total.
+  const pendingOn = (s: HomepageSurface) => {
+    const d = draftSummary.bySurface[s]
+    return draftSummary.hasDraft ? d.sections.added + d.sections.removed + d.sections.edited + d.slides.added + d.slides.removed + d.slides.edited : 0
+  }
 
   // Mirror the other migrated entities: header carries only title + description + badges;
   // one shared FormFooter at the bottom owns Cancel / Save as Draft / Publish / Discard.
@@ -123,17 +135,30 @@ export default async function HomepagePage() {
     <div className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5">
       <PageHeader
         title="Homepage"
-        description="Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish."
+        description={SURFACE_COPY[surface].description}
         badges={draftPending ? <Badge tone="amber">Draft pending</Badge> : null}
       />
 
+      <TabLinks
+        value={surface}
+        scroll={false}
+        tabs={[
+          { id: 'web', label: SURFACE_COPY.web.tab, href: base, count: pendingOn('web') },
+          { id: 'app', label: SURFACE_COPY.app.tab, href: `${base}?surface=app`, count: pendingOn('app') },
+        ]}
+      />
+
+      {/* Keyed by surface: both managers seed their state from props once. */}
       <HomepageSectionManager
-        initial={editable.sections}
+        key={surface}
+        surface={surface}
+        initial={sections}
         options={sectionOptions}
         heroEditor={
           <HeroSlideManager
-            key="hero-editor"
-            initialSlides={editable.heroSlides}
+            key={`hero-editor-${surface}`}
+            surface={surface}
+            initialSlides={heroSlides}
             categoryOptions={hero.categoryOptions}
             brandOptions={hero.brandOptions}
             gradeOptions={hero.gradeOptions}

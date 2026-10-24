@@ -6,6 +6,7 @@ import {
   configIds,
   configNumber,
   sectionLimit,
+  spotlightConfig,
   valueStatMetrics,
   type HomepageSection,
   type SectionType,
@@ -221,8 +222,21 @@ export async function getValueStats(section: SectionShape): Promise<ValueStat[]>
   return metrics.map(m => ({ ...m, value: Number(row?.[m.metric] ?? 0) })).filter(s => s.value > 0)
 }
 
+export interface SpotlightData {
+  product: any
+}
+
+/** The spotlight's product card; null until one is picked or when it is no longer active. */
+export async function getSpotlightProduct(section: SectionShape, gstEnabled: boolean): Promise<SpotlightData | null> {
+  const { productId } = spotlightConfig(section)
+  if (!productId) return null
+  const [product] = await getProductCardsByIds([productId], gstEnabled)
+  return product ? { product } : null
+}
+
 const LOADERS: Partial<Record<SectionType, (s: SectionShape, gstEnabled: boolean) => Promise<unknown>>> = {
   countdown_deal: (s, gst) => getCountdownDeal(s, gst),
+  product_spotlight: getSpotlightProduct,
   testimonials: s => getTestimonials(s),
   category_tabs: getCategoryTabs,
   bundle_spotlight: getBundles,

@@ -15,10 +15,14 @@ import CategoryTabsEditor from './editors/CategoryTabsEditor'
 import CountdownDealEditor from './editors/CountdownDealEditor'
 import DealOfTheDayEditor from './editors/DealOfTheDayEditor'
 import FeaturedForYouEditor from './editors/FeaturedForYouEditor'
+import MotionHeroEditor from './editors/MotionHeroEditor'
 import ProductRowEditor from './editors/ProductRowEditor'
+import ProductSpotlightEditor from './editors/ProductSpotlightEditor'
 import PromoBannerEditor from './editors/PromoBannerEditor'
 import RecentlyViewedEditor from './editors/RecentlyViewedEditor'
+import RewardsGameEditor from './editors/RewardsGameEditor'
 import SocialStripEditor from './editors/SocialStripEditor'
+import StoriesEditor from './editors/StoriesEditor'
 import TestimonialsEditor from './editors/TestimonialsEditor'
 import TrustStripEditor from './editors/TrustStripEditor'
 import ValueStatsEditor from './editors/ValueStatsEditor'
@@ -39,10 +43,14 @@ const EDITORS: Partial<Record<SectionType, (props: EditorProps) => React.ReactEl
   countdown_deal: CountdownDealEditor,
   deal_of_the_day: DealOfTheDayEditor,
   featured_for_you: FeaturedForYouEditor,
+  motion_hero: MotionHeroEditor,
   product_row: ProductRowEditor,
+  product_spotlight: ProductSpotlightEditor,
   promo_banner: PromoBannerEditor,
   recently_viewed: RecentlyViewedEditor,
+  rewards_game: RewardsGameEditor,
   social_strip: SocialStripEditor,
+  stories: StoriesEditor,
   testimonials: TestimonialsEditor,
   trust_strip: TrustStripEditor,
   value_stats: ValueStatsEditor,

@@ -26,7 +26,19 @@ export interface RewardCoupon {
   value: number
   minPurchase: number
   createdAt: string
+  /** 'fixed' rupees off (loyalty redemptions) or 'percentage' (a rewards-game prize). */
+  discountType: 'fixed' | 'percentage'
+  maxDiscount: number | null
+  validUntil: string | null
+  /** Where it came from: 'loyalty' or 'game'. */
+  source: 'loyalty' | 'game'
 }
+
+const REWARD_COUPON_WHERE = `c.generated_for_user_id = $1
+         AND (c.generated_for_campaign = $2 OR c.generated_for_campaign LIKE 'reward_game:%')
+         AND c.is_active = TRUE
+         AND (c.valid_until IS NULL OR c.valid_until > NOW())
+         AND c.times_used < COALESCE(c.usage_limit, 1)`
 
 export async function getLoyaltyAccount(userId: string): Promise<LoyaltyAccount> {
   const row = await queryOne<{ points: number; lifetime_points: number; tier: string; tier_updated_at: string | null }>(
@@ -103,27 +115,28 @@ export async function listRewardCoupons(
   const safePage = Math.max(1, Math.floor(page) || 1)
   const safeSize = Math.min(100, Math.max(1, Math.floor(pageSize) || 1))
   const [rows, count] = await Promise.all([
-    queryMany<{ code: string; value: string; min_purchase: string | null; created_at: string }>(
-      `SELECT c.code, c.discount_value AS value, c.min_purchase_amount AS min_purchase, c.created_at
+    queryMany<{
+      code: string
+      value: string
+      min_purchase: string | null
+      created_at: string
+      discount_type: string
+      max_discount: string | null
+      valid_until: string | null
+      campaign: string
+    }>(
+      `SELECT c.code, c.discount_value AS value, c.min_purchase_amount AS min_purchase, c.created_at,
+              c.discount_type, c.max_discount_amount AS max_discount, c.valid_until, c.generated_for_campaign AS campaign
        FROM coupons c
-       WHERE c.generated_for_user_id = $1
-         AND c.generated_for_campaign = $2
-         AND c.is_active = TRUE
-         AND (c.valid_until IS NULL OR c.valid_until > NOW())
-         AND c.times_used < COALESCE(c.usage_limit, 1)
+       WHERE ${REWARD_COUPON_WHERE}
        ORDER BY c.created_at DESC
        LIMIT $3 OFFSET $4`,
       [userId, REWARD_COUPON_CAMPAIGN, safeSize, (safePage - 1) * safeSize]
     ),
-    queryOne<{ total: number }>(
-      `SELECT COUNT(*)::int AS total FROM coupons c
-       WHERE c.generated_for_user_id = $1
-         AND c.generated_for_campaign = $2
-         AND c.is_active = TRUE
-         AND (c.valid_until IS NULL OR c.valid_until > NOW())
-         AND c.times_used < COALESCE(c.usage_limit, 1)`,
-      [userId, REWARD_COUPON_CAMPAIGN]
-    ),
+    queryOne<{ total: number }>(`SELECT COUNT(*)::int AS total FROM coupons c WHERE ${REWARD_COUPON_WHERE}`, [
+      userId,
+      REWARD_COUPON_CAMPAIGN,
+    ]),
   ])
   return {
     items: rows.map(row => ({
@@ -131,6 +144,10 @@ export async function listRewardCoupons(
       value: Number(row.value),
       minPurchase: Number(row.min_purchase ?? 0),
       createdAt: row.created_at,
+      discountType: row.discount_type === 'percentage' ? 'percentage' : 'fixed',
+      maxDiscount: row.max_discount == null ? null : Number(row.max_discount),
+      validUntil: row.valid_until,
+      source: row.campaign === REWARD_COUPON_CAMPAIGN ? 'loyalty' : 'game',
     })),
     total: count?.total ?? 0,
     page: safePage,

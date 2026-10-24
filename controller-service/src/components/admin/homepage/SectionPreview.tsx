@@ -4,10 +4,27 @@ import { useEffect, useState } from 'react'
 import { Link2, Package } from 'lucide-react'
 import AdminImage from '@/components/admin/AdminImage'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
-import type { HomepageSection, PreviewItem } from '@/lib/catalog/homepage-sections'
+import {
+  motionHeroSlides,
+  rowSurface,
+  spotlightConfig,
+  storyGroups,
+  type HomepageSection,
+  type PreviewItem,
+} from '@/lib/catalog/homepage-sections'
 
 type PreviewKind =
-  'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'
+  | 'products'
+  | 'categories'
+  | 'brands'
+  | 'hero'
+  | 'offers'
+  | 'about'
+  | 'reviews'
+  | 'links'
+  | 'stats'
+  | 'stories'
+  | 'none'
 
 interface PreviewResponse {
   kind: PreviewKind
@@ -25,6 +42,28 @@ const KIND_LABEL: Record<Exclude<PreviewKind, 'none'>, string> = {
   reviews: 'reviews',
   links: 'items',
   stats: 'numbers',
+  stories: 'stories',
+}
+
+// The route caps `config` at 8000 chars, so media-heavy sections send only what their preview
+// draws (validated through the same readers the storefront uses). Other types send it whole.
+function previewConfig(section: HomepageSection): Record<string, unknown> {
+  switch (section.type) {
+    case 'motion_hero':
+      return { slides: motionHeroSlides(section).map(s => ({ bgImage: s.bgImage, headline: s.headline })) }
+    case 'stories':
+      return {
+        groups: storyGroups(section).map(g => ({
+          title: g.title,
+          cover: g.cover,
+          slides: [{ image: g.slides[0]?.image }],
+        })),
+      }
+    case 'product_spotlight':
+      return { productId: spotlightConfig(section).productId }
+    default:
+      return section.config ?? {}
+  }
 }
 
 // Tiles draw what the storefront draws: category icons, brand initials, and an icon instead of
@@ -49,7 +88,7 @@ function PreviewTile({ kind, item }: { kind: Exclude<PreviewKind, 'none'>; item:
   const icon =
     kind === 'categories' ? (
       <CategoryIcon categoryName={item.name} className="w-7 h-7 text-primary-600 dark:text-primary-400" />
-    ) : kind === 'hero' ? undefined : kind === 'links' ? (
+    ) : kind === 'hero' || kind === 'stories' ? undefined : kind === 'links' ? (
       <Link2 className="w-6 h-6 text-foreground-muted" aria-hidden="true" />
     ) : (
       <Package className="w-6 h-6 text-foreground-muted" aria-hidden="true" />
@@ -61,7 +100,7 @@ export default function SectionPreview({ section }: { section: HomepageSection }
   const [data, setData] = useState<PreviewResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const configKey = JSON.stringify(section.config ?? {})
+  const configKey = JSON.stringify(previewConfig(section))
 
   useEffect(() => {
     let cancelled = false
@@ -71,7 +110,7 @@ export default function SectionPreview({ section }: { section: HomepageSection }
 
     const timer = setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ type: section.type, config: configKey })
+        const params = new URLSearchParams({ type: section.type, config: configKey, surface: rowSurface(section) })
         const res = await fetch(`/api/admin/homepage/preview?${params.toString()}`, {
           credentials: 'include',
           signal: controller.signal,
@@ -91,9 +130,9 @@ export default function SectionPreview({ section }: { section: HomepageSection }
       controller.abort()
       clearTimeout(timer)
     }
-  }, [section.type, configKey])
+  }, [section.type, configKey, section.surface])
 
-  const hero = section.type === 'hero'
+  const hero = section.type === 'hero' || section.type === 'motion_hero'
 
   if (loading && !data) {
     return <p className="text-xs text-foreground-muted py-2">Loading live preview…</p>

@@ -94,9 +94,11 @@ describe('loyalty redemption', () => {
       expect(result).toMatchObject({ ok: true, value: 200, points: 200, balance: 150 })
 
       const coupon = inserts('coupons')[0]
-      expect(coupon.sql).toContain("'fixed', $2, $2, 1, 1")
+      expect(coupon.sql).toContain('usage_limit,\n          usage_limit_per_user')
+      expect(coupon.sql).toContain('1, 1, NOW()')
       expect(coupon.params[0]).toMatch(/^RWD-[A-HJ-NP-Z2-9]{8}$/)
-      expect(coupon.params.slice(1)).toEqual([200, 'u1', 'loyalty_reward'])
+      // description, type, value, min purchase (= value), cap, expiry, owner, campaign
+      expect(coupon.params.slice(1)).toEqual(['Rewards coupon', 'fixed', 200, 200, null, null, 'u1', 'loyalty_reward'])
       expect(result.ok && result.code).toBe(coupon.params[0])
 
       expect(inserts('loyalty_ledger')[0].sql).toContain("'redeem'")
@@ -108,7 +110,7 @@ describe('loyalty redemption', () => {
       useClient({ balance: 300 })
       const result = await redeemPoints('u1', 250)
       expect(result).toMatchObject({ ok: true, value: 125 })
-      expect(inserts('coupons')[0].params[1]).toBe(125)
+      expect(inserts('coupons')[0].params[3]).toBe(125)
     })
 
     it('takes the customer lock before reading the balance', async () => {

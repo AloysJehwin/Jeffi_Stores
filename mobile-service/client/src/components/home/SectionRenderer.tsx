@@ -20,10 +20,18 @@ import TestimonialWall from './TestimonialWall'
 import BlogTeaser from './BlogTeaser'
 import SocialStrip from './SocialStrip'
 import ValueStats from './ValueStats'
+import MotionHero from './MotionHero'
+import Stories from './Stories'
+import ProductSpotlight from './ProductSpotlight'
+import RewardsGame from './RewardsGame'
 
 // Mirror of controller-service components/visitor/home/SectionRenderer.tsx.
 const SIMPLE = {
   hero: HeroCarousel,
+  motion_hero: MotionHero,
+  stories: Stories,
+  product_spotlight: ProductSpotlight,
+  rewards_game: RewardsGame,
   offer_slider: OfferSlider,
   trust_strip: TrustStrip,
   promo_banner: PromoBanner,

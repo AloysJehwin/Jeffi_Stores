@@ -4,6 +4,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
+import { HOMEPAGE_SURFACES, rowSurface } from '@/lib/catalog/homepage-sections'
 import {
   applyDraftOrder,
   getEditableHomepage,
@@ -43,6 +44,7 @@ const bodySchema = z.object({
   filterInStock: z.boolean().optional(),
   filterOnSale: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
 })
 
 // POST /api/admin/hero-slides — create a new slide in the draft (appended to the end).
@@ -57,10 +59,12 @@ export async function POST(request: NextRequest) {
   if (!parsed.ok) return parsed.response
   const d = parsed.data
 
+  const surface = rowSurface({ surface: d.surface })
   const slide = await withHomepageDraft(admin.adminId, draft => {
     const now = new Date().toISOString()
     const row: DraftHeroSlide = {
       id: randomUUID(),
+      surface,
       title: d.title,
       subtitle: d.subtitle ?? null,
       badge_text: d.badgeText ?? null,
@@ -79,7 +83,7 @@ export async function POST(request: NextRequest) {
       filter_max_price: d.filterMaxPrice ?? null,
       filter_in_stock: d.filterInStock ?? false,
       filter_on_sale: d.filterOnSale ?? false,
-      display_order: nextDisplayOrder(draft.heroSlides),
+      display_order: nextDisplayOrder(draft.heroSlides.filter(s => rowSurface(s) === surface)),
       is_active: d.isActive ?? true,
       created_at: now,
       updated_at: now,

@@ -28,7 +28,7 @@ export async function resnapshotHomepageSession() {
 // to the homepage editor. Kept parallel with startCouponDraft / startBrandDraft
 // for consistency even though homepage has no separate /view page: the draft is
 // implicit, created on first mutation. ON CONFLICT DO NOTHING is safe.
-export async function startHomepageDraft(_formData: FormData) {
+export async function startHomepageDraft(formData: FormData) {
   const session = await getAdminSession()
   await query(
     `INSERT INTO homepage_drafts (id, sections, hero_slides, updated_by)
@@ -40,5 +40,6 @@ export async function startHomepageDraft(_formData: FormData) {
     [session?.adminId ?? null]
   )
   const host = await getHost()
-  redirect(ap('/admin/settings/homepage', host))
+  const surface = formData.get('surface') === 'app' ? '?surface=app' : ''
+  redirect(`${ap('/admin/settings/homepage', host)}${surface}`)
 }
