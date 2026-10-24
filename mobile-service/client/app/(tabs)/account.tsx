@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
+import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
@@ -77,7 +78,7 @@ export default function AccountScreen() {
   return (
     <View className="flex-1 bg-surface">
       <TopNav />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <KeyboardScroll showsVerticalScrollIndicator={false}>
         {/* Hero header */}
         <View className="px-4 pt-8 pb-14">
           <Gradient from={dark ? accent[700] : accent[600]} to={dark ? accent[600] : accent[500]} />
@@ -255,7 +256,7 @@ export default function AccountScreen() {
             </Pressable>
           </View>
         </View>
-      </ScrollView>
+      </KeyboardScroll>
     </View>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Alert, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
+import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, ShoppingCart } from 'lucide-react-native'
@@ -207,11 +208,9 @@ export default function CartScreen() {
   return (
     <View className="flex-1 bg-surface">
       <TopNav />
-      <ScrollView
+      <KeyboardScroll
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}
         refreshControl={refreshControl}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         <Text className="mb-4 text-3xl font-bold text-foreground">Shopping Cart</Text>
@@ -411,7 +410,7 @@ export default function CartScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </KeyboardScroll>
     </View>
   )
 }

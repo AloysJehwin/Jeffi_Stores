@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native'
+import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { pushRecentlyViewed } from '../../src/stores/recentlyViewedStore'
@@ -242,10 +243,9 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
     <View className="flex-1 bg-surface">
       <TopNav />
 
-      <ScrollView
+      <KeyboardScroll
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}
         onLayout={e => setViewportH(e.nativeEvent.layout.height)}
         onContentSizeChange={remeasure}
@@ -422,7 +422,7 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
             ) : null}
           </View>
         </View>
-      </ScrollView>
+      </KeyboardScroll>
 
       <StickyAddToCartBar
         action={purchase.stickyAction}

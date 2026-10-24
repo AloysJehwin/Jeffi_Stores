@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { BackHandler, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { Extrapolation, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { KeyboardAvoidingView, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 
 // A sheet that springs up from the bottom and drags down to dismiss. Rendered at the root (not in a
 // native Modal) so gestures stay inside the app's GestureHandlerRootView and toasts can sit above it.
@@ -24,11 +25,14 @@ export function SheetFooter({ children }: { children: ReactNode }) {
 export function BottomSheet({
   open,
   onClose,
+  onClosed,
   children,
   maxHeightRatio = 0.92,
 }: {
   open: boolean
   onClose: () => void
+  /** After the slide-out finishes (a host Modal can hide then). */
+  onClosed?: () => void
   children: ReactNode
   maxHeightRatio?: number
 }) {
@@ -40,6 +44,13 @@ export function BottomSheet({
   const sheetH = useSharedValue(winH)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  const closedRef = useRef(onClosed)
+  closedRef.current = onClosed
+  const { progress: keyboard } = useReanimatedKeyboardAnimation()
+  const finish = () => {
+    setMounted(false)
+    closedRef.current?.()
+  }
 
   useEffect(() => {
     if (open) {
@@ -52,7 +63,7 @@ export function BottomSheet({
       ty.value = withSpring(0, SPRING)
     } else if (mounted) {
       ty.value = withTiming(sheetH.value || winH, { duration: 200 }, done => {
-        if (done) runOnJS(setMounted)(false)
+        if (done) runOnJS(finish)()
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,6 +99,8 @@ export function BottomSheet({
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(ty.value, [0, sheetH.value || winH], [1, 0], Extrapolation.CLAMP),
   }))
+  // The keyboard already covers the home-indicator / nav-bar strip.
+  const footerStyle = useAnimatedStyle(() => ({ paddingBottom: 12 + insets.bottom * (1 - keyboard.value) }))
 
   if (!mounted) return null
   return (
@@ -97,10 +110,10 @@ export function BottomSheet({
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} className="bg-black/50">
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} accessibilityLabel="Close" />
       </Animated.View>
-      {/* The sheet is a flex child pinned to the end, not absolutely positioned: on iOS the avoiding
-          view's bottom padding only moves children that take part in layout. */}
+      {/* The sheet is a flex child pinned to the end, not absolutely positioned: the avoiding view's
+          bottom padding only moves children that take part in layout. */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end' }]}
         pointerEvents="box-none"
       >
@@ -126,9 +139,9 @@ export function BottomSheet({
             {children}
           </ScrollView>
           {footer ? (
-            <View className="border-t border-border-default px-5 pt-3" style={{ paddingBottom: insets.bottom + 12 }}>
+            <Animated.View className="border-t border-border-default px-5 pt-3" style={footerStyle}>
               {footer}
-            </View>
+            </Animated.View>
           ) : null}
         </Animated.View>
       </KeyboardAvoidingView>
