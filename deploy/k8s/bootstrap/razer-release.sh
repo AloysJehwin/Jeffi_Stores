@@ -18,17 +18,39 @@ else
   cmd="ssh -i $KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 $RAZER '$remote'"
 fi
 
+run_remote() {
+  id=$(aws ssm send-command --instance-ids "$core" --document-name AWS-RunShellScript \
+    --comment "ai-gateway $remote" --parameters "commands=[\"$cmd\"],executionTimeout=[\"1800\"]" \
+    --query Command.CommandId --output text)
+  while :; do
+    sleep 10
+    st=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$core" --query Status --output text 2>/dev/null || echo Pending)
+    case $st in Pending|InProgress|Delayed) continue ;; esac
+    break
+  done
+  out=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$core" --query StandardOutputContent --output text)
+  err=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$core" --query StandardErrorContent --output text)
+  echo "$out"
+  [ -n "$err" ] && [ "$err" != None ] && echo "$err" >&2
+  return 0
+}
+
+# Retry only what a network blip explains: the SSH hop or the source fetch (last step marker is
+# missing or "== Fetching"), or a failed smoke check. A build or rollout failure is real; no retry.
+transient() {
+  [ "$SHA" = smoke ] && return 0
+  local last
+  last=$(grep '^== ' <<<"$out" | tail -1 || true)
+  [ -z "$last" ] || [[ $last == "== Fetching"* ]]
+}
+
 say "AI gateway on the Razer box: $remote (via $core)"
-id=$(aws ssm send-command --instance-ids "$core" --document-name AWS-RunShellScript \
-  --comment "ai-gateway $remote" --parameters "commands=[\"$cmd\"],executionTimeout=[\"1800\"]" \
-  --query Command.CommandId --output text)
-while :; do
-  sleep 10
-  st=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$core" --query Status --output text 2>/dev/null || echo Pending)
-  case $st in Pending|InProgress|Delayed) continue ;; esac
-  break
+for attempt in 1 2 3; do
+  run_remote
+  [ "$st" = Success ] && exit 0
+  [ $attempt -lt 3 ] && transient || break
+  echo "AI gateway $remote: $st on attempt $attempt, looks transient; retrying in 30s" >&2
+  sleep 30
 done
-aws ssm get-command-invocation --command-id "$id" --instance-id "$core" --query StandardOutputContent --output text
-err=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$core" --query StandardErrorContent --output text)
-[ -n "$err" ] && [ "$err" != None ] && echo "$err" >&2
-[ "$st" = Success ] || { echo "AI gateway release $st" >&2; exit 1; }
+echo "AI gateway release $st" >&2
+exit 1
