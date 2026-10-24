@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Link2, Package } from 'lucide-react'
 import AdminImage from '@/components/admin/AdminImage'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
-import type { HomepageSection, PreviewItem } from '@/lib/catalog/homepage-sections'
+import { rowSurface, type HomepageSection, type PreviewItem } from '@/lib/catalog/homepage-sections'
 
 type PreviewKind =
   'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'
@@ -71,7 +71,7 @@ export default function SectionPreview({ section }: { section: HomepageSection }
 
     const timer = setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ type: section.type, config: configKey })
+        const params = new URLSearchParams({ type: section.type, config: configKey, surface: rowSurface(section) })
         const res = await fetch(`/api/admin/homepage/preview?${params.toString()}`, {
           credentials: 'include',
           signal: controller.signal,
@@ -91,7 +91,7 @@ export default function SectionPreview({ section }: { section: HomepageSection }
       controller.abort()
       clearTimeout(timer)
     }
-  }, [section.type, configKey])
+  }, [section.type, configKey, section.surface])
 
   const hero = section.type === 'hero'
 

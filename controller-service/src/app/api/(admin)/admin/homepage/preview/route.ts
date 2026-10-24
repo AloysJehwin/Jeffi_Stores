@@ -13,6 +13,10 @@ import {
   safeHref,
   SECTION_TYPES,
   SECTION_COPY_DEFAULTS,
+  HOMEPAGE_SURFACES,
+  forSurface,
+  rowSurface,
+  type HomepageSurface,
   type SectionType,
   type HomepageSection,
   type PreviewItem,
@@ -52,6 +56,7 @@ interface PreviewResult {
 const querySchema = z.object({
   type: z.enum(SECTION_TYPES as [string, ...string[]]),
   config: z.string().max(8000).optional(),
+  surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
 })
 
 function parseConfig(raw: string | undefined): Record<string, unknown> {
@@ -161,9 +166,10 @@ async function topBrands(): Promise<PreviewItem[]> {
   return rows.map(r => ({ id: r.id, name: r.name, image_url: null }))
 }
 
-async function heroItems(): Promise<PreviewItem[]> {
+// The slides the surface would show: its own, or the website's when it has none (as the live model does).
+async function heroItems(surface: HomepageSurface): Promise<PreviewItem[]> {
   const { heroSlides } = await getEditableHomepage()
-  return heroSlides
+  return forSurface(heroSlides, surface)
     .filter(s => s.is_active)
     .slice(0, PREVIEW_LIMIT)
     .map(s => ({
@@ -242,14 +248,17 @@ function tileItems(config: Record<string, unknown>, titleKey: string, fallback: 
     }))
 }
 
-const RESOLVERS: Partial<Record<SectionType, (config: Record<string, unknown>) => Promise<PreviewResult>>> = {
+type PreviewContext = { surface: HomepageSurface }
+const RESOLVERS: Partial<
+  Record<SectionType, (config: Record<string, unknown>, ctx: PreviewContext) => Promise<PreviewResult>>
+> = {
   product_row: async c => ({ kind: 'products', items: await productRow(c) }),
   featured_for_you: async () => ({ kind: 'products', items: await productRow({ source: 'featured' }) }),
   deal_of_the_day: async () => ({ kind: 'products', items: await dealOfTheDay() }),
   category_grid: async () => ({ kind: 'categories', items: await mainCategories() }),
   category_showcase: async () => ({ kind: 'categories', items: await showcaseCategories() }),
   brand_carousel: async () => ({ kind: 'brands', items: await topBrands() }),
-  hero: async () => ({ kind: 'hero', items: await heroItems() }),
+  hero: async (_c, ctx) => ({ kind: 'hero', items: await heroItems(ctx.surface) }),
   offer_slider: async c => ({ kind: 'offers', items: await offerItems(c) }),
   about: async c => ({ kind: 'about', items: await aboutItems(c) }),
   countdown_deal: countdownDeal,
@@ -311,6 +320,7 @@ export async function GET(request: NextRequest) {
   const parsed = querySchema.safeParse({
     type: searchParams.get('type') ?? undefined,
     config: searchParams.get('config') ?? undefined,
+    surface: searchParams.get('surface') ?? undefined,
   })
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid preview request' }, { status: 400 })
@@ -322,7 +332,7 @@ export async function GET(request: NextRequest) {
 
   const config = parseConfig(parsed.data.config)
   try {
-    const { kind, items, note } = await resolver(config)
+    const { kind, items, note } = await resolver(config, { surface: rowSurface({ surface: parsed.data.surface }) })
     return NextResponse.json({ kind, items, ...(note ? { note } : {}) })
   } catch (err) {
     console.error('[homepage-preview]', type, err)
