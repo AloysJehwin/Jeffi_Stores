@@ -137,6 +137,11 @@ export async function googleSignInIdToken(): Promise<string | null> {
     return res.data.idToken
   } catch (err: any) {
     if (err?.code === statusCodes.SIGN_IN_CANCELLED || err?.code === statusCodes.IN_PROGRESS) return null
+    // Setup problems (no Android OAuth client for this package/SHA-1 → DEVELOPER_ERROR, code 10; no Play
+    // Services) are ours to fix, not the customer's: point them at the other ways in.
+    const code = String(err?.code ?? '')
+    if (code === '10' || code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE || /DEVELOPER_ERROR/.test(String(err?.message ?? '')))
+      throw new Error("Google sign-in isn't available right now — use your mobile number or email instead.")
     throw err
   }
 }

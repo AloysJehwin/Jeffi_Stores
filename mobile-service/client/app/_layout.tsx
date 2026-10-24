@@ -11,6 +11,7 @@ import { getStoredToken } from '../src/api/client'
 import { getMe } from '../src/api/auth'
 import { getCart } from '../src/api/cart'
 import Toast from '../src/components/ui/Toast'
+import UpdatePrompt from '../src/components/ui/UpdatePrompt'
 import { trackScreen } from '../src/lib/analytics'
 
 const queryClient = new QueryClient({
@@ -102,6 +103,7 @@ export default function RootLayout() {
             <Stack.Screen name="account/profile" />
             <Stack.Screen name="account/addresses" />
           </Stack>
+          <UpdatePrompt />
           <Toast />
         </QueryClientProvider>
       </SafeAreaProvider>
