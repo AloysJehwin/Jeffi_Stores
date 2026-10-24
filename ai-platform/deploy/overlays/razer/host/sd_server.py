@@ -23,7 +23,11 @@ MAX_BATCH = int(os.environ.get("SD_SERVER_MAX_BATCH", "4"))
 
 txt2img = AutoPipelineForText2Image.from_pretrained(MODEL, torch_dtype=torch.float16, variant="fp16")
 txt2img.enable_model_cpu_offload()
-txt2img.enable_vae_tiling()
+# diffusers >= 0.40 moved tiling onto the VAE.
+if hasattr(txt2img, "enable_vae_tiling"):
+    txt2img.enable_vae_tiling()
+else:
+    txt2img.vae.enable_tiling()
 img2img = AutoPipelineForImage2Image.from_pipe(txt2img)
 lock = threading.Lock()
 app = FastAPI()

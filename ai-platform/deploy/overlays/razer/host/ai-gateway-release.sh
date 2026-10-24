@@ -34,7 +34,9 @@ DRY=false; [ "${3:-}" = --dry-run ] && DRY=true
 
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 echo "== Fetching ai-platform at ${SHA:0:8}"
-curl -fsSL --max-time 300 "$REPO_TARBALL/$SHA" | tar -xz -C "$work" --strip-components=1 --wildcards '*/ai-platform/*'
+# Download, then unpack: a DNS or network blip on the box is retried instead of handing tar a broken stream.
+curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 300 -o "$work/src.tar.gz" "$REPO_TARBALL/$SHA"
+tar -xzf "$work/src.tar.gz" -C "$work" --strip-components=1 --wildcards '*/ai-platform/*'
 src=$work/ai-platform
 [ -f "$src/gateway/Dockerfile" ] || { echo "ai-platform not found at $SHA" >&2; exit 1; }
 
