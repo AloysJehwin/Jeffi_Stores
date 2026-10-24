@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
-import type { HomepageSection } from '@/lib/catalog/homepage-sections'
+import { rowSurface, type HomepageSection, type HomepageSurface } from '@/lib/catalog/homepage-sections'
 import type { HeroSlide } from '@/lib/catalog/hero-slides'
 
 export type DraftSection = HomepageSection & { created_at: string; updated_at: string }
@@ -28,6 +28,8 @@ export interface HomepageDraftSummary {
   updatedBy: string | null
   sections: DraftDiff
   slides: DraftDiff
+  /** The same diffs split by surface, for the Website / Mobile app tabs. */
+  bySurface: Record<HomepageSurface, { sections: DraftDiff; slides: DraftDiff }>
 }
 
 export type PublishCounts = { inserted: number; updated: number; deleted: number }
@@ -36,6 +38,7 @@ export type PublishResult = { sections: PublishCounts; heroSlides: PublishCounts
 interface DraftRow {
   id: string
   display_order: number
+  surface?: HomepageSurface | null
   created_at?: string
   updated_at?: string
 }
@@ -52,6 +55,7 @@ const SECTION_COLUMNS = [
   'is_active',
   'starts_at',
   'ends_at',
+  'surface',
 ] as const
 
 const SLIDE_COLUMNS = [
@@ -75,14 +79,17 @@ const SLIDE_COLUMNS = [
   'filter_on_sale',
   'display_order',
   'is_active',
+  'surface',
 ] as const
 
+// Draft rows copied before a column existed have no key for it; jsonb_populate_recordset gives NULL.
 const NOT_NULL_DEFAULTS: Record<string, string> = {
   config: `'{}'::jsonb`,
   display_order: '0',
   is_active: 'true',
   filter_in_stock: 'false',
   filter_on_sale: 'false',
+  surface: `'web'`,
 }
 
 const liveRows = (table: 'homepage_sections' | 'hero_slides') =>
@@ -144,6 +151,8 @@ class Unchanged extends Error {
 }
 
 const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : [])
+// Rows saved before the surface column existed read as web, so diffs and per-surface views agree.
+const asRows = <T extends DraftRow>(value: unknown): T[] => asArray<T>(value).map(r => ({ ...r, surface: rowSurface(r) }))
 const asUuid = (id: string | null | undefined) => (id && UUID_RE.test(id) ? id : null)
 const isUndefinedTable = (err: unknown) => (err as { code?: string } | null)?.code === '42P01'
 
@@ -229,15 +238,15 @@ async function readDraft() {
 
 async function readLive(): Promise<HomepageDraftState> {
   const row = await queryOne<{ sections: unknown; hero_slides: unknown }>(READ_LIVE_SQL)
-  return { sections: asArray(row?.sections), heroSlides: asArray(row?.hero_slides) }
+  return { sections: asRows(row?.sections), heroSlides: asRows(row?.hero_slides) }
 }
 
 export async function getEditableHomepage(): Promise<EditableHomepage> {
   const draft = await readDraft()
   if (!draft) return { ...(await readLive()), draft: null }
   return {
-    sections: sortByDisplayOrder(asArray<DraftSection>(draft.sections)),
-    heroSlides: sortByDisplayOrder(asArray<DraftHeroSlide>(draft.hero_slides)),
+    sections: sortByDisplayOrder(asRows<DraftSection>(draft.sections)),
+    heroSlides: sortByDisplayOrder(asRows<DraftHeroSlide>(draft.hero_slides)),
     draft: { updatedAt: toIso(draft.updated_at), updatedBy: draft.updated_by_name ?? null },
   }
 }
@@ -247,7 +256,7 @@ async function lockDraft(client: PoolClient, updatedBy: string | null): Promise<
   for (let attempt = 0; attempt < 3; attempt++) {
     await client.query(ENSURE_DRAFT_SQL, [updatedBy])
     const { rows } = await client.query(LOCK_DRAFT_SQL)
-    if (rows[0]) return { sections: asArray(rows[0].sections), heroSlides: asArray(rows[0].hero_slides) }
+    if (rows[0]) return { sections: asRows(rows[0].sections), heroSlides: asRows(rows[0].hero_slides) }
   }
   throw new Error('Homepage draft is unavailable')
 }
@@ -329,15 +338,34 @@ function diffRows(draft: DraftRow[], live: DraftRow[], fields: readonly string[]
 
 const noChanges = (): DraftDiff => ({ added: 0, removed: 0, edited: 0, reordered: false })
 
+function diffState(draft: HomepageDraftState, live: HomepageDraftState) {
+  return {
+    sections: diffRows(draft.sections, live.sections, SECTION_DIFF_FIELDS),
+    slides: diffRows(draft.heroSlides, live.heroSlides, SLIDE_DIFF_FIELDS),
+  }
+}
+
+const onSurface = (state: HomepageDraftState, surface: HomepageSurface): HomepageDraftState => ({
+  sections: state.sections.filter(s => s.surface === surface),
+  heroSlides: state.heroSlides.filter(s => s.surface === surface),
+})
+
 export async function getHomepageDraftSummary(): Promise<HomepageDraftSummary> {
   const draft = await readDraft()
-  if (!draft) return { hasDraft: false, updatedAt: null, updatedBy: null, sections: noChanges(), slides: noChanges() }
+  if (!draft) {
+    const none = () => ({ sections: noChanges(), slides: noChanges() })
+    return { hasDraft: false, updatedAt: null, updatedBy: null, ...none(), bySurface: { web: none(), app: none() } }
+  }
   const live = await readLive()
+  const state: HomepageDraftState = { sections: asRows(draft.sections), heroSlides: asRows(draft.hero_slides) }
   return {
     hasDraft: true,
     updatedAt: toIso(draft.updated_at),
     updatedBy: draft.updated_by_name ?? null,
-    sections: diffRows(asArray(draft.sections), live.sections, SECTION_DIFF_FIELDS),
-    slides: diffRows(asArray(draft.hero_slides), live.heroSlides, SLIDE_DIFF_FIELDS),
+    ...diffState(state, live),
+    bySurface: {
+      web: diffState(onSurface(state, 'web'), onSurface(live, 'web')),
+      app: diffState(onSurface(state, 'app'), onSurface(live, 'app')),
+    },
   }
 }

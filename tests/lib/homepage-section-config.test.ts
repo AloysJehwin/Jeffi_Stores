@@ -38,9 +38,15 @@ describe('new section types', () => {
 
   it('keeps the database CHECK in step with the section types', async () => {
     const { readFileSync } = await import('fs')
-    const sql = readFileSync('database/catalog.sql', 'utf8')
-    const check = sql.slice(sql.indexOf('homepage_sections_type_check'), sql.indexOf('homepage_sections_window_check'))
+    // The CHECK lives in constraints.sql so the tenant fan-out re-applies it (an inline one never changes).
+    const sql = readFileSync('database/constraints.sql', 'utf8')
+    const start = sql.indexOf('ADD CONSTRAINT homepage_sections_type_check')
+    expect(start).toBeGreaterThan(-1)
+    const check = sql.slice(start, sql.indexOf(';', start))
     for (const t of SECTION_TYPES) expect(check).toContain(`'${t}'::text`)
+    const inCheck = [...check.matchAll(/'([a-z_]+)'::text/g)].map(m => m[1])
+    expect(inCheck.sort()).toEqual([...SECTION_TYPES].sort())
+    expect(readFileSync('database/catalog.sql', 'utf8')).not.toContain('CONSTRAINT homepage_sections_type_check')
   })
 })
 

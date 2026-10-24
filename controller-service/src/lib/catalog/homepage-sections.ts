@@ -54,6 +54,11 @@ export type ProductSource = 'featured' | 'new_arrivals' | 'best_sellers' | 'on_s
 
 export type SectionLayout = 'grid' | 'carousel'
 
+/** The website and the mobile app each have their own homepage layout (sections and hero slides). */
+export type HomepageSurface = 'web' | 'app'
+
+export const HOMEPAGE_SURFACES: HomepageSurface[] = ['web', 'app']
+
 export interface HomepageSection {
   id: string
   type: SectionType
@@ -67,6 +72,22 @@ export interface HomepageSection {
   is_active: boolean
   starts_at: string | null
   ends_at: string | null
+  /** Absent on rows saved before the column existed; read it through rowSurface(). */
+  surface?: HomepageSurface | null
+}
+
+export function rowSurface(row: { surface?: string | null }): HomepageSurface {
+  return row.surface === 'app' ? 'app' : 'web'
+}
+
+/**
+ * The rows that belong to a surface. The app mirrors the website until it has a layout of its own
+ * (any app row, active or not), so a store that never opens the Mobile app tab keeps one layout.
+ */
+export function forSurface<T extends { surface?: string | null }>(rows: T[], surface: HomepageSurface): T[] {
+  const own = rows.filter(r => rowSurface(r) === surface)
+  if (own.length > 0 || surface === 'web') return own
+  return rows.filter(r => rowSurface(r) === 'web')
 }
 
 export interface SectionMeta {
