@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { useAuthStore } from '../src/stores/authStore'
 import { useCartStore } from '../src/stores/cartStore'
 import { getStoredToken } from '../src/api/client'
@@ -87,6 +88,8 @@ function CartRehydrator() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* Edge-to-edge Android no longer resizes the window for the keyboard; this tracks it on both platforms. */}
+      <KeyboardProvider>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthRehydrator />
@@ -112,6 +115,7 @@ export default function RootLayout() {
           <Toast />
         </QueryClientProvider>
       </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   )
 }

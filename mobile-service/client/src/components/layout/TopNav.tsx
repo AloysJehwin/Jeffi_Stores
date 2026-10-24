@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  Animated, Easing, Keyboard, Modal, Pressable, ScrollView, Text, TextInput,
+  Animated, Easing, Modal, Pressable, ScrollView, Text, TextInput,
   TouchableOpacity, View, useWindowDimensions,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { KeyboardEvents } from 'react-native-keyboard-controller'
 import { usePathname, useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -175,8 +176,9 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
 
   useEffect(() => {
     if (!searchOpen) return
-    const show = Keyboard.addListener('keyboardDidShow', e => setKb(e.endCoordinates.height))
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKb(0))
+    // In window coordinates on edge-to-edge Android too (RN's event leaves out the nav bar).
+    const show = KeyboardEvents.addListener('keyboardDidShow', e => setKb(e.height))
+    const hide = KeyboardEvents.addListener('keyboardDidHide', () => setKb(0))
     return () => { show.remove(); hide.remove() }
   }, [searchOpen])
 

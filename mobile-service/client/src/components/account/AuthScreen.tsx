@@ -1,15 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import {
-  ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native'
+import { useEffect, useMemo, type ReactNode } from 'react'
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native'
 import Animated, {
   Easing,
   SlideInDown,
@@ -20,6 +10,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
+import { KeyboardScroll } from '../ui/KeyboardScroll'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
@@ -46,24 +38,11 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
   const { height: windowHeight } = useWindowDimensions()
   const config = useStoreConfig()
   const storeName = config.identity.name || 'Jeffi Stores'
-  const folded = useSharedValue(0)
-  const [keyboardOpen, setKeyboardOpen] = useState(false)
+  // 0 → 1 with the keyboard, frame by frame on both platforms.
+  const { progress: folded } = useReanimatedKeyboardAnimation()
 
   const openHeight = Math.max(250, Math.round(windowHeight * 0.38))
   const compactHeight = insets.top + COMPACT_PANEL
-
-  useEffect(() => {
-    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardOpen(true))
-    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardOpen(false))
-    return () => {
-      show.remove()
-      hide.remove()
-    }
-  }, [])
-
-  useEffect(() => {
-    folded.value = withTiming(keyboardOpen ? 1 : 0, { duration: 260, easing: Easing.out(Easing.cubic) })
-  }, [keyboardOpen, folded])
 
   const panelStyle = useAnimatedStyle(() => ({ height: openHeight + (compactHeight - openHeight) * folded.value }))
   const fadeStyle = useAnimatedStyle(() => ({ opacity: 1 - folded.value }))
@@ -87,20 +66,16 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
       </Animated.View>
 
       <Animated.View entering={SlideInDown.springify().damping(20).stiffness(160)} className="-mt-6 flex-1 overflow-hidden rounded-t-[28px] bg-surface-elevated">
-        {/* iOS lays the keyboard over the window; Android resizes it, so only iOS needs the padding. */}
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: insets.bottom + 24 }}
-            showsVerticalScrollIndicator={false}
-          >
-            <View className="mb-5">
-              <Text className="text-[26px] font-black leading-8 tracking-tight text-foreground">{title}</Text>
-              {subtitle ? <Text className="mt-1.5 text-[15px] leading-5 text-foreground-secondary">{subtitle}</Text> : null}
-            </View>
-            {children}
-          </ScrollView>
-        </KeyboardAvoidingView>
+        <KeyboardScroll
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: insets.bottom + 24 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="mb-5">
+            <Text className="text-[26px] font-black leading-8 tracking-tight text-foreground">{title}</Text>
+            {subtitle ? <Text className="mt-1.5 text-[15px] leading-5 text-foreground-secondary">{subtitle}</Text> : null}
+          </View>
+          {children}
+        </KeyboardScroll>
       </Animated.View>
     </View>
   )

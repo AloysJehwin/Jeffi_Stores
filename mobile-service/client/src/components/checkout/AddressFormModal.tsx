@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View,
-} from 'react-native'
+import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from 'react-native'
+import { KeyboardScroll } from '../ui/KeyboardScroll'
 import { Check, ChevronDown, CircleCheck, CircleX, X } from 'lucide-react-native'
 import { createAddress, lookupPincode, updateAddress } from '../../api/addresses'
 import { useAuthStore } from '../../stores/authStore'
@@ -180,178 +179,176 @@ export default function AddressFormModal({
 
   return (
     <Modal visible={isOpen} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-        <View className="flex-1 items-center justify-center bg-black/30 p-4">
-          <View className="w-full rounded-lg bg-surface-elevated shadow-xl" style={{ maxHeight: '90%' }}>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16 }}>
-              <View className="mb-4 flex-row items-center justify-between">
-                <Text className="text-lg font-bold text-foreground">{editAddress ? 'Edit Address' : 'Add Delivery Address'}</Text>
-                <Pressable onPress={onClose} hitSlop={8} className="p-1">
-                  <X size={20} color={t.foregroundMuted} />
-                </Pressable>
-              </View>
+      <View className="flex-1 items-center justify-center bg-black/30 p-4">
+        <View className="w-full rounded-lg bg-surface-elevated shadow-xl" style={{ maxHeight: '90%' }}>
+          <KeyboardScroll contentContainerStyle={{ padding: 16 }}>
+            <View className="mb-4 flex-row items-center justify-between">
+              <Text className="text-lg font-bold text-foreground">{editAddress ? 'Edit Address' : 'Add Delivery Address'}</Text>
+              <Pressable onPress={onClose} hitSlop={8} className="p-1">
+                <X size={20} color={t.foregroundMuted} />
+              </Pressable>
+            </View>
 
-              <View className="gap-4">
-                <Select
-                  label="Address Type *"
-                  value={form.address_type}
-                  options={TYPES}
-                  onChange={v => set({ address_type: v as Address['address_type'] })}
+            <View className="gap-4">
+              <Select
+                label="Address Type *"
+                value={form.address_type}
+                options={TYPES}
+                onChange={v => set({ address_type: v as Address['address_type'] })}
+              />
+              <View>
+                <Label>Full Name *</Label>
+                <TextInput
+                  value={form.full_name}
+                  onChangeText={v => set({ full_name: v })}
+                  className={`${INPUT} bg-surface`}
+                  placeholderTextColor={t.foregroundMuted}
                 />
-                <View>
-                  <Label>Full Name *</Label>
-                  <TextInput
-                    value={form.full_name}
-                    onChangeText={v => set({ full_name: v })}
-                    className={`${INPUT} bg-surface`}
-                    placeholderTextColor={t.foregroundMuted}
-                  />
-                </View>
-
-                <View>
-                  <Label>Phone Number *</Label>
-                  <View className="flex-row">
-                    <View className="justify-center rounded-l-lg border border-r-0 border-border-secondary bg-surface px-4 py-2">
-                      <Text className="text-sm font-medium text-foreground-secondary">+91</Text>
-                    </View>
-                    <TextInput
-                      value={form.phone}
-                      onChangeText={v => set({ phone: v.replace(/\D/g, '').slice(0, 10) })}
-                      keyboardType="number-pad"
-                      maxLength={10}
-                      placeholder="00000 00000"
-                      placeholderTextColor={t.foregroundMuted}
-                      className="flex-1 rounded-r-lg border border-border-secondary bg-surface px-4 py-2 text-foreground"
-                    />
-                  </View>
-                  {form.phone.length > 0 && form.phone.length !== 10 ? (
-                    <Text className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</Text>
-                  ) : null}
-                </View>
-
-                <View>
-                  <Label>Address Line 1 *</Label>
-                  <TextInput
-                    value={form.address_line1}
-                    onChangeText={v => set({ address_line1: v })}
-                    placeholder="Start typing your street address…"
-                    placeholderTextColor={t.foregroundMuted}
-                    autoComplete="off"
-                    className={`${INPUT} bg-surface`}
-                  />
-                </View>
-
-                <View>
-                  <Label>PIN Code *</Label>
-                  <View className="justify-center">
-                    <TextInput
-                      value={form.postal_code}
-                      onChangeText={onPin}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      placeholder="6-digit PIN code"
-                      placeholderTextColor={t.foregroundMuted}
-                      className={`${INPUT} bg-surface pr-10`}
-                    />
-                    <View className="absolute right-3">
-                      {pinState === 'loading' && <ActivityIndicator size="small" color={accent[500]} />}
-                      {pinState === 'found' && <CircleCheck size={16} color={status.white} fill={status.success} />}
-                      {pinState === 'error' && <CircleX size={16} color={status.white} fill={status.danger} />}
-                    </View>
-                  </View>
-                  {pinState === 'error' ? (
-                    <Text className="mt-1 text-xs text-red-500">PIN code not found. Please check and try again.</Text>
-                  ) : null}
-                </View>
-
-                <View>
-                  <Label>City / District *</Label>
-                  <TextInput
-                    value={form.city}
-                    editable={!pinDone}
-                    onChangeText={v => set({ city: v })}
-                    placeholder="Auto-filled from PIN"
-                    placeholderTextColor={t.foregroundMuted}
-                    className={`${INPUT} ${pinDone ? 'bg-surface-secondary' : 'bg-surface'}`}
-                  />
-                </View>
-                <View>
-                  <Label>State *</Label>
-                  <TextInput
-                    value={form.state}
-                    editable={!pinDone}
-                    onChangeText={v => set({ state: v })}
-                    placeholder="Auto-filled from PIN"
-                    placeholderTextColor={t.foregroundMuted}
-                    className={`${INPUT} ${pinDone ? 'bg-surface-secondary' : 'bg-surface'}`}
-                  />
-                </View>
-
-                {localities.length > 0 ? (
-                  <Select
-                    label="Locality / Village"
-                    value={form.address_line2}
-                    placeholder="Select locality"
-                    options={localities.map(l => ({ value: l, label: l }))}
-                    onChange={v => set({ address_line2: v })}
-                  />
-                ) : (
-                  <View>
-                    <Label>Locality / Village</Label>
-                    <TextInput
-                      value={form.address_line2}
-                      onChangeText={v => set({ address_line2: v })}
-                      placeholder="Area, Colony, Village"
-                      placeholderTextColor={t.foregroundMuted}
-                      className={`${INPUT} bg-surface`}
-                    />
-                  </View>
-                )}
-
-                <View>
-                  <Label>Landmark</Label>
-                  <TextInput
-                    value={form.landmark}
-                    onChangeText={v => set({ landmark: v })}
-                    placeholder="Nearby landmark"
-                    placeholderTextColor={t.foregroundMuted}
-                    className={`${INPUT} bg-surface`}
-                  />
-                </View>
-
-                <Pressable onPress={() => set({ is_default: !form.is_default })} className="flex-row items-center gap-2">
-                  <View
-                    className={`h-4 w-4 items-center justify-center rounded border ${form.is_default ? 'border-accent-600 bg-accent-600' : 'border-border-secondary bg-surface'}`}
-                  >
-                    {form.is_default ? <Check size={12} color={status.white} strokeWidth={3} /> : null}
-                  </View>
-                  <Text className="text-sm text-foreground-secondary">Set as default address</Text>
-                </Pressable>
-
-                <View className="flex-row justify-end gap-3 pt-2">
-                  <Pressable onPress={onClose} disabled={saving} className="rounded-lg bg-surface-secondary px-5 py-2">
-                    <Text className="font-medium text-foreground-secondary">Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={submit}
-                    disabled={saving}
-                    className="flex-row items-center rounded-lg bg-accent-500 px-5 py-2 active:bg-accent-600 disabled:opacity-50"
-                  >
-                    {saving ? (
-                      <>
-                        <ActivityIndicator size="small" color={status.white} />
-                        <Text className="ml-2 font-semibold text-white">Saving...</Text>
-                      </>
-                    ) : (
-                      <Text className="font-semibold text-white">{editAddress ? 'Update Address' : 'Save Address'}</Text>
-                    )}
-                  </Pressable>
-                </View>
               </View>
-            </ScrollView>
-          </View>
+
+              <View>
+                <Label>Phone Number *</Label>
+                <View className="flex-row">
+                  <View className="justify-center rounded-l-lg border border-r-0 border-border-secondary bg-surface px-4 py-2">
+                    <Text className="text-sm font-medium text-foreground-secondary">+91</Text>
+                  </View>
+                  <TextInput
+                    value={form.phone}
+                    onChangeText={v => set({ phone: v.replace(/\D/g, '').slice(0, 10) })}
+                    keyboardType="number-pad"
+                    maxLength={10}
+                    placeholder="00000 00000"
+                    placeholderTextColor={t.foregroundMuted}
+                    className="flex-1 rounded-r-lg border border-border-secondary bg-surface px-4 py-2 text-foreground"
+                  />
+                </View>
+                {form.phone.length > 0 && form.phone.length !== 10 ? (
+                  <Text className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</Text>
+                ) : null}
+              </View>
+
+              <View>
+                <Label>Address Line 1 *</Label>
+                <TextInput
+                  value={form.address_line1}
+                  onChangeText={v => set({ address_line1: v })}
+                  placeholder="Start typing your street address…"
+                  placeholderTextColor={t.foregroundMuted}
+                  autoComplete="off"
+                  className={`${INPUT} bg-surface`}
+                />
+              </View>
+
+              <View>
+                <Label>PIN Code *</Label>
+                <View className="justify-center">
+                  <TextInput
+                    value={form.postal_code}
+                    onChangeText={onPin}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    placeholder="6-digit PIN code"
+                    placeholderTextColor={t.foregroundMuted}
+                    className={`${INPUT} bg-surface pr-10`}
+                  />
+                  <View className="absolute right-3">
+                    {pinState === 'loading' && <ActivityIndicator size="small" color={accent[500]} />}
+                    {pinState === 'found' && <CircleCheck size={16} color={status.white} fill={status.success} />}
+                    {pinState === 'error' && <CircleX size={16} color={status.white} fill={status.danger} />}
+                  </View>
+                </View>
+                {pinState === 'error' ? (
+                  <Text className="mt-1 text-xs text-red-500">PIN code not found. Please check and try again.</Text>
+                ) : null}
+              </View>
+
+              <View>
+                <Label>City / District *</Label>
+                <TextInput
+                  value={form.city}
+                  editable={!pinDone}
+                  onChangeText={v => set({ city: v })}
+                  placeholder="Auto-filled from PIN"
+                  placeholderTextColor={t.foregroundMuted}
+                  className={`${INPUT} ${pinDone ? 'bg-surface-secondary' : 'bg-surface'}`}
+                />
+              </View>
+              <View>
+                <Label>State *</Label>
+                <TextInput
+                  value={form.state}
+                  editable={!pinDone}
+                  onChangeText={v => set({ state: v })}
+                  placeholder="Auto-filled from PIN"
+                  placeholderTextColor={t.foregroundMuted}
+                  className={`${INPUT} ${pinDone ? 'bg-surface-secondary' : 'bg-surface'}`}
+                />
+              </View>
+
+              {localities.length > 0 ? (
+                <Select
+                  label="Locality / Village"
+                  value={form.address_line2}
+                  placeholder="Select locality"
+                  options={localities.map(l => ({ value: l, label: l }))}
+                  onChange={v => set({ address_line2: v })}
+                />
+              ) : (
+                <View>
+                  <Label>Locality / Village</Label>
+                  <TextInput
+                    value={form.address_line2}
+                    onChangeText={v => set({ address_line2: v })}
+                    placeholder="Area, Colony, Village"
+                    placeholderTextColor={t.foregroundMuted}
+                    className={`${INPUT} bg-surface`}
+                  />
+                </View>
+              )}
+
+              <View>
+                <Label>Landmark</Label>
+                <TextInput
+                  value={form.landmark}
+                  onChangeText={v => set({ landmark: v })}
+                  placeholder="Nearby landmark"
+                  placeholderTextColor={t.foregroundMuted}
+                  className={`${INPUT} bg-surface`}
+                />
+              </View>
+
+              <Pressable onPress={() => set({ is_default: !form.is_default })} className="flex-row items-center gap-2">
+                <View
+                  className={`h-4 w-4 items-center justify-center rounded border ${form.is_default ? 'border-accent-600 bg-accent-600' : 'border-border-secondary bg-surface'}`}
+                >
+                  {form.is_default ? <Check size={12} color={status.white} strokeWidth={3} /> : null}
+                </View>
+                <Text className="text-sm text-foreground-secondary">Set as default address</Text>
+              </Pressable>
+
+              <View className="flex-row justify-end gap-3 pt-2">
+                <Pressable onPress={onClose} disabled={saving} className="rounded-lg bg-surface-secondary px-5 py-2">
+                  <Text className="font-medium text-foreground-secondary">Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={submit}
+                  disabled={saving}
+                  className="flex-row items-center rounded-lg bg-accent-500 px-5 py-2 active:bg-accent-600 disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <ActivityIndicator size="small" color={status.white} />
+                      <Text className="ml-2 font-semibold text-white">Saving...</Text>
+                    </>
+                  ) : (
+                    <Text className="font-semibold text-white">{editAddress ? 'Update Address' : 'Save Address'}</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardScroll>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   )
 }
