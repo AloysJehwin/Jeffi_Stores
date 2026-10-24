@@ -4,11 +4,17 @@ import { useState } from 'react'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Copy, GripVertical, Plus, Trash2 } from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { SECTION_META, SECTION_TYPES, type HomepageSection, type SectionType } from '@/lib/catalog/homepage-sections'
+import {
+  SECTION_META,
+  sectionTypesFor,
+  type HomepageSection,
+  type HomepageSurface,
+  type SectionType,
+} from '@/lib/catalog/homepage-sections'
 import SectionConfigFields from './SectionConfigFields'
 import SectionPreview from './SectionPreview'
 import OfferSliderControl from './OfferSliderControl'
@@ -20,6 +26,8 @@ export type SaveSectionConfig = (config: Record<string, unknown>) => void
 
 interface Props {
   initial: HomepageSection[]
+  /** Which layout these rows belong to; new sections are created on it. */
+  surface?: HomepageSurface
   options?: SectionOptions
   /** Rendered inside the expanded `hero` row — the slide editor lives there. */
   heroEditor?: React.ReactNode
@@ -27,15 +35,49 @@ interface Props {
   alwaysExpanded?: boolean
 }
 
-export default function HomepageSectionManager({ initial, options, heroEditor, alwaysExpanded = false }: Props) {
+export default function HomepageSectionManager({
+  initial,
+  surface = 'web',
+  options,
+  heroEditor,
+  alwaysExpanded = false,
+}: Props) {
   const { showToast, showConfirm } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [sections, setSections] = useState(initial)
   const [picking, setPicking] = useState(false)
   const [addedId, setAddedId] = useState<string | null>(null)
+  const [copying, setCopying] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const usedSingletons = new Set(sections.filter(s => SECTION_META[s.type]?.singleton).map(s => s.type))
+  const pickable = sectionTypesFor(surface)
+
+  // "Start from the website layout": copies the website's sections and slides onto the app surface with
+  // new ids, then reloads so both managers (and the hero editor inside the Hero row) pick up the rows.
+  async function copyWebsiteLayout() {
+    setCopying(true)
+    try {
+      const res = await fetch('/api/admin/homepage-draft/copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ from: 'web', to: surface }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Failed to copy the website layout', 'error')
+        setCopying(false)
+        return
+      }
+      showToast('Website layout copied to the draft', 'success')
+      notifyHomepageDraftChanged()
+      window.location.reload()
+    } catch {
+      showToast('Failed to copy the website layout', 'error')
+      setCopying(false)
+    }
+  }
 
   async function patch(id: string, body: Record<string, unknown>) {
     const res = await fetch(`/api/admin/homepage-sections/${id}`, {
@@ -64,7 +106,7 @@ export default function HomepageSectionManager({ initial, options, heroEditor, a
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ type }),
+      body: JSON.stringify({ type, surface }),
     })
     if (!res.ok) {
       showToast('Failed to add section', 'error')
@@ -147,10 +189,32 @@ export default function HomepageSectionManager({ initial, options, heroEditor, a
         </SortableContext>
       </DndContext>
 
-      {sections.length === 0 && (
+      {sections.length === 0 && surface === 'web' && (
         <p className="text-xs text-foreground-muted">
           No sections configured — the homepage is using its built-in default layout.
         </p>
+      )}
+
+      {sections.length === 0 && surface === 'app' && (
+        <div className="rounded-lg border border-dashed border-border-secondary p-4 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">The app is showing the website layout</p>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              Give the app its own homepage by starting from a copy of the website layout, or add sections below.
+              The website layout stays as it is.
+            </p>
+          </div>
+          {canWrite && (
+            <button
+              type="button"
+              disabled={copying}
+              onClick={copyWebsiteLayout}
+              className="inline-flex items-center gap-1.5 px-3 h-control text-sm font-medium rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50"
+            >
+              <Copy className="w-4 h-4" /> {copying ? 'Copying…' : 'Start from the website layout'}
+            </button>
+          )}
+        </div>
       )}
 
       {canWrite && (
@@ -165,7 +229,7 @@ export default function HomepageSectionManager({ initial, options, heroEditor, a
 
           {picking && (
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {SECTION_TYPES.map(type => {
+              {pickable.map(type => {
                 const meta = SECTION_META[type]
                 const taken = meta.singleton && usedSingletons.has(type)
                 return (

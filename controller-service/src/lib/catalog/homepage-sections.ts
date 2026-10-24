@@ -95,6 +95,16 @@ export interface SectionMeta {
   description: string
   /** A singleton may only appear once on the page. */
   singleton?: boolean
+  /** Surfaces that can use the type; absent means both. */
+  surfaces?: HomepageSurface[]
+}
+
+/** The types the picker offers on a surface. */
+export function sectionTypesFor(surface: HomepageSurface): SectionType[] {
+  return SECTION_TYPES.filter(t => {
+    const only = SECTION_META[t].surfaces
+    return !only || only.includes(surface)
+  })
 }
 
 export const SECTION_META: Record<SectionType, SectionMeta> = {

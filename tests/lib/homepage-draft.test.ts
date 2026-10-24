@@ -20,6 +20,8 @@ vi.mock('@/lib/shared/db', () => ({
 import {
   applyDraftOrder,
   applyDraftPatch,
+  copySurfaceLayout,
+  SurfaceNotEmpty,
   discardHomepageDraft,
   endsBeforeStart,
   getEditableHomepage,
@@ -320,6 +322,65 @@ describe('getHomepageDraftSummary', () => {
     expect(summary.sections).toEqual({ added: 0, removed: 0, edited: 0, reordered: false })
     expect(summary.slides).toEqual({ added: 0, removed: 0, edited: 0, reordered: false })
     expect(summary.updatedBy).toBe('Aloys Jehwin')
+  })
+})
+
+describe('copySurfaceLayout', () => {
+  // Loosely typed: the helpers above build rows without the optional `surface` key.
+  type Draft = { sections: any[]; heroSlides: any[] }
+  const T1 = '2026-10-24T00:00:00.000Z'
+  let n = 0
+  const newId = () => `new-${++n}`
+  beforeEach(() => {
+    n = 0
+  })
+
+  it('copies the source rows onto the target with fresh ids, renumbered, leaving the source alone', () => {
+    const draft: Draft = {
+      sections: [section('b', 5, { surface: 'web' }), section('a', 2, { surface: 'web', config: { source: 'featured' } })],
+      heroSlides: [slide('s', 3, { surface: 'web' })],
+    }
+    const result = copySurfaceLayout(draft, 'web', 'app', { now: T1, newId })
+    expect(result).toEqual({ sections: 2, slides: 1, replaced: 0 })
+    const app = draft.sections.filter(r => r.surface === 'app')
+    expect(app.map(r => [r.id, r.title, r.display_order, r.created_at])).toEqual([
+      ['new-1', 'a', 0, T1],
+      ['new-2', 'b', 1, T1],
+    ])
+    expect(app[0].config).toEqual({ source: 'featured' })
+    expect(draft.sections.filter(r => r.surface === 'web').map(r => r.id)).toEqual(['b', 'a'])
+    expect(draft.heroSlides.map(r => [r.id, r.surface, r.display_order])).toEqual([
+      ['s', 'web', 3],
+      ['new-3', 'app', 0],
+    ])
+  })
+
+  it('refuses a target that already has rows unless asked to replace them', () => {
+    const draft: Draft = {
+      sections: [section('w', 0, { surface: 'web' }), section('old', 0, { surface: 'app' })],
+      heroSlides: [slide('os', 0, { surface: 'app' })],
+    }
+    expect(() => copySurfaceLayout(draft, 'web', 'app', { now: T1, newId })).toThrow(SurfaceNotEmpty)
+    expect(draft.sections.map(r => r.id)).toEqual(['w', 'old'])
+    const result = copySurfaceLayout(draft, 'web', 'app', { now: T1, newId, replace: true })
+    expect(result).toEqual({ sections: 1, slides: 0, replaced: 2 })
+    expect(draft.sections.map(r => [r.id, r.surface])).toEqual([
+      ['w', 'web'],
+      ['new-1', 'app'],
+    ])
+    expect(draft.heroSlides).toEqual([])
+  })
+
+  it('materialises the built-in default layout when the source has no sections', () => {
+    const draft: Draft = { sections: [], heroSlides: [] }
+    const result = copySurfaceLayout(draft, 'web', 'app', { now: T1, newId })
+    expect(result.sections).toBeGreaterThan(5)
+    expect(draft.sections.every(r => r.surface === 'app' && r.id.startsWith('new-') && r.is_active)).toBe(true)
+    expect(draft.sections[0].type).toBe('hero')
+  })
+
+  it('rejects copying a surface onto itself', () => {
+    expect(() => copySurfaceLayout({ sections: [], heroSlides: [] }, 'web', 'web')).toThrow(/same/)
   })
 })
 

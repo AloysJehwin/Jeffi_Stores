@@ -107,6 +107,16 @@ describe('POST', () => {
     expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled()
   })
 
+  it('creates an app-surface section numbered within its own surface', async () => {
+    const res = await POST(req('POST', { type: 'product_row', surface: 'app' }))
+    expect(res.status).toBe(200)
+    const { section } = await res.json()
+    expect(section).toMatchObject({ surface: 'app', display_order: 0 })
+    const web = await POST(req('POST', { type: 'trust_strip' }))
+    expect((await web.json()).section).toMatchObject({ surface: 'web', display_order: 3 })
+    expect(fake.state.draft!.sections).toHaveLength(5)
+  })
+
   it('rejects an end time before the start time without creating a draft', async () => {
     const res = await POST(
       req('POST', {

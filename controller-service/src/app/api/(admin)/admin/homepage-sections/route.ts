@@ -4,7 +4,7 @@ import { authenticateAdmin, type AdminJWTPayload } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
-import { SECTION_TYPES, type SectionType } from '@/lib/catalog/homepage-sections'
+import { HOMEPAGE_SURFACES, SECTION_TYPES, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
 import {
   applyDraftOrder,
   endsBeforeStart,
@@ -43,6 +43,7 @@ const bodySchema = z.object({
   isActive: z.boolean().optional(),
   startsAt: z.string().datetime().nullish(),
   endsAt: z.string().datetime().nullish(),
+  surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -56,18 +57,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'The end time must be after the start time' }, { status: 400 })
   }
 
+  const surface = rowSurface({ surface: d.surface })
   const section = await withHomepageDraft(admin.adminId, draft => {
     const now = new Date().toISOString()
     const row: DraftSection = {
       id: randomUUID(),
       type: d.type as SectionType,
+      surface,
       title: d.title ?? null,
       subtitle: d.subtitle ?? null,
       eyebrow: d.eyebrow ?? null,
       cta_label: d.ctaLabel ?? null,
       cta_url: d.ctaUrl ?? null,
       config: d.config ?? {},
-      display_order: nextDisplayOrder(draft.sections),
+      display_order: nextDisplayOrder(draft.sections.filter(s => rowSurface(s) === surface)),
       is_active: d.isActive ?? true,
       starts_at: d.startsAt ?? null,
       ends_at: d.endsAt ?? null,
