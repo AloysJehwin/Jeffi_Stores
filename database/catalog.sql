@@ -610,6 +610,8 @@ CREATE TABLE public.hero_slides (
     filter_on_sale boolean DEFAULT false NOT NULL,
     display_order integer DEFAULT 0 NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
+    -- Which storefront shows the slide: the website or the mobile app (each has its own carousel).
+    surface character varying(10) DEFAULT 'web'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT hero_slides_pkey PRIMARY KEY (id)
@@ -670,6 +672,9 @@ CREATE TABLE public.offer_drafts (
 
 --
 -- Name: homepage_sections; Type: TABLE; Schema: public; Owner: -
+-- The allowed `type` values are a CHECK in constraints.sql (homepage_sections_type_check), not
+-- inline: the tenant fan-out turns CREATE TABLE into IF NOT EXISTS, so an inline CHECK never
+-- changes on an existing tenant, whereas CHECKs in constraints.sql are re-applied every run.
 --
 
 CREATE TABLE public.homepage_sections (
@@ -685,17 +690,11 @@ CREATE TABLE public.homepage_sections (
     is_active boolean DEFAULT true NOT NULL,
     starts_at timestamp with time zone,
     ends_at timestamp with time zone,
+    -- Which storefront the section is part of: the website or the mobile app (separate layouts).
+    surface character varying(10) DEFAULT 'web'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT homepage_sections_pkey PRIMARY KEY (id),
-    CONSTRAINT homepage_sections_type_check CHECK ((type = ANY (ARRAY[
-        'hero'::text, 'offer_slider'::text, 'trust_strip'::text, 'category_grid'::text, 'brand_carousel'::text,
-        'product_row'::text, 'category_showcase'::text, 'deal_of_the_day'::text,
-        'promo_banner'::text, 'featured_for_you'::text, 'benefits'::text,
-        'why_us'::text, 'about'::text, 'business_cta'::text,
-        'countdown_deal'::text, 'testimonials'::text, 'recently_viewed'::text, 'category_tabs'::text,
-        'bundle_spotlight'::text, 'back_in_stock'::text, 'blog_teaser'::text, 'social_strip'::text,
-        'value_stats'::text]))),
     CONSTRAINT homepage_sections_window_check CHECK ((ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at))
 );
 
