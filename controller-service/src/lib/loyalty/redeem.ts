@@ -1,20 +1,13 @@
-import crypto from 'crypto'
 import { queryOne, withTransaction } from '@/lib/shared/db'
 import { round2 } from '@/lib/catalog/gst'
 import { getLoyaltySettings } from './settings'
+import { insertUserCoupon } from './coupons'
 import { eligibleCustomerSql, ensureLoyaltyAccount, lockLoyaltyUser, refreshLoyaltyAccount } from './reconcile'
 
 export const REWARD_COUPON_CAMPAIGN = 'loyalty_reward'
 
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const MAX_POINTS = 1_000_000
 const MAX_NOTE_LENGTH = 500
-
-function rewardCode(): string {
-  let code = ''
-  for (const byte of crypto.randomBytes(8)) code += CODE_ALPHABET[byte % CODE_ALPHABET.length]
-  return `RWD-${code}`
-}
 
 export async function isLoyaltyEligible(userId: string): Promise<boolean> {
   const row = await queryOne(`SELECT 1 FROM users u WHERE u.id = $1 AND ${eligibleCustomerSql('u')}`, [userId])
@@ -47,22 +40,17 @@ export async function redeemPoints(userId: string, points: number): Promise<Rede
     ).rows[0].points
     if (balance < points) return { ok: false, reason: 'insufficient_points' }
 
-    let coupon: { id: string; code: string } | undefined
-    for (let attempt = 0; attempt < 5 && !coupon; attempt++) {
-      coupon = (
-        await client.query<{ id: string; code: string }>(
-          `INSERT INTO coupons
-             (code, description, discount_type, discount_value, min_purchase_amount, usage_limit,
-              usage_limit_per_user, valid_from, is_active, auto_generated, generated_for_user_id,
-              generated_for_campaign)
-           VALUES ($1, 'Rewards coupon', 'fixed', $2, $2, 1, 1, NOW(), TRUE, TRUE, $3, $4)
-           ON CONFLICT (code) DO NOTHING
-           RETURNING id, code`,
-          [rewardCode(), value, userId, REWARD_COUPON_CAMPAIGN]
-        )
-      ).rows[0]
-    }
-    if (!coupon) throw new Error('Could not generate a reward coupon code')
+    const coupon = await insertUserCoupon(client, {
+      prefix: 'RWD',
+      description: 'Rewards coupon',
+      discountType: 'fixed',
+      value,
+      minPurchase: value,
+      maxDiscount: null,
+      validUntil: null,
+      campaign: REWARD_COUPON_CAMPAIGN,
+      userId,
+    })
 
     await ensureLoyaltyAccount(client, userId)
     await client.query(

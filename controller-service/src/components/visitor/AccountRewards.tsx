@@ -29,6 +29,18 @@ interface RewardCoupon {
   value: number
   minPurchase: number
   createdAt: string
+  discountType?: 'fixed' | 'percentage'
+  maxDiscount?: number | null
+  validUntil?: string | null
+  source?: 'loyalty' | 'game'
+}
+
+/** "₹200 off" or "10% off (up to ₹150)", with the minimum order and expiry when set. */
+function couponTerms(c: RewardCoupon, formatMoney: (n: number) => string): string {
+  const off = c.discountType === 'percentage' ? `${c.value}% off${c.maxDiscount ? ` (up to ${formatMoney(c.maxDiscount)})` : ''}` : `${formatMoney(c.value)} off`
+  const min = c.minPurchase > 0 ? ` orders of ${formatMoney(c.minPurchase)} or more` : ''
+  const until = c.validUntil ? ` · valid till ${new Date(c.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''
+  return `${off}${min}${until}`
 }
 
 interface Page<T> {
@@ -259,7 +271,7 @@ function CouponList({ list }: { list: InfiniteList<RewardCoupon> }) {
             <div>
               <p className="font-mono font-semibold text-foreground">{coupon.code}</p>
               <p className="text-xs text-foreground-secondary">
-                {formatMoney(coupon.value)} off orders of {formatMoney(coupon.minPurchase)} or more
+                {couponTerms(coupon, formatMoney)}
               </p>
             </div>
             <button

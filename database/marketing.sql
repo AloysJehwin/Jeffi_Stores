@@ -73,6 +73,25 @@ CREATE TABLE public.coupon_usage (
 
 
 --
+-- Name: reward_game_plays; Type: TABLE; Schema: public; Owner: -
+-- One row per play of a homepage rewards game (game_key is the section's own key, not its row id:
+-- publish recreates section rows, and the key survives a copy onto the other surface). period_key is
+-- the play window the limit applies to ('once', a date, or an ISO week), unique per user and game.
+--
+
+CREATE TABLE public.reward_game_plays (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    game_key uuid NOT NULL,
+    user_id uuid NOT NULL,
+    period_key character varying(16) NOT NULL,
+    prize_id character varying(64) NOT NULL,
+    prize_label character varying(120) NOT NULL,
+    coupon_id uuid,
+    played_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: coupons; Type: TABLE; Schema: public; Owner: -
 --
 

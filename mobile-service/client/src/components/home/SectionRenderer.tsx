@@ -23,6 +23,7 @@ import ValueStats from './ValueStats'
 import MotionHero from './MotionHero'
 import Stories from './Stories'
 import ProductSpotlight from './ProductSpotlight'
+import RewardsGame from './RewardsGame'
 
 // Mirror of controller-service components/visitor/home/SectionRenderer.tsx.
 const SIMPLE = {
@@ -30,6 +31,7 @@ const SIMPLE = {
   motion_hero: MotionHero,
   stories: Stories,
   product_spotlight: ProductSpotlight,
+  rewards_game: RewardsGame,
   offer_slider: OfferSlider,
   trust_strip: TrustStrip,
   promo_banner: PromoBanner,
@@ -81,8 +83,6 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
         />
       )
     }
-    case 'rewards_game':
-      return null // not in the app yet
     default: {
       const Component = SIMPLE[section.type]
       return Component ? <Component section={section} data={data} /> : null

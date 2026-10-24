@@ -164,6 +164,42 @@ export interface SpotlightData {
   callouts: string[]
 }
 
+// extras[section.id] of a rewards_game section (homepage-sections.ts rewardsGamePublic): no weights, null when unplayable.
+export interface RewardsGamePrize {
+  id: string
+  label: string
+  kind: 'percent' | 'fixed' | 'none'
+}
+
+export interface RewardsGameData {
+  gameKey: string
+  mode: 'wheel' | 'scratch'
+  playLimit: 'once' | 'daily' | 'weekly'
+  prizes: RewardsGamePrize[]
+}
+
+// Responses of /api/rewards/game/[gameKey] (lib/rewards/game.ts GamePlay / GameState).
+export interface RewardGamePlay {
+  prizeId: string
+  prizeLabel: string
+  playedAt: string
+  coupon: {
+    id: string
+    code: string
+    discountType: 'fixed' | 'percentage'
+    value: number
+    minPurchase: number
+    maxDiscount: number | null
+    validUntil: string | null
+  } | null
+}
+
+export interface RewardGameState {
+  canPlay: boolean
+  nextPlayAt: string | null
+  lastPlay: RewardGamePlay | null
+}
+
 export interface HomeData {
   heroSlides: HeroSlide[]
   offers: ProductOffer[]
