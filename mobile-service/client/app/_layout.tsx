@@ -12,6 +12,7 @@ import { getMe } from '../src/api/auth'
 import { getCart } from '../src/api/cart'
 import Toast from '../src/components/ui/Toast'
 import UpdatePrompt from '../src/components/ui/UpdatePrompt'
+import { QuickAddSheetHost } from '../src/components/product/QuickAddSheet'
 import { trackScreen } from '../src/lib/analytics'
 
 const queryClient = new QueryClient({
@@ -103,6 +104,8 @@ export default function RootLayout() {
             <Stack.Screen name="account/profile" />
             <Stack.Screen name="account/addresses" />
           </Stack>
+          {/* One sheet for every "+" and long-press; lives above the stack so toasts still render over it. */}
+          <QuickAddSheetHost />
           <UpdatePrompt />
           <Toast />
         </QueryClientProvider>
