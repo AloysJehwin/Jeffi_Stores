@@ -275,7 +275,7 @@ function BounceDot({ delay }: { delay: number }) {
 
 // ─── Main component ─────────────────────────────────────────────────────────
 
-export default function SupportChat({ onInputFocus }: { onInputFocus?: () => void }) {
+export default function SupportChat() {
   const storeName = useStoreConfig().identity.name || 'Support'
   const t = useTokens()
   const [mode, setMode] = useState<'bot' | 'live'>('bot')
@@ -533,7 +533,6 @@ export default function SupportChat({ onInputFocus }: { onInputFocus?: () => voi
             <TextInput
               value={input}
               onChangeText={setInput}
-              onFocus={onInputFocus}
               onSubmitEditing={sendLiveMessage}
               submitBehavior="submit"
               returnKeyType="send"

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { PhotoIcon, PlusIcon, SearchIcon } from './icons'
 import { searchProducts, type ProductSearchResult } from '../../api/products'
 import { absUrl } from '../../lib/links'
@@ -66,9 +67,10 @@ function SearchPanel({
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <View className="flex-1 items-center" style={{ paddingTop: insets.top + 96 }}>
+      {/* The results list gives way above the keyboard. */}
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, alignItems: 'center', paddingTop: insets.top + 96 }}>
         <Pressable className="absolute inset-0 bg-black/30" onPress={onClose} accessibilityLabel="Close" />
-        <View className="w-72 overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-2xl">
+        <View className="mb-3 w-72 shrink overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-2xl">
           <View className="flex-row items-center gap-2 border-b border-border-default px-3 py-2.5">
             <SearchIcon size={14} color={t.foregroundMuted} />
             <TextInput
@@ -83,7 +85,7 @@ function SearchPanel({
             {loading ? <ActivityIndicator size="small" color={accent[500]} /> : null}
           </View>
           {results.length > 0 ? (
-            <ScrollView style={{ maxHeight: 256 }} keyboardShouldPersistTaps="handled">
+            <ScrollView style={{ maxHeight: 256, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
               {results.map(r => {
                 const img = absUrl(r.thumbnail_url || r.image_url)
                 return (
@@ -120,7 +122,7 @@ function SearchPanel({
             <Text className="px-4 py-3 text-xs text-foreground-muted">Type at least 2 characters to search.</Text>
           ) : null}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

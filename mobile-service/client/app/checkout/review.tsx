@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
+import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -366,10 +367,8 @@ export default function CheckoutReviewScreen() {
   return (
     <View className="flex-1 bg-surface">
       <TopNav />
-      <ScrollView
+      <KeyboardScroll
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: insets.bottom + 32 }}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         <View className="mb-4">
@@ -793,7 +792,7 @@ export default function CheckoutReviewScreen() {
             </View>
           </View>
         </View>
-      </ScrollView>
+      </KeyboardScroll>
 
       <AddressFormModal
         isOpen={showAddressModal}

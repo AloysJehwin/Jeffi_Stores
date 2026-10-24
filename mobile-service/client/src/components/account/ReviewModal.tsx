@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { useRef, useState } from 'react'
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { Image } from 'expo-image'
 import { generateReview, postForm, type OrderReview } from '../../api/account'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
@@ -123,9 +124,18 @@ export default function ReviewModal({
     }
   }
 
+  // The sheet shrinks above the keyboard; with several items, bring the one being typed in to the top.
+  const scrollRef = useRef<ScrollView>(null)
+  const itemY = useRef<number[]>([])
+  const fieldY = useRef<number[]>([])
+  const reveal = (i: number) => {
+    if (items.length < 2) return
+    setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, (itemY.current[i] ?? 0) + (fieldY.current[i] ?? 0) - 12), animated: true }), 300)
+  }
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 justify-end">
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable className="absolute inset-0 bg-black/50" onPress={onClose} />
         <View className="bg-surface-elevated rounded-t-2xl" style={{ maxHeight: '90%' }}>
           <View className="border-b border-border-default px-5 py-4 flex-row items-center justify-between">
@@ -134,12 +144,12 @@ export default function ReviewModal({
               <HeroIcon name="x" size={20} color={t.foregroundMuted} />
             </Pressable>
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, gap: 32 }}>
+          <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, gap: 32 }}>
             {items.map((item, i) => {
               const s = states[i]
               const img = absUrl(item.productImage)
               return (
-                <View key={item.productId} className={i > 0 ? 'pt-8 border-t border-border-default' : ''}>
+                <View key={item.productId} className={i > 0 ? 'pt-8 border-t border-border-default' : ''} onLayout={e => (itemY.current[i] = e.nativeEvent.layout.y)}>
                   <View className="flex-row items-center gap-3 mb-4">
                     {img && <Image source={{ uri: img }} style={{ width: 48, height: 48, borderRadius: 8 }} contentFit="cover" />}
                     <Text className="flex-1 text-sm font-semibold text-foreground" numberOfLines={2}>
@@ -189,13 +199,14 @@ export default function ReviewModal({
                     </Pressable>
                   )}
 
-                  <View className="mb-4">
+                  <View className="mb-4" onLayout={e => (fieldY.current[i] = e.nativeEvent.layout.y)}>
                     <Text className="text-sm font-medium text-foreground mb-1">
                       Title <Text className="text-foreground-muted">(optional)</Text>
                     </Text>
                     <TextInput
                       value={s.title}
                       onChangeText={v => update(i, { title: v })}
+                      onFocus={() => reveal(i)}
                       maxLength={120}
                       placeholder="Summarise your experience"
                       placeholderTextColor={t.foregroundMuted}
@@ -210,6 +221,7 @@ export default function ReviewModal({
                     <TextInput
                       value={s.comment}
                       onChangeText={v => update(i, { comment: v })}
+                      onFocus={() => reveal(i)}
                       maxLength={2000}
                       multiline
                       numberOfLines={3}

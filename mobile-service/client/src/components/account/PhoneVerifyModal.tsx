@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { abandonSignup, acceptPolicies, phoneSendOtp, phoneVerifyOtp, updateProfile } from '../../api/account'
 import { refreshUser } from './hooks'
 import { DobInput, ErrorBox, isValidDob, Label, PhoneInput, PolicyConsent, PrimaryButton } from './ui'
@@ -88,7 +89,7 @@ export default function PhoneVerifyModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={handleCancel}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <View className="flex-1 items-center justify-center bg-black/60 px-4">
           <ScrollView className="w-full" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} keyboardShouldPersistTaps="handled">
             <View className="bg-surface-elevated rounded-lg p-6 w-full" style={{ boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)' }}>

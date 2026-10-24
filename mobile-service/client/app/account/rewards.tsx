@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native'
+import { Pressable, Share, Text, TextInput, View } from 'react-native'
+import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -308,8 +309,7 @@ export default function RewardsScreen() {
   return (
     <View className="flex-1 bg-surface">
       <TopNav />
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
+      <KeyboardScroll
         contentContainerStyle={{ paddingBottom: 40 }}
         scrollEventThrottle={200}
         onScroll={e => {
@@ -342,7 +342,7 @@ export default function RewardsScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </KeyboardScroll>
     </View>
   )
 }

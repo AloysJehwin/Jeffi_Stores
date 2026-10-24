@@ -3,6 +3,7 @@ import { ActivityIndicator, Animated, Pressable, Text, TextInput, View, type Tex
 import { useRouter } from 'expo-router'
 import HeroIcon from './HeroIcon'
 import { accent, useTokens } from '../../theme'
+import { DateField, formatDate } from '../ui/DatePickerSheet'
 import type { InfiniteList } from './hooks'
 
 // Shared bits of the storefront's account/auth markup at the mobile breakpoint.
@@ -75,46 +76,36 @@ export function PhoneInput({ value, onChange, dense, autoFocus }: { value: strin
 }
 
 
-/** A date of birth typed as dd/mm/yyyy, reported as YYYY-MM-DD ('' until complete). */
-export function useDobField(value: string, onChange: (v: string) => void) {
-  const toDisplay = (iso: string) => {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
-    return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
-  }
-  const [text, setText] = useState(toDisplay(value))
-  useEffect(() => {
-    if (value && toDisplay(value) !== text) setText(toDisplay(value))
-    if (!value && text.replace(/\D/g, '').length === 8) setText('')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value])
-  const handle = (raw: string) => {
-    const digits = raw.replace(/\D/g, '').slice(0, 8)
-    const parts = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean)
-    setText(parts.join('/'))
-    onChange(digits.length === 8 ? `${digits.slice(4, 8)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}` : '')
-  }
-  return { text, handle }
+/** isValidDob's first and last allowed dates, and where the picker opens (about 25 years back). */
+export function dobRange(): { min: string; max: string; initial: string } {
+  const now = new Date()
+  const [y, m, d] = [now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()]
+  const at = (years: number, days: number) => new Date(Date.UTC(y - years, m, d + days)).toISOString().slice(0, 10)
+  // Step a day at a time so Feb 29 and the birthday itself land exactly where isValidDob draws the line.
+  let max = at(MIN_AGE_YEARS, 0)
+  for (let i = 1; !isValidDob(max) && i < 4; i++) max = at(MIN_AGE_YEARS, -i)
+  let min = at(MAX_AGE_YEARS + 1, 0)
+  for (let i = 1; !isValidDob(min) && i < 4; i++) min = at(MAX_AGE_YEARS + 1, i)
+  return { min, max, initial: at(25, 0) }
 }
 
-/** The web's DatePicker for a date of birth. */
+/** A date-of-birth field that opens the app's date picker. */
 export function DobInput({ value, onChange, dense }: { value: string; onChange: (v: string) => void; dense?: boolean }) {
   const t = useTokens()
-  const { text, handle } = useDobField(value, onChange)
+  const { min, max, initial } = dobRange()
   return (
-    <View className="relative">
-      <TextInput
-        value={text}
-        onChangeText={handle}
-        keyboardType="number-pad"
-        maxLength={10}
-        placeholder="dd/mm/yyyy"
-        placeholderTextColor={t.foregroundMuted}
-        className={`w-full border border-border-secondary rounded-lg bg-surface text-foreground pr-10 ${dense ? 'px-3 py-2 text-xs' : 'px-4 py-3'}`}
-      />
-      <View pointerEvents="none" className="absolute right-3 top-0 bottom-0 justify-center">
-        <HeroIcon name="calendar" size={16} color={t.foregroundMuted} />
-      </View>
-    </View>
+    <DateField value={value} onChange={onChange} title="Date of birth" min={min} max={max} defaultView={initial} startWith="year">
+      {open => (
+        <View
+          className={`w-full flex-row items-center gap-2 border rounded-lg bg-surface ${open ? 'border-accent-500' : 'border-border-secondary'} ${dense ? 'px-3 py-2' : 'px-4 py-3'}`}
+        >
+          <Text className={`flex-1 ${dense ? 'text-xs' : 'leading-5'} ${value ? 'text-foreground' : 'text-foreground-muted'}`}>
+            {value ? formatDate(value) : 'Select date'}
+          </Text>
+          <HeroIcon name="calendar" size={16} color={open ? accent[500] : t.foregroundMuted} />
+        </View>
+      )}
+    </DateField>
   )
 }
 
