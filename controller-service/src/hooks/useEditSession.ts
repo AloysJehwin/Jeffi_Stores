@@ -18,6 +18,8 @@ export interface UseEditSessionResult {
   resumed: boolean
   status: EditSessionStatus
   open: () => Promise<void>
+  /** Open a fresh session after the current one closed, for editors that stay on the page. */
+  reopen: () => Promise<void>
   save: () => Promise<boolean>
   cancel: () => Promise<boolean>
   error: string | null
@@ -93,6 +95,12 @@ export function useEditSession({
     [sessionId, onCancelled]
   )
 
+  const reopen = useCallback(async () => {
+    openedRef.current = false
+    setSessionId(null)
+    await open()
+  }, [open])
+
   const save = useCallback(() => close('save'), [close])
   const cancel = useCallback(() => close('cancel'), [close])
 
@@ -100,5 +108,5 @@ export function useEditSession({
     if (autoOpen && resourceId && !openedRef.current) void open()
   }, [autoOpen, resourceId, open])
 
-  return { sessionId, resumed, status, open, save, cancel, error }
+  return { sessionId, resumed, status, open, reopen, save, cancel, error }
 }
