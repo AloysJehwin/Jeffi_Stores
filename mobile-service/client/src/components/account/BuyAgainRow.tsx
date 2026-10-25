@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ScrollView, View } from 'react-native'
-import { Text } from '../../ui'
+import { Section } from '../../ui'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { getBuyAgain } from '../../api/account'
@@ -20,13 +20,7 @@ export default function BuyAgainRow() {
   const item = Math.max(160, Math.floor(width * 0.45))
 
   return (
-    <View className="bg-surface-elevated rounded-xl border border-border-default p-4">
-      <View className="flex-row items-center justify-between mb-4">
-        <Text className="text-sm font-semibold text-foreground">Buy again</Text>
-        <Text className="text-xs text-accent-600 dark:text-accent-400 font-medium" onPress={() => router.push('/orders')}>
-          Past orders
-        </Text>
-      </View>
+    <Section title="Buy again" actionLabel="Past orders" onAction={() => router.push('/orders')} gutter={false}>
       <View onLayout={e => setWidth(e.nativeEvent.layout.width)}>
         {width > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={item + 12} decelerationRate="fast" contentContainerStyle={{ gap: 12 }}>
@@ -38,6 +32,6 @@ export default function BuyAgainRow() {
           </ScrollView>
         )}
       </View>
-    </View>
+    </Section>
   )
 }

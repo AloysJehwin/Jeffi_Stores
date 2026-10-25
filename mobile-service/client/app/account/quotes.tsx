@@ -1,33 +1,27 @@
 import { useEffect } from 'react'
 import { FlatList, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { FileText } from 'lucide-react-native'
 import { listRfqs, type Rfq } from '../../src/api/account'
-import HeroIcon from '../../src/components/account/HeroIcon'
 import { useAccountUser, useInfiniteList } from '../../src/components/account/hooks'
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { useAuthStore } from '../../src/stores/authStore'
-import { useTokens } from '../../src/theme'
-import { Screen, Skeleton, Text, useBottomInset } from '../../src/ui'
+import { Badge, BodySmall, Caption, Card, EmptyState, Screen, Skeleton, Text, useBottomInset, type Tone } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/account/quotes/page.tsx.
 
-const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  pending: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
-  reviewed: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
-  converted: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
-  rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400' },
-}
+const STATUS_TONE: Record<string, Tone> = { pending: 'warning', reviewed: 'info', converted: 'success', rejected: 'danger' }
 
-// The loaded list: intro strip, RFQ rows, footer, as one bordered stack.
+// The loaded list: intro line, then RFQ cards.
 function QuotesLoading() {
   return (
-    <View className="mx-4 mt-4">
-      <View className="gap-1.5 rounded-t-lg border border-border-default bg-surface-elevated px-6 py-4">
+    <View className="gap-3 px-4 pt-4">
+      <View className="mb-1 gap-1.5">
         <Skeleton height={12} width="85%" />
         <Skeleton height={12} width="45%" />
       </View>
       {[0, 1, 2, 3].map(i => (
-        <View key={i} className="gap-2 border-x border-t border-border-default bg-surface-elevated p-5">
+        <View key={i} className="gap-2 rounded-panel bg-surface-elevated p-4 dark:border dark:border-border-default">
           <View className="mb-1 flex-row items-center gap-2">
             <Skeleton height={14} width={120} />
             <Skeleton height={20} width={72} rounded="rounded-full" />
@@ -36,9 +30,6 @@ function QuotesLoading() {
           <Skeleton height={10} width={130} rounded="rounded" />
         </View>
       ))}
-      <View className="items-center rounded-b-lg border border-border-default bg-surface-elevated px-6 py-4">
-        <Skeleton height={10} width={130} rounded="rounded" />
-      </View>
     </View>
   )
 }
@@ -46,7 +37,6 @@ function QuotesLoading() {
 export default function QuotesScreen() {
   const bottom = useBottomInset()
   const router = useRouter()
-  const t = useTokens()
   const user = useAccountUser()
   const isLoading = useAuthStore(s => s.isLoading)
   const allowed = !!user?.isBusiness && user.approvalStatus === 'approved'
@@ -74,50 +64,39 @@ export default function QuotesScreen() {
         onEndReached={list.loadMore}
         onEndReachedThreshold={0.5}
         contentContainerStyle={{ paddingBottom: bottom }}
-        ListHeaderComponent={
-          <View className="mx-4 mt-4 bg-surface-elevated rounded-t-lg border border-border-default px-6 py-4">
-            <Text className="text-sm text-foreground-secondary">Track your RFQ submissions. Our team will review and respond.</Text>
-          </View>
-        }
+        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+        ListHeaderComponent={<BodySmall className="mx-4 mb-4 mt-4">Track your RFQ submissions. Our team will review and respond.</BodySmall>}
         ListEmptyComponent={
-          <View className="mx-4 bg-surface-elevated border-x border-border-default p-12 items-center">
-            <HeroIcon name="copy" size={64} color={t.foregroundMuted} strokeWidth={1} />
-            <Text className="text-foreground-secondary font-medium mt-4">No quote requests yet</Text>
-            <Text className="text-sm text-foreground-muted mt-1 text-center">Use the “Request Quote” button on any product page or cart to get started.</Text>
-            <Text onPress={() => router.navigate('/(tabs)/products')} className="mt-4 text-sm font-medium text-accent-600 dark:text-accent-400">
-              Browse Products
-            </Text>
-          </View>
+          <EmptyState
+            icon={FileText}
+            title="No quote requests yet"
+            message="Use the “Request Quote” button on any product page or cart to get started."
+            actionLabel="Browse Products"
+            onAction={() => router.navigate('/(tabs)/products')}
+          />
         }
-        renderItem={({ item: rfq }) => {
-          const tone = STATUS_STYLES[rfq.status] || STATUS_STYLES.pending
-          return (
-            <View className="mx-4 bg-surface-elevated border-x border-t border-border-default p-5 gap-2">
-              <View className="flex-row items-center gap-2 mb-1">
-                <Text className="font-semibold text-foreground font-mono text-sm">{rfq.rfq_number}</Text>
-                <View className={`px-2 py-0.5 rounded-full ${tone.bg}`}>
-                  <Text className={`text-xs font-semibold ${tone.text}`}>{rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}</Text>
-                </View>
-              </View>
-              <Text className="text-sm text-foreground-secondary">
-                {rfq.item_count} item{rfq.item_count !== 1 ? 's' : ''}
-              </Text>
-              {!!rfq.notes && (
-                <Text className="text-sm text-foreground-muted" numberOfLines={1}>
-                  {rfq.notes}
-                </Text>
-              )}
-              <Text className="text-xs text-foreground-muted">
-                Submitted {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </Text>
-              {rfq.status === 'converted' && !!rfq.converted_quotation_id && (
-                <Text className="text-xs text-green-700 dark:text-green-400 font-medium">Quotation sent — check your email</Text>
-              )}
+        renderItem={({ item: rfq }) => (
+          <Card className="mx-4 gap-1.5">
+            <View className="mb-1 flex-row items-center gap-2">
+              <Text className="font-mono text-sm font-semibold text-foreground">{rfq.rfq_number}</Text>
+              <Badge label={rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)} tone={STATUS_TONE[rfq.status] ?? 'warning'} size="sm" />
             </View>
-          )
-        }}
+            <BodySmall>
+              {rfq.item_count} item{rfq.item_count !== 1 ? 's' : ''}
+            </BodySmall>
+            {!!rfq.notes && (
+              <Text className="text-sm text-foreground-muted" numberOfLines={1}>
+                {rfq.notes}
+              </Text>
+            )}
+            <Caption>Submitted {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Caption>
+            {rfq.status === 'converted' && !!rfq.converted_quotation_id && (
+              <Text className="text-xs font-semibold text-green-700 dark:text-green-400">Quotation sent — check your email</Text>
+            )}
+          </Card>
+        )}
         ListFooterComponent={
-          <View className="mx-4 bg-surface-elevated rounded-b-lg border border-border-default px-6 py-3">
+          <View className="px-4">
             <InfiniteFooter shown={rfqs.length} list={list} noun="quotes" />
           </View>
         }

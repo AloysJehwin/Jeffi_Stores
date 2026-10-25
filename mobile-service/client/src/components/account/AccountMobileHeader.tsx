@@ -1,5 +1,5 @@
 import { Pressable, View } from 'react-native'
-import { Text } from '../../ui'
+import { cn, elevationClass, Text, useElevation } from '../../ui'
 import { Image } from 'expo-image'
 import { usePathname, useRouter } from 'expo-router'
 import HeroIcon from './HeroIcon'
@@ -8,22 +8,23 @@ import { accent, useTokens } from '../../theme'
 
 // Mirror of controller-service components/visitor/AccountMobileHeader.tsx (lg:hidden parts).
 
-const CARD_SHADOW = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)'
-
 /** The icon-only tab row (`flex-1 py-3.5 border-b-2`, icons w-5). */
-export function AccountTabRow({ items }: { items: AccountNavItem[] }) {
+function AccountTabRow({ items }: { items: AccountNavItem[] }) {
   const router = useRouter()
   const pathname = usePathname()
   const t = useTokens()
+  const shadow = useElevation('overlay')
   return (
-    <View className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+    <View className={cn('overflow-hidden rounded-xl bg-surface-elevated', elevationClass('overlay'))} style={shadow}>
       <View className="flex-row">
         {items.map(item => {
           const active = isNavActive(item, pathname)
           return (
             <Pressable
               key={item.href}
+              accessibilityRole="tab"
               accessibilityLabel={item.label}
+              accessibilityState={{ selected: active }}
               onPress={() => !active && router.navigate(item.route as never)}
               className={`flex-1 items-center justify-center py-3.5 border-b-2 ${active ? 'border-accent-500' : 'border-transparent'}`}
             >
@@ -32,16 +33,6 @@ export function AccountTabRow({ items }: { items: AccountNavItem[] }) {
           )
         })}
       </View>
-    </View>
-  )
-}
-
-/** AccountMobileTabBar — the account dashboard's bar under its own hero. */
-export function AccountMobileTabBar() {
-  const items = useAccountNavItems()
-  return (
-    <View className="mx-3 mt-3 mb-4">
-      <AccountTabRow items={items} />
     </View>
   )
 }
@@ -61,7 +52,7 @@ export default function AccountMobileHeader() {
       <View className="bg-accent-500 pt-8 pb-16 px-4">
         <Text className="text-lg font-semibold text-white/80 mb-4">My Account</Text>
         <View className="flex-row items-center gap-4">
-          <Pressable onPress={() => router.navigate('/(tabs)/account')} className="w-16 h-16 rounded-full overflow-hidden">
+          <Pressable onPress={() => router.navigate('/(tabs)/account')} accessibilityRole="button" accessibilityLabel="My account" className="w-16 h-16 rounded-full overflow-hidden">
             {user.avatarUrl ? (
               <Image source={{ uri: user.avatarUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
             ) : (

@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { Modal, View } from 'react-native'
+import { useState, type ReactNode, type Ref } from 'react'
+import { Modal, View, type ScrollView } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { X } from 'lucide-react-native'
 import { BottomSheet, SheetFooter } from './BottomSheet'
@@ -18,16 +18,30 @@ export interface ModalSheetProps {
   /** Pinned under the scrolling content (actions). */
   footer?: ReactNode
   maxHeightRatio?: number
+  /** After the slide-out (a parent that mounts the sheet only while open can unmount it then). */
+  onClosed?: () => void
+  dismissible?: boolean
+  scrollRef?: Ref<ScrollView>
 }
 
-export function ModalSheet({ open, onClose, title, subtitle, children, footer, maxHeightRatio }: ModalSheetProps) {
+export function ModalSheet({ open, onClose, title, subtitle, children, footer, maxHeightRatio, onClosed, dismissible, scrollRef }: ModalSheetProps) {
   const [shown, setShown] = useState(open)
   if (open && !shown) setShown(true)
   if (!shown) return null
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <BottomSheet open={open} onClose={onClose} onClosed={() => setShown(false)} maxHeightRatio={maxHeightRatio}>
+        <BottomSheet
+          open={open}
+          onClose={onClose}
+          onClosed={() => {
+            setShown(false)
+            onClosed?.()
+          }}
+          maxHeightRatio={maxHeightRatio}
+          dismissible={dismissible}
+          scrollRef={scrollRef}
+        >
           {title ? <SheetHeader title={title} subtitle={subtitle} onClose={onClose} /> : null}
           {children}
           {footer ? <SheetFooter>{footer}</SheetFooter> : null}

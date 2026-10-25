@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { View } from 'react-native'
+import { StyleSheet, View, type StyleProp, type TextStyle } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
+import { cssInterop } from 'nativewind'
 import { CloudOff, PackageOpen } from 'lucide-react-native'
 import { useTokens } from '../theme'
 import { Text } from './Text'
@@ -51,13 +52,45 @@ export function ErrorState({ title = "Couldn't load this", message = 'Check your
   return <StateView icon={icon} tile="bg-red-50 dark:bg-red-900/20" title={title} message={message} actionLabel={onRetry ? 'Try again' : undefined} onAction={onRetry} {...props} />
 }
 
-/** An inline message box (form errors, notices). */
-export function Notice({ tone = 'info', children, className }: { tone?: 'info' | 'danger' | 'success'; children: ReactNode; className?: string }) {
-  const frame = tone === 'danger' ? 'bg-red-50 dark:bg-red-900/20' : tone === 'success' ? 'bg-green-50 dark:bg-green-900/20' : 'bg-accent-50 dark:bg-accent-900/20'
-  const text = tone === 'danger' ? 'text-red-700 dark:text-red-300' : tone === 'success' ? 'text-green-800 dark:text-green-300' : 'text-accent-800 dark:text-accent-200'
+const NOTICE = {
+  info: { frame: 'bg-accent-50 dark:bg-accent-900/20', text: 'text-accent-800 dark:text-accent-200' },
+  danger: { frame: 'bg-red-50 dark:bg-red-900/20', text: 'text-red-700 dark:text-red-300' },
+  success: { frame: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-800 dark:text-green-300' },
+  warning: { frame: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-800 dark:text-orange-300' },
+}
+
+// A lucide icon coloured by a text-* class, so the icon follows the notice's tone in both schemes.
+function ToneIcon({ icon: Icon, style }: { icon: IconComponent; style?: StyleProp<TextStyle> }) {
+  return <Icon size={20} color={StyleSheet.flatten(style)?.color as string | undefined} />
+}
+const TintedIcon = cssInterop(ToneIcon, { className: 'style' })
+
+/** An inline message box (form errors, order notices); string children take the tone's colour. */
+export function Notice({
+  tone = 'info',
+  title,
+  icon,
+  children,
+  className,
+}: {
+  tone?: keyof typeof NOTICE
+  title?: string
+  icon?: IconComponent
+  children?: ReactNode
+  className?: string
+}) {
+  const { frame, text } = NOTICE[tone]
   return (
-    <View accessibilityLiveRegion="polite" className={cn('rounded-field px-4 py-3', frame, className)}>
-      {typeof children === 'string' ? <Text className={cn('text-sm leading-5', text)}>{children}</Text> : children}
+    <View accessibilityLiveRegion="polite" className={cn('flex-row gap-3 rounded-field px-4 py-3', frame, className)}>
+      {icon ? (
+        <View className="mt-px">
+          <TintedIcon icon={icon} className={text} />
+        </View>
+      ) : null}
+      <View className="flex-1">
+        {title ? <Text className={cn('text-[15px] font-bold leading-[22px]', text)}>{title}</Text> : null}
+        {typeof children === 'string' ? <Text className={cn('text-sm leading-5', title && 'mt-0.5', text)}>{children}</Text> : children}
+      </View>
     </View>
   )
 }
