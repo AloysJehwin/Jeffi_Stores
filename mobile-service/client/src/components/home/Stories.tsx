@@ -5,7 +5,7 @@ import { Image } from 'expo-image'
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg'
 import { GUTTER, SectionHeading } from './layout'
-import { absUrl } from '../../lib/links'
+import { useImageSource } from '../../hooks/useImageSource'
 import { isGroupSeen, openStories, useStoryStore } from '../../stores/storyStore'
 import { accent, useTokens } from '../../theme'
 import type { SectionProps, StoriesData, StoryGroup } from '../../types/home'
@@ -89,7 +89,7 @@ function Row({ groups, seen }: { groups: StoryGroup[]; seen: Record<string, numb
 function Ring({ group, seen, onPress }: { group: StoryGroup; seen: boolean; onPress: () => void }) {
   const gid = `ring${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const inner = RING - 2 * (STROKE + INSET)
-  const cover = absUrl(group.cover)
+  const cover = useImageSource()(group.cover, inner)
   return (
     <Pressable
       onPress={onPress}
@@ -113,7 +113,7 @@ function Ring({ group, seen, onPress }: { group: StoryGroup; seen: boolean; onPr
           </Svg>
         )}
         <View style={{ width: inner, height: inner, borderRadius: inner / 2 }} className="overflow-hidden bg-surface-secondary">
-          <Image recyclingKey={cover} source={cover ? { uri: cover } : undefined} style={{ width: inner, height: inner }} contentFit="cover" transition={200} />
+          <Image recyclingKey={group.cover} source={cover} style={{ width: inner, height: inner }} contentFit="cover" transition={200} />
         </View>
       </View>
       <Text

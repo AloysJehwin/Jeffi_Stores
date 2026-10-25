@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { useReducedMotion } from 'motion/react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import { backdropImg, onImgError } from '@/lib/shared/image-url'
 import Slides from './slides/Slides'
 import { useSwipe } from './slides/useSwipe'
 
@@ -23,6 +24,9 @@ interface ProductImageGalleryProps {
 }
 
 const DESKTOP_QUERY = '(min-width: 1024px)'
+// The phone pager and the desktop main image share one size, so both pick the same download; the
+// desktop share leaves headroom for the hover zoom.
+const MAIN_SIZES = '(min-width: 1024px) 60vw, 100vw'
 
 const wrap = (i: number, n: number) => ((i % n) + n) % n
 
@@ -167,7 +171,8 @@ export default function ProductImageGallery({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={image.image_url}
+                    {...backdropImg(image.image_url)}
+                    onError={onImgError}
                     alt=""
                     aria-hidden="true"
                     loading={loading}
@@ -178,6 +183,7 @@ export default function ProductImageGallery({
                     alt={`${productName} - Image ${index + 1}`}
                     blurhash={image.blurhash}
                     loading={loading}
+                    sizes={MAIN_SIZES}
                     className="w-full h-full object-contain"
                   />
                 </button>
@@ -212,7 +218,8 @@ export default function ProductImageGallery({
           <div className="w-full aspect-[5/3] relative overflow-hidden flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={currentImage.image_url}
+              {...backdropImg(currentImage.image_url)}
+              onError={onImgError}
               alt=""
               aria-hidden="true"
               className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
@@ -226,6 +233,7 @@ export default function ProductImageGallery({
                 src={currentImage.image_url}
                 alt={`${productName} - Image ${active + 1}`}
                 blurhash={currentImage.blurhash}
+                sizes={MAIN_SIZES}
                 className="w-full h-full object-contain animate-fade-in motion-reduce:animate-none"
               />
             </div>
@@ -271,6 +279,7 @@ export default function ProductImageGallery({
                     src={image.thumbnail_url}
                     alt={`${productName} - Thumbnail ${index + 1}`}
                     blurhash={image.blurhash}
+                    sizes="128px"
                     className="w-full h-full object-contain bg-surface-secondary rounded-md"
                   />
                 </div>

@@ -6,7 +6,7 @@ import { preauthorize, settle, AiWalletError } from './billing'
 import { aiGatewayUrl } from '@/lib/shared/ai-client'
 import { uploadGalleryImage, putObjectBuffer, getS3Url, currentBucket } from '@/lib/shared/s3'
 import { query, queryOne } from '@/lib/shared/db'
-import { AI_VIDEO_ASPECTS, AI_VIDEO_DURATIONS, type AiVideoAspect } from './media-features'
+import { AI_VIDEO_ASPECTS, AI_VIDEO_DURATIONS, PNG_IMAGE_FEATURES, type AiVideoAspect } from './media-features'
 import { padToAspect, extForMime } from './reshape-image'
 
 export { AiWalletError }
@@ -200,7 +200,8 @@ async function fetchBytes(url: string): Promise<Buffer> {
 
 async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: number, model: string): Promise<GeneratedImage> {
   const bytes = await fetchBytes(img.url)
-  const up = await uploadGalleryImage(bytes, `ai-${opts.feature}-${Date.now()}-${idx}.png`)
+  const png = !!opts.attachToProductId || PNG_IMAGE_FEATURES.includes(opts.feature)
+  const up = await uploadGalleryImage(bytes, `ai-${opts.feature}-${Date.now()}-${idx}`, { format: png ? 'png' : 'webp' })
   const out: GeneratedImage = {
     url: up.url,
     width: up.width || img.width,
@@ -214,8 +215,8 @@ async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: num
     const tenantId = opts.tenantId ?? (await resolveTenantIdSafe())
     const row = await queryOne<{ id: string }>(
       `INSERT INTO gallery_images (image_url, thumbnail_url, s3_key, s3_thumbnail_key, s3_bucket, file_name, file_size, mime_type, width, height, blurhash, custom_name, tenant_id, source, prompt_text, model_name, media_kind)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'image/png', $8, $9, $10, $11, $12, 'ai', $13, $14, 'image') RETURNING id`,
-      [up.url, up.thumbnailUrl, up.s3Key, up.s3ThumbnailKey, await currentBucket(), up.fileName, up.fileSize, up.width, up.height, up.blurhash, `AI: ${opts.prompt.slice(0, 80)}`, tenantId, opts.prompt, model]
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'ai', $14, $15, 'image') RETURNING id`,
+      [up.url, up.thumbnailUrl, up.s3Key, up.s3ThumbnailKey, await currentBucket(), up.fileName, up.fileSize, up.mimeType, up.width, up.height, up.blurhash, `AI: ${opts.prompt.slice(0, 80)}`, tenantId, opts.prompt, model]
     )
     if (row) out.galleryId = row.id
   } catch (err) {
@@ -224,9 +225,9 @@ async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: num
   if (opts.attachToProductId) {
     const row = await queryOne<{ id: string }>(
       `INSERT INTO product_images (product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key, file_name, file_size, mime_type, width, height, blurhash, alt_text, display_order, is_primary)
-       SELECT $1, $2, $3, $4, $5, $6, $7, $8, 'image/png', $9, $10, $11, $12, COALESCE(MAX(display_order), -1) + 1, false
+       SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, COALESCE(MAX(display_order), -1) + 1, false
        FROM product_images WHERE product_id = $1 RETURNING id`,
-      [opts.attachToProductId, up.url, up.thumbnailUrl, await currentBucket(), up.s3Key, up.s3ThumbnailKey, up.fileName, up.fileSize, up.width, up.height, up.blurhash, opts.prompt.slice(0, 200)]
+      [opts.attachToProductId, up.url, up.thumbnailUrl, await currentBucket(), up.s3Key, up.s3ThumbnailKey, up.fileName, up.fileSize, up.mimeType, up.width, up.height, up.blurhash, opts.prompt.slice(0, 200)]
     )
     if (row) out.productImageId = row.id
   }

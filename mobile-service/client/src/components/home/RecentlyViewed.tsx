@@ -5,8 +5,8 @@ import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { ImageIcon } from 'lucide-react-native'
 import { Badge, Button, Card, ModalSheet, Pill, Text, usePressScale } from '../../ui'
-import { Grid, SectionHeading } from './layout'
-import { absUrl } from '../../lib/links'
+import { Grid, SectionHeading, useColumnWidth } from './layout'
+import { useImageSource } from '../../hooks/useImageSource'
 import { inr } from '../../lib/format'
 import { useTokens } from '../../theme'
 import { useRecentlyViewedStore, type RecentProduct } from '../../stores/recentlyViewedStore'
@@ -86,7 +86,8 @@ function Tile({ product, onPress, onLongPress }: { product: RecentProduct; onPre
   const t = useTokens()
   const press = usePressScale(0.97)
   const discount = product.mrp && product.mrp > product.price ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : 0
-  const image = absUrl(product.image)
+  const tile = useColumnWidth(2, 12)
+  const image = useImageSource()(product.image, tile)
   return (
     <Animated.View style={press.style} className="flex-1">
       <Pressable
@@ -102,7 +103,7 @@ function Tile({ product, onPress, onLongPress }: { product: RecentProduct; onPre
         <Card padded={false} className="flex-1 overflow-hidden">
           <View className="relative aspect-square overflow-hidden bg-surface">
             {image ? (
-              <Image recyclingKey={image} source={{ uri: image }} contentFit="cover" style={{ width: '100%', height: '100%' }} accessibilityLabel={product.name} />
+              <Image recyclingKey={product.image} source={image} contentFit="cover" style={{ width: '100%', height: '100%' }} accessibilityLabel={product.name} />
             ) : (
               <View className="h-full w-full items-center justify-center">
                 <PhotoIcon color={t.foregroundMuted} />
@@ -140,14 +141,14 @@ function Tile({ product, onPress, onLongPress }: { product: RecentProduct; onPre
 
 function QuickView({ product }: { product: RecentProduct }) {
   const t = useTokens()
-  const image = absUrl(product.image)
+  const image = useImageSource()(product.image, 72)
   const off = product.mrp && product.mrp > product.price ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : 0
   return (
     <View>
       <View className="mb-4 flex-row gap-4">
         <View className="h-20 w-20 shrink-0 overflow-hidden rounded-field border border-border-default bg-surface-secondary">
           {image ? (
-            <Image recyclingKey={image} source={{ uri: image }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={product.name} />
+            <Image recyclingKey={product.image} source={image} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={product.name} />
           ) : (
             <View className="h-full w-full items-center justify-center">
               <PhotoIcon color={t.foregroundMuted} />

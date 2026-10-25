@@ -6,21 +6,24 @@ import { ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react-native'
 import { IconButton, Lightbox, Pill } from '../../ui'
 import { useTokens } from '../../theme'
 import type { PdpImage } from '../../api/pdp'
+import { useImageSource } from '../../hooks/useImageSource'
 
 // Mirror of controller-service components/visitor/ProductImageGallery.tsx at the mobile breakpoint, plus swipe paging.
 
+// The pager shows a resized copy; the lightbox keeps the original for zooming.
 function Slide({ image, width, height }: { image: PdpImage; width: number; height: number }) {
+  const imgSource = useImageSource()
   return (
     <View style={{ width, height }} className="items-center justify-center overflow-hidden">
       <Image recyclingKey={image.image_url}
-        source={{ uri: image.image_url }}
+        source={imgSource(image.image_url, 64)}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6, transform: [{ scale: 1.1 }] }}
         contentFit="cover"
         blurRadius={24}
         accessible={false}
       />
       <Image recyclingKey={image.image_url}
-        source={{ uri: image.image_url }}
+        source={imgSource(image.image_url, width)}
         placeholder={image.blurhash ? { blurhash: image.blurhash } : undefined}
         style={{ width: '100%', height: '100%' }}
         contentFit="contain"

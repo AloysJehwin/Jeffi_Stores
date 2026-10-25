@@ -314,7 +314,8 @@ async function fetchImages(
     try {
       const buffer = await fetchImportImage(url)
       const fileName = safeFileName(url)
-      const r = await uploadGalleryImage(buffer, fileName)
+      // Product photos stay PNG (shared by WhatsApp, email and social; see uploadGalleryImage).
+      const r = await uploadGalleryImage(buffer, fileName, { format: 'png' })
       images.push({
         image_url: r.url,
         thumbnail_url: r.thumbnailUrl,
@@ -323,7 +324,7 @@ async function fetchImages(
         s3_thumbnail_key: r.s3ThumbnailKey,
         file_name: r.fileName,
         file_size: r.fileSize,
-        mime_type: 'image/png',
+        mime_type: r.mimeType,
         width: r.width,
         height: r.height,
         is_primary: images.length === 0,
@@ -399,7 +400,7 @@ async function buildVariantImages(
     for (const url of urls) {
       try {
         const buffer = await fetchImportImage(url)
-        const r = await uploadGalleryImage(buffer, safeFileName(url))
+        const r = await uploadGalleryImage(buffer, safeFileName(url), { format: 'png' })
         out.push({
           id: `draft-vi-${variantId}-${order}`,
           variant_id: variantId,
@@ -410,7 +411,7 @@ async function buildVariantImages(
           s3_thumbnail_key: r.s3ThumbnailKey,
           file_name: r.fileName,
           file_size: r.fileSize,
-          mime_type: 'image/png',
+          mime_type: r.mimeType,
           width: r.width,
           height: r.height,
           is_primary: order === 0,

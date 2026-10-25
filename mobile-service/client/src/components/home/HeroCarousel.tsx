@@ -132,7 +132,7 @@ function Slide({ slide: s, active, play, cardWidth, titleSize }: { slide: Resolv
       <View className="bg-black" style={FILL}>
         {/* The image covers the right 62%; its left edge fades into the base. */}
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: imageWidth }}>
-          <Media image={s.img} video={s.video} blurhash={s.blurhash} style={FILL} transition={300} active={play} />
+          <Media image={s.img} video={s.video} blurhash={s.blurhash} style={FILL} width={imageWidth} transition={300} active={play} />
           <Gradient dir="r" stops={[[0, status.black], [0.35, status.black, 0]]} />
         </View>
         {/* bg-gradient-to-r from-35% via-80% at 60% to-transparent, then to-b from-black/20 via-transparent to-black/30 */}

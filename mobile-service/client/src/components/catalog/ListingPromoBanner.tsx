@@ -1,9 +1,10 @@
-import { Pressable, View } from 'react-native'
+import { Pressable, View, useWindowDimensions } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { badgeBg } from '../../lib/badge'
 import { absUrl, openHref } from '../../lib/links'
+import { useImageSource } from '../../hooks/useImageSource'
 import { status } from '../../theme'
 import { Gradient, Text, elevationClass, useElevation, usePressScale } from '../../ui'
 import type { PromoOffer } from '../../api/products'
@@ -17,6 +18,8 @@ export default function ListingPromoBanner({ offer }: { offer: PromoOffer }) {
   const router = useRouter()
   const shadow = useElevation('overlay')
   const press = usePressScale(0.985)
+  const imgSource = useImageSource()
+  const { width } = useWindowDimensions()
   const src = absUrl(offer.image_url_mobile || offer.image_url)
   if (!src) return null
   const blurhash = offer.blurhash_mobile || offer.blurhash || null
@@ -31,7 +34,7 @@ export default function ListingPromoBanner({ offer }: { offer: PromoOffer }) {
         className={`w-full overflow-hidden rounded-panel bg-black ${elevationClass('overlay')}`}
         style={{ height: 144 }}
       >
-        <Image source={{ uri: src }} placeholder={blurhash ? { blurhash } : undefined} style={FILL} contentFit="cover" transition={200} />
+        <Image source={imgSource(src, width)} placeholder={blurhash ? { blurhash } : undefined} style={FILL} contentFit="cover" transition={200} />
         {/* bg-gradient-to-r from-black/75 via-black/40 to-transparent */}
         <Gradient dir="r" stops={[[0, status.black, 0.75], [0.5, status.black, 0.4], [1, status.black, 0]]} />
         <View className="h-full items-start justify-center gap-1.5 px-5" style={{ maxWidth: '85%' }}>

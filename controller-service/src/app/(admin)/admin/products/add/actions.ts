@@ -319,7 +319,7 @@ export async function createProduct(formData: FormData): Promise<ProductActionRe
           ...copied,
           fileName: gimg.custom_name || gimg.file_name,
           fileSize: gimg.file_size,
-          mimeType: gimg.mime_type,
+          mimeType: copied.mimeType ?? gimg.mime_type,
           width: gimg.width,
           height: gimg.height,
         })

@@ -10,6 +10,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import sharp from 'sharp'
+import type { Sharp } from 'sharp'
 import { encode as encodeBlurhash } from 'blurhash'
 import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
 
@@ -244,33 +245,53 @@ export interface GalleryUploadResult {
   s3ThumbnailKey: string
   fileName: string
   fileSize: number
+  /** What was stored (image/webp, image/png, or a kept animation's own type). */
+  mimeType: string
   width: number
   height: number
   blurhash: string | null
 }
 
-export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string): Promise<GalleryUploadResult> {
+/**
+ * WebP by default. PNG for images that leave the storefront for clients that can't rely on WebP:
+ * email, WhatsApp and push media, social and ad creatives, and product photos (which feed all of those).
+ */
+export type GalleryImageFormat = 'webp' | 'png'
+export interface GalleryUploadOptions {
+  format?: GalleryImageFormat
+}
+
+const GALLERY_MAX_EDGE = 1600
+const GALLERY_ENCODERS: Record<GalleryImageFormat, { ext: string; mime: string; full: (s: Sharp) => Sharp; thumb: (s: Sharp) => Sharp }> = {
+  // Both keep alpha.
+  webp: { ext: 'webp', mime: 'image/webp', full: s => s.webp({ quality: 82 }), thumb: s => s.webp({ quality: 75 }) },
+  png: { ext: 'png', mime: 'image/png', full: s => s.png({ compressionLevel: 8 }), thumb: s => s.png({ compressionLevel: 8 }) },
+}
+
+export async function uploadGalleryImage(
+  imageBuffer: Buffer,
+  fileName: string,
+  opts: GalleryUploadOptions = {}
+): Promise<GalleryUploadResult> {
+  const enc = GALLERY_ENCODERS[opts.format ?? 'webp']
   const BUCKET_NAME = await resolveBucket()
   const timestamp = Date.now()
   const baseName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '')
-  const s3Key = `gallery/${timestamp}-${baseName}.png`
-  const s3ThumbnailKey = `gallery/thumbnails/${timestamp}-${baseName}.png`
+  const s3Key = `gallery/${timestamp}-${baseName}.${enc.ext}`
+  const s3ThumbnailKey = `gallery/thumbnails/${timestamp}-${baseName}.${enc.ext}`
 
-  const metadata = await sharp(imageBuffer).rotate().metadata()
-  const pngBuffer = await sharp(imageBuffer).rotate().png({ compressionLevel: 8 }).toBuffer()
-  const thumbnailBuffer = await sharp(imageBuffer)
-    .rotate()
-    .resize(300, 300, { fit: 'cover' })
-    .png({ compressionLevel: 8 })
-    .toBuffer()
+  const { data: body, info } = await enc
+    .full(sharp(imageBuffer).rotate().resize(GALLERY_MAX_EDGE, GALLERY_MAX_EDGE, { fit: 'inside', withoutEnlargement: true }))
+    .toBuffer({ resolveWithObject: true })
+  const thumbnailBuffer = await enc.thumb(sharp(imageBuffer).rotate().resize(300, 300, { fit: 'cover' })).toBuffer()
   const blurhash = await computeBlurhash(imageBuffer)
 
   await s3Client.send(
     new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: `${KEY_PREFIX}${s3Key}`,
-      Body: pngBuffer,
-      ContentType: 'image/png',
+      Body: body,
+      ContentType: enc.mime,
     })
   )
   await s3Client.send(
@@ -278,7 +299,7 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
       Bucket: BUCKET_NAME,
       Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
       Body: thumbnailBuffer,
-      ContentType: 'image/png',
+      ContentType: enc.mime,
     })
   )
 
@@ -287,17 +308,16 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
     thumbnailUrl: await getS3Url(s3ThumbnailKey),
     s3Key,
     s3ThumbnailKey,
-    fileName: `${baseName}.png`,
-    fileSize: pngBuffer.length,
-    width: metadata.width || 0,
-    height: metadata.height || 0,
+    fileName: `${baseName}.${enc.ext}`,
+    fileSize: body.length,
+    mimeType: enc.mime,
+    width: info.width || 0,
+    height: info.height || 0,
     blurhash,
   }
 }
 
 export interface GalleryMediaResult extends GalleryUploadResult {
-  /** What was stored: image/gif or image/webp when the animation was kept, else image/png. */
-  mimeType: string
   animated: boolean
 }
 
@@ -307,30 +327,36 @@ const ANIMATED_FORMATS: Record<string, { mime: string; ext: string }> = {
 }
 
 /**
- * Gallery upload that keeps animation: an animated GIF or WebP is stored byte-for-byte (a PNG
- * re-encode would keep only the first frame) with a first-frame PNG thumbnail and blurhash.
- * Anything else takes the uploadGalleryImage PNG path. `mime` is a hint; sharp decides.
+ * Gallery upload that keeps animation: an animated GIF or WebP is stored byte-for-byte (a re-encode
+ * would keep only the first frame) with a first-frame thumbnail and blurhash. Anything else takes
+ * the uploadGalleryImage path. `mime` is a hint; sharp decides.
  */
-export async function uploadGalleryMedia(buffer: Buffer, fileName: string, mime: string): Promise<GalleryMediaResult> {
+export async function uploadGalleryMedia(
+  buffer: Buffer,
+  fileName: string,
+  mime: string,
+  opts: GalleryUploadOptions = {}
+): Promise<GalleryMediaResult> {
   const maybeAnimated = !mime || mime === 'image/gif' || mime === 'image/webp' || mime === 'application/octet-stream'
   const meta = maybeAnimated ? await sharp(buffer, { animated: true }).metadata().catch(() => null) : null
   const fmt = meta?.format ? ANIMATED_FORMATS[meta.format] : undefined
   if (!meta || !fmt || (meta.pages ?? 1) <= 1) {
-    return { ...(await uploadGalleryImage(buffer, fileName)), mimeType: 'image/png', animated: false }
+    return { ...(await uploadGalleryImage(buffer, fileName, opts)), animated: false }
   }
 
+  const enc = GALLERY_ENCODERS[opts.format ?? 'webp']
   const BUCKET_NAME = await resolveBucket()
   const timestamp = Date.now()
   const baseName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '')
   const s3Key = `gallery/${timestamp}-${baseName}.${fmt.ext}`
-  const s3ThumbnailKey = `gallery/thumbnails/${timestamp}-${baseName}.png`
+  const s3ThumbnailKey = `gallery/thumbnails/${timestamp}-${baseName}.${enc.ext}`
   // Without { animated: true } sharp reads only the first frame.
-  const thumbnailBuffer = await sharp(buffer).resize(300, 300, { fit: 'cover' }).png({ compressionLevel: 8 }).toBuffer()
+  const thumbnailBuffer = await enc.thumb(sharp(buffer).resize(300, 300, { fit: 'cover' })).toBuffer()
   const blurhash = await computeBlurhash(buffer)
 
   await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: buffer, ContentType: fmt.mime }))
   await s3Client.send(
-    new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnailBuffer, ContentType: 'image/png' })
+    new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnailBuffer, ContentType: enc.mime })
   )
 
   return {
@@ -427,17 +453,41 @@ async function resolveSourceKey(canonicalKey: string): Promise<string | null> {
   return null
 }
 
+// Product photos also feed WhatsApp headers, emails, social posts and PDFs, which can't rely on WebP,
+// so a WebP gallery object becomes a PNG on the way in; anything else is copied as-is.
+const WEBP_KEY = /\.webp$/i
+const productKey = (key: string) => key.replace(WEBP_KEY, '.png')
+
+async function copyForProduct(bucket: string, srcKey: string, destKey: string): Promise<void> {
+  if (!WEBP_KEY.test(srcKey)) {
+    await s3Client.send(new CopyObjectCommand({ Bucket: bucket, CopySource: `${bucket}/${srcKey}`, Key: `${KEY_PREFIX}${destKey}` }))
+    return
+  }
+  const res = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: srcKey }))
+  const png = await sharp(Buffer.from(await res.Body!.transformToByteArray())).png({ compressionLevel: 8 }).toBuffer()
+  await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: `${KEY_PREFIX}${destKey}`, Body: png, ContentType: 'image/png' }))
+}
+
 export async function copyGalleryImageToProduct(
   galleryS3Key: string,
   galleryS3ThumbnailKey: string,
   productId: string
-): Promise<{ s3Bucket: string; s3Key: string; s3ThumbnailKey: string; url: string; thumbnailUrl: string }> {
+): Promise<{
+  s3Bucket: string
+  s3Key: string
+  s3ThumbnailKey: string
+  url: string
+  thumbnailUrl: string
+  /** image/png when a WebP source was re-encoded; null when the gallery's own type still holds. */
+  mimeType: string | null
+}> {
   const BUCKET_NAME = await resolveBucket()
   const fileName = galleryS3Key.replace(/^gallery\//, '')
   const thumbFileName = galleryS3ThumbnailKey.replace(/^gallery\/thumbnails\//, '')
 
-  const s3Key = `products/${productId}/${fileName}`
-  const s3ThumbnailKey = `products/${productId}/thumbnails/${thumbFileName}`
+  const s3Key = productKey(`products/${productId}/${fileName}`)
+  const s3ThumbnailKey = productKey(`products/${productId}/thumbnails/${thumbFileName}`)
+  const mimeType = WEBP_KEY.test(galleryS3Key) ? 'image/png' : null
 
   // Resolve the real source location. If the gallery object doesn't exist, THROW —
   // never fall back to the gallery key, or the product row would point at gallery/…
@@ -450,31 +500,20 @@ export async function copyGalleryImageToProduct(
     )
   }
 
-  await s3Client.send(
-    new CopyObjectCommand({
-      Bucket: BUCKET_NAME,
-      CopySource: `${BUCKET_NAME}/${srcKey}`,
-      Key: `${KEY_PREFIX}${s3Key}`,
-    })
-  )
+  await copyForProduct(BUCKET_NAME, srcKey, s3Key)
 
   // Thumbnail is best-effort: if the gallery thumb is missing, reuse the full image
   // as the product thumbnail (still a product-owned key, never a gallery key).
   const srcThumbKey = await resolveSourceKey(galleryS3ThumbnailKey)
   if (srcThumbKey) {
-    await s3Client.send(
-      new CopyObjectCommand({
-        Bucket: BUCKET_NAME,
-        CopySource: `${BUCKET_NAME}/${srcThumbKey}`,
-        Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
-      })
-    )
+    await copyForProduct(BUCKET_NAME, srcThumbKey, s3ThumbnailKey)
     return {
       s3Bucket: BUCKET_NAME,
       s3Key,
       s3ThumbnailKey,
       url: await getS3Url(s3Key),
       thumbnailUrl: await getS3Url(s3ThumbnailKey),
+      mimeType,
     }
   }
   return {
@@ -483,6 +522,7 @@ export async function copyGalleryImageToProduct(
     s3ThumbnailKey: s3Key,
     url: await getS3Url(s3Key),
     thumbnailUrl: await getS3Url(s3Key),
+    mimeType,
   }
 }
 

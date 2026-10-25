@@ -88,6 +88,7 @@ function Strip({ section, items }: { section: SectionProps['section']; items: So
                 video={item.video}
                 accessibilityLabel={item.caption || undefined}
                 style={{ width: '100%', height: '100%' }}
+                width={TILE}
                 transition={300}
                 active={onScreen && i >= range[0] && i <= range[1]}
               />

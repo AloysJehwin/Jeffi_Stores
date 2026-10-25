@@ -2,9 +2,9 @@
 
 import { useRef, useState } from 'react'
 import { Images, Loader2, Upload } from 'lucide-react'
-import GalleryPicker from '@/components/admin/GalleryPicker'
+import GalleryPicker, { type GalleryImage } from '@/components/admin/GalleryPicker'
 import AiMediaButton from '@/components/admin/ai/AiMediaButton'
-import { AI_SIZE_PRESETS, type AiImageFeature } from '@/lib/ai/media-features'
+import { AI_SIZE_PRESETS, PNG_IMAGE_FEATURES, type AiImageFeature } from '@/lib/ai/media-features'
 
 // An image-URL field with an Upload button: paste a link or upload a file (→ CDN URL in the field).
 // Optional Gallery pick and AI image generation sit beside it.
@@ -20,6 +20,20 @@ export async function uploadImage(file: File, endpoint = '/api/admin/uploads/ima
   if (!r.ok || !d.url) throw new Error(d.error || 'Upload failed')
   return d.url as string
 }
+
+/** A gallery image re-stored as PNG; WebP is the gallery default. */
+async function copyAsPng(imageUrl: string): Promise<string> {
+  const r = await fetch('/api/admin/uploads/image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageUrl }),
+  })
+  const d = await r.json().catch(() => ({}))
+  if (!r.ok || !d.url) throw new Error(d.error || 'Could not copy the image')
+  return d.url as string
+}
+
+const isWebp = (g: GalleryImage) => g.mime_type === 'image/webp' || /\.webp(?:[?#]|$)/i.test(g.image_url)
 
 /** AI image generation for the field: feature (billing + scope) and the AI_SIZE_PRESETS keys to offer. */
 export interface ImageUrlAi {
@@ -46,6 +60,7 @@ export default function ImageUrlInput({
   preview = true,
   ai,
   gallery,
+  png,
 }: {
   value: string
   onChange: (url: string) => void
@@ -59,12 +74,15 @@ export default function ImageUrlInput({
   ai?: ImageUrlAi | false
   /** Adds a Gallery pick; on by default when `ai` is set. */
   gallery?: boolean
+  /** The field's clients can't show WebP, so a WebP gallery pick is copied as PNG; defaults from the AI feature. */
+  png?: boolean
 }) {
   const file = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [picker, setPicker] = useState(false)
   const showGallery = gallery ?? !!ai
+  const pngOnly = png ?? (!!ai && PNG_IMAGE_FEATURES.includes(ai.feature))
   const extras = !!ai || showGallery
   async function pick(f: File | undefined) {
     if (!f) return
@@ -77,6 +95,18 @@ export default function ImageUrlInput({
     } finally {
       setBusy(false)
       if (file.current) file.current.value = ''
+    }
+  }
+  async function pickGallery(g: GalleryImage) {
+    if (!pngOnly || !isWebp(g)) return onChange(g.image_url)
+    setBusy(true)
+    setErr(null)
+    try {
+      onChange(await copyAsPng(g.image_url))
+    } catch (e: any) {
+      setErr(e.message)
+    } finally {
+      setBusy(false)
     }
   }
   const sizes = ai
@@ -132,7 +162,7 @@ export default function ImageUrlInput({
           onClose={() => setPicker(false)}
           onConfirm={imgs => {
             setPicker(false)
-            if (imgs[0]) onChange(imgs[0].image_url)
+            if (imgs[0]) void pickGallery(imgs[0])
           }}
         />
       )}

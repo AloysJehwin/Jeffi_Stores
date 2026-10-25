@@ -1,4 +1,7 @@
+'use client'
+
 import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
+import { onImgError, srcSetFor } from '@/lib/shared/image-url'
 
 export interface SlideImageProps {
   /** The wide (desktop) image. */
@@ -20,6 +23,8 @@ export interface SlideImageProps {
   className?: string
   /** Wraps the blurhash canvas; defaults to filling the slide. */
   blurClassName?: string
+  /** Rendered width for the resized srcset; defaults to the full width (wide) or half of it (card). */
+  sizes?: string
 }
 
 // A slide's backdrop: the blurhash under a <picture> that swaps the mobile image for the wide one
@@ -38,6 +43,7 @@ export default function SlideImage({
   loading,
   className = 'absolute inset-0 h-full w-full object-cover object-center',
   blurClassName = 'absolute inset-0',
+  sizes,
 }: SlideImageProps) {
   // The canvas sits under the <picture>, whose default <img> is the mobile source, so prefer the
   // hash of whatever renders first.
@@ -45,6 +51,8 @@ export default function SlideImage({
   const wide = src || mobileSrc || placeholder
   const narrow = mobileSrc || src || placeholder
   const single = card ? cardSrc || src || mobileSrc || placeholder : null
+  const shown = sizes ?? (card ? '(min-width: 1024px) 50vw, 100vw' : '100vw')
+  const set = (u: string | null | undefined) => srcSetFor(u, shown)
 
   return (
     <>
@@ -55,12 +63,30 @@ export default function SlideImage({
       )}
       {single ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={single} alt={alt} loading={loading} className={className} />
+        <img
+          sizes={shown}
+          srcSet={set(single)}
+          src={single}
+          alt={alt}
+          loading={loading}
+          className={className}
+          onError={onImgError}
+        />
       ) : (
         narrow && (
           <picture>
-            {wide && wide !== narrow && <source media={`(min-width: ${breakpoint}px)`} srcSet={wide} />}
-            <img src={narrow} alt={alt} loading={loading} className={className} />
+            {wide && wide !== narrow && (
+              <source media={`(min-width: ${breakpoint}px)`} sizes={shown} srcSet={set(wide) ?? wide} data-raw={wide} />
+            )}
+            <img
+              sizes={shown}
+              srcSet={set(narrow)}
+              src={narrow}
+              alt={alt}
+              loading={loading}
+              className={className}
+              onError={onImgError}
+            />
           </picture>
         )
       )}

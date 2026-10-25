@@ -4,7 +4,7 @@ import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Package } from 'lucide-react-native'
 import { DealCountdown } from './DealOfTheDay'
-import { absUrl } from '../../lib/links'
+import { useImageSource } from '../../hooks/useImageSource'
 import { inr } from '../../lib/format'
 import { accent, primary, useTokens } from '../../theme'
 import type { CountdownDeal, SectionProps } from '../../types/home'
@@ -16,6 +16,7 @@ const COPY = { eyebrow: 'Limited time', title: 'Deal ends soon', ctaLabel: 'Grab
 export default function CountdownDealBanner({ section, data }: SectionProps) {
   const router = useRouter()
   const t = useTokens()
+  const imgSource = useImageSource()
   const deal = data.extras[section.id] as CountdownDeal | null | undefined
   if (!deal) return null
 
@@ -40,7 +41,7 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
           >
             {image ? (
               <Image
-                source={{ uri: absUrl(image.image_url) ?? image.image_url }}
+                source={imgSource(image.image_url, 352)}
                 placeholder={image.blurhash ? { blurhash: image.blurhash } : undefined}
                 style={{ flex: 1, margin: 16 }}
                 contentFit="contain"

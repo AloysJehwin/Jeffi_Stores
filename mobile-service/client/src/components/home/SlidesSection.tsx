@@ -27,7 +27,8 @@ import { useOnScreen } from './scroll-context'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { productLabel } from '../../lib/a11y'
 import { inr } from '../../lib/format'
-import { absUrl, openHref } from '../../lib/links'
+import { absUrl, openHref, type RemoteImage } from '../../lib/links'
+import { useImageSource } from '../../hooks/useImageSource'
 import { openQuickAdd } from '../../stores/quickAddStore'
 import { primary, status } from '../../theme'
 import type { CardProduct, SectionProps, SlideCard, SlidesData } from '../../types/home'
@@ -214,7 +215,7 @@ function SlideCardView({
   return (
     <View style={[shadow, room && { marginTop: SHADOW_ROOM.top, marginBottom: SHADOW_ROOM.bottom }]} className={`rounded-panel ${elevationClass('overlay')}`}>
       <View className="w-full overflow-hidden rounded-panel bg-black" style={{ height }}>
-        <Backdrop slide={slide} shape={shape} motion={motion} current={current} play={play} info={info} />
+        <Backdrop slide={slide} shape={shape} motion={motion} current={current} play={play} info={info} width={width} />
         <Gradient dir="t" stops={SCRIM} />
         <Caption motion={motion} current={current} info={info}>
           <SlideBadge text={slide.badge} color={slide.badgeClass} />
@@ -274,6 +275,7 @@ function Backdrop({
   current,
   play,
   info,
+  width,
 }: {
   slide: SlideCard
   shape: Shape
@@ -281,8 +283,10 @@ function Backdrop({
   current: boolean
   play: boolean
   info?: PageInfo
+  width: number
 }) {
   const { src, blurhash, video } = pickImage(slide, shape)
+  const imgSource = useImageSource()
   const [playing, setPlaying] = useState(false)
   if (!src) {
     return (
@@ -291,8 +295,9 @@ function Backdrop({
       </View>
     )
   }
-  if (slide.product) return <ProductShot src={src} blurhash={blurhash} />
-  const img = <Media image={src} video={video} blurhash={blurhash} style={FILL} active={play} onPlaying={setPlaying} />
+  if (slide.product) return <ProductShot src={src} image={imgSource(src, width * 0.8)} backdrop={imgSource(src, 64)} blurhash={blurhash} />
+  // Parallax and the zoom scale the picture up a little.
+  const img = <Media image={src} video={video} blurhash={blurhash} style={FILL} width={width * 1.15} active={play} onPlaying={setPlaying} />
   if (motion === 'parallax' && info) return <Parallax info={info}>{img}</Parallax>
   // The clip is the motion; the zoom waits for it to stop.
   if (motion === 'kenburns') return <KenBurns on={current && !playing}>{img}</KenBurns>
@@ -300,19 +305,19 @@ function Backdrop({
 }
 
 /** The whole product, uncropped and clear of the caption, over a blurred copy of itself. */
-function ProductShot({ src, blurhash }: { src: string; blurhash: string | null }) {
+function ProductShot({ src, image, backdrop, blurhash }: { src: string; image?: RemoteImage; backdrop?: RemoteImage; blurhash: string | null }) {
   return (
     <View style={FILL} className="bg-surface-elevated">
       <Image
         recyclingKey={src}
-        source={{ uri: src }}
+        source={backdrop}
         style={[FILL, { opacity: 0.6, transform: [{ scale: 1.1 }] }]}
         contentFit="cover"
         blurRadius={24}
       />
       <Image
         recyclingKey={src}
-        source={{ uri: src }}
+        source={image}
         placeholder={blurhash ? { blurhash } : undefined}
         style={{ position: 'absolute', top: '8%', left: '10%', right: '10%', bottom: '38%' }}
         contentFit="contain"

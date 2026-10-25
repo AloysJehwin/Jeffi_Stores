@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
 import Constants from 'expo-constants'
 import { X } from 'lucide-react-native'
-import { getAppConfig, isOlderVersion } from '../api/appConfig'
+import { appConfigQuery, isOlderVersion } from '../api/appConfig'
 import { useTokens } from '../theme'
 import { Button, IconButton } from './Button'
 import { Caption, Text } from './Text'
@@ -26,7 +26,7 @@ export default function UpdatePrompt() {
   const shadow = useElevation('floating')
   const { animate } = useMotion()
   const [dismissed, setDismissed] = useState(false)
-  const { data } = useQuery({ queryKey: ['app-config'], queryFn: getAppConfig, staleTime: 60 * 60_000, retry: 0 })
+  const { data } = useQuery(appConfigQuery)
   const current = Constants.expoConfig?.version
   if (dismissed || !data || !isOlderVersion(current, data.min_app_version)) return null
   return (

@@ -36,6 +36,7 @@ export default function CountdownDealBanner({ product, endsAt, eyebrow, title, c
                   src={image.image_url}
                   alt={product.name}
                   blurhash={image.blurhash}
+                  sizes="(min-width: 768px) 384px, 90vw"
                   className="w-full h-full object-contain p-4"
                 />
               ) : (
