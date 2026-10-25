@@ -129,7 +129,7 @@ export default function OtpScreen() {
 
         <Text className="text-center text-sm text-foreground-secondary">
           New here?{' '}
-          <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/signup')}>
+          <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/signup')}>
             Create an account
           </Text>
         </Text>

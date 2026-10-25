@@ -102,7 +102,7 @@ function Tile({ product, onPress, onLongPress }: { product: RecentProduct; onPre
         <Card padded={false} className="flex-1 overflow-hidden">
           <View className="relative aspect-square overflow-hidden bg-surface">
             {image ? (
-              <Image source={{ uri: image }} contentFit="cover" style={{ width: '100%', height: '100%' }} accessibilityLabel={product.name} />
+              <Image recyclingKey={image} source={{ uri: image }} contentFit="cover" style={{ width: '100%', height: '100%' }} accessibilityLabel={product.name} />
             ) : (
               <View className="h-full w-full items-center justify-center">
                 <PhotoIcon color={t.foregroundMuted} />
@@ -147,7 +147,7 @@ function QuickView({ product }: { product: RecentProduct }) {
       <View className="mb-4 flex-row gap-4">
         <View className="h-20 w-20 shrink-0 overflow-hidden rounded-field border border-border-default bg-surface-secondary">
           {image ? (
-            <Image source={{ uri: image }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={product.name} />
+            <Image recyclingKey={image} source={{ uri: image }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={product.name} />
           ) : (
             <View className="h-full w-full items-center justify-center">
               <PhotoIcon color={t.foregroundMuted} />

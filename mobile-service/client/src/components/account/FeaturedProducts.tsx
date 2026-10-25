@@ -7,6 +7,7 @@ import { getPopularProducts } from '../../api/account'
 import { Grid } from '../home/layout'
 import { ImageOff } from 'lucide-react-native'
 import { useTokens } from '../../theme'
+import { productLabel } from '../../lib/a11y'
 
 // Mirror of controller-service components/visitor/FeaturedProducts.tsx ("You might also like").
 
@@ -18,7 +19,7 @@ export default function FeaturedProducts() {
 
   return (
     <View className="mt-8">
-      <Text className="text-base font-semibold text-foreground mb-3">You might also like</Text>
+      <Text accessibilityRole="header" className="text-base font-semibold text-foreground mb-3">You might also like</Text>
       <Grid cols={2} gap={12}>
         {products.map(p => {
           const image = p.product_images?.find(i => i.is_primary) || p.product_images?.[0]
@@ -28,12 +29,14 @@ export default function FeaturedProducts() {
           return (
             <Pressable
               key={p.id}
+              accessibilityRole="button"
+              accessibilityLabel={productLabel({ name: p.name, price, from: p.has_variants, mrp, discountPct: discount })}
               onPress={() => router.push(`/product/${p.slug}`)}
               className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden"
             >
               <View className="relative bg-surface" style={{ aspectRatio: 1 }}>
                 {image ? (
-                  <Image source={{ uri: image.thumbnail_url }} style={{ position: 'absolute', top: 8, left: 8, right: 8, bottom: 8 }} contentFit="contain" />
+                  <Image source={{ uri: image.thumbnail_url }} recyclingKey={image.thumbnail_url} accessible={false} style={{ position: 'absolute', top: 8, left: 8, right: 8, bottom: 8 }} contentFit="contain" />
                 ) : (
                   <View className="flex-1 items-center justify-center">
                     <ImageOff size={36} color={t.foregroundMuted} strokeWidth={1.5} />

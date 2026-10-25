@@ -61,7 +61,7 @@ export default function WhyUs({ section }: SectionProps) {
             >
               <IconByName name={item.icon} size={24} color={iconColor(item.color)} />
             </View>
-            <Text className="mb-2 font-display text-lg font-extrabold text-foreground">{item.title}</Text>
+            <Text accessibilityRole="header" className="mb-2 font-display text-lg font-extrabold text-foreground">{item.title}</Text>
             <Text className="text-sm leading-relaxed text-foreground-secondary">{item.desc}</Text>
           </Card>
         ))}

@@ -59,7 +59,7 @@ export default function SocialStrip({ section }: SectionProps) {
           >
             {/* the caption overlay is hover/focus-only on the web, so it never shows on touch */}
             <View className="h-full w-full bg-gray-200 dark:bg-gray-700">
-              <Image
+              <Image recyclingKey={absUrl(item.imageUrl) ?? undefined}
                 source={{ uri: absUrl(item.imageUrl) ?? undefined }}
                 accessibilityLabel={item.caption}
                 style={{ width: '100%', height: '100%' }}

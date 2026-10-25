@@ -90,7 +90,7 @@ function Dot({ on, onPress, label }: { on: boolean; onPress: () => void; label: 
   }, [on, w])
   const style = useAnimatedStyle(() => ({ width: w.value }))
   return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={label}>
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: on }}>
       <Animated.View
         style={[{ height: 8, borderRadius: 999 }, style, on ? { backgroundColor: primary[500] } : { backgroundColor: t.foreground, opacity: 0.2 }]}
       />

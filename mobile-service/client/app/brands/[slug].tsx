@@ -40,7 +40,7 @@ export default function BrandScreen() {
           <View className="flex-row items-center gap-4">
             {logo ? (
               <View className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
-                <Image source={{ uri: logo }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={brand.name} />
+                <Image recyclingKey={logo} source={{ uri: logo }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={brand.name} />
               </View>
             ) : null}
             <View className="min-w-0 flex-1">

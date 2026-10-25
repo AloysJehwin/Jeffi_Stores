@@ -9,7 +9,9 @@ import Gradient from '../../src/components/account/Gradient'
 import { useInfiniteList, useRequireAuth, type InfiniteList } from '../../src/components/account/hooks'
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { showToast } from '../../src/stores/toastStore'
-import { BodySmall, Button, Caption, Card, cn, Divider, elevationClass, EmptyState, Heading, Overline, Screen, Skeleton, Text, TextField, useElevation } from '../../src/ui'
+import {
+  BodySmall, Button, Caption, Card, CardSegment, cn, Divider, elevationClass, EmptyState, Heading, Overline, Screen, SectionedList, Skeleton, Text, TextField, useElevation,
+} from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountRewards.tsx (mobile layout).
 
@@ -155,67 +157,71 @@ function RedeemCard({ data, onRedeemed }: { data: RewardsData; onRedeemed: () =>
   )
 }
 
-function CouponList({ list }: { list: InfiniteList<RewardCoupon> }) {
-  if ((list.total ?? 0) === 0 && !list.loading) return null
-  // No clipboard module in the app: the share sheet offers Copy.
-  const copy = (code: string) => Share.share({ message: code }).catch(() => showToast('Could not copy the code', 'error'))
+// Coupons and points history are rows of one list; each section is a card sliced per row.
+type RewardsSection = { key: 'coupons'; data: RewardCoupon[] } | { key: 'history'; data: RewardsHistoryEntry[] }
+
+// No clipboard module in the app: the share sheet offers Copy.
+const copyCode = (code: string) => Share.share({ message: code }).catch(() => showToast('Could not copy the code', 'error'))
+
+function CouponRow({ c }: { c: RewardCoupon }) {
   return (
-    <Card>
-      <Heading>Your reward coupons</Heading>
-      <BodySmall className="mt-1">Enter the code in the coupon box at checkout.</BodySmall>
-      <View className="mt-4 gap-3">
-        {list.rows.map(c => (
-          <View key={c.code} className="flex-row flex-wrap items-center justify-between gap-3 rounded-field border-2 border-dashed border-border-default px-4 py-3">
-            <View className="flex-1">
-              <Text className="font-mono font-semibold text-foreground">{c.code}</Text>
-              <Text className="text-xs text-foreground-secondary">
-                {c.discountType === 'percentage'
-                  ? `${c.value}% off${c.maxDiscount ? ` (up to ${formatMoney(c.maxDiscount)})` : ''}`
-                  : `${formatMoney(c.value)} off`}
-                {c.minPurchase > 0 ? ` orders of ${formatMoney(c.minPurchase)} or more` : ''}
-                {c.validUntil ? ` · valid till ${new Date(c.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
-              </Text>
-            </View>
-            <View>
-              <Button label="Copy" icon={Copy} variant="secondary" size="sm" block={false} onPress={() => copy(c.code)} />
-            </View>
-          </View>
-        ))}
+    <View className="flex-row flex-wrap items-center justify-between gap-3 rounded-field border-2 border-dashed border-border-default px-4 py-3">
+      <View className="flex-1">
+        <Text className="font-mono font-semibold text-foreground">{c.code}</Text>
+        <Text className="text-xs text-foreground-secondary">
+          {c.discountType === 'percentage'
+            ? `${c.value}% off${c.maxDiscount ? ` (up to ${formatMoney(c.maxDiscount)})` : ''}`
+            : `${formatMoney(c.value)} off`}
+          {c.minPurchase > 0 ? ` orders of ${formatMoney(c.minPurchase)} or more` : ''}
+          {c.validUntil ? ` · valid till ${new Date(c.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+        </Text>
       </View>
-      <InfiniteFooter shown={list.rows.length} list={list} noun="coupons" />
-    </Card>
+      <View>
+        <Button label="Copy" icon={Copy} variant="secondary" size="sm" block={false} accessibilityLabel={`Copy coupon ${c.code}`} onPress={() => copyCode(c.code)} />
+      </View>
+    </View>
   )
 }
 
-function History({ list }: { list: InfiniteList<RewardsHistoryEntry> }) {
+function HistoryRow({ e }: { e: RewardsHistoryEntry }) {
   return (
-    <Card>
+    <View className="flex-row items-center justify-between gap-4 py-3">
+      <View className="flex-1">
+        <Text className="text-sm text-foreground">{historyLabel(e)}</Text>
+        <Caption>{formatDate(e.createdAt)}</Caption>
+      </View>
+      <Text className={`text-sm font-semibold ${e.delta > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-secondary'}`} style={TABULAR}>
+        {e.delta > 0 ? '+' : ''}
+        {e.delta.toLocaleString('en-IN')}
+      </Text>
+    </View>
+  )
+}
+
+function SectionTop({ section, history }: { section: RewardsSection; history: InfiniteList<RewardsHistoryEntry> }) {
+  if (section.key === 'coupons') {
+    return (
+      <CardSegment position="top" className="px-4 pb-4 pt-4">
+        <Heading>Your reward coupons</Heading>
+        <BodySmall className="mt-1">Enter the code in the coupon box at checkout.</BodySmall>
+      </CardSegment>
+    )
+  }
+  const empty = (history.total ?? 0) === 0 && !history.loading
+  return (
+    <CardSegment position="top" className={cn('px-4 pt-4', !empty && 'pb-3')}>
       <Heading>Points history</Heading>
-      {(list.total ?? 0) === 0 && !list.loading ? (
-        <Text className="mt-3 text-sm text-foreground-muted">No points yet. They appear here after your first delivered order.</Text>
-      ) : (
-        <>
-          <View className="mt-3">
-            {list.rows.map((e, i) => (
-              <View key={e.id}>
-                {i > 0 ? <Divider /> : null}
-                <View className="flex-row items-center justify-between gap-4 py-3">
-                  <View className="flex-1">
-                    <Text className="text-sm text-foreground">{historyLabel(e)}</Text>
-                    <Caption>{formatDate(e.createdAt)}</Caption>
-                  </View>
-                  <Text className={`text-sm font-semibold ${e.delta > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-secondary'}`} style={TABULAR}>
-                    {e.delta > 0 ? '+' : ''}
-                    {e.delta.toLocaleString('en-IN')}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-          <InfiniteFooter shown={list.rows.length} list={list} noun="entries" />
-        </>
-      )}
-    </Card>
+      {empty ? <Text className="mt-3 text-sm text-foreground-muted">No points yet. They appear here after your first delivered order.</Text> : null}
+    </CardSegment>
+  )
+}
+
+function SectionBottom({ section, coupons, history }: { section: RewardsSection; coupons: InfiniteList<RewardCoupon>; history: InfiniteList<RewardsHistoryEntry> }) {
+  const list = section.key === 'coupons' ? coupons : history
+  return (
+    <CardSegment position="bottom" className={cn('px-4 pb-4', section.key === 'coupons' && 'mb-4')}>
+      <InfiniteFooter shown={list.rows.length} list={list} noun={section.key === 'coupons' ? 'coupons' : 'entries'} />
+    </CardSegment>
   )
 }
 
@@ -342,37 +348,63 @@ export default function RewardsScreen() {
     coupons.reload()
   }
 
+  const sections: RewardsSection[] = [
+    ...((coupons.total ?? 0) === 0 && !coupons.loading ? [] : [{ key: 'coupons' as const, data: coupons.rows }]),
+    { key: 'history', data: (history.total ?? 0) === 0 && !history.loading ? [] : history.rows },
+  ]
+
+  if (loading || unavailable || !data) {
+    return (
+      <Screen title="Rewards">
+        {loading ? (
+          <RewardsLoading />
+        ) : (
+          <EmptyState
+            fill
+            icon={Gift}
+            title={failed ? 'Could not load your rewards' : 'Rewards are not available for this account'}
+            actionLabel="Back to my account"
+            onAction={() => router.navigate('/(tabs)/account')}
+          />
+        )}
+      </Screen>
+    )
+  }
+
   return (
-    <Screen
-      title="Rewards"
-      mode="keyboard"
-      scrollProps={{
-        scrollEventThrottle: 200,
-        onScroll: e => {
-          const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
-          if (contentOffset.y + layoutMeasurement.height > contentSize.height - 400) history.loadMore()
-        },
-      }}
-    >
-      {loading ? (
-        <RewardsLoading />
-      ) : unavailable || !data ? (
-        <EmptyState
-          fill
-          icon={Gift}
-          title={failed ? 'Could not load your rewards' : 'Rewards are not available for this account'}
-          actionLabel="Back to my account"
-          onAction={() => router.navigate('/(tabs)/account')}
-        />
-      ) : (
-        <View className="gap-4">
-          <TierCard data={data} />
-          <RedeemCard data={data} onRedeemed={reload} />
-          <CouponList list={coupons} />
-          <History list={history} />
-          <HowItWorks program={data.program} />
-        </View>
-      )}
+    <Screen title="Rewards" mode="none">
+      <SectionedList<RewardCoupon | RewardsHistoryEntry, RewardsSection>
+        sections={sections}
+        keyboard
+        keyExtractor={item => ('code' in item ? `c-${item.code}` : `h-${item.id}`)}
+        onEndReached={history.loadMore}
+        onEndReachedThreshold={0.5}
+        ListHeaderComponent={
+          <View className="mb-4 gap-4">
+            <TierCard data={data} />
+            <RedeemCard data={data} onRedeemed={reload} />
+          </View>
+        }
+        renderSectionHeader={({ section }) => <SectionTop section={section} history={history} />}
+        renderSectionFooter={({ section }) => <SectionBottom section={section} coupons={coupons} history={history} />}
+        renderItem={({ item, index, section }) =>
+          section.key === 'coupons' ? (
+            <CardSegment className={cn('px-4', index > 0 && 'pt-3')}>
+              <CouponRow c={item as RewardCoupon} />
+            </CardSegment>
+          ) : (
+            <CardSegment className="px-4">
+              {index > 0 ? <Divider /> : null}
+              <HistoryRow e={item as RewardsHistoryEntry} />
+            </CardSegment>
+          )
+        }
+        ListFooterComponent={
+          <View className="mt-4">
+            <HowItWorks program={data.program} />
+          </View>
+        }
+      />
     </Screen>
   )
 }

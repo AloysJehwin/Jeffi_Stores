@@ -109,7 +109,7 @@ function Card({ spot, copy }: { spot: SpotlightData; copy: SectionCopy }) {
             </Text>
           ) : null}
           {title !== product.name ? (
-            <Text className="mt-1 text-sm text-foreground-secondary" numberOfLines={2} onPress={open}>
+            <Text accessibilityRole="link" className="mt-1 text-sm text-foreground-secondary" numberOfLines={2} onPress={open}>
               {product.name}
             </Text>
           ) : null}

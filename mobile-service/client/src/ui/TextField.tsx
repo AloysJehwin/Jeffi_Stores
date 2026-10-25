@@ -116,7 +116,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           {...props}
         />
         {clearable && props.value ? (
-          <Pressable accessibilityLabel="Clear" hitSlop={10} onPress={() => props.onChangeText?.('')} className="ml-2 h-6 w-6 items-center justify-center rounded-full bg-border-default">
+          <Pressable accessibilityRole="button" accessibilityLabel="Clear" hitSlop={10} onPress={() => props.onChangeText?.('')} className="ml-2 h-6 w-6 items-center justify-center rounded-full bg-border-default">
             <X size={14} color={t.foregroundSecondary} strokeWidth={2.5} />
           </Pressable>
         ) : null}

@@ -45,8 +45,8 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
             onPress={open}
             className="overflow-hidden rounded-xl bg-surface-elevated"
             style={{ width: '100%', maxWidth: 384, aspectRatio: 1 }}
-            accessibilityRole="button"
-            accessibilityLabel={product.name}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
           >
             {image ? (
               <Image
@@ -76,7 +76,7 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
                 {product.brandName}
               </Text>
             ) : null}
-            <Text onPress={open} className="text-center text-lg font-semibold text-foreground">
+            <Text accessibilityRole="link" onPress={open} className="text-center text-lg font-semibold text-foreground">
               {product.name}
             </Text>
             <View className="flex-row items-baseline gap-3">

@@ -8,7 +8,7 @@ export function Overlay({ open, onClose, closeLabel = 'Close', children }: { ope
   return (
     <Modal visible={open} transparent animationType={animate ? 'fade' : 'none'} statusBarTranslucent onRequestClose={onClose}>
       <View className="flex-1">
-        <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} accessibilityLabel={closeLabel} />
+        <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} accessibilityRole="button" accessibilityLabel={closeLabel} />
         {children}
       </View>
     </Modal>

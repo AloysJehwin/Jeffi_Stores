@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics'
 import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react-native'
 import { BottomSheet } from './BottomSheet'
+import { useMotion } from './motion'
 import { useTokens } from '../theme'
 
 // The app's date picker: a sheet with a day calendar plus month and year grids (the web DatePicker's
@@ -96,6 +97,7 @@ export function DatePickerSheet({ open, onClose, ...props }: PickerProps & { ope
 
 function Picker({ value, onChange, title, min, max, defaultView, startWith = 'day', onClose }: PickerProps & { onClose: () => void }) {
   const t = useTokens()
+  const { animate } = useMotion()
   const insets = useSafeAreaInsets()
   const now = new Date()
   const todayIso = toIso(now.getFullYear(), now.getMonth(), now.getDate())
@@ -166,7 +168,7 @@ function Picker({ value, onChange, title, min, max, defaultView, startWith = 'da
             {sel ? formatDate(sel, 'medium') : hint}
           </Text>
         </View>
-        <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary">
+        <Pressable onPress={onClose} hitSlop={6} accessibilityRole="button" accessibilityLabel="Close" className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary">
           <X size={18} color={t.foregroundSecondary} strokeWidth={2} />
         </Pressable>
       </View>
@@ -185,11 +187,11 @@ function Picker({ value, onChange, title, min, max, defaultView, startWith = 'da
 
       <View style={{ height: BODY }} className="mt-3 overflow-hidden">
         {mode === 'day' ? (
-          <Animated.View key={`${view.y}-${view.m}`} entering={(dir === 1 ? FadeInRight : dir === -1 ? FadeInLeft : FadeIn).duration(200)}>
+          <Animated.View key={`${view.y}-${view.m}`} entering={animate ? (dir === 1 ? FadeInRight : dir === -1 ? FadeInLeft : FadeIn).duration(200) : undefined}>
             <DayGrid y={view.y} m={view.m} sel={sel} today={todayIso} minIso={minIso} maxIso={maxIso} onPick={pickDay} />
           </Animated.View>
         ) : mode === 'month' ? (
-          <Animated.View key="month" entering={FadeIn.duration(180)} className="flex-1 gap-2.5 pt-1">
+          <Animated.View key="month" entering={animate ? FadeIn.duration(180) : undefined} className="flex-1 gap-2.5 pt-1">
             {[0, 1, 2, 3].map(r => (
               <View key={r} className="flex-1 flex-row gap-2.5">
                 {[0, 1, 2].map(c => {
@@ -211,7 +213,7 @@ function Picker({ value, onChange, title, min, max, defaultView, startWith = 'da
             ))}
           </Animated.View>
         ) : (
-          <Animated.View key="year" entering={FadeIn.duration(180)} className="flex-1">
+          <Animated.View key="year" entering={animate ? FadeIn.duration(180) : undefined} className="flex-1">
             <YearGrid from={lo.y} to={hi.y} view={view.y} sel={parseIso(sel)?.y ?? null} onPick={pickYear} />
           </Animated.View>
         )}
@@ -237,6 +239,7 @@ function DayGrid({
   maxIso: string
   onPick: (d: number) => void
 }) {
+  const { animate } = useMotion()
   const lead = new Date(Date.UTC(y, m, 1)).getUTCDay()
   const cells: (number | null)[] = Array.from({ length: 42 }, (_, i) => {
     const d = i - lead + 1
@@ -276,7 +279,7 @@ function DayGrid({
                       isToday && !on ? 'border-2 border-accent-500' : ''
                     } ${pressed && !on ? 'bg-accent-50 dark:bg-accent-900/30' : ''}`}
                   >
-                    {on ? <Animated.View entering={ZoomIn.duration(180)} className="absolute h-10 w-10 rounded-full bg-accent-500" /> : null}
+                    {on ? <Animated.View entering={animate ? ZoomIn.duration(180) : undefined} className="absolute h-10 w-10 rounded-full bg-accent-500" /> : null}
                     <Text
                       className={`text-[15px] ${
                         on

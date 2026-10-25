@@ -41,7 +41,7 @@ export function StatusNotices({ order, returnRequest, refundBreakdown }: { order
           {returnRequest?.type === 'replacement' && returnRequest.replacement_order_id ? (
             <Text className="mt-0.5 text-sm leading-5 text-green-800 dark:text-green-300">
               Your replacement order{' '}
-              <Text className="font-semibold underline" onPress={() => router.push(`/orders/${returnRequest.replacement_order_id}`)}>
+              <Text accessibilityRole="link" className="font-semibold underline" onPress={() => router.push(`/orders/${returnRequest.replacement_order_id}`)}>
                 #{returnRequest.replacement_order_number || returnRequest.replacement_order_id.slice(0, 8)}
               </Text>{' '}
               has been created and confirmed.

@@ -60,7 +60,7 @@ function Thumb({ p, size, current = false }: { p: CompareItem; size: number; cur
       style={{ width: size, height: size }}
     >
       {p.image ? (
-        <Image source={{ uri: p.image }} style={{ flex: 1, margin: 4 }} contentFit="contain" accessibilityLabel={p.name} />
+        <Image recyclingKey={p.image} source={{ uri: p.image }} style={{ flex: 1, margin: 4 }} contentFit="contain" accessibilityLabel={p.name} />
       ) : (
         <View className="h-full w-full items-center justify-center">
           <ImageIcon size={size / 2.7} strokeWidth={1} color={t.foregroundMuted} />
@@ -137,7 +137,7 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: {
                         {p.name}
                       </Text>
                     ) : (
-                      <Pressable accessibilityRole="link" onPress={() => router.push(`/product/${p.slug}`)}>
+                      <Pressable accessibilityRole="link" hitSlop={4} onPress={() => router.push(`/product/${p.slug}`)}>
                         <Text numberOfLines={2} className="mb-1 text-center text-xs font-semibold leading-snug text-foreground">
                           {p.name}
                         </Text>

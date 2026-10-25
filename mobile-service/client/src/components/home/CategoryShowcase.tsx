@@ -24,7 +24,7 @@ export default function CategoryShowcase({ section, data }: SectionProps) {
         {items.map(cat => (
           <Card key={cat.id} padded={false} className="grow overflow-hidden">
             <View className="flex-row items-center justify-between px-4 pb-2 pt-4">
-              <Pressable className="shrink" accessibilityRole="button" onPress={() => openCategory(cat.slug)}>
+              <Pressable className="shrink" hitSlop={8} accessibilityRole="button" onPress={() => openCategory(cat.slug)}>
                 <Text className="text-sm font-bold text-foreground" style={{ lineHeight: 17.5 }}>
                   {cat.name}
                 </Text>
@@ -50,7 +50,7 @@ export default function CategoryShowcase({ section, data }: SectionProps) {
                   >
                     <View className="aspect-square items-center justify-center overflow-hidden rounded-lg bg-surface-secondary">
                       {src ? (
-                        <Image source={{ uri: src }} contentFit="contain" style={{ width: '100%', height: '100%' }} accessibilityLabel={p.name} />
+                        <Image recyclingKey={src} source={{ uri: src }} contentFit="contain" style={{ width: '100%', height: '100%' }} accessibilityLabel={p.name} />
                       ) : (
                         <View className="h-full w-full rounded-lg bg-surface-secondary" />
                       )}

@@ -29,11 +29,11 @@ export default function SavedItemRow({
 
   return (
     <View className={`flex-row gap-4 p-4 ${last ? '' : 'border-b border-border-default'}`}>
-      <Pressable onPress={openProduct} accessibilityRole="imagebutton" accessibilityLabel={item.products.name}>
+      <Pressable onPress={openProduct} accessible={false} importantForAccessibility="no-hide-descendants">
         <LineThumb uri={img?.thumbnail_url || img?.image_url} blurhash={img?.blurhash} size={80} iconSize={32} />
       </Pressable>
       <View className="min-w-0 flex-1">
-        <Pressable onPress={openProduct}>
+        <Pressable onPress={openProduct} accessibilityRole="link">
           <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
             {item.products.name}
           </Text>

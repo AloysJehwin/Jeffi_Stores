@@ -86,7 +86,7 @@ function OrderCard({ order, cancelling, onCancel }: { order: ListOrder; cancelli
   return (
     <Card className="mx-4">
       <View className="flex-row items-center justify-between gap-2">
-        <Text onPress={open} className="flex-1 font-mono text-sm font-semibold text-foreground" numberOfLines={1}>
+        <Text accessibilityRole="link" onPress={open} className="flex-1 font-mono text-sm font-semibold text-foreground" numberOfLines={1}>
           {order.order_number}
         </Text>
         <Badge label={orderStatusLabel(order.status)} tone={statusTone(order.status)} />
@@ -105,7 +105,7 @@ function OrderCard({ order, cancelling, onCancel }: { order: ListOrder; cancelli
       {first && (
         <View className="mt-4 flex-row items-center gap-3">
           <View className="h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-surface">
-            {img ? <Image source={{ uri: img.thumbnail_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <ImageOff size={20} color={t.foregroundMuted} />}
+            {img ? <Image recyclingKey={img.thumbnail_url} source={{ uri: img.thumbnail_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <ImageOff size={20} color={t.foregroundMuted} />}
           </View>
           <View className="flex-1">
             <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>

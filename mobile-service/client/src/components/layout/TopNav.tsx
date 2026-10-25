@@ -171,7 +171,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
         className="bg-surface-elevated dark:border-b dark:border-border-default"
       >
         <View className="px-3 h-16 flex-row items-center justify-between gap-3">
-          <Pressable onPress={() => router.navigate('/(tabs)')} className="flex-row items-center gap-2 shrink" accessibilityRole="link">
+          <Pressable onPress={() => router.navigate('/(tabs)')} className="flex-row items-center gap-2 shrink" accessibilityRole="link" accessibilityLabel={`${identity.name}, home`}>
             <StoreLogo uri={identity.logoUrl} name={identity.name} size={32} />
             <Text className="text-base font-bold text-secondary-500 dark:text-primary-400 shrink" numberOfLines={1}>
               {identity.name}
@@ -253,7 +253,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
               </View>
               <View className="py-1">
                 {history.map(q => (
-                  <Pressable key={q} accessibilityRole="button" onPress={() => searchFor(q)} className="min-h-[44px] flex-row items-center gap-3 px-4 py-2.5 active:bg-surface-secondary">
+                  <Pressable key={q} accessibilityRole="button" accessibilityLabel={`Search for ${q}`} onPress={() => searchFor(q)} className="min-h-[44px] flex-row items-center gap-3 px-4 py-2.5 active:bg-surface-secondary">
                     <View className="h-7 w-7 items-center justify-center rounded-md bg-surface-secondary">
                       <Clock size={14} color={t.foregroundMuted} />
                     </View>
@@ -278,6 +278,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
                           <Pressable
                             key={cat.id}
                             accessibilityRole="button"
+                            accessibilityLabel={`Category, ${cat.name}`}
                             onPress={() => {
                               saveHistory(query)
                               closeSearch()
@@ -306,6 +307,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
                             <Pressable
                               key={product.id}
                               accessibilityRole="button"
+                              accessibilityLabel={`${product.name}, ${product.has_variants ? 'from ' : ''}₹${inr(price)}`}
                               onPress={() => {
                                 saveHistory(query)
                                 closeSearch()
@@ -315,7 +317,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
                             >
                               <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-border-default bg-surface-secondary">
                                 {img ? (
-                                  <Image source={{ uri: img.thumbnail_url }} contentFit="contain" style={{ width: 36, height: 36 }} />
+                                  <Image source={{ uri: img.thumbnail_url }} recyclingKey={img.thumbnail_url} accessible={false} contentFit="contain" style={{ width: 36, height: 36 }} />
                                 ) : (
                                   <ImageIcon size={20} strokeWidth={1} color={t.foregroundMuted} />
                                 )}

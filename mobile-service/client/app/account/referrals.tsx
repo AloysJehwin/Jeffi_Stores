@@ -13,7 +13,8 @@ import { SITE_URL } from '../../src/lib/links'
 import { showToast } from '../../src/stores/toastStore'
 import { accent, useTokens } from '../../src/theme'
 import {
-  Badge, BodySmall, Button, Caption, Card, cn, Divider, elevationClass, EmptyState, Heading, Overline, Screen, Skeleton, Text, TextButton, useElevation,
+  Badge, BodySmall, Button, Caption, Card, CardSegment, cn, Divider, elevationClass, EmptyState, Heading, List, Overline, Screen, Skeleton, Text, TextButton,
+  useElevation,
   type Tone,
 } from '../../src/ui'
 
@@ -53,7 +54,7 @@ function ShareCard({ data, storeName }: { data: ReferralsData; storeName: string
     <View className={cn('overflow-hidden rounded-panel p-4', elevationClass('raised'))} style={shadow}>
       {dark ? <Gradient from={accent[900]} to={accent[800]} fromOpacity={0.4} toOpacity={0.2} radius={20} /> : <Gradient from={accent[100]} to={accent[50]} radius={20} />}
       <Overline className="text-accent-700 dark:text-accent-300">Refer &amp; Earn</Overline>
-      <Text className="mt-1 font-display text-xl font-extrabold leading-7 text-foreground">Invite friends, earn {points} points each</Text>
+      <Text accessibilityRole="header" className="mt-1 font-display text-xl font-extrabold leading-7 text-foreground">Invite friends, earn {points} points each</Text>
       <BodySmall className="mt-1">When a friend signs up with your link and their first order is delivered, the points are yours.</BodySmall>
 
       <View className="mt-4 flex-row items-center gap-2 rounded-field bg-surface-elevated py-1.5 pl-4 pr-1.5">
@@ -212,68 +213,80 @@ export default function ReferralsScreen() {
   const failed = summary.isError
   const unavailable = !loading && (failed || !data || !data.enabled || data.eligible === false)
 
+  if (loading || unavailable || !data) {
+    return (
+      <Screen title="Refer & Earn">
+        {loading ? (
+          <ReferralsLoading />
+        ) : (
+          <EmptyState
+            fill
+            icon={UserPlus}
+            title={failed ? 'Could not load your referrals' : 'Referrals are not available for this account'}
+            actionLabel="Back to my account"
+            onAction={() => router.navigate('/(tabs)/account')}
+          />
+        )}
+      </Screen>
+    )
+  }
+
+  const none = friends.total === 0 && !friends.loading
+  // The friends card is sliced per row so a long list renders lazily.
   return (
-    <Screen
-      title="Refer & Earn"
-      scrollProps={{
-        scrollEventThrottle: 200,
-        onScroll: e => {
-          const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
-          if (contentOffset.y + layoutMeasurement.height > contentSize.height - 400) friends.loadMore()
-        },
-      }}
-    >
-      {loading ? (
-        <ReferralsLoading />
-      ) : unavailable || !data ? (
-        <EmptyState
-          fill
-          icon={UserPlus}
-          title={failed ? 'Could not load your referrals' : 'Referrals are not available for this account'}
-          actionLabel="Back to my account"
-          onAction={() => router.navigate('/(tabs)/account')}
-        />
-      ) : (
-        <View className="gap-4">
-          <ShareCard data={data} storeName={config.identity.name} />
-          <Stats data={data} />
-          <Card>
-            <Heading>Your friends</Heading>
-            {friends.total === 0 && !friends.loading ? (
-              <View className="mt-4 flex-row items-center gap-3 rounded-field bg-surface-secondary p-3">
-                <View className="h-10 w-10 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/40">
-                  <Share2 size={18} color={t.accent600} />
+    <Screen title="Refer & Earn" mode="none">
+      <List
+        data={none ? [] : friends.rows}
+        keyExtractor={f => f.id}
+        onEndReached={friends.loadMore}
+        onEndReachedThreshold={0.5}
+        ListHeaderComponent={
+          <View>
+            <View className="mb-4 gap-4">
+              <ShareCard data={data} storeName={config.identity.name} />
+              <Stats data={data} />
+            </View>
+            <CardSegment position="top" className={cn('px-4 pt-4', !none && 'pb-2')}>
+              <Heading>Your friends</Heading>
+              {none ? (
+                <View className="mt-4 flex-row items-center gap-3 rounded-field bg-surface-secondary p-3">
+                  <View className="h-10 w-10 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/40">
+                    <Share2 size={18} color={t.accent600} />
+                  </View>
+                  <BodySmall className="flex-1">No one has joined with your link yet. Share it above to get started.</BodySmall>
                 </View>
-                <BodySmall className="flex-1">No one has joined with your link yet. Share it above to get started.</BodySmall>
+              ) : null}
+            </CardSegment>
+          </View>
+        }
+        renderItem={({ item: f, index }) => {
+          const chip = statusChip(f)
+          return (
+            <CardSegment className="px-4">
+              {index > 0 ? <Divider /> : null}
+              <View className="flex-row items-center justify-between gap-3 py-3">
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+                    {f.name}
+                  </Text>
+                  <Caption>Joined {formatDate(f.signedUpAt)}</Caption>
+                </View>
+                <Badge label={chip.label} tone={chip.tone} />
               </View>
-            ) : (
-              <>
-                <View className="mt-2">
-                  {friends.rows.map((f, i) => {
-                    const chip = statusChip(f)
-                    return (
-                      <View key={f.id}>
-                        {i > 0 ? <Divider /> : null}
-                        <View className="flex-row items-center justify-between gap-3 py-3">
-                          <View className="flex-1">
-                            <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
-                              {f.name}
-                            </Text>
-                            <Caption>Joined {formatDate(f.signedUpAt)}</Caption>
-                          </View>
-                          <Badge label={chip.label} tone={chip.tone} />
-                        </View>
-                      </View>
-                    )
-                  })}
-                </View>
-                <InfiniteFooter shown={friends.rows.length} list={friends} noun="friends" />
-              </>
-            )}
-          </Card>
-          <HowItWorks program={data.program} />
-        </View>
-      )}
+            </CardSegment>
+          )
+        }}
+        ListFooterComponent={
+          <>
+            <CardSegment position="bottom" className="px-4 pb-4">
+              {none ? null : <InfiniteFooter shown={friends.rows.length} list={friends} noun="friends" />}
+            </CardSegment>
+            <View className="mt-4">
+              <HowItWorks program={data.program} />
+            </View>
+          </>
+        }
+      />
     </Screen>
   )
 }

@@ -24,7 +24,7 @@ function Thumb({ p, size, onRemove, bordered }: { p: CompareProduct; size: numbe
     <Pressable onPress={onRemove} accessibilityRole="button" accessibilityLabel={`Remove ${p.name} from compare`} className="relative shrink-0 active:opacity-70">
       <View className={`overflow-hidden rounded-xl border ${bordered}`} style={{ width: size, height: size }}>
         {src ? (
-          <Image source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: size > 40 ? 4 : 2 }} />
+          <Image recyclingKey={src} source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: size > 40 ? 4 : 2 }} />
         ) : (
           <View className="flex-1 items-center justify-center">
             <ImageIcon size={size > 40 ? 20 : 16} strokeWidth={1.5} color={t.foregroundMuted} />

@@ -23,7 +23,7 @@ function BrandCard({ brand }: { brand: BrandWithCount }) {
       <View className="mb-4 flex-row items-start gap-4">
         <View className="h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
           {logo ? (
-            <Image source={{ uri: logo }} contentFit="contain" style={{ width: '100%', height: '100%', margin: 4 }} />
+            <Image recyclingKey={logo} source={{ uri: logo }} contentFit="contain" style={{ width: '100%', height: '100%', margin: 4 }} />
           ) : (
             <Tag size={32} strokeWidth={1.5} color={t.foregroundMuted} />
           )}

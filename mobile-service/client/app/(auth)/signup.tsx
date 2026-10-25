@@ -379,7 +379,7 @@ export default function SignupScreen() {
 
       <Text className="mt-6 text-center text-sm text-foreground-secondary">
         Already have an account?{' '}
-        <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/login')}>
+        <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/login')}>
           Log in
         </Text>
       </Text>

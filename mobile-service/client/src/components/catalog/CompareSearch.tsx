@@ -90,7 +90,7 @@ function SearchPanel({
               >
                 <View className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
                   {img ? (
-                    <Image source={{ uri: img }} contentFit="contain" style={{ flex: 1, margin: 2 }} />
+                    <Image recyclingKey={img} source={{ uri: img }} contentFit="contain" style={{ flex: 1, margin: 2 }} />
                   ) : (
                     <View className="flex-1 items-center justify-center">
                       <ImageIcon size={16} strokeWidth={1.5} color={t.foregroundMuted} />

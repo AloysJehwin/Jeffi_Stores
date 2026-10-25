@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { ImageOff } from 'lucide-react-native'
 import WarningBadges from '../cart/WarningBadges'
 import { useTokens } from '../../theme'
-import { Badge, Card, Caption, cn, Divider, Heading, Text } from '../../ui'
+import { Badge, Caption, CardSegment, cn, Divider, Heading, Text } from '../../ui'
 import { inrCur, thumbOf, unitText, type Order, type OrderItem } from './shared'
 
 function Item({ item }: { item: OrderItem }) {
@@ -17,11 +17,11 @@ function Item({ item }: { item: OrderItem }) {
   const u = unitText(unitLabel)
   return (
     <View className="flex-row gap-4">
-      <View className="h-20 w-20 items-center justify-center overflow-hidden rounded-xl bg-surface">
-        {thumb ? <Image source={{ uri: thumb }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <ImageOff size={28} color={t.foregroundMuted} />}
+      <View className="h-20 w-20 items-center justify-center overflow-hidden rounded-xl bg-surface" importantForAccessibility="no-hide-descendants">
+        {thumb ? <Image source={{ uri: thumb }} recyclingKey={thumb} accessible={false} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <ImageOff size={28} color={t.foregroundMuted} />}
       </View>
       <View className="flex-1">
-        <Text className="text-[15px] font-semibold text-foreground" onPress={item.products?.slug ? () => router.push(`/product/${item.products!.slug}`) : undefined}>
+        <Text accessibilityRole={item.products?.slug ? 'link' : undefined} className="text-[15px] font-semibold text-foreground" onPress={item.products?.slug ? () => router.push(`/product/${item.products!.slug}`) : undefined}>
           {item.productName}
         </Text>
         {(!!item.variantName || !!item.subVariantName) && (
@@ -39,7 +39,7 @@ function Item({ item }: { item: OrderItem }) {
                 {!!item.vaultUrl && (
                   <>
                     {' · '}
-                    <Text className="underline" onPress={() => Linking.openURL(item.vaultUrl!)}>
+                    <Text accessibilityRole="link" className="underline" onPress={() => Linking.openURL(item.vaultUrl!)}>
                       Open in vault
                     </Text>
                   </>
@@ -76,21 +76,31 @@ function Line({ label, value, tone = 'secondary' }: { label: string; value: stri
   )
 }
 
-/** The order's line items and its totals. */
-export default function OrderItems({ order }: { order: Order }) {
+// The items card is sliced into list rows (OrderItemsTop, OrderItemRow per item, OrderTotals) so the
+// order page can render its items through a FlatList.
+
+export function OrderItemsTop({ order }: { order: Order }) {
   return (
-    <Card>
-      <Heading className="mb-4">
+    <CardSegment position="top" className="px-4 pb-4 pt-4">
+      <Heading>
         Order Items ({order.items.length} {order.items.length === 1 ? 'item' : 'items'})
       </Heading>
-      <View className="gap-4">
-        {order.items.map((item, idx) => (
-          <View key={item.id} className="gap-4">
-            {idx > 0 ? <Divider /> : null}
-            <Item item={item} />
-          </View>
-        ))}
-      </View>
+    </CardSegment>
+  )
+}
+
+export function OrderItemRow({ item, index }: { item: OrderItem; index: number }) {
+  return (
+    <CardSegment className="gap-4 px-4">
+      {index > 0 ? <Divider className="mt-4" /> : null}
+      <Item item={item} />
+    </CardSegment>
+  )
+}
+
+export function OrderTotals({ order }: { order: Order }) {
+  return (
+    <CardSegment position="bottom" className="px-4 pb-4">
       <Divider className="mb-4 mt-5" />
       <View className="gap-2">
         <Line label="Subtotal" value={inrCur(order.subtotal)} />
@@ -104,6 +114,6 @@ export default function OrderItems({ order }: { order: Order }) {
         </View>
         {order.taxAmount > 0 && <Caption>Price inclusive of all taxes</Caption>}
       </View>
-    </Card>
+    </CardSegment>
   )
 }

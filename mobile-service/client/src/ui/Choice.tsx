@@ -35,7 +35,7 @@ export function Chip({ label, selected, onPress, icon: Icon, meta, disabled, una
         haptic.select()
         onPress?.()
       }}
-      hitSlop={size === 'sm' ? 4 : 0}
+      hitSlop={size === 'sm' ? 6 : 3}
       className={cn(
         'flex-row items-center gap-1.5 rounded-full border-2',
         size === 'sm' ? 'min-h-[32px] px-3' : 'min-h-[38px] px-4',

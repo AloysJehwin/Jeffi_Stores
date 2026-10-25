@@ -1,13 +1,13 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
 import { View, useWindowDimensions } from 'react-native'
-import Animated, { Easing, SlideInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
+import Animated, { Easing, SlideInDown, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { Image } from 'expo-image'
 import { X } from 'lucide-react-native'
-import { Button, Caption, Divider, IconButton, KeyboardScroll, Text, Title } from '../../ui'
+import { Button, Caption, Divider, IconButton, KeyboardScroll, Text, Title, useEntering, useMotion } from '../../ui'
 import Gradient from './Gradient'
 import { GoogleMark } from '../brand/Marks'
 import { listCategories } from '../../api/categories'
@@ -37,12 +37,13 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
 
   const panelStyle = useAnimatedStyle(() => ({ height: openHeight + (compactHeight - openHeight) * folded.value }))
   const fadeStyle = useAnimatedStyle(() => ({ opacity: 1 - folded.value }))
+  const rise = useEntering(SlideInDown.springify().damping(20).stiffness(160))
 
   return (
     <View className="flex-1 bg-accent-600">
       <Animated.View style={panelStyle} className="overflow-hidden">
         <Gradient from={accent[600]} to={accent[400]} />
-        <Animated.View style={fadeStyle} pointerEvents="none" className="absolute inset-0">
+        <Animated.View style={fadeStyle} pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden className="absolute inset-0">
           <Mosaic top={compactHeight + 8} />
         </Animated.View>
         <View style={{ paddingTop: insets.top + 8 }} className="flex-row items-center gap-3 px-4">
@@ -54,7 +55,7 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
         </View>
       </Animated.View>
 
-      <Animated.View entering={SlideInDown.springify().damping(20).stiffness(160)} className="-mt-6 flex-1 overflow-hidden rounded-t-[28px] bg-surface-elevated">
+      <Animated.View entering={rise} className="-mt-6 flex-1 overflow-hidden rounded-t-[28px] bg-surface-elevated">
         <KeyboardScroll
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: insets.bottom + 24 }}
           showsVerticalScrollIndicator={false}
@@ -74,12 +75,12 @@ function BrandMark({ logoUrl, name }: { logoUrl: string | null; name: string }) 
   if (logoUrl) {
     return (
       <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white">
-        <Image source={{ uri: logoUrl }} style={{ width: 32, height: 32 }} contentFit="contain" />
+        <Image source={{ uri: logoUrl }} style={{ width: 32, height: 32 }} contentFit="contain" accessible={false} />
       </View>
     )
   }
   return (
-    <View className="h-10 w-10 items-center justify-center rounded-xl bg-white/25">
+    <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden className="h-10 w-10 items-center justify-center rounded-xl bg-white/25">
       <Text className="text-lg font-black text-white">{name.trim().charAt(0).toUpperCase() || 'S'}</Text>
     </View>
   )
@@ -100,7 +101,7 @@ function Mosaic({ top }: { top: number }) {
 }
 
 function MosaicRow({ images, direction, offset }: { images: string[]; direction: 1 | -1; offset: number }) {
-  const reduceMotion = useReducedMotion()
+  const { reduced: reduceMotion } = useMotion()
   const span = images.length * (TILE + GAP)
   const x = useSharedValue(0)
   useEffect(() => {
@@ -144,11 +145,11 @@ export function TermsNote() {
   return (
     <Text className="mt-6 text-center text-xs leading-5 text-foreground-muted">
       By continuing, you agree to our{' '}
-      <Text className="font-semibold text-foreground-secondary" onPress={() => router.push('/legal/terms-and-conditions')}>
+      <Text accessibilityRole="link" className="font-semibold text-foreground-secondary" onPress={() => router.push('/legal/terms-and-conditions')}>
         Terms &amp; Conditions
       </Text>{' '}
       and{' '}
-      <Text className="font-semibold text-foreground-secondary" onPress={() => router.push('/legal/privacy-policy')}>
+      <Text accessibilityRole="link" className="font-semibold text-foreground-secondary" onPress={() => router.push('/legal/privacy-policy')}>
         Privacy Policy
       </Text>
       .
