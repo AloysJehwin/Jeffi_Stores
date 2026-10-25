@@ -115,7 +115,7 @@ export default function Header() {
               <Link
                 href="/wishlist"
                 aria-label={wishlistCount > 0 ? `Wishlist, ${wishlistCount} items` : 'Wishlist'}
-                className="flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all hover:scale-110 active:scale-95 relative"
+                className="hidden sm:flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all hover:scale-110 active:scale-95 relative"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -136,7 +136,7 @@ export default function Header() {
               <Link
                 href="/cart"
                 aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : 'Cart'}
-                className="flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group"
+                className="hidden sm:flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group"
               >
                 <svg
                   className="w-6 h-6 transition-transform group-hover:scale-110"
@@ -160,7 +160,9 @@ export default function Header() {
                 )}
               </Link>
 
-              <UserMenu />
+              <div className="hidden sm:block">
+                <UserMenu />
+              </div>
 
               {/* Theme Toggle (desktop only) */}
               <div className="hidden lg:block">
@@ -170,13 +172,19 @@ export default function Header() {
               {/* Mobile Menu Button */}
               <button
                 type="button"
-                className="lg:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-90"
+                className="lg:hidden relative p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-90"
                 onClick={() => setMobileMenuOpen(true)}
-                aria-label="Open menu"
+                aria-label={cartCount > 0 ? `Open menu, ${cartCount} in cart` : 'Open menu'}
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
+                {/* Phones keep the cart in the drawer, so its count rides on the menu button. */}
+                {cartCount > 0 && (
+                  <span className="sm:hidden absolute top-0.5 right-0.5 bg-accent-500 text-white text-xs font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
