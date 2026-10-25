@@ -1,6 +1,6 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native'
-import { KeyboardScroll } from '../ui/KeyboardScroll'
+import { KeyboardScroll } from '../../ui/KeyboardScroll'
 import { createAddress, lookupPincode } from '../../api/addresses'
 import type { Address } from '../../types'
 import { showToast } from '../../stores/toastStore'

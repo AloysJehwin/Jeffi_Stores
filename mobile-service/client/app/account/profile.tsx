@@ -1,6 +1,6 @@
 import { View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
+import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import TopNav from '../../src/components/layout/TopNav'
 import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import ProfileCard from '../../src/components/account/ProfileCard'

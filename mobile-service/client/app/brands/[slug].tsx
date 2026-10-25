@@ -8,7 +8,7 @@ import TopNav from '../../src/components/layout/TopNav'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import PagedProductGrid from '../../src/components/catalog/PagedProductGrid'
 import { Breadcrumb, EmptyCard } from '../../src/components/catalog/Paged'
-import Spinner from '../../src/components/ui/Spinner'
+import Spinner from '../../src/ui/Spinner'
 import { absUrl } from '../../src/lib/links'
 
 // Mirror of controller-service app/(storefront)/brands/[slug]/page.tsx at the mobile breakpoint.

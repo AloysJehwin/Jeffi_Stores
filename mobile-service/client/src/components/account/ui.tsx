@@ -3,7 +3,7 @@ import { ActivityIndicator, Animated, Pressable, Text, TextInput, View, type Tex
 import { useRouter } from 'expo-router'
 import HeroIcon from './HeroIcon'
 import { accent, useTokens } from '../../theme'
-import { DateField, formatDate } from '../ui/DatePickerSheet'
+import { DateField, formatDate } from '../../ui/DatePickerSheet'
 import type { InfiniteList } from './hooks'
 
 // Shared bits of the storefront's account/auth markup at the mobile breakpoint.

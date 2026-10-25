@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ActivityIndicator, Alert, Linking, Pressable, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
+import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import TopNav from '../../src/components/layout/TopNav'

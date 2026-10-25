@@ -17,10 +17,10 @@ import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { showToast } from '../../src/stores/toastStore'
 import { AuthScreen, BigButton, FieldError, Frame, GoogleRow, Note, TermsNote, TextAction } from '../../src/components/account/AuthScreen'
 import { ChannelChips } from '../../src/components/account/ChannelChips'
-import { OtpBoxes } from '../../src/components/account/OtpBoxes'
+import { OtpField } from '../../src/ui/OtpField'
 import { dobRange, isValidDob, PolicyConsent } from '../../src/components/account/ui'
 import HeroIcon from '../../src/components/account/HeroIcon'
-import { DateField, formatDate } from '../../src/components/ui/DatePickerSheet'
+import { DateField, formatDate } from '../../src/ui/DatePickerSheet'
 import { useFeatureFlags, useLeaveAuth, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
 import { finishSignIn, getPendingGoogle, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
@@ -381,7 +381,7 @@ export default function SignupScreen() {
       {step === 'otp' && (
         <View className="gap-5">
           <View>
-            <OtpBoxes value={otp} onChange={setOtp} inputRef={otpInputRef} shake={shake} />
+            <OtpField value={otp} onChange={setOtp} inputRef={otpInputRef} shake={shake} />
             <FieldError message={error} />
           </View>
           <View className="flex-row items-center justify-between">

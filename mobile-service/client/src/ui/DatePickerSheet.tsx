@@ -4,9 +4,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, { FadeIn, FadeInLeft, FadeInRight, ZoomIn } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics'
-import HeroIcon from '../account/HeroIcon'
+import HeroIcon from '../components/account/HeroIcon'
 import { BottomSheet } from './BottomSheet'
-import { useTokens } from '../../theme'
+import { useTokens } from '../theme'
 
 // The app's date picker: a sheet with a day calendar plus month and year grids (the web DatePicker's
 // three views), in its own Modal so it also opens over other modals. Dates are YYYY-MM-DD strings.

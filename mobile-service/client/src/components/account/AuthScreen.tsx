@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
-import { KeyboardScroll } from '../ui/KeyboardScroll'
+import { KeyboardScroll } from '../../ui/KeyboardScroll'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
