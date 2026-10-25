@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View } from 'react-native'
-import { Text } from '../../ui'
+import { Text, useMotion } from '../../ui'
 import ProductCard from '../product/ProductCard'
 import { Grid, SectionHeading } from './layout'
 import type { SectionProps } from '../../types/home'
@@ -14,14 +14,16 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export function DealCountdown({ endsAt }: { endsAt: string }) {
   const target = Date.parse(endsAt)
   const [ms, setMs] = useState<number | null>(null)
+  // With reduced motion the seconds don't tick; the minutes update.
+  const { animate } = useMotion()
 
   useEffect(() => {
     if (!Number.isFinite(target)) return
     const tick = () => setMs(Math.max(0, target - Date.now()))
     tick()
-    const id = setInterval(tick, 1000)
+    const id = setInterval(tick, animate ? 1000 : 60_000)
     return () => clearInterval(id)
-  }, [target])
+  }, [target, animate])
 
   if (ms == null || ms <= 0) return null
 
@@ -31,11 +33,12 @@ export function DealCountdown({ endsAt }: { endsAt: string }) {
     ...(days > 0 ? [{ value: pad(days), label: 'Days' }] : []),
     { value: pad(Math.floor((total % 86400) / 3600)), label: 'Hrs' },
     { value: pad(Math.floor((total % 3600) / 60)), label: 'Min' },
-    { value: pad(total % 60), label: 'Sec' },
+    ...(animate ? [{ value: pad(total % 60), label: 'Sec' }] : []),
   ]
+  const spoken = [days > 0 && `${days} days`, `${Math.floor((total % 86400) / 3600)} hours`, `${Math.floor((total % 3600) / 60)} minutes`].filter(Boolean).join(' ')
 
   return (
-    <View className="flex-row items-center gap-1.5" accessibilityRole="timer" accessibilityLabel="Offer ends in">
+    <View className="flex-row items-center gap-1.5" accessible accessibilityRole="timer" accessibilityLabel={`Offer ends in ${spoken}`}>
       {parts.map(part => (
         <View key={part.label} className="min-w-[2.5rem] items-center rounded-lg bg-primary-500 px-2 py-1">
           <Text className="text-sm font-black leading-none text-white" style={{ fontVariant: ['tabular-nums'] }}>

@@ -108,7 +108,7 @@ export function ReturnForm({
               return (
                 <Checkbox key={item.id} checked={checked} onChange={on => onToggle(item.id, on)}>
                   <View className="flex-row items-center gap-3">
-                    {thumb && <Image source={{ uri: thumb }} style={{ width: 40, height: 40, borderRadius: 10 }} contentFit="cover" />}
+                    {thumb && <Image recyclingKey={thumb} source={{ uri: thumb }} style={{ width: 40, height: 40, borderRadius: 10 }} contentFit="cover" />}
                     <View className="flex-1">
                       <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
                         {item.productName}

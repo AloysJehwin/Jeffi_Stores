@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { TextInput, View, type NativeSyntheticEvent, type TextInputEndEditingEventData } from 'react-native'
+import { useRef, useState } from 'react'
+import { TextInput, View, type AccessibilityActionEvent, type NativeSyntheticEvent, type TextInputEndEditingEventData } from 'react-native'
 import { Minus, Plus } from 'lucide-react-native'
 import { useTokens } from '../theme'
 import { IconButton } from './Button'
@@ -46,10 +46,31 @@ export function Stepper({
 }) {
   const t = useTokens()
   const [focused, setFocused] = useState(false)
+  const input = useRef<TextInput>(null)
   const suffix = itemName ? ` for ${itemName}` : ''
   const steps = !!(onDecrement || onIncrement)
+  const locked = !!(disabled || busy)
+  // Screen readers get one adjustable control: swipe up/down steps it, double tap opens the field.
+  const onAction = (e: AccessibilityActionEvent) => {
+    const name = e.nativeEvent.actionName
+    if (name === 'increment' && !locked && canIncrement) onIncrement?.()
+    else if (name === 'decrement' && !locked && canDecrement) onDecrement?.()
+    else if (name === 'activate' && !locked) input.current?.focus()
+  }
+  const a11y = steps
+    ? {
+        accessible: true,
+        accessibilityRole: 'adjustable' as const,
+        accessibilityLabel: `Quantity${suffix}`,
+        accessibilityValue: { text: value ?? defaultValue ?? '' },
+        accessibilityState: { disabled: !!disabled, busy: !!busy },
+        accessibilityActions: [{ name: 'increment' }, { name: 'decrement' }, { name: 'activate', label: 'Edit quantity' }],
+        onAccessibilityAction: onAction,
+      }
+    : {}
   return (
     <View
+      {...a11y}
       className={cn(
         'h-11 flex-row items-center self-start rounded-full border-2',
         steps ? 'px-0.5' : 'px-3',
@@ -67,6 +88,7 @@ export function Stepper({
         </View>
       ) : (
         <TextInput
+          ref={input}
           key={inputKey}
           value={value}
           defaultValue={defaultValue}

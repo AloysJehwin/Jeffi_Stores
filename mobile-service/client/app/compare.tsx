@@ -140,7 +140,7 @@ function ProductHead({ p, gstEnabled, ids, onChange }: { p: ProductRow; gstEnabl
       <View className="w-full items-center">
         <View className="aspect-square w-full overflow-hidden rounded-lg border border-border-default bg-surface-secondary" style={{ maxWidth: 120 }}>
           {src ? (
-            <Image source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: 8 }} accessibilityLabel={p.name} />
+            <Image recyclingKey={src} source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: 8 }} accessibilityLabel={p.name} />
           ) : (
             <View className="flex-1 items-center justify-center">
               <ImageOff size={36} strokeWidth={1.5} color={t.foregroundMuted} />
@@ -148,7 +148,7 @@ function ProductHead({ p, gstEnabled, ids, onChange }: { p: ProductRow; gstEnabl
           )}
         </View>
       </View>
-      <Pressable accessibilityRole="link" onPress={() => router.push(`/product/${p.slug}`)}>
+      <Pressable accessibilityRole="link" hitSlop={4} onPress={() => router.push(`/product/${p.slug}`)}>
         <Text numberOfLines={2} className="text-sm font-semibold text-foreground" style={{ lineHeight: 18 }}>
           {p.name}
         </Text>

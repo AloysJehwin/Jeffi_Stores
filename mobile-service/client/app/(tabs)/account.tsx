@@ -69,7 +69,7 @@ function SignedOut() {
           </View>
           <Text className="mt-5 text-center text-sm text-foreground-secondary">
             Don&apos;t have an account?{' '}
-            <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.push('/(auth)/signup')}>
+            <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.push('/(auth)/signup')}>
               Create one
             </Text>
           </Text>

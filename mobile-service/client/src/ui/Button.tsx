@@ -70,6 +70,7 @@ export function Button({
         accessibilityRole="button"
         accessibilityState={{ disabled: off, busy: !!loading }}
         disabled={off}
+        hitSlop={size === 'sm' ? 2 : undefined}
         onPress={() => {
           if (haptics) haptic.tap()
           onPress?.()
@@ -125,6 +126,7 @@ export function IconButton({ icon: Icon, label, onPress, variant = 'plain', size
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={badge ? `${label}, ${badge}` : label}
+        accessibilityState={{ disabled: !!rest.disabled }}
         hitSlop={size === 'xs' ? 8 : size === 'sm' ? 6 : 2}
         onPress={onPress}
         {...press.handlers}

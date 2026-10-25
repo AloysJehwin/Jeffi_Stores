@@ -122,7 +122,7 @@ function Pager({ slides, intervalMs }: { slides: MotionHeroSlide[]; intervalMs: 
       {count > 1 && (
         <View className="mt-3 flex-row items-center justify-center gap-1.5">
           {slides.map((_, i) => (
-            <Pill key={i} i={i} x={x} page={page} onPress={() => ref.current?.scrollTo({ x: i * page, animated: true })} />
+            <Pill key={i} i={i} x={x} page={page} onPress={() => ref.current?.scrollTo({ x: i * page, animated: !reduceMotion })} />
           ))}
         </View>
       )}
@@ -180,7 +180,7 @@ function Card({
       style={{ width: w, height: h }}
       className="overflow-hidden rounded-sheet bg-black"
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={slide.headline}
+      accessibilityLabel={[slide.eyebrow, slide.headline, slide.sub, slide.ctaLabel].filter(Boolean).join(', ')}
     >
       <Animated.View style={[FILL, bgStyle]}>
         <Image source={bg ? { uri: bg } : undefined} style={FILL} contentFit="cover" transition={300} />

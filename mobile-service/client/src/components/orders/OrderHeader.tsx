@@ -39,7 +39,7 @@ export default function OrderHeader({
       {!!order.originalOrderId && !!order.originalOrderNumber && (
         <Text className="mt-0.5 text-sm text-foreground-secondary">
           Replacement for{' '}
-          <Text className="font-semibold text-accent-600 underline dark:text-accent-400" onPress={() => router.push(`/orders/${order.originalOrderId}`)}>
+          <Text accessibilityRole="link" className="font-semibold text-accent-600 underline dark:text-accent-400" onPress={() => router.push(`/orders/${order.originalOrderId}`)}>
             #{order.originalOrderNumber}
           </Text>
         </Text>

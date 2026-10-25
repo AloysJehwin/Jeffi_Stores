@@ -159,7 +159,7 @@ export default function ReviewModal({
           <View key={item.productId} className={i > 0 ? 'mt-6' : ''} onLayout={e => (itemY.current[i] = e.nativeEvent.layout.y)}>
             {i > 0 ? <Divider className="mb-6" /> : null}
             <View className="mb-4 flex-row items-center gap-3">
-              {img && <Image source={{ uri: img }} style={{ width: 48, height: 48, borderRadius: 12 }} contentFit="cover" />}
+              {img && <Image recyclingKey={img} source={{ uri: img }} style={{ width: 48, height: 48, borderRadius: 12 }} contentFit="cover" />}
               <Text className="flex-1 text-[15px] font-semibold text-foreground" numberOfLines={2}>
                 {item.productName}
               </Text>
@@ -229,7 +229,7 @@ export default function ReviewModal({
                 <View className="flex-row flex-wrap gap-3">
                   {s.existingImageUrls.map((url, j) => (
                     <View key={`ex-${j}`} className="h-16 w-16 overflow-hidden rounded-xl border border-border-default">
-                      <Image source={{ uri: absUrl(s.existingThumbUrls[j] || url) ?? undefined }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                      <Image recyclingKey={absUrl(s.existingThumbUrls[j] || url) ?? undefined} source={{ uri: absUrl(s.existingThumbUrls[j] || url) ?? undefined }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                       <IconButton
                         icon={X}
                         label="Remove photo"

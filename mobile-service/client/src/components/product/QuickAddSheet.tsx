@@ -128,7 +128,7 @@ function Header({ name, brand, image, productId, slug }: { name: string; brand: 
         accessibilityLabel={`View ${name}`}
         className="h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-field border border-border-default bg-surface"
       >
-        {image ? <Image source={{ uri: image }} style={{ width: 72, height: 72 }} contentFit="contain" transition={150} /> : null}
+        {image ? <Image recyclingKey={image} source={{ uri: image }} style={{ width: 72, height: 72 }} contentFit="contain" transition={150} /> : null}
       </Pressable>
       <View className="flex-1">
         {brand ? <Text className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">{brand}</Text> : null}

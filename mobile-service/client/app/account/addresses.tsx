@@ -9,7 +9,7 @@ import FeaturedProducts from '../../src/components/account/FeaturedProducts'
 import { useRequireAuth } from '../../src/components/account/hooks'
 import AddressSheet, { emptyAddressForm as emptyForm, usePincodeLookup, type AddressFormData as FormData } from '../../src/components/account/AddressSheet'
 import { status } from '../../src/theme'
-import { Badge, BodySmall, Button, Card, Chip, ChipGroup, confirm, EmptyState, IconButton, Screen, Skeleton, Subheading } from '../../src/ui'
+import { Badge, BodySmall, Button, Card, Chip, ChipGroup, confirm, EmptyState, IconButton, List, Screen, Skeleton, Subheading } from '../../src/ui'
 
 // Mirror of controller-service components/shared/AccountAddresses.tsx + AccountAddressForm.tsx (visitor).
 
@@ -145,66 +145,77 @@ export default function AddressesScreen() {
 
   const loading = !user || isLoading
 
-  return (
-    <Screen
-      title="My Addresses"
-      loading={loading}
-      skeleton={<AddressesLoading />}
-      footer={loading ? undefined : <Button label="Add New Address" icon={Plus} onPress={handleAdd} />}
-    >
-      {addresses.length === 0 ? (
+  const card = ({ item: a }: { item: Address }) => (
+    <Card className="flex-row items-start gap-2">
+      <View className="flex-1">
+        <View className="mb-2 flex-row flex-wrap gap-1.5">
+          <Badge label={capital(a.address_type)} />
+          {a.is_default ? <Badge label="Default" tone="success" /> : null}
+        </View>
+        <Subheading>{a.full_name}</Subheading>
+        <BodySmall className="mt-0.5 text-foreground">{a.address_line1}</BodySmall>
+        {!!a.address_line2 && <BodySmall>{a.address_line2}</BodySmall>}
+        {!!a.landmark && <BodySmall>Near: {a.landmark}</BodySmall>}
+        <BodySmall>
+          {a.city}, {a.state} {a.postal_code}
+        </BodySmall>
+        <BodySmall>{a.country}</BodySmall>
+        <BodySmall className="mt-2">Phone: {a.phone}</BodySmall>
+      </View>
+      <View className="-mr-2 -mt-2 flex-row">
+        <IconButton icon={Pencil} label={`Edit address for ${a.full_name}`} onPress={() => handleEdit(a)} />
+        <IconButton icon={Trash2} label={`Delete address for ${a.full_name}`} color={status.danger} onPress={() => handleDelete(a.id)} />
+      </View>
+    </Card>
+  )
+
+  const addButton = <Button label="Add New Address" icon={Plus} onPress={handleAdd} />
+  const sheet = (
+    <AddressSheet
+      open={showForm}
+      formData={formData}
+      setFormData={setFormData}
+      editing={!!editing}
+      isSaving={isSaving}
+      pinLookupState={pinLookupState}
+      localities={localities}
+      onPincodeChange={handlePincodeChange}
+      onSubmit={handleSubmit}
+      onCancel={() => {
+        setShowForm(false)
+        setEditing(null)
+      }}
+    />
+  )
+
+  if (loading || addresses.length === 0) {
+    return (
+      <Screen title="My Addresses" loading={loading} skeleton={<AddressesLoading />} footer={loading ? undefined : addButton}>
         <EmptyState icon={MapPin} title="No addresses saved" message="Add an address to make checkout faster." />
-      ) : (
-        <>
+        <FeaturedProducts />
+        {sheet}
+      </Screen>
+    )
+  }
+
+  return (
+    <Screen title="My Addresses" mode="none" footer={addButton}>
+      <List
+        data={filtered}
+        keyExtractor={a => a.id}
+        renderItem={card}
+        gap={12}
+        footerBar
+        ListHeaderComponent={
           <ChipGroup className="mb-4">
             {(['all', 'shipping', 'billing'] as const).map(f => (
               <Chip key={f} label={capital(f)} selected={filterType === f} onPress={() => setFilterType(f)} />
             ))}
           </ChipGroup>
-          <View className="gap-3">
-            {filtered.map(a => (
-              <Card key={a.id} className="flex-row items-start gap-2">
-                <View className="flex-1">
-                  <View className="mb-2 flex-row flex-wrap gap-1.5">
-                    <Badge label={capital(a.address_type)} />
-                    {a.is_default ? <Badge label="Default" tone="success" /> : null}
-                  </View>
-                  <Subheading>{a.full_name}</Subheading>
-                  <BodySmall className="mt-0.5 text-foreground">{a.address_line1}</BodySmall>
-                  {!!a.address_line2 && <BodySmall>{a.address_line2}</BodySmall>}
-                  {!!a.landmark && <BodySmall>Near: {a.landmark}</BodySmall>}
-                  <BodySmall>
-                    {a.city}, {a.state} {a.postal_code}
-                  </BodySmall>
-                  <BodySmall>{a.country}</BodySmall>
-                  <BodySmall className="mt-2">Phone: {a.phone}</BodySmall>
-                </View>
-                <View className="-mr-2 -mt-2 flex-row">
-                  <IconButton icon={Pencil} label="Edit address" onPress={() => handleEdit(a)} />
-                  <IconButton icon={Trash2} label="Delete address" color={status.danger} onPress={() => handleDelete(a.id)} />
-                </View>
-              </Card>
-            ))}
-          </View>
-        </>
-      )}
-      <FeaturedProducts />
-
-      <AddressSheet
-        open={showForm}
-        formData={formData}
-        setFormData={setFormData}
-        editing={!!editing}
-        isSaving={isSaving}
-        pinLookupState={pinLookupState}
-        localities={localities}
-        onPincodeChange={handlePincodeChange}
-        onSubmit={handleSubmit}
-        onCancel={() => {
-          setShowForm(false)
-          setEditing(null)
-        }}
+        }
+        ListFooterComponent={<FeaturedProducts />}
       />
+      {sheet}
     </Screen>
   )
 }

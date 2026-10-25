@@ -37,7 +37,7 @@ function TableRow({ product: c, stripe, last }: { product: ListingCard; stripe: 
     >
       <View className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
         {src ? (
-          <Image source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={c.name} />
+          <Image recyclingKey={src} source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={c.name} />
         ) : (
           <View className="flex-1 items-center justify-center opacity-30">
             <Box size={16} strokeWidth={1.5} color={t.foregroundMuted} />

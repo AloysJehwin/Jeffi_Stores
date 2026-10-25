@@ -64,12 +64,12 @@ export default function CartLineItem({
   return (
     <View className={`p-4 ${last ? '' : 'border-b border-border-default'}`}>
       <View className="flex-row gap-4">
-        <Pressable onPress={openProduct} accessibilityRole="imagebutton" accessibilityLabel={item.products.name}>
+        <Pressable onPress={openProduct} accessible={false} importantForAccessibility="no-hide-descendants">
           <LineThumb uri={img?.thumbnail_url || img?.image_url} blurhash={img?.blurhash} size={96} iconSize={48} />
         </Pressable>
 
         <View className="flex-1">
-          <Pressable onPress={openProduct}>
+          <Pressable onPress={openProduct} accessibilityRole="link">
             <Text className="text-base font-semibold text-foreground">{item.products.name}</Text>
           </Pressable>
           <View className="mt-0.5 flex-row flex-wrap items-center gap-2">

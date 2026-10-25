@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { CreditCard, Tag } from 'lucide-react-native'
-import { Overline, Text, useEntering } from '../../ui'
+import { Overline, Text, useEntering, useMotion } from '../../ui'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
@@ -24,12 +24,13 @@ export default function RazorpayOffers() {
   const t = useTokens()
   const fadeIn = useEntering(FadeIn.duration(500))
   const fadeOut = useEntering(FadeOut.duration(500))
+  const { animate } = useMotion()
 
   useEffect(() => {
-    if (offers.length < 2) return
+    if (offers.length < 2 || !animate) return
     const t = setTimeout(() => setActive(a => (a + 1) % offers.length), AUTO_MS)
     return () => clearTimeout(t)
-  }, [active, offers.length])
+  }, [active, offers.length, animate])
 
   if (offers.length === 0) return null
   const i = active % offers.length
@@ -44,7 +45,10 @@ export default function RazorpayOffers() {
 
       <Pressable
         onPress={() => openHref(router, '/legal/terms-and-conditions#5a-bank-offers-cashback')}
-        accessibilityLabel="Bank offer T&C"
+        accessibilityRole="link"
+        accessibilityLabel={`${offer.title}. Bank offer terms`}
+        accessibilityActions={offers.length > 1 ? [{ name: 'next', label: 'Next offer' }] : undefined}
+        onAccessibilityAction={() => setActive(a => (a + 1) % offers.length)}
         className="relative h-11 overflow-hidden rounded-field"
       >
         <Animated.View
@@ -69,12 +73,13 @@ export default function RazorpayOffers() {
         </Animated.View>
 
         {offers.length > 1 ? (
-          <View className="absolute bottom-1.5 right-2 z-10 flex-row items-center gap-1">
+          <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden className="absolute bottom-1.5 right-2 z-10 flex-row items-center gap-1">
             {offers.map((o, n) => (
               <Pressable
                 key={o.id}
                 onPress={() => setActive(n)}
                 hitSlop={4}
+                accessibilityRole="button"
                 accessibilityLabel={`Offer ${n + 1}`}
                 className={`rounded-full ${n === i ? 'h-1 w-3 bg-white' : 'h-1 w-1 bg-white/40'}`}
               />

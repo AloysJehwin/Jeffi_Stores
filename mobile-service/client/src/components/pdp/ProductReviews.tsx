@@ -38,7 +38,7 @@ const STAR = primary[400]
 export function StarRow({ rating, size = 20 }: { rating: number; size?: number }) {
   const t = useTokens()
   return (
-    <View className="flex-row" style={{ gap: 2 }}>
+    <View accessible accessibilityRole="image" accessibilityLabel={`Rated ${rating} out of 5`} className="flex-row" style={{ gap: 2 }}>
       {[1, 2, 3, 4, 5].map(star =>
         star <= rating ? (
           <Star key={star} size={size} color={STAR} fill={STAR} />
@@ -96,6 +96,7 @@ function RatingBar({ star, count, total, isActive, onPress }: { star: number; co
       accessibilityRole="button"
       accessibilityState={{ selected: isActive, disabled: count === 0 }}
       accessibilityLabel={`${star} star, ${count} ${count === 1 ? 'review' : 'reviews'}`}
+      hitSlop={{ top: 3, bottom: 3 }}
       className={`w-full flex-row items-center gap-2 rounded-lg px-1.5 py-1 ${isActive ? 'bg-accent-50 dark:bg-accent-900/20' : ''} ${count === 0 ? 'opacity-50' : ''}`}
     >
       <Text className={`w-3 text-right text-xs ${isActive ? 'font-semibold text-accent-600 dark:text-accent-400' : 'text-foreground-muted'}`}>{star}</Text>
@@ -301,7 +302,7 @@ export default function ProductReviews({
               {visible.map(review => (
                 <Card key={review.id}>
                   <View className="mb-3 flex-row items-start gap-3">
-                    <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/40">
+                    <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/40">
                       <Text className="text-sm font-bold text-accent-700 dark:text-accent-300">{initialsOf(review)}</Text>
                     </View>
                     <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
@@ -332,7 +333,7 @@ export default function ProductReviews({
                             accessibilityLabel={`Review photo ${idx + 1}`}
                             className="h-16 w-16 overflow-hidden rounded-xl border border-border-secondary"
                           >
-                            <Image source={{ uri: review.image_thumbnail_urls?.[idx] || url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                            <Image source={{ uri: review.image_thumbnail_urls?.[idx] || url }} recyclingKey={url} accessible={false} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                           </Pressable>
                         ))}
                       </View>
@@ -376,7 +377,7 @@ export default function ProductReviews({
                     accessibilityLabel={`Review photo ${idx + 1}`}
                     className="h-20 w-20 overflow-hidden rounded-xl border border-border-secondary"
                   >
-                    <Image source={{ uri: shown.image_thumbnail_urls?.[idx] || url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                    <Image source={{ uri: shown.image_thumbnail_urls?.[idx] || url }} accessible={false} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                   </Pressable>
                 ))}
               </View>
@@ -389,8 +390,8 @@ export default function ProductReviews({
       </ModalSheet>
 
       <Lightbox open={!!lightboxUrl} onClose={() => setLightboxUrl(null)}>
-        <Pressable onPress={() => setLightboxUrl(null)} accessibilityLabel="Close" className="flex-1 items-center justify-center p-4">
-          {lightboxUrl ? <Image source={{ uri: lightboxUrl }} style={{ width: '100%', height: '90%', borderRadius: 16 }} contentFit="contain" /> : null}
+        <Pressable onPress={() => setLightboxUrl(null)} accessibilityRole="button" accessibilityLabel="Review photo" accessibilityHint="Closes the photo" className="flex-1 items-center justify-center p-4">
+          {lightboxUrl ? <Image source={{ uri: lightboxUrl }} style={{ width: '100%', height: '90%', borderRadius: 16 }} contentFit="contain" accessible={false} /> : null}
         </Pressable>
       </Lightbox>
     </View>

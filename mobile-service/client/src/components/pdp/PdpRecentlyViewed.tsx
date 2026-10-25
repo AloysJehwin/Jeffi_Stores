@@ -17,7 +17,7 @@ const noDecimals = (n: number) => n.toLocaleString('en-IN', { minimumFractionDig
 function Photo({ uri, label, cover }: { uri: string | null; label: string; cover?: boolean }) {
   const t = useTokens()
   return uri ? (
-    <Image source={{ uri }} contentFit={cover ? 'cover' : 'contain'} style={cover ? { width: '100%', height: '100%' } : { flex: 1, margin: 4 }} accessibilityLabel={label} />
+    <Image recyclingKey={uri} source={{ uri }} contentFit={cover ? 'cover' : 'contain'} style={cover ? { width: '100%', height: '100%' } : { flex: 1, margin: 4 }} accessibilityLabel={label} />
   ) : (
     <View className="h-full w-full items-center justify-center">
       <ImageIcon size={32} strokeWidth={1} color={t.foregroundMuted} />

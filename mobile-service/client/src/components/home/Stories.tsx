@@ -75,7 +75,7 @@ function Ring({ group, seen, onPress }: { group: StoryGroup; seen: boolean; onPr
           </Svg>
         )}
         <View style={{ width: inner, height: inner, borderRadius: inner / 2 }} className="overflow-hidden bg-surface-secondary">
-          <Image source={cover ? { uri: cover } : undefined} style={{ width: inner, height: inner }} contentFit="cover" transition={200} />
+          <Image recyclingKey={cover} source={cover ? { uri: cover } : undefined} style={{ width: inner, height: inner }} contentFit="cover" transition={200} />
         </View>
       </View>
       <Text

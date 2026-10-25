@@ -48,7 +48,7 @@ export default function BlogTeaser({ section }: SectionProps) {
               <View className="relative overflow-hidden bg-surface-secondary" style={{ aspectRatio: 16 / 9 }}>
                 {img ? (
                   <View className="h-full w-full bg-gray-200 dark:bg-gray-700">
-                    <Image source={{ uri: img }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={300} />
+                    <Image recyclingKey={img} source={{ uri: img }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={300} />
                   </View>
                 ) : (
                   <View className="h-full w-full items-center justify-center">

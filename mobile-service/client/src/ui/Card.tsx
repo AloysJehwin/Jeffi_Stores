@@ -41,6 +41,41 @@ export function Card({ children, elevation = 'raised', padded = true, onPress, c
   )
 }
 
+/** One slice of a Card that a list renders row by row; `top` and `bottom` round its ends. */
+export function CardSegment({
+  position = 'middle',
+  children,
+  className,
+}: {
+  position?: 'top' | 'middle' | 'bottom' | 'single'
+  children: ReactNode
+  className?: string
+}) {
+  const shadow = useElevation('raised')
+  const top = position === 'top' || position === 'single'
+  const bottom = position === 'bottom' || position === 'single'
+  return (
+    <View
+      style={shadow}
+      className={cn(
+        'bg-surface-elevated dark:border-x dark:border-border-default',
+        top && 'rounded-t-panel dark:border-t',
+        bottom && 'rounded-b-panel dark:border-b',
+        className,
+      )}
+    >
+      {children}
+    </View>
+  )
+}
+
+/** `CardSegment` position of row `i` of `n` rows, given whether the card has its own header and footer slices. */
+export function segmentAt(i: number, n: number, { header = false, footer = false } = {}): 'top' | 'middle' | 'bottom' | 'single' {
+  const first = i === 0 && !header
+  const last = i === n - 1 && !footer
+  return first && last ? 'single' : first ? 'top' : last ? 'bottom' : 'middle'
+}
+
 export function Divider({ inset, className }: { inset?: boolean; className?: string }) {
   return <View className={cn('h-px bg-border-default', inset && 'ml-14', className)} />
 }

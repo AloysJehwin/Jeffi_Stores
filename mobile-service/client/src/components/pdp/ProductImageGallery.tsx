@@ -9,22 +9,23 @@ import type { PdpImage } from '../../api/pdp'
 
 // Mirror of controller-service components/visitor/ProductImageGallery.tsx at the mobile breakpoint, plus swipe paging.
 
-function Slide({ image, width, height, label }: { image: PdpImage; width: number; height: number; label: string }) {
+function Slide({ image, width, height }: { image: PdpImage; width: number; height: number }) {
   return (
     <View style={{ width, height }} className="items-center justify-center overflow-hidden">
-      <Image
+      <Image recyclingKey={image.image_url}
         source={{ uri: image.image_url }}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6, transform: [{ scale: 1.1 }] }}
         contentFit="cover"
         blurRadius={24}
+        accessible={false}
       />
-      <Image
+      <Image recyclingKey={image.image_url}
         source={{ uri: image.image_url }}
         placeholder={image.blurhash ? { blurhash: image.blurhash } : undefined}
         style={{ width: '100%', height: '100%' }}
         contentFit="contain"
         transition={200}
-        accessibilityLabel={label}
+        accessible={false}
       />
     </View>
   )
@@ -90,8 +91,14 @@ export default function ProductImageGallery({
             scrollEnabled={displayImages.length > 1}
           >
             {displayImages.map((img, i) => (
-              <Pressable key={img.id ?? i} accessibilityRole="imagebutton" accessibilityHint="Opens full screen" onPress={() => setLightbox(true)}>
-                <Slide image={img} width={slideW} height={height - 2} label={`${productName} - Image ${i + 1}`} />
+              <Pressable
+                key={img.id ?? i}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={`${productName}, image ${i + 1} of ${displayImages.length}`}
+                accessibilityHint="Opens full screen"
+                onPress={() => setLightbox(true)}
+              >
+                <Slide image={img} width={slideW} height={height - 2} />
               </Pressable>
             ))}
           </ScrollView>
@@ -106,17 +113,18 @@ export default function ProductImageGallery({
               key={img.id ?? i}
               onPress={() => select(i)}
               accessibilityRole="imagebutton"
+              accessibilityLabel={`Show image ${i + 1} of ${displayImages.length}`}
               accessibilityState={{ selected: i === index }}
               style={{ width: thumbW, transform: [{ scale: i === index ? 1.02 : 1 }] }}
               className={`overflow-hidden rounded-xl border-2 bg-surface-elevated ${i === index ? 'border-accent-500' : 'border-border-default'}`}
             >
               <View className="h-20 w-full overflow-hidden rounded-[10px] bg-surface-secondary">
-                <Image
+                <Image recyclingKey={img.thumbnail_url || img.image_url}
                   source={{ uri: img.thumbnail_url || img.image_url }}
                   placeholder={img.blurhash ? { blurhash: img.blurhash } : undefined}
                   style={{ width: '100%', height: '100%' }}
                   contentFit="contain"
-                  accessibilityLabel={`${productName} - Thumbnail ${i + 1}`}
+                  accessible={false}
                 />
               </View>
             </Pressable>
@@ -170,12 +178,20 @@ function GalleryLightbox({
         onMomentumScrollEnd={e => onIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
       >
         {images.map((img, i) => (
-          <Pressable key={img.id ?? i} onPress={onClose} accessibilityLabel="Close" style={{ width, height }} className="items-center justify-center p-4">
-            <Image
+          <Pressable
+            key={img.id ?? i}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel={`${productName}, image ${i + 1} of ${images.length}`}
+            accessibilityHint="Closes the full screen view"
+            style={{ width, height }}
+            className="items-center justify-center p-4"
+          >
+            <Image recyclingKey={img.image_url}
               source={{ uri: img.image_url }}
               style={{ width: width - 32, height: height * 0.85 }}
               contentFit="contain"
-              accessibilityLabel={`${productName} - Image ${i + 1}`}
+              accessible={false}
             />
           </Pressable>
         ))}
@@ -195,11 +211,12 @@ function GalleryLightbox({
                 <Pressable
                   key={img.id ?? i}
                   onPress={() => go(i)}
-                  accessibilityLabel={`Image ${i + 1}`}
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={`Show image ${i + 1} of ${images.length}`}
                   accessibilityState={{ selected: i === index }}
                   className={`h-16 w-16 overflow-hidden rounded-xl border-2 bg-surface-secondary ${i === index ? 'border-accent-500' : 'border-transparent'}`}
                 >
-                  <Image source={{ uri: img.thumbnail_url || img.image_url }} style={{ width: '100%', height: '100%' }} contentFit="contain" />
+                  <Image recyclingKey={img.thumbnail_url || img.image_url} source={{ uri: img.thumbnail_url || img.image_url }} style={{ width: '100%', height: '100%' }} contentFit="contain" accessible={false} />
                 </Pressable>
               ))}
             </ScrollView>

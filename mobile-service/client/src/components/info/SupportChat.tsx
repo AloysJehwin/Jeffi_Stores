@@ -61,7 +61,7 @@ function Linkified({ text, className }: { text: string; className: string }) {
         const url = m ? m[1] : part
         return (
           <Text key={i}>
-            <Text className="text-accent-600 underline dark:text-accent-400" onPress={() => Linking.openURL(url)}>
+            <Text accessibilityRole="link" className="text-accent-600 underline dark:text-accent-400" onPress={() => Linking.openURL(url)}>
               {url}
             </Text>
             {m ? m[2] : ''}
@@ -465,7 +465,7 @@ export default function SupportChat() {
 
         {isSending && mode === 'bot' ? (
           <View className="flex-row justify-start">
-            <View className="flex-row items-center gap-1 rounded-2xl rounded-bl-sm border border-border-default bg-surface px-3.5 py-2.5">
+            <View accessible accessibilityLabel="Jeffi is typing" className="flex-row items-center gap-1 rounded-2xl rounded-bl-sm border border-border-default bg-surface px-3.5 py-2.5">
               <BounceDot delay={0} />
               <BounceDot delay={150} />
               <BounceDot delay={300} />

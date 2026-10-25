@@ -21,7 +21,7 @@ function Thumb({ product, dimmed }: { product: CardProduct; dimmed: boolean }) {
   return (
     <View className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface ${dimmed ? 'opacity-40' : ''}`}>
       {img?.image_url ? (
-        <Image
+        <Image recyclingKey={img.thumbnail_url || img.image_url}
           source={{ uri: img.thumbnail_url || img.image_url }}
           placeholder={img.blurhash ? { blurhash: img.blurhash } : undefined}
           style={{ flex: 1, margin: 4 }}
@@ -129,7 +129,7 @@ export default function FrequentlyBoughtTogether({
                       {p.name}
                     </Text>
                   ) : (
-                    <Text onPress={() => open(p.slug)} className="text-sm leading-snug text-foreground">
+                    <Text accessibilityRole="link" onPress={() => open(p.slug)} className="text-sm leading-snug text-foreground">
                       {p.name}
                     </Text>
                   )}
@@ -141,7 +141,7 @@ export default function FrequentlyBoughtTogether({
                       <Text className="text-xs text-foreground-muted line-through">₹{inr(p.mrp)}</Text>
                     ) : null}
                     {p.hasVariants ? (
-                      <Text onPress={() => (isCurrent ? onChooseOptions() : open(p.slug))} className="text-xs font-semibold text-accent-600 dark:text-accent-400">
+                      <Text accessibilityRole="button" onPress={() => (isCurrent ? onChooseOptions() : open(p.slug))} className="text-xs font-semibold text-accent-600 dark:text-accent-400">
                         {isCurrent ? 'Choose options above' : 'Choose options'}
                       </Text>
                     ) : Number(p.effectiveStock) <= 0 ? (

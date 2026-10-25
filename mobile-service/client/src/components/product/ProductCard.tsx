@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react'
-import { Pressable, View } from 'react-native'
+import { Pressable, View, type AccessibilityActionEvent } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
@@ -11,6 +11,7 @@ import { useWishlistToggle } from '../../hooks/useWishlist'
 import { useAuthStore } from '../../stores/authStore'
 import { resolveEdd } from '../../lib/edd'
 import { inr, shortDate } from '../../lib/format'
+import { productLabel } from '../../lib/a11y'
 import { status, useTokens } from '../../theme'
 import { IconButton, Pill, Text, elevationClass, haptic, useElevation, usePressScale } from '../../ui'
 import type { CardProduct } from '../../types/home'
@@ -29,6 +30,25 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
   const img = product.primaryImage
   const shadow = useElevation('raised')
   const press = usePressScale(0.98)
+  const stock = digital ? 'Digital, instant access' : inStock ? 'In stock' : 'Out of stock'
+  const label = productLabel({
+    name: product.name,
+    price: product.displayPrice,
+    from: product.hasVariants,
+    mrp: product.mrp,
+    discountPct: product.mrpDiscount || undefined,
+    stock,
+    extra: [!product.mrpDiscount && product.discountPct > 0 && 'On sale', product.badge, edd && !digital && inStock && `Deliver by ${shortDate(edd)}`],
+  })
+  // The "+" and heart sit inside the card, so screen readers reach them as actions on it too.
+  const actions = [
+    ...(inStock ? [{ name: 'quickAdd', label: product.hasVariants ? 'Choose options' : 'Quick add to cart' }] : []),
+    ...(pending ? [] : [{ name: 'wishlist', label: inWishlist ? 'Remove from wishlist' : 'Add to wishlist' }]),
+  ]
+  const onAction = (e: AccessibilityActionEvent) => {
+    if (e.nativeEvent.actionName === 'quickAdd') openQuickAdd(product)
+    else if (e.nativeEvent.actionName === 'wishlist') toggle()
+  }
 
   useEffect(() => {
     if (digital) return
@@ -45,7 +65,9 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
     <Animated.View style={[shadow, { borderRadius: 20 }, press.style]} className="grow">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={product.name}
+        accessibilityLabel={label}
+        accessibilityActions={actions}
+        onAccessibilityAction={onAction}
         onPress={() => router.push(`/product/${product.slug}`)}
         onLongPress={() => {
           if (!inStock) return
@@ -77,6 +99,7 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
                   blurRadius={24}
                   cachePolicy="memory-disk"
                   recyclingKey={img.image_url}
+                  accessible={false}
                 />
                 <Image
                   source={{ uri: img.image_url }}
@@ -86,11 +109,11 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
                   transition={200}
                   cachePolicy="memory-disk"
                   recyclingKey={img.image_url}
-                  accessibilityLabel={product.name}
+                  accessible={false}
                 />
               </>
             ) : (
-              <View className="flex-1 items-center justify-center">
+              <View className="flex-1 items-center justify-center" importantForAccessibility="no-hide-descendants">
                 <ImageIcon size={48} color={t.foregroundMuted} strokeWidth={1} />
               </View>
             )}
@@ -153,7 +176,7 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
             </View>
             {gstEnabled ? <Text className="mb-2 text-[11px] text-foreground-muted">Inclusive of all taxes</Text> : null}
             <View className="flex-row items-center justify-between gap-1">
-              <Text className={`text-xs font-medium ${inStock ? 'text-green-600' : 'text-red-600'}`} numberOfLines={1}>
+              <Text className={`text-xs font-medium ${inStock ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} numberOfLines={1}>
                 {digital ? 'Instant access' : inStock ? 'In Stock' : 'Out of Stock'}
               </Text>
               <Text className="text-xs font-semibold text-accent-500" numberOfLines={1}>

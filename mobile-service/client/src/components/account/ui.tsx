@@ -83,11 +83,11 @@ export function PolicyConsent({ checked, onChange }: { checked: boolean; onChang
     <Checkbox checked={checked} onChange={onChange}>
       <Text className="text-sm leading-[22px] text-foreground-secondary">
         I agree to the{' '}
-        <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.push('/legal/privacy-policy')}>
+        <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.push('/legal/privacy-policy')}>
           Privacy Policy
         </Text>{' '}
         and{' '}
-        <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.push('/legal/terms-and-conditions')}>
+        <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.push('/legal/terms-and-conditions')}>
           Terms &amp; Conditions
         </Text>
         .

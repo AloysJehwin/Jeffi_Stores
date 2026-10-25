@@ -528,7 +528,7 @@ export default function CheckoutReviewScreen() {
                   <Copy size={32} color={t.accent500} strokeWidth={1.5} />
                 </View>
                 <View className="flex-1">
-                  <Text className="mb-2 font-display text-base font-extrabold text-foreground">Our Delivery Promise</Text>
+                  <Text accessibilityRole="header" className="mb-2 font-display text-base font-extrabold text-foreground">Our Delivery Promise</Text>
                   <View className="gap-1.5">
                     {PROMISES.map(p => (
                       <View key={p} className="flex-row items-center gap-2">

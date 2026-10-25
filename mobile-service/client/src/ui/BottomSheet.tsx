@@ -116,7 +116,13 @@ export function BottomSheet({
     {/* Taps are ignored while the sheet slides away, so a second tap on "Add" can't post twice. */}
     <View style={StyleSheet.absoluteFill} pointerEvents={open ? 'box-none' : 'none'}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} className="bg-black/50">
-        <Pressable style={StyleSheet.absoluteFill} onPress={dismissible ? dismiss : undefined} accessibilityLabel={dismissible ? 'Close' : undefined} />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={dismissible ? dismiss : undefined}
+          accessibilityRole={dismissible ? 'button' : undefined}
+          accessibilityLabel={dismissible ? 'Close' : undefined}
+          importantForAccessibility={dismissible ? 'auto' : 'no'}
+        />
       </Animated.View>
       {/* The sheet is a flex child pinned to the end, not absolutely positioned: the avoiding view's
           bottom padding only moves children that take part in layout. */}

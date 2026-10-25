@@ -61,7 +61,7 @@ export default function StickyAddToCartBar({
     >
       <View className="flex-row items-center gap-3 px-4 py-3">
         <View className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
-          {image ? <Image source={{ uri: image }} style={{ width: '100%', height: '100%' }} contentFit="contain" /> : null}
+          {image ? <Image recyclingKey={image} source={{ uri: image }} style={{ width: '100%', height: '100%' }} contentFit="contain" /> : null}
         </View>
         <View className="min-w-0 flex-1">
           <Text numberOfLines={1} className="text-sm font-semibold text-foreground">

@@ -93,11 +93,11 @@ export default function LegalIndexScreen() {
         </View>
         <Caption className="mt-3">
           Full terms:{' '}
-          <Text className="font-semibold text-primary-600 dark:text-primary-400" onPress={() => router.push('/legal/terms-and-conditions')}>
+          <Text accessibilityRole="link" className="font-semibold text-primary-600 dark:text-primary-400" onPress={() => router.push('/legal/terms-and-conditions')}>
             Terms &amp; Conditions
           </Text>{' '}
           ·{' '}
-          <Text className="font-semibold text-primary-600 dark:text-primary-400" onPress={() => router.push('/legal/return-refund-policy')}>
+          <Text accessibilityRole="link" className="font-semibold text-primary-600 dark:text-primary-400" onPress={() => router.push('/legal/return-refund-policy')}>
             Return &amp; Refund Policy
           </Text>
         </Caption>

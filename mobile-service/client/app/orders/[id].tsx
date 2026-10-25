@@ -25,13 +25,13 @@ import { AdjustmentNotice, CancelConfirm, VariantChangeNotice } from '../../src/
 import { StatusNotices } from '../../src/components/orders/StatusNotices'
 import { ReturnForm, ReturnItems } from '../../src/components/orders/Returns'
 import { DeliveryEstimate, TrackingCard } from '../../src/components/orders/Delivery'
-import OrderItems from '../../src/components/orders/OrderItems'
+import { OrderItemRow, OrderItemsTop, OrderTotals } from '../../src/components/orders/OrderItems'
 import { ReviewPrompt } from '../../src/components/orders/Reviews'
 import { OrderNote, StoreNotes } from '../../src/components/orders/Notes'
 import { ShippingAddress } from '../../src/components/orders/ShippingAddress'
 import { PaymentNotices } from '../../src/components/orders/Payment'
 import { invoiceUrl, RETURN_STATUSES, returnEligibility, returnTitle } from '../../src/components/orders/shared'
-import { Button, EmptyState, Screen } from '../../src/ui'
+import { Button, EmptyState, List, Screen } from '../../src/ui'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { useCartStore } from '../../src/stores/cartStore'
 import { showToast } from '../../src/stores/toastStore'
@@ -278,105 +278,119 @@ export default function OrderDetailScreen() {
 
   return (
     <>
-      <Screen title={TITLE} mode="keyboard" contentClassName="gap-4">
-        <OrderHeader
-          order={order}
-          unpaidPending={unpaidPending}
-          returnLabel={returnTitle(canRefund, canReplace)}
-          showReturn={canReturn && !showReturnForm}
-          returnWindowExpired={returnWindowExpired}
-          limitReached={monthlyLimitReached && (canRefund || canReplace) && !returnRequest}
-          invoiceUrl={showInvoice ? invoiceUrl(config.slug, order.viewToken!) : null}
-          onCancel={() => setShowCancelConfirm(true)}
-          onReturn={() => {
-            setReturnType(canRefund ? 'refund' : 'replacement')
-            setShowReturnForm(true)
-          }}
+      {/* Items are list rows (the card sliced per row); everything above and below rides as header and footer. */}
+      <Screen title={TITLE} mode="none">
+        <List
+          data={order.items}
+          keyExtractor={item => item.id}
+          keyboard
+          renderItem={({ item, index }) => <OrderItemRow item={item} index={index} />}
+          ListHeaderComponent={
+            <View className="gap-4">
+              <OrderHeader
+                order={order}
+                unpaidPending={unpaidPending}
+                returnLabel={returnTitle(canRefund, canReplace)}
+                showReturn={canReturn && !showReturnForm}
+                returnWindowExpired={returnWindowExpired}
+                limitReached={monthlyLimitReached && (canRefund || canReplace) && !returnRequest}
+                invoiceUrl={showInvoice ? invoiceUrl(config.slug, order.viewToken!) : null}
+                onCancel={() => setShowCancelConfirm(true)}
+                onReturn={() => {
+                  setReturnType(canRefund ? 'refund' : 'replacement')
+                  setShowReturnForm(true)
+                }}
+              />
+
+              {showCancelConfirm && <CancelConfirm unpaidPending={unpaidPending} busy={isCancelling} onConfirm={handleCancelOrder} onKeep={() => setShowCancelConfirm(false)} />}
+
+              <StatusNotices order={order} returnRequest={returnRequest} refundBreakdown={refundBreakdown} />
+
+              {a && (
+                <AdjustmentNotice
+                  order={order}
+                  busy={vcrBusy}
+                  onConfirm={() => confirmChange(`/api/orders/${order.id}/adjustments/${a.id}/confirm`, 'Order changes')}
+                  onDecline={() => reject(() => rejectAdjustment(order.id, a.id), 'Could not decline the changes')}
+                />
+              )}
+
+              {vc && vc.status === 'pending_customer' && (
+                <VariantChangeNotice
+                  order={order}
+                  busy={vcrBusy}
+                  onConfirm={() => confirmChange(`/api/orders/${order.id}/variant-change/confirm`, 'Variant change')}
+                  onDecline={() => reject(() => rejectVariantChange(order.id), 'Failed to decline change')}
+                />
+              )}
+
+              {returnRequest && !!returnRequest.items?.length && RETURN_STATUSES.includes(order.status) && <ReturnItems returnRequest={returnRequest} />}
+
+              {showReturnForm && (
+                <ReturnForm
+                  order={order}
+                  title={returnTitle(canRefund, canReplace)}
+                  canRefund={canRefund}
+                  canReplace={canReplace}
+                  deliveryTs={deliveryTs}
+                  returnType={returnType}
+                  onType={rt => {
+                    setReturnType(rt)
+                    setReturnSelectedItems({})
+                  }}
+                  selected={returnSelectedItems}
+                  onToggle={(itemId, on) => setReturnSelectedItems(prev => ({ ...prev, [itemId]: on }))}
+                  reason={returnReason}
+                  onReason={setReturnReason}
+                  description={returnDescription}
+                  onDescription={setReturnDescription}
+                  error={returnError}
+                  submitting={isSubmittingReturn}
+                  onSubmit={handleSubmitReturn}
+                  onCancel={() => {
+                    setShowReturnForm(false)
+                    setReturnError('')
+                    setReturnSelectedItems({})
+                  }}
+                />
+              )}
+
+              <DeliveryEstimate order={order} />
+
+              {!!order.awbNumber && !order.isAllDigital && <TrackingCard orderId={order.id} />}
+
+              {RETURN_STATUSES.includes(order.status) && !!returnRequest?.rvp_awb_number && <TrackingCard orderId={order.id} reverse />}
+              <OrderItemsTop order={order} />
+            </View>
+          }
+          ListFooterComponent={
+            <View className="gap-4">
+              <OrderTotals order={order} />
+              {(order.status === 'delivered' || order.status === 'granted') && <ReviewPrompt order={order} reviewMap={reviewMap} onOpen={() => setShowReviewModal(true)} />}
+
+              {!!order.sharedNotes?.length && <StoreNotes notes={order.sharedNotes} />}
+
+              {order.shippingAddress && <ShippingAddress order={order} onChanged={fetchOrder} />}
+
+              {!!order.notes && <OrderNote notes={order.notes} />}
+
+              <PaymentNotices
+                order={order}
+                razorpay={isRazorpayEnabled}
+                countdown={countdown}
+                autoCancelling={isAutoCancelling}
+                paying={isPayingNow}
+                onPay={handlePayNow}
+                store={storeIdentity}
+              />
+
+              <View className="gap-3">
+                <Button label="View All Orders" onPress={() => router.navigate('/orders')} />
+                <Button label="Continue Shopping" variant="outline" onPress={() => router.navigate('/(tabs)/products')} />
+              </View>
+            </View>
+          }
         />
-
-        {showCancelConfirm && <CancelConfirm unpaidPending={unpaidPending} busy={isCancelling} onConfirm={handleCancelOrder} onKeep={() => setShowCancelConfirm(false)} />}
-
-        <StatusNotices order={order} returnRequest={returnRequest} refundBreakdown={refundBreakdown} />
-
-        {a && (
-          <AdjustmentNotice
-            order={order}
-            busy={vcrBusy}
-            onConfirm={() => confirmChange(`/api/orders/${order.id}/adjustments/${a.id}/confirm`, 'Order changes')}
-            onDecline={() => reject(() => rejectAdjustment(order.id, a.id), 'Could not decline the changes')}
-          />
-        )}
-
-        {vc && vc.status === 'pending_customer' && (
-          <VariantChangeNotice
-            order={order}
-            busy={vcrBusy}
-            onConfirm={() => confirmChange(`/api/orders/${order.id}/variant-change/confirm`, 'Variant change')}
-            onDecline={() => reject(() => rejectVariantChange(order.id), 'Failed to decline change')}
-          />
-        )}
-
-        {returnRequest && !!returnRequest.items?.length && RETURN_STATUSES.includes(order.status) && <ReturnItems returnRequest={returnRequest} />}
-
-        {showReturnForm && (
-          <ReturnForm
-            order={order}
-            title={returnTitle(canRefund, canReplace)}
-            canRefund={canRefund}
-            canReplace={canReplace}
-            deliveryTs={deliveryTs}
-            returnType={returnType}
-            onType={rt => {
-              setReturnType(rt)
-              setReturnSelectedItems({})
-            }}
-            selected={returnSelectedItems}
-            onToggle={(itemId, on) => setReturnSelectedItems(prev => ({ ...prev, [itemId]: on }))}
-            reason={returnReason}
-            onReason={setReturnReason}
-            description={returnDescription}
-            onDescription={setReturnDescription}
-            error={returnError}
-            submitting={isSubmittingReturn}
-            onSubmit={handleSubmitReturn}
-            onCancel={() => {
-              setShowReturnForm(false)
-              setReturnError('')
-              setReturnSelectedItems({})
-            }}
-          />
-        )}
-
-        <DeliveryEstimate order={order} />
-
-        {!!order.awbNumber && !order.isAllDigital && <TrackingCard orderId={order.id} />}
-
-        {RETURN_STATUSES.includes(order.status) && !!returnRequest?.rvp_awb_number && <TrackingCard orderId={order.id} reverse />}
-
-        <OrderItems order={order} />
-
-        {(order.status === 'delivered' || order.status === 'granted') && <ReviewPrompt order={order} reviewMap={reviewMap} onOpen={() => setShowReviewModal(true)} />}
-
-        {!!order.sharedNotes?.length && <StoreNotes notes={order.sharedNotes} />}
-
-        {order.shippingAddress && <ShippingAddress order={order} onChanged={fetchOrder} />}
-
-        {!!order.notes && <OrderNote notes={order.notes} />}
-
-        <PaymentNotices
-          order={order}
-          razorpay={isRazorpayEnabled}
-          countdown={countdown}
-          autoCancelling={isAutoCancelling}
-          paying={isPayingNow}
-          onPay={handlePayNow}
-          store={storeIdentity}
-        />
-
-        <View className="gap-3">
-          <Button label="View All Orders" onPress={() => router.navigate('/orders')} />
-          <Button label="Continue Shopping" variant="outline" onPress={() => router.navigate('/(tabs)/products')} />
-        </View>
       </Screen>
 
       {showReviewModal && (

@@ -28,7 +28,7 @@ export default function CompareBar() {
             <View key={p.id} className="relative shrink-0">
               <View className="h-12 w-12 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
                 {p.image ? (
-                  <Image source={{ uri: p.image }} style={{ flex: 1, margin: 4 }} contentFit="contain" accessibilityLabel={p.name} />
+                  <Image recyclingKey={p.image} source={{ uri: p.image }} style={{ flex: 1, margin: 4 }} contentFit="contain" accessibilityLabel={p.name} />
                 ) : (
                   <View className="h-full w-full items-center justify-center">
                     <ImageIcon size={20} strokeWidth={1} color={t.foregroundMuted} />

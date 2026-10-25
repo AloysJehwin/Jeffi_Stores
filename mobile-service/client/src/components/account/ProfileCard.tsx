@@ -37,7 +37,7 @@ export function useDobNudge() {
 export function DobNudge({ onAdd, onDismiss, className }: { onAdd: () => void; onDismiss: () => void; className?: string }) {
   return (
     <Notice className={className}>
-      <Text className="text-sm leading-5 text-accent-800 dark:text-accent-200" onPress={onAdd}>
+      <Text accessibilityRole="button" className="text-sm leading-5 text-accent-800 dark:text-accent-200" onPress={onAdd}>
         Add your date of birth so we can send you a birthday treat.
       </Text>
       <TextButton label="Dismiss" onPress={onDismiss} className="mt-1" />
