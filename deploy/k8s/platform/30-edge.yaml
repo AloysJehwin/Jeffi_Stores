@@ -50,6 +50,27 @@ spec:
       subject: { commonName: true }
       issuer: { commonName: true }
 ---
+# gzip/brotli for text responses (API JSON is ~6x smaller); media is already compressed and SSE must stream.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: compress, namespace: jeffi-edge }
+spec:
+  compress:
+    minResponseBodyBytes: 1024
+    excludedContentTypes:
+      - text/event-stream
+      - image/png
+      - image/jpeg
+      - image/gif
+      - image/webp
+      - image/avif
+      - video/mp4
+      - video/webm
+      - application/pdf
+      - application/zip
+      - application/octet-stream
+      - font/woff2
+---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata: { name: https-redirect, namespace: jeffi-edge }
