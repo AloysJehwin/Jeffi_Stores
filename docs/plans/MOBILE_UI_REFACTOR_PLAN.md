@@ -1,6 +1,6 @@
 # Mobile app UI refactor: one design system for every screen
 
-Status: phase 0 in progress (2026-10-25). Scope: the Expo app in `mobile-service/client`. Supersedes the
+Status: all phases in review (2026-10-25): 0 #580, skeletons #582, 1 #583, 2 #586, 3 #587, 4 #588, 5 #590. Device and TalkBack passes still to do. Scope: the Expo app in `mobile-service/client`. Supersedes the
 *visual* rules of `docs/MOBILE_PARITY_PLAN.md` (data and behaviour parity with the storefront still hold).
 
 ## Why

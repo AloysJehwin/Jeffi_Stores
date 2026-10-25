@@ -1,6 +1,6 @@
 # Push notifications: order updates, an in-app inbox, and campaign pushes
 
-Status: planned 2026-10-25, nothing started. Scope: the Android app (`mobile-service/client`), the controller,
+Status: phases 0–3 in review (2026-10-25): server #584, app #585, Mailer and scenarios #589. Needs the FCM service account and a device check before go-live. Scope: the Android app (`mobile-service/client`), the controller,
 messaging-service, and the two campaign systems. iOS, web push and white-label tenant apps come later (phase 4).
 
 ## What exists today (audit 2026-10-25)
