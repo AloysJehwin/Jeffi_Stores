@@ -248,10 +248,13 @@ export interface ListingModel {
   promoOffer: ProductOffer | null
 }
 
-export async function buildListingModel(resolvedSearchParams: ListingSearchParams): Promise<ListingModel> {
+export async function buildListingModel(
+  resolvedSearchParams: ListingSearchParams,
+  { categoryBanners: withBanners = true }: { categoryBanners?: boolean } = {}
+): Promise<ListingModel> {
   const { products, total, page, totalPages, gstEnabled } = await getProducts(resolvedSearchParams)
   const [categories, brands] = await Promise.all([getCategories(), getBrands()])
-  const categoryBanners = await getCategoryBanners(gstEnabled)
+  const categoryBanners = withBanners ? await getCategoryBanners(gstEnabled) : []
 
   // Facets are computed against the category+brand+search base only (not the
   // active scalar filters) so counts stay meaningful when toggling grade/material/etc.

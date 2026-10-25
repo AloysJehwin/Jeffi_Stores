@@ -16,6 +16,9 @@ import FreeShippingProgress from '@/components/visitor/cart/FreeShippingProgress
 import CartUpsellRow from '@/components/visitor/cart/CartUpsellRow'
 import CouponNudge from '@/components/visitor/cart/CouponNudge'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
+import MobileCheckoutBar from '@/components/visitor/cart/MobileCheckoutBar'
+
+const SUMMARY_CTA_ID = 'cart-summary-cta'
 
 interface AppliedCoupon {
   couponId: string
@@ -844,35 +847,19 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                {user ? (
-                  <button
-                    type="button"
-                    onClick={proceedToCheckout}
-                    disabled={proceedingToCheckout || cartCount === 0 || hasInactiveItems}
-                    className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
-                  >
-                    {proceedingToCheckout
-                      ? 'Starting…'
-                      : hasInactiveItems
-                        ? 'Remove unavailable items to checkout'
-                        : 'Proceed to Checkout'}
-                    <svg
-                      aria-hidden="true"
-                      className="w-5 h-5 ml-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                <div id={SUMMARY_CTA_ID}>
+                  {user ? (
+                    <button
+                      type="button"
+                      onClick={proceedToCheckout}
+                      disabled={proceedingToCheckout || cartCount === 0 || hasInactiveItems}
+                      className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                ) : (
-                  <div className="space-y-3">
-                    <Link
-                      href="/login?redirect=/checkout"
-                      className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
-                    >
-                      Login to Checkout
+                      {proceedingToCheckout
+                        ? 'Starting…'
+                        : hasInactiveItems
+                          ? 'Remove unavailable items to checkout'
+                          : 'Proceed to Checkout'}
                       <svg
                         aria-hidden="true"
                         className="w-5 h-5 ml-2"
@@ -882,18 +869,36 @@ export default function CartPage() {
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
-                    </Link>
-                    <p className="text-sm text-foreground-secondary text-center">
-                      New customer?{' '}
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
                       <Link
-                        href="/signup"
-                        className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium"
+                        href="/login?redirect=/checkout"
+                        className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                       >
-                        Create an account
+                        Login to Checkout
+                        <svg
+                          aria-hidden="true"
+                          className="w-5 h-5 ml-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
                       </Link>
-                    </p>
-                  </div>
-                )}
+                      <p className="text-sm text-foreground-secondary text-center">
+                        New customer?{' '}
+                        <Link
+                          href="/signup"
+                          className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium"
+                        >
+                          Create an account
+                        </Link>
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 <Link
                   href="/products"
@@ -906,6 +911,38 @@ export default function CartPage() {
           )}
         </div>
       </div>
+
+      {cartItems.length > 0 && (
+        <MobileCheckoutBar
+          watchId={SUMMARY_CTA_ID}
+          label={
+            hasInactiveItems ? (
+              <span className="text-red-600 dark:text-red-400">Remove unavailable items</span>
+            ) : (
+              `Total (${cartCount} ${cartCount === 1 ? 'item' : 'items'})`
+            )
+          }
+          amount={`₹${finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        >
+          {user ? (
+            <button
+              type="button"
+              onClick={proceedToCheckout}
+              disabled={proceedingToCheckout || cartCount === 0 || hasInactiveItems}
+              className="shrink-0 min-h-[44px] px-5 bg-accent-500 hover:bg-accent-600 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              {proceedingToCheckout ? 'Starting…' : 'Checkout'}
+            </button>
+          ) : (
+            <Link
+              href="/login?redirect=/checkout"
+              className="shrink-0 min-h-[44px] px-5 inline-flex items-center bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              Login to checkout
+            </Link>
+          )}
+        </MobileCheckoutBar>
+      )}
     </div>
   )
 }

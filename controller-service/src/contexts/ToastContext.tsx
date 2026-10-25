@@ -58,6 +58,8 @@ function ToastItem({
 
   return createPortal(
     <div
+      data-toast
+      role={toast.type === 'error' ? 'alert' : 'status'}
       className={`animate-slide-in-right fixed z-[9999] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border max-w-sm ${BG[toast.type]}`}
       style={{ bottom: bottomOffset, right: 16 }}
     >

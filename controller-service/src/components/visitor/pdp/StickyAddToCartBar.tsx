@@ -7,8 +7,8 @@ import { PDP_BUY_BUTTONS_ID, PDP_OPTIONS_ID, formatRupees, scrollToId, type Stic
 
 // The fixed site header is h-16 / lg:h-20; buy buttons tucked under it count as scrolled away.
 const HEADER_OFFSET_PX = 80
-// CompareBar sits fixed at bottom-0 and is this tall whenever 2+ products are queued to compare.
-const ABOVE_COMPARE_BAR = 'bottom-[73px]'
+// CompareBar sits fixed at bottom-0 and is this tall (plus the home-indicator inset) whenever 2+ products are queued to compare.
+const ABOVE_COMPARE_BAR = 'bottom-[73px] mb-[env(safe-area-inset-bottom,0px)]'
 
 interface StickyAddToCartBarProps {
   action: StickyBarAction
@@ -89,7 +89,7 @@ export default function StickyAddToCartBar({
             type="button"
             onClick={onAdd}
             disabled={adding}
-            className="shrink-0 inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 sm:px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="shrink-0 inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 sm:px-6 py-2.5 min-h-[44px] lg:min-h-0 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {adding && (
               <span
@@ -103,7 +103,7 @@ export default function StickyAddToCartBar({
           <button
             type="button"
             onClick={() => scrollToId(PDP_OPTIONS_ID, 'center')}
-            className="shrink-0 bg-accent-500 hover:bg-accent-600 text-white px-4 sm:px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+            className="shrink-0 min-h-[44px] lg:min-h-0 bg-accent-500 hover:bg-accent-600 text-white px-4 sm:px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
           >
             Choose options
           </button>

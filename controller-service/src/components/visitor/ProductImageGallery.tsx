@@ -36,6 +36,15 @@ export default function ProductImageGallery({
     setSelectedImageIndex(0)
   }, [variantImages])
 
+  useEffect(() => {
+    if (!showLightbox) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowLightbox(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [showLightbox])
+
   if (!displayImages || displayImages.length === 0) {
     return (
       <div className="relative bg-surface-elevated rounded-xl overflow-hidden border border-border-default">
@@ -170,7 +179,8 @@ export default function ProductImageGallery({
           {/* Close Button */}
           <button
             onClick={() => setShowLightbox(false)}
-            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors z-10"
+            aria-label="Close"
+            className="absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.5rem,env(safe-area-inset-right))] p-2 text-white hover:text-gray-300 transition-colors z-10"
           >
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -178,7 +188,7 @@ export default function ProductImageGallery({
           </button>
 
           {/* Image Counter */}
-          <div className="absolute top-4 left-4 text-white text-sm bg-black bg-opacity-60 px-4 py-2 rounded-lg z-10">
+          <div className="absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] text-white text-sm bg-black bg-opacity-60 px-4 py-2 rounded-lg z-10">
             {selectedImageIndex + 1} / {displayImages.length}
           </div>
 
@@ -221,7 +231,7 @@ export default function ProductImageGallery({
 
           {/* Thumbnail Navigation in Lightbox */}
           {displayImages.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-black bg-opacity-60 p-2 rounded-lg max-w-full overflow-x-auto">
+            <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 flex gap-2 bg-black bg-opacity-60 p-2 rounded-lg max-w-full overflow-x-auto">
               {displayImages.map((image, index) => (
                 <button
                   key={image.id}
