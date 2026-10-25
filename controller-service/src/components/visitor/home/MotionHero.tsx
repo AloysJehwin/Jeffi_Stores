@@ -1,49 +1,28 @@
 'use client'
 
-import { Fragment, useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
-import {
-  motion,
-  useMotionValue,
-  useMotionValueEvent,
-  useSpring,
-  useTransform,
-  type MotionValue,
-  type Variants,
-} from 'motion/react'
+import { motion, useMotionValue, useMotionValueEvent, type MotionValue } from 'motion/react'
 import StoreImage from '@/components/visitor/StoreImage'
 import { SlideArrows, SlideProgress } from '@/components/visitor/slides/SlideControls'
 import { useAutoplay } from '@/components/visitor/slides/useAutoplay'
 import { useSwipe } from '@/components/visitor/slides/useSwipe'
+import {
+  FADE_S,
+  KEN_BURNS,
+  RevealWords,
+  headlineVariants,
+  riseVariants,
+  usePointerParallax,
+} from '@/components/visitor/slides/slide-motion'
 import type { MotionHeroSlide } from '@/lib/catalog/homepage-sections'
-
-const FADE_S = 0.7
-const KEN_BURNS = 0.06
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
 interface MotionHeroProps {
   slides: MotionHeroSlide[]
   /** How long a slide stays; also the length of its Ken Burns drift. */
   intervalMs: number
 }
-
-// Under reduced motion every variant resolves instantly; the hidden state waits out the crossfade
-// so the outgoing slide's text does not vanish before its image has faded.
-const headlineVariants = (reduced: boolean): Variants => ({
-  hidden: {},
-  show: { transition: reduced ? { staggerChildren: 0 } : { staggerChildren: 0.06, delayChildren: 0.15 } },
-})
-
-const wordVariants = (reduced: boolean): Variants => ({
-  hidden: { y: '110%', opacity: 0, transition: { duration: 0, delay: reduced ? 0 : FADE_S } },
-  show: { y: 0, opacity: 1, transition: reduced ? { duration: 0 } : { duration: 0.7, ease: EASE } },
-})
-
-const riseVariants = (reduced: boolean, delay: number): Variants => ({
-  hidden: { y: 14, opacity: 0, transition: { duration: 0, delay: reduced ? 0 : FADE_S } },
-  show: { y: 0, opacity: 1, transition: reduced ? { duration: 0 } : { duration: 0.6, ease: EASE, delay } },
-})
 
 export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
   const count = slides.length
@@ -62,26 +41,16 @@ export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
     paused: swipe.pressed,
   })
 
-  // Pointer parallax for the foreground image: mouse only, softened by springs.
-  const mx = useMotionValue(0)
-  const my = useMotionValue(0)
-  const px = useSpring(mx, { stiffness: 60, damping: 18, mass: 0.6 })
-  const py = useSpring(my, { stiffness: 60, damping: 18, mass: 0.6 })
-  const fgX = useTransform(px, v => v * 18)
-  const fgY = useTransform(py, v => v * 12)
+  // Pointer parallax for the foreground image.
+  const parallax = usePointerParallax(reduced)
 
   const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
     swipe.bind.onPointerMove(e)
-    if (reduced || e.pointerType !== 'mouse') return
-    const r = e.currentTarget.getBoundingClientRect()
-    mx.set(((e.clientX - r.left) / r.width - 0.5) * 2)
-    my.set(((e.clientY - r.top) / r.height - 0.5) * 2)
+    parallax.onPointerMove(e)
   }
   const onPointerLeave = (e: React.PointerEvent<HTMLElement>) => {
     bind.onPointerLeave(e)
-    if (e.pointerType !== 'mouse') return
-    mx.set(0)
-    my.set(0)
+    parallax.onPointerLeave(e)
   }
 
   if (count === 0) return null
@@ -111,8 +80,8 @@ export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
             active={i === active}
             reduced={reduced}
             progress={progress}
-            fgX={fgX}
-            fgY={fgY}
+            fgX={parallax.x}
+            fgY={parallax.y}
           />
         ))}
 
@@ -151,7 +120,6 @@ function Slide({ slide, index, count, active, reduced, progress, fgX, fgY }: Sli
   useMotionValueEvent(progress, 'change', v => {
     if (active) scale.set(reduced ? 1 : 1 + KEN_BURNS * v)
   })
-  const words = slide.headline.split(/\s+/)
 
   return (
     <motion.div
@@ -218,16 +186,7 @@ function Slide({ slide, index, count, active, reduced, progress, fgX, fgY }: Sli
           variants={headlineVariants(reduced)}
           className="text-[clamp(2rem,6vw,4.5rem)] font-black leading-[0.95] tracking-tight"
         >
-          {words.map((word, i) => (
-            <Fragment key={i}>
-              {i > 0 && ' '}
-              <span className="-mb-[0.12em] inline-block overflow-hidden pb-[0.12em] align-bottom">
-                <motion.span className="inline-block" variants={wordVariants(reduced)}>
-                  {word}
-                </motion.span>
-              </span>
-            </Fragment>
-          ))}
+          <RevealWords text={slide.headline} reduced={reduced} />
         </motion.h1>
         {slide.sub && (
           <motion.p

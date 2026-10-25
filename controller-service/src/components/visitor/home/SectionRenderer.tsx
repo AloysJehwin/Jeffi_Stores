@@ -22,6 +22,7 @@ import MotionHero from './MotionHero'
 import Stories from './Stories'
 import ProductSpotlight from './ProductSpotlight'
 import RewardsGame from './RewardsGame'
+import SlidesSection from './SlidesSection'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import {
   sectionLayout,
@@ -37,6 +38,7 @@ import {
   storyGroups,
   SECTION_COPY_DEFAULTS,
   type HomepageSection,
+  type SlidesData,
 } from '@/lib/catalog/homepage-sections'
 import { cardPropsFor } from '@/lib/catalog/product-card-props'
 import type { SectionData } from '@/lib/catalog/homepage-model'
@@ -376,6 +378,12 @@ export default function SectionRenderer({
       const game = rewardsGamePublic(section)
       if (!game) return null
       return <RewardsGame game={game} eyebrow={section.eyebrow} title={section.title} ctaLabel={section.cta_label} />
+    }
+
+    case 'slides': {
+      const slides = extra as SlidesData | undefined
+      if (!slides?.slides.length) return null
+      return <SlidesSection data={slides} eyebrow={section.eyebrow} title={section.title} />
     }
 
     default:
