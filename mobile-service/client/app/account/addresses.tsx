@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Alert, Pressable, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -18,6 +19,7 @@ import { useTokens } from '../../src/theme'
 // Mirror of controller-service components/shared/AccountAddresses.tsx + AccountAddressForm.tsx (visitor).
 
 export default function AddressesScreen() {
+  const insets = useSafeAreaInsets()
   const t = useTokens()
   const qc = useQueryClient()
   const user = useRequireAuth()
@@ -103,7 +105,7 @@ export default function AddressesScreen() {
   return (
     <View className="flex-1 bg-surface">
       <TopNav />
-      <KeyboardScroll contentContainerStyle={{ paddingBottom: 32 }}>
+      <KeyboardScroll contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         {!user || isLoading ? (
           <View className="px-4 pt-4 pb-8 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (

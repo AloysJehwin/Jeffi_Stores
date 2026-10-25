@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -50,6 +51,7 @@ function confirm(title: string, message: string, confirmLabel: string, danger = 
 }
 
 export default function SubscriptionsScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const t = useTokens()
   const qc = useQueryClient()
@@ -96,7 +98,7 @@ export default function SubscriptionsScreen() {
   return (
     <View className="flex-1 bg-surface">
       <TopNav />
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         <AccountMobileHeader />
         <View className="px-4 pt-4 gap-4">
           {!user || isLoading ? (

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Pressable, Share, Text, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
@@ -268,6 +269,7 @@ function HowItWorks({ program }: { program: RewardsData['program'] }) {
 }
 
 export default function RewardsScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const qc = useQueryClient()
   const user = useRequireAuth()
@@ -310,7 +312,7 @@ export default function RewardsScreen() {
     <View className="flex-1 bg-surface">
       <TopNav />
       <KeyboardScroll
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         scrollEventThrottle={200}
         onScroll={e => {
           const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
