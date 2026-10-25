@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { BookOpen } from 'lucide-react'
-import StoreImage from '@/components/visitor/StoreImage'
+import StoreMedia from '@/components/visitor/media/StoreMedia'
 import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.blog_teaser
@@ -10,6 +10,8 @@ export interface BlogTeaserItem {
   excerpt: string
   url: string
   imageUrl: string
+  /** MP4/WebM over the image, its poster. */
+  video?: string
 }
 
 const isExternal = (url: string) => /^https?:\/\//i.test(url)
@@ -51,11 +53,12 @@ export default function BlogTeaser({ items, eyebrow, title, ctaLabel, ctaUrl }: 
               className="group flex flex-col rounded-2xl border border-border-default bg-surface-elevated overflow-hidden hover:shadow-md hover:border-accent-300 transition-all"
             >
               <div className="relative aspect-[16/9] bg-surface-secondary overflow-hidden">
-                {item.imageUrl ? (
-                  <StoreImage
-                    src={item.imageUrl}
-                    alt=""
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                {item.imageUrl || item.video ? (
+                  <StoreMedia
+                    image={item.imageUrl}
+                    video={item.video}
+                    wrapperClassName="absolute inset-0"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">

@@ -54,6 +54,7 @@ export type PromoOffer = Pick<
   | 'image_url_mobile'
   | 'blurhash'
   | 'blurhash_mobile'
+  | 'video_url'
   | 'cta_label'
 >
 

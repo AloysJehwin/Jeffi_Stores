@@ -2,8 +2,9 @@
 
 import { Fragment } from 'react'
 import Link from 'next/link'
-import Slides from '@/components/visitor/slides/Slides'
+import Slides, { useSlide } from '@/components/visitor/slides/Slides'
 import SlideImage from '@/components/visitor/slides/SlideImage'
+import StoreMedia from '@/components/visitor/media/StoreMedia'
 
 export interface HeroSlide {
   // New DB-backed shape
@@ -16,6 +17,8 @@ export interface HeroSlide {
   image_url_mobile?: string | null
   blurhash?: string | null
   blurhash_mobile?: string | null
+  /** MP4/WebM over the desktop image, its poster. */
+  video_url?: string | null
   href?: string
   // Legacy category-derived fields (fallback path)
   name?: string
@@ -98,6 +101,7 @@ interface Resolved {
   mobileImg: string
   desktopImg: string
   blurhash: string | null
+  video: string | null
 }
 
 function resolveSlide(s: HeroSlide, i: number): Resolved {
@@ -112,7 +116,38 @@ function resolveSlide(s: HeroSlide, i: number): Resolved {
   // Mirrors the desktop image's fallback chain: the canvas sits under the <picture>, whose
   // default <img> is the mobile source, so prefer whichever hash matches what renders first.
   const blurhash = s.blurhash_mobile || s.blurhash || null
-  return { key: s.id ?? s.slug ?? String(i), href, title, subtitle, badge, badgeColor, mobileImg, desktopImg, blurhash }
+  const video = s.video_url ?? null
+  return {
+    key: s.id ?? s.slug ?? String(i),
+    href,
+    title,
+    subtitle,
+    badge,
+    badgeColor,
+    mobileImg,
+    desktopImg,
+    blurhash,
+    video,
+  }
+}
+
+const MEDIA = `absolute right-0 top-0 h-full w-[62%] sm:w-[60%] ${EDGE_MASK}`
+
+// Fade a slide's left edge into the base instead of cutting it off; only the current slide's clip plays.
+function Backdrop({ s }: { s: Resolved }) {
+  const { current } = useSlide()
+  return (
+    <StoreMedia image={s.desktopImg} video={s.video} active={current} className={`${MEDIA} object-cover object-center`}>
+      <SlideImage
+        src={s.desktopImg}
+        mobileSrc={s.mobileImg}
+        blurhash={s.blurhash}
+        breakpoint={1024}
+        blurClassName={MEDIA}
+        className={`${MEDIA} object-cover object-center`}
+      />
+    </StoreMedia>
+  )
 }
 
 export default function HeroCarousel({ slides }: Props) {
@@ -137,15 +172,7 @@ export default function HeroCarousel({ slides }: Props) {
                   (--color-surface #F9FAFB) bled through on the left as a grey haze, and the
                   boundary where that met the image read as a faint vertical line. */}
               <div className="absolute inset-0 bg-[#0d0d0d]">
-                {/* Fade the image's left edge into the base instead of cutting it off. */}
-                <SlideImage
-                  src={s.desktopImg}
-                  mobileSrc={s.mobileImg}
-                  blurhash={s.blurhash}
-                  breakpoint={1024}
-                  blurClassName={`absolute right-0 top-0 h-full w-[62%] sm:w-[60%] ${EDGE_MASK}`}
-                  className={`absolute right-0 top-0 h-full w-[62%] sm:w-[60%] object-cover object-center ${EDGE_MASK}`}
-                />
+                <Backdrop s={s} />
                 <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] from-35% via-[#0d0d0d]/80 via-60% to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/30" />
               </div>

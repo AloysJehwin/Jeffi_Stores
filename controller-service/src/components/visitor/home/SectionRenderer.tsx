@@ -89,6 +89,9 @@ function tiles<T>(raw: unknown, keys: (keyof T & string)[]): T[] | null {
   return rows.length > 0 ? (rows as T[]) : null
 }
 
+// An optional clip URL from admin jsonb.
+const clip = (raw: unknown): string | undefined => (typeof raw === 'string' ? (safeHref(raw) ?? undefined) : undefined)
+
 export default function SectionRenderer({
   section,
   data,
@@ -188,6 +191,7 @@ export default function SectionRenderer({
           imageUrl={typeof cfg.imageUrl === 'string' ? cfg.imageUrl : null}
           imageUrlMobile={typeof cfg.imageUrlMobile === 'string' ? cfg.imageUrlMobile : null}
           blurhash={typeof cfg.blurhash === 'string' ? cfg.blurhash : null}
+          video={clip(cfg.video)}
           ctaLabel={section.cta_label}
           ctaUrl={section.cta_url}
         />
@@ -222,6 +226,7 @@ export default function SectionRenderer({
           aboutCopy={section.subtitle || data.aboutCopy}
           body={typeof cfg.body === 'string' ? cfg.body : null}
           imageUrl={typeof cfg.imageUrl === 'string' ? cfg.imageUrl : null}
+          video={clip(cfg.video)}
           ctaLabel={section.cta_label}
           ctaUrl={section.cta_url}
           stats={tiles<{ value: string; label: string }>(cfg.stats, ['value', 'label']) ?? data.stats}
@@ -311,7 +316,7 @@ export default function SectionRenderer({
 
     case 'blog_teaser': {
       const items = (tiles<BlogTeaserItem>(cfg.items, ['title', 'excerpt', 'url', 'imageUrl']) ?? [])
-        .map(i => ({ ...i, url: safeHref(i.url) ?? '', imageUrl: safeHref(i.imageUrl) ?? '' }))
+        .map(i => ({ ...i, url: safeHref(i.url) ?? '', imageUrl: safeHref(i.imageUrl) ?? '', video: clip(i.video) }))
         .filter(i => i.title.trim() && i.url)
       if (items.length === 0) return null
       return (
@@ -327,7 +332,7 @@ export default function SectionRenderer({
 
     case 'social_strip': {
       const items = (tiles<SocialStripItem>(cfg.items, ['imageUrl', 'url', 'caption']) ?? [])
-        .map(i => ({ ...i, url: safeHref(i.url) ?? '', imageUrl: safeHref(i.imageUrl) ?? '' }))
+        .map(i => ({ ...i, url: safeHref(i.url) ?? '', imageUrl: safeHref(i.imageUrl) ?? '', video: clip(i.video) }))
         .filter(i => i.url && i.imageUrl)
       if (items.length === 0) return null
       return (

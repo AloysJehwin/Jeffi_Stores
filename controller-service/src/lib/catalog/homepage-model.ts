@@ -104,7 +104,7 @@ async function getHeroSlides(surface: HomepageSurface) {
   // filtered after the surface is picked so an app with only paused slides doesn't borrow the web's.
   const slides = await queryMany<any>(
     `SELECT id, title, subtitle, badge_text, badge_color, image_url, image_url_mobile, blurhash, blurhash_mobile,
-            cta_url, filter_category, filter_brand, filter_grade, filter_material, filter_min_price,
+            video_url, cta_url, filter_category, filter_brand, filter_grade, filter_material, filter_min_price,
             filter_max_price, filter_in_stock, filter_on_sale, is_active, ${SURFACE_COLUMN_SQL('h')}
        FROM hero_slides h ORDER BY display_order ASC, created_at ASC`
   )
@@ -120,6 +120,7 @@ async function getHeroSlides(surface: HomepageSurface) {
       image_url_mobile: s.image_url_mobile,
       blurhash: s.blurhash,
       blurhash_mobile: s.blurhash_mobile,
+      video_url: safeHref(s.video_url),
       href: heroSlideHref(s),
     }))
   }
@@ -254,7 +255,8 @@ export async function buildHomeModel({
   // The Business CTA promotes the B2B portal, which only exists on plans that sell it (Pro+); the
   // rewards game issues coupons, a customer-programs feature on the same footing.
   const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
-  const businessAllowed = (await currentTenantPlanGate('business_customers:read').catch(() => ({ allowed: false }))).allowed
+  const businessAllowed = (await currentTenantPlanGate('business_customers:read').catch(() => ({ allowed: false })))
+    .allowed
   const programsAllowed = allSections.some(s => s.type === 'rewards_game')
     ? await (await import('@/lib/loyalty/settings')).customerProgramsAllowed()
     : false
@@ -403,7 +405,10 @@ export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
   for (const s of sections) {
     if (s.type === 'product_row') {
       const days = justLandedDays(s)
-      productRows[s.id] = cards(data.productRows.get(s.id) ?? [], days ? r => (launchedWithin(r, days) ? 'New' : null) : undefined)
+      productRows[s.id] = cards(
+        data.productRows.get(s.id) ?? [],
+        days ? r => (launchedWithin(r, days) ? 'New' : null) : undefined
+      )
     }
     if (!data.extras.has(s.id)) continue
     const value = data.extras.get(s.id)
@@ -463,7 +468,12 @@ export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
       ...data,
       productRows,
       dealOfTheDay: cards(data.dealOfTheDay),
-      categoryShowcase: data.categoryShowcase.map((c: any) => ({ id: c.id, name: c.name, slug: c.slug, products: cards(c.products) })),
+      categoryShowcase: data.categoryShowcase.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        products: cards(c.products),
+      })),
       extras,
     },
   }

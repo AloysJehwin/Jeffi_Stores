@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { motion, useMotionValue, useMotionValueEvent, type MotionValue } from 'motion/react'
 import StoreImage from '@/components/visitor/StoreImage'
+import StoreMedia, { useCanPlayVideo } from '@/components/visitor/media/StoreMedia'
 import { SlideArrows, SlideProgress } from '@/components/visitor/slides/SlideControls'
 import { useAutoplay } from '@/components/visitor/slides/useAutoplay'
 import { useSwipe } from '@/components/visitor/slides/useSwipe'
@@ -117,8 +118,11 @@ interface SlideProps {
 function Slide({ slide, index, count, active, reduced, progress, fgX, fgY }: SlideProps) {
   // Follows the clock while active and freezes otherwise, so the outgoing image keeps its frame through the crossfade.
   const scale = useMotionValue(1)
+  // No Ken Burns under a clip, so the frame doesn't jump when it starts.
+  const [failed, setFailed] = useState(false)
+  const still = useCanPlayVideo() && !!slide.bgVideo && !failed
   useMotionValueEvent(progress, 'change', v => {
-    if (active) scale.set(reduced ? 1 : 1 + KEN_BURNS * v)
+    if (active) scale.set(reduced || still ? 1 : 1 + KEN_BURNS * v)
   })
 
   return (
@@ -133,13 +137,15 @@ function Slide({ slide, index, count, active, reduced, progress, fgX, fgY }: Sli
       transition={{ duration: reduced ? 0 : FADE_S, ease: 'easeInOut' }}
     >
       <motion.div className="absolute inset-0" style={{ scale }}>
-        <StoreImage
-          src={slide.bgImage}
-          alt=""
+        <StoreMedia
+          image={slide.bgImage}
+          video={slide.bgVideo}
+          active={active}
           priority={index === 0}
           sizes="100vw"
           wrapperClassName="absolute inset-0"
           className="absolute inset-0 h-full w-full object-cover"
+          onFail={() => setFailed(true)}
         />
       </motion.div>
       <div

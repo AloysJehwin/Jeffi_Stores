@@ -1,12 +1,38 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
+import StoreMedia from '@/components/visitor/media/StoreMedia'
 
 /** The backdrop image classes, hover zoom included. */
 export const CARD_IMAGE =
   'absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out motion-safe:group-hover:scale-[1.04]'
 export const BANNER_IMAGE =
   'absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out motion-safe:group-hover:scale-[1.03]'
+
+export interface PromoMediaProps {
+  /** A 4:5 / 1:1 card takes the card clip, a wide slot the wide one; each falls back to the other. */
+  card: boolean
+  video?: string | null
+  videoCard?: string | null
+  /** The picture the slot draws, which is the clip's poster. */
+  poster?: string | null
+  alt?: string
+  /** Plays only while true, e.g. the current slide. */
+  active: boolean
+  /** The clip's classes: the image's, so it fills the same box. */
+  className: string
+  /** The slot's picture (SlideImage). */
+  children: ReactNode
+}
+
+/** A promo backdrop: the slot's picture with its clip, picked as the picture is, over it. */
+export function PromoMedia({ card, video, videoCard, poster, children, ...p }: PromoMediaProps) {
+  return (
+    <StoreMedia {...p} image={poster} video={card ? videoCard || video : video || videoCard}>
+      {children}
+    </StoreMedia>
+  )
+}
 
 const FOCUS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'
