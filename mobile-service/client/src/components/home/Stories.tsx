@@ -1,21 +1,25 @@
 import { useEffect, useId } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { Text } from '../../ui'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Gradient, Text } from '../../ui'
 import { Image } from 'expo-image'
+import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg'
 import { GUTTER, SectionHeading } from './layout'
 import { absUrl } from '../../lib/links'
 import { isGroupSeen, openStories, useStoryStore } from '../../stores/storyStore'
-import { accent } from '../../theme'
+import { accent, useTokens } from '../../theme'
 import type { SectionProps, StoriesData, StoryGroup } from '../../types/home'
 
-// A row of story rings; tapping one opens the full-screen viewer (StoryViewerHost at the root).
+// A row of story rings; tapping one opens the full-screen viewer (StoryViewerHost at the root). Like the
+// web's grid-auto-cols-[minmax(…,1fr)] row, a few groups share the full width and many scroll.
 
 const COPY = { eyebrow: 'Fresh today', title: 'Stories' }
 const RING = 68
 const STROKE = 2.5
 const INSET = 2.5 // gap between the ring and the cover
 const CELL = RING + 8
+const GAP = 12
+const FADE = GUTTER * 2
 
 export default function Stories({ section, data }: SectionProps) {
   const groups = (data.extras[section.id] as StoriesData | undefined)?.groups ?? []
@@ -34,16 +38,50 @@ export default function Stories({ section, data }: SectionProps) {
         titleClassName="font-display text-xl font-extrabold text-foreground"
         className="mb-4"
       />
-      <ScrollView
+      <Row groups={groups} seen={seen} />
+    </View>
+  )
+}
+
+// Cells grow to share the row and scroll once they overflow; the edges fade only where more rings hide.
+function Row({ groups, seen }: { groups: StoryGroup[]; seen: Record<string, number> }) {
+  const t = useTokens()
+  const x = useSharedValue(0)
+  const viewport = useSharedValue(0)
+  const content = useSharedValue(0)
+  const onScroll = useAnimatedScrollHandler(e => {
+    x.value = e.contentOffset.x
+  })
+  const leftFade = useAnimatedStyle(() => ({ opacity: interpolate(x.value, [0, FADE], [0, 1], Extrapolation.CLAMP) }))
+  const rightFade = useAnimatedStyle(() => ({
+    opacity: interpolate(content.value - viewport.value - x.value, [1, FADE], [0, 1], Extrapolation.CLAMP),
+  }))
+
+  return (
+    <View style={{ marginHorizontal: -GUTTER }}>
+      <Animated.ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={{ marginHorizontal: -GUTTER }}
-        contentContainerStyle={{ paddingHorizontal: GUTTER, gap: 12 }}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        onLayout={e => {
+          viewport.value = e.nativeEvent.layout.width
+        }}
+        onContentSizeChange={w => {
+          content.value = w
+        }}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: GUTTER, gap: GAP }}
       >
         {groups.map((group, i) => (
           <Ring key={group.id} group={group} seen={isGroupSeen(seen, group)} onPress={() => openStories(groups, i)} />
         ))}
-      </ScrollView>
+      </Animated.ScrollView>
+      <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: 0, bottom: 0, width: FADE }, leftFade]}>
+        <Gradient dir="r" stops={[[0, t.surface], [1, t.surface, 0]]} />
+      </Animated.View>
+      <Animated.View pointerEvents="none" style={[{ position: 'absolute', right: 0, top: 0, bottom: 0, width: FADE }, rightFade]}>
+        <Gradient dir="l" stops={[[0, t.surface], [1, t.surface, 0]]} />
+      </Animated.View>
     </View>
   )
 }
@@ -55,7 +93,7 @@ function Ring({ group, seen, onPress }: { group: StoryGroup; seen: boolean; onPr
   return (
     <Pressable
       onPress={onPress}
-      style={{ width: CELL }}
+      style={{ flexGrow: 1, flexBasis: CELL }}
       className="items-center"
       accessibilityRole="button"
       accessibilityLabel={`${group.title} story${seen ? '' : ', new'}`}
@@ -80,8 +118,7 @@ function Ring({ group, seen, onPress }: { group: StoryGroup; seen: boolean; onPr
       </View>
       <Text
         numberOfLines={1}
-        className={`mt-1.5 text-xs ${seen ? 'text-foreground-muted' : 'font-semibold text-foreground'}`}
-        style={{ width: CELL, textAlign: 'center' }}
+        className={`mt-1.5 self-stretch text-center text-xs ${seen ? 'text-foreground-muted' : 'font-semibold text-foreground'}`}
       >
         {group.title}
       </Text>
