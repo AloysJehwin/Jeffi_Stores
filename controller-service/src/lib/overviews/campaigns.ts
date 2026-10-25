@@ -14,8 +14,10 @@ const SENT_COLS = `
        COUNT(*) FILTER (WHERE s.channel = 'email') AS emails,
        COUNT(*) FILTER (WHERE s.channel <> 'email') AS other_channels,
        COUNT(*) FILTER (WHERE s.channel = 'email' AND s.bounced_at IS NULL) AS delivered_emails,
-       COUNT(s.opened_at) AS opened,
-       COUNT(s.clicked_at) AS clicked,
+       COUNT(s.opened_at) FILTER (WHERE s.channel = 'email') AS opened,
+       COUNT(s.clicked_at) FILTER (WHERE s.channel = 'email') AS clicked,
+       COUNT(*) FILTER (WHERE s.channel = 'push' AND s.metadata->>'status' IN ('sent', 'deferred')) AS pushes,
+       COUNT(s.opened_at) FILTER (WHERE s.channel = 'push') AS push_opened,
        COUNT(s.converted_at) AS converted,
        COUNT(s.unsubscribed_at) AS unsubscribed,
        COUNT(s.bounced_at) AS bounced,
@@ -101,6 +103,9 @@ export interface CampaignStats {
   sends: number
   emails: number
   other_channels: number
+  /** App pushes delivered or waiting out quiet hours; their taps (opens count clicks too). */
+  pushes: number
+  push_opened: number
   delivered_emails: number
   opened: number
   clicked: number
@@ -122,6 +127,8 @@ export function toCampaignStats(r: Record<string, unknown> | undefined): Campaig
     sends: num(r?.sends),
     emails: num(r?.emails),
     other_channels: num(r?.other_channels),
+    pushes: num(r?.pushes),
+    push_opened: num(r?.push_opened),
     delivered_emails: num(r?.delivered_emails),
     opened: num(r?.opened),
     clicked: num(r?.clicked),

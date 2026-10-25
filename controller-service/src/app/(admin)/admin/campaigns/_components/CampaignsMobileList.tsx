@@ -94,7 +94,7 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
                 )}
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                {getChannels(c.kind).map(ch => (
+                {getChannels(c.kind, c.parameters, c.scenario_kind).map(ch => (
                   <ChannelChip key={ch} channel={ch} />
                 ))}
                 {c.discount_percent > 0 && (
@@ -139,7 +139,7 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
         {selected && (
           <div className="px-5 py-4 space-y-4">
             <div className="flex items-center gap-1.5 flex-wrap">
-              {getChannels(selected.kind).map(ch => (
+              {getChannels(selected.kind, selected.parameters, selected.scenario_kind).map(ch => (
                 <ChannelChip key={ch} channel={ch} />
               ))}
               {selected.discount_percent > 0 && (

@@ -35,7 +35,7 @@ const SERIES: SeriesDef[] = [
   { key: 'clicked', label: 'Clicks', color: 'rgb(224 123 63)', kind: 'line', axis: 'count', on: false },
   { key: 'converted', label: 'Conversions', color: 'rgb(168 85 247)', kind: 'line', axis: 'count', on: false },
 ]
-const CHANNEL: Record<string, string> = { email: 'Email', whatsapp: 'WhatsApp', sms: 'SMS' }
+const CHANNEL: Record<string, string> = { email: 'Email', whatsapp: 'WhatsApp', sms: 'SMS', push: 'App push' }
 
 export default function CampaignsOverview() {
   const [period, setPeriod] = usePeriod()
@@ -166,6 +166,13 @@ export default function CampaignsOverview() {
                   ),
                 },
                 { key: 'sends', label: 'Sends', num: true, render: r => count(r.sends), sort: r => r.sends },
+                {
+                  key: 'push',
+                  label: 'Push',
+                  num: true,
+                  render: r => (r.pushes ? `${count(r.pushes)}${r.push_opened ? ` · ${count(r.push_opened)} opened` : ''}` : '-'),
+                  sort: r => r.pushes,
+                },
                 { key: 'open', label: 'Open', num: true, render: r => pct(r.open_rate), sort: r => r.open_rate ?? -1 },
                 {
                   key: 'click',

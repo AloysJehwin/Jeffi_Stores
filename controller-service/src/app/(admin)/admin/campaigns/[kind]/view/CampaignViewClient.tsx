@@ -10,12 +10,15 @@ import { renderLayoutPreview, EMAIL_LAYOUT_OPTIONS } from '@/lib/templates/email
 import { renderBlocks, type EmailBlock } from '@/lib/templates/blocks'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import { WhatsAppPreview } from '@/components/admin/campaigns/WhatsAppTemplateEditor'
+import { PushPreview } from '@/components/admin/campaigns/PushEditor'
+import { campaignSupportsPush, scenarioPushCopy } from '@/lib/campaigns/push-kinds'
 import { CampaignDetailSkeleton, CampaignPageSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import {
   type CampaignRow,
   getChannels,
   ChannelChip,
   CampaignStatsGrid,
+  CampaignPushStats,
 } from '@/app/(admin)/admin/campaigns/_components/campaign-presentation'
 import {
   EligibleRecipientsPanel,
@@ -54,6 +57,7 @@ interface ViewCampaign extends CampaignRow {
   wa_variables?: Record<string, string> | null
   wa_header_image_url?: string | null
   parameters?: Record<string, unknown> | null
+  scenario_kind?: string | null
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -136,6 +140,10 @@ export default function CampaignViewClient({
   const smsPreview = smsEnabled && smsSource ? renderVars(smsSource, vars) : ''
   const layoutLabel = EMAIL_LAYOUT_OPTIONS.find(l => l.key === c.template_layout)?.label ?? 'Classic'
   const waEnabled = campaignSupportsWhatsApp(kind) && !!c.parameters?.whatsappEnabled && !!c.wa_template_slug
+  const pushKind = campaignSupportsPush(kind) ? kind : (c.scenario_kind ?? '')
+  const pushEnabled = campaignSupportsPush(pushKind) && c.parameters?.pushEnabled === true
+  const pushCopy = scenarioPushCopy(pushKind, c.parameters)
+  const pushHistory = ['push_sent', 'push_waiting', 'push_skipped', 'push_failed'].some(k => Number((c as any)[k] ?? 0) > 0)
 
   return (
     <div className="space-y-5">
@@ -152,7 +160,7 @@ export default function CampaignViewClient({
                   >
                     {c.enabled ? 'Active' : 'Paused'}
                   </span>
-                  {getChannels(kind).map(ch => (
+                  {getChannels(kind, c.parameters, c.scenario_kind).map(ch => (
                     <ChannelChip key={ch} channel={ch} />
                   ))}
                   {hasDraft && (
@@ -195,6 +203,12 @@ export default function CampaignViewClient({
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Performance</h3>
             <CampaignStatsGrid c={c} />
+            {(pushEnabled || pushHistory) && (
+              <div className="mt-4 pt-4 border-t border-border-default">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted mb-2">App push</p>
+                <CampaignPushStats c={c} />
+              </div>
+            )}
           </div>
 
           {/* Operational panels — collapsed, stacked under the summary in the left column. */}
@@ -237,6 +251,18 @@ export default function CampaignViewClient({
               <WhatsAppPreview
                 value={{ slug: c.wa_template_slug ?? null, variables: c.wa_variables ?? {} }}
                 vars={vars}
+              />
+            </div>
+          )}
+
+          {pushEnabled && (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+              <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">App push</h3>
+              <PushPreview
+                title={pushCopy.title}
+                body={pushCopy.body}
+                image={pushKind === 'birthday' ? null : String(SAMPLE_VARS.productImageUrl)}
+                vars={{ ...vars, items: 'Sample Product and 1 more', headline: 'Sample Product is now ₹799' }}
               />
             </div>
           )}
