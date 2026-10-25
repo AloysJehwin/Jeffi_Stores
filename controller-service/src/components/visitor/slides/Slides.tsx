@@ -109,8 +109,8 @@ const opt = <T extends object>(v: boolean | T | undefined, fallback: boolean): T
   v === undefined ? (fallback ? ({} as T) : null) : v === false ? null : v === true ? ({} as T) : v
 const autoplayMs = (v: boolean | number | undefined) => (typeof v === 'number' ? v : v ? DEFAULT_AUTOPLAY_MS : 0)
 
-// React 18 has no `inert` prop; the attribute still passes through, server-rendered too.
-const inert = (on: boolean) => (on ? { inert: '' } : {}) as object
+// The app router renders with React 19, where `inert` is a boolean prop; the React 18 types lack it.
+const inert = (on: boolean) => (on ? { inert: true } : {}) as object
 
 function onArrowKeys(e: React.KeyboardEvent, prev: () => void, next: () => void) {
   if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
