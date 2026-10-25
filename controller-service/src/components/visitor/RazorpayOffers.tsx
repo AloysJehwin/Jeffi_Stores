@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Slides from '@/components/visitor/slides/Slides'
 import type { PublicOffer } from '@/lib/payments/razorpay-offers'
 
 // Offers were hardcoded here: HDFC, ICICI, Kotak, SBI and RuPay deals that do not exist on this
@@ -34,8 +35,6 @@ function subtitle(o: PublicOffer): string {
 
 export default function RazorpayOffers() {
   const [offers, setOffers] = useState<PublicOffer[]>([])
-  const [active, setActive] = useState(0)
-  const go = useCallback((n: number) => setActive(n), [])
 
   useEffect(() => {
     let cancelled = false
@@ -49,12 +48,6 @@ export default function RazorpayOffers() {
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    if (offers.length < 2) return
-    const t = setTimeout(() => go((active + 1) % offers.length), AUTO_MS)
-    return () => clearTimeout(t)
-  }, [active, offers.length, go])
 
   if (offers.length === 0) return null
 
@@ -79,15 +72,22 @@ export default function RazorpayOffers() {
         </span>
       </div>
 
-      <Link
-        href="/legal/terms-and-conditions#5a-bank-offers-cashback"
-        className="block relative rounded-lg overflow-hidden h-10 cursor-pointer"
-        title="Bank offer T&C"
+      {/* Each slide links to the T&C, so the dots no longer sit inside a link. */}
+      <Slides
+        layout="fade"
+        ariaLabel="Bank offers"
+        itemLabel="offer"
+        autoplay={AUTO_MS}
+        className="relative rounded-lg overflow-hidden h-10"
+        slideClassName="duration-500"
+        dots={{ size: 'sm', label: i => `Offer ${i + 1}`, className: 'absolute right-2 bottom-1.5 z-20' }}
       >
         {offers.map((offer, i) => (
-          <div
+          <Link
             key={offer.id}
-            className={`absolute inset-0 flex items-center gap-3 px-3 bg-gradient-to-r ${GRADIENTS[i % GRADIENTS.length]} transition-opacity duration-500 ${i === active ? 'opacity-100' : 'opacity-0'}`}
+            href="/legal/terms-and-conditions#5a-bank-offers-cashback"
+            title="Bank offer T&C"
+            className={`absolute inset-0 flex items-center gap-3 px-3 bg-gradient-to-r ${GRADIENTS[i % GRADIENTS.length]}`}
           >
             <svg
               className="w-3.5 h-3.5 text-white/70 shrink-0"
@@ -106,25 +106,9 @@ export default function RazorpayOffers() {
             {subtitle(offer) && (
               <span className="text-[10px] text-white/60 shrink-0 ml-auto hidden sm:block">{subtitle(offer)}</span>
             )}
-          </div>
+          </Link>
         ))}
-
-        {offers.length > 1 && (
-          <div className="absolute right-2 bottom-1.5 flex items-center gap-1 z-10">
-            {offers.map((o, i) => (
-              <button
-                key={o.id}
-                onClick={e => {
-                  e.preventDefault()
-                  go(i)
-                }}
-                className={`rounded-full transition-all duration-300 ${i === active ? 'bg-white w-3 h-1' : 'bg-white/40 w-1 h-1'}`}
-                aria-label={`Offer ${i + 1}`}
-              />
-            ))}
-          </div>
-        )}
-      </Link>
+      </Slides>
     </div>
   )
 }

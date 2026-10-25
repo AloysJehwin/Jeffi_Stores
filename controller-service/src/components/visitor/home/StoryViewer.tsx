@@ -4,13 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { ArrowUpRight, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import StoreImage from '@/components/visitor/StoreImage'
+import { SlideProgress } from '@/components/visitor/slides/SlideControls'
+import { useAutoplay } from '@/components/visitor/slides/useAutoplay'
+import { useSwipe } from '@/components/visitor/slides/useSwipe'
 import type { StoryGroup } from '@/lib/catalog/homepage-sections'
 
 const CLOSE_DRAG_PX = 120
 const SWIPE_PX = 60
-const TAP_MS = 300
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 const ARROW =
   'absolute top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-white/20 bg-white/10 p-3 text-white transition-colors hover:bg-white/20 md:inline-flex'
@@ -28,10 +30,6 @@ export default function StoryViewer({ groups, startIndex, onClose, onGroupOpen }
   const [gi, setGi] = useState(startIndex)
   const [si, setSi] = useState(0)
   const [round, setRound] = useState(0)
-  const [holding, setHolding] = useState(false)
-  const [hidden, setHidden] = useState(false)
-  const progress = useMotionValue(0)
-  const elapsedRef = useRef(0)
   const closeRef = useRef<HTMLButtonElement>(null)
 
   const group = groups[gi]
@@ -58,32 +56,30 @@ export default function StoryViewer({ groups, startIndex, onClose, onGroupOpen }
     } else setRound(r => r + 1)
   }, [si, gi])
 
-  useEffect(() => {
-    elapsedRef.current = 0
-    progress.set(0)
-  }, [gi, si, round, progress])
+  // Tap zones: a quick tap navigates (left third back, the rest forward); holding pauses;
+  // a horizontal swipe navigates; dragging down past the threshold closes.
+  const swipe = useSwipe({
+    onSwipe: d => (d > 0 ? next() : prev()),
+    threshold: SWIPE_PX,
+    onTap: e => {
+      const r = e.currentTarget.getBoundingClientRect()
+      if (e.clientX - r.left < r.width / 3) prev()
+      else next()
+    },
+    onDragDown: onClose,
+    dragDownPx: CLOSE_DRAG_PX,
+    capture: true,
+  })
 
   // Progress keeps running under reduced motion: it is the only cue for how long a slide has left.
-  const durationMs = (slide?.seconds ?? 5) * 1000
-  const running = !!slide && !holding && !hidden
-  useEffect(() => {
-    if (!running) return
-    let frame = 0
-    const started = performance.now() - elapsedRef.current
-    const tick = (now: number) => {
-      const elapsed = now - started
-      elapsedRef.current = elapsed
-      const p = Math.min(1, elapsed / durationMs)
-      progress.set(p)
-      if (p >= 1) {
-        next()
-        return
-      }
-      frame = requestAnimationFrame(tick)
-    }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [running, durationMs, next, progress, gi, si, round])
+  const { progress } = useAutoplay({
+    durationMs: (slide?.seconds ?? 5) * 1000,
+    resetKey: `${gi}:${si}:${round}`,
+    onComplete: next,
+    enabled: !!slide,
+    paused: swipe.pressed,
+    ignoreReducedMotion: true,
+  })
 
   useEffect(() => {
     const upcoming = group?.slides[si + 1] ?? groups[gi + 1]?.slides[0]
@@ -101,12 +97,6 @@ export default function StoryViewer({ groups, startIndex, onClose, onGroupOpen }
   }, [onClose, next, prev])
 
   useEffect(() => {
-    const onVisibility = () => setHidden(document.hidden)
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => document.removeEventListener('visibilitychange', onVisibility)
-  }, [])
-
-  useEffect(() => {
     const prevOverflow = document.body.style.overflow
     const prevFocus = document.activeElement as HTMLElement | null
     document.body.style.overflow = 'hidden'
@@ -116,46 +106,6 @@ export default function StoryViewer({ groups, startIndex, onClose, onGroupOpen }
       prevFocus?.focus?.()
     }
   }, [])
-
-  // Tap zones: a quick tap navigates (left third back, the rest forward); holding pauses;
-  // a horizontal swipe navigates; dragging down past the threshold closes.
-  const pointer = useRef<{ x: number; y: number; t: number } | null>(null)
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    pointer.current = { x: e.clientX, y: e.clientY, t: performance.now() }
-    setHolding(true)
-  }
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const p = pointer.current
-    if (p && e.clientY - p.y > CLOSE_DRAG_PX) {
-      pointer.current = null
-      setHolding(false)
-      onClose()
-    }
-  }
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    const p = pointer.current
-    pointer.current = null
-    setHolding(false)
-    if (!p) return
-    const dx = e.clientX - p.x
-    const dy = e.clientY - p.y
-    if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) next()
-      else prev()
-      return
-    }
-    if (performance.now() - p.t < TAP_MS && Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-      const r = e.currentTarget.getBoundingClientRect()
-      if (e.clientX - r.left < r.width / 3) prev()
-      else next()
-    }
-  }
-  const onPointerCancel = () => {
-    pointer.current = null
-    setHolding(false)
-  }
 
   if (typeof document === 'undefined' || !group || !slide) return null
 
@@ -192,19 +142,12 @@ export default function StoryViewer({ groups, startIndex, onClose, onGroupOpen }
         <div
           aria-hidden="true"
           className="absolute inset-0 z-10 touch-none select-none"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
+          {...swipe.bind}
           onContextMenu={e => e.preventDefault()}
         />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <div className="flex gap-1" aria-hidden="true">
-            {group.slides.map((s, i) => (
-              <Segment key={s.id} index={i} active={si} progress={progress} />
-            ))}
-          </div>
+          <SlideProgress count={slideCount} index={si} progress={progress} className="flex gap-1" />
           <div className="pointer-events-auto mt-3 flex items-center gap-3">
             <StoreImage
               src={group.cover}
@@ -253,14 +196,5 @@ export default function StoryViewer({ groups, startIndex, onClose, onGroupOpen }
       </button>
     </motion.div>,
     document.body
-  )
-}
-
-function Segment({ index, active, progress }: { index: number; active: number; progress: MotionValue<number> }) {
-  const fill = useTransform(progress, v => (index < active ? 1 : index === active ? v : 0))
-  return (
-    <span className="block h-0.5 flex-1 overflow-hidden rounded-full bg-white/30">
-      <motion.span className="block h-full w-full origin-left bg-white" style={{ scaleX: fill }} />
-    </span>
   )
 }

@@ -1,27 +1,26 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import {
   motion,
   useMotionValue,
   useMotionValueEvent,
-  useReducedMotion,
   useSpring,
   useTransform,
   type MotionValue,
   type Variants,
 } from 'motion/react'
 import StoreImage from '@/components/visitor/StoreImage'
+import { SlideArrows, SlideProgress } from '@/components/visitor/slides/SlideControls'
+import { useAutoplay } from '@/components/visitor/slides/useAutoplay'
+import { useSwipe } from '@/components/visitor/slides/useSwipe'
 import type { MotionHeroSlide } from '@/lib/catalog/homepage-sections'
 
 const FADE_S = 0.7
-const SWIPE_PX = 50
 const KEN_BURNS = 0.06
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
-const ARROW =
-  'absolute top-1/2 z-30 hidden -translate-y-1/2 rounded-full border border-white/25 bg-black/30 p-2.5 text-white backdrop-blur-sm transition-colors hover:bg-black/50 md:inline-flex'
 
 interface MotionHeroProps {
   slides: MotionHeroSlide[]
@@ -47,51 +46,21 @@ const riseVariants = (reduced: boolean, delay: number): Variants => ({
 })
 
 export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
-  const reduced = !!useReducedMotion()
   const count = slides.length
   const [active, setActive] = useState(0)
-  const [hovered, setHovered] = useState(false)
-  const [focused, setFocused] = useState(false)
-  const [hidden, setHidden] = useState(false)
-  const [swiping, setSwiping] = useState(false)
-
-  // One clock drives the autoplay, the segment fill and the Ken Burns drift, so pausing stops all three.
-  const progress = useMotionValue(0)
-  const elapsedRef = useRef(0)
 
   const go = useCallback((n: number) => setActive(((n % count) + count) % count), [count])
 
-  useEffect(() => {
-    elapsedRef.current = 0
-    progress.set(reduced ? 1 : 0)
-  }, [active, reduced, progress])
-
-  const running = !reduced && !hidden && !hovered && !focused && !swiping
-  useEffect(() => {
-    if (!running) return
-    let frame = 0
-    const started = performance.now() - elapsedRef.current
-    const tick = (now: number) => {
-      const elapsed = now - started
-      elapsedRef.current = elapsed
-      const p = Math.min(1, elapsed / intervalMs)
-      progress.set(p)
-      if (p >= 1) {
-        if (count > 1) go(active + 1)
-        return
-      }
-      frame = requestAnimationFrame(tick)
-    }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [running, active, count, intervalMs, go, progress])
-
-  useEffect(() => {
-    const onVisibility = () => setHidden(document.hidden)
-    onVisibility()
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => document.removeEventListener('visibilitychange', onVisibility)
-  }, [])
+  const swipe = useSwipe({ onSwipe: d => go(active + d) })
+  // One clock drives the autoplay, the segment fill and the Ken Burns drift, so pausing stops all three.
+  const { progress, reduced, bind } = useAutoplay({
+    durationMs: intervalMs,
+    resetKey: active,
+    onComplete: () => {
+      if (count > 1) go(active + 1)
+    },
+    paused: swipe.pressed,
+  })
 
   // Pointer parallax for the foreground image: mouse only, softened by springs.
   const mx = useMotionValue(0)
@@ -102,37 +71,17 @@ export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
   const fgY = useTransform(py, v => v * 12)
 
   const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    swipe.bind.onPointerMove(e)
     if (reduced || e.pointerType !== 'mouse') return
     const r = e.currentTarget.getBoundingClientRect()
     mx.set(((e.clientX - r.left) / r.width - 0.5) * 2)
     my.set(((e.clientY - r.top) / r.height - 0.5) * 2)
   }
-  const onPointerEnter = (e: React.PointerEvent<HTMLElement>) => {
-    if (e.pointerType === 'mouse') setHovered(true)
-  }
   const onPointerLeave = (e: React.PointerEvent<HTMLElement>) => {
+    bind.onPointerLeave(e)
     if (e.pointerType !== 'mouse') return
-    setHovered(false)
     mx.set(0)
     my.set(0)
-  }
-
-  const touch = useRef<{ x: number; y: number } | null>(null)
-  const delta = useRef({ x: 0, y: 0 })
-  const onTouchStart = (e: React.TouchEvent) => {
-    touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-    delta.current = { x: 0, y: 0 }
-    setSwiping(true)
-  }
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!touch.current) return
-    delta.current = { x: e.touches[0].clientX - touch.current.x, y: e.touches[0].clientY - touch.current.y }
-  }
-  const onTouchEnd = () => {
-    const { x, y } = delta.current
-    if (Math.abs(x) > SWIPE_PX && Math.abs(x) > Math.abs(y)) go(active + (x < 0 ? 1 : -1))
-    touch.current = null
-    setSwiping(false)
   }
 
   if (count === 0) return null
@@ -143,18 +92,11 @@ export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
       <section
         aria-roledescription="carousel"
         aria-label="Featured"
-        className="relative isolate h-[clamp(20rem,56svh,36rem)] w-full select-none overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl md:h-[clamp(26rem,64vh,46rem)]"
+        className="relative isolate h-[clamp(20rem,56svh,36rem)] w-full touch-pan-y touch-pinch-zoom select-none overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl md:h-[clamp(26rem,64vh,46rem)]"
+        {...swipe.bind}
+        {...bind}
         onPointerMove={onPointerMove}
-        onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchEnd}
-        onFocus={() => setFocused(true)}
-        onBlur={e => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false)
-        }}
         onKeyDown={e => {
           if (e.key === 'ArrowRight') go(active + 1)
           else if (e.key === 'ArrowLeft') go(active - 1)
@@ -176,17 +118,15 @@ export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
 
         {count > 1 && (
           <>
-            <button type="button" onClick={() => go(active - 1)} aria-label="Previous slide" className={`${ARROW} left-4`}>
-              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-            </button>
-            <button type="button" onClick={() => go(active + 1)} aria-label="Next slide" className={`${ARROW} right-4`}>
-              <ChevronRight className="h-5 w-5" aria-hidden="true" />
-            </button>
-            <div className="absolute inset-x-0 bottom-0 z-30 flex gap-1.5 px-5 pb-5 sm:px-8 md:px-12 lg:px-16">
-              {slides.map((s, i) => (
-                <Segment key={i} index={i} active={active} headline={s.headline} progress={progress} onSelect={() => go(i)} />
-              ))}
-            </div>
+            <SlideArrows onPrev={() => go(active - 1)} onNext={() => go(active + 1)} />
+            <SlideProgress
+              count={count}
+              index={active}
+              progress={progress}
+              onSelect={go}
+              label={i => `Go to slide ${i + 1}: ${slides[i].headline}`}
+              className="absolute inset-x-0 bottom-0 z-30 flex gap-1.5 px-5 pb-5 sm:px-8 md:px-12 lg:px-16"
+            />
           </>
         )}
       </section>
@@ -311,34 +251,5 @@ function Slide({ slide, index, count, active, reduced, progress, fgX, fgY }: Sli
         )}
       </motion.div>
     </motion.div>
-  )
-}
-
-function Segment({
-  index,
-  active,
-  headline,
-  progress,
-  onSelect,
-}: {
-  index: number
-  active: number
-  headline: string
-  progress: MotionValue<number>
-  onSelect: () => void
-}) {
-  const fill = useTransform(progress, v => (index < active ? 1 : index === active ? v : 0))
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-label={`Go to slide ${index + 1}: ${headline}`}
-      aria-current={index === active ? 'true' : undefined}
-      className="group flex h-6 max-w-[6rem] flex-1 items-center"
-    >
-      <span className="block h-0.5 w-full overflow-hidden rounded-full bg-white/30 transition-colors group-hover:bg-white/50">
-        <motion.span className="block h-full w-full origin-left bg-white" style={{ scaleX: fill }} />
-      </span>
-    </button>
   )
 }
