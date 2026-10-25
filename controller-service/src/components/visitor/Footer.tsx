@@ -38,7 +38,7 @@ const GROUPS = [
 ]
 
 const link =
-  'flex items-center min-h-[44px] sm:min-h-0 sm:py-1 text-sm text-gray-300 hover:text-accent-400 transition-colors'
+  'flex items-center min-h-[44px] sm:min-h-0 sm:py-0.5 text-sm sm:text-[13px] text-gray-300 hover:text-accent-400 transition-colors'
 
 /** Storefront footer: links, contact, policies and copyright. Pads itself for the home indicator and any fixed bottom bar. */
 export default function Footer({ cookieConsent = false }: { cookieConsent?: boolean }) {
@@ -53,23 +53,23 @@ export default function Footer({ cookieConsent = false }: { cookieConsent?: bool
 
   return (
     <footer data-footer-strip className="bg-secondary-800 text-white">
-      <div className="container mx-auto px-4 pt-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        <div className="flex flex-col lg:flex-row lg:justify-between gap-6 lg:gap-12">
+      <div className="container mx-auto px-4 pt-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="flex flex-col lg:flex-row lg:justify-between gap-5 lg:gap-12">
           <div className="min-w-0 lg:max-w-xs">
             <div className="flex items-center gap-2.5">
               {identity.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={identity.logoUrl} alt="" className="h-8 w-auto max-w-[8rem] object-contain" />
+                <img src={identity.logoUrl} alt="" className="h-7 w-auto max-w-[8rem] object-contain" />
               ) : (
-                <div className="w-8 h-8 shrink-0 bg-accent-500 rounded-lg flex items-center justify-center">
+                <div className="w-7 h-7 shrink-0 bg-accent-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">{initials}</span>
                 </div>
               )}
-              <span className="font-bold text-base truncate">{identity.name}</span>
+              <span className="font-bold text-sm truncate">{identity.name}</span>
             </div>
-            {storefront.metaTagline && <p className="mt-2 text-sm text-gray-400">{storefront.metaTagline}</p>}
+            {storefront.metaTagline && <p className="mt-1.5 text-xs text-gray-400">{storefront.metaTagline}</p>}
             {(identity.email || identity.phone) && (
-              <div className="mt-3 flex flex-col text-sm text-gray-300">
+              <div className="mt-1 sm:mt-2 flex flex-wrap gap-x-4 text-sm text-gray-300">
                 {identity.email && (
                   <a href={`mailto:${identity.email}`} className={`${link} break-all`}>
                     {identity.email}
@@ -87,7 +87,7 @@ export default function Footer({ cookieConsent = false }: { cookieConsent?: bool
           <div className="grid grid-cols-3 gap-4 sm:gap-12">
             {GROUPS.map(g => (
               <nav key={g.title} aria-label={g.title} className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1 sm:mb-2">{g.title}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">{g.title}</p>
                 <ul>
                   {g.links.map(l => (
                     <li key={l.href}>
@@ -107,7 +107,7 @@ export default function Footer({ cookieConsent = false }: { cookieConsent?: bool
           </div>
         </div>
 
-        <div className="border-t border-gray-700 mt-6 pt-4">
+        <div className="border-t border-gray-700 mt-5 pt-3">
           <p className="text-gray-400 text-xs text-center lg:text-left">
             © {new Date().getFullYear()} {identity.name}. All rights reserved.
           </p>
