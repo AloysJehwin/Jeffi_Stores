@@ -94,6 +94,26 @@ export const BulkMessagesRequest = z.object({
 export type BulkMessagesRequest = z.infer<typeof BulkMessagesRequest>
 export const BatchMessageResponse = z.object({ batch_id: z.string().uuid(), accepted: z.number(), rejected: z.array(z.object({ to: z.string(), reason: z.string() })) })
 
+// ── push (internal only: the store's own app over FCM; not a public Channel) ──
+export const PushCategory = z.enum(['orders', 'account', 'offers', 'price_alerts'])
+export type PushCategory = z.infer<typeof PushCategory>
+export const SendPushRequest = z.object({
+  tokens: z.array(z.string().min(20).max(512)).min(1).max(500),
+  title: z.string().min(1).max(120),
+  body: z.string().min(1).max(1000),
+  image: z.string().url().optional(),
+  link: z.string().max(500).optional(), // storefront path the app opens on tap
+  category: PushCategory,
+  collapse_key: z.string().max(64).optional(),
+  data: z.record(z.string(), z.string()).optional(),
+  reference: z.string().max(120).optional(),
+})
+export type SendPushRequest = z.infer<typeof SendPushRequest>
+export const SendPushResponse = z.object({
+  results: z.array(z.object({ token: z.string(), ok: z.boolean(), message_id: z.string().nullable(), error: z.string().nullable(), invalid_token: z.boolean() })),
+})
+export type SendPushResponse = z.infer<typeof SendPushResponse>
+
 // ── templates ──
 export const Template = z.object({
   id: z.string().uuid(),

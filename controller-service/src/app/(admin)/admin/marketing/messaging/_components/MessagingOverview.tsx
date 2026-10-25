@@ -21,7 +21,7 @@ interface Data {
   previous_totals: MessagingTotals
   channels: { channel: string; sent: number; delivered: number; failed: number; spend: number; total: number }[]
   failures: { key: string; label: string; count: number; channels: string[] }[]
-  series: { label: string; email: number; whatsapp: number; sms: number; failed: number }[]
+  series: { label: string; email: number; whatsapp: number; sms: number; push: number; failed: number }[]
   broadcasts: {
     id: string
     title: string
@@ -41,9 +41,10 @@ const SERIES: SeriesDef[] = [
   { key: 'email', label: 'Email', color: 'rgb(59 130 246)', kind: 'bar', axis: 'count', on: true },
   { key: 'whatsapp', label: 'WhatsApp', color: 'rgb(34 197 94)', kind: 'bar', axis: 'count', on: true },
   { key: 'sms', label: 'SMS', color: 'rgb(168 85 247)', kind: 'bar', axis: 'count', on: false },
+  { key: 'push', label: 'App push', color: 'rgb(249 115 22)', kind: 'bar', axis: 'count', on: false },
   { key: 'failed', label: 'Failed', color: 'rgb(239 68 68)', kind: 'line', axis: 'count', on: true },
 ]
-const CHANNEL: Record<string, string> = { email: 'Email', whatsapp: 'WhatsApp', sms: 'SMS' }
+const CHANNEL: Record<string, string> = { email: 'Email', whatsapp: 'WhatsApp', sms: 'SMS', push: 'App push' }
 const human = (s: string) => s.replace(/_/g, ' ')
 
 export default function MessagingOverview() {

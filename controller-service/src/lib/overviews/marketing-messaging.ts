@@ -9,13 +9,15 @@ import { BOUNDS, bucketsCte, inBucket, num, periodCase, str } from './marketing'
 
 const CAP = `(l.error ILIKE '%63049%' OR l.error ILIKE '%caps marketing messages%')`
 const ML_FAILED = `(ml.status = 'failed' OR ml.delivery_status IN ('failed', 'undelivered'))`
+// App push rows still queued, held for quiet hours or skipped (daily limit, push off) aren't messages.
+const DONE = (a: string) => `${a}.status NOT IN ('queued', 'sending', 'deferred', 'skipped')`
 
 export const KPI_SQL = `
 WITH ${BOUNDS},
 l AS (
   SELECT ecl.*, ${periodCase('ecl.sent_at')} AS period
     FROM email_campaign_logs ecl, b
-   WHERE ecl.sent_at >= b.p0 AND ecl.sent_at < b.c1
+   WHERE ecl.sent_at >= b.p0 AND ecl.sent_at < b.c1 AND ${DONE('ecl')}
 ),
 ml AS (
   SELECT m.*, ${periodCase('m.sent_at')} AS period
@@ -42,7 +44,7 @@ export const BY_CHANNEL_SQL = `
 WITH ${BOUNDS}
 SELECT 'broadcast' AS source, COALESCE(l.channel, 'email') AS channel, l.status AS outcome, COUNT(*) AS n, 0 AS spend
   FROM email_campaign_logs l, b
- WHERE l.sent_at >= b.c0 AND l.sent_at < b.c1
+ WHERE l.sent_at >= b.c0 AND l.sent_at < b.c1 AND ${DONE('l')}
  GROUP BY 1, 2, 3
 UNION ALL
 SELECT 'automated', ml.channel,
@@ -69,8 +71,8 @@ SELECT ml.channel, COALESCE(NULLIF(ml.error, ''), ml.delivery_status), COUNT(*)
 export const seriesSql = (bucket: Bucket) => `
 WITH ${BOUNDS}, ${bucketsCte(bucket)},
 m AS (
-  SELECT sent_at, COALESCE(channel, 'email') AS channel, status = 'failed' AS failed FROM email_campaign_logs, b
-   WHERE sent_at >= b.c0 AND sent_at < b.c1
+  SELECT l.sent_at, COALESCE(l.channel, 'email') AS channel, l.status = 'failed' AS failed FROM email_campaign_logs l, b
+   WHERE l.sent_at >= b.c0 AND l.sent_at < b.c1 AND ${DONE('l')}
   UNION ALL
   SELECT ml.sent_at, ml.channel, ${ML_FAILED} FROM message_logs ml, b
    WHERE ml.sent_at >= b.c0 AND ml.sent_at < b.c1 AND COALESCE(ml.direction, 'outbound') = 'outbound'
@@ -79,6 +81,7 @@ SELECT to_char(k.bucket, 'YYYY-MM-DD') AS label,
        COUNT(m.sent_at) FILTER (WHERE m.channel = 'email') AS email,
        COUNT(m.sent_at) FILTER (WHERE m.channel = 'whatsapp') AS whatsapp,
        COUNT(m.sent_at) FILTER (WHERE m.channel = 'sms') AS sms,
+       COUNT(m.sent_at) FILTER (WHERE m.channel = 'push') AS push,
        COUNT(m.sent_at) FILTER (WHERE m.failed) AS failed
   FROM k LEFT JOIN m ON ${inBucket('m.sent_at', bucket)}
  GROUP BY k.bucket ORDER BY k.bucket
@@ -88,7 +91,7 @@ SELECT to_char(k.bucket, 'YYYY-MM-DD') AS label,
 export const BROADCASTS_SQL = `
 WITH ${BOUNDS}
 SELECT c.id, c.title, c.template_key, c.channels, c.status, c.sent_at, c.recipient_count,
-       COUNT(l.id) AS messages,
+       COUNT(l.id) FILTER (WHERE ${DONE('l')}) AS messages,
        COUNT(l.id) FILTER (WHERE l.status = 'failed') AS failed,
        COUNT(l.id) FILTER (WHERE l.status = 'failed' AND ${CAP}) AS wa_cap
   FROM email_campaigns c LEFT JOIN email_campaign_logs l ON l.campaign_id = c.id, b

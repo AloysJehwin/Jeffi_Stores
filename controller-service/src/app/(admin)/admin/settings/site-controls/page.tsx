@@ -460,7 +460,7 @@ export default async function SiteControlsPage() {
                         <div>
                           <SectionCard
                             title="Notifications"
-                            description="SMS and WhatsApp channels for customer OTP, order updates and marketing. Growth plan and above."
+                            description="SMS, WhatsApp and app push channels for customer OTP, order updates and marketing. Growth plan and above."
                             columns
                           >
                             <FullSpan>
@@ -477,6 +477,22 @@ export default async function SiteControlsPage() {
                                 label="WhatsApp notifications"
                                 hint="When off, WhatsApp channel is hidden from signin/signup and no WhatsApp messages are sent."
                                 initial={c.flags.whatsappEnabled}
+                              />
+                            </FullSpan>
+                            <FullSpan>
+                              <ToggleControl
+                                settingKey="feature_push_enabled"
+                                label="App push notifications"
+                                hint="Order updates pushed to the mobile app. When off, nothing is pushed; customers still see every update in the app's inbox."
+                                initial={c.flags.pushEnabled}
+                              />
+                            </FullSpan>
+                            <FullSpan>
+                              <ToggleControl
+                                settingKey="feature_marketing_push_enabled"
+                                label="Marketing push notifications"
+                                hint="Offers and price alerts pushed to the app. Needs app push on; each customer's own notification settings still apply."
+                                initial={c.flags.marketingPushEnabled}
                               />
                             </FullSpan>
                             <FullSpan>

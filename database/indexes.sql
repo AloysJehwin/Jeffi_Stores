@@ -609,6 +609,10 @@ CREATE INDEX idx_delhivery_pickup_locations_tenant ON public.delhivery_pickup_lo
 
 CREATE INDEX idx_email_campaign_logs_campaign ON public.email_campaign_logs USING btree (campaign_id);
 
+CREATE UNIQUE INDEX idx_email_campaign_logs_push_device ON public.email_campaign_logs USING btree (campaign_id, push_device_id) WHERE (push_device_id IS NOT NULL);
+
+CREATE INDEX idx_email_campaign_logs_push_due ON public.email_campaign_logs USING btree (send_after) WHERE ((channel)::text = 'push'::text AND (status)::text = ANY (ARRAY['queued'::text, 'deferred'::text]));
+
 
 
 --
@@ -1054,6 +1058,20 @@ CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (c
 --
 
 CREATE INDEX idx_notifications_user_id ON public.notifications USING btree (user_id);
+
+CREATE INDEX idx_notifications_user_created ON public.notifications USING btree (user_id, created_at DESC);
+
+CREATE INDEX idx_notifications_user_unread ON public.notifications USING btree (user_id) WHERE (is_read = false);
+
+CREATE INDEX idx_push_devices_user_active ON public.push_devices USING btree (user_id) WHERE (disabled_at IS NULL);
+
+CREATE INDEX idx_push_sends_user ON public.push_sends USING btree (user_id, sent_at DESC) WHERE (user_id IS NOT NULL);
+
+CREATE INDEX idx_push_sends_device ON public.push_sends USING btree (push_device_id, sent_at DESC) WHERE (user_id IS NULL);
+
+CREATE INDEX idx_push_queue_due ON public.push_queue USING btree (send_after);
+
+CREATE INDEX idx_notifications_source_ref ON public.notifications USING btree (source, source_ref) WHERE (source_ref IS NOT NULL);
 
 CREATE INDEX idx_admin_notifications_unread ON public.admin_notifications USING btree (is_read, created_at DESC);
 
