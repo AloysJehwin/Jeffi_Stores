@@ -1,4 +1,5 @@
 import { RefreshControl, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 import { useQuery } from '@tanstack/react-query'
 import TopNav from '../../src/components/layout/TopNav'
@@ -9,6 +10,7 @@ import { getHome } from '../../src/api/home'
 
 // The storefront home: the admin-configured sections from GET /api/home, rendered like the web's page.
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets()
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['home'],
     queryFn: getHome,
@@ -35,6 +37,7 @@ export default function HomeScreen() {
             onScroll={onScroll}
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: insets.bottom }}
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
           >
             {data.sections.map((section, i) => (

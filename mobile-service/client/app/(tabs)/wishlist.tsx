@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -91,6 +92,7 @@ function EmptyCard({ title, body, action, onAction }: { title: string; body: str
 }
 
 export default function WishlistScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const qc = useQueryClient()
   const t = useTokens()
@@ -235,7 +237,7 @@ export default function WishlistScreen() {
   return (
     <View className="flex-1 bg-surface">
       <TopNav />
-      <ScrollView refreshControl={refreshControl} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+      <ScrollView refreshControl={refreshControl} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         <AccountMobileHeader />
         <View className="px-4 py-4">
           <View className="mb-4 flex-row items-center gap-1.5">

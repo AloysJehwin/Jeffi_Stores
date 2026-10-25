@@ -9,7 +9,7 @@ import { KeyboardEvents } from 'react-native-keyboard-controller'
 import { usePathname, useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, CircleX, Clock, ImageIcon, Layers, Menu, Moon, Search, Sun, X } from 'lucide-react-native'
+import { ChevronRight, CircleX, Clock, ImageIcon, Layers, Menu, Moon, Search, ShoppingCart, Sun, X } from 'lucide-react-native'
 import { api } from '../../api/client'
 import { logout } from '../../api/auth'
 import { getWishlist } from '../../api/wishlist'
@@ -265,6 +265,14 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
           <View className="flex-row items-center gap-2 shrink-0">
             <IconButton onPress={openSearch} label="Search">
               <Search size={24} color={iconColor} />
+            </IconButton>
+            <IconButton onPress={() => router.navigate('/(tabs)/cart')} label={cartCount > 0 ? `Cart, ${cartCount} items` : 'Cart'}>
+              <ShoppingCart size={24} color={iconColor} />
+              {cartCount > 0 && (
+                <View className="absolute right-0.5 top-0.5 h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent-500 px-1">
+                  <Text className="text-[10px] font-black leading-none text-white">{cartCount > 99 ? '99+' : cartCount}</Text>
+                </View>
+              )}
             </IconButton>
             <IconButton onPress={openDrawer} label="Open menu" scale={0.9}>
               <Menu size={24} color={iconColor} />
