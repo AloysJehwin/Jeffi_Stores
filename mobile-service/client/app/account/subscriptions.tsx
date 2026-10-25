@@ -1,64 +1,46 @@
 import { useState } from 'react'
-import { Alert, Pressable, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronDown, MapPin, Repeat } from 'lucide-react-native'
 import { getSubscriptions, subscriptionAction, type SubscriptionItem } from '../../src/api/account'
 import { listAddresses } from '../../src/api/addresses'
-import HeroIcon from '../../src/components/account/HeroIcon'
 import { useRequireAuth } from '../../src/components/account/hooks'
 import { absUrl } from '../../src/lib/links'
 import { showToast } from '../../src/stores/toastStore'
 import { useTokens } from '../../src/theme'
-import { Screen, Skeleton, Text } from '../../src/ui'
+import { Badge, BodySmall, Button, Caption, Card, confirm, Divider, EmptyState, ListGroup, ListRow, Screen, Skeleton, Text, TextButton, type Tone } from '../../src/ui'
 
 // Mirror of controller-service components/subscriptions/MySubscriptions.tsx (visitor).
 
 type Action = 'cancel' | 'pause' | 'resume' | 'address'
 
-const STATUS_TONE: Record<string, { bg: string; text: string }> = {
-  active: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-400' },
-  authenticated: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-400' },
-  created: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-400' },
-  pending: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-800 dark:text-amber-400' },
-  paused: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-800 dark:text-amber-400' },
-  halted: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-400' },
+const STATUS_TONE: Record<string, Tone> = {
+  active: 'success',
+  authenticated: 'info',
+  created: 'info',
+  pending: 'warning',
+  paused: 'warning',
+  halted: 'danger',
 }
-const DEFAULT_TONE = { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-700 dark:text-gray-300' }
 const ENDED = new Set(['cancelled', 'completed', 'expired'])
 
 const formatInr = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
-
-function Btn({ label, onPress, disabled, danger }: { label: string; onPress: () => void; disabled?: boolean; danger?: boolean }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} className={`px-3 py-1.5 rounded-lg border border-border-secondary ${disabled ? 'opacity-50' : ''}`}>
-      <Text className={`text-sm font-medium ${danger ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>{label}</Text>
-    </Pressable>
-  )
-}
-
-function confirm(title: string, message: string, confirmLabel: string, danger = false): Promise<boolean> {
-  return new Promise(resolve =>
-    Alert.alert(title, message, [
-      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-      { text: confirmLabel, style: danger ? 'destructive' : 'default', onPress: () => resolve(true) },
-    ])
-  )
-}
 
 // Subscription cards: image, name + status, plan lines, action buttons.
 function SubscriptionsLoading() {
   return (
     <>
       {[0, 1].map(i => (
-        <View key={i} className="gap-3 rounded-lg border border-border-default bg-surface-elevated p-4">
+        <View key={i} className="gap-4 rounded-panel bg-surface-elevated p-4 dark:border dark:border-border-default">
           <View className="flex-row items-start gap-3">
-            <Skeleton width={64} height={64} rounded="rounded" />
+            <Skeleton width={64} height={64} rounded="rounded-xl" />
             <View className="flex-1 gap-2">
               <View className="flex-row items-center gap-2">
                 <Skeleton height={15} width="50%" />
-                <Skeleton height={20} width={64} rounded="rounded-full" />
+                <Skeleton height={24} width={64} rounded="rounded-full" />
               </View>
               <Skeleton height={12} width="75%" />
               <Skeleton height={12} width="45%" />
@@ -66,9 +48,9 @@ function SubscriptionsLoading() {
             </View>
           </View>
           <View className="flex-row gap-2">
-            <Skeleton height={32} width={64} rounded="rounded-lg" />
-            <Skeleton height={32} width={124} rounded="rounded-lg" />
-            <Skeleton height={32} width={68} rounded="rounded-lg" />
+            <Skeleton height={40} width={76} rounded="rounded-xl" />
+            <Skeleton height={40} width={140} rounded="rounded-xl" />
+            <Skeleton height={40} width={80} rounded="rounded-xl" />
           </View>
         </View>
       ))}
@@ -113,11 +95,11 @@ export default function SubscriptionsScreen() {
       pause: { title: 'Pause subscription?', message: 'No further charges until you resume.', label: 'Pause', danger: false },
       resume: { title: 'Resume subscription?', message: 'Charges restart from the next cycle.', label: 'Resume', danger: false },
     }[action]
-    if (await confirm(copy.title, copy.message, copy.label, copy.danger)) run(s.id, action)
+    if (await confirm({ title: copy.title, message: copy.message, confirmLabel: copy.label, destructive: copy.danger })) run(s.id, action)
   }
 
   const changeAddress = async (id: string, addressId: string) => {
-    if (await confirm('Change delivery address?', 'Future cycles will ship to the selected address.', 'Change address')) run(id, 'address', addressId)
+    if (await confirm({ title: 'Change delivery address?', message: 'Future cycles will ship to the selected address.', confirmLabel: 'Change address' })) run(id, 'address', addressId)
   }
 
   return (
@@ -125,12 +107,7 @@ export default function SubscriptionsScreen() {
       {!user || isLoading ? (
         <SubscriptionsLoading />
       ) : subs.length === 0 ? (
-        <View className="bg-surface-elevated rounded-lg border border-border-default p-8 items-center">
-          <Text className="text-foreground-secondary mb-3">You have no subscriptions yet.</Text>
-          <Pressable onPress={() => router.navigate('/(tabs)')}>
-            <Text className="text-accent-600 font-medium">Browse products</Text>
-          </Pressable>
-        </View>
+        <EmptyState icon={Repeat} title="You have no subscriptions yet." actionLabel="Browse products" onAction={() => router.navigate('/(tabs)')} />
       ) : (
         subs.map(s => {
           const ended = ENDED.has(s.status)
@@ -140,92 +117,92 @@ export default function SubscriptionsScreen() {
           const canAddress = !s.isDigital && !ended
           const paid = s.currentCycle ?? 0
           const locked = !!s.minCycles && paid < s.minCycles
-          const tone = STATUS_TONE[s.status] ?? DEFAULT_TONE
           const img = absUrl(s.imageUrl)
+          const busyHere = busy === s.id
           return (
-            <View key={s.id} className="bg-surface-elevated rounded-lg border border-border-default p-4 gap-3">
-              <View className="flex-row gap-3 items-start">
-                {img && <Image source={{ uri: img }} style={{ width: 64, height: 64, borderRadius: 4 }} contentFit="cover" />}
+            <Card key={s.id} className="gap-4">
+              <View className="flex-row items-start gap-3">
+                {img && <Image source={{ uri: img }} style={{ width: 64, height: 64, borderRadius: 12 }} contentFit="cover" />}
                 <View className="flex-1">
                   <View className="flex-row flex-wrap items-center gap-2">
-                    <Text onPress={() => router.push(`/product/${s.productSlug}`)} className="font-semibold text-foreground" numberOfLines={1}>
+                    <Text onPress={() => router.push(`/product/${s.productSlug}`)} className="text-[15px] font-semibold text-foreground" numberOfLines={1}>
                       {s.productName}
                     </Text>
-                    <View className={`px-2 py-0.5 rounded-full ${tone.bg}`}>
-                      <Text className={`text-xs font-semibold ${tone.text}`}>{s.statusLabel}</Text>
-                    </View>
-                    {s.cancelAtCycleEnd && !ended && <Text className="text-xs text-foreground-muted">Ends {fmtDate(s.currentEnd)}</Text>}
+                    <Badge label={s.statusLabel} tone={STATUS_TONE[s.status] ?? 'neutral'} size="sm" />
+                    {s.cancelAtCycleEnd && !ended && <Caption>Ends {fmtDate(s.currentEnd)}</Caption>}
                   </View>
-                  <Text className="text-sm text-foreground-secondary">
+                  <BodySmall className="mt-0.5">
                     {formatInr(s.amount)} · {s.intervalLabel}
                     {!s.isDigital && ` · Qty ${s.quantity}`}
                     {s.totalCycles ? ` · Cycle ${paid} of ${s.totalCycles}` : ''}
-                  </Text>
-                  {!ended && !s.cancelAtCycleEnd && !!s.nextChargeAt && <Text className="text-sm text-foreground-secondary">Next charge {fmtDate(s.nextChargeAt)}</Text>}
-                  {s.isDigital && !!s.accessExpiresAt && <Text className="text-sm text-foreground-secondary">Access until {fmtDate(s.accessExpiresAt)}</Text>}
+                  </BodySmall>
+                  {!ended && !s.cancelAtCycleEnd && !!s.nextChargeAt && <BodySmall>Next charge {fmtDate(s.nextChargeAt)}</BodySmall>}
+                  {s.isDigital && !!s.accessExpiresAt && <BodySmall>Access until {fmtDate(s.accessExpiresAt)}</BodySmall>}
                   {s.address && (
-                    <Text className="text-xs text-foreground-muted">
+                    <Caption className="mt-1">
                       {s.address.name}, {s.address.line1}, {s.address.city}, {s.address.state} {s.address.pincode}
-                    </Text>
+                    </Caption>
                   )}
                 </View>
               </View>
 
               {!ended && (
-                <View className="flex-row flex-wrap gap-2">
-                  {canPause && <Btn label="Pause" disabled={busy === s.id || locked} onPress={() => ask(s, 'pause')} />}
-                  {canResume && <Btn label="Resume" disabled={busy === s.id} onPress={() => ask(s, 'resume')} />}
-                  {canAddress && <Btn label="Change address" disabled={busy === s.id} onPress={() => setAddressFor(s.id)} />}
-                  {canCancel && <Btn label="Cancel" danger disabled={busy === s.id || locked} onPress={() => ask(s, 'cancel')} />}
+                <View className="gap-2">
+                  <View className="flex-row flex-wrap gap-2">
+                    {canPause && <Button label="Pause" variant="secondary" size="sm" block={false} disabled={busyHere || locked} onPress={() => ask(s, 'pause')} />}
+                    {canResume && <Button label="Resume" variant="secondary" size="sm" block={false} disabled={busyHere} onPress={() => ask(s, 'resume')} />}
+                    {canAddress && <Button label="Change address" icon={MapPin} variant="secondary" size="sm" block={false} disabled={busyHere} onPress={() => setAddressFor(s.id)} />}
+                    {canCancel && <Button label="Cancel" variant="destructive" size="sm" block={false} disabled={busyHere || locked} onPress={() => ask(s, 'cancel')} />}
+                  </View>
                   {locked && (canPause || canCancel) && (
-                    <Text className="w-full text-xs text-foreground-muted">
+                    <Caption>
                       Minimum {s.minCycles} charges: you can cancel or pause after charge {s.minCycles} ({paid} paid so far).
-                    </Text>
+                    </Caption>
                   )}
                 </View>
               )}
 
               {addressFor === s.id && (
-                <View className="border border-border-default rounded-lg p-3 gap-2">
-                  <Text className="text-sm font-medium text-foreground">Deliver future cycles to</Text>
+                <View className="gap-2">
+                  <Text className="text-sm font-semibold text-foreground">Deliver future cycles to</Text>
                   {addresses.length === 0 ? (
                     <Text className="text-sm text-foreground-muted">
                       No saved addresses.{' '}
-                      <Text className="text-accent-600" onPress={() => router.push('/account/addresses')}>
+                      <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.push('/account/addresses')}>
                         Add one
                       </Text>
                     </Text>
                   ) : (
-                    addresses.map(a => (
-                      <Pressable key={a.id} disabled={busy === s.id} onPress={() => changeAddress(s.id, a.id)} className="px-3 py-2 rounded">
-                        <Text className="text-sm text-foreground">
-                          {a.full_name} — {a.city} {a.postal_code}
-                        </Text>
-                      </Pressable>
-                    ))
+                    <ListGroup>
+                      {addresses.map(a => (
+                        <ListRow key={a.id} icon={MapPin} title={a.full_name} subtitle={`${a.city} ${a.postal_code}`} disabled={busyHere} onPress={() => changeAddress(s.id, a.id)} />
+                      ))}
+                    </ListGroup>
                   )}
-                  <Pressable onPress={() => setAddressFor(null)} className="self-start">
-                    <Text className="text-sm text-foreground-muted">Close</Text>
-                  </Pressable>
+                  <TextButton label="Close" tone="muted" onPress={() => setAddressFor(null)} />
                 </View>
               )}
 
               {s.orders.length > 0 && (
                 <View>
-                  <Pressable onPress={() => setOpenOrders(o => ({ ...o, [s.id]: !o[s.id] }))} className="flex-row items-center gap-1">
+                  <Divider className="mb-3" />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: !!openOrders[s.id] }}
+                    onPress={() => setOpenOrders(o => ({ ...o, [s.id]: !o[s.id] }))}
+                    className="min-h-[36px] flex-row items-center gap-1.5"
+                  >
                     <View style={{ transform: [{ rotate: openOrders[s.id] ? '0deg' : '-90deg' }] }}>
-                      <HeroIcon name="chevronDown" size={14} color={t.foregroundSecondary} />
+                      <ChevronDown size={16} color={t.foregroundSecondary} />
                     </View>
-                    <Text className="text-sm text-foreground-secondary">Cycle orders ({s.orders.length})</Text>
+                    <Text className="text-sm font-medium text-foreground-secondary">Cycle orders ({s.orders.length})</Text>
                   </Pressable>
                   {openOrders[s.id] && (
-                    <View className="mt-2 gap-1">
+                    <View className="mt-2 gap-2">
                       {s.orders.map(o => (
-                        <View key={o.id} className="flex-row justify-between gap-2">
-                          <Text className="text-sm text-accent-600" onPress={() => router.push(`/orders/${o.id}`)}>
-                            Cycle {o.cycle} · {o.orderNumber}
-                          </Text>
-                          <Text className="text-sm text-foreground-secondary">
+                        <View key={o.id} className="flex-row items-center justify-between gap-2">
+                          <TextButton label={`Cycle ${o.cycle} · ${o.orderNumber}`} onPress={() => router.push(`/orders/${o.id}`)} />
+                          <Text className="text-[13px] text-foreground-secondary">
                             {fmtDate(o.createdAt)} · {formatInr(o.total)}
                           </Text>
                         </View>
@@ -234,7 +211,7 @@ export default function SubscriptionsScreen() {
                   )}
                 </View>
               )}
-            </View>
+            </Card>
           )
         })
       )}

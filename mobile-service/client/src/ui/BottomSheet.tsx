@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { BackHandler, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { Extrapolation, interpolate, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
@@ -28,6 +28,8 @@ export function BottomSheet({
   onClosed,
   children,
   maxHeightRatio = 0.92,
+  dismissible = true,
+  scrollRef,
 }: {
   open: boolean
   onClose: () => void
@@ -35,6 +37,9 @@ export function BottomSheet({
   onClosed?: () => void
   children: ReactNode
   maxHeightRatio?: number
+  /** false: the backdrop and the drag don't close it (a required step); back still calls onClose. */
+  dismissible?: boolean
+  scrollRef?: Ref<ScrollView>
 }) {
   const { height: winH } = useWindowDimensions()
   const insets = useSafeAreaInsets()
@@ -83,6 +88,7 @@ export function BottomSheet({
   const dismiss = () => closeRef.current()
 
   const pan = Gesture.Pan()
+    .enabled(dismissible)
     .hitSlop({ top: 12, bottom: 24 })
     .onUpdate(e => {
       ty.value = Math.max(0, e.translationY)
@@ -110,7 +116,7 @@ export function BottomSheet({
     {/* Taps are ignored while the sheet slides away, so a second tap on "Add" can't post twice. */}
     <View style={StyleSheet.absoluteFill} pointerEvents={open ? 'box-none' : 'none'}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} className="bg-black/50">
-        <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} accessibilityLabel="Close" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismissible ? dismiss : undefined} accessibilityLabel={dismissible ? 'Close' : undefined} />
       </Animated.View>
       {/* The sheet is a flex child pinned to the end, not absolutely positioned: the avoiding view's
           bottom padding only moves children that take part in layout. */}
@@ -133,6 +139,7 @@ export function BottomSheet({
           </GestureDetector>
           {/* flexShrink lets the list give way to the footer once the sheet hits its max height. */}
           <ScrollView
+            ref={scrollRef}
             bounces={false}
             keyboardShouldPersistTaps="handled"
             style={{ flexShrink: 1 }}

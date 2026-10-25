@@ -1,15 +1,15 @@
 import { useState } from 'react'
-import { Pressable, Share, TextInput, View } from 'react-native'
+import { Share, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Copy, Gift } from 'lucide-react-native'
 import { getLoyalty, redeemPoints, type RewardCoupon, type RewardsData, type RewardsHistoryEntry } from '../../src/api/account'
 import Gradient from '../../src/components/account/Gradient'
 import { useInfiniteList, useRequireAuth, type InfiniteList } from '../../src/components/account/hooks'
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { showToast } from '../../src/stores/toastStore'
-import { useTokens } from '../../src/theme'
-import { Screen, Skeleton, Text } from '../../src/ui'
+import { BodySmall, Button, Caption, Card, cn, Divider, elevationClass, EmptyState, Heading, Overline, Screen, Skeleton, Text, TextField, useElevation } from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountRewards.tsx (mobile layout).
 
@@ -28,8 +28,6 @@ const TIER_BADGE: Record<string, { bg: string; text: string }> = {
   platinum: { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-800 dark:text-indigo-300' },
 }
 
-const CARD = 'bg-surface-elevated rounded-xl border border-border-default p-5'
-const SHADOW = { boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }
 const TABULAR = { fontVariant: ['tabular-nums' as const] }
 
 const formatMoney = (amount: number) =>
@@ -59,13 +57,14 @@ function historyLabel(e: RewardsHistoryEntry): string {
 function TierCard({ data }: { data: RewardsData }) {
   const { colorScheme } = useColorScheme()
   const dark = colorScheme === 'dark'
+  const shadow = useElevation('raised')
   const tier = TIER_STYLES[data.tier.key] ?? TIER_STYLES.bronze
   const currentMin = data.program.tiers.find(x => x.key === data.tier.key)?.minPoints ?? 0
   const span = data.nextTier ? Math.max(1, data.nextTier.minPoints - currentMin) : 1
   const progress = data.nextTier ? Math.min(100, Math.max(0, ((Math.max(0, data.lifetimePoints) - currentMin) / span) * 100)) : 100
 
   return (
-    <View className={`rounded-xl border border-border-default overflow-hidden ${tier.bg}`} style={SHADOW}>
+    <View className={cn('overflow-hidden rounded-panel', tier.bg, elevationClass('raised'))} style={shadow}>
       {dark ? <Gradient from="black" to="black" fromOpacity={0} toOpacity={0.25} /> : <Gradient from="white" to="white" fromOpacity={0} toOpacity={0.5} />}
       <View className="p-5">
         <View className="flex-row items-center justify-between gap-3">
@@ -74,7 +73,7 @@ function TierCard({ data }: { data: RewardsData }) {
           </View>
           {data.tier.multiplier > 1 && <Text className={`text-xs font-medium opacity-80 ${tier.text}`}>{data.tier.multiplier}x points</Text>}
         </View>
-        <Text className={`mt-4 text-4xl font-bold ${tier.text}`} style={TABULAR}>
+        <Text className={`mt-4 font-display text-4xl font-extrabold ${tier.text}`} style={TABULAR}>
           {Math.max(0, data.points).toLocaleString('en-IN')}
         </Text>
         <Text className={`text-sm opacity-80 ${tier.text}`}>points available, worth {formatMoney(Math.max(0, data.points) * data.program.pointValue)}</Text>
@@ -100,7 +99,6 @@ function TierCard({ data }: { data: RewardsData }) {
 }
 
 function RedeemCard({ data, onRedeemed }: { data: RewardsData; onRedeemed: () => void }) {
-  const t = useTokens()
   const [input, setInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const { minRedeemPoints, pointValue } = data.program
@@ -125,37 +123,35 @@ function RedeemCard({ data, onRedeemed }: { data: RewardsData; onRedeemed: () =>
   }
 
   return (
-    <View className={CARD} style={SHADOW}>
-      <Text className="font-semibold text-foreground">Redeem points</Text>
-      <Text className="mt-1 text-sm text-foreground-secondary">
+    <Card>
+      <Heading>Redeem points</Heading>
+      <BodySmall className="mt-1">
         Turn points into a coupon. Each point is worth {formatMoney(pointValue)}, from {minRedeemPoints.toLocaleString('en-IN')} points.
-      </Text>
+      </BodySmall>
       {canRedeem ? (
         <View className="mt-4 gap-3">
-          <View>
-            <Text className="text-xs font-medium text-foreground-secondary mb-1">Points to redeem</Text>
-            <TextInput
-              keyboardType="number-pad"
-              value={input}
-              onChangeText={v => setInput(v.replace(/\D/g, '').slice(0, 7))}
-              placeholder={String(minRedeemPoints)}
-              placeholderTextColor={t.foregroundMuted}
-              className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground"
-            />
-          </View>
-          <Pressable onPress={redeem} disabled={!valid || submitting} className={`w-full px-4 py-2.5 rounded-lg bg-accent-500 items-center ${!valid || submitting ? 'opacity-50' : ''}`}>
-            <Text className="text-white text-sm font-medium">{submitting ? 'Creating coupon' : valid ? `Get ${formatMoney(points * pointValue)} coupon` : 'Get coupon'}</Text>
-          </Pressable>
-          {input !== '' && !valid && (
-            <Text className="text-xs text-red-600 dark:text-red-400">
-              {points > data.points ? 'You do not have that many points' : `Enter at least ${minRedeemPoints.toLocaleString('en-IN')} points`}
-            </Text>
-          )}
+          <TextField
+            label="Points to redeem"
+            keyboardType="number-pad"
+            value={input}
+            onChangeText={v => setInput(v.replace(/\D/g, '').slice(0, 7))}
+            placeholder={String(minRedeemPoints)}
+            error={input !== '' && !valid ? (points > data.points ? 'You do not have that many points' : `Enter at least ${minRedeemPoints.toLocaleString('en-IN')} points`) : null}
+          />
+          <Button
+            label={valid ? `Get ${formatMoney(points * pointValue)} coupon` : 'Get coupon'}
+            loadingLabel="Creating coupon"
+            loading={submitting}
+            disabled={!valid}
+            icon={Gift}
+            size="md"
+            onPress={redeem}
+          />
         </View>
       ) : (
         <Text className="mt-4 text-sm text-foreground-muted">You need {(minRedeemPoints - Math.max(0, data.points)).toLocaleString('en-IN')} more points to redeem.</Text>
       )}
-    </View>
+    </Card>
   )
 }
 
@@ -164,12 +160,12 @@ function CouponList({ list }: { list: InfiniteList<RewardCoupon> }) {
   // No clipboard module in the app: the share sheet offers Copy.
   const copy = (code: string) => Share.share({ message: code }).catch(() => showToast('Could not copy the code', 'error'))
   return (
-    <View className={CARD} style={SHADOW}>
-      <Text className="font-semibold text-foreground">Your reward coupons</Text>
-      <Text className="mt-1 text-sm text-foreground-secondary">Enter the code in the coupon box at checkout.</Text>
+    <Card>
+      <Heading>Your reward coupons</Heading>
+      <BodySmall className="mt-1">Enter the code in the coupon box at checkout.</BodySmall>
       <View className="mt-4 gap-3">
         {list.rows.map(c => (
-          <View key={c.code} className="flex-row flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border-default px-4 py-3">
+          <View key={c.code} className="flex-row flex-wrap items-center justify-between gap-3 rounded-field border-2 border-dashed border-border-default px-4 py-3">
             <View className="flex-1">
               <Text className="font-mono font-semibold text-foreground">{c.code}</Text>
               <Text className="text-xs text-foreground-secondary">
@@ -180,43 +176,46 @@ function CouponList({ list }: { list: InfiniteList<RewardCoupon> }) {
                 {c.validUntil ? ` · valid till ${new Date(c.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
               </Text>
             </View>
-            <Pressable onPress={() => copy(c.code)} className="px-3 py-1.5 rounded-lg border border-border-default">
-              <Text className="text-sm text-foreground-secondary">Copy</Text>
-            </Pressable>
+            <View>
+              <Button label="Copy" icon={Copy} variant="secondary" size="sm" block={false} onPress={() => copy(c.code)} />
+            </View>
           </View>
         ))}
       </View>
       <InfiniteFooter shown={list.rows.length} list={list} noun="coupons" />
-    </View>
+    </Card>
   )
 }
 
 function History({ list }: { list: InfiniteList<RewardsHistoryEntry> }) {
   return (
-    <View className={CARD} style={SHADOW}>
-      <Text className="font-semibold text-foreground">Points history</Text>
+    <Card>
+      <Heading>Points history</Heading>
       {(list.total ?? 0) === 0 && !list.loading ? (
         <Text className="mt-3 text-sm text-foreground-muted">No points yet. They appear here after your first delivered order.</Text>
       ) : (
         <>
           <View className="mt-3">
             {list.rows.map((e, i) => (
-              <View key={e.id} className={`flex-row items-center justify-between gap-4 py-3 ${i > 0 ? 'border-t border-border-default' : ''}`}>
-                <View className="flex-1">
-                  <Text className="text-sm text-foreground">{historyLabel(e)}</Text>
-                  <Text className="text-xs text-foreground-muted">{formatDate(e.createdAt)}</Text>
+              <View key={e.id}>
+                {i > 0 ? <Divider /> : null}
+                <View className="flex-row items-center justify-between gap-4 py-3">
+                  <View className="flex-1">
+                    <Text className="text-sm text-foreground">{historyLabel(e)}</Text>
+                    <Caption>{formatDate(e.createdAt)}</Caption>
+                  </View>
+                  <Text className={`text-sm font-semibold ${e.delta > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-secondary'}`} style={TABULAR}>
+                    {e.delta > 0 ? '+' : ''}
+                    {e.delta.toLocaleString('en-IN')}
+                  </Text>
                 </View>
-                <Text className={`text-sm font-semibold ${e.delta > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-secondary'}`} style={TABULAR}>
-                  {e.delta > 0 ? '+' : ''}
-                  {e.delta.toLocaleString('en-IN')}
-                </Text>
               </View>
             ))}
           </View>
           <InfiniteFooter shown={list.rows.length} list={list} noun="entries" />
         </>
       )}
-    </View>
+    </Card>
   )
 }
 
@@ -228,8 +227,8 @@ function HowItWorks({ program }: { program: RewardsData['program'] }) {
     'Your tier is based on all the points you have earned, and redeeming never lowers it.',
   ]
   return (
-    <View className={CARD} style={SHADOW}>
-      <Text className="font-semibold text-foreground">How it works</Text>
+    <Card>
+      <Heading>How it works</Heading>
       <View className="mt-3 gap-1.5">
         {points.map(p => (
           <View key={p} className="flex-row gap-2 pl-1">
@@ -241,15 +240,15 @@ function HowItWorks({ program }: { program: RewardsData['program'] }) {
       <View className="mt-4">
         <View className="flex-row py-2">
           {['Tier', 'Points needed', 'Earning rate'].map((h, i) => (
-            <Text key={h} className={`text-xs uppercase font-medium text-foreground-muted ${i === 2 ? 'w-24' : 'flex-1 pr-4'}`} style={{ letterSpacing: 0.3 }}>
+            <Overline key={h} className={i === 2 ? 'w-24' : 'flex-1 pr-4'}>
               {h}
-            </Text>
+            </Overline>
           ))}
         </View>
         {program.tiers.map(tier => {
           const b = TIER_BADGE[tier.key] ?? TIER_BADGE.bronze
           return (
-            <View key={tier.key} className="flex-row items-center border-t border-border-default py-2">
+            <View key={tier.key} className="flex-row items-center border-t border-border-default py-2.5">
               <View className="flex-1 pr-4 items-start">
                 <View className={`px-2 py-0.5 rounded-full ${b.bg}`}>
                   <Text className={`text-xs font-medium ${b.text}`}>{tier.name}</Text>
@@ -261,31 +260,33 @@ function HowItWorks({ program }: { program: RewardsData['program'] }) {
           )
         })}
       </View>
-    </View>
+    </Card>
   )
 }
+
+const SKELETON_CARD = 'rounded-panel bg-surface-elevated p-4 dark:border dark:border-border-default'
 
 // Tier card, redeem card and points history, as loaded.
 function RewardsLoading() {
   return (
     <View className="gap-4">
-      <View className={CARD}>
+      <View className="rounded-panel bg-surface-elevated p-5 dark:border dark:border-border-default">
         <Skeleton width={90} height={24} rounded="rounded-full" />
         <Skeleton width={120} height={36} className="mt-4" />
         <Skeleton width="70%" height={13} className="mt-2" />
         <Skeleton height={8} rounded="rounded-full" className="mt-5" />
         <Skeleton width="60%" height={13} className="mt-2" />
       </View>
-      <View className={CARD}>
-        <Skeleton width={120} height={15} />
+      <View className={SKELETON_CARD}>
+        <Skeleton width={140} height={18} />
         <Skeleton height={12} className="mt-2" />
         <Skeleton width="55%" height={12} className="mt-1.5" />
-        <Skeleton width={100} height={11} rounded="rounded" className="mt-4" />
-        <Skeleton height={40} className="mt-1.5" />
-        <Skeleton height={40} className="mt-3" />
+        <Skeleton width={110} height={12} rounded="rounded" className="mt-4" />
+        <Skeleton height={56} rounded="rounded-field" className="mt-2" />
+        <Skeleton height={48} rounded="rounded-field" className="mt-3" />
       </View>
-      <View className={CARD}>
-        <Skeleton width={110} height={15} />
+      <View className={SKELETON_CARD}>
+        <Skeleton width={130} height={18} />
         <View className="mt-3">
           {[0, 1, 2].map(i => (
             <View key={i} className={`flex-row items-center justify-between gap-4 py-3 ${i > 0 ? 'border-t border-border-default' : ''}`}>
@@ -356,12 +357,13 @@ export default function RewardsScreen() {
       {loading ? (
         <RewardsLoading />
       ) : unavailable || !data ? (
-        <View className={`${CARD} items-center py-12`} style={SHADOW}>
-          <Text className="text-foreground font-medium text-center">{failed ? 'Could not load your rewards' : 'Rewards are not available for this account'}</Text>
-          <Pressable onPress={() => router.navigate('/(tabs)/account')} className="mt-3">
-            <Text className="text-sm text-accent-600">Back to my account</Text>
-          </Pressable>
-        </View>
+        <EmptyState
+          fill
+          icon={Gift}
+          title={failed ? 'Could not load your rewards' : 'Rewards are not available for this account'}
+          actionLabel="Back to my account"
+          onAction={() => router.navigate('/(tabs)/account')}
+        />
       ) : (
         <View className="gap-4">
           <TierCard data={data} />
