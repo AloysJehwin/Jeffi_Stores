@@ -43,8 +43,12 @@ const ADMIN = { adminId: 'a1', email: 'a@b.c', role: 'staff', scopes: ['social:w
 const USAGE = '11111111-1111-4111-8111-111111111111'
 const post = (body: unknown) =>
   new NextRequest('http://localhost/api/admin/ai/video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-const poll = (jobId: string, usageId?: string) =>
-  GET(new NextRequest(`http://localhost/api/admin/ai/video/${jobId}${usageId ? `?usageId=${usageId}` : ''}`), { params: Promise.resolve({ jobId }) })
+const poll = (jobId: string, usageId?: string, feature?: string) => {
+  const qs = new URLSearchParams()
+  if (usageId) qs.set('usageId', usageId)
+  if (feature) qs.set('feature', feature)
+  return GET(new NextRequest(`http://localhost/api/admin/ai/video/${jobId}?${qs}`), { params: Promise.resolve({ jobId }) })
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -61,9 +65,10 @@ describe('POST /api/admin/ai/video', () => {
     expect(h.generateVideo).toHaveBeenCalledWith(expect.objectContaining({ durationSec: 6, aspect: '16:9', actor: 'a@b.c' }))
   })
 
-  it('accepts only 4, 6 or 8 seconds and 9:16 or 16:9', async () => {
+  it('accepts only 4, 6 or 8 seconds and 9:16, 16:9 or 1:1', async () => {
     expect((await POST(post({ feature: 'social_video', prompt: 'a bolt spinning', durationSec: 5 }))).status).toBe(400)
-    expect((await POST(post({ feature: 'social_video', prompt: 'a bolt spinning', aspect: '1:1' }))).status).toBe(400)
+    expect((await POST(post({ feature: 'social_video', prompt: 'a bolt spinning', aspect: '4:3' }))).status).toBe(400)
+    expect((await POST(post({ feature: 'social_video', prompt: 'a bolt spinning', aspect: '1:1' }))).status).toBe(200)
     expect((await POST(post({ feature: 'social_image', prompt: 'a bolt spinning' }))).status).toBe(400)
   })
 
@@ -74,6 +79,15 @@ describe('POST /api/admin/ai/video', () => {
 
   it('403s when the plan does not include AI', async () => {
     vi.mocked(currentTenantPlanGate).mockResolvedValue({ allowed: false, plan: 'basic', upgradeRequired: 'pro' })
+    expect((await POST(post({ feature: 'social_video', prompt: 'a bolt spinning' }))).status).toBe(403)
+  })
+
+  it('gates homepage and offer videos on their own area scope', async () => {
+    expect((await POST(post({ feature: 'homepage_video', prompt: 'a bolt spinning' }))).status).toBe(403)
+    expect((await POST(post({ feature: 'offer_video', prompt: 'a bolt spinning' }))).status).toBe(403)
+    vi.mocked(authenticateAdmin).mockResolvedValue({ ...ADMIN, scopes: ['settings:write', 'coupons:write', 'catalog_enrichment:write'] } as any)
+    expect((await POST(post({ feature: 'homepage_video', prompt: 'a bolt spinning' }))).status).toBe(200)
+    expect((await POST(post({ feature: 'offer_video', prompt: 'a bolt spinning' }))).status).toBe(200)
     expect((await POST(post({ feature: 'social_video', prompt: 'a bolt spinning' }))).status).toBe(403)
   })
 
@@ -103,6 +117,13 @@ describe('GET /api/admin/ai/video/[jobId]', () => {
     vi.mocked(authenticateAdmin).mockResolvedValue({ ...ADMIN, scopes: ['catalog_enrichment:write'] } as any)
     expect((await poll('job-1')).status).toBe(403)
     expect(h.videoJob).not.toHaveBeenCalled()
+  })
+
+  it('gates the poll on the feature scope', async () => {
+    h.videoJob.mockResolvedValue({ status: 'running' })
+    expect((await poll('job-1', undefined, 'offer_video')).status).toBe(403)
+    vi.mocked(authenticateAdmin).mockResolvedValue({ ...ADMIN, scopes: ['coupons:write', 'catalog_enrichment:write'] } as any)
+    expect((await poll('job-1', undefined, 'offer_video')).status).toBe(200)
   })
 
   it('keeps the AiMediaError status', async () => {

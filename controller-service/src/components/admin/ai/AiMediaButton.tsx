@@ -11,12 +11,13 @@ import { ap } from '@/lib/shared/admin-path'
 import {
   AI_QUALITIES,
   AI_SIZE_PRESETS,
+  type AiImageFeature,
   type AiQuality,
   type AiSizePreset,
 } from '@/lib/ai/media-features'
 
 interface Props {
-  feature: 'social_image' | 'product_image' | 'ads_image' | 'email_hero' | 'hero_image' | 'offer_image' | 'meta_ads_image' | 'generate_image'
+  feature: AiImageFeature
   /** Area whose :write scope gates the button; defaults from the feature. */
   scope?: string
   /** Initial prompt (prefilled from context: product name, campaign title). */
@@ -48,6 +49,7 @@ const SCOPE_BY_FEATURE: Record<Props['feature'], string> = {
   offer_image: 'coupons',
   meta_ads_image: 'meta_ads_campaigns',
   generate_image: 'settings',
+  homepage_image: 'settings',
 }
 
 export default function AiMediaButton(props: Props) {
@@ -233,7 +235,12 @@ function AiMediaDialog({
                     className="group relative overflow-hidden rounded-lg border border-border-default hover:border-accent-500"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt="" className="aspect-square w-full bg-surface-secondary object-contain" />
+                    <img
+                      src={img.url}
+                      alt=""
+                      style={img.width && img.height ? { aspectRatio: `${img.width} / ${img.height}` } : undefined}
+                      className={`${img.width && img.height ? '' : 'aspect-square '}w-full bg-surface-secondary object-contain`}
+                    />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-sm font-semibold text-white opacity-0 group-hover:opacity-100">
                       Use this
                     </span>

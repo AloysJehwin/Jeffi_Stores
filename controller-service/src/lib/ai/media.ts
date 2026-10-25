@@ -6,14 +6,14 @@ import { preauthorize, settle, AiWalletError } from './billing'
 import { aiGatewayUrl } from '@/lib/shared/ai-client'
 import { uploadGalleryImage, putObjectBuffer, getS3Url, currentBucket } from '@/lib/shared/s3'
 import { query, queryOne } from '@/lib/shared/db'
-import { AI_VIDEO_DURATIONS } from './media-features'
+import { AI_VIDEO_ASPECTS, AI_VIDEO_DURATIONS, type AiVideoAspect } from './media-features'
 import { padToAspect, extForMime } from './reshape-image'
 
 export { AiWalletError }
 
 export type AiProvider = 'razer' | 'google' | 'replicate'
 export type AiQuality = 'draft' | 'standard' | 'premium'
-export type AiVideoAspect = '9:16' | '16:9'
+export type { AiVideoAspect }
 
 interface GatewayImage {
   url: string
@@ -115,6 +115,8 @@ export interface VideoJobResult {
   priceInr?: number
   /** gallery_videos id once the finished video has been written to the tenant gallery. */
   galleryVideoId?: string
+  /** The reference image the video started from, recorded as the gallery poster. */
+  posterUrl?: string | null
   error?: string
 }
 
@@ -310,7 +312,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
 export async function generateVideo(opts: GenerateVideoOpts): Promise<GenerateVideoResult> {
   // Veo renders 4, 6 or 8 s; snap to the nearest so the estimate matches what is rendered.
   const durationSec = AI_VIDEO_DURATIONS.reduce((best, d) => (Math.abs(d - (opts.durationSec ?? 4)) < Math.abs(best - (opts.durationSec ?? 4)) ? d : best), 4)
-  const aspect: AiVideoAspect = opts.aspect === '16:9' ? '16:9' : '9:16'
+  const aspect: AiVideoAspect = opts.aspect && AI_VIDEO_ASPECTS.includes(opts.aspect) ? opts.aspect : '9:16'
   const { usageId, priceInr } = await preauthorize({
     feature: opts.feature,
     capability: 'video',
@@ -424,7 +426,16 @@ async function finishJob(jobId: string, state: JobState, gw: GatewayJob): Promis
   }
   const key = videoKey(jobId, gw.result.mime)
   if (status === 'ok') {
+    // Another poll (or pod) already persisted it; hand back the gallery row it wrote.
+    const row = await queryOne<{ id: string; thumbnail_url: string | null }>(
+      `SELECT id, thumbnail_url FROM gallery_videos WHERE s3_key = $1 ORDER BY created_at DESC LIMIT 1`,
+      [key]
+    ).catch(() => null)
     const out: VideoJobResult = { status: 'done', videoUrl: await getS3Url(key), durationSec: gw.result.durationSec }
+    if (row) {
+      out.galleryVideoId = row.id
+      out.posterUrl = row.thumbnail_url
+    }
     state.done = out
     jobs.set(jobId, state)
     return out
@@ -432,15 +443,16 @@ async function finishJob(jobId: string, state: JobState, gw: GatewayJob): Promis
   const bytes = await fetchBytes(gw.result.videoUrl)
   await putObjectBuffer(key, bytes, gw.result.mime || 'video/mp4')
   const videoUrl = await getS3Url(key)
-  const out: VideoJobResult = { status: 'done', videoUrl, durationSec: gw.result.durationSec }
+  const posterUrl = state.referenceImageUrl ?? null
+  const out: VideoJobResult = { status: 'done', videoUrl, durationSec: gw.result.durationSec, posterUrl }
   // Land the finished video in the tenant gallery with provenance; a gallery write failure
   // must not fail the job (the caller already has the asset URL).
   try {
     const tenantId = state.tenantId ?? (await resolveTenantIdSafe())
     const row = await queryOne<{ id: string }>(
-      `INSERT INTO gallery_videos (tenant_id, s3_bucket, s3_key, url, mime, duration_seconds, aspect, prompt_text, model_name, source)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ai') RETURNING id`,
-      [tenantId, await currentBucket(), key, videoUrl, gw.result.mime || 'video/mp4', gw.result.durationSec, state.aspect ?? null, state.prompt ?? null, state.model ?? null]
+      `INSERT INTO gallery_videos (tenant_id, s3_bucket, s3_key, url, mime, duration_seconds, aspect, width, height, thumbnail_url, prompt_text, model_name, source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'ai') RETURNING id`,
+      [tenantId, await currentBucket(), key, videoUrl, gw.result.mime || 'video/mp4', gw.result.durationSec, state.aspect ?? null, gw.result.width || null, gw.result.height || null, posterUrl, state.prompt ?? null, state.model ?? null]
     )
     if (row) out.galleryVideoId = row.id
   } catch (err) {

@@ -598,6 +598,8 @@ CREATE TABLE public.hero_slides (
     image_url_mobile text,
     blurhash character varying(64),
     blurhash_mobile character varying(64),
+    -- Optional MP4/WebM banner; image_url is its poster.
+    video_url text,
     cta_label character varying(100),
     cta_url text,
     filter_category character varying(255),
@@ -635,6 +637,9 @@ CREATE TABLE public.product_offers (
     blurhash_mobile character varying(64),
     image_url_card text,
     blurhash_card character varying(64),
+    -- Optional MP4/WebM per slot; image_url_card / image_url are their posters.
+    video_url_card text,
+    video_url text,
     cta_label character varying(100),
     starts_at timestamp with time zone,
     ends_at timestamp with time zone,

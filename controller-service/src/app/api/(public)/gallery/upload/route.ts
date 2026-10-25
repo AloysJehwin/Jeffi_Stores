@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { uploadGalleryImage, fetchRemoteImage } from '@/lib/shared/s3'
+import { uploadGalleryMedia, fetchRemoteImage } from '@/lib/shared/s3'
 import { queryOne } from '@/lib/shared/db'
 
 export async function OPTIONS() {
@@ -11,9 +11,14 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  // The extension token is scoped to products:write; enforce it here so a token/admin
-  // without that scope can't upload.
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
+  // The extension token is scoped to products:write. Gallery media is shared with the homepage,
+  // offer and social editors, so their write scopes may add to it too.
+  const canUpload =
+    hasScope(admin.role, admin.scopes, 'products:write') ||
+    hasScope(admin.role, admin.scopes, 'settings:write') ||
+    hasScope(admin.role, admin.scopes, 'coupons:write') ||
+    hasScope(admin.role, admin.scopes, 'social:write')
+  if (!canUpload) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -23,6 +28,7 @@ export async function POST(request: NextRequest) {
     let sourceUrl: string | null = null
     let customName: string | null = null
     let categoryId: string | null = null
+    let mime = ''
 
     const contentType = request.headers.get('content-type') || ''
 
@@ -39,12 +45,13 @@ export async function POST(request: NextRequest) {
       const file = formData.get('file') as File | null
       if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
       fileName = file.name
+      mime = file.type
       customName = (formData.get('customName') as string | null) || null
       categoryId = (formData.get('categoryId') as string | null) || null
       imageBuffer = Buffer.from(await file.arrayBuffer())
     }
 
-    const result = await uploadGalleryImage(imageBuffer, fileName)
+    const result = await uploadGalleryMedia(imageBuffer, fileName, mime)
 
     const record = await queryOne(
       `INSERT INTO gallery_images (image_url, thumbnail_url, s3_key, s3_thumbnail_key, s3_bucket, file_name, file_size, mime_type, width, height, blurhash, source_url, custom_name, category_id)
@@ -57,7 +64,7 @@ export async function POST(request: NextRequest) {
         process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
         result.fileName,
         result.fileSize,
-        'image/png',
+        result.mimeType,
         result.width,
         result.height,
         result.blurhash,

@@ -15,6 +15,9 @@ export interface ProductOffer {
   /** Portrait 4:5 picture for the offer cards; falls back to a crop of image_url. */
   image_url_card: string | null
   blurhash_card: string | null
+  /** Optional MP4/WebM for the card and wide slots; image_url_card / image_url are the posters. */
+  video_url_card?: string | null
+  video_url?: string | null
   cta_label: string | null
   starts_at: string | null
   ends_at: string | null

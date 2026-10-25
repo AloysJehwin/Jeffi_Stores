@@ -15,6 +15,9 @@ export const AI_FEATURE_SCOPES: Record<AiFeature, AiFeatureScope> = {
   offer_image: 'coupons:write',
   meta_ads_image: 'meta_ads_campaigns:write',
   generate_image: 'settings:write',
+  homepage_image: 'settings:write',
+  homepage_video: 'settings:write',
+  offer_video: 'coupons:write',
 }
 
 export function scopeForFeature(feature: string): AiFeatureScope | null {
