@@ -1,5 +1,5 @@
-import { useCallback, useRef, type ReactNode } from 'react'
-import { AccessibilityInfo, Pressable, View, useWindowDimensions, type AccessibilityActionEvent, type AccessibilityProps } from 'react-native'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { AccessibilityInfo, Pressable, StyleSheet, View, useWindowDimensions, type AccessibilityActionEvent, type AccessibilityProps } from 'react-native'
 import Animated, {
   Extrapolation,
   interpolate,
@@ -9,6 +9,7 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
 import { useTokens } from '../theme'
@@ -16,10 +17,11 @@ import { Gradient } from './Gradient'
 import { PagerDots, type PagerDotsProps } from './PagerDots'
 import { GUTTER } from './Screen'
 import { useMotion } from './motion'
-import { useAutoplay } from './paging'
+import { useAutoplay, useSwipe } from './paging'
 
 // Horizontal pagers that snap one page at a time. Pager: full-width pages (the motion hero). PeekPager:
 // centred cards whose neighbours peek in, shrunk, dimmed and faded at both edges (offer cards).
+// FadePager: full-width pages that crossfade in place.
 
 export interface PageInfo {
   index: number
@@ -76,6 +78,20 @@ export interface PeekPagerProps<T> extends PagerBaseProps<T> {
   fade?: string | false
 }
 
+export interface FadePageInfo {
+  index: number
+  /** The page on show. */
+  active: boolean
+  width: number
+  height: number
+}
+
+export interface FadePagerProps<T> extends Omit<PagerBaseProps<T>, 'renderItem' | 'gap'> {
+  renderItem: (item: T, info: FadePageInfo) => ReactNode
+  /** Side padding (default the gutter). */
+  inset?: number
+}
+
 export function Pager<T>({ inset = GUTTER, aspect = 16 / 9, width, ...rest }: PagerProps<T>) {
   const win = useWindowDimensions().width
   const viewport = width ?? win
@@ -95,6 +111,78 @@ const NEXT_PREV = [
   { name: 'previous', label: 'Previous slide' },
 ]
 const INC_DEC = [{ name: 'increment' }, { name: 'decrement' }]
+
+// Built on the JS side and captured: worklets can't call plain functions.
+const pageRange = (i: number, page: number) => [(i - 1) * page, i * page, (i + 1) * page]
+
+/** A layer that drifts against its page while paging (`drift` of a page each side); still under reduced motion. */
+export function usePageParallax({ index, x, page }: PageInfo, drift: number, scale = 1) {
+  const still = useMotion().reduced
+  const range = pageRange(index, page)
+  return useAnimatedStyle(() => {
+    if (still) return {}
+    const tx = interpolate(x.value, range, [-page * drift, 0, page * drift], Extrapolation.CLAMP)
+    return { transform: [{ scale }, { translateX: tx }] }
+  })
+}
+
+/** Text that fades and rises in as its page settles; still under reduced motion. */
+export function usePageReveal({ index, x, page }: PageInfo, lift = 14) {
+  const still = useMotion().reduced
+  const range = pageRange(index, page)
+  return useAnimatedStyle(() => {
+    if (still) return {}
+    return {
+      opacity: interpolate(x.value, range, [0, 1, 0], Extrapolation.CLAMP),
+      transform: [{ translateY: interpolate(x.value, range, [lift, 0, lift], Extrapolation.CLAMP) }],
+    }
+  })
+}
+
+/** One page as screen readers get it: a button (or an adjustable when it can't be pressed) with next / previous. */
+function pageA11y({
+  label,
+  position,
+  pressable,
+  many,
+  extra,
+  step,
+}: {
+  label?: string
+  position?: string
+  pressable: boolean
+  many: boolean
+  extra: PageAction[]
+  step: (d: 1 | -1) => void
+}): AccessibilityProps {
+  const actions = [...(many ? (pressable ? NEXT_PREV : INC_DEC) : []), ...extra.map(a => ({ name: a.name, label: a.label }))]
+  return {
+    accessible: true,
+    accessibilityLabel: label ? [label, position].filter(Boolean).join(', ') : undefined,
+    accessibilityHint: label ? undefined : position,
+    accessibilityRole: pressable ? 'button' : many ? 'adjustable' : undefined,
+    accessibilityActions: actions.length ? actions : undefined,
+    onAccessibilityAction: (e: AccessibilityActionEvent) => {
+      const name = e.nativeEvent.actionName
+      const custom = extra.find(a => a.name === name)
+      if (custom) custom.run()
+      else if (name === 'next' || name === 'increment') step(1)
+      else if (name === 'previous' || name === 'decrement') step(-1)
+    },
+  }
+}
+
+function PageBody({ onPress, a11y, children }: { onPress?: () => void; a11y: AccessibilityProps; children: ReactNode }) {
+  return onPress ? (
+    <Pressable style={{ flex: 1 }} onPress={onPress} {...a11y}>
+      {children}
+    </Pressable>
+  ) : (
+    <View style={{ flex: 1 }} {...a11y}>
+      {children}
+    </View>
+  )
+}
 
 function Track<T>({
   data,
@@ -153,7 +241,7 @@ function Track<T>({
   const label = (i: number) => itemLabel?.(data[i], i)
   const position = (i: number) => (count > 1 ? `Slide ${i + 1} of ${count}` : undefined)
   // Screen-reader next / previous: scroll there and say where we landed.
-  const step = (from: number, d: number) => {
+  const step = (from: number, d: 1 | -1) => {
     const to = (from + d + count) % count
     go(to, animate)
     AccessibilityInfo.announceForAccessibility([label(to), position(to)].filter(Boolean).join(', '))
@@ -180,9 +268,6 @@ function Track<T>({
         >
           {data.map((item, i) => {
             const pressable = !!onPress && (canPress?.(item, i) ?? true)
-            const l = label(i)
-            const extra = itemActions?.(item, i) ?? []
-            const actions = [...(count > 1 ? (pressable ? NEXT_PREV : INC_DEC) : []), ...extra.map(a => ({ name: a.name, label: a.label }))]
             return (
               <Page
                 key={keyExtractor ? keyExtractor(item, i) : i}
@@ -194,20 +279,14 @@ function Track<T>({
                 peek={peek}
                 still={reduced}
                 onPress={pressable ? () => onPress?.(item, i) : undefined}
-                a11y={{
-                  accessible: true,
-                  accessibilityLabel: l ? [l, position(i)].filter(Boolean).join(', ') : undefined,
-                  accessibilityHint: l ? undefined : position(i),
-                  accessibilityRole: pressable ? 'button' : count > 1 ? 'adjustable' : undefined,
-                  accessibilityActions: actions.length ? actions : undefined,
-                  onAccessibilityAction: (e: AccessibilityActionEvent) => {
-                    const name = e.nativeEvent.actionName
-                    const custom = extra.find(a => a.name === name)
-                    if (custom) custom.run()
-                    else if (name === 'next' || name === 'increment') step(i, 1)
-                    else if (name === 'previous' || name === 'decrement') step(i, -1)
-                  },
-                }}
+                a11y={pageA11y({
+                  label: label(i),
+                  position: position(i),
+                  pressable,
+                  many: count > 1,
+                  extra: itemActions?.(item, i) ?? [],
+                  step: d => step(i, d),
+                })}
               >
                 {renderItem(item, { index: i, x, page, width: itemWidth, height: itemHeight })}
               </Page>
@@ -249,7 +328,7 @@ function Page({
   a11y: AccessibilityProps
   children: ReactNode
 }) {
-  const range = [(i - 1) * page, i * page, (i + 1) * page]
+  const range = pageRange(i, page)
   // PeekPager: the centred card is full size; neighbours shrink (not under reduced motion) and dim.
   const style = useAnimatedStyle(() => {
     if (!peek) return {}
@@ -258,15 +337,113 @@ function Page({
   })
   return (
     <Animated.View style={[{ width, height }, style]}>
-      {onPress ? (
-        <Pressable style={{ flex: 1 }} onPress={onPress} {...a11y}>
-          {children}
-        </Pressable>
-      ) : (
-        <View style={{ flex: 1 }} {...a11y}>
-          {children}
-        </View>
-      )}
+      <PageBody onPress={onPress} a11y={a11y}>
+        {children}
+      </PageBody>
+    </Animated.View>
+  )
+}
+
+export function FadePager<T>({
+  data,
+  renderItem,
+  keyExtractor,
+  onPress,
+  canPress,
+  itemLabel,
+  itemActions,
+  aspect = 16 / 9,
+  height,
+  autoplay = false,
+  intervalMs = 5000,
+  onIndexChange,
+  dots = true,
+  width,
+  inset = GUTTER,
+}: FadePagerProps<T>) {
+  const win = useWindowDimensions().width
+  const itemWidth = (width ?? win) - inset * 2
+  const itemHeight = typeof height === 'function' ? height(itemWidth) : (height ?? Math.round(itemWidth / aspect))
+  const count = data.length
+  const [active, setActive] = useState(0)
+  const index = active < count ? active : 0
+
+  const go = useCallback((i: number) => setActive(((i % count) + count) % count), [count])
+  const shift = useCallback((d: 1 | -1) => setActive(a => (((a + d) % count) + count) % count), [count])
+  const auto = useAutoplay(() => shift(1), { enabled: autoplay && count > 1, intervalMs })
+  const swipe = useSwipe(shift)
+
+  const indexChange = useRef(onIndexChange)
+  indexChange.current = onIndexChange
+  const shown = useRef(index)
+  useEffect(() => {
+    auto.restart()
+    if (shown.current === index) return
+    shown.current = index
+    indexChange.current?.(index)
+  }, [auto, index])
+
+  if (count === 0) return null
+  const label = (i: number) => itemLabel?.(data[i], i)
+  const position = (i: number) => (count > 1 ? `Slide ${i + 1} of ${count}` : undefined)
+  const step = (from: number, d: 1 | -1) => {
+    const to = (from + d + count) % count
+    go(to)
+    AccessibilityInfo.announceForAccessibility([label(to), position(to)].filter(Boolean).join(', '))
+  }
+  const dotOpts = typeof dots === 'object' ? dots : {}
+
+  return (
+    <View>
+      <View
+        style={{ height: itemHeight, marginHorizontal: inset }}
+        {...(count > 1 ? swipe : null)}
+        onTouchStart={() => auto.hold(true)}
+        onTouchEnd={() => auto.hold(false)}
+        onTouchCancel={() => auto.hold(false)}
+      >
+        {data.map((item, i) => {
+          const pressable = !!onPress && (canPress?.(item, i) ?? true)
+          return (
+            <FadePage key={keyExtractor ? keyExtractor(item, i) : i} on={i === index}>
+              <PageBody
+                onPress={pressable ? () => onPress?.(item, i) : undefined}
+                a11y={pageA11y({
+                  label: label(i),
+                  position: position(i),
+                  pressable,
+                  many: count > 1,
+                  extra: itemActions?.(item, i) ?? [],
+                  step: d => step(i, d),
+                })}
+              >
+                {renderItem(item, { index: i, active: i === index, width: itemWidth, height: itemHeight })}
+              </PageBody>
+            </FadePage>
+          )
+        })}
+      </View>
+      {dots && count > 1 ? <PagerDots {...dotOpts} count={count} index={index} onSelect={go} className={dotOpts.className ?? 'mt-3'} /> : null}
+    </View>
+  )
+}
+
+/** A stacked page; only the one on show takes touches or reaches screen readers. */
+function FadePage({ on, children }: { on: boolean; children: ReactNode }) {
+  const { animate } = useMotion()
+  const opacity = useSharedValue(on ? 1 : 0)
+  useEffect(() => {
+    opacity.value = withTiming(on ? 1 : 0, { duration: animate ? 700 : 0 })
+  }, [on, opacity, animate])
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }))
+  return (
+    <Animated.View
+      pointerEvents={on ? 'auto' : 'none'}
+      importantForAccessibility={on ? 'auto' : 'no-hide-descendants'}
+      accessibilityElementsHidden={!on}
+      style={[StyleSheet.absoluteFill, { zIndex: on ? 1 : 0 }, style]}
+    >
+      {children}
     </Animated.View>
   )
 }

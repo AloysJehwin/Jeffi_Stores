@@ -1,9 +1,9 @@
 import { View } from 'react-native'
-import { Gradient, Overline, Pager, Text, useMotion, type PageInfo } from '../../ui'
+import { Gradient, Overline, Pager, Text, usePageParallax, usePageReveal, type PageInfo } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { ArrowRight } from 'lucide-react-native'
-import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated'
+import Animated from 'react-native-reanimated'
+import { SlideCta } from './layout'
 import { absUrl, openHref } from '../../lib/links'
 import { status } from '../../theme'
 import type { MotionHeroData, MotionHeroSlide, SectionProps } from '../../types/home'
@@ -35,30 +35,16 @@ export default function MotionHero({ section, data }: SectionProps) {
   )
 }
 
-function Card({ slide, info: { index: i, x, page, width: w, height: h } }: { slide: MotionHeroSlide; info: PageInfo }) {
-  const still = useMotion().reduced
+function Card({ slide, info }: { slide: MotionHeroSlide; info: PageInfo }) {
+  const { width: w, height: h } = info
   const bg = absUrl(slide.bgImage)
   const fg = absUrl(slide.fgImage)
-  const range = [(i - 1) * page, i * page, (i + 1) * page]
   const titleSize = Math.min(40, Math.max(26, Math.round(w * 0.085)))
 
   // Relative to the card: the background lags a little, the foreground more, so the layers separate while paging.
-  const bgStyle = useAnimatedStyle(() =>
-    still
-      ? {}
-      : { transform: [{ scale: 1.12 }, { translateX: interpolate(x.value, range, [-page * 0.08, 0, page * 0.08], Extrapolation.CLAMP) }] }
-  )
-  const fgStyle = useAnimatedStyle(() =>
-    still ? {} : { transform: [{ translateX: interpolate(x.value, range, [-page * 0.28, 0, page * 0.28], Extrapolation.CLAMP) }] }
-  )
-  const textStyle = useAnimatedStyle(() =>
-    still
-      ? {}
-      : {
-          opacity: interpolate(x.value, range, [0, 1, 0], Extrapolation.CLAMP),
-          transform: [{ translateY: interpolate(x.value, range, [14, 0, 14], Extrapolation.CLAMP) }],
-        }
-  )
+  const bgStyle = usePageParallax(info, 0.08, 1.12)
+  const fgStyle = usePageParallax(info, 0.28)
+  const textStyle = usePageReveal(info)
 
   return (
     <View style={{ width: w, height: h }} className="overflow-hidden rounded-sheet bg-black">
@@ -94,12 +80,7 @@ function Card({ slide, info: { index: i, x, page, width: w, height: h } }: { sli
             {slide.sub}
           </Text>
         ) : null}
-        {slide.ctaLabel ? (
-          <View className="mt-4 flex-row items-center gap-1.5 self-start rounded-full bg-white px-4 py-2.5">
-            <Text className="text-sm font-bold text-black">{slide.ctaLabel}</Text>
-            <ArrowRight size={16} color={status.black} strokeWidth={2.5} />
-          </View>
-        ) : null}
+        <SlideCta label={slide.ctaLabel} size="md" className="mt-4" />
       </Animated.View>
     </View>
   )

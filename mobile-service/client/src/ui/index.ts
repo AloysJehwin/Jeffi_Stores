@@ -24,7 +24,10 @@ export { ModalSheet, SheetHeader, type ModalSheetProps } from './ModalSheet'
 export { Lightbox } from './Lightbox'
 export { Gradient, type GradientStop, type GradientDir } from './Gradient'
 export { PagerDots, type PagerDotsProps, type DotTone } from './PagerDots'
-export { Pager, PeekPager, type PageInfo, type PageAction, type PagerProps, type PeekPagerProps } from './Pager'
+export {
+  Pager, PeekPager, FadePager, usePageParallax, usePageReveal,
+  type PageInfo, type PageAction, type PagerProps, type PeekPagerProps, type FadePageInfo, type FadePagerProps,
+} from './Pager'
 export { Rail } from './Rail'
 export { Overlay } from './Overlay'
 export { Stepper } from './Stepper'
