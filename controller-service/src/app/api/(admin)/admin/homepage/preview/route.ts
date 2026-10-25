@@ -14,6 +14,7 @@ import {
   motionHeroSlides,
   storyGroups,
   spotlightConfig,
+  slidesConfig,
   SECTION_TYPES,
   SECTION_COPY_DEFAULTS,
   HOMEPAGE_SURFACES,
@@ -23,12 +24,14 @@ import {
   type SectionType,
   type HomepageSection,
   type PreviewItem,
+  type SlidesData,
 } from '@/lib/catalog/homepage-sections'
 import {
   getBackInStock,
   getBundles,
   getCategoryTabs,
   getCountdownDeal,
+  getSlides,
   getSpotlightProduct,
   getTestimonials,
   getValueStats,
@@ -58,6 +61,7 @@ type PreviewKind =
   | 'links'
   | 'stats'
   | 'stories'
+  | 'slides'
   | 'none'
 
 interface PreviewResult {
@@ -65,6 +69,8 @@ interface PreviewResult {
   items: PreviewItem[]
   /** Shown instead of the tiles when there is nothing to draw, e.g. per-visitor or unconfigured sections. */
   note?: string
+  /** Slides: the resolved section, drawn by the storefront component. */
+  slides?: SlidesData
 }
 
 const querySchema = z.object({
@@ -277,6 +283,22 @@ function stories(config: Record<string, unknown>): PreviewResult {
       }
 }
 
+async function slidesPreview(config: Record<string, unknown>): Promise<PreviewResult> {
+  const data = await withGst(gst => getSlides(shape('slides', config), gst))
+  if (data.slides.length > 0) {
+    const items = data.slides.map(s => ({ id: s.id, name: s.title, image_url: s.imageCard ?? s.image }))
+    return { kind: 'slides', items, slides: data }
+  }
+  return {
+    kind: 'slides',
+    items: [],
+    note:
+      slidesConfig({ config }).items.length > 0
+        ? 'None of these slides are live (an offer ended or is hidden, a category is empty, a product is unlisted), so this section is hidden.'
+        : 'Add an offer, category, product or custom slide to preview this section.',
+  }
+}
+
 function tileItems(config: Record<string, unknown>, titleKey: string, fallback: string): PreviewItem[] {
   const raw = Array.isArray(config.items) ? config.items : []
   return raw
@@ -343,6 +365,7 @@ const RESOLVERS: Partial<
   motion_hero: async c => motionHero(c),
   stories: async c => stories(c),
   product_spotlight: productSpotlight,
+  slides: slidesPreview,
   value_stats: async c => ({
     kind: 'stats',
     items: (await getValueStats(shape('value_stats', c))).map(s => ({
@@ -377,8 +400,10 @@ export async function GET(request: NextRequest) {
 
   const config = parseConfig(parsed.data.config)
   try {
-    const { kind, items, note } = await resolver(config, { surface: rowSurface({ surface: parsed.data.surface }) })
-    return NextResponse.json({ kind, items, ...(note ? { note } : {}) })
+    const { kind, items, note, slides } = await resolver(config, {
+      surface: rowSurface({ surface: parsed.data.surface }),
+    })
+    return NextResponse.json({ kind, items, ...(note ? { note } : {}), ...(slides ? { slides } : {}) })
   } catch (err) {
     console.error('[homepage-preview]', type, err)
     return NextResponse.json({ error: 'Preview failed' }, { status: 500 })

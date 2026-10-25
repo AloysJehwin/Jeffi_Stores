@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import { Link2, Package } from 'lucide-react'
 import AdminImage from '@/components/admin/AdminImage'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
+import SlidesSection from '@/components/visitor/home/SlidesSection'
 import {
   motionHeroSlides,
   rowSurface,
+  slidesConfig,
   spotlightConfig,
   storyGroups,
   type HomepageSection,
   type PreviewItem,
+  type SlidesData,
 } from '@/lib/catalog/homepage-sections'
 
 type PreviewKind =
@@ -24,12 +27,14 @@ type PreviewKind =
   | 'links'
   | 'stats'
   | 'stories'
+  | 'slides'
   | 'none'
 
 interface PreviewResponse {
   kind: PreviewKind
   items: PreviewItem[]
   note?: string
+  slides?: SlidesData
 }
 
 const KIND_LABEL: Record<Exclude<PreviewKind, 'none'>, string> = {
@@ -43,6 +48,35 @@ const KIND_LABEL: Record<Exclude<PreviewKind, 'none'>, string> = {
   links: 'items',
   stats: 'numbers',
   stories: 'stories',
+  slides: 'slides',
+}
+
+// The preview route's cap on `config`.
+const CONFIG_MAX = 8000
+const clip = (s: string | null, max: number) => s?.slice(0, max)
+
+// Each slide keeps only what its card draws: a reference, or one image (the one its shape shows)
+// and trimmed text. Trailing slides drop if a long config still runs over.
+function slidesPreviewConfig(section: HomepageSection): Record<string, unknown> {
+  const { items, ...settings } = slidesConfig(section)
+  const portrait = settings.layout !== 'banner' && settings.aspect !== '16:9'
+  const slim = items.map(i => {
+    if (i.kind === 'offer') return { kind: i.kind, offerId: i.offerId }
+    if (i.kind === 'category') return { kind: i.kind, categoryId: i.categoryId }
+    if (i.kind === 'product') return { kind: i.kind, productId: i.productId }
+    return {
+      kind: i.kind,
+      image: (portrait && i.imageCard) || i.image,
+      title: clip(i.title, 100),
+      eyebrow: clip(i.eyebrow, 40),
+      sub: clip(i.sub, 120),
+      ctaLabel: clip(i.ctaLabel, 40),
+      motion: i.motion,
+    }
+  })
+  const config = { ...settings, items: slim }
+  while (slim.length > 1 && JSON.stringify(config).length > CONFIG_MAX) slim.pop()
+  return config
 }
 
 // The route caps `config` at 8000 chars, so media-heavy sections send only what their preview
@@ -61,6 +95,8 @@ function previewConfig(section: HomepageSection): Record<string, unknown> {
       }
     case 'product_spotlight':
       return { productId: spotlightConfig(section).productId }
+    case 'slides':
+      return slidesPreviewConfig(section)
     default:
       return section.config ?? {}
   }
@@ -153,6 +189,19 @@ export default function SectionPreview({ section }: { section: HomepageSection }
       <p className="text-xs text-foreground-muted py-2">
         Nothing to show yet — no matching {KIND_LABEL[data.kind]} are live.
       </p>
+    )
+  }
+
+  if (data.kind === 'slides' && data.slides) {
+    return (
+      <div className="rounded-lg border border-border-default p-2.5">
+        <p className="text-[11px] uppercase tracking-wide text-foreground-muted mb-2">
+          Live preview · {data.slides.slides.length} {KIND_LABEL.slides}
+        </p>
+        <div className="overflow-hidden rounded-lg">
+          <SlidesSection data={data.slides} eyebrow={section.eyebrow} title={section.title} preview />
+        </div>
+      </div>
     )
   }
 
