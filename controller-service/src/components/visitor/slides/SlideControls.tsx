@@ -77,8 +77,9 @@ const DOT: Record<DotsTone, Record<DotsSize, [active: string, idle: string]>> = 
     sm: ['bg-white w-3 h-1', 'bg-white/40 w-1 h-1'],
   },
   brand: {
-    md: ['bg-primary-500 w-5 h-2', 'bg-foreground/20 hover:bg-foreground/40 w-2 h-2'],
-    sm: ['bg-primary-500 w-3 h-1', 'bg-foreground/20 w-1 h-1'],
+    // `foreground` is a bare CSS variable, so an opacity modifier on it renders nothing.
+    md: ['bg-primary-500 w-5 h-2', 'bg-foreground-muted opacity-40 hover:opacity-70 w-2 h-2'],
+    sm: ['bg-primary-500 w-3 h-1', 'bg-foreground-muted opacity-40 w-1 h-1'],
   },
 }
 
