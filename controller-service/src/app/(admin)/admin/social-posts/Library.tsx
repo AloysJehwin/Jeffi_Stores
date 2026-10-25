@@ -5,6 +5,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import Toggle from '@/components/ui/Toggle'
 import Select from '@/components/ui/Select'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, Empty, Section, api, btnGhost, btnPrimary, inputCls } from '@/components/admin/channels/ui'
@@ -113,7 +114,19 @@ function TemplateForm({ initial, onDone }: { initial: Template | null; onDone: (
       </div>
       <div>
         <label className={lbl}>Caption</label>
-        <textarea rows={4} className={inputCls} value={caption} onChange={e => setCaption(e.target.value)} placeholder="New in: {name}, now {price}. {url}" />
+        <AIEnrichButton
+          fieldLabel="Social caption template"
+          value={caption}
+          onChange={setCaption}
+          scope="social:write"
+          variables={['name', 'price', 'old_price', 'url']}
+          multiline
+          write
+          broadcast
+          context={`Reusable social post caption "${name}"; {name} {price} {old_price} {url} are filled from the product.`}
+        >
+          <textarea rows={4} className={`${inputCls} pr-8`} value={caption} onChange={e => setCaption(e.target.value)} placeholder="New in: {name}, now {price}. {url}" />
+        </AIEnrichButton>
       </div>
       <div>
         <label className={lbl}>Hashtags</label>

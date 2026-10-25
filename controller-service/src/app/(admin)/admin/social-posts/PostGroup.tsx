@@ -5,6 +5,7 @@ import { CalendarClock, ExternalLink, Pencil, RotateCcw, Send, X } from 'lucide-
 import IconButton from '@/components/ui/IconButton'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, api, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
@@ -145,7 +146,16 @@ function EditPost({ post, onDone }: { post: Post; onDone: (saved: boolean) => vo
     <div className="mt-2 rounded-lg bg-surface-secondary p-3 space-y-2">
       <div>
         <label className={lbl}>Caption</label>
-        <textarea rows={3} className={inputCls} value={caption} onChange={e => setCaption(e.target.value)} />
+        <AIEnrichButton
+          fieldLabel="Social media caption"
+          value={caption}
+          onChange={setCaption}
+          scope="social:write"
+          multiline
+          context={`A ${label(post.platform)} post.`}
+        >
+          <textarea rows={3} className={`${inputCls} pr-8`} value={caption} onChange={e => setCaption(e.target.value)} />
+        </AIEnrichButton>
       </div>
       <div>
         <label className={lbl}>Hashtags</label>
@@ -155,7 +165,17 @@ function EditPost({ post, onDone }: { post: Post; onDone: (saved: boolean) => vo
         {TITLE_PLATFORMS.includes(post.platform) && (
           <div>
             <label className={lbl}>Title</label>
-            <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} />
+            <AIEnrichButton
+              fieldLabel="Video / pin title"
+              value={title}
+              onChange={setTitle}
+              scope="social:write"
+              maxLength={100}
+              write
+              context={`Title of a ${label(post.platform)} post.${caption ? ` Caption: ${caption.slice(0, 300)}` : ''}`}
+            >
+              <input className={`${inputCls} pr-8`} value={title} onChange={e => setTitle(e.target.value)} />
+            </AIEnrichButton>
           </div>
         )}
         <div>

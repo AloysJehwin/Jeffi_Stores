@@ -8,6 +8,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import Toggle from '@/components/ui/Toggle'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import DatePicker from '@/components/ui/DatePicker'
 import OfferProductPicker, { type AssignOption } from '@/components/admin/OffersProductPicker'
 import { useEditSession } from '@/hooks/useEditSession'
@@ -90,8 +91,8 @@ export default function OfferDetailClient({
     [offer.id, showToast]
   )
 
-  async function commitTitle() {
-    const next = title.trim()
+  async function commitTitle(value = title) {
+    const next = value.trim()
     if (!next) {
       setTitle(savedTitle)
       return
@@ -138,15 +139,27 @@ export default function OfferDetailClient({
 
             <div>
               <label className="block text-xs font-medium text-foreground-secondary mb-1">Title</label>
-              <input
-                type="text"
+              <AIEnrichButton
+                fieldLabel="Offer title"
                 value={title}
-                onChange={e => setTitle(e.target.value)}
-                onBlur={commitTitle}
+                onChange={v => {
+                  setTitle(v)
+                  void commitTitle(v)
+                }}
+                scope="coupons:write"
                 maxLength={255}
-                disabled={!canWrite}
-                className={INPUT_CLASS}
-              />
+                context="Headline of a storefront offer card; keep it short and punchy."
+              >
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  onBlur={() => commitTitle()}
+                  maxLength={255}
+                  disabled={!canWrite}
+                  className={`${INPUT_CLASS} pr-8`}
+                />
+              </AIEnrichButton>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">

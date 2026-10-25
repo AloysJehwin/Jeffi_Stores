@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, Upload } from 'lucide-react'
 import Select from '@/components/ui/Select'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AiMediaButton from '@/components/admin/ai/AiMediaButton'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { uploadImage } from '@/components/admin/ImageUrlInput'
@@ -199,6 +200,9 @@ export function NewAdDialog({ onClose, onDone }: { onClose: () => void; onDone: 
     }))
   }
 
+  const adContext = product
+    ? `Product: ${product.name}.${product.description ? ` ${product.description.replace(/<[^>]+>/g, ' ').slice(0, 400)}` : ''}`
+    : 'An ad for the store.'
   const tooLong = f.headline.length > TEXT_LIMITS.headline || f.description.length > TEXT_LIMITS.description || f.message.length > TEXT_LIMITS.message.max
   const ready = canWrite && !!setup?.page && f.adsetId && f.name.trim() && f.link && f.message.trim() && f.headline.trim() && f.imageUrl && !tooLong
 
@@ -265,14 +269,48 @@ export function NewAdDialog({ onClose, onDone }: { onClose: () => void; onDone: 
         <input className={inputCls} aria-label="Link" value={f.link} onChange={e => set('link', e.target.value.trim())} placeholder="https://..." />
       </Field>
       <Field label="Primary text" counter={<Counter n={f.message.length} max={TEXT_LIMITS.message.max} recommended={TEXT_LIMITS.message.recommended} />}>
-        <textarea className={inputCls} aria-label="Primary text" rows={3} maxLength={TEXT_LIMITS.message.max} value={f.message} onChange={e => set('message', e.target.value)} />
+        <AIEnrichButton
+          fieldLabel="Facebook ad primary text"
+          value={f.message}
+          onChange={v => set('message', v)}
+          scope="meta_ads_campaigns:write"
+          maxLength={TEXT_LIMITS.message.max}
+          multiline
+          write
+          broadcast
+          context={`${adContext} Primary text of a Facebook/Instagram ad; keep the hook within the first ${TEXT_LIMITS.message.recommended} characters.`}
+        >
+          <textarea className={`${inputCls} pr-8`} aria-label="Primary text" rows={3} maxLength={TEXT_LIMITS.message.max} value={f.message} onChange={e => set('message', e.target.value)} />
+        </AIEnrichButton>
       </Field>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Field label="Headline" counter={<Counter n={f.headline.length} max={TEXT_LIMITS.headline} />}>
-          <input className={inputCls} aria-label="Headline" maxLength={TEXT_LIMITS.headline} value={f.headline} onChange={e => set('headline', e.target.value)} />
+          <AIEnrichButton
+            fieldLabel="Facebook ad headline"
+            value={f.headline}
+            onChange={v => set('headline', v)}
+            scope="meta_ads_campaigns:write"
+            maxLength={TEXT_LIMITS.headline}
+            write
+            broadcast
+            context={`${adContext} Headline under the ad image.`}
+          >
+            <input className={`${inputCls} pr-8`} aria-label="Headline" maxLength={TEXT_LIMITS.headline} value={f.headline} onChange={e => set('headline', e.target.value)} />
+          </AIEnrichButton>
         </Field>
         <Field label="Description (optional)" counter={<Counter n={f.description.length} max={TEXT_LIMITS.description} />}>
-          <input className={inputCls} aria-label="Description" maxLength={TEXT_LIMITS.description} value={f.description} onChange={e => set('description', e.target.value)} />
+          <AIEnrichButton
+            fieldLabel="Facebook ad link description"
+            value={f.description}
+            onChange={v => set('description', v)}
+            scope="meta_ads_campaigns:write"
+            maxLength={TEXT_LIMITS.description}
+            write
+            broadcast
+            context={`${adContext} Short line under the headline.`}
+          >
+            <input className={`${inputCls} pr-8`} aria-label="Description" maxLength={TEXT_LIMITS.description} value={f.description} onChange={e => set('description', e.target.value)} />
+          </AIEnrichButton>
         </Field>
       </div>
       <Field group label="Button">

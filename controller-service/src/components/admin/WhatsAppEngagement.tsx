@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { MessageCircle, Send, ChevronDown, Check, X } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 interface ThreadMessage {
   id: string
@@ -55,6 +56,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
   const [isOpen, setIsOpen] = useState(!!forceOpen)
   const [isLoading, setIsLoading] = useState(false)
   const [thread, setThread] = useState<ThreadMessage[]>([])
+  const lastInbound = [...thread].reverse().find(m => m.direction === 'inbound')?.body ?? ''
   const [templates, setTemplates] = useState<Record<string, TemplateEntry>>({})
   const [prefill, setPrefill] = useState<Prefill | null>(null)
   const [availability, setAvailability] = useState<Availability>({})
@@ -279,19 +281,31 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
         </div>
         <div className="pt-3 border-t border-border-default">
           <div className="flex gap-2">
-            <input
-              type="text"
-              value={freeText}
-              onChange={e => setFreeText(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSendFreeText()
-                }
-              }}
-              placeholder="Free text message…"
-              className="flex-1 min-w-0 px-3.5 h-control rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-            />
+            <div className="relative flex-1 min-w-0">
+              <input
+                type="text"
+                value={freeText}
+                onChange={e => setFreeText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendFreeText()
+                  }
+                }}
+                placeholder="Free text message…"
+                className="w-full px-3.5 pr-10 h-control rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+              />
+              <AIEnrichButton
+                placement="in-field"
+                anchorClassName="absolute right-2 top-1/2 -translate-y-1/2"
+                fieldLabel="WhatsApp message"
+                value={freeText}
+                onChange={setFreeText}
+                scope="customers:write"
+                write={!!lastInbound}
+                context={`A one-to-one WhatsApp reply from the store to a customer; short, friendly, plain text.${lastInbound ? ` The customer wrote: "${lastInbound.slice(0, 600)}"` : ''}`}
+              />
+            </div>
             <button
               onClick={handleSendFreeText}
               disabled={isSending || !freeText.trim()}

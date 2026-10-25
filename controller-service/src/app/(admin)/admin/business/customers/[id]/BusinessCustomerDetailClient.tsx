@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { Card, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, TextArea, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { APPROVAL_STATUS, fmtDay } from '../../_status'
 
@@ -161,7 +162,16 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
 
   const rejectForm = (
     <div className="space-y-2">
-      <TextArea value={rejectionNote} onChange={e => setRejectionNote(e.target.value)} placeholder="Rejection reason (optional)" rows={3} className="resize-none" />
+      <AIEnrichButton
+        fieldLabel="Reason for rejecting the business account"
+        value={rejectionNote}
+        onChange={setRejectionNote}
+        scope="business_customers:write"
+        multiline
+        context={`Sent to ${customer.company_name || contact} explaining why their business account application was declined. Polite, brief, factual.`}
+      >
+        <TextArea value={rejectionNote} onChange={e => setRejectionNote(e.target.value)} placeholder="Rejection reason (optional)" rows={3} className="resize-none pr-8" />
+      </AIEnrichButton>
       <div className="flex gap-2">
         <button onClick={handleReject} disabled={actionLoading} className="control-md flex-1 bg-red-600 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
           Confirm Reject

@@ -9,6 +9,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from './FormsPreview'
 import Toggle from '@/components/ui/Toggle'
 import AIFillForm from '@/components/admin/AIFillForm'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { Badge, FormFooter } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
@@ -403,13 +404,23 @@ export default function ReviewFormForm({
 
         <div>
           <label className={labelClass}>Form Title *</label>
-          <input
+          <AIEnrichButton
+            fieldLabel="Review form title"
             value={title}
-            onChange={e => setTitle(e.target.value)}
-            required
-            className={inputClass}
-            placeholder="e.g. Leave Us a Google Review"
-          />
+            onChange={setTitle}
+            scope="review_forms:write"
+            maxLength={255}
+            write
+            context={`Heading of a public ${TEMPLATES.find(t => t.value === templateType)?.label ?? 'review'} form customers fill in.`}
+          >
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              required
+              className={`${inputClass} pr-8`}
+              placeholder="e.g. Leave Us a Google Review"
+            />
+          </AIEnrichButton>
         </div>
 
         <div>
@@ -457,13 +468,23 @@ export default function ReviewFormForm({
 
         <div>
           <label className={labelClass}>Description</label>
-          <textarea
+          <AIEnrichButton
+            fieldLabel="Review form description"
             value={description}
-            onChange={e => setDescription(e.target.value)}
-            rows={2}
-            className={inputClass}
-            placeholder="Optional — shown to customer on the form page"
-          />
+            onChange={setDescription}
+            scope="review_forms:write"
+            multiline
+            write
+            context={`Intro shown under the title "${title}" on a public ${TEMPLATES.find(t => t.value === templateType)?.label ?? 'review'} form; one or two sentences.`}
+          >
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={2}
+              className={`${inputClass} pr-8`}
+              placeholder="Optional — shown to customer on the form page"
+            />
+          </AIEnrichButton>
         </div>
 
         <div className="flex items-center gap-2">

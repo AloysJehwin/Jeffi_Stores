@@ -5,6 +5,7 @@ import { ChevronDown, Mail, Send, Sparkles } from 'lucide-react'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { fieldInputCls } from '@/components/admin/kit/form'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 
 type TemplateOption = { id: string; label: string; subject: string; body: string }
@@ -297,17 +298,40 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
 
           <div>
             <label className="block text-xs font-medium text-foreground-muted mb-1.5">Subject</label>
-            <input
-              type="text"
+            <AIEnrichButton
+              fieldLabel="Email subject"
               value={subject}
-              onChange={e => setSubject(e.target.value)}
-              className={fieldInputCls}
-            />
+              onChange={setSubject}
+              scope="mailer:write"
+              format="subject"
+              write
+              context={`Email to the customer about order #${orderNumber}.`}
+            >
+              <input
+                type="text"
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                className={`${fieldInputCls} pr-8`}
+              />
+            </AIEnrichButton>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-foreground-muted mb-1.5">Message</label>
-            <EmailComposer value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
+            <div className="relative">
+              <EmailComposer value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
+              <AIEnrichButton
+                placement="in-field"
+                anchorClassName="absolute right-3 bottom-3 z-10"
+                fieldLabel="Email message (HTML)"
+                value={body}
+                onChange={setBody}
+                scope="mailer:write"
+                format="html"
+                write
+                context={`Email to the customer about order #${orderNumber}. Subject: "${subject}".`}
+              />
+            </div>
             <p className="text-[11px] text-foreground-muted mt-1.5">
               Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
               are replaced with the actual customer details when the email is sent.

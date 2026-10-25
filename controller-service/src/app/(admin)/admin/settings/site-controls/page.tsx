@@ -590,6 +590,9 @@ export default async function SiteControlsPage() {
                           hint="Default story for the homepage About section; Settings > Homepage > About can replace it. Leave empty for the default."
                           initial={c.storefront.aboutCopy}
                           rows={4}
+                          ai={{
+                            context: "The store's story for the homepage About section; one or two short paragraphs.",
+                          }}
                         />
                       </FullSpan>
                       <FullSpan>
