@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { ArrowRight } from 'lucide-react'
 import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
 import { offerHref, type ProductOffer } from '@/lib/catalog/product-offers-shared'
 
@@ -46,9 +47,9 @@ export default function OfferSlider({ offers, title, eyebrow }: Props) {
   const next = offers[(active + 1) % count]
 
   return (
-    <section className="bg-surface px-3 sm:px-6 md:px-8 py-8 md:py-12">
+    <section className="bg-surface px-3 sm:px-6 md:px-8 py-6 md:py-8">
       {(eyebrow || title) && (
-        <div className="max-w-6xl mx-auto mb-5 md:mb-7 px-1">
+        <div className="mb-5 md:mb-7 px-1">
           {eyebrow && (
             <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{eyebrow}</p>
           )}
@@ -57,7 +58,7 @@ export default function OfferSlider({ offers, title, eyebrow }: Props) {
       )}
 
       <div
-        className="relative max-w-6xl mx-auto select-none"
+        className="relative select-none"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -80,8 +81,8 @@ export default function OfferSlider({ offers, title, eyebrow }: Props) {
         <div className="flex items-center justify-center gap-3 md:gap-5">
           {!single && <OfferPeek offer={prev} onClick={() => go(active - 1)} side="left" />}
 
-          <div className="w-full sm:w-[70%] md:w-[64%] shrink-0">
-            <OfferCard offer={current} priority />
+          <div className={single ? 'w-full' : 'w-full sm:w-[70%] md:w-[64%] shrink-0'}>
+            <OfferCard offer={current} priority wide={single} />
           </div>
 
           {!single && <OfferPeek offer={next} onClick={() => go(active + 1)} side="right" />}
@@ -165,13 +166,16 @@ function OfferPeek({ offer, onClick, side }: { offer: ProductOffer; onClick: () 
   )
 }
 
-function OfferCard({ offer, priority }: { offer: ProductOffer; priority?: boolean }) {
+// `wide`: a lone offer spans the row like the hero and business cards, so it gets more height and room.
+function OfferCard({ offer, priority, wide }: { offer: ProductOffer; priority?: boolean; wide?: boolean }) {
   const desktopImg = offer.image_url ?? offer.image_url_mobile ?? PLACEHOLDER
   const mobileImg = offer.image_url_mobile ?? offer.image_url ?? PLACEHOLDER
   const blurhash = offer.blurhash_mobile || offer.blurhash || null
 
   const card = (
-    <div className="relative w-full h-[clamp(11rem,44vw,22rem)] rounded-2xl overflow-hidden shadow-xl bg-[#0d0d0d]">
+    <div
+      className={`relative w-full overflow-hidden rounded-2xl bg-[#0d0d0d] shadow-xl ${wide ? 'h-[clamp(14rem,40vw,28rem)] shadow-2xl' : 'h-[clamp(11rem,44vw,22rem)]'}`}
+    >
       {blurhash && (
         <div className="absolute inset-0">
           <BlurhashCanvas hash={blurhash} />
@@ -183,28 +187,32 @@ function OfferCard({ offer, priority }: { offer: ProductOffer; priority?: boolea
           src={mobileImg}
           alt={offer.title}
           loading={priority ? 'eager' : 'lazy'}
-          className="absolute inset-0 h-full w-full object-cover object-center"
+          className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out motion-safe:group-hover:scale-[1.03]"
         />
       </picture>
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/30 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-      <div className="absolute inset-x-0 bottom-0 p-5 md:p-7 pointer-events-none">
+      <div className={`absolute inset-x-0 bottom-0 pointer-events-none ${wide ? 'p-6 sm:p-10 lg:p-14' : 'p-5 md:p-7'}`}>
         {offer.badge_text && (
           <span
-            className={`inline-block text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded mb-3 ${offer.badge_color || 'bg-primary-500'}`}
+            className={`inline-block text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full mb-3 ${offer.badge_color || 'bg-primary-500'}`}
           >
             {offer.badge_text}
           </span>
         )}
-        <h3 className="font-black text-white leading-tight tracking-tight text-[clamp(1.25rem,3.2vw,2.25rem)]">
+        <h3
+          className={`max-w-2xl font-black text-white leading-[1.05] tracking-tight ${wide ? 'text-[clamp(1.75rem,4.4vw,3.75rem)]' : 'text-[clamp(1.25rem,3.2vw,2.25rem)]'}`}
+        >
           {offer.title}
         </h3>
         {offer.subtitle && (
-          <p className="text-white/70 text-xs sm:text-sm leading-relaxed mt-1 max-w-md">{offer.subtitle}</p>
+          <p className={`mt-2 max-w-md leading-relaxed text-white/80 ${wide ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'}`}>{offer.subtitle}</p>
         )}
         {offer.cta_label && (
-          <span className="inline-block mt-3 bg-white text-black text-xs sm:text-sm font-bold px-4 py-2 rounded-lg">
+          <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-gray-900 shadow-sm sm:px-5 sm:py-2.5 sm:text-sm">
             {offer.cta_label}
+            <ArrowRight className="h-4 w-4 transition-transform motion-safe:group-hover:translate-x-0.5" aria-hidden="true" />
           </span>
         )}
       </div>
@@ -214,7 +222,7 @@ function OfferCard({ offer, priority }: { offer: ProductOffer; priority?: boolea
   if (!priority) return card
 
   return (
-    <Link href={offerHref(offer.slug)} aria-label={`Shop ${offer.title}`} className="block">
+    <Link href={offerHref(offer.slug)} aria-label={`Shop ${offer.title}`} className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
       {card}
     </Link>
   )
