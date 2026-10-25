@@ -42,8 +42,7 @@ function Thumb({ p, size, onRemove, bordered }: { p: CompareProduct; size: numbe
   )
 }
 
-/** `inTabs`: the screen sits above the tab bar, which already takes the bottom inset. */
-export default function CompareBar({ inTabs = false }: { inTabs?: boolean }) {
+export default function CompareBar() {
   const t = useTokens()
   const insets = useSafeAreaInsets()
   const { compareList, removeFromCompare, clearCompare } = useCompareStore()
@@ -53,7 +52,7 @@ export default function CompareBar({ inTabs = false }: { inTabs?: boolean }) {
   return (
     <View
       className="absolute bottom-0 left-0 right-0 z-30 border-t border-border-default bg-surface-elevated shadow-2xl"
-      style={{ paddingBottom: inTabs ? 0 : insets.bottom }}
+      style={{ paddingBottom: insets.bottom }}
     >
       <View className="flex-row items-center gap-3 px-4 py-3">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="min-w-0 flex-1" contentContainerStyle={{ gap: 8, paddingTop: 6, paddingRight: 6 }}>

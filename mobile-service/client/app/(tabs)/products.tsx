@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Pressable, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useColorScheme } from 'nativewind'
@@ -66,6 +67,7 @@ const pairs = (rows: ListingCard[], prefix: string): Item[] =>
   Array.from({ length: Math.ceil(rows.length / 2) }, (_, i) => ({ type: 'pair' as const, key: `${prefix}${rows[i * 2].id}`, rows: rows.slice(i * 2, i * 2 + 2) }))
 
 export default function ProductsScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const t = useTokens()
   const dark = useColorScheme().colorScheme === 'dark'
@@ -202,7 +204,7 @@ export default function ProductsScreen() {
         </View>
       ) : null}
       <RecentlyViewed section={RECENT} data={undefined as never} />
-      <View style={{ height: compareCount >= 2 ? 96 : 24 }} />
+      <View style={{ height: (compareCount >= 2 ? 96 : 24) + insets.bottom }} />
     </View>
   )
 
@@ -271,7 +273,7 @@ export default function ProductsScreen() {
         offers={first?.offers ?? []}
         onApply={apply}
       />
-      <CompareBar inTabs />
+      <CompareBar />
     </View>
   )
 }

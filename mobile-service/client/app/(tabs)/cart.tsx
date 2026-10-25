@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Alert, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -34,6 +35,7 @@ import { status, useTokens } from '../../src/theme'
 
 // Mirror of controller-service app/(storefront)/cart/page.tsx at the mobile breakpoint.
 export default function CartScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const qc = useQueryClient()
   const t = useTokens()
@@ -209,7 +211,7 @@ export default function CartScreen() {
     <View className="flex-1 bg-surface">
       <TopNav />
       <KeyboardScroll
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: insets.bottom + 32 }}
         refreshControl={refreshControl}
         showsVerticalScrollIndicator={false}
       >
