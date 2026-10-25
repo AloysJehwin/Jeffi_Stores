@@ -9,6 +9,7 @@ import {
   CARD_IMAGE,
   PromoBanner,
   PromoCard,
+  PromoMedia,
   type PromoFaceProps,
 } from '@/components/visitor/slides/PromoCard'
 import { KEN_BURNS, RevealWords, headlineVariants, usePointerParallax } from '@/components/visitor/slides/slide-motion'
@@ -134,15 +135,26 @@ function Slide({ slide, layout, aspect, seconds, preview }: SlideProps) {
   const portrait = !wide && aspect !== '16:9'
   const src = portrait ? (slide.imageCard ?? slide.image) : (slide.image ?? slide.imageCard)
   const hash = portrait ? (slide.blurhashCard ?? slide.blurhash) : (slide.blurhash ?? slide.blurhashCard)
+  const cls = product ? (wide ? BANNER_PRODUCT : CARD_PRODUCT) : wide ? BANNER_IMAGE : CARD_IMAGE
   const image = src ? (
-    <SlideImage
-      card
-      cardSrc={src}
-      blurhashCard={hash}
+    <PromoMedia
+      card={portrait}
+      video={slide.video}
+      videoCard={slide.videoCard}
+      poster={src}
       alt={slide.title}
-      loading={current ? 'eager' : 'lazy'}
-      className={product ? (wide ? BANNER_PRODUCT : CARD_PRODUCT) : wide ? BANNER_IMAGE : CARD_IMAGE}
-    />
+      active={current}
+      className={cls}
+    >
+      <SlideImage
+        card
+        cardSrc={src}
+        blurhashCard={hash}
+        alt={slide.title}
+        loading={current ? 'eager' : 'lazy'}
+        className={cls}
+      />
+    </PromoMedia>
   ) : null
 
   const backdrop =

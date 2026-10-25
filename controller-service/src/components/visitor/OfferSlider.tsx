@@ -2,7 +2,14 @@
 
 import Slides, { useSlide } from '@/components/visitor/slides/Slides'
 import SlideImage from '@/components/visitor/slides/SlideImage'
-import { BANNER_IMAGE, CARD_IMAGE, PromoBanner, PromoCard, PromoHeading } from '@/components/visitor/slides/PromoCard'
+import {
+  BANNER_IMAGE,
+  CARD_IMAGE,
+  PromoBanner,
+  PromoCard,
+  PromoHeading,
+  PromoMedia,
+} from '@/components/visitor/slides/PromoCard'
 import { offerHref, type ProductOffer } from '@/lib/catalog/product-offers-shared'
 
 const PLACEHOLDER =
@@ -49,19 +56,29 @@ function OfferCard({ offer }: { offer: ProductOffer }) {
       label={shopLabel(offer)}
       tabIndex={clone ? -1 : undefined}
       backdrop={
-        <SlideImage
+        <PromoMedia
           card
-          cardSrc={offer.image_url_card}
-          src={offer.image_url}
-          mobileSrc={offer.image_url_mobile}
-          blurhashCard={offer.blurhash_card}
-          blurhash={offer.blurhash}
-          blurhashMobile={offer.blurhash_mobile}
-          placeholder={CARD_PLACEHOLDER}
+          video={offer.video_url}
+          videoCard={offer.video_url_card}
+          poster={offer.image_url_card || offer.image_url || offer.image_url_mobile}
           alt={offer.title}
-          loading={current ? 'eager' : 'lazy'}
+          active={current}
           className={CARD_IMAGE}
-        />
+        >
+          <SlideImage
+            card
+            cardSrc={offer.image_url_card}
+            src={offer.image_url}
+            mobileSrc={offer.image_url_mobile}
+            blurhashCard={offer.blurhash_card}
+            blurhash={offer.blurhash}
+            blurhashMobile={offer.blurhash_mobile}
+            placeholder={CARD_PLACEHOLDER}
+            alt={offer.title}
+            loading={current ? 'eager' : 'lazy'}
+            className={CARD_IMAGE}
+          />
+        </PromoMedia>
       }
       badge={offer.badge_text}
       badgeClass={offer.badge_color}
@@ -79,16 +96,26 @@ function OfferBanner({ offer }: { offer: ProductOffer }) {
       href={offerHref(offer.slug)}
       label={`Shop ${offer.title}`}
       backdrop={
-        <SlideImage
-          src={offer.image_url}
-          mobileSrc={offer.image_url_mobile}
-          blurhash={offer.blurhash}
-          blurhashMobile={offer.blurhash_mobile}
-          placeholder={PLACEHOLDER}
+        <PromoMedia
+          card={false}
+          video={offer.video_url}
+          videoCard={offer.video_url_card}
+          poster={offer.image_url || offer.image_url_mobile}
           alt={offer.title}
-          loading="eager"
+          active
           className={BANNER_IMAGE}
-        />
+        >
+          <SlideImage
+            src={offer.image_url}
+            mobileSrc={offer.image_url_mobile}
+            blurhash={offer.blurhash}
+            blurhashMobile={offer.blurhash_mobile}
+            placeholder={PLACEHOLDER}
+            alt={offer.title}
+            loading="eager"
+            className={BANNER_IMAGE}
+          />
+        </PromoMedia>
       }
       badge={offer.badge_text}
       badgeClass={offer.badge_color}

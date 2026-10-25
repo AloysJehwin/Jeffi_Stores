@@ -1,8 +1,12 @@
 import Link from 'next/link'
 import SlideImage from '@/components/visitor/slides/SlideImage'
+import StoreMedia from '@/components/visitor/media/StoreMedia'
 import { offerHref, pickPromoOffer, type PromoOffer } from '@/lib/catalog/product-offers-shared'
 
 export { pickPromoOffer, type PromoOffer }
+
+const MEDIA =
+  'absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-[1.02]'
 
 export default function ListingPromoBanner({ offer }: { offer: PromoOffer }) {
   const desktopImg = offer.image_url || offer.image_url_mobile
@@ -16,14 +20,16 @@ export default function ListingPromoBanner({ offer }: { offer: PromoOffer }) {
       aria-label={`Shop ${offer.title}`}
       className="group relative block w-full h-[clamp(9rem,26vw,13rem)] rounded-2xl overflow-hidden bg-[#0d0d0d] shadow-sm"
     >
-      <SlideImage
-        src={desktopImg}
-        mobileSrc={mobileImg}
-        blurhash={offer.blurhash}
-        blurhashMobile={offer.blurhash_mobile}
-        loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-[1.02]"
-      />
+      <StoreMedia image={desktopImg} video={offer.video_url} className={MEDIA}>
+        <SlideImage
+          src={desktopImg}
+          mobileSrc={mobileImg}
+          blurhash={offer.blurhash}
+          blurhashMobile={offer.blurhash_mobile}
+          loading="lazy"
+          className={MEDIA}
+        />
+      </StoreMedia>
       <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/40 to-transparent" />
       <div className="relative z-10 h-full flex flex-col justify-center items-start gap-1.5 px-5 sm:px-8 max-w-[85%] sm:max-w-[60%]">
         {offer.badge_text && (
