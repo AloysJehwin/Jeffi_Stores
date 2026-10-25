@@ -13,6 +13,7 @@ import CopySku from '@/components/ui/CopySku'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
 import MobileCheckoutBar from '@/components/visitor/cart/MobileCheckoutBar'
+import { urlCoupon, withCoupon } from '@/components/visitor/coupons/terms'
 import { trackBeginCheckout } from '@/lib/client/analytics'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
@@ -52,6 +53,14 @@ function CheckoutPage() {
   const isBuyNow =
     intentMode === 'buyNow' || (intentMode === null && searchParams.get('buyNow') === '1' && !intentToken)
   const couponId = searchParams.get('couponId')
+  // Every redirect off this page hands the coupon on, and sign-in comes back to the full URL.
+  const coupon = urlCoupon(searchParams)
+  const reviewPath = withCoupon('/checkout/review', coupon, 'review')
+  const loginPath = () => {
+    const qs = searchParams.toString()
+    return `/login?redirect=${encodeURIComponent(qs ? `/checkout?${qs}` : '/checkout')}`
+  }
+  const recoveringPayment = useRef(false)
 
   const authWasLoading = useRef(false)
   useEffect(() => {
@@ -109,6 +118,7 @@ function CheckoutPage() {
         const age = Date.now() - (pending.ts || 0)
         if (age < 1800_000 && pending.draftToken && pending.razorpayOrderId) {
           sessionStorage.removeItem('rzp_pending')
+          recoveringPayment.current = true
           if (pending.razorpayPaymentId && pending.razorpaySignature) {
             // Payment IDs present — verify directly
             setPendingVerify(pending)
@@ -183,12 +193,16 @@ function CheckoutPage() {
 
   useEffect(() => {
     if (!authLoading && !user && authWasLoading.current) {
-      router.push('/login?redirect=/checkout')
+      router.push(loginPath())
       return
     }
 
-    if (!intentToken && !isBuyNow && !cartLoading && cartCount === 0 && !razorpayOpen.current) {
-      router.push('/cart')
+    // No intent: an old "use at checkout" link or the cart's sign-in round trip. The cart applies
+    // coupons and the review page starts checkout; this page only pays for an intent.
+    if (!intentToken && !isBuyNow) {
+      if (cartLoading || razorpayOpen.current || recoveringPayment.current) return
+      if (coupon || cartCount === 0) router.replace(withCoupon('/cart', coupon, 'cart'))
+      else if (!authLoading) router.replace(user ? reviewPath : loginPath())
       return
     }
 
@@ -206,7 +220,7 @@ function CheckoutPage() {
             setIntentMode('cart')
             const intentAddressId = d.addressId || addressId
             if (!intentAddressId) {
-              router.push('/checkout/review')
+              router.push(reviewPath)
               return
             }
             if (d.shippingCharge != null) setShippingCharge(Number(d.shippingCharge))
@@ -256,7 +270,7 @@ function CheckoutPage() {
         return
       }
       if (!addressId) {
-        router.push('/checkout/review')
+        router.push(reviewPath)
         return
       }
 
@@ -343,7 +357,7 @@ function CheckoutPage() {
     try {
       const response = await fetch('/api/user/addresses', { credentials: 'include' })
       if (response.status === 401) {
-        router.push('/login?redirect=/checkout')
+        router.push(loginPath())
         return
       }
       if (response.ok) {
@@ -353,13 +367,13 @@ function CheckoutPage() {
           setAddress(selectedAddr)
           if (!skipShipping) fetchShipping(selectedAddr.postal_code)
         } else {
-          router.push('/checkout/review')
+          router.push(reviewPath)
         }
       } else {
-        router.push('/checkout/review')
+        router.push(reviewPath)
       }
     } catch {
-      router.push('/checkout/review')
+      router.push(reviewPath)
     } finally {
       setIsLoadingAddress(false)
     }

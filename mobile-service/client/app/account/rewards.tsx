@@ -4,13 +4,14 @@ import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Gift } from 'lucide-react-native'
-import { getLoyalty, redeemPoints, type RewardCoupon, type RewardsData, type RewardsHistoryEntry } from '../../src/api/account'
+import { getAccountCoupons, getLoyalty, redeemPoints, type AccountCoupon, type RewardsData, type RewardsHistoryEntry } from '../../src/api/account'
 import Gradient from '../../src/components/account/Gradient'
 import { useInfiniteList, useRequireAuth, type InfiniteList } from '../../src/components/account/hooks'
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { showToast } from '../../src/stores/toastStore'
+import { couponTerms, formatExpiry } from '../../src/lib/coupons'
 import {
-  BodySmall, Button, Caption, Card, CardSegment, cn, Divider, elevationClass, EmptyState, Heading, Overline, Screen, SectionedList, Skeleton, Text, TextField, useElevation,
+  Badge, BodySmall, Button, Caption, Card, CardSegment, cn, Divider, elevationClass, EmptyState, Heading, Overline, Screen, SectionedList, Skeleton, Text, TextField, useElevation, type Tone,
 } from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountRewards.tsx (mobile layout).
@@ -158,28 +159,61 @@ function RedeemCard({ data, onRedeemed }: { data: RewardsData; onRedeemed: () =>
 }
 
 // Coupons and points history are rows of one list; each section is a card sliced per row.
-type RewardsSection = { key: 'coupons'; data: RewardCoupon[] } | { key: 'history'; data: RewardsHistoryEntry[] }
+type RewardsSection = { key: 'coupons'; data: AccountCoupon[] } | { key: 'history'; data: RewardsHistoryEntry[] }
 
 // No clipboard module in the app: the share sheet offers Copy.
 const copyCode = (code: string) => Share.share({ message: code }).catch(() => showToast('Could not copy the code', 'error'))
 
-function CouponRow({ c }: { c: RewardCoupon }) {
+const COUPON_STATUS: Record<AccountCoupon['status'], { label: string; tone: Tone }> = {
+  usable: { label: 'Ready to use', tone: 'success' },
+  used: { label: 'Used', tone: 'neutral' },
+  expired: { label: 'Expired', tone: 'danger' },
+}
+const COUPON_SOURCE: Record<AccountCoupon['source'], string> = { game: 'Won in the rewards game', loyalty: 'Redeemed points', store: 'From the store' }
+
+// Mirror of controller-service components/visitor/account/AccountCoupons.tsx.
+function CouponRow({ c }: { c: AccountCoupon }) {
+  const router = useRouter()
+  const usable = c.status === 'usable'
+  const status = COUPON_STATUS[c.status]
+  const source = c.source === 'store' ? (c.label ?? COUPON_SOURCE.store) : COUPON_SOURCE[c.source]
+  const expiry = c.validUntil ? ` · ${new Date(c.validUntil) <= new Date() ? 'expired' : 'valid till'} ${formatExpiry(c.validUntil)}` : ''
   return (
-    <View className="flex-row flex-wrap items-center justify-between gap-3 rounded-field border-2 border-dashed border-border-default px-4 py-3">
-      <View className="flex-1">
-        <Text className="font-mono font-semibold text-foreground">{c.code}</Text>
-        <Text className="text-xs text-foreground-secondary">
-          {c.discountType === 'percentage'
-            ? `${c.value}% off${c.maxDiscount ? ` (up to ${formatMoney(c.maxDiscount)})` : ''}`
-            : `${formatMoney(c.value)} off`}
-          {c.minPurchase > 0 ? ` orders of ${formatMoney(c.minPurchase)} or more` : ''}
-          {c.validUntil ? ` · valid till ${new Date(c.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
-        </Text>
+    <View className="rounded-field border-2 border-dashed border-border-default px-4 py-3">
+      <View className="flex-row flex-wrap items-center gap-2">
+        <Text className={cn('font-mono font-semibold', usable ? 'text-foreground' : 'text-foreground-muted line-through')}>{c.code}</Text>
+        <Badge label={status.label} tone={status.tone} size="sm" />
       </View>
-      <View>
-        <Button label="Copy" icon={Copy} variant="secondary" size="sm" block={false} accessibilityLabel={`Copy coupon ${c.code}`} onPress={() => copyCode(c.code)} />
-      </View>
+      <Text className="mt-0.5 text-xs text-foreground-secondary">{couponTerms(c, { expiry: false })}</Text>
+      <Text className="text-xs text-foreground-muted">{`${source}${expiry}`}</Text>
+      {usable ? (
+        <View className="mt-3 flex-row gap-2">
+          <Button label="Copy" icon={Copy} variant="secondary" size="sm" block={false} accessibilityLabel={`Copy coupon ${c.code}`} onPress={() => copyCode(c.code)} />
+          <Button
+            label="Apply in cart"
+            size="sm"
+            block={false}
+            accessibilityLabel={`Apply coupon ${c.code} in your cart`}
+            onPress={() => router.navigate({ pathname: '/(tabs)/cart', params: { coupon: c.code } })}
+          />
+        </View>
+      ) : null}
     </View>
+  )
+}
+
+/** The coupons alone, when the points programme is off or not open to this account. */
+function CouponsCard({ coupons }: { coupons: AccountCoupon[] }) {
+  return (
+    <Card>
+      <Heading>Your coupons</Heading>
+      <BodySmall className="mt-1">Apply one in your cart, or enter the code in the coupon box at checkout.</BodySmall>
+      <View className="mt-4 gap-3">
+        {coupons.map(c => (
+          <CouponRow key={c.id} c={c} />
+        ))}
+      </View>
+    </Card>
   )
 }
 
@@ -202,8 +236,8 @@ function SectionTop({ section, history }: { section: RewardsSection; history: In
   if (section.key === 'coupons') {
     return (
       <CardSegment position="top" className="px-4 pb-4 pt-4">
-        <Heading>Your reward coupons</Heading>
-        <BodySmall className="mt-1">Enter the code in the coupon box at checkout.</BodySmall>
+        <Heading>Your coupons</Heading>
+        <BodySmall className="mt-1">Apply one in your cart, or enter the code in the coupon box at checkout.</BodySmall>
       </CardSegment>
     )
   }
@@ -216,11 +250,11 @@ function SectionTop({ section, history }: { section: RewardsSection; history: In
   )
 }
 
-function SectionBottom({ section, coupons, history }: { section: RewardsSection; coupons: InfiniteList<RewardCoupon>; history: InfiniteList<RewardsHistoryEntry> }) {
-  const list = section.key === 'coupons' ? coupons : history
+function SectionBottom({ section, history }: { section: RewardsSection; history: InfiniteList<RewardsHistoryEntry> }) {
+  if (section.key === 'coupons') return <CardSegment position="bottom" className="mb-4 px-4 pb-4">{null}</CardSegment>
   return (
-    <CardSegment position="bottom" className={cn('px-4 pb-4', section.key === 'coupons' && 'mb-4')}>
-      <InfiniteFooter shown={list.rows.length} list={list} noun={section.key === 'coupons' ? 'coupons' : 'entries'} />
+    <CardSegment position="bottom" className="px-4 pb-4">
+      <InfiniteFooter shown={history.rows.length} list={history} noun="entries" />
     </CardSegment>
   )
 }
@@ -315,7 +349,7 @@ export default function RewardsScreen() {
   const user = useRequireAuth()
   const uid = user?.id ?? null
 
-  // Tier / stats come from page 1; history and coupons paginate independently.
+  // Tier / stats come from page 1; history paginates.
   const summary = useQuery({ queryKey: ['rewards', uid, 1, 1], queryFn: () => getLoyalty(1, 1), enabled: !!user, retry: 0 })
   const fetchPage = (h: number, c: number) =>
     h === 1 && c === 1 ? qc.fetchQuery({ queryKey: ['rewards', uid, 1, 1], queryFn: () => getLoyalty(1, 1) }) : getLoyalty(h, c)
@@ -328,15 +362,9 @@ export default function RewardsScreen() {
       return { rows: d.history.items, total: d.history.total }
     },
   })
-  const coupons = useInfiniteList<RewardCoupon>({
-    key: ['rewards-coupons', uid],
-    enabled: !!user,
-    pageSize: 20,
-    fetchPage: async p => {
-      const d = await fetchPage(1, p)
-      return { rows: d.coupons.items, total: d.coupons.total }
-    },
-  })
+  // Personal coupons don't depend on the points programme, so they show even when it is off.
+  const couponsQ = useQuery({ queryKey: ['account-coupons', uid, 'all'], queryFn: () => getAccountCoupons(), enabled: !!user, retry: 0 })
+  const coupons = couponsQ.data ?? []
 
   const data = summary.data
   const loading = !user || summary.isLoading
@@ -345,19 +373,21 @@ export default function RewardsScreen() {
   const reload = async () => {
     await qc.invalidateQueries({ queryKey: ['rewards', uid] })
     history.reload()
-    coupons.reload()
+    qc.invalidateQueries({ queryKey: ['account-coupons', uid] })
   }
 
   const sections: RewardsSection[] = [
-    ...((coupons.total ?? 0) === 0 && !coupons.loading ? [] : [{ key: 'coupons' as const, data: coupons.rows }]),
+    ...(coupons.length === 0 ? [] : [{ key: 'coupons' as const, data: coupons }]),
     { key: 'history', data: (history.total ?? 0) === 0 && !history.loading ? [] : history.rows },
   ]
 
   if (loading || unavailable || !data) {
     return (
       <Screen title="Rewards">
-        {loading ? (
+        {loading || couponsQ.isLoading ? (
           <RewardsLoading />
+        ) : !failed && coupons.length > 0 ? (
+          <CouponsCard coupons={coupons} />
         ) : (
           <EmptyState
             fill
@@ -373,7 +403,7 @@ export default function RewardsScreen() {
 
   return (
     <Screen title="Rewards" mode="none">
-      <SectionedList<RewardCoupon | RewardsHistoryEntry, RewardsSection>
+      <SectionedList<AccountCoupon | RewardsHistoryEntry, RewardsSection>
         sections={sections}
         keyboard
         keyExtractor={item => ('code' in item ? `c-${item.code}` : `h-${item.id}`)}
@@ -386,11 +416,11 @@ export default function RewardsScreen() {
           </View>
         }
         renderSectionHeader={({ section }) => <SectionTop section={section} history={history} />}
-        renderSectionFooter={({ section }) => <SectionBottom section={section} coupons={coupons} history={history} />}
+        renderSectionFooter={({ section }) => <SectionBottom section={section} history={history} />}
         renderItem={({ item, index, section }) =>
           section.key === 'coupons' ? (
             <CardSegment className={cn('px-4', index > 0 && 'pt-3')}>
-              <CouponRow c={item as RewardCoupon} />
+              <CouponRow c={item as AccountCoupon} />
             </CardSegment>
           ) : (
             <CardSegment className="px-4">

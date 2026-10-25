@@ -471,6 +471,26 @@ export const getLoyalty = (historyPage: number, couponPage: number) =>
 
 export const redeemPoints = (points: number) => postJson<{ code?: string }>('/api/user/loyalty/redeem', { points })
 
+/** /api/account/coupons (controller lib/rewards/account-coupons.ts AccountCoupon). */
+export interface AccountCoupon {
+  id: string
+  code: string
+  source: 'game' | 'loyalty' | 'store'
+  label: string | null
+  discountType: 'fixed' | 'percentage'
+  value: number
+  minPurchase: number
+  maxDiscount: number | null
+  validUntil: string | null
+  createdAt: string
+  status: 'usable' | 'used' | 'expired'
+}
+
+export async function getAccountCoupons(usableOnly = false): Promise<AccountCoupon[]> {
+  const data = await api<{ coupons?: AccountCoupon[] }>(`/api/account/coupons${usableOnly ? '?status=usable' : ''}`)
+  return Array.isArray(data?.coupons) ? data.coupons : []
+}
+
 // ── Subscriptions ──
 
 export interface SubscriptionItem {

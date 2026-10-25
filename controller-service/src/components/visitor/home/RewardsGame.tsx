@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
+import { cartCouponHref, couponTerms } from '@/components/visitor/coupons/terms'
 import { SECTION_COPY_DEFAULTS, type RewardsGamePublic } from '@/lib/catalog/homepage-sections'
 import type { GamePlay, GameState } from '@/lib/rewards/game'
 
@@ -29,27 +31,6 @@ const LIMIT_COPY: Record<RewardsGamePublic['playLimit'], string> = {
 
 const CTA =
   'inline-flex items-center justify-center rounded-xl bg-primary-500 px-8 py-3 font-bold text-white shadow-lg shadow-primary-500/20 transition-all hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-60'
-
-function formatMoney(amount: number): string {
-  return amount.toLocaleString('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })
-}
-
-function couponTerms(c: NonNullable<GamePlay['coupon']>): string {
-  const off =
-    c.discountType === 'percentage'
-      ? `${c.value}% off${c.maxDiscount ? ` (up to ${formatMoney(c.maxDiscount)})` : ''}`
-      : `${formatMoney(c.value)} off`
-  const min = c.minPurchase > 0 ? ` on orders of ${formatMoney(c.minPurchase)} or more` : ''
-  const until = c.validUntil
-    ? ` · valid till ${new Date(c.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
-    : ''
-  return `${off}${min}${until}`
-}
 
 function formatWhen(iso: string): string {
   return new Date(iso).toLocaleString('en-IN', {
@@ -324,7 +305,9 @@ function ResultCard({
   nextPlayAt: string | null
   onCopy: (code: string) => void
 }) {
+  const { cartCount } = useCart()
   const coupon = play.coupon
+  const status = coupon?.status ?? 'usable'
   const again =
     playLimit === 'once'
       ? "You've played this one."
@@ -342,24 +325,47 @@ function ResultCard({
       {coupon ? (
         <div className="mt-3 flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded-lg border border-dashed border-border-secondary bg-surface-secondary px-3 py-2 font-mono text-sm font-bold tracking-wider text-foreground">
+            <code
+              className={`min-w-0 flex-1 truncate rounded-lg border border-dashed border-border-secondary bg-surface-secondary px-3 py-2 font-mono text-sm font-bold tracking-wider ${status === 'usable' ? 'text-foreground' : 'text-foreground-muted line-through'}`}
+            >
               {coupon.code}
             </code>
-            <button
-              type="button"
-              onClick={() => onCopy(coupon.code)}
-              className="rounded-lg border border-border-default px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:border-accent-400 hover:text-accent-600"
-            >
-              Copy
-            </button>
+            {status === 'usable' && (
+              <button
+                type="button"
+                onClick={() => onCopy(coupon.code)}
+                className="shrink-0 rounded-lg border border-border-default px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:border-accent-400 hover:text-accent-600 dark:hover:border-accent-500 dark:hover:text-accent-400"
+              >
+                Copy
+              </button>
+            )}
           </div>
           <p className="text-xs text-foreground-muted">{couponTerms(coupon)}</p>
-          <Link
-            href={`/checkout?couponId=${encodeURIComponent(coupon.id)}`}
-            className="inline-flex items-center gap-1 text-sm font-bold text-accent-600 transition-colors hover:text-accent-700 dark:text-accent-400"
-          >
-            Use at checkout &rarr;
-          </Link>
+          {status !== 'usable' ? (
+            <p className="text-xs font-semibold text-foreground-secondary">
+              {status === 'used' ? 'You have used this coupon.' : 'This coupon has expired.'}
+            </p>
+          ) : cartCount === 0 ? (
+            <p className="text-xs text-foreground-secondary">
+              Saved to your account. Add something to your cart and apply it there.
+            </p>
+          ) : null}
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
+            {status === 'usable' && (
+              <Link
+                href={cartCount > 0 ? cartCouponHref(coupon.code) : '/products'}
+                className="inline-flex items-center justify-center rounded-xl bg-accent-500 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-600"
+              >
+                {cartCount > 0 ? 'Apply in cart' : 'Shop now'} &rarr;
+              </Link>
+            )}
+            <Link
+              href="/account/rewards#coupons"
+              className="text-sm font-semibold text-accent-600 transition-colors hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300"
+            >
+              Your coupons
+            </Link>
+          </div>
         </div>
       ) : (
         <p className="mt-2 text-sm text-foreground-secondary">No coupon this time — thanks for playing.</p>

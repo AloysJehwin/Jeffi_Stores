@@ -6,8 +6,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import CopySku from '@/components/ui/CopySku'
@@ -15,6 +15,8 @@ import CartInsightPanel from '@/components/on-device/CartInsightPanel'
 import FreeShippingProgress from '@/components/visitor/cart/FreeShippingProgress'
 import CartUpsellRow from '@/components/visitor/cart/CartUpsellRow'
 import CouponNudge from '@/components/visitor/cart/CouponNudge'
+import YourCoupons from '@/components/visitor/cart/YourCoupons'
+import { couponLookup, urlCoupon, urlCouponCode } from '@/components/visitor/coupons/terms'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
 import MobileCheckoutBar from '@/components/visitor/cart/MobileCheckoutBar'
 
@@ -55,7 +57,7 @@ export default function CartPage() {
   } = useCart()
   const gstEnabled = useStoreConfig().flags.gstEnabled
   const hasInactiveItems = cartItems.some((item: any) => item.products?.is_active === false)
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
   const { showToast } = useToast()
   const confirm = useConfirm()
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
@@ -65,6 +67,97 @@ export default function CartPage() {
   const [couponError, setCouponError] = useState('')
   const [proceedingToCheckout, setProceedingToCheckout] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  // ?coupon=CODE (or a legacy ?couponId=) from a win card or an old checkout link.
+  const fromUrl = urlCoupon(searchParams)
+  const urlCode = urlCouponCode(fromUrl)
+  const urlKey = fromUrl ? JSON.stringify(fromUrl) : null
+  const consumedUrlCoupon = useRef<string | null>(null)
+
+  const applyCoupon = async (input: { code: string } | { couponId: string }) => {
+    setCouponLoading(true)
+    setCouponError('')
+    try {
+      const res = await fetch('/api/coupons/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ...input, subtotal: getCartTotal() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setCouponError(data.error || 'Invalid coupon')
+      } else {
+        setAppliedCoupon({
+          couponId: data.couponId,
+          code: data.code,
+          description: data.description,
+          discountAmount: data.discountAmount,
+        })
+        setCouponCode('')
+        showToast(
+          `Coupon "${data.code}" applied — saving ₹${data.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          'success'
+        )
+      }
+    } catch {
+      setCouponError('Failed to apply coupon')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  const handleApplyCoupon = (codeArg?: string) => {
+    const code = (codeArg ?? couponCode).trim()
+    if (code) void applyCoupon({ code })
+  }
+
+  // Apply the URL's coupon once there is something to apply it to, then drop it from the URL so a
+  // refresh doesn't re-apply. Signed out or an empty cart keeps it, with a notice.
+  useEffect(() => {
+    if (!fromUrl || !urlKey) {
+      consumedUrlCoupon.current = null
+      return
+    }
+    if (consumedUrlCoupon.current === urlKey) return
+    if (isLoading || authLoading || !user || cartItems.length === 0) return
+    consumedUrlCoupon.current = urlKey
+    if (urlCode) setCouponCode(urlCode)
+    void applyCoupon(couponLookup(fromUrl))
+    const next = new URLSearchParams(searchParams.toString())
+    for (const key of ['coupon', 'couponCode', 'couponId']) next.delete(key)
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlKey, isLoading, authLoading, user, cartItems.length])
+
+  const couponLabel = urlCode ? (
+    <span className="font-mono font-bold text-accent-700 dark:text-accent-300">{urlCode}</span>
+  ) : (
+    'Your coupon'
+  )
+  const couponNotice =
+    !fromUrl || authLoading || (user && cartItems.length > 0) ? null : (
+      <div
+        role="status"
+        className="mb-4 rounded-lg border border-dashed border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/20 px-4 py-3 text-sm text-foreground-secondary"
+      >
+        {user ? (
+          <>{couponLabel} is saved to your account. Add something to your cart and it applies here.</>
+        ) : (
+          <>
+            Sign in to use {couponLabel} — it&apos;s saved to your account.{' '}
+            <Link
+              href={`/login?redirect=${encodeURIComponent(`${pathname}?${searchParams.toString()}`)}`}
+              className="font-semibold text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300"
+            >
+              Sign in
+            </Link>
+          </>
+        )}
+      </div>
+    )
 
   async function proceedToCheckout() {
     setProceedingToCheckout(true)
@@ -151,6 +244,7 @@ export default function CartPage() {
     return (
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-md mx-auto text-center">
+          {couponNotice}
           <svg
             aria-hidden="true"
             className="w-24 h-24 mx-auto text-foreground-muted mb-6"
@@ -185,41 +279,6 @@ export default function CartPage() {
   const discount = appliedCoupon?.discountAmount ?? 0
   const finalTotal = Math.max(0, total - discount)
 
-  const handleApplyCoupon = async (codeArg?: string) => {
-    const code = (codeArg ?? couponCode).trim()
-    if (!code) return
-    setCouponLoading(true)
-    setCouponError('')
-    try {
-      const res = await fetch('/api/coupons/apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ code, subtotal: total }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setCouponError(data.error || 'Invalid coupon')
-      } else {
-        setAppliedCoupon({
-          couponId: data.couponId,
-          code: data.code,
-          description: data.description,
-          discountAmount: data.discountAmount,
-        })
-        setCouponCode('')
-        showToast(
-          `Coupon "${data.code}" applied — saving ₹${data.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-          'success'
-        )
-      }
-    } catch {
-      setCouponError('Failed to apply coupon')
-    } finally {
-      setCouponLoading(false)
-    }
-  }
-
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null)
     setCouponError('')
@@ -229,6 +288,7 @@ export default function CartPage() {
     <div className="bg-surface min-h-screen py-4 sm:py-6 lg:py-8">
       <div className="container mx-auto px-4">
         <h1 className="text-3xl font-bold text-foreground mb-4 sm:mb-6 lg:mb-8">Shopping Cart</h1>
+        {couponNotice}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Cart Items */}
@@ -802,6 +862,7 @@ export default function CartPage() {
                         applying={couponLoading}
                         onApply={handleApplyCoupon}
                       />
+                      {user && <YourCoupons subtotal={total} applying={couponLoading} onApply={handleApplyCoupon} />}
                     </div>
                   )}
                 </div>
