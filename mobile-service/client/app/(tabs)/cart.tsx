@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, ShoppingCart } from 'lucide-react-native'
 import TopNav from '../../src/components/layout/TopNav'
-import Pulse from '../../src/components/cart/Pulse'
+import { Skeleton, SummarySkeleton } from '../../src/ui'
 import CartLineItem from '../../src/components/cart/CartLineItem'
 import SavedItemRow from '../../src/components/cart/SavedItemRow'
 import FreeShippingProgress from '../../src/components/cart/FreeShippingProgress'
@@ -165,20 +165,7 @@ export default function CartScreen() {
     return (
       <View className="flex-1 bg-surface">
         <TopNav />
-        <View className="gap-4 px-4 py-6">
-          {[0, 1, 2].map(i => (
-            <Pulse key={i} delay={i * 80}>
-              <View className="flex-row gap-4 rounded-lg border border-border-default bg-surface-elevated p-4">
-                <View className="h-20 w-20 rounded-lg bg-surface-secondary" />
-                <View className="flex-1 gap-2">
-                  <View className="h-4 w-3/4 rounded bg-surface-secondary" />
-                  <View className="h-3 w-1/2 rounded bg-surface-secondary" />
-                  <View className="h-4 w-24 rounded bg-surface-secondary" />
-                </View>
-              </View>
-            </Pulse>
-          ))}
-        </View>
+        <CartLoading />
       </View>
     )
   }
@@ -413,6 +400,33 @@ export default function CartScreen() {
           )}
         </View>
       </KeyboardScroll>
+    </View>
+  )
+}
+
+/** The loaded cart's shape: title, one card of line rows (96px thumb, price, stepper, subtotal), summary. */
+function CartLoading() {
+  return (
+    <View className="flex-1 overflow-hidden px-4 pt-4">
+      <Skeleton height={32} width={210} className="mb-4" />
+      <View className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
+        {[0, 1, 2].map(i => (
+          <View key={i} className={`flex-row gap-4 p-4 ${i < 2 ? 'border-b border-border-default' : ''}`}>
+            <Skeleton width={96} height={96} />
+            <View className="flex-1 gap-2">
+              <Skeleton height={15} />
+              <Skeleton height={15} width="60%" />
+              <Skeleton height={20} width={90} className="mt-1" />
+              <View className="mt-2 flex-row items-center gap-3">
+                <Skeleton height={36} width={112} />
+                <Skeleton height={12} width={80} rounded="rounded" />
+              </View>
+              <Skeleton height={18} width={130} className="mt-2" />
+            </View>
+          </View>
+        ))}
+      </View>
+      <SummarySkeleton rows={2} className="mt-4" />
     </View>
   )
 }

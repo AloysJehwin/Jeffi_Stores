@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import TopNav from '../../src/components/layout/TopNav'
-import Spinner from '../../src/ui/Spinner'
+import { Skeleton } from '../../src/ui'
 import { Glyph, DOCUMENT, DOWNLOAD } from '../../src/components/info/Glyph'
 import { POLICY_ICONS, openPolicyPdf } from '../../src/components/info/policy'
 import { PageHeader, SolidButton } from '../../src/components/info/common'
@@ -19,6 +19,30 @@ const SUBSCRIPTION_TERMS = [
   'Each delivered cycle of a physical subscription follows the Return & Refund Policy.',
   'The mandate shows the payment collector\'s name: "Jeffi" where the store collects through the Jeffi Commerce platform, otherwise the store\'s own name.',
 ]
+
+// Policy cards: icon, title, two-line summary, date, download column.
+function PoliciesLoading() {
+  return (
+    <View className="gap-4">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <View key={i} className="flex-row rounded-xl border border-border-default bg-surface-elevated">
+          <View className="flex-1 flex-row items-start gap-4 p-5">
+            <Skeleton width={40} height={40} rounded="rounded-lg" />
+            <View className="flex-1 gap-1.5">
+              <Skeleton height={14} width="55%" />
+              <Skeleton height={10} width="95%" rounded="rounded" />
+              <Skeleton height={10} width="70%" rounded="rounded" />
+              <Skeleton height={10} width={110} rounded="rounded" className="mt-1.5" />
+            </View>
+          </View>
+          <View className="items-center justify-center border-l border-border-default px-3">
+            <Skeleton width={16} height={16} rounded="rounded" />
+          </View>
+        </View>
+      ))}
+    </View>
+  )
+}
 
 export default function LegalIndexScreen() {
   const router = useRouter()
@@ -37,7 +61,7 @@ export default function LegalIndexScreen() {
 
         <View className="gap-8 px-4 py-8">
           {isLoading ? (
-            <Spinner />
+            <PoliciesLoading />
           ) : isError || !policies ? (
             <Text className="text-center text-sm text-foreground-muted">Couldn&apos;t load the policies. Please try again.</Text>
           ) : (

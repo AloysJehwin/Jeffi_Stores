@@ -20,6 +20,7 @@ import { useThemeStore } from '../../stores/themeStore'
 import { openHref } from '../../lib/links'
 import { inr } from '../../lib/format'
 import { accent, useTokens } from '../../theme'
+import { Skeleton } from '../../ui'
 
 // Mirror of controller-service visitor/Header.tsx + MobileDrawer.tsx + SearchBar.tsx at the mobile breakpoint.
 
@@ -90,16 +91,24 @@ function Highlight({ text, query }: { text: string; query: string }) {
   )
 }
 
-/** `w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full animate-spin` */
-function RingSpinner() {
-  const spin = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true }))
-    loop.start()
-    return () => loop.stop()
-  }, [spin])
-  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] })
-  return <Animated.View className="w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full" style={{ transform: [{ rotate }] }} />
+/** Product result rows while a search runs: thumb, name, price. */
+function ResultsSkeleton() {
+  return (
+    <View className="py-1" accessible accessibilityLabel="Searching">
+      <View className="px-4 pt-3 pb-1.5">
+        <Skeleton height={10} width={64} rounded="rounded" />
+      </View>
+      {(['70%', '55%', '80%', '62%'] as const).map((w, i) => (
+        <View key={i} className="flex-row items-center gap-3 px-4 py-2.5">
+          <Skeleton width={40} height={40} />
+          <View className="flex-1 gap-1.5">
+            <Skeleton height={13} width={w} />
+            <Skeleton height={10} width={56} rounded="rounded" />
+          </View>
+        </View>
+      ))}
+    </View>
+  )
 }
 
 /** 44px icon button; `scale` mirrors the web's active:scale-*. */
@@ -356,10 +365,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
                 <View className="bg-surface-elevated rounded-2xl border border-border-default overflow-hidden">
                   <ScrollView style={{ maxHeight: Math.max(panelMax, 120) }} keyboardShouldPersistTaps="handled">
                     {isLoading ? (
-                      <View className="flex-row items-center justify-center gap-3 py-8">
-                        <RingSpinner />
-                        <Text className="text-foreground-muted text-sm">Searching...</Text>
-                      </View>
+                      <ResultsSkeleton />
                     ) : hasResults ? (
                       <View className="py-1">
                         {categories.length > 0 && (

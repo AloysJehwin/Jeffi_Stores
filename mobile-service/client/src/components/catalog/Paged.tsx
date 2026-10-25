@@ -1,10 +1,9 @@
-import { useEffect, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { InboxIcon } from './icons'
-import { useColumnWidth } from '../home/layout'
 import { useTokens } from '../../theme'
+import { ProductGridSkeleton, Skeleton } from '../../ui'
 
 // The admin kit's InfiniteFooter (ServerPagedItems / useReveal), the listing skeletons and empty card.
 
@@ -60,37 +59,26 @@ export function InfiniteFooter({ shown, control, noun = 'products' }: { shown: n
   )
 }
 
-/** animate-pulse */
-export function Pulse({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
-  const o = useSharedValue(1)
-  useEffect(() => {
-    const id = setTimeout(() => {
-      o.value = withRepeat(withTiming(0.5, { duration: 1000 }), -1, true)
-    }, delay)
-    return () => clearTimeout(id)
-  }, [o, delay])
-  const style = useAnimatedStyle(() => ({ opacity: o.value }))
-  return <Animated.View style={style}>{children}</Animated.View>
-}
+export { ProductGridSkeleton }
 
-/** The listing loading.tsx card grid. */
-export function ProductGridSkeleton({ cols = 2, count = 6 }: { cols?: number; count?: number }) {
-  const gap = 12
-  const w = useColumnWidth(cols, gap)
+/** A category / brand page while it loads: the header band (breadcrumb, logo, title), the count line and the grid. */
+export function ListingPageSkeleton({ logo = false, cols = 2, gap = 12 }: { logo?: boolean; cols?: 1 | 2; gap?: number }) {
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
-      {Array.from({ length: count }).map((_, i) => (
-        <View key={i} style={{ width: w }}>
-          <Pulse delay={i * 80}>
-            <View className="rounded-lg border border-border-default bg-surface-elevated p-3">
-              <View className="mb-4 rounded-lg bg-surface-secondary" style={{ aspectRatio: 5 / 3 }} />
-              <View className="mb-2 h-4 rounded bg-surface-secondary" />
-              <View className="mb-3 h-4 w-3/4 rounded bg-surface-secondary" />
-              <View className="h-6 w-1/3 rounded bg-surface-secondary" />
-            </View>
-          </Pulse>
+    <View className="flex-1 overflow-hidden">
+      <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
+        <Skeleton height={14} width={180} rounded="rounded" className="mb-5" />
+        <View className="flex-row items-center gap-4">
+          {logo ? <Skeleton width={64} height={64} rounded="rounded-lg" /> : null}
+          <View className="flex-1 gap-2.5">
+            <Skeleton height={28} width="60%" />
+            <Skeleton height={14} width="85%" />
+          </View>
         </View>
-      ))}
+      </View>
+      <View className="px-4 pt-4">
+        <Skeleton height={22} width={140} className="mb-6" />
+        <ProductGridSkeleton cols={cols} gap={gap} count={cols === 1 ? 3 : 6} />
+      </View>
     </View>
   )
 }

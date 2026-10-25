@@ -9,7 +9,8 @@ import { listOrdersPage, type ListOrder } from '../../src/api/account'
 import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
-import { InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, orderStatusLabel, Pulse, StatusPill } from '../../src/components/account/ui'
+import { InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, orderStatusLabel, StatusPill } from '../../src/components/account/ui'
+import { Skeleton } from '../../src/ui'
 import { useTokens } from '../../src/theme'
 
 // Mirror of controller-service app/(storefront)/account/orders/page.tsx (the sm:hidden mobile card).
@@ -42,21 +43,33 @@ function getEddDisplay(order: ListOrder, edd: string): { label: string; color: s
 const qtyText = (q: number, mode?: string, unit?: string | null) =>
   mode === 'weight' || mode === 'length' ? `${Number(q).toFixed(3)} ${unit ?? ''}` : String(Math.round(Number(q)))
 
-function Skeleton() {
+// OrderCard's shape: header strip, first line item, actions row.
+function OrdersLoading() {
   return (
-    <View className="px-4 pt-4 pb-8 gap-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <View key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <View className="flex-row items-center justify-between mb-3">
-            <Pulse className="h-4 bg-surface-secondary rounded w-40" />
-            <Pulse className="h-5 bg-surface-secondary rounded-full w-20" />
+    <View className="gap-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <View key={i} className="mx-4 overflow-hidden rounded-lg border border-border-default bg-surface-elevated">
+          <View className="gap-2 border-b border-border-default bg-surface px-4 py-3">
+            <View className="flex-row items-center justify-between">
+              <Skeleton height={16} width={150} />
+              <Skeleton height={20} width={80} rounded="rounded-full" />
+            </View>
+            <View className="flex-row gap-3">
+              <Skeleton height={11} width={80} rounded="rounded" />
+              <Skeleton height={11} width={64} rounded="rounded" />
+            </View>
           </View>
-          <Pulse className="h-3 bg-surface-secondary rounded w-32 mb-3" />
-          <View className="flex-row items-center gap-3">
-            <Pulse className="w-12 h-12 bg-surface-secondary rounded-lg" />
-            <View className="flex-1 gap-2">
-              <Pulse className="h-3 bg-surface-secondary rounded w-3/4" />
-              <Pulse className="h-3 bg-surface-secondary rounded w-1/2" />
+          <View className="px-4 py-3">
+            <View className="flex-row items-center gap-3">
+              <Skeleton width={48} height={48} rounded="rounded-lg" />
+              <View className="flex-1 gap-2">
+                <Skeleton height={13} width="75%" />
+                <Skeleton height={11} width="35%" />
+              </View>
+            </View>
+            <View className="mt-3 flex-row items-center justify-between border-t border-border-default pt-3">
+              <Skeleton height={13} width={90} />
+              <Skeleton height={11} width={110} rounded="rounded" />
             </View>
           </View>
         </View>
@@ -199,7 +212,7 @@ export default function OrdersScreen() {
         renderItem={({ item }) => <OrderCard order={item} cancelling={cancellingId === item.id} onCancel={() => handleCancel(item.id)} />}
         ListEmptyComponent={
           !user || list.loading ? (
-            <Skeleton />
+            <OrdersLoading />
           ) : (
             <View className="mx-4 bg-surface-elevated rounded-lg border border-border-default p-12 items-center">
               <HeroIcon name="bag" size={64} color={t.foregroundMuted} strokeWidth={1.5} />

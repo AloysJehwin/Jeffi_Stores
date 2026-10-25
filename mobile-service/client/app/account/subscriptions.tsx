@@ -10,10 +10,10 @@ import { listAddresses } from '../../src/api/addresses'
 import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useRequireAuth } from '../../src/components/account/hooks'
-import { Pulse } from '../../src/components/account/ui'
 import { absUrl } from '../../src/lib/links'
 import { showToast } from '../../src/stores/toastStore'
 import { useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/subscriptions/MySubscriptions.tsx (visitor).
 
@@ -47,6 +47,35 @@ function confirm(title: string, message: string, confirmLabel: string, danger = 
       { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
       { text: confirmLabel, style: danger ? 'destructive' : 'default', onPress: () => resolve(true) },
     ])
+  )
+}
+
+// Subscription cards: image, name + status, plan lines, action buttons.
+function SubscriptionsLoading() {
+  return (
+    <>
+      {[0, 1].map(i => (
+        <View key={i} className="gap-3 rounded-lg border border-border-default bg-surface-elevated p-4">
+          <View className="flex-row items-start gap-3">
+            <Skeleton width={64} height={64} rounded="rounded" />
+            <View className="flex-1 gap-2">
+              <View className="flex-row items-center gap-2">
+                <Skeleton height={15} width="50%" />
+                <Skeleton height={20} width={64} rounded="rounded-full" />
+              </View>
+              <Skeleton height={12} width="75%" />
+              <Skeleton height={12} width="45%" />
+              <Skeleton height={10} width="85%" rounded="rounded" />
+            </View>
+          </View>
+          <View className="flex-row gap-2">
+            <Skeleton height={32} width={64} rounded="rounded-lg" />
+            <Skeleton height={32} width={124} rounded="rounded-lg" />
+            <Skeleton height={32} width={68} rounded="rounded-lg" />
+          </View>
+        </View>
+      ))}
+    </>
   )
 }
 
@@ -102,7 +131,7 @@ export default function SubscriptionsScreen() {
         <AccountMobileHeader />
         <View className="px-4 pt-4 gap-4">
           {!user || isLoading ? (
-            <Pulse className="h-32 bg-surface-elevated rounded-lg border border-border-default" />
+            <SubscriptionsLoading />
           ) : subs.length === 0 ? (
             <View className="bg-surface-elevated rounded-lg border border-border-default p-8 items-center">
               <Text className="text-foreground-secondary mb-3">You have no subscriptions yet.</Text>

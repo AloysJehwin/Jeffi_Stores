@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Banknote, Check, Copy, MapPin, ShieldCheck, Truck } from 'lucide-react-native'
 import TopNav from '../../src/components/layout/TopNav'
-import Pulse from '../../src/components/cart/Pulse'
+import { Skeleton, SummarySkeleton } from '../../src/ui'
 import AiInsight from '../../src/components/cart/AiInsight'
 import AddressFormModal from '../../src/components/checkout/AddressFormModal'
 import CouponHintBanner from '../../src/components/checkout/CouponHintBanner'
@@ -55,6 +55,66 @@ const PROMISES = [
 
 function eddLabel(ymd: string) {
   return new Date(ymd + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+/** An address choice: radio, name, two address lines and the phone. */
+function AddressSkeleton() {
+  return (
+    <View className="flex-row items-start gap-4 rounded-lg border-2 border-border-default p-4">
+      <Skeleton width={20} height={20} rounded="rounded-full" className="mt-1" />
+      <View className="flex-1 gap-2">
+        <Skeleton height={15} width="45%" />
+        <Skeleton height={12} width="85%" rounded="rounded" />
+        <Skeleton height={12} width="60%" rounded="rounded" />
+        <Skeleton height={12} width="40%" rounded="rounded" />
+      </View>
+    </View>
+  )
+}
+
+/** The loaded review's shape: title, address card, item rows, delivery date, summary. */
+function ReviewLoading() {
+  return (
+    <View className="flex-1 overflow-hidden px-4 pt-4">
+      <View className="mb-4 gap-2">
+        <Skeleton height={32} width={200} />
+        <Skeleton height={14} width="80%" rounded="rounded" />
+      </View>
+      <View className="gap-6">
+        <View className={CARD}>
+          <View className="mb-4 flex-row items-center justify-between">
+            <Skeleton height={22} width={160} />
+            <Skeleton height={14} width={110} rounded="rounded" />
+          </View>
+          <AddressSkeleton />
+        </View>
+        <View className={CARD}>
+          <Skeleton height={22} width={180} className="mb-6" />
+          <View className="gap-4">
+            {[0, 1].map(i => (
+              <View key={i} className={`flex-row gap-4 pb-4 ${i === 0 ? 'border-b border-border-default' : ''}`}>
+                <Skeleton width={80} height={80} />
+                <View className="flex-1 gap-2">
+                  <Skeleton height={15} />
+                  <Skeleton height={15} width="55%" />
+                  <Skeleton height={12} width="40%" rounded="rounded" className="mt-1" />
+                  <Skeleton height={14} width={80} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+        <View className="flex-row items-start gap-4 rounded-lg border border-border-default bg-surface-elevated p-4">
+          <Skeleton width={32} height={32} />
+          <View className="flex-1 gap-2">
+            <Skeleton height={12} width={110} rounded="rounded" />
+            <Skeleton height={20} width={180} />
+          </View>
+        </View>
+        <SummarySkeleton />
+      </View>
+    </View>
+  )
 }
 
 export default function CheckoutReviewScreen() {
@@ -335,12 +395,7 @@ export default function CheckoutReviewScreen() {
             </Pressable>
           </View>
         ) : (
-          <Pulse className="gap-4 px-4 py-8">
-            <View className="h-6 w-40 rounded bg-surface-elevated" />
-            <View className="h-32 rounded-lg bg-surface-elevated" />
-            <View className="h-48 rounded-lg bg-surface-elevated" />
-            <View className="h-24 rounded-lg bg-surface-elevated" />
-          </Pulse>
+          <ReviewLoading />
         )}
       </View>
     )
@@ -401,11 +456,8 @@ export default function CheckoutReviewScreen() {
 
               {addrQ.isLoading ? (
                 <View className="gap-3">
-                  {[1, 2].map(i => (
-                    <Pulse key={i}>
-                      <View className="h-20 rounded-lg border border-border-default bg-surface" />
-                    </Pulse>
-                  ))}
+                  <AddressSkeleton />
+                  <AddressSkeleton />
                 </View>
               ) : addresses.length === 0 ? (
                 <View className="items-center py-8">
@@ -494,9 +546,10 @@ export default function CheckoutReviewScreen() {
                   ) : !selectedAddress ? (
                     <Text className="text-sm text-foreground-muted">Select a delivery address to see expected delivery date</Text>
                   ) : eddQ.isLoading ? (
-                    <Pulse>
-                      <View className="h-5 w-48 rounded bg-border-default" />
-                    </Pulse>
+                    <View className="gap-2 py-0.5">
+                      <Skeleton height={12} width={110} rounded="rounded" />
+                      <Skeleton height={20} width={180} />
+                    </View>
                   ) : eddQ.data?.edd ? (
                     <>
                       <Text className="text-sm text-foreground-secondary">Expected Delivery</Text>
@@ -564,9 +617,7 @@ export default function CheckoutReviewScreen() {
                 {allDigital ? (
                   <Text className="font-medium text-green-600 dark:text-green-400">Delivered to your vault</Text>
                 ) : isLoadingShipping ? (
-                  <Pulse>
-                    <Text className="text-sm text-foreground-muted">Calculating...</Text>
-                  </Pulse>
+                  <Skeleton height={14} width={64} />
                 ) : shippingError ? (
                   <Text className="text-sm text-yellow-600 dark:text-yellow-400">Unavailable</Text>
                 ) : shippingCharge != null ? (

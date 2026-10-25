@@ -8,6 +8,7 @@ import { getProductReviews, type PdpReview } from '../../api/pdp'
 import { SITE_URL } from '../../lib/links'
 import { useAuthStore } from '../../stores/authStore'
 import { showToast } from '../../stores/toastStore'
+import { Skeleton, SkeletonText } from '../../ui'
 
 // Mirror of controller-service components/visitor/ProductReviews.tsx (list, rating summary, filter, sort,
 // read-more and photo views). Writing/editing posts multipart images, so it hands off to the storefront page.
@@ -226,17 +227,21 @@ export default function ProductReviews({
       ) : (
         <View className="gap-6">
           {isLoading ? (
-            <View className="rounded-xl border border-border-default bg-surface-elevated p-5 shadow-sm">
+            <View className="rounded-xl border border-border-default bg-surface-elevated p-4 shadow-sm">
               <View className="mb-4 flex-row items-center gap-3">
-                <View className="h-12 w-12 rounded bg-surface-secondary" />
-                <View className="flex-1 gap-2">
-                  <View className="h-3 w-24 rounded bg-surface-secondary" />
-                  <View className="h-2 w-16 rounded bg-surface-secondary" />
+                <Skeleton width={72} height={44} />
+                <View className="gap-1.5">
+                  <Skeleton height={18} width={108} rounded="rounded" />
+                  <Skeleton height={10} width={60} rounded="rounded" />
                 </View>
               </View>
-              <View className="gap-2">
+              <View className="gap-1.5">
                 {[1, 2, 3, 4, 5].map(i => (
-                  <View key={i} className="h-2 rounded bg-surface-secondary" />
+                  <View key={i} className="h-5 flex-row items-center gap-2 px-1">
+                    <Skeleton width={26} height={10} rounded="rounded" />
+                    <Skeleton height={6} rounded="rounded-full" className="flex-1" />
+                    <Skeleton width={16} height={10} rounded="rounded" />
+                  </View>
                 ))}
               </View>
             </View>
@@ -291,18 +296,15 @@ export default function ProductReviews({
             <View className="gap-4">
               {[1, 2].map(i => (
                 <View key={i} className="rounded-xl border border-border-default bg-surface-elevated p-4">
-                  <View className="mb-3 flex-row items-start gap-3">
-                    <View className="h-9 w-9 rounded-full bg-surface-secondary" />
-                    <View className="flex-1 gap-2">
-                      <View className="h-3 w-1/2 rounded bg-surface-secondary" />
-                      <View className="h-2.5 w-1/3 rounded bg-surface-secondary" />
+                  <View className="mb-3 flex-row items-center gap-3">
+                    <Skeleton width={36} height={36} rounded="rounded-full" />
+                    <View className="flex-1 flex-row items-center gap-2">
+                      <Skeleton height={13} width={90} />
+                      <Skeleton height={14} width={88} rounded="rounded" />
+                      <Skeleton height={10} width={64} rounded="rounded" className="ml-auto" />
                     </View>
                   </View>
-                  <View className="gap-2">
-                    <View className="h-2.5 rounded bg-surface-secondary" />
-                    <View className="h-2.5 w-11/12 rounded bg-surface-secondary" />
-                    <View className="h-2.5 w-3/4 rounded bg-surface-secondary" />
-                  </View>
+                  <SkeletonText lines={2} />
                 </View>
               ))}
             </View>

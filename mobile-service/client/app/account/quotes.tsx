@@ -7,9 +7,10 @@ import { listRfqs, type Rfq } from '../../src/api/account'
 import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useAccountUser, useInfiniteList } from '../../src/components/account/hooks'
-import { InfiniteFooter, Pulse } from '../../src/components/account/ui'
+import { InfiniteFooter } from '../../src/components/account/ui'
 import { useAuthStore } from '../../src/stores/authStore'
 import { useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/account/quotes/page.tsx.
 
@@ -20,19 +21,27 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400' },
 }
 
-function Skeleton() {
+// The loaded list: intro strip, RFQ rows, footer, as one bordered stack.
+function QuotesLoading() {
   return (
-    <View className="px-4 pt-4 pb-8 gap-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <View key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <View className="flex-row items-center justify-between mb-2">
-            <Pulse className="h-4 bg-surface-secondary rounded w-36" />
-            <Pulse className="h-5 bg-surface-secondary rounded-full w-20" />
+    <View className="mx-4 mt-4">
+      <View className="gap-1.5 rounded-t-lg border border-border-default bg-surface-elevated px-6 py-4">
+        <Skeleton height={12} width="85%" />
+        <Skeleton height={12} width="45%" />
+      </View>
+      {[0, 1, 2, 3].map(i => (
+        <View key={i} className="gap-2 border-x border-t border-border-default bg-surface-elevated p-5">
+          <View className="mb-1 flex-row items-center gap-2">
+            <Skeleton height={14} width={120} />
+            <Skeleton height={20} width={72} rounded="rounded-full" />
           </View>
-          <Pulse className="h-3 bg-surface-secondary rounded w-48 mb-1" />
-          <Pulse className="h-3 bg-surface-secondary rounded w-24" />
+          <Skeleton height={12} width={60} />
+          <Skeleton height={10} width={130} rounded="rounded" />
         </View>
       ))}
+      <View className="items-center rounded-b-lg border border-border-default bg-surface-elevated px-6 py-4">
+        <Skeleton height={10} width={130} rounded="rounded" />
+      </View>
     </View>
   )
 }
@@ -64,7 +73,8 @@ export default function QuotesScreen() {
     return (
       <View className="flex-1 bg-surface">
         <TopNav />
-        <Skeleton />
+        <AccountMobileHeader />
+        <QuotesLoading />
       </View>
     )
   }

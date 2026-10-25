@@ -8,8 +8,9 @@ import TopNav from '../../src/components/layout/TopNav'
 import CategoryIcon from '../../src/components/catalog/CategoryIcon'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRightIcon } from '../../src/components/catalog/icons'
-import { InfiniteFooter, Pulse } from '../../src/components/catalog/Paged'
+import { InfiniteFooter } from '../../src/components/catalog/Paged'
 import { accent } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/categories/page.tsx at the mobile breakpoint.
 
@@ -66,6 +67,33 @@ function CategoryCard({ category, subcategories }: { category: CategoryDetail; s
   )
 }
 
+function CategoryCardSkeleton() {
+  return (
+    <View className="rounded-lg border border-border-default bg-surface-elevated p-4">
+      <View className="mb-4 flex-row items-center gap-4">
+        <Skeleton width={64} height={64} rounded="rounded-lg" />
+        <View className="flex-1 gap-2">
+          <Skeleton height={20} width="55%" />
+          <Skeleton height={12} width={80} rounded="rounded" />
+        </View>
+      </View>
+      <View className="mb-4 gap-2">
+        <Skeleton height={12} />
+        <Skeleton height={12} width="70%" />
+      </View>
+      <View className="border-t border-border-default pt-4">
+        <Skeleton height={10} width={90} rounded="rounded" className="mb-2" />
+        <View className="flex-row gap-2">
+          {[64, 80, 56].map((w, i) => (
+            <Skeleton key={i} width={w} height={22} rounded="rounded" />
+          ))}
+        </View>
+      </View>
+      <Skeleton height={14} width={130} rounded="rounded" className="mt-4" />
+    </View>
+  )
+}
+
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets()
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
@@ -92,9 +120,7 @@ export default function CategoriesScreen() {
             {isLoading ? (
               <View className="gap-4 px-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Pulse key={i} delay={i * 60}>
-                    <View className="h-40 rounded-lg border border-border-default bg-surface-elevated" />
-                  </Pulse>
+                  <CategoryCardSkeleton key={i} />
                 ))}
               </View>
             ) : error && !data ? (

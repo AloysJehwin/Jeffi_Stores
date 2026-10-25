@@ -10,9 +10,10 @@ import { getLoyalty, redeemPoints, type RewardCoupon, type RewardsData, type Rew
 import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import Gradient from '../../src/components/account/Gradient'
 import { useInfiniteList, useRequireAuth, type InfiniteList } from '../../src/components/account/hooks'
-import { InfiniteFooter, Pulse } from '../../src/components/account/ui'
+import { InfiniteFooter } from '../../src/components/account/ui'
 import { showToast } from '../../src/stores/toastStore'
 import { useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountRewards.tsx (mobile layout).
 
@@ -268,6 +269,43 @@ function HowItWorks({ program }: { program: RewardsData['program'] }) {
   )
 }
 
+// Tier card, redeem card and points history, as loaded.
+function RewardsLoading() {
+  return (
+    <View className="gap-4">
+      <View className={CARD}>
+        <Skeleton width={90} height={24} rounded="rounded-full" />
+        <Skeleton width={120} height={36} className="mt-4" />
+        <Skeleton width="70%" height={13} className="mt-2" />
+        <Skeleton height={8} rounded="rounded-full" className="mt-5" />
+        <Skeleton width="60%" height={13} className="mt-2" />
+      </View>
+      <View className={CARD}>
+        <Skeleton width={120} height={15} />
+        <Skeleton height={12} className="mt-2" />
+        <Skeleton width="55%" height={12} className="mt-1.5" />
+        <Skeleton width={100} height={11} rounded="rounded" className="mt-4" />
+        <Skeleton height={40} className="mt-1.5" />
+        <Skeleton height={40} className="mt-3" />
+      </View>
+      <View className={CARD}>
+        <Skeleton width={110} height={15} />
+        <View className="mt-3">
+          {[0, 1, 2].map(i => (
+            <View key={i} className={`flex-row items-center justify-between gap-4 py-3 ${i > 0 ? 'border-t border-border-default' : ''}`}>
+              <View className="flex-1 gap-1.5">
+                <Skeleton width="65%" height={13} />
+                <Skeleton width={80} height={10} rounded="rounded" />
+              </View>
+              <Skeleton width={36} height={13} />
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  )
+}
+
 export default function RewardsScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
@@ -322,11 +360,7 @@ export default function RewardsScreen() {
         <AccountMobileHeader />
         <View className="px-4 pt-4">
           {loading ? (
-            <View className="gap-4">
-              <Pulse className="h-44 rounded-xl bg-surface-elevated border border-border-default" />
-              <Pulse className="h-28 rounded-xl bg-surface-elevated border border-border-default" />
-              <Pulse className="h-56 rounded-xl bg-surface-elevated border border-border-default" />
-            </View>
+            <RewardsLoading />
           ) : unavailable || !data ? (
             <View className={`${CARD} items-center py-12`} style={SHADOW}>
               <Text className="text-foreground font-medium text-center">{failed ? 'Could not load your rewards' : 'Rewards are not available for this account'}</Text>

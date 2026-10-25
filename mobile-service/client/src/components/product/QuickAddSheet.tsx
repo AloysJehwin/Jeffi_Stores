@@ -11,7 +11,7 @@ import QuantityInput, { InCartQtyHint } from '../pdp/QuantityInput'
 import { OptionChips } from '../pdp/OptionChips'
 import { unitText } from '../pdp/pdp'
 import { BottomSheet, SheetFooter } from '../../ui/BottomSheet'
-import { Pulse } from '../account/ui'
+import { Skeleton } from '../../ui'
 import { useWishlistToggle } from '../../hooks/useWishlist'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { useAuthStore } from '../../stores/authStore'
@@ -75,18 +75,35 @@ function ErrorBody({ seed, retry }: { seed: CardProduct; retry?: () => void }) {
   )
 }
 
+// QuickAddBody's shape under the seed's header: price row, option chips, quantity, details link.
 function LoadingBody({ seed }: { seed: CardProduct }) {
   return (
-    <View>
+    <View className="gap-5">
       <SheetFooter>
-        <Pulse className="h-14 rounded-2xl bg-surface-secondary" />
+        <Skeleton height={56} rounded="rounded-2xl" />
       </SheetFooter>
       <Header name={seed.name} brand={seed.brandName} image={seed.primaryImage?.thumbnail_url || seed.primaryImage?.image_url || null} productId={seed.id} slug={seed.slug} />
-      <View className="mt-4 gap-3">
-        <Pulse className="h-6 w-32 rounded-lg bg-surface-secondary" />
-        <Pulse className="h-10 rounded-xl bg-surface-secondary" />
-        <Pulse className="h-10 w-2/3 rounded-xl bg-surface-secondary" />
+      <View className="flex-row items-center gap-2">
+        <Skeleton height={28} width={110} />
+        <Skeleton height={20} width={64} rounded="rounded-full" />
       </View>
+      <View className="gap-2">
+        <Skeleton height={14} width={110} rounded="rounded" />
+        <View className="flex-row gap-2">
+          {[72, 88, 64].map((w, i) => (
+            <Skeleton key={i} height={38} width={w} rounded="rounded-full" />
+          ))}
+        </View>
+      </View>
+      <View className="gap-2">
+        <Skeleton height={14} width={70} rounded="rounded" />
+        <View className="flex-row items-center gap-2">
+          <Skeleton width={36} height={36} rounded="rounded-full" />
+          <Skeleton width={64} height={36} />
+          <Skeleton width={36} height={36} rounded="rounded-full" />
+        </View>
+      </View>
+      <Skeleton height={44} rounded="rounded-2xl" />
     </View>
   )
 }

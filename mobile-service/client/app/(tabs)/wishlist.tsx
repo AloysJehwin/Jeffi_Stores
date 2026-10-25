@@ -7,10 +7,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Heart, ImageIcon, ShoppingCart, X } from 'lucide-react-native'
 import TopNav from '../../src/components/layout/TopNav'
 import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
-import Pulse from '../../src/components/cart/Pulse'
 import WarningBadges from '../../src/components/cart/WarningBadges'
 import FeaturedProducts from '../../src/components/account/FeaturedProducts'
-import { Grid } from '../../src/components/home/layout'
 import { money } from '../../src/components/cart/lines'
 import { getWishlist, removeFromWishlist } from '../../src/api/wishlist'
 import { addToCart, createBuyNowIntent } from '../../src/api/cart'
@@ -18,6 +16,7 @@ import { useAuthStore } from '../../src/stores/authStore'
 import { showToast } from '../../src/stores/toastStore'
 import { openHref } from '../../src/lib/links'
 import { status, useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/wishlist/page.tsx at the mobile breakpoint.
 
@@ -73,6 +72,28 @@ function wishlistBadges(i: {
     if (pct >= 1) priceDrop = { was: Math.round(((i.shownPrice * snapshot) / current) * 100) / 100, pct }
   }
   return { backInStock, priceDrop }
+}
+
+/** A wishlist card while the list loads: image, remove button, title, price, stock and the cart button. */
+function WishlistCardSkeleton() {
+  return (
+    <View className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated">
+      <View className="mx-3 mt-3">
+        <Skeleton aspectRatio={5 / 3} />
+      </View>
+      <View className="p-4">
+        <Skeleton width={28} height={28} rounded="rounded-full" className="mb-1 self-end" />
+        <View className="mb-2 min-h-[48px] gap-2">
+          <Skeleton height={15} />
+          <Skeleton height={15} width="65%" />
+        </View>
+        <Skeleton height={24} width="40%" className="mb-2 mt-1" />
+        <Skeleton height={10} width={110} rounded="rounded" className="mb-3" />
+        <Skeleton height={12} width={64} rounded="rounded" className="mb-3" />
+        <Skeleton height={36} />
+      </View>
+    </View>
+  )
 }
 
 function EmptyCard({ title, body, action, onAction }: { title: string; body: string; action: string; onAction: () => void }) {
@@ -194,21 +215,20 @@ export default function WishlistScreen() {
     return (
       <View className="flex-1 bg-surface">
         <TopNav />
-        <View className="px-4 py-6">
-          <Grid cols={2} gap={16}>
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Pulse key={i} delay={i * 70}>
-                <View className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated">
-                  <View className="bg-surface-secondary" style={{ aspectRatio: 1 }} />
-                  <View className="gap-2 p-3">
-                    <View className="h-3 w-3/4 rounded bg-surface-secondary" />
-                    <View className="h-4 w-1/2 rounded bg-surface-secondary" />
-                  </View>
-                </View>
-              </Pulse>
-            ))}
-          </Grid>
-        </View>
+        <ScrollView scrollEnabled={false} showsVerticalScrollIndicator={false}>
+          <AccountMobileHeader />
+          <View className="px-4 py-4">
+            <View className="mb-4 flex-row gap-1.5">
+              {[40, 72, 98].map((w, i) => (
+                <Skeleton key={i} width={w} height={24} rounded="rounded-full" />
+              ))}
+            </View>
+            <View className="gap-4">
+              <WishlistCardSkeleton />
+              <WishlistCardSkeleton />
+            </View>
+          </View>
+        </ScrollView>
       </View>
     )
   }

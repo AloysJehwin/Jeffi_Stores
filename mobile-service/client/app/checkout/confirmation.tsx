@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
 import TopNav from '../../src/components/layout/TopNav'
-import Pulse from '../../src/components/cart/Pulse'
+import { Skeleton } from '../../src/ui'
 import AiInsight from '../../src/components/cart/AiInsight'
 import OrderCelebration from '../../src/components/checkout/OrderCelebration'
 import RecommendedProducts from '../../src/components/checkout/RecommendedProducts'
@@ -36,6 +36,53 @@ function statusLabel(s: string) {
   if (s === 'granted') return 'Access granted'
   if (s === 'cancel_requested') return 'Cancellation Requested'
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/** The loaded page's shape: celebration card, order summary, shipping address. */
+function ConfirmationLoading() {
+  return (
+    <View className="flex-1 overflow-hidden px-4 pt-12">
+      <View className="mb-8 items-center rounded-lg border-2 border-border-default bg-surface-elevated p-4">
+        <Skeleton width={64} height={64} rounded="rounded-full" className="mb-4" />
+        <Skeleton height={30} width={220} className="mb-3" />
+        <View className="mb-4 w-full items-center gap-2">
+          <Skeleton height={14} width="85%" rounded="rounded" />
+          <Skeleton height={14} width="60%" rounded="rounded" />
+        </View>
+        <View className="items-center gap-2 rounded-lg bg-surface p-4">
+          <Skeleton height={12} width={96} rounded="rounded" />
+          <Skeleton height={26} width={170} />
+        </View>
+      </View>
+      <View className="mb-6 rounded-lg bg-surface-elevated p-4 shadow-md">
+        <Skeleton height={22} width={150} className="mb-4" />
+        <View className="mb-6 gap-4">
+          {[0, 1].map(i => (
+            <View key={i} className={`flex-row items-center justify-between gap-3 pb-4 ${i === 0 ? 'border-b border-border-default' : ''}`}>
+              <View className="flex-1 gap-2">
+                <Skeleton height={15} width="75%" />
+                <Skeleton height={12} width="35%" rounded="rounded" />
+                <Skeleton height={12} width="50%" rounded="rounded" />
+              </View>
+              <Skeleton height={15} width={64} />
+            </View>
+          ))}
+        </View>
+        <View className="flex-row items-center justify-between border-t-2 border-border-default pt-4">
+          <Skeleton height={20} width={60} />
+          <Skeleton height={28} width={110} />
+        </View>
+      </View>
+      <View className="rounded-lg bg-surface-elevated p-4 shadow-md">
+        <Skeleton height={22} width={170} className="mb-4" />
+        <View className="gap-2">
+          <Skeleton height={14} width="80%" rounded="rounded" />
+          <Skeleton height={14} width="55%" rounded="rounded" />
+          <Skeleton height={14} width="40%" rounded="rounded" className="mt-1" />
+        </View>
+      </View>
+    </View>
+  )
 }
 
 export default function OrderConfirmationScreen() {
@@ -75,14 +122,7 @@ export default function OrderConfirmationScreen() {
     return (
       <View className="flex-1 bg-surface">
         <TopNav />
-        <View className="flex-1 justify-center px-4">
-          <Pulse className="items-center gap-4">
-            <View className="h-16 w-16 rounded-full bg-surface-elevated" />
-            <View className="h-6 w-48 rounded bg-surface-elevated" />
-            <View className="h-4 w-64 rounded bg-surface-elevated" />
-            <View className="h-32 w-full rounded-lg bg-surface-elevated" />
-          </Pulse>
-        </View>
+        <ConfirmationLoading />
       </View>
     )
   }

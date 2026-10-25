@@ -9,6 +9,7 @@ import AccountMobileHeader from '../../src/components/account/AccountMobileHeade
 import { useRequireAuth, useSignOut } from '../../src/components/account/hooks'
 import { checkAccountDeletion, deleteAccount, type DeletionBlocker } from '../../src/api/account'
 import { useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Account deletion, as on the web account page (controller-service components/visitor/account/DeleteAccountCard.tsx).
 
@@ -78,7 +79,12 @@ export default function DeleteAccountScreen() {
           </View>
 
           {isLoading ? (
-            <ActivityIndicator color={t.foregroundMuted} />
+            // The confirm step: prompt, input, button.
+            <View className="gap-3">
+              <Skeleton height={13} width={150} />
+              <Skeleton height={48} rounded="rounded-lg" />
+              <Skeleton height={44} rounded="rounded-xl" />
+            </View>
           ) : blockers.length ? (
             <View className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 gap-1">
               {blockers.map(b => (
