@@ -1,4 +1,5 @@
 import { Linking, Pressable, ScrollView, Share, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -162,6 +163,7 @@ function HowItWorks({ program }: { program: ReferralsData['program'] }) {
 }
 
 export default function ReferralsScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const qc = useQueryClient()
   const user = useRequireAuth()
@@ -189,7 +191,7 @@ export default function ReferralsScreen() {
     <View className="flex-1 bg-surface">
       <TopNav />
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         scrollEventThrottle={200}
         onScroll={e => {
           const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent

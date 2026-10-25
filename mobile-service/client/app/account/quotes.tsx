@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { FlatList, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import TopNav from '../../src/components/layout/TopNav'
 import { listRfqs, type Rfq } from '../../src/api/account'
@@ -37,6 +38,7 @@ function Skeleton() {
 }
 
 export default function QuotesScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const t = useTokens()
   const user = useAccountUser()
@@ -75,7 +77,7 @@ export default function QuotesScreen() {
         keyExtractor={r => r.id}
         onEndReached={list.loadMore}
         onEndReachedThreshold={0.5}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         ListHeaderComponent={
           <>
             <AccountMobileHeader />

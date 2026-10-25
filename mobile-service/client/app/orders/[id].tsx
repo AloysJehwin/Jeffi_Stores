@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { Image } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -145,6 +146,7 @@ function Skeleton() {
 }
 
 export default function OrderDetailScreen() {
+  const insets = useSafeAreaInsets()
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const qc = useQueryClient()
@@ -416,7 +418,7 @@ export default function OrderDetailScreen() {
   return (
     <View className="flex-1 bg-surface">
       <TopNav />
-      <KeyboardScroll contentContainerStyle={{ paddingBottom: 32 }}>
+      <KeyboardScroll contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         <AccountMobileHeader />
         <View className="px-4 py-4 gap-4">
           {/* Order header */}

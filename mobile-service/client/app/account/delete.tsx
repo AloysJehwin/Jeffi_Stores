@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ActivityIndicator, Alert, Linking, Pressable, Text, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
@@ -14,6 +15,7 @@ import { useTokens } from '../../src/theme'
 const DELETED = ['Profile, phone and date of birth', 'Saved addresses', 'Cart and wishlist', 'Reviews and their photos', 'Loyalty points and referrals', 'Search history and sign-in sessions']
 
 export default function DeleteAccountScreen() {
+  const insets = useSafeAreaInsets()
   useRequireAuth()
   const t = useTokens()
   const router = useRouter()
@@ -54,7 +56,7 @@ export default function DeleteAccountScreen() {
   return (
     <View className="flex-1 bg-surface">
       <TopNav />
-      <KeyboardScroll contentContainerStyle={{ paddingBottom: 32 }}>
+      <KeyboardScroll contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         <AccountMobileHeader />
         <View className="px-4 pt-4 gap-4">
           <View className="bg-surface-elevated rounded-xl border border-border-default p-4 gap-3">

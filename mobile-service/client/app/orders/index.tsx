@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Alert, FlatList, Pressable, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import TopNav from '../../src/components/layout/TopNav'
@@ -142,6 +143,7 @@ function OrderCard({ order, cancelling, onCancel }: { order: ListOrder; cancelli
 }
 
 export default function OrdersScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const t = useTokens()
   const user = useRequireAuth()
@@ -184,7 +186,7 @@ export default function OrdersScreen() {
       <FlatList
         data={!user || list.loading ? [] : orders}
         keyExtractor={o => o.id}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         ListHeaderComponent={
           <>
             <AccountMobileHeader />

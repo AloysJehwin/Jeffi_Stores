@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
@@ -109,6 +110,7 @@ function compareItem(p: PdpProduct, gstEnabled: boolean): CompareItem {
 }
 
 function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSku?: string }) {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const t = useTokens()
   const user = useAuthStore(s => s.user)
@@ -271,7 +273,7 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
             </View>
           </View>
 
-          <View className="px-4 pt-4" style={{ paddingBottom: 80 + (compareCount >= 2 ? 73 : 0) }}>
+          <View className="px-4 pt-4" style={{ paddingBottom: 80 + insets.bottom + (compareCount >= 2 ? 73 : 0) }}>
             {/* Product details card */}
             <View className="mb-4 overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
               <View className="gap-4 p-4">

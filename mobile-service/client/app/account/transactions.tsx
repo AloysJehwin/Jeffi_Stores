@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FlatList, Modal, Pressable, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import TopNav from '../../src/components/layout/TopNav'
 import { listTransactions, type Transaction } from '../../src/api/account'
@@ -43,6 +44,7 @@ function Skeleton() {
 }
 
 export default function TransactionsScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const t = useTokens()
   const user = useRequireAuth()
@@ -103,7 +105,7 @@ export default function TransactionsScreen() {
           data={filtered}
           keyExtractor={x => x.id}
           ListHeaderComponent={header}
-          contentContainerStyle={{ paddingBottom: 32 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
           onEndReached={list.loadMore}
           onEndReachedThreshold={0.5}
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
