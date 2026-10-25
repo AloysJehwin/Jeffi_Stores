@@ -57,6 +57,7 @@ export default function ValueStatsEditor(props: EditorProps) {
                   label="Label"
                   value={shown.get(m.metric) ?? m.label}
                   disabled={!canWrite}
+                  aiContext={`Caption under the live "${m.label}" number, 1-3 words.`}
                   onCommit={v => relabel(m.metric, v)}
                 />
               ) : (

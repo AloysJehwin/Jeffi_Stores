@@ -391,6 +391,8 @@ function SlideCard({
                 fieldLabel="Hero slide title"
                 value={slide.title}
                 scope="settings:write"
+                maxLength={255}
+                write
                 context={`Homepage hero banner for the ${slide.filter_category || 'store'} category. Keep it punchy, 1-3 words.`}
                 onChange={v => field({ title: v }, { title: v })}
               >
@@ -410,6 +412,8 @@ function SlideCard({
                 fieldLabel="Hero slide subtitle"
                 value={slide.subtitle ?? ''}
                 scope="settings:write"
+                maxLength={500}
+                write
                 context={`Short supporting line under the hero title "${slide.title}" for the ${slide.filter_category || 'store'} category. One concise sentence.`}
                 onChange={v => field({ subtitle: v }, { subtitle: v })}
               >
@@ -433,6 +437,8 @@ function SlideCard({
                 fieldLabel="Hero slide badge"
                 value={slide.badge_text ?? ''}
                 scope="settings:write"
+                maxLength={100}
+                write
                 context={`Tiny uppercase promo badge (1-2 words) for the ${slide.filter_category || 'store'} hero slide, e.g. "New Arrivals", "Top Picks".`}
                 onChange={v => field({ badge_text: v }, { badgeText: v })}
               >

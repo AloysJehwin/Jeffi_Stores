@@ -146,6 +146,7 @@ export default function StoriesEditor(props: EditorProps) {
                   value={g.title}
                   disabled={!canWrite}
                   placeholder="New this week"
+                  aiContext="The story's short title, shown under its ring."
                   onCommit={v => update(i, { title: v })}
                 />
                 <Image
@@ -197,6 +198,7 @@ export default function StoriesEditor(props: EditorProps) {
                   blank={BLANK_SLIDE}
                   disabled={!canWrite}
                   max={MAX_SLIDES}
+                  aiContext={`Story ${i + 1}${g.title ? ` "${g.title}"` : ''}.`}
                   showIcon={false}
                   itemLabel="Slide"
                   onCommit={slides => update(i, { slides })}

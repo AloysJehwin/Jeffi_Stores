@@ -1,7 +1,7 @@
 'use client'
 
-import type { SectionType } from '@/lib/catalog/homepage-sections'
-import { DateTimeField, Grid, useSectionBinding, type EditorProps } from './editors/fields'
+import { SECTION_META, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
+import { AiCopyScope, DateTimeField, Grid, useSectionBinding, type EditorProps } from './editors/fields'
 import AboutEditor from './editors/AboutEditor'
 import BackInStockEditor from './editors/BackInStockEditor'
 import BenefitsEditor from './editors/BenefitsEditor'
@@ -60,11 +60,20 @@ const EDITORS: Partial<Record<SectionType, (props: EditorProps) => React.ReactEl
 }
 
 export default function SectionConfigFields(props: EditorProps) {
-  const Editor = EDITORS[props.section.type]
+  const { section } = props
+  const Editor = EDITORS[section.type]
+  const meta = SECTION_META[section.type]
+  const surface = rowSurface(section) === 'app' ? 'mobile app' : 'website'
+  const heading = section.title ? ` Section heading: "${section.title}".` : ''
+  const aiContext = `Section "${meta.label}" on the ${surface} homepage: ${meta.description}${heading}`
 
   return (
     <div className="space-y-4">
-      {Editor && <Editor {...props} />}
+      {Editor && (
+        <AiCopyScope context={aiContext}>
+          <Editor {...props} />
+        </AiCopyScope>
+      )}
       <Scheduling {...props} />
     </div>
   )
