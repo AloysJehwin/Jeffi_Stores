@@ -37,11 +37,16 @@ interface TileListEditorProps {
   blank: Tile
   disabled: boolean
   max?: number
+  /** Prepended to what the AI sparkle on each tile's copy is told, e.g. the story the slides belong to. */
+  aiContext?: string
   /** False for tiles without an icon, such as About stats. */
   showIcon?: boolean
   itemLabel?: string
   onCommit: (tiles: Tile[]) => void
 }
+
+// Links, ids and numbers are not copy, so they get no AI sparkle.
+const NOT_COPY_KEY = /(url|href|link|id|slug|code|email|phone|seconds|days|weight|value|purchase|discount)$/i
 
 const BTN_CLASS =
   'px-2 py-1 text-xs font-medium rounded-md border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed'
@@ -55,6 +60,7 @@ export default function TileListEditor({
   blank,
   disabled,
   max = 8,
+  aiContext,
   showIcon = true,
   itemLabel = 'Tile',
   onCommit,
@@ -74,6 +80,12 @@ export default function TileListEditor({
     const [row] = next.splice(index, 1)
     next.splice(target, 0, row)
     onCommit(next)
+  }
+
+  function tileContext(index: number, tile: Tile) {
+    const lead = tile.headline || tile.title || tile.label || tile.text
+    const where = `${label}${hint ? ` (${hint})` : ''}: ${itemLabel.toLowerCase()} ${index + 1} of ${shown.length}`
+    return `${aiContext ? `${aiContext} ` : ''}${where}${lead ? `, "${lead}"` : ''}.`
   }
 
   return (
@@ -202,6 +214,8 @@ export default function TileListEditor({
                     disabled={disabled}
                     hint={f.hint}
                     rows={2}
+                    ai={!NOT_COPY_KEY.test(f.key)}
+                    aiContext={tileContext(i, tile)}
                     onCommit={v => replace(i, { [f.key]: v })}
                   />
                 ) : f.kind === 'image' ? (
@@ -239,6 +253,8 @@ export default function TileListEditor({
                     disabled={disabled}
                     hint={f.hint}
                     placeholder={f.placeholder}
+                    ai={!NOT_COPY_KEY.test(f.key)}
+                    aiContext={tileContext(i, tile)}
                     onCommit={v => replace(i, { [f.key]: v })}
                   />
                 )

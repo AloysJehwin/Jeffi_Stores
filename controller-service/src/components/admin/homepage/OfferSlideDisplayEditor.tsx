@@ -6,6 +6,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import MediaField, { type MediaSize, type MediaValue } from '@/components/admin/media/MediaField'
 import AiCopyButton from '@/components/admin/ai/AiCopyButton'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 export interface OfferSlide {
   id: string
@@ -68,6 +69,9 @@ const COPY_FIELDS = [
   { name: 'cta_label', label: 'Button label, 1-3 words e.g. Shop the offer', type: 'text' as const },
 ]
 
+const INPUT_CLASS =
+  'w-full pl-3 pr-9 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60'
+
 const BADGE_COLORS = [
   { value: 'bg-primary-500', label: 'Primary', swatch: '#7c3aed' },
   { value: 'bg-accent-500', label: 'Accent', swatch: '#84cc16' },
@@ -90,6 +94,7 @@ export default function OfferSlideDisplayEditor({
   const canWrite = useCanWrite('coupons:write')
   const storeName = useStoreConfig().identity.name || 'an online store'
   const [saving, setSaving] = useState(false)
+  const aiContext = `Homepage offer card for "${offer.title}" at ${storeName}.`
 
   const save = useCallback(
     async (patch: Partial<Record<string, unknown>>) => {
@@ -169,7 +174,7 @@ export default function OfferSlideDisplayEditor({
 
       <AiCopyButton
         scope="coupons:write"
-        context={`Homepage offer card for "${offer.title}" at ${storeName}.`}
+        context={aiContext}
         defaultBrief={offer.title}
         fields={COPY_FIELDS}
         onFill={fillCopy}
@@ -177,29 +182,55 @@ export default function OfferSlideDisplayEditor({
 
       <div>
         <label className="block text-xs font-medium text-foreground-secondary mb-1">Card copy</label>
-        <input
-          type="text"
+        <AIEnrichButton
+          fieldLabel="Offer card subtitle"
           value={offer.subtitle ?? ''}
-          onChange={e => onChange({ subtitle: e.target.value })}
-          onBlur={e => save({ subtitle: e.target.value || null })}
-          placeholder="Short line shown under the title"
-          disabled={!canWrite}
-          className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
-        />
+          onChange={v => {
+            onChange({ subtitle: v })
+            save({ subtitle: v || null })
+          }}
+          scope="coupons:write"
+          maxLength={500}
+          write
+          context={`${aiContext} A short line under the offer title, one concise sentence.`}
+        >
+          <input
+            type="text"
+            value={offer.subtitle ?? ''}
+            onChange={e => onChange({ subtitle: e.target.value })}
+            onBlur={e => save({ subtitle: e.target.value || null })}
+            placeholder="Short line shown under the title"
+            disabled={!canWrite}
+            className={INPUT_CLASS}
+          />
+        </AIEnrichButton>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-foreground-secondary mb-1">Badge text</label>
-          <input
-            type="text"
+          <AIEnrichButton
+            fieldLabel="Offer card badge"
             value={offer.badge_text ?? ''}
-            onChange={e => onChange({ badge_text: e.target.value })}
-            onBlur={e => save({ badgeText: e.target.value || null })}
-            placeholder="Diwali"
-            disabled={!canWrite}
-            className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
-          />
+            onChange={v => {
+              onChange({ badge_text: v })
+              save({ badgeText: v || null })
+            }}
+            scope="coupons:write"
+            maxLength={100}
+            write
+            context={`${aiContext} A tiny uppercase badge, 1-2 words, e.g. Diwali.`}
+          >
+            <input
+              type="text"
+              value={offer.badge_text ?? ''}
+              onChange={e => onChange({ badge_text: e.target.value })}
+              onBlur={e => save({ badgeText: e.target.value || null })}
+              placeholder="Diwali"
+              disabled={!canWrite}
+              className={INPUT_CLASS}
+            />
+          </AIEnrichButton>
         </div>
         <div>
           <label className="block text-xs font-medium text-foreground-secondary mb-1">Badge color</label>
@@ -224,15 +255,29 @@ export default function OfferSlideDisplayEditor({
 
       <div>
         <label className="block text-xs font-medium text-foreground-secondary mb-1">CTA label</label>
-        <input
-          type="text"
+        <AIEnrichButton
+          fieldLabel="Offer card button label"
           value={offer.cta_label ?? ''}
-          onChange={e => onChange({ cta_label: e.target.value })}
-          onBlur={e => save({ ctaLabel: e.target.value || null })}
-          placeholder="Shop the offer"
-          disabled={!canWrite}
-          className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
-        />
+          onChange={v => {
+            onChange({ cta_label: v })
+            save({ ctaLabel: v || null })
+          }}
+          scope="coupons:write"
+          format="label"
+          maxLength={100}
+          write
+          context={aiContext}
+        >
+          <input
+            type="text"
+            value={offer.cta_label ?? ''}
+            onChange={e => onChange({ cta_label: e.target.value })}
+            onBlur={e => save({ ctaLabel: e.target.value || null })}
+            placeholder="Shop the offer"
+            disabled={!canWrite}
+            className={INPUT_CLASS}
+          />
+        </AIEnrichButton>
       </div>
     </div>
   )
