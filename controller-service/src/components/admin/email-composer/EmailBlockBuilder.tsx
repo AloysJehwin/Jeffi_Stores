@@ -148,13 +148,16 @@ function BlockRow({
       )}
 
       {block.type === 'text' && (
-        <EmailComposer
-          value={block.html}
-          onChange={html => onPatch({ ...block, html })}
-          extraVariables={vars}
-          minHeight={120}
-          allowSource={false}
-        />
+        <div className="relative">
+          <EmailComposer
+            value={block.html}
+            onChange={html => onPatch({ ...block, html })}
+            extraVariables={vars}
+            minHeight={120}
+            allowSource={false}
+          />
+          <AIEnrichButton placement="in-field" anchorClassName="absolute right-3 bottom-3 z-10" fieldLabel="Email text block (HTML)" value={block.html} onChange={html => onPatch({ ...block, html })} scope="mailer:write" format="html" variables={varNames} write context="A paragraph block inside a marketing email; no buttons or images." />
+        </div>
       )}
 
       {(block.type === 'hero_image' || block.type === 'image') && (

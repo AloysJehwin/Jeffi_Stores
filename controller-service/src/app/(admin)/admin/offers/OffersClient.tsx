@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { EmptyState, badgeCls, fieldInputCls } from '@/components/admin/kit'
 import Toggle from '@/components/ui/Toggle'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 interface AdminOffer {
   id: string
@@ -178,13 +179,25 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                 <div className="mt-3 pt-3 border-t border-border-default flex items-center gap-3 flex-wrap">
                   {editing === o.id ? (
                     <>
-                      <input
-                        value={draftTitle}
-                        onChange={e => setDraftTitle(e.target.value)}
-                        placeholder={o.title}
-                        maxLength={200}
-                        className={`${fieldInputCls} w-full sm:w-auto sm:flex-1 sm:min-w-[16rem]`}
-                      />
+                      <div className="w-full sm:w-auto sm:flex-1 sm:min-w-[16rem]">
+                        <AIEnrichButton
+                          fieldLabel="Payment offer wording"
+                          value={draftTitle}
+                          onChange={setDraftTitle}
+                          scope="coupons:write"
+                          maxLength={200}
+                          write
+                          context={`Storefront wording for a Razorpay payment offer. Razorpay's own text: "${o.title}".`}
+                        >
+                          <input
+                            value={draftTitle}
+                            onChange={e => setDraftTitle(e.target.value)}
+                            placeholder={o.title}
+                            maxLength={200}
+                            className={`${fieldInputCls} w-full pr-8`}
+                          />
+                        </AIEnrichButton>
+                      </div>
                       <button
                         onClick={() => {
                           patch(o.id, { titleOverride: draftTitle })

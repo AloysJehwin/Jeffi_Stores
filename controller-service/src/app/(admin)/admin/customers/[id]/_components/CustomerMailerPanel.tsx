@@ -673,7 +673,21 @@ export default function CustomerMailerPanel({
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
               Message
             </label>
-            <EmailComposer value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
+            <div className="relative">
+              <EmailComposer value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
+              <AIEnrichButton
+                placement="in-field"
+                anchorClassName="absolute right-3 bottom-3 z-10"
+                fieldLabel="Email message (HTML)"
+                value={body}
+                onChange={setBody}
+                scope="mailer:write"
+                format="html"
+                write
+                broadcast
+                context={`${aiContext} Headline: "${headline}". Subject: "${subject}".`}
+              />
+            </div>
             <p className="text-[11px] text-foreground-muted mt-1.5">
               Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
               are replaced with the actual customer details when the email is sent.

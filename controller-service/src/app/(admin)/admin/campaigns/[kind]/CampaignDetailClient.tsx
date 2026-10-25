@@ -360,6 +360,18 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     : SAMPLE_VARS
   const linked = form.email_template_slug && linkedEmail ? linkedEmail : null
   const varsKind = form.scenario_kind || kind
+  // Editing a preset's body makes it a Custom template (so edits aren't mislabeled).
+  const setBody = (v: string) =>
+    setForm(f =>
+      f
+        ? {
+            ...f,
+            body_template: v,
+            template_layout:
+              v !== layoutStarterBody(f.template_layout) && f.template_layout !== 'custom' ? 'custom' : f.template_layout,
+          }
+        : f
+    )
   const composerVars = campaignVariables(varsKind, 'email').map(v => ({
     key: v.key,
     label: v.label,
@@ -663,27 +675,28 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                     }
                   />
                 ) : (
-                  <EmailComposer
-                    value={form.body_template}
-                    onChange={v =>
-                      // Editing a preset's body makes it a Custom template (so edits aren't mislabeled).
-                      setForm(f =>
-                        f
-                          ? {
-                              ...f,
-                              body_template: v,
-                              template_layout:
-                                v !== layoutStarterBody(f.template_layout) && f.template_layout !== 'custom'
-                                  ? 'custom'
-                                  : f.template_layout,
-                            }
-                          : f
-                      )
-                    }
-                    extraVariables={composerVars}
-                    ctaHref="{ctaUrl}"
-                    minHeight={260}
-                  />
+                  <div className="relative">
+                    <EmailComposer
+                      value={form.body_template}
+                      onChange={setBody}
+                      extraVariables={composerVars}
+                      ctaHref="{ctaUrl}"
+                      minHeight={260}
+                    />
+                    <AIEnrichButton
+                      placement="in-field"
+                      anchorClassName="absolute right-3 bottom-3 z-10"
+                      fieldLabel="Email body (HTML)"
+                      value={form.body_template}
+                      onChange={setBody}
+                      scope="campaigns:write"
+                      format="html"
+                      variables={composerVars.map(v => v.key)}
+                      write
+                      broadcast
+                      context={`Campaign: ${campaign.name ?? ''}. Subject: "${form.subject_template}". One call-to-action button linking to {ctaUrl}.`}
+                    />
+                  </div>
                 )}
                 <div className="mt-2">
                   <CampaignVariables
@@ -719,14 +732,28 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                   />
                 ) : (
                   <>
-                    <textarea
+                    <AIEnrichButton
+                      fieldLabel="SMS message"
                       value={form.sms_template}
-                      onChange={e => setForm(f => (f ? { ...f, sms_template: e.target.value } : f))}
-                      rows={3}
+                      onChange={v => setForm(f => (f ? { ...f, sms_template: v } : f))}
+                      scope="campaigns:write"
+                      format="sms"
                       maxLength={480}
-                      placeholder="Short text sent alongside WhatsApp when a phone is on file. Leave blank to use the built-in line. Variables like {firstName} and {couponCode} are filled per recipient."
-                      className="field-normal w-full border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
-                    />
+                      variables={campaignVariables(varsKind, 'sms').map(v => v.key)}
+                      multiline
+                      write
+                      broadcast
+                      context={`SMS for the "${campaign.name ?? kind}" campaign, sent alongside WhatsApp.`}
+                    >
+                      <textarea
+                        value={form.sms_template}
+                        onChange={e => setForm(f => (f ? { ...f, sms_template: e.target.value } : f))}
+                        rows={3}
+                        maxLength={480}
+                        placeholder="Short text sent alongside WhatsApp when a phone is on file. Leave blank to use the built-in line. Variables like {firstName} and {couponCode} are filled per recipient."
+                        className="field-normal w-full pr-8 border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      />
+                    </AIEnrichButton>
                     <p className="text-[10px] text-foreground-muted mt-1">
                       {form.sms_template.length} chars ·{' '}
                       {form.sms_template.length === 0 ? 0 : Math.ceil(form.sms_template.length / 160)} segment

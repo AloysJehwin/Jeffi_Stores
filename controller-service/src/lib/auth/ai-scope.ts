@@ -14,6 +14,13 @@ export const AI_ACTION_SCOPES = [
   'crm:write',
   'customers:write',
   'settings:write',
+  'orders:write',
+  'returns:write',
+  'business_customers:write',
+  'business_rfqs:write',
+  'social:write',
+  'merchant_sync:write',
+  'meta_ads_campaigns:write',
 ] as const
 
 export type AiActionScope = (typeof AI_ACTION_SCOPES)[number]

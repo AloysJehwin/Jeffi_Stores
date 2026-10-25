@@ -373,7 +373,17 @@ export default function Composer({
           {showTitle && (
             <div>
               <label className={lbl}>Title (YouTube, Pinterest)</label>
-              <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} />
+              <AIEnrichButton
+                fieldLabel="Video / pin title"
+                value={title}
+                onChange={setTitle}
+                scope="social:write"
+                maxLength={100}
+                write
+                context={`Title of a YouTube video or Pinterest pin.${product ? ` Product: ${product.name}.` : ''}${caption ? ` Caption: ${caption.slice(0, 300)}` : ''}`}
+              >
+                <input className={`${inputCls} pr-8`} value={title} onChange={e => setTitle(e.target.value)} />
+              </AIEnrichButton>
             </div>
           )}
 
@@ -383,7 +393,7 @@ export default function Composer({
               fieldLabel="Social media caption"
               value={caption}
               onChange={setCaption}
-              scope="campaigns:write"
+              scope="social:write"
               context={`${product ? `Product: ${product.name}${product.short_description ? ' - ' + product.short_description : ''}. ` : ''}Networks: ${platforms.map(p => PLATFORM_LABEL[p]).join(', ') || 'social media'}.`}
               multiline
             >
