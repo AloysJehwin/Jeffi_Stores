@@ -2,7 +2,6 @@ import { Pressable, View } from 'react-native'
 import { cn, elevationClass, Text, useElevation } from '../../ui'
 import { Image } from 'expo-image'
 import { usePathname, useRouter } from 'expo-router'
-import HeroIcon from './HeroIcon'
 import { isNavActive, useAccountNavItems, useAccountUser, type AccountNavItem } from './hooks'
 import { accent, useTokens } from '../../theme'
 
@@ -28,7 +27,7 @@ function AccountTabRow({ items }: { items: AccountNavItem[] }) {
               onPress={() => !active && router.navigate(item.route as never)}
               className={`flex-1 items-center justify-center py-3.5 border-b-2 ${active ? 'border-accent-500' : 'border-transparent'}`}
             >
-              <HeroIcon name={item.icon} size={20} color={active ? accent[500] : t.foregroundMuted} />
+              <item.icon size={20} color={active ? accent[500] : t.foregroundMuted} />
             </Pressable>
           )
         })}

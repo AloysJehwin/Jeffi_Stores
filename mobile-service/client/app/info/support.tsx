@@ -1,9 +1,8 @@
-import { Linking, Pressable, View, useWindowDimensions } from 'react-native'
-import { Screen, ScreenHeader, Text } from '../../src/ui'
+import { Linking, View, useWindowDimensions } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Mail, MapPin, MessageSquare, Phone } from 'lucide-react-native'
+import { BodySmall, Caption, Card, EmptyState, Heading, ListGroup, ListRow, Overline, Screen, ScreenHeader, Text, Title } from '../../src/ui'
 import SupportChat from '../../src/components/info/SupportChat'
-import { Glyph, CHAT, CHEVRON_RIGHT } from '../../src/components/info/Glyph'
-import { SHADOW_SM, SolidButton } from '../../src/components/info/common'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { useAuthStore } from '../../src/stores/authStore'
 import { openHref } from '../../src/lib/links'
@@ -39,21 +38,11 @@ const HOURS = [
 function LinkCard({ title, links }: { title: string; links: Array<{ label: string; href: string }> }) {
   const router = useRouter()
   return (
-    <View className="rounded-xl border border-border-default bg-surface-elevated p-5">
-      <Text className="mb-3 text-sm font-bold text-foreground">{title}</Text>
-      <View>
-        {links.map((link, i) => (
-          <Pressable
-            key={link.href}
-            onPress={() => openHref(router, link.href)}
-            className={`flex-row items-center justify-between py-2 ${i > 0 ? 'border-t border-border-default' : ''}`}
-          >
-            <Text className="text-sm text-foreground-secondary">{link.label}</Text>
-            <Glyph d={CHEVRON_RIGHT} size={14} className="text-foreground-muted" />
-          </Pressable>
-        ))}
-      </View>
-    </View>
+    <ListGroup title={title}>
+      {links.map(link => (
+        <ListRow key={link.href} title={link.label} onPress={() => openHref(router, link.href)} />
+      ))}
+    </ListGroup>
   )
 }
 
@@ -67,74 +56,51 @@ export default function SupportScreen() {
   return (
     <Screen header={<ScreenHeader title="Help & Support" />} mode="keyboard" scrollProps={{ showsVerticalScrollIndicator: false }}>
       <View className="mb-6">
-        <Text className="text-3xl font-extrabold text-foreground">How can we help?</Text>
-        <Text className="mt-1.5 text-sm text-foreground-secondary">Chat with our support bot or reach us directly.</Text>
+        <Title>How can we help?</Title>
+        <BodySmall className="mt-1.5">Chat with our support bot or reach us directly.</BodySmall>
       </View>
 
-      <View className="mb-8 gap-4">
-        <View className="gap-4 rounded-xl border border-border-default bg-surface-elevated p-5">
-          <Text className="text-sm font-bold text-foreground">Contact Us</Text>
-          <View>
-            <Text className="mb-1 text-xs text-foreground-muted">Phone</Text>
-            <Text className="text-sm font-medium text-foreground" onPress={() => Linking.openURL(`tel:${identity.phone}`)}>
-              {identity.phone}
-            </Text>
-          </View>
-          <View>
-            <Text className="mb-1 text-xs text-foreground-muted">Email</Text>
-            <Text className="text-sm font-medium text-foreground" onPress={() => Linking.openURL(`mailto:${identity.email}`)}>
-              {identity.email}
-            </Text>
-          </View>
-          <View>
-            <Text className="mb-1 text-xs text-foreground-muted">Address</Text>
-            <Text className="text-sm font-medium leading-snug text-foreground">
-              Sanjay Gandhi Chowk, Station Road, Raipur, CG 490092
-            </Text>
-          </View>
-          <View className="border-t border-border-default pt-1">
-            <Text className="mb-1.5 text-xs text-foreground-muted">Business Hours</Text>
+      <View className="mb-8 gap-6">
+        <ListGroup title="Contact Us">
+          <ListRow icon={Phone} title={identity.phone} subtitle="Phone" chevron={false} onPress={() => Linking.openURL(`tel:${identity.phone}`)} />
+          <ListRow icon={Mail} title={identity.email} subtitle="Email" chevron={false} onPress={() => Linking.openURL(`mailto:${identity.email}`)} />
+          <ListRow icon={MapPin} title="Address" subtitle="Sanjay Gandhi Chowk, Station Road, Raipur, CG 490092" />
+          <View className="px-4 py-3">
+            <Caption className="mb-1.5">Business Hours</Caption>
             <View className="gap-1">
               {HOURS.map(h => (
                 <View key={h.day} className="flex-row justify-between">
-                  <Text className="text-xs text-foreground-secondary">{h.day}</Text>
-                  <Text className={h.closed ? 'text-xs font-medium text-red-500' : 'text-xs font-medium text-foreground'}>{h.time}</Text>
+                  <Text className="text-[13px] text-foreground-secondary">{h.day}</Text>
+                  <Text className={h.closed ? 'text-[13px] font-medium text-red-600 dark:text-red-400' : 'text-[13px] font-medium text-foreground'}>{h.time}</Text>
                 </View>
               ))}
             </View>
           </View>
-        </View>
+        </ListGroup>
 
         <LinkCard title="Quick Links" links={QUICK_LINKS} />
         <LinkCard title="Legal & Policies" links={LEGAL_LINKS} />
       </View>
 
-      <View className="mb-2">
-        <Text className="mb-1 text-xs font-bold uppercase text-accent-500" style={{ letterSpacing: 1.2 }}>
-          Support Chat
-        </Text>
-        <Text className="mb-4 text-xl font-extrabold text-foreground">Chat with us</Text>
+      <View className="mb-4">
+        <Overline className="mb-1 text-accent-600 dark:text-accent-400">Support Chat</Overline>
+        <Heading>Chat with us</Heading>
       </View>
 
       {isLoading ? null : user ? (
-        <View className="overflow-hidden rounded-2xl border border-border-default" style={{ height: chatHeight, boxShadow: SHADOW_SM }}>
+        <Card padded={false} className="overflow-hidden" style={{ height: chatHeight }}>
           <SupportChat />
-        </View>
+        </Card>
       ) : (
-        <View className="items-center rounded-2xl border border-border-default bg-surface-elevated py-16" style={{ boxShadow: SHADOW_SM }}>
-          <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30">
-            <Glyph d={CHAT} size={32} className="text-primary-500" />
-          </View>
-          <Text className="mb-2 text-lg font-bold text-foreground">Sign in to use Support Chat</Text>
-          <Text className="mb-6 text-center text-sm text-foreground-secondary">
-            Log in to chat with our support bot and get help with your orders and account.
-          </Text>
-          <SolidButton
-            label="Sign In"
-            onPress={() => openHref(router, '/login')}
-            className="bg-primary-500 px-8 py-2.5 active:bg-primary-600"
+        <Card padded={false}>
+          <EmptyState
+            icon={MessageSquare}
+            title="Sign in to use Support Chat"
+            message="Log in to chat with our support bot and get help with your orders and account."
+            actionLabel="Sign In"
+            onAction={() => openHref(router, '/login')}
           />
-        </View>
+        </Card>
       )}
     </Screen>
   )

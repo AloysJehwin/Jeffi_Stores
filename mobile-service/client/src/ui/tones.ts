@@ -17,7 +17,7 @@ export const TONES: Record<Tone, { bg: string; text: string; solid: string }> = 
 const ORDER: Record<string, Tone> = {
   pending: 'warning', unpaid: 'warning',
   confirmed: 'info', processing: 'info', return_approved: 'info', return_received: 'info',
-  shipped: 'transit', returned: 'transit', refunded: 'transit',
+  shipped: 'transit', dispatched: 'transit', returned: 'transit', refunded: 'transit',
   out_for_delivery: 'info',
   delivered: 'success', granted: 'success', paid: 'success', completed: 'success',
   cancel_requested: 'progress', return_requested: 'progress',

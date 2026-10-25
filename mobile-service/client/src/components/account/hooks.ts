@@ -6,7 +6,8 @@ import { logout } from '../../api/auth'
 import { useAuthStore } from '../../stores/authStore'
 import { useCartStore } from '../../stores/cartStore'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
-import type { HeroIconName } from './HeroIcon'
+import { FileText, Gift, Heart, MapPin, Receipt, RefreshCw, ShoppingBag, User, UserPlus } from 'lucide-react-native'
+import type { IconComponent } from '../../ui'
 
 const OFF: FeatureFlags = { smsEnabled: true, whatsappEnabled: true, loyaltyEnabled: false, birthdayEnabled: false, referralEnabled: false }
 
@@ -90,20 +91,20 @@ export interface AccountNavItem {
   route: string
   label: string
   exact: boolean
-  icon: HeroIconName
+  icon: IconComponent
 }
 
 const NAV: AccountNavItem[] = [
-  { href: '/account', route: '/(tabs)/account', label: 'Profile', exact: true, icon: 'user' },
-  { href: '/account/orders', route: '/orders', label: 'My Orders', exact: false, icon: 'bag' },
-  { href: '/account/transactions', route: '/account/transactions', label: 'Transactions', exact: false, icon: 'receipt' },
-  { href: '/account/addresses', route: '/account/addresses', label: 'My Addresses', exact: false, icon: 'location' },
-  { href: '/wishlist', route: '/(tabs)/wishlist', label: 'Wishlist', exact: false, icon: 'heart' },
+  { href: '/account', route: '/(tabs)/account', label: 'Profile', exact: true, icon: User },
+  { href: '/account/orders', route: '/orders', label: 'My Orders', exact: false, icon: ShoppingBag },
+  { href: '/account/transactions', route: '/account/transactions', label: 'Transactions', exact: false, icon: Receipt },
+  { href: '/account/addresses', route: '/account/addresses', label: 'My Addresses', exact: false, icon: MapPin },
+  { href: '/wishlist', route: '/(tabs)/wishlist', label: 'Wishlist', exact: false, icon: Heart },
 ]
-const SUBSCRIPTIONS: AccountNavItem = { href: '/account/subscriptions', route: '/account/subscriptions', label: 'Subscriptions', exact: false, icon: 'refresh' }
-const REWARDS: AccountNavItem = { href: '/account/rewards', route: '/account/rewards', label: 'Rewards', exact: false, icon: 'gift' }
-const REFERRALS: AccountNavItem = { href: '/account/referrals', route: '/account/referrals', label: 'Refer & Earn', exact: false, icon: 'userAdd' }
-const QUOTES: AccountNavItem = { href: '/account/quotes', route: '/account/quotes', label: 'My Quotes', exact: false, icon: 'document' }
+const SUBSCRIPTIONS: AccountNavItem = { href: '/account/subscriptions', route: '/account/subscriptions', label: 'Subscriptions', exact: false, icon: RefreshCw }
+const REWARDS: AccountNavItem = { href: '/account/rewards', route: '/account/rewards', label: 'Rewards', exact: false, icon: Gift }
+const REFERRALS: AccountNavItem = { href: '/account/referrals', route: '/account/referrals', label: 'Refer & Earn', exact: false, icon: UserPlus }
+const QUOTES: AccountNavItem = { href: '/account/quotes', route: '/account/quotes', label: 'My Quotes', exact: false, icon: FileText }
 
 /** The web's useAccountNavItems (+ the approved-business quotes tab). */
 export function useAccountNavItems(): AccountNavItem[] {

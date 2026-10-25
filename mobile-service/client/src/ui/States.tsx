@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
-import { StyleSheet, View, type StyleProp, type TextStyle } from 'react-native'
+import { View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
-import { cssInterop } from 'nativewind'
 import { CloudOff, PackageOpen } from 'lucide-react-native'
 import { useTokens } from '../theme'
 import { Text } from './Text'
 import { Button, type IconComponent } from './Button'
 import { cn } from './cn'
 import { useEntering } from './motion'
+import { TintedIcon } from './Icon'
 
 interface StateProps {
   icon?: IconComponent
@@ -58,12 +58,6 @@ const NOTICE = {
   success: { frame: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-800 dark:text-green-300' },
   warning: { frame: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-800 dark:text-orange-300' },
 }
-
-// A lucide icon coloured by a text-* class, so the icon follows the notice's tone in both schemes.
-function ToneIcon({ icon: Icon, style }: { icon: IconComponent; style?: StyleProp<TextStyle> }) {
-  return <Icon size={20} color={StyleSheet.flatten(style)?.color as string | undefined} />
-}
-const TintedIcon = cssInterop(ToneIcon, { className: 'style' })
 
 /** An inline message box (form errors, order notices); string children take the tone's colour. */
 export function Notice({

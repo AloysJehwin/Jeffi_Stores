@@ -5,10 +5,10 @@ import { useQuery } from '@tanstack/react-query'
 import { listBrandsWithCounts, type BrandWithCount } from '../../src/api/brands'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRight, Tag } from 'lucide-react-native'
-import { EmptyCard, InfiniteFooter } from '../../src/components/catalog/Paged'
+import { EmptyCard } from '../../src/components/catalog/Paged'
 import { absUrl } from '../../src/lib/links'
 import { useTokens } from '../../src/theme'
-import { Card, Screen, ScreenHeader, Skeleton, Text, useBottomInset } from '../../src/ui'
+import { Card, ErrorState, Screen, ScreenHeader, Skeleton, Text, useBottomInset } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/brands/page.tsx at the mobile breakpoint.
 
@@ -50,7 +50,7 @@ function BrandCard({ brand }: { brand: BrandWithCount }) {
 
 function BrandCardSkeleton() {
   return (
-    <View className="rounded-panel bg-surface-elevated p-4 dark:border dark:border-border-default">
+    <Card>
       <View className="mb-4 flex-row items-start gap-4">
         <Skeleton width={64} height={64} rounded="rounded-xl" />
         <View className="flex-1 gap-2 pt-1">
@@ -63,7 +63,7 @@ function BrandCardSkeleton() {
         <Skeleton height={12} width="70%" />
       </View>
       <Skeleton height={14} width={130} rounded="rounded" />
-    </View>
+    </Card>
   )
 }
 
@@ -94,10 +94,7 @@ export default function BrandsScreen() {
         ListEmptyComponent={
           isLoading ? null : error ? (
             <View className="px-4">
-              <InfiniteFooter
-                shown={0}
-                control={{ hasMore: false, loadingMore: false, error: error.message || 'Failed to load', loadMore: refetch, retry: refetch }}
-              />
+              <ErrorState message={error.message || 'Failed to load'} onRetry={refetch} />
             </View>
           ) : (
             <View className="px-4">

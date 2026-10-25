@@ -1,10 +1,9 @@
 import { Pressable, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { Screen, ScreenHeader, Skeleton, Text } from '../../src/ui'
-import { Glyph, DOCUMENT, DOWNLOAD } from '../../src/components/info/Glyph'
-import { POLICY_ICONS, openPolicyPdf } from '../../src/components/info/policy'
-import { SolidButton } from '../../src/components/info/common'
+import { Download } from 'lucide-react-native'
+import { BodySmall, Button, Caption, Card, ErrorState, IconButton, Screen, ScreenHeader, Skeleton, Subheading, Text, TintedIcon } from '../../src/ui'
+import { DEFAULT_POLICY_ICON, POLICY_ICONS, openPolicyPdf } from '../../src/components/info/policy'
 import { listPolicies } from '../../src/api/info'
 import { openHref } from '../../src/lib/links'
 
@@ -23,8 +22,8 @@ function PoliciesLoading() {
   return (
     <View className="gap-4">
       {Array.from({ length: 5 }).map((_, i) => (
-        <View key={i} className="flex-row rounded-xl border border-border-default bg-surface-elevated">
-          <View className="flex-1 flex-row items-start gap-4 p-5">
+        <Card key={i} padded={false} className="flex-row">
+          <View className="flex-1 flex-row items-start gap-4 p-4">
             <Skeleton width={40} height={40} rounded="rounded-lg" />
             <View className="flex-1 gap-1.5">
               <Skeleton height={14} width="55%" />
@@ -34,9 +33,9 @@ function PoliciesLoading() {
             </View>
           </View>
           <View className="items-center justify-center border-l border-border-default px-3">
-            <Skeleton width={16} height={16} rounded="rounded" />
+            <Skeleton width={20} height={20} rounded="rounded" />
           </View>
-        </View>
+        </Card>
       ))}
     </View>
   )
@@ -44,56 +43,46 @@ function PoliciesLoading() {
 
 export default function LegalIndexScreen() {
   const router = useRouter()
-  const { data: policies, isLoading, isError } = useQuery({ queryKey: ['legal-policies'], queryFn: listPolicies, staleTime: 3_600_000 })
+  const { data: policies, isLoading, isError, refetch } = useQuery({ queryKey: ['legal-policies'], queryFn: listPolicies, staleTime: 3_600_000 })
 
   return (
     <Screen header={<ScreenHeader title="Policies & Legal" />} contentClassName="gap-8" scrollProps={{ showsVerticalScrollIndicator: false }}>
-      <Text className="-mb-4 text-sm text-foreground-secondary">
-        Everything you need to know about how we operate, your rights, and our commitments to you.
-      </Text>
+      <BodySmall className="-mb-4">Everything you need to know about how we operate, your rights, and our commitments to you.</BodySmall>
 
       {isLoading ? (
         <PoliciesLoading />
       ) : isError || !policies ? (
-        <Text className="text-center text-sm text-foreground-muted">Couldn&apos;t load the policies. Please try again.</Text>
+        <ErrorState title="Couldn't load the policies" message="Please try again." onRetry={() => refetch()} />
       ) : (
         <View className="gap-4">
           {policies.map(policy => (
-            <View key={policy.slug} className="flex-row items-start gap-3 rounded-xl border border-border-default bg-surface-elevated">
+            <Card key={policy.slug} padded={false} className="flex-row">
               <Pressable
+                accessibilityRole="button"
                 onPress={() => router.push(`/legal/${policy.slug}`)}
-                className="min-w-0 flex-1 flex-row items-start gap-4 p-5"
+                className="min-w-0 flex-1 flex-row items-start gap-4 rounded-l-panel p-4 active:bg-surface-secondary"
               >
-                <View className="h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-900/20">
-                  <Glyph
-                    d={POLICY_ICONS[policy.slug] ?? DOCUMENT}
-                    size={20}
-                    strokeWidth={1.5}
-                    className="text-primary-600 dark:text-primary-400"
-                  />
+                <View className="h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-900/20">
+                  <TintedIcon icon={POLICY_ICONS[policy.slug] ?? DEFAULT_POLICY_ICON} size={20} strokeWidth={1.75} className="text-primary-600 dark:text-primary-400" />
                 </View>
                 <View className="min-w-0 flex-1">
-                  <Text className="text-sm font-bold text-foreground">{policy.title}</Text>
-                  <Text numberOfLines={2} className="mt-0.5 text-xs leading-relaxed text-foreground-secondary">
+                  <Text className="text-[15px] font-bold text-foreground">{policy.title}</Text>
+                  <BodySmall numberOfLines={2} className="mt-0.5">
                     {policy.description}
-                  </Text>
-                  <Text className="mt-2 text-xs text-foreground-muted">Updated {policy.lastUpdated}</Text>
+                  </BodySmall>
+                  <Caption className="mt-2">Updated {policy.lastUpdated}</Caption>
                 </View>
               </Pressable>
-              <Pressable
-                accessibilityLabel={`Download ${policy.title} as PDF`}
-                onPress={() => openPolicyPdf(policy.slug)}
-                className="shrink-0 items-center justify-center self-stretch rounded-r-xl border-l border-border-default px-3 active:bg-primary-50 dark:active:bg-primary-900/10"
-              >
-                <Glyph d={DOWNLOAD} size={16} className="text-foreground-muted" />
-              </Pressable>
-            </View>
+              <View className="items-center justify-center border-l border-border-default px-1">
+                <IconButton icon={Download} label={`Download ${policy.title} as PDF`} onPress={() => openPolicyPdf(policy.slug)} />
+              </View>
+            </Card>
           ))}
         </View>
       )}
 
-      <View className="rounded-xl border border-border-default bg-surface-elevated p-6">
-        <Text className="mb-2 text-base font-bold text-foreground">Subscriptions &amp; auto-debit</Text>
+      <Card>
+        <Subheading className="mb-2">Subscriptions &amp; auto-debit</Subheading>
         <View className="gap-1.5">
           {SUBSCRIPTION_TERMS.map(term => (
             <View key={term} className="flex-row pl-1">
@@ -102,24 +91,22 @@ export default function LegalIndexScreen() {
             </View>
           ))}
         </View>
-        <Text className="mt-3 text-xs text-foreground-muted">
+        <Caption className="mt-3">
           Full terms:{' '}
-          <Text className="text-primary-600" onPress={() => router.push('/legal/terms-and-conditions')}>
+          <Text className="font-semibold text-primary-600 dark:text-primary-400" onPress={() => router.push('/legal/terms-and-conditions')}>
             Terms &amp; Conditions
           </Text>{' '}
           ·{' '}
-          <Text className="text-primary-600" onPress={() => router.push('/legal/return-refund-policy')}>
+          <Text className="font-semibold text-primary-600 dark:text-primary-400" onPress={() => router.push('/legal/return-refund-policy')}>
             Return &amp; Refund Policy
           </Text>
-        </Text>
-      </View>
+        </Caption>
+      </Card>
 
-      <View className="items-center rounded-xl border border-border-default bg-surface-elevated p-6">
-        <Text className="mb-3 text-center text-sm text-foreground-secondary">
-          Can&apos;t find what you&apos;re looking for? Our support team can help.
-        </Text>
-        <SolidButton label="Contact Support" onPress={() => openHref(router, '/support')} />
-      </View>
+      <Card className="items-center">
+        <BodySmall className="mb-4 text-center">Can&apos;t find what you&apos;re looking for? Our support team can help.</BodySmall>
+        <Button label="Contact Support" size="md" onPress={() => openHref(router, '/support')} />
+      </Card>
     </Screen>
   )
 }

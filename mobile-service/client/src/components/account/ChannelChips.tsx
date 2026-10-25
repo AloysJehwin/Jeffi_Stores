@@ -1,16 +1,14 @@
-import { Pressable, View } from 'react-native'
-import { Text } from '../../ui'
-import HeroIcon, { type HeroIconName } from './HeroIcon'
-import { status, useTokens } from '../../theme'
+import { Mail, MessageCircle, Smartphone } from 'lucide-react-native'
+import { BodySmall, Chip, ChipGroup, type IconComponent } from '../../ui'
 import type { OtpChannel } from '../../api/auth'
 
-const CHANNEL: Record<OtpChannel, { label: string; icon: HeroIconName }> = {
-  email: { label: 'Email', icon: 'mail' },
-  sms: { label: 'SMS', icon: 'phone' },
-  whatsapp: { label: 'WhatsApp', icon: 'chat' },
+const CHANNEL: Record<OtpChannel, { label: string; icon: IconComponent }> = {
+  email: { label: 'Email', icon: Mail },
+  sms: { label: 'SMS', icon: Smartphone },
+  whatsapp: { label: 'WhatsApp', icon: MessageCircle },
 }
 
-/** Pill chips for where the OTP goes ("Get the code on  [SMS] [WhatsApp]"). */
+/** Where the OTP goes ("Get the code on  [SMS] [WhatsApp]"). */
 export function ChannelChips({
   label,
   options,
@@ -24,25 +22,12 @@ export function ChannelChips({
   onChange: (c: OtpChannel) => void
   isDisabled?: (c: OtpChannel) => boolean
 }) {
-  const t = useTokens()
   return (
-    <View className="mt-3 flex-row flex-wrap items-center gap-2">
-      <Text className="mr-1 text-sm text-foreground-secondary">{label}</Text>
-      {options.map(id => {
-        const on = id === value
-        const off = !!isDisabled?.(id)
-        return (
-          <Pressable
-            key={id}
-            disabled={off}
-            onPress={() => onChange(id)}
-            className={`flex-row items-center gap-1.5 rounded-full px-3.5 py-2 ${on ? 'bg-accent-500' : 'bg-surface-secondary'} ${off ? 'opacity-40' : ''}`}
-          >
-            <HeroIcon name={CHANNEL[id].icon} size={16} color={on ? status.white : t.foregroundSecondary} />
-            <Text className={`text-sm font-semibold ${on ? 'text-white' : 'text-foreground-secondary'}`}>{CHANNEL[id].label}</Text>
-          </Pressable>
-        )
-      })}
-    </View>
+    <ChipGroup className="mt-3 items-center">
+      <BodySmall className="mr-1">{label}</BodySmall>
+      {options.map(id => (
+        <Chip key={id} label={CHANNEL[id].label} icon={CHANNEL[id].icon} selected={id === value} disabled={!!isDisabled?.(id)} onPress={() => onChange(id)} />
+      ))}
+    </ChipGroup>
   )
 }

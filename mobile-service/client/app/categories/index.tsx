@@ -6,9 +6,8 @@ import { getHome } from '../../src/api/home'
 import CategoryIcon from '../../src/components/catalog/CategoryIcon'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRight } from 'lucide-react-native'
-import { InfiniteFooter } from '../../src/components/catalog/Paged'
 import { accent, useTokens } from '../../src/theme'
-import { Badge, Card, Screen, ScreenHeader, Skeleton, Text, useBottomInset } from '../../src/ui'
+import { Badge, Caption, Card, ErrorState, Screen, ScreenHeader, Skeleton, Text, useBottomInset } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/categories/page.tsx at the mobile breakpoint.
 
@@ -40,7 +39,7 @@ function CategoryCard({ category, subcategories }: { category: CategoryDetail; s
 
       {subcategories.length > 0 ? (
         <View className="border-t border-border-default pt-4">
-          <Text className="mb-2 text-xs font-medium text-foreground-muted">Subcategories:</Text>
+          <Caption className="mb-2">Subcategories:</Caption>
           <View className="flex-row flex-wrap items-center gap-2">
             {subcategories.slice(0, 5).map(sub => (
               <Badge key={sub.id} label={sub.name} />
@@ -62,7 +61,7 @@ function CategoryCard({ category, subcategories }: { category: CategoryDetail; s
 
 function CategoryCardSkeleton() {
   return (
-    <View className="rounded-panel bg-surface-elevated p-4 dark:border dark:border-border-default">
+    <Card>
       <View className="mb-4 flex-row items-center gap-4">
         <Skeleton width={64} height={64} rounded="rounded-xl" />
         <View className="flex-1 gap-2">
@@ -83,7 +82,7 @@ function CategoryCardSkeleton() {
         </View>
       </View>
       <Skeleton height={14} width={130} rounded="rounded" className="mt-4" />
-    </View>
+    </Card>
   )
 }
 
@@ -113,10 +112,7 @@ export default function CategoriesScreen() {
               </View>
             ) : error && !data ? (
               <View className="px-4">
-                <InfiniteFooter
-                  shown={0}
-                  control={{ hasMore: false, loadingMore: false, error: error.message || 'Failed to load', loadMore: refetch, retry: refetch }}
-                />
+                <ErrorState message={error.message || 'Failed to load'} onRetry={refetch} />
               </View>
             ) : null}
           </>
