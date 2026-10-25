@@ -40,6 +40,12 @@ export function openHref(router: Router, href: string | null | undefined) {
   if ((slug = m(/^\/brands\/([^/]+)$/))) return router.push(`/brands/${slug}`)
   if ((slug = m(/^\/(?:account\/)?orders\/([^/]+)$/)) && slug !== 'confirmation') return router.push(`/orders/${slug}`)
   if ((slug = m(/^\/legal\/([^/]+)$/))) return router.push(`/legal/${slug}`)
+  // A coupon link (a win, an old "use at checkout" link) opens the cart, which applies it.
+  const coupon = url.searchParams.get('coupon') ?? url.searchParams.get('couponCode')
+  const couponId = url.searchParams.get('couponId')
+  if ((path === '/cart' || path === '/checkout') && (coupon || couponId)) {
+    return router.navigate({ pathname: '/(tabs)/cart', params: coupon ? { coupon } : { couponId: couponId! } })
+  }
   const screens: Record<string, string> = {
     '/': '/(tabs)',
     '/categories': '/categories',

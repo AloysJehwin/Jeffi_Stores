@@ -245,6 +245,8 @@ export interface RewardGamePlay {
     minPurchase: number
     maxDiscount: number | null
     validUntil: string | null
+    /** Absent from servers older than the status. */
+    status?: 'usable' | 'used' | 'expired'
   } | null
 }
 

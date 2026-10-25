@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
+import AccountCoupons from '@/components/visitor/account/AccountCoupons'
+import { useAccountCoupons } from '@/components/visitor/coupons/useAccountCoupons'
 import { useInfiniteList, InfiniteFooter, fetchJson, type InfiniteList } from '@/components/admin/kit/infinite'
 
 interface Tier {
@@ -24,25 +26,6 @@ interface HistoryEntry {
   createdAt: string
 }
 
-interface RewardCoupon {
-  code: string
-  value: number
-  minPurchase: number
-  createdAt: string
-  discountType?: 'fixed' | 'percentage'
-  maxDiscount?: number | null
-  validUntil?: string | null
-  source?: 'loyalty' | 'game'
-}
-
-/** "₹200 off" or "10% off (up to ₹150)", with the minimum order and expiry when set. */
-function couponTerms(c: RewardCoupon, formatMoney: (n: number) => string): string {
-  const off = c.discountType === 'percentage' ? `${c.value}% off${c.maxDiscount ? ` (up to ${formatMoney(c.maxDiscount)})` : ''}` : `${formatMoney(c.value)} off`
-  const min = c.minPurchase > 0 ? ` orders of ${formatMoney(c.minPurchase)} or more` : ''
-  const until = c.validUntil ? ` · valid till ${new Date(c.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''
-  return `${off}${min}${until}`
-}
-
 interface Page<T> {
   items: T[]
   total: number
@@ -59,7 +42,6 @@ interface RewardsData {
   lifetimePoints: number
   pending: { points: number; nextCreditAt: string | null }
   history: Page<HistoryEntry>
-  coupons: Page<RewardCoupon>
   program: {
     rupeesPerPoint: number
     pointValue: number
@@ -245,50 +227,6 @@ function RedeemCard({ data, onRedeemed }: { data: RewardsData; onRedeemed: () =>
   )
 }
 
-function CouponList({ list }: { list: InfiniteList<RewardCoupon> }) {
-  const { showToast } = useToast()
-  if ((list.total ?? 0) === 0 && !list.loading) return null
-
-  const copy = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code)
-      showToast('Coupon code copied', 'success')
-    } catch {
-      showToast('Could not copy the code', 'error')
-    }
-  }
-
-  return (
-    <div className={CARD}>
-      <h2 className="font-semibold text-foreground">Your reward coupons</h2>
-      <p className="mt-1 text-sm text-foreground-secondary">Enter the code in the coupon box at checkout.</p>
-      <ul className="mt-4 space-y-3">
-        {list.rows.map(coupon => (
-          <li
-            key={coupon.code}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border-default px-4 py-3"
-          >
-            <div>
-              <p className="font-mono font-semibold text-foreground">{coupon.code}</p>
-              <p className="text-xs text-foreground-secondary">
-                {couponTerms(coupon, formatMoney)}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => copy(coupon.code)}
-              className="px-3 py-1.5 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary"
-            >
-              Copy
-            </button>
-          </li>
-        ))}
-      </ul>
-      <InfiniteFooter shown={list.rows.length} control={list} noun="coupons" />
-    </div>
-  )
-}
-
 function HowItWorks({ program }: { program: RewardsData['program'] }) {
   return (
     <div className={CARD}>
@@ -372,9 +310,8 @@ export default function AccountRewards() {
   const [data, setData] = useState<RewardsData | null>(null)
   const [failed, setFailed] = useState(false)
 
-  // Both lists paginate independently; each uses the same endpoint but drives
-  // its own page param. Page 1 of history also seeds the surrounding tier / stats
-  // so the shell renders without a separate initial fetch.
+  // Page 1 of history also seeds the surrounding tier / stats so the shell renders
+  // without a separate initial fetch.
   const history = useInfiniteList<HistoryEntry>({
     key: user ? `rewards-history-${user.id}` : null,
     pageSize: 20,
@@ -385,7 +322,8 @@ export default function AccountRewards() {
           setData(d)
           setFailed(false)
         }
-        return { rows: d.history.items, total: d.history.total }
+        // A disabled or ineligible programme answers without history.
+        return { rows: d.history?.items ?? [], total: d.history?.total ?? 0 }
       } catch (e) {
         if (page === 1) setFailed(true)
         throw e
@@ -394,15 +332,9 @@ export default function AccountRewards() {
     getKey: e => e.id,
   })
 
-  const coupons = useInfiniteList<RewardCoupon>({
-    key: user ? `rewards-coupons-${user.id}` : null,
-    pageSize: 20,
-    fetchPage: async (page, signal) => {
-      const d = await fetchJson<RewardsData>(`/api/user/loyalty?historyPage=1&couponPage=${page}`, signal)
-      return { rows: d.coupons.items, total: d.coupons.total }
-    },
-    getKey: c => c.code,
-  })
+  // Personal coupons don't depend on the loyalty programme, so they show even when it is off.
+  const [couponsKey, setCouponsKey] = useState(0)
+  const { coupons } = useAccountCoupons(!!user, { reloadKey: couponsKey })
 
   useEffect(() => {
     if (authLoading) return
@@ -413,7 +345,7 @@ export default function AccountRewards() {
   const unavailable = !loading && (failed || !data || !data.enabled || data.eligible === false)
   const reload = () => {
     history.reload()
-    coupons.reload()
+    setCouponsKey(k => k + 1)
   }
 
   return (
@@ -430,20 +362,25 @@ export default function AccountRewards() {
             <div className="hidden lg:block h-72 rounded-xl bg-surface-elevated border border-border-default" />
           </div>
         ) : unavailable || !data ? (
-          <div className={`${CARD} text-center py-12`}>
-            <p className="text-foreground font-medium">
-              {failed ? 'Could not load your rewards' : 'Rewards are not available for this account'}
-            </p>
-            <Link href="/account" className="mt-3 inline-block text-sm text-accent-600 hover:text-accent-700">
-              Back to my account
-            </Link>
+          <div className="space-y-4">
+            {(failed || coupons?.length === 0) && (
+              <div className={`${CARD} text-center py-12`}>
+                <p className="text-foreground font-medium">
+                  {failed ? 'Could not load your rewards' : 'Rewards are not available for this account'}
+                </p>
+                <Link href="/account" className="mt-3 inline-block text-sm text-accent-600 hover:text-accent-700">
+                  Back to my account
+                </Link>
+              </div>
+            )}
+            <AccountCoupons coupons={coupons ?? []} />
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
             <div className="min-w-0 space-y-4 lg:col-span-2">
               <TierCard data={data} />
               <RedeemCard data={data} onRedeemed={reload} />
-              <CouponList list={coupons} />
+              <AccountCoupons coupons={coupons ?? []} />
               <History list={history} />
             </div>
             <div className="min-w-0 lg:sticky lg:top-4">

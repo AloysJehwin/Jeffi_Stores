@@ -17,6 +17,7 @@ import { round2 } from '@/lib/catalog/gst'
 import { bp } from '@/lib/shared/business-path'
 import CheckoutRecapSummary from '@/components/on-device/CheckoutRecapSummary'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
+import { couponLookup, urlCoupon, urlCouponCode, withCoupon } from '@/components/visitor/coupons/terms'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -236,8 +237,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     const unauthCondition = isBusiness ? !authLoading && !user && authWasLoading.current : !authLoading && !user
 
     if (unauthCondition) {
-      const currentUrl = intentToken ? `${reviewPath}?intent=${encodeURIComponent(intentToken)}` : reviewPath
-      router.push(signinPath(currentUrl))
+      // The whole query (intent, coupon) survives the sign-in.
+      const qs = searchParams.toString()
+      router.push(signinPath(qs ? `${reviewPath}?${qs}` : reviewPath))
       return
     }
 
@@ -333,7 +335,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         })
         .catch(() => router.push(homePath))
     } else if (!intentToken && !cartLoading && cartCount === 0) {
-      router.replace(cartPath)
+      router.replace(withCoupon(cartPath, urlCoupon(searchParams), 'cart'))
     }
   }, [cartCount, user, authLoading, cartLoading, router, isBuyNow, intentToken])
 
@@ -534,18 +536,20 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const discountAmount = appliedCoupon?.discountAmount ?? 0
 
   useEffect(() => {
-    const codeFromUrl = searchParams.get('couponCode')
-    if (!codeFromUrl || appliedCoupon || cartSubtotal === 0) return
-    setCouponCode(codeFromUrl)
+    const fromUrl = urlCoupon(searchParams)
+    if (!fromUrl || appliedCoupon || cartSubtotal === 0) return
+    const code = urlCouponCode(fromUrl)
+    if (code) setCouponCode(code)
     fetch('/api/coupons/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...portalHeader },
       credentials: 'include',
-      body: JSON.stringify({ code: codeFromUrl, subtotal: cartSubtotal }),
+      body: JSON.stringify({ ...couponLookup(fromUrl), subtotal: cartSubtotal }),
     })
-      .then(r => r.json())
-      .then(data => {
-        if (data.couponId) setAppliedCoupon(data)
+      .then(async r => ({ ok: r.ok, data: await r.json() }))
+      .then(({ ok, data }) => {
+        if (ok && data.couponId) setAppliedCoupon(data)
+        else if (data?.error) setCouponError(data.error)
       })
       .catch(() => {})
   }, [searchParams, cartSubtotal])

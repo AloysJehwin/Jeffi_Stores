@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { cartCouponHref } from '@/components/visitor/coupons/terms'
 
 interface Coupon {
   id: string
@@ -43,17 +44,17 @@ export default function ReviewCouponPopup() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-72 bg-white rounded-2xl shadow-2xl border border-orange-100 overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-      <div style={{ background: '#1a3a4a' }} className="px-4 py-2.5 flex items-center justify-between">
+    <div className="fixed bottom-4 right-4 z-50 w-72 bg-surface-elevated rounded-2xl shadow-2xl border border-border-default overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+      <div className="bg-secondary-800 px-4 py-2.5 flex items-center justify-between">
         <span className="text-white text-xs font-semibold">You earned a reward!</span>
-        <button onClick={dismiss} className="text-white/60 hover:text-white text-lg leading-none">
+        <button onClick={dismiss} aria-label="Dismiss" className="text-white/60 hover:text-white text-lg leading-none">
           ×
         </button>
       </div>
       <div className="p-4 space-y-3">
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-3 text-white text-center space-y-0.5">
           <p className="text-xs font-medium opacity-90">{discountText} on your next order</p>
-          <p className="text-2xl font-black tracking-widest">{coupon.code}</p>
+          <p className="text-xl font-black tracking-widest break-all">{coupon.code}</p>
           {coupon.description && <p className="text-xs opacity-80">{coupon.description}</p>}
           {coupon.valid_until && (
             <p className="text-xs opacity-70">
@@ -67,11 +68,11 @@ export default function ReviewCouponPopup() {
           )}
         </div>
         <a
-          href={`/checkout?couponCode=${encodeURIComponent(coupon.code)}`}
+          href={cartCouponHref(coupon.code)}
           className="block w-full py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold text-center transition-colors"
           onClick={dismiss}
         >
-          Use at Checkout →
+          Apply in cart →
         </a>
       </div>
     </div>
