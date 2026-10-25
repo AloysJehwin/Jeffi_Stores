@@ -117,6 +117,7 @@ describe('editor coverage', () => {
       'blog_teaser',
       'social_strip',
       'value_stats',
+      'slides',
     ]) {
       expect(config).toContain(`${type}:`)
     }

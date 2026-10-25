@@ -83,6 +83,8 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
         />
       )
     }
+    case 'slides':
+      return null
     default: {
       const Component = SIMPLE[section.type]
       return Component ? <Component section={section} data={data} /> : null

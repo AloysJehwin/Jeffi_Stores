@@ -5,7 +5,7 @@ export type SectionType =
   | 'category_showcase' | 'deal_of_the_day' | 'promo_banner' | 'featured_for_you' | 'benefits'
   | 'why_us' | 'about' | 'business_cta' | 'countdown_deal' | 'testimonials' | 'recently_viewed'
   | 'category_tabs' | 'bundle_spotlight' | 'back_in_stock' | 'blog_teaser' | 'social_strip' | 'value_stats'
-  | 'motion_hero' | 'stories' | 'product_spotlight' | 'rewards_game'
+  | 'motion_hero' | 'stories' | 'product_spotlight' | 'rewards_game' | 'slides'
 
 export interface SectionCopy {
   eyebrow?: string
@@ -164,6 +164,41 @@ export interface SpotlightData {
   product: CardProduct
   headline: string | null
   callouts: string[]
+}
+
+// extras[section.id] of a slides section (homepage-extras.ts getSlides): every reference resolved, dead ones dropped.
+export interface SlideCard {
+  id: string
+  kind: 'offer' | 'category' | 'product' | 'custom'
+  href: string | null
+  title: string
+  eyebrow: string | null
+  sub: string | null
+  badge: string | null
+  /** A `bg-*` class for the badge pill, when the source sets one. */
+  badgeClass: string | null
+  ctaLabel: string | null
+  image: string | null
+  /** Portrait 4:5 picture, when there is one. */
+  imageCard: string | null
+  blurhash: string | null
+  blurhashCard: string | null
+  price?: number
+  mrp?: number | null
+  productId?: string
+  productSlug?: string
+  /** Product slides: the card, for the quick-add sheet. */
+  product?: CardProduct
+  motion: 'none' | 'kenburns' | 'parallax' | 'reveal'
+}
+
+export interface SlidesData {
+  layout: 'cards' | 'banner' | 'rail' | 'fade'
+  aspect: '4:5' | '1:1' | '16:9'
+  autoplay: boolean
+  /** 3–20 s; only used with autoplay. */
+  intervalSeconds: number
+  slides: SlideCard[]
 }
 
 // extras[section.id] of a rewards_game section (homepage-sections.ts rewardsGamePublic): no weights, null when unplayable.
