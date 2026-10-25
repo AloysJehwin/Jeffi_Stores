@@ -427,12 +427,17 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? 
 const objects = (raw: unknown): Record<string, unknown>[] =>
   Array.isArray(raw) ? raw.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object') : []
 
+// How an opaque foreground photo sits on the slide; 'none' is for transparent cutouts.
+export const FG_FRAMES = ['rounded', 'fade', 'none'] as const
+export type FgFrame = (typeof FG_FRAMES)[number]
+
 // Animated hero: `config.slides`, each with a background image and a headline at least.
 export interface MotionHeroSlide {
   bgImage: string
   /** MP4/WebM behind the slide; `bgImage` is its poster. Absent when unset. */
   bgVideo?: string
   fgImage: string | null
+  fgFrame: FgFrame
   eyebrow: string | null
   headline: string
   sub: string | null
@@ -451,6 +456,7 @@ export function motionHeroSlides(section: Pick<HomepageSection, 'config'>): Moti
       bgImage,
       ...(bgVideo ? { bgVideo } : {}),
       fgImage: safeHref(str(r.fgImage)),
+      fgFrame: FG_FRAMES.find(f => f === r.fgFrame) ?? 'rounded',
       eyebrow: str(r.eyebrow),
       headline,
       sub: str(r.sub),

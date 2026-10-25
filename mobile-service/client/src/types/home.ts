@@ -137,6 +137,8 @@ export interface MotionHeroSlide {
   /** MP4/WebM behind the slide; `bgImage` is its poster. */
   bgVideo?: string
   fgImage: string | null
+  /** Absent from older servers: treat as 'none'. */
+  fgFrame?: 'rounded' | 'fade' | 'none'
   eyebrow: string | null
   headline: string
   sub: string | null

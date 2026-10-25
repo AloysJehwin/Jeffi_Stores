@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
 
 interface StoreImageProps {
@@ -8,6 +8,7 @@ interface StoreImageProps {
   alt: string
   className?: string
   wrapperClassName?: string
+  imgStyle?: CSSProperties
   blurhash?: string | null
   /** Set on the LCP image (first hero/product shot) so the browser fetches it immediately. */
   priority?: boolean
@@ -21,6 +22,7 @@ export default function StoreImage({
   alt,
   className,
   wrapperClassName,
+  imgStyle,
   blurhash,
   priority,
   sizes,
@@ -63,6 +65,7 @@ export default function StoreImage({
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : undefined}
         decoding={priority ? 'sync' : 'async'}
+        style={imgStyle}
         className={`${className ?? ''} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         onLoad={() => setLoaded(true)}
         onError={() => setLoaded(true)}

@@ -17,7 +17,21 @@ import {
   riseVariants,
   usePointerParallax,
 } from '@/components/visitor/slides/slide-motion'
-import type { MotionHeroSlide } from '@/lib/catalog/homepage-sections'
+import type { FgFrame, MotionHeroSlide } from '@/lib/catalog/homepage-sections'
+
+const FG_FRAME_CLASS: Record<FgFrame, string> = {
+  rounded: 'rounded-2xl md:rounded-3xl shadow-2xl shadow-black/60 ring-1 ring-white/15',
+  fade: '',
+  none: 'drop-shadow-2xl',
+}
+// Feathers all four edges: two linear masks multiplied.
+const FEATHER = 'transparent, #000 14%, #000 86%, transparent'
+const FG_FADE = {
+  maskImage: `linear-gradient(to right, ${FEATHER}), linear-gradient(to bottom, ${FEATHER})`,
+  WebkitMaskImage: `linear-gradient(to right, ${FEATHER}), linear-gradient(to bottom, ${FEATHER})`,
+  maskComposite: 'intersect',
+  WebkitMaskComposite: 'source-in',
+} as const
 
 interface MotionHeroProps {
   slides: MotionHeroSlide[]
@@ -163,13 +177,15 @@ function Slide({ slide, index, count, active, reduced, progress, fgX, fgY }: Sli
             animate={{ y: [0, -8, 0] }}
             transition={reduced ? { duration: 0 } : { duration: 7, repeat: Infinity, ease: 'easeInOut' }}
           >
+            {/* The image hugs its own shape so a frame or fade follows its edges, not the box. */}
             <StoreImage
               src={slide.fgImage}
               alt={slide.headline}
               priority={index === 0}
               sizes="(min-width: 768px) 36vw, 56vw"
-              wrapperClassName="relative h-full w-full"
-              className="h-full w-full object-contain object-right-bottom drop-shadow-2xl md:object-right"
+              wrapperClassName={`relative flex h-full w-full justify-end md:items-center ${slide.fgFrame === 'none' ? 'items-end' : 'items-start'}`}
+              className={`max-h-full max-w-full ${FG_FRAME_CLASS[slide.fgFrame]}`}
+              imgStyle={slide.fgFrame === 'fade' ? FG_FADE : undefined}
             />
           </motion.div>
         </motion.div>
