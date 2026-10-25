@@ -4,7 +4,7 @@ import { motionHeroIntervalMs, motionHeroSlides, safeHref } from '@/lib/catalog/
 import { Grid, Note, NumberField, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
 
-const KEYS = ['bgImage', 'bgVideo', 'fgImage', 'eyebrow', 'headline', 'sub', 'ctaLabel', 'url']
+const KEYS = ['bgImage', 'bgVideo', 'fgImage', 'fgFrame', 'eyebrow', 'headline', 'sub', 'ctaLabel', 'url']
 const MAX_SECONDS = 20
 
 export default function MotionHeroEditor(props: EditorProps) {
@@ -30,9 +30,20 @@ export default function MotionHeroEditor(props: EditorProps) {
           },
           {
             key: 'fgImage',
-            label: 'Foreground image (optional, PNG with transparency works best)',
+            label: 'Foreground image (optional)',
             kind: 'image',
             size: ['square', 'portrait'],
+          },
+          {
+            key: 'fgFrame',
+            label: 'Foreground style',
+            kind: 'select',
+            placeholder: 'Rounded card',
+            options: [
+              { value: 'rounded', label: 'Rounded card' },
+              { value: 'fade', label: 'Faded edges' },
+              { value: 'none', label: 'No frame (transparent PNG cutout)' },
+            ],
           },
           { key: 'eyebrow', label: 'Eyebrow', placeholder: 'New season' },
           { key: 'headline', label: 'Headline', placeholder: 'Built to last' },
@@ -40,7 +51,7 @@ export default function MotionHeroEditor(props: EditorProps) {
           { key: 'ctaLabel', label: 'Button label', placeholder: 'Shop now' },
           { key: 'url', label: 'Button link', placeholder: 'https://… or /products' },
         ]}
-        blank={{ bgImage: '', bgVideo: '', fgImage: '', eyebrow: '', headline: '', sub: '', ctaLabel: '', url: '' }}
+        blank={{ bgImage: '', bgVideo: '', fgImage: '', fgFrame: '', eyebrow: '', headline: '', sub: '', ctaLabel: '', url: '' }}
         disabled={!canWrite}
         max={8}
         showIcon={false}
