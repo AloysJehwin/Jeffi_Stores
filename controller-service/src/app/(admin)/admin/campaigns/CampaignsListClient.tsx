@@ -49,7 +49,7 @@ export default function CampaignsListClient() {
       if (statusFilter === 'active' && !c.enabled) return false
       if (statusFilter === 'paused' && c.enabled) return false
       if (channelFilter !== 'all') {
-        if (!getChannels(c.kind).includes(channelFilter as 'email' | 'whatsapp')) return false
+        if (!getChannels(c.kind, c.parameters, c.scenario_kind).includes(channelFilter as 'email' | 'whatsapp')) return false
       }
       if (search.trim()) {
         const q = search.toLowerCase()
@@ -317,7 +317,7 @@ export default function CampaignsListClient() {
                     >
                       {c.enabled ? 'Active' : 'Paused'}
                     </span>
-                    {getChannels(c.kind).map(ch => (
+                    {getChannels(c.kind, c.parameters, c.scenario_kind).map(ch => (
                       <ChannelChip key={ch} channel={ch} />
                     ))}
                     {c.draft_fields != null && (

@@ -171,7 +171,7 @@ export async function recordSent(params: {
   metadata?: Record<string, unknown>
   // Which channel this row records. Email reads filter channel='email' so a whatsapp/sms dedup marker
   // can never block an email send (or vice-versa). Defaults to 'email'.
-  channel?: 'email' | 'whatsapp' | 'sms'
+  channel?: 'email' | 'whatsapp' | 'sms' | 'push'
 }): Promise<string | null> {
   try {
     // The dedup unique index (campaign_kind,user_id,coalesce(reference_id,'')) is permanent, so a

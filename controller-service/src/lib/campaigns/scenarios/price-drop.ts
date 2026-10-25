@@ -9,6 +9,7 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import {
   NOT_RECENTLY_EMAILED_SQL,
   SAVED_ITEMS_SQL,
@@ -22,6 +23,7 @@ interface Params extends Record<string, unknown> {
   maxWatchesPerSweep: number
   whatsappEnabled: boolean
   smsEnabled: boolean
+  pushEnabled?: boolean
 }
 
 interface Row {
@@ -39,7 +41,7 @@ export const priceDrop: ScenarioModule<Params, Row> = {
   description: 'Saved product price dropped',
   trigger:
     "Fires when a product on the wishlist or saved for later in the cart has a base_price drops by at least the configured threshold % below the snapshot price. Only for active products that are in stock. The wishlist snapshot is refreshed once the email is sent, so a further drop notifies again.",
-  defaultParams: { priceDropThresholdPct: 5, maxWatchesPerSweep: 100, whatsappEnabled: false, smsEnabled: false },
+  defaultParams: { priceDropThresholdPct: 5, maxWatchesPerSweep: 100, whatsappEnabled: false, smsEnabled: false, pushEnabled: false },
   paramSchema: {
     priceDropThresholdPct: {
       type: 'integer',
@@ -64,6 +66,11 @@ export const priceDrop: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via SMS',
       description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
+    pushEnabled: {
+      type: 'boolean',
+      label: 'Also send as an app push',
+      description: 'Additionally notify the customer in the store app (quiet hours and the 2-a-day push limit apply)',
     },
   },
 
@@ -128,12 +135,21 @@ export const priceDrop: ScenarioModule<Params, Row> = {
     })
 
     await settleWishlistEvent(result, row.user_id, row.product_id)
+    const headline = `${row.product_name} is now ₹${Math.round(newPrice).toLocaleString('en-IN')}`
     if ((params.whatsappEnabled || (params as any).smsEnabled) && result.ok) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, {
-        headline: `${row.product_name} is now ₹${Math.round(newPrice).toLocaleString('en-IN')}`,
+        headline,
         code: couponCode || '',
         discount: discountPercent ? String(discountPercent) : '',
       }, cooldownMinutes(params)).catch(() => {})
+    }
+    if (params.pushEnabled && result.ok) {
+      sendCampaignPush(
+        campaign.kind,
+        row.user_id,
+        { headline, product: row.product_name, imageUrl: productImageUrl ?? undefined, url: productUrl, code: couponCode || '', discount: discountPercent ? String(discountPercent) : '' },
+        cooldownMinutes(params)
+      ).catch(() => {})
     }
 
     return result

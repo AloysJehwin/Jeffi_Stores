@@ -4,6 +4,7 @@ import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import { createTemplateVariableResolver, renderTemplate } from '@/lib/templates/variables'
 import { platformBrandName } from '@/lib/catalog/brand'
 import { getEmailLayout } from '@/lib/templates/email-layouts'
+import type { PushChannel } from '@/lib/push/copy'
 
 const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -287,7 +288,8 @@ function renderCampaignEmailRaw(
 
 export interface Recipient {
   user_id: string
-  email: string
+  /** Null for a customer known only by phone or app; each channel sends to whoever it can reach. */
+  email: string | null
   phone?: string | null
   first_name: string | null
   last_name?: string | null
@@ -297,12 +299,22 @@ export type MessagingChannels = {
   email?: { slug: string; vars?: Record<string, string>; subject?: string }
   sms?: { slug: string; vars?: Record<string, string> }
   whatsapp?: { slug: string; vars?: Record<string, string>; media_url?: string; button_url?: string }
+  push?: PushChannel
 }
 
+// Customers in an audience; each channel then reaches whoever it can (email: an address, SMS and
+// WhatsApp: a phone, push: an active app install — see lib/push/broadcast). The app audiences pick
+// customers with an install; 'app_installs' also pushes to opted-in signed-out installs.
 export async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
   const base = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u`
   const base_cp = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
-  const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL AND u.marketing_opt_out = false`
+  const where = `WHERE u.is_active = true AND u.is_guest = false AND u.marketing_opt_out = false`
+
+  if (audienceType === 'app_users' || audienceType === 'app_installs') {
+    return queryMany<Recipient>(
+      `${base} ${where} AND EXISTS (SELECT 1 FROM push_devices d WHERE d.user_id = u.id AND d.disabled_at IS NULL)`
+    )
+  }
 
   if (audienceType === 'customer_type') {
     const types = audienceFilter.customerTypes as string[]
@@ -319,7 +331,7 @@ export async function resolveAudience(audienceType: string, audienceFilter: Reco
   if (audienceType === 'specific_user') {
     const userId = audienceFilter.userId as string
     return queryMany<Recipient>(
-      `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u WHERE u.id = $1 AND u.email IS NOT NULL AND u.marketing_opt_out = false`,
+      `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u WHERE u.id = $1 AND u.marketing_opt_out = false`,
       [userId]
     )
   }
@@ -397,11 +409,24 @@ export async function sendCampaign(
   }
 
   if (campaign.template_key === 'library') {
-    const r = await sendLibraryMessaging(campaign.id, campaign.channels ?? {}, campaign.subject, recipients, {
+    const channels = campaign.channels ?? {}
+    const r = await sendLibraryMessaging(campaign.id, channels, campaign.subject, recipients, {
       resolveVars, fromAddr, baseUrl, sourceCoupon, batchSize, batchDelay,
     })
+    // Push: one log row per install, then drained now (quiet-hours rows wait for the dispatch cron).
+    let installs = 0
+    if (channels.push) {
+      const { enqueueCampaignPush, drainCampaignPush, includesSignedOut, pushReach } = await import('@/lib/push/broadcast')
+      const signedOut = includesSignedOut(campaign.audience_type)
+      const ids = recipients.map(x => x.user_id)
+      if (signedOut) installs = (await pushReach([], true)).signedOut
+      await enqueueCampaignPush(campaign.id, ids, signedOut)
+      const t = await drainCampaignPush({ campaignId: campaign.id, budgetMs: 5 * 60_000 })
+      r.sent += t.sent
+      r.failed += t.failed
+    }
     await query(`UPDATE email_campaigns SET status = 'sent', sent_at = NOW(), recipient_count = $2 WHERE id = $1`, [
-      campaignId, recipients.length,
+      campaignId, recipients.length + installs,
     ])
     return r
   }
@@ -409,9 +434,12 @@ export async function sendCampaign(
   let sent = 0
   let failed = 0
 
+  // Legacy templates are email-only.
+  const emailable = recipients.filter((x): x is Recipient & { email: string } => !!x.email)
+
   // Send in batches to avoid blocking and stay under SES rate limits
-  for (let i = 0; i < recipients.length; i += batchSize) {
-    const batch = recipients.slice(i, i + batchSize)
+  for (let i = 0; i < emailable.length; i += batchSize) {
+    const batch = emailable.slice(i, i + batchSize)
 
     await Promise.all(
       batch.map(async recipient => {
@@ -476,7 +504,7 @@ export async function sendCampaign(
     )
 
     // Delay between batches (skip after last batch)
-    if (i + batchSize < recipients.length) {
+    if (i + batchSize < emailable.length) {
       await new Promise(r => setTimeout(r, batchDelay))
     }
   }
@@ -490,6 +518,16 @@ export async function sendCampaign(
 }
 
 type Coupon = { id: string; code: string; discount_type: string; discount_value: number }
+
+// Site Controls WhatsApp toggle (sendByTemplate below doesn't check it).
+async function whatsappChannelOn(): Promise<boolean> {
+  try {
+    const { getFeatureFlags } = await import('@/lib/catalog/site-controls')
+    return (await getFeatureFlags()).whatsappEnabled
+  } catch {
+    return process.env.WHATSAPP_DISABLED !== 'true'
+  }
+}
 
 async function logSend(campaignId: string, channel: string, to: string, ok: boolean, error?: string) {
   await query(
@@ -534,7 +572,9 @@ async function sendLibraryMessaging(
     ? (emailT.blocks_format === 'email-blocks' && Array.isArray(emailT.blocks?.blocks) && renderBlocks(emailT.blocks.blocks)) || emailT.body
     : ''
   const waSlots = waT ? [...new Set([...waT.body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => m[1]))] : []
+  const waOn = channels.whatsapp ? await whatsappChannelOn() : false
   const waProblem = !channels.whatsapp ? null
+    : !waOn ? 'WhatsApp is turned off in Site Controls'
     : !waT ? 'WhatsApp template not found'
     : waT.approval_status !== 'approved' ? 'WhatsApp template is not approved by Meta'
     : waSlots.some(n => !channels.whatsapp!.vars?.[n]?.trim()) ? 'WhatsApp template has unfilled slots'
@@ -545,7 +585,7 @@ async function sendLibraryMessaging(
   const tally = (ok: boolean) => (ok ? sent++ : failed++)
 
   async function one(r: Recipient) {
-    const registered = ctx.resolveVars({ recipient: { email: r.email, first_name: r.first_name, last_name: r.last_name } })
+    const registered = ctx.resolveVars({ recipient: { email: r.email ?? '', first_name: r.first_name, last_name: r.last_name } })
     const coupon = ctx.sourceCoupon
     if (coupon) {
       await query(`INSERT INTO coupon_eligible_users (coupon_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [coupon.id, r.user_id])

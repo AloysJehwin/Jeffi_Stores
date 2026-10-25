@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertTriangle, Mail, MessageSquare, MessageCircle, Sparkles, Loader2, Pencil, Save } from 'lucide-react'
+import { AlertTriangle, Bell, Mail, MessageSquare, MessageCircle, Sparkles, Loader2, Pencil, Save } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import DateTimePicker from '@/components/ui/DateTimePicker'
@@ -12,6 +12,8 @@ import LinkedTemplateEditor from '@/components/admin/messaging-templates/LinkedT
 import PhonePreview from '@/components/admin/messaging-templates/PhonePreview'
 import { WhatsAppPreview, waSlots } from '@/components/admin/campaigns/WhatsAppTemplateEditor'
 import WaParamsForm, { waParams, VarInput, usageContext } from '@/components/admin/campaigns/WaParamsForm'
+import { PushFields, PushPreview } from '@/components/admin/campaigns/PushEditor'
+import { pushCopyProblem, type PushChannel } from '@/lib/push/copy'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
@@ -24,18 +26,28 @@ import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import { BackLink, fieldInputCls } from '@/components/admin/kit'
 
 type Channel = 'email' | 'sms' | 'whatsapp'
+// Push has no library template: its copy is written here and stored as channels.push.
+type Tab = Channel | 'push'
 type Channels = Partial<
   Record<
     Channel,
     { slug: string; vars?: Record<string, string>; subject?: string; media_url?: string; button_url?: string }
   >
 >
+type Payload = Channels & { push?: PushChannel }
+const TEMPLATE_CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
 type Loaded = { slug: string; subject: string | null; body: string; approval_status: string | null; blocks?: any }
 
-const CHANNELS: Array<{ key: Channel; label: string; icon: typeof Mail; note: string }> = [
-  { key: 'email', label: 'Email', icon: Mail, note: 'Sent to every customer in the audience' },
+const CHANNELS: Array<{ key: Tab; label: string; icon: typeof Mail; note: string }> = [
+  { key: 'email', label: 'Email', icon: Mail, note: 'Customers with an email address' },
   { key: 'sms', label: 'SMS', icon: MessageSquare, note: 'Customers with a phone number' },
   { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, note: 'Meta-approved templates only' },
+  {
+    key: 'push',
+    label: 'App push',
+    icon: Bell,
+    note: 'Android app installs that allow offers. Quiet hours (00:00–09:00 on the phone) delay it; at most 2 a day per person.',
+  },
 ]
 
 // Legacy Mailer drafts → the library templates they were imported as.
@@ -52,6 +64,8 @@ const AUDIENCE_OPTIONS = [
   { value: 'segment', label: 'By customer segment' },
   { value: 'tag', label: 'By CRM tag' },
   { value: 'specific_user', label: 'A specific customer' },
+  { value: 'app_users', label: 'All signed-in app users' },
+  { value: 'app_installs', label: 'All app installs, including signed out' },
 ]
 
 const SEGMENT_OPTIONS = [
@@ -92,7 +106,7 @@ interface ReviewFormOption {
   slug: string
 }
 interface Recipient {
-  email: string
+  email: string | null
   phone: string | null
   first_name: string | null
 }
@@ -105,6 +119,7 @@ export default function NewMessagePage() {
   const { showToast } = useToast()
   const [step, setStep] = useState(1)
   const [channels, setChannels] = useState<Channels>({})
+  const [push, setPush] = useState<PushChannel | null>(null)
   const [vars, setVars] = useState<Record<string, string>>({})
   const [waVars, setWaVars] = useState<Record<string, string>>({})
   // _action WhatsApp templates: the header image and the button's destination for this send.
@@ -112,7 +127,7 @@ export default function NewMessagePage() {
   const [waLink, setWaLink] = useState('')
   const [loaded, setLoaded] = useState<Partial<Record<Channel, Loaded>>>({})
   const [editing, setEditing] = useState<Channel | null>(null)
-  const [previewTab, setPreviewTab] = useState<Channel>('email')
+  const [previewTab, setPreviewTab] = useState<Tab>('email')
   const [subject, setSubject] = useState('')
   const [title, setTitle] = useState('')
   const [audienceType, setAudienceType] = useState('all')
@@ -131,6 +146,8 @@ export default function NewMessagePage() {
   const [reviewForms, setReviewForms] = useState<ReviewFormOption[]>([])
   const [audienceCount, setAudienceCount] = useState<number | null>(null)
   const [withPhone, setWithPhone] = useState(0)
+  const [withEmail, setWithEmail] = useState(0)
+  const [pushReach, setPushReach] = useState<{ devices: number; people: number; signedOut: number } | null>(null)
   const [audienceKey, setAudienceKey] = useState<string | null>(null)
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audienceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -146,14 +163,17 @@ export default function NewMessagePage() {
   const [showRestoreBanner, setShowRestoreBanner] = useState(false)
   const draftIdRef = useRef<string | null>(null)
 
-  const active = CHANNELS.map(c => c.key).filter(k => channels[k])
-  const ready = active.length > 0 && active.every(k => channels[k]!.slug)
+  const tplActive = TEMPLATE_CHANNELS.filter(k => channels[k])
+  const active: Tab[] = [...tplActive, ...(push ? (['push'] as const) : [])]
+  const isOn = (k: Tab) => (k === 'push' ? !!push : !!channels[k])
+  const pushProblem = push ? pushCopyProblem(push) : null
+  const ready = active.length > 0 && tplActive.every(k => channels[k]!.slug) && !pushProblem
   // Email can be left empty in step 1 — step 2's AI Assist writes it.
-  const step1Ready = active.length > 0 && active.every(k => k === 'email' || channels[k]!.slug)
+  const step1Ready = active.length > 0 && tplActive.every(k => k === 'email' || channels[k]!.slug)
 
-  // What the send stores: shared named vars for email/SMS, numbered slots for WhatsApp.
-  const payloadChannels = useMemo<Channels>(() => {
-    const out: Channels = {}
+  // What the send stores: shared named vars for email/SMS, numbered slots for WhatsApp, push copy.
+  const payloadChannels = useMemo<Payload>(() => {
+    const out: Payload = {}
     if (channels.email?.slug) out.email = { slug: channels.email.slug, vars, ...(subject ? { subject } : {}) }
     if (channels.sms?.slug) out.sms = { slug: channels.sms.slug, vars }
     if (channels.whatsapp?.slug)
@@ -163,8 +183,9 @@ export default function NewMessagePage() {
         ...(waMedia ? { media_url: waMedia } : {}),
         ...(waLink ? { button_url: waLink } : {}),
       }
+    if (push) out.push = push
     return out
-  }, [channels, vars, waVars, waMedia, waLink, subject])
+  }, [channels, vars, waVars, waMedia, waLink, subject, push])
 
   useEffect(() => {
     fetch('/api/admin/review-forms?page=1')
@@ -198,10 +219,10 @@ export default function NewMessagePage() {
   }, [audienceType, daysSinceOrder, segment, selectedTags, specificUser])
 
   // Picked templates' current content (drives the variable inputs and previews).
-  const slugKey = active.map(k => `${k}:${channels[k]?.slug ?? ''}`).join('|')
+  const slugKey = tplActive.map(k => `${k}:${channels[k]?.slug ?? ''}`).join('|')
   useEffect(() => {
     let live = true
-    for (const k of active) {
+    for (const k of tplActive) {
       const slug = channels[k]?.slug
       if (!slug || loaded[k]?.slug === slug) continue
       fetch(`/api/admin/messaging-templates/${k}/${encodeURIComponent(slug)}`)
@@ -305,12 +326,13 @@ export default function NewMessagePage() {
       setDraftId(id)
       setTitle(campaign.title || '')
       setSubject(campaign.subject || '')
-      const ch: Channels = campaign.channels ?? {}
+      const { push: savedPush, ...ch }: Payload = campaign.channels ?? {}
       if (campaign.template_key !== 'library' && LEGACY_SLUG[campaign.template_key]) {
         setChannels({ email: { slug: LEGACY_SLUG[campaign.template_key] } })
         setVars(campaign.template_data || {})
       } else {
         setChannels(ch)
+        setPush(savedPush ?? null)
         setVars(ch.email?.vars ?? ch.sms?.vars ?? {})
         setWaVars(ch.whatsapp?.vars ?? {})
         setWaMedia(ch.whatsapp?.media_url ?? '')
@@ -368,7 +390,10 @@ export default function NewMessagePage() {
     }
   }, [step, loadPreview, loaded])
 
-  const audienceQuery = useCallback(() => JSON.stringify({ audience_type: audienceType, audience_filter: buildAudienceFilter() }), [audienceType, buildAudienceFilter])
+  const audienceQuery = useCallback(
+    () => JSON.stringify({ audience_type: audienceType, audience_filter: buildAudienceFilter(), push: !!push }),
+    [audienceType, buildAudienceFilter, push]
+  )
   // Recipients load 25 at a time; count/withPhone come with the first page.
   const audience = useInfiniteList<Recipient>({
     key: step === 3 ? audienceKey : null,
@@ -383,6 +408,8 @@ export default function NewMessagePage() {
       if (p === 1) {
         setAudienceCount(data.count ?? 0)
         setWithPhone(data.withPhone ?? 0)
+        setWithEmail(data.withEmail ?? data.count ?? 0)
+        setPushReach(data.push ?? null)
       }
       return { rows: data.recipients || [], total: data.count ?? 0 }
     },
@@ -415,7 +442,8 @@ export default function NewMessagePage() {
     return () => clearTimeout(t)
   }, [audienceType, customerQuery])
 
-  function toggleChannel(k: Channel) {
+  function toggleChannel(k: Tab) {
+    if (k === 'push') return setPush(p => (p ? null : { title: '', body: '', link: '/' }))
     setChannels(p => {
       const n = { ...p }
       if (n[k]) delete n[k]
@@ -613,7 +641,7 @@ export default function NewMessagePage() {
               library.
             </p>
             {CHANNELS.map(c => {
-              const on = !!channels[c.key]
+              const on = isOn(c.key)
               const Icon = c.icon
               return (
                 <div
@@ -633,13 +661,16 @@ export default function NewMessagePage() {
                       <p className="text-xs text-foreground-muted mt-0.5">{c.note}</p>
                     </div>
                   </label>
-                  {on && (
+                  {on && c.key === 'push' && (
+                    <p className="mt-2 pl-7 text-[11px] text-foreground-muted">Write the title, text and link in the next step.</p>
+                  )}
+                  {on && c.key !== 'push' && (
                     <div className="mt-3 pl-7">
                       <LibraryTemplatePicker
                         channel={c.key}
                         kind="messaging"
                         value={channels[c.key]!.slug || null}
-                        onChange={slug => pickTemplate(c.key, slug)}
+                        onChange={slug => pickTemplate(c.key as Channel, slug)}
                         allowNone={false}
                       />
                       {c.key === 'email' && canUseAi && !channels.email?.slug && (
@@ -822,8 +853,19 @@ export default function NewMessagePage() {
               )}
               {waProblem && <p className="text-xs text-amber-700 dark:text-amber-400">{waProblem}</p>}
 
+              {push && (
+                <PushFields
+                  value={push}
+                  onChange={setPush}
+                  inputClass={inputClass}
+                  labelClass={labelClass}
+                  context={title || subject || undefined}
+                />
+              )}
+              {pushProblem && <p className="text-xs text-amber-700 dark:text-amber-400">{pushProblem}</p>}
+
               <div className="flex flex-wrap gap-2">
-                {active
+                {tplActive
                   .filter(k => k !== 'whatsapp')
                   .map(k => (
                     <button
@@ -882,13 +924,13 @@ export default function NewMessagePage() {
                     key={k}
                     type="button"
                     onClick={() => setPreviewTab(k)}
-                    className={`px-3 h-control-sm rounded-md text-xs font-medium ${previewTab === k || (!channels[previewTab] && k === active[0]) ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:bg-surface-secondary'}`}
+                    className={`px-3 h-control-sm rounded-md text-xs font-medium ${previewTab === k || (!isOn(previewTab) && k === active[0]) ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:bg-surface-secondary'}`}
                   >
                     {CHANNELS.find(c => c.key === k)!.label}
                   </button>
                 ))}
               </div>
-              {(channels[previewTab] ? previewTab : active[0]) === 'email' && (
+              {(isOn(previewTab) ? previewTab : active[0]) === 'email' && (
                 <div
                   className="border border-border-default rounded-lg overflow-hidden bg-surface-elevated"
                   style={{ minHeight: '520px' }}
@@ -910,15 +952,18 @@ export default function NewMessagePage() {
                   )}
                 </div>
               )}
-              {(channels[previewTab] ? previewTab : active[0]) === 'sms' && (
+              {(isOn(previewTab) ? previewTab : active[0]) === 'sms' && (
                 <PhonePreview channel="sms" body={loaded.sms?.body ?? ''} vars={previewVars} />
               )}
-              {(channels[previewTab] ? previewTab : active[0]) === 'whatsapp' && (
+              {(isOn(previewTab) ? previewTab : active[0]) === 'whatsapp' && (
                 <WhatsAppPreview
                   value={{ slug: channels.whatsapp?.slug || null, variables: waVars }}
                   vars={previewVars}
                   mediaUrl={waMedia || null}
                 />
+              )}
+              {(isOn(previewTab) ? previewTab : active[0]) === 'push' && push && (
+                <PushPreview title={push.title} body={push.body} image={push.image_url} vars={previewVars} />
               )}
             </div>
           </div>
@@ -1041,6 +1086,12 @@ export default function NewMessagePage() {
                 />
               </div>
               <p className="text-xs text-foreground-muted">Customers who opted out of marketing are never messaged.</p>
+              {push && (
+                <p className="text-xs text-foreground-muted">
+                  App pushes go to installs that allow offers. A phone in quiet hours (00:00–09:00 its time) gets it when they
+                  end, and nobody gets more than 2 offer pushes a day across messages and campaigns.
+                </p>
+              )}
               <div className="flex flex-wrap gap-3 pt-2">
                 <button type="button" onClick={() => setStep(2)} className={btnSecondary}>
                   Back
@@ -1077,9 +1128,15 @@ export default function NewMessagePage() {
                 <p className="text-xs font-medium text-foreground-muted uppercase tracking-wide">Recipients</p>
                 {audienceCount !== null && !audienceLoading && (
                   <span className="text-xs font-semibold text-accent-500">
-                    {channels.email && `${audienceCount.toLocaleString()} email`}
-                    {channels.email && (channels.sms || channels.whatsapp) && ' · '}
-                    {(channels.sms || channels.whatsapp) && `${withPhone.toLocaleString()} with a phone`}
+                    {[
+                      channels.email && `${withEmail.toLocaleString()} email`,
+                      (channels.sms || channels.whatsapp) && `${withPhone.toLocaleString()} with a phone`,
+                      push &&
+                        pushReach &&
+                        `${pushReach.devices.toLocaleString()} app devices${pushReach.signedOut ? ` (${pushReach.signedOut.toLocaleString()} signed out)` : ''}`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </span>
                 )}
               </div>
@@ -1103,14 +1160,14 @@ export default function NewMessagePage() {
                       <div key={i} className="flex items-center gap-3 px-4 py-2.5">
                         <div className="w-7 h-7 rounded-full bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
                           <span className="text-xs font-semibold text-accent-500">
-                            {(r.first_name?.[0] || r.email[0]).toUpperCase()}
+                            {(r.first_name?.[0] || r.email?.[0] || '?').toUpperCase()}
                           </span>
                         </div>
                         <div className="min-w-0 flex-1">
                           {r.first_name && (
                             <p className="text-sm font-medium text-foreground truncate">{r.first_name}</p>
                           )}
-                          <p className="text-xs text-foreground-muted truncate">{r.email}</p>
+                          <p className="text-xs text-foreground-muted truncate">{r.email || r.phone || 'No email or phone'}</p>
                         </div>
                         {(channels.sms || channels.whatsapp) && (
                           <span
