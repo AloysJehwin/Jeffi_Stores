@@ -15,9 +15,18 @@ export interface OfferSlide {
   cta_label: string | null
   image_url: string | null
   blurhash: string | null
+  image_url_card?: string | null
+  blurhash_card?: string | null
   is_active: boolean
   product_count: number
 }
+
+type ImageField = 'image_url' | 'image_url_card'
+const SLOTS: { field: ImageField; label: string; hint: string; thumb: string }[] = [
+  { field: 'image_url_card', label: 'Card image', hint: '4:5, e.g. 1080×1350. The offer cards.', thumb: 'w-8 h-10' },
+  { field: 'image_url', label: 'Wide image', hint: '2.4:1, e.g. 1536×640. Listing banners and a lone offer.', thumb: 'w-16 h-10' },
+]
+const HASH: Record<ImageField, 'blurhash' | 'blurhash_card'> = { image_url: 'blurhash', image_url_card: 'blurhash_card' }
 
 const BADGE_COLORS = [
   { value: 'bg-primary-500', label: 'Primary', swatch: '#7c3aed' },
@@ -42,10 +51,12 @@ export default function OfferSlideDisplayEditor({
   const canUseAi = useCanUseAi('coupons:write')
   const storeName = useStoreConfig().identity.name || 'an online store'
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [generating, setGenerating] = useState(false)
+  const [uploading, setUploading] = useState<ImageField | null>(null)
+  const [generating, setGenerating] = useState<ImageField | null>(null)
   const [aiPrompt, setAiPrompt] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const pending = useRef<ImageField>('image_url_card')
+  const busy = uploading !== null || generating !== null
 
   const save = useCallback(
     async (patch: Partial<Record<string, unknown>>) => {
@@ -69,12 +80,13 @@ export default function OfferSlideDisplayEditor({
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    const field = pending.current
     if (!file) return
-    setUploading(true)
+    setUploading(field)
     try {
       const form = new FormData()
       form.append('file', file)
-      form.append('field', 'image_url')
+      form.append('field', field)
       const res = await fetch(`/api/admin/product-offers/${offer.id}/image`, {
         method: 'POST',
         body: form,
@@ -82,37 +94,37 @@ export default function OfferSlideDisplayEditor({
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.url) {
-        onChange({ image_url: data.url, blurhash: data.blurhash ?? null })
+        onChange({ [field]: data.url, [HASH[field]]: data.blurhash ?? null })
         showToast('Image updated', 'success')
       } else showToast(data.error || 'Upload failed', 'error')
     } catch {
       showToast('Upload failed', 'error')
     } finally {
-      setUploading(false)
+      setUploading(null)
       if (fileRef.current) fileRef.current.value = ''
     }
   }
 
-  async function generateImage() {
+  async function generateImage(field: ImageField) {
     const prompt = aiPrompt.trim()
-    if (!prompt || generating) return
-    setGenerating(true)
+    if (!prompt || busy) return
+    setGenerating(field)
     try {
       const res = await fetch(`/api/admin/product-offers/${offer.id}/generate-image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ prompt, field: 'image_url' }),
+        body: JSON.stringify({ prompt, field }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.url) {
-        onChange({ image_url: data.url, blurhash: data.blurhash ?? null })
+        onChange({ [field]: data.url, [HASH[field]]: data.blurhash ?? null })
         showToast('Image generated', 'success')
       } else showToast(data.error || 'Image generation failed', 'error')
     } catch {
       showToast('Image generation failed', 'error')
     } finally {
-      setGenerating(false)
+      setGenerating(null)
     }
   }
 
@@ -124,37 +136,40 @@ export default function OfferSlideDisplayEditor({
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Slide image</label>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-16 h-10 rounded-lg bg-surface-secondary border border-border-default overflow-hidden shrink-0">
-            {offer.image_url ? (
-              <AdminImage
-                src={offer.image_url}
-                alt=""
-                blurhash={offer.blurhash}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-foreground-muted/40 text-[10px]">
-                No image
+        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={onFile} className="hidden" />
+        <div className="space-y-2 mb-2">
+          {SLOTS.map(slot => {
+            const url = offer[slot.field]
+            return (
+              <div key={slot.field} className="flex items-center gap-3">
+                <div className={`${slot.thumb} rounded-md bg-surface-secondary border border-border-default overflow-hidden shrink-0`}>
+                  {url ? (
+                    <AdminImage src={url} alt="" blurhash={offer[HASH[slot.field]]} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-foreground-muted/40 text-[10px]">—</div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-foreground-secondary">{slot.label}</p>
+                  <p className="text-[11px] text-foreground-muted">{slot.hint}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    pending.current = slot.field
+                    fileRef.current?.click()
+                  }}
+                  disabled={busy || !canWrite}
+                  className="px-3 h-control-sm rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50 shrink-0"
+                >
+                  {uploading === slot.field ? 'Uploading…' : url ? 'Replace' : 'Upload'}
+                </button>
               </div>
-            )}
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={onFile}
-            className="hidden"
-          />
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading || generating || !canWrite}
-            className="px-3 h-control-sm rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
-          >
-            {uploading ? 'Uploading…' : offer.image_url ? 'Replace image' : 'Upload image'}
-          </button>
+            )
+          })}
+          {!offer.image_url_card && offer.image_url && (
+            <p className="text-[11px] text-foreground-muted">Without a card image, the cards show a centre crop of the wide one.</p>
+          )}
         </div>
 
         {canUseAi && (
@@ -183,21 +198,26 @@ export default function OfferSlideDisplayEditor({
               placeholder={`e.g. 'Diwali festive sale banner for ${storeName}, warm lights, celebratory'`}
               className="w-full px-3 py-2 rounded-lg border border-violet-200 dark:border-violet-700 bg-surface text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
             />
-            <button
-              type="button"
-              onClick={generateImage}
-              disabled={generating || !aiPrompt.trim()}
-              className="mt-2 w-full h-control rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {generating ? (
-                <>
-                  <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />{' '}
-                  Creating image…
-                </>
-              ) : (
-                'Generate image'
-              )}
-            </button>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {SLOTS.map(slot => (
+                <button
+                  key={slot.field}
+                  type="button"
+                  onClick={() => generateImage(slot.field)}
+                  disabled={busy || !aiPrompt.trim()}
+                  className="h-control rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {generating === slot.field ? (
+                    <>
+                      <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />{' '}
+                      Creating…
+                    </>
+                  ) : (
+                    `Generate ${slot.label.toLowerCase()}`
+                  )}
+                </button>
+              ))}
+            </div>
             <p className="mt-1.5 text-[11px] text-violet-500/80 dark:text-violet-400/80">
               Image generation can take up to a minute.
             </p>
