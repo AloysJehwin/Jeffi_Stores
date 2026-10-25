@@ -137,57 +137,60 @@ export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
 
   if (count === 0) return null
 
+  // A card inset by the page gutter with rounded corners, like the app's hero (not full bleed).
   return (
-    <section
-      aria-roledescription="carousel"
-      aria-label="Featured"
-      className="relative isolate h-[clamp(22rem,60svh,40rem)] w-full select-none overflow-hidden bg-gray-950 text-white md:h-[clamp(28rem,70vh,52rem)]"
-      onPointerMove={onPointerMove}
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onTouchCancel={onTouchEnd}
-      onFocus={() => setFocused(true)}
-      onBlur={e => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false)
-      }}
-      onKeyDown={e => {
-        if (e.key === 'ArrowRight') go(active + 1)
-        else if (e.key === 'ArrowLeft') go(active - 1)
-      }}
-    >
-      {slides.map((slide, i) => (
-        <Slide
-          key={i}
-          slide={slide}
-          index={i}
-          count={count}
-          active={i === active}
-          reduced={reduced}
-          progress={progress}
-          fgX={fgX}
-          fgY={fgY}
-        />
-      ))}
+    <div className="container mx-auto px-4 pt-4 sm:pt-6">
+      <section
+        aria-roledescription="carousel"
+        aria-label="Featured"
+        className="relative isolate h-[clamp(20rem,56svh,36rem)] w-full select-none overflow-hidden rounded-[1.75rem] bg-gray-950 text-white shadow-xl shadow-black/10 md:h-[clamp(26rem,64vh,46rem)] md:rounded-[2rem]"
+        onPointerMove={onPointerMove}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+        onFocus={() => setFocused(true)}
+        onBlur={e => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'ArrowRight') go(active + 1)
+          else if (e.key === 'ArrowLeft') go(active - 1)
+        }}
+      >
+        {slides.map((slide, i) => (
+          <Slide
+            key={i}
+            slide={slide}
+            index={i}
+            count={count}
+            active={i === active}
+            reduced={reduced}
+            progress={progress}
+            fgX={fgX}
+            fgY={fgY}
+          />
+        ))}
 
-      {count > 1 && (
-        <>
-          <button type="button" onClick={() => go(active - 1)} aria-label="Previous slide" className={`${ARROW} left-4`}>
-            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <button type="button" onClick={() => go(active + 1)} aria-label="Next slide" className={`${ARROW} right-4`}>
-            <ChevronRight className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <div className="absolute inset-x-0 bottom-0 z-30 flex gap-1.5 px-5 pb-5 sm:px-8 md:px-12 lg:px-20">
-            {slides.map((s, i) => (
-              <Segment key={i} index={i} active={active} headline={s.headline} progress={progress} onSelect={() => go(i)} />
-            ))}
-          </div>
-        </>
-      )}
-    </section>
+        {count > 1 && (
+          <>
+            <button type="button" onClick={() => go(active - 1)} aria-label="Previous slide" className={`${ARROW} left-4`}>
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <button type="button" onClick={() => go(active + 1)} aria-label="Next slide" className={`${ARROW} right-4`}>
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <div className="absolute inset-x-0 bottom-0 z-30 flex gap-1.5 px-5 pb-5 sm:px-8 md:px-12 lg:px-16">
+              {slides.map((s, i) => (
+                <Segment key={i} index={i} active={active} headline={s.headline} progress={progress} onSelect={() => go(i)} />
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+    </div>
   )
 }
 
@@ -259,7 +262,7 @@ function Slide({ slide, index, count, active, reduced, progress, fgX, fgY }: Sli
       )}
 
       <motion.div
-        className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-start gap-3 px-5 pb-14 pt-24 sm:px-8 md:inset-y-0 md:right-auto md:w-[58%] md:max-w-3xl md:justify-center md:px-12 md:pb-0 md:pt-0 lg:px-20"
+        className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-start gap-3 px-5 pb-14 pt-24 sm:px-8 md:inset-y-0 md:right-auto md:w-[58%] md:max-w-3xl md:justify-center md:px-12 md:pb-0 md:pt-0 lg:px-16"
         initial="hidden"
         animate={active ? 'show' : 'hidden'}
       >
