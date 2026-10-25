@@ -1,5 +1,8 @@
 # Mobile app ↔ storefront parity
 
+> **Visual rules superseded (2026-10-25).** The app now has its own design language; see
+> [`plans/MOBILE_UI_REFACTOR_PLAN.md`](plans/MOBILE_UI_REFACTOR_PLAN.md). The data and behaviour parity rules below still apply.
+
 The Play Store app (`mobile-service/client`) must look and behave like the storefront's mobile web view
 (`controller-service/src/app/(storefront)`, components in `src/components/visitor`). Every storefront change
 that affects the mobile viewport lands here too, in the same PR.
