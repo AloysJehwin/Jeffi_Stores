@@ -17,6 +17,8 @@ import Toast from '../src/ui/Toast'
 import UpdatePrompt from '../src/ui/UpdatePrompt'
 import { QuickAddSheetHost } from '../src/components/product/QuickAddSheet'
 import { StoryViewerHost } from '../src/components/home/StoryViewer'
+import { PushBootstrap } from '../src/components/push/PushBootstrap'
+import { PushPermissionSheetHost } from '../src/components/push/PushPermissionSheet'
 import { trackScreen } from '../src/lib/analytics'
 import { ConfirmHost } from '../src/ui'
 import { useTokens } from '../src/theme'
@@ -109,6 +111,7 @@ export default function RootLayout() {
           <ScreenTracker />
           <CartRehydrator />
           <ThemeRehydrator />
+          <PushBootstrap />
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           {/* The scene background matches the theme, so a push never flashes white in dark mode. */}
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.surface } }}>
@@ -122,10 +125,13 @@ export default function RootLayout() {
             <Stack.Screen name="orders/[id]" />
             <Stack.Screen name="account/profile" />
             <Stack.Screen name="account/addresses" />
+            <Stack.Screen name="account/notifications" />
+            <Stack.Screen name="notifications" />
           </Stack>
           {/* One sheet for every "+" and long-press; lives above the stack so toasts still render over it. */}
           <QuickAddSheetHost />
           <StoryViewerHost />
+          <PushPermissionSheetHost />
           <UpdatePrompt />
           <ConfirmHost />
           <Toast />

@@ -5,12 +5,13 @@ import { usePathname, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  CircleUser, FileText, GitCompareArrows, Heart, House, Info, LayoutGrid, LifeBuoy, LogIn, LogOut, Mail, Moon,
+  Bell, BellRing, CircleUser, FileText, GitCompareArrows, Heart, House, Info, LayoutGrid, LifeBuoy, LogIn, LogOut, Mail, Moon,
   Package, RotateCcw, ShoppingBag, ShoppingCart, Smartphone, Sun, Tag, UserPlus, X,
 } from 'lucide-react-native'
 import { logout } from '../../api/auth'
 import { getWishlist } from '../../api/wishlist'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
+import { useUnreadCount } from '../../hooks/useNotifications'
 import { useCartStore } from '../../stores/cartStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore'
@@ -83,6 +84,7 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
   const { data: wishlist } = useQuery({ queryKey: ['wishlist'], queryFn: getWishlist, enabled: !!user, staleTime: 60_000 })
   const wishlistCount = user ? wishlist?.length ?? 0 : 0
+  const unread = useUnreadCount().count
 
   // Navigation waits until the sheet is gone, so modal routes (sign in) never open under it.
   const pending = useRef<(() => void) | null>(null)
@@ -165,11 +167,16 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
             />
             {row('My account', CircleUser, '/account', () => router.navigate('/(tabs)/account'))}
             {row('My orders', Package, '/orders', () => router.push('/orders'))}
+            {row('Notifications', Bell, '/notifications', () => router.push('/notifications'), {
+              trailing: unread > 0 ? <Badge label={unread > 99 ? '99+' : String(unread)} tone="accent" solid size="sm" /> : null,
+            })}
+            {row('Notification settings', BellRing, '/account/notifications', () => router.push('/account/notifications'))}
           </ListGroup>
         ) : (
           <ListGroup>
             <ListRow key="login" title="Sign in" icon={LogIn} iconTone="accent" onPress={() => go(() => router.push('/(auth)/login'))} />
             <ListRow key="signup" title="Create account" icon={UserPlus} onPress={() => go(() => router.push('/(auth)/signup'))} />
+            {row('Notification settings', BellRing, '/account/notifications', () => router.push('/account/notifications'))}
           </ListGroup>
         )}
 
