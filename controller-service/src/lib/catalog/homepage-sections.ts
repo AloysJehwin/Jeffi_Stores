@@ -493,7 +493,7 @@ export function storyGroups(section: Pick<HomepageSection, 'config'>): StoryGrou
     if (slides.length === 0) return
     groups.push({ id: str(g.id) ?? `group-${gi}`, title, cover, slides: slides.slice(0, 12) })
   })
-  return groups.slice(0, 12)
+  return groups.slice(0, 24)
 }
 
 // Product spotlight: one picked product with short callouts.
