@@ -109,6 +109,6 @@ controller-service/public/models/onboarding/ort/*.mjs
 .vault-store/
 .env.local.overrides
 
-**/node_modules/
+**/node_modules
 **/.env.local
 document-service/.documents/
