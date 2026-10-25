@@ -42,6 +42,8 @@ const EDITABLE_KEYS = [
   'feature_inventory_validation_enabled',
   'feature_sms_enabled',
   'feature_whatsapp_enabled',
+  'feature_push_enabled',
+  'feature_marketing_push_enabled',
   'feature_birthday_enabled',
   // Shared with Marketing > Referrals so the two switches can never disagree.
   'referral_enabled',

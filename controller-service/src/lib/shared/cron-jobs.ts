@@ -413,6 +413,17 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'meta_ads:read',
   },
   {
+    id: 'prune_push_devices',
+    name: 'Prune stale push devices',
+    path: '/api/cron/prune-push-devices',
+    method: 'GET',
+    intervalMs: 7 * DAY,
+    intervalLabel: 'every 7 days',
+    startDelayMs: 585 * SEC,
+    lockTtlMs: DAY - MIN,
+    tenantScope: 'dashboard:read',
+  },
+  {
     id: 'ai_health',
     name: 'AI platform health',
     path: '/api/internal/ai/health',
@@ -451,6 +462,7 @@ const DAILY_AT_IST: Record<string, string> = {
 // Weekly jobs: minute hour * * day-of-week (IST).
 const WEEKLY_AT_IST: Record<string, string> = {
   google_ads_digest: '0 9 * * 1',
+  prune_push_devices: '30 3 * * 0',
 }
 
 // Cron expression (evaluated in Asia/Kolkata) for a job's k8s CronJob. Sub-minute jobs round up to 1m.

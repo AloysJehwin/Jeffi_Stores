@@ -113,3 +113,15 @@ DO $$ BEGIN
   END IF;
 END $$;
 ALTER TABLE public.template_version VALIDATE CONSTRAINT template_version_variant_fkey;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'push_devices_user_id_fkey' AND conrelid = 'public.push_devices'::regclass) THEN
+    ALTER TABLE ONLY public.push_devices ADD CONSTRAINT push_devices_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+END $$;
+ALTER TABLE public.push_devices VALIDATE CONSTRAINT push_devices_user_id_fkey;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'notification_preferences_user_id_fkey' AND conrelid = 'public.notification_preferences'::regclass) THEN
+    ALTER TABLE ONLY public.notification_preferences ADD CONSTRAINT notification_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+END $$;
+ALTER TABLE public.notification_preferences VALIDATE CONSTRAINT notification_preferences_user_id_fkey;
