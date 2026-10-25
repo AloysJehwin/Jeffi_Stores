@@ -4,7 +4,7 @@ import { useRouter, type Href } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  FileText, Gift, Heart, ImageOff, LogIn, LogOut, MapPin, Package, Receipt, Repeat, Search, Trash2, User, UserPlus,
+  Bell, FileText, Gift, Heart, ImageOff, LogIn, LogOut, MapPin, Package, Receipt, Repeat, Search, Trash2, User, UserPlus,
 } from 'lucide-react-native'
 import { clearSearchHistory, getDashboard, getSearchHistory } from '../../src/api/account'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
@@ -170,6 +170,7 @@ export default function AccountScreen() {
         </ListGroup>
         <ListGroup title="Your account" className="mb-6">
           {rows('account')}
+          <ListRow title="Notifications" subtitle="Order updates, offers and alerts" icon={Bell} onPress={() => router.push('/account/notifications')} />
         </ListGroup>
 
         <Section title="Recent orders" actionLabel="View all" onAction={() => router.push('/orders')} gutter={false}>
