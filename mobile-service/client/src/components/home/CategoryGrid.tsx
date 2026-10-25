@@ -1,5 +1,5 @@
 import { View } from 'react-native'
-import { Card, Text } from '../../ui'
+import { Card, Rail, Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import {
@@ -7,7 +7,7 @@ import {
   Hammer, Hexagon, Link, Link2, Magnet, Nut, Package, PaintRoller, Paintbrush, PlugZap, Ruler, ScanLine, Scissors,
   Shield, Toolbox, Truck, Waves, Wrench, Zap, type LucideIcon,
 } from 'lucide-react-native'
-import { Carousel, Grid, SectionHeading } from './layout'
+import { Grid, SectionHeading } from './layout'
 import { primary } from '../../theme'
 import type { SectionProps } from '../../types/home'
 
@@ -166,7 +166,7 @@ export default function CategoryGrid({ section, data }: SectionProps) {
   return (
     <View className="bg-surface px-4 pb-12 pt-8">
       <SectionHeading eyebrow={section.copy.eyebrow} title={section.copy.title} eyebrowClassName="text-primary-500" />
-      {section.layout === 'carousel' ? <Carousel>{items}</Carousel> : <Grid cols={2} gap={10}>{items}</Grid>}
+      {section.layout === 'carousel' ? <Rail>{items}</Rail> : <Grid cols={2} gap={10}>{items}</Grid>}
     </View>
   )
 }

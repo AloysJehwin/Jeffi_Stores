@@ -1,9 +1,8 @@
 import { View, useWindowDimensions } from 'react-native'
-import { Button, Overline, Text, elevationClass, useElevation } from '../../ui'
+import { Button, Gradient, Overline, Text, elevationClass, useElevation } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { ChevronRight } from 'lucide-react-native'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { absUrl, openHref } from '../../lib/links'
 import { primary, status } from '../../theme'
 import type { SectionProps } from '../../types/home'
@@ -43,27 +42,10 @@ export default function PromoBanner({ section }: SectionProps) {
                 transition={200}
               />
               {/* bg-gradient-to-r from-10% via-70% at 55% to-transparent */}
-              <Svg style={FILL} width="100%" height="100%">
-                <Defs>
-                  <LinearGradient id="promo" x1="0" y1="0" x2="1" y2="0">
-                    <Stop offset="0.1" stopColor={status.black} />
-                    <Stop offset="0.55" stopColor={status.black} stopOpacity={0.7} />
-                    <Stop offset="1" stopColor={status.black} stopOpacity={0} />
-                  </LinearGradient>
-                </Defs>
-                <Rect width="100%" height="100%" fill="url(#promo)" />
-              </Svg>
+              <Gradient dir="r" stops={[[0.1, status.black], [0.55, status.black, 0.7], [1, status.black, 0]]} />
             </>
           ) : (
-            <Svg style={FILL} width="100%" height="100%">
-              <Defs>
-                <LinearGradient id="promoFallback" x1="0" y1="0" x2="1" y2="1">
-                  <Stop offset="0" stopColor={primary[600]} />
-                  <Stop offset="1" stopColor={primary[800]} />
-                </LinearGradient>
-              </Defs>
-              <Rect width="100%" height="100%" fill="url(#promoFallback)" />
-            </Svg>
+            <Gradient stops={[[0, primary[600]], [1, primary[800]]]} />
           )}
 
           <View className="gap-3 px-6 py-10" style={{ maxWidth: '90%' }}>

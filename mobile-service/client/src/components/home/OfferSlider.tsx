@@ -1,20 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { PanResponder, Pressable, View, useWindowDimensions } from 'react-native'
-import { IconButton, Text, elevationClass, useElevation } from '../../ui'
+import { useCallback, useState } from 'react'
+import { Pressable, View, useWindowDimensions } from 'react-native'
+import { Gradient, IconButton, PagerDots, Text, elevationClass, useElevation, useSwipe } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, ChevronRight } from 'lucide-react-native'
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { SectionHeading } from './layout'
 import { badgeBg } from '../../lib/badge'
 import { absUrl, openHref } from '../../lib/links'
-import { primary, status, useTokens } from '../../theme'
+import { status } from '../../theme'
 import type { ProductOffer, SectionProps } from '../../types/home'
 
 // Mirror of controller-service components/visitor/OfferSlider.tsx at the mobile breakpoint (no peeks).
 
-const SWIPE_THRESHOLD = 50
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const
 
 export default function OfferSlider({ section, data }: SectionProps) {
@@ -30,17 +27,7 @@ function Slider({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
   const go = useCallback((next: number) => setActive(((next % count) + count) % count), [count])
   const step = useCallback((d: number) => setActive(a => (((a + d) % count) + count) % count), [count])
 
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderRelease: (_, g) => {
-          if (Math.abs(g.dx) > SWIPE_THRESHOLD) step(g.dx < 0 ? 1 : -1)
-        },
-      }),
-    [step]
-  )
+  const swipe = useSwipe(step)
 
   const single = count === 1
   const index = active < count ? active : 0
@@ -55,7 +42,7 @@ function Slider({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
         <SectionHeading eyebrow={eyebrow} title={title} eyebrowClassName="text-primary-500" className="mb-5 px-1" />
       ) : null}
 
-      <View {...pan.panHandlers}>
+      <View {...swipe}>
         <Pressable onPress={() => openHref(router, `/products?offer=${encodeURIComponent(current.slug)}`)} accessibilityRole="button" accessibilityLabel={`Shop ${current.title}`}>
           <OfferCard offer={current} height={cardHeight} titleSize={Math.min(36, Math.max(20, width * 0.032))} />
         </Pressable>
@@ -69,32 +56,11 @@ function Slider({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
               <IconButton icon={ChevronRight} label="Next offer" variant="overlay" size="sm" onPress={() => go(index + 1)} />
             </View>
 
-            <View className="flex-row items-center justify-center gap-2" style={{ marginTop: 16 }}>
-              {offers.map((_, i) => (
-                <Dot key={i} on={i === index} onPress={() => go(i)} label={`Go to offer ${i + 1}`} />
-              ))}
-            </View>
+            <PagerDots count={count} index={index} onSelect={go} tone="primary" label={i => `Go to offer ${i + 1}`} className="mt-4" />
           </>
         )}
       </View>
     </View>
-  )
-}
-
-// Pager pill: bg-primary-500 w-5 when active, bg-foreground/20 w-2 otherwise (transition-all duration-300).
-function Dot({ on, onPress, label }: { on: boolean; onPress: () => void; label: string }) {
-  const t = useTokens()
-  const w = useSharedValue(on ? 20 : 8)
-  useEffect(() => {
-    w.value = withTiming(on ? 20 : 8, { duration: 300 })
-  }, [on, w])
-  const style = useAnimatedStyle(() => ({ width: w.value }))
-  return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: on }}>
-      <Animated.View
-        style={[{ height: 8, borderRadius: 999 }, style, on ? { backgroundColor: primary[500] } : { backgroundColor: t.foreground, opacity: 0.2 }]}
-      />
-    </Pressable>
   )
 }
 
@@ -115,16 +81,7 @@ function OfferCard({ offer, height, titleSize }: { offer: ProductOffer; height: 
           accessibilityLabel={offer.title}
         />
         {/* bg-gradient-to-t from-black/70 via-black/10 to-transparent */}
-        <Svg style={FILL} width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="offer" x1="0" y1="1" x2="0" y2="0">
-              <Stop offset="0" stopColor={status.black} stopOpacity={0.7} />
-              <Stop offset="0.5" stopColor={status.black} stopOpacity={0.1} />
-              <Stop offset="1" stopColor={status.black} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#offer)" />
-        </Svg>
+        <Gradient dir="t" stops={[[0, status.black, 0.7], [0.5, status.black, 0.1], [1, status.black, 0]]} />
 
         <View pointerEvents="none" className="absolute bottom-0 left-0 right-0 p-5">
           {offer.badge_text ? (

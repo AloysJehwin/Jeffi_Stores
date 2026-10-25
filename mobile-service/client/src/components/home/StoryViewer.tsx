@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BackHandler, StyleSheet, View, useWindowDimensions } from 'react-native'
-import { Button, IconButton, Text, haptic, useEntering, useMotion } from '../../ui'
+import { Button, Gradient, IconButton, Text, haptic, useEntering, useMotion } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -22,7 +22,6 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { absUrl, openHref } from '../../lib/links'
 import { useStoryStore } from '../../stores/storyStore'
 import { status } from '../../theme'
@@ -271,16 +270,11 @@ function Segment({ width, state, progress }: { width: number; state: 'done' | 'a
 
 /** Dark fade behind the chrome so the title and caption stay readable on bright images. */
 function Scrim({ top }: { top?: boolean }) {
-  const id = top ? 'storyScrimTop' : 'storyScrimBottom'
   return (
-    <Svg pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, [top ? 'top' : 'bottom']: 0, height: top ? 160 : 220 }} width="100%" height="100%">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1={top ? '0' : '1'} x2="0" y2={top ? '1' : '0'}>
-          <Stop offset="0" stopColor={status.black} stopOpacity={top ? 0.6 : 0.75} />
-          <Stop offset="1" stopColor={status.black} stopOpacity={0} />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
+    <Gradient
+      dir={top ? 'b' : 't'}
+      stops={[[0, status.black, top ? 0.6 : 0.75], [1, status.black, 0]]}
+      style={{ left: 0, right: 0, [top ? 'top' : 'bottom']: 0, height: top ? 160 : 220 }}
+    />
   )
 }

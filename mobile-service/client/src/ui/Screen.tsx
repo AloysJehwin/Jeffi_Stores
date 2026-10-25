@@ -14,6 +14,9 @@ import { cn } from './cn'
 // Every route renders through Screen: it owns the background, the header, the bottom safe area, pull to
 // refresh and the loading / error / empty slots, so no screen pads for the nav bar by hand.
 
+/** The content gutter (Screen's px-4); full-bleed rows pad by it. */
+export const GUTTER = 16
+
 /** Bottom padding that clears the system navigation bar (for lists a screen renders itself). */
 export function useBottomInset(extra = 24) {
   return useSafeAreaInsets().bottom + extra
