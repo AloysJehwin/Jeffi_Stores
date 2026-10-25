@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import TopNav from '../../src/components/layout/TopNav'
 import SectionRenderer from '../../src/components/home/SectionRenderer'
 import { HomeScrollContext } from '../../src/components/home/scroll-context'
-import Spinner from '../../src/components/ui/Spinner'
+import Spinner from '../../src/ui/Spinner'
 import { getHome } from '../../src/api/home'
 
 // The storefront home: the admin-configured sections from GET /api/home, rendered like the web's page.

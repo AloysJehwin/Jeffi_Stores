@@ -1,5 +1,5 @@
 import { Linking, Pressable, Text, View, useWindowDimensions } from 'react-native'
-import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
+import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import TopNav from '../../src/components/layout/TopNav'

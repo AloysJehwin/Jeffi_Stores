@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
 import Constants from 'expo-constants'
 import { X } from 'lucide-react-native'
-import { getAppConfig, isOlderVersion } from '../../api/appConfig'
-import { useTokens } from '../../theme'
+import { getAppConfig, isOlderVersion } from '../api/appConfig'
+import { useTokens } from '../theme'
 
 const PACKAGE = 'com.jeffistores.app'
 const STORE_URL = Platform.select({

@@ -10,7 +10,7 @@ import CompareBar from '../../src/components/catalog/CompareBar'
 import PagedProductGrid from '../../src/components/catalog/PagedProductGrid'
 import { Breadcrumb, EmptyCard, InfiniteFooter } from '../../src/components/catalog/Paged'
 import { Grid } from '../../src/components/home/layout'
-import Spinner from '../../src/components/ui/Spinner'
+import Spinner from '../../src/ui/Spinner'
 import { accent } from '../../src/theme'
 
 // Mirror of controller-service app/(storefront)/categories/[slug]/page.tsx at the mobile breakpoint.

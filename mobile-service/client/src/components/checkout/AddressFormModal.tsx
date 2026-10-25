@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from 'react-native'
-import { KeyboardScroll } from '../ui/KeyboardScroll'
+import { KeyboardScroll } from '../../ui/KeyboardScroll'
 import { Check, ChevronDown, CircleCheck, CircleX, X } from 'lucide-react-native'
 import { createAddress, lookupPincode, updateAddress } from '../../api/addresses'
 import { useAuthStore } from '../../stores/authStore'

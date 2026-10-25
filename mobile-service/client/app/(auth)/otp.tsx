@@ -5,7 +5,7 @@ import { loginWithOtp, requestOtp, type OtpChannel } from '../../src/api/auth'
 import { updateProfile } from '../../src/api/account'
 import { showToast } from '../../src/stores/toastStore'
 import { AuthScreen, BigButton, FieldError, TextAction } from '../../src/components/account/AuthScreen'
-import { OtpBoxes } from '../../src/components/account/OtpBoxes'
+import { OtpField } from '../../src/ui/OtpField'
 import { PolicyConsent } from '../../src/components/account/ui'
 import { finishSignIn } from '../../src/components/account/authFlow'
 import { useLeaveAuth } from '../../src/components/account/hooks'
@@ -102,7 +102,7 @@ export default function OtpScreen() {
     <AuthScreen title="Enter the code" subtitle={`We sent a 6-digit code to ${where}.`}>
       <View className="gap-5">
         <View>
-          <OtpBoxes value={otp} onChange={setOtp} inputRef={inputRef} shake={shake} />
+          <OtpField value={otp} onChange={setOtp} inputRef={inputRef} shake={shake} />
           <FieldError message={error} />
         </View>
 
