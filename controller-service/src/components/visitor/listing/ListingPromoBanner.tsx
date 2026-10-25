@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
+import SlideImage from '@/components/visitor/slides/SlideImage'
 import { offerHref, pickPromoOffer, type PromoOffer } from '@/lib/catalog/product-offers-shared'
 
 export { pickPromoOffer, type PromoOffer }
@@ -8,7 +8,6 @@ export default function ListingPromoBanner({ offer }: { offer: PromoOffer }) {
   const desktopImg = offer.image_url || offer.image_url_mobile
   const mobileImg = offer.image_url_mobile || offer.image_url
   if (!desktopImg || !mobileImg) return null
-  const blurhash = offer.blurhash_mobile || offer.blurhash || null
   const badgeClass = offer.badge_color?.startsWith('bg-') ? offer.badge_color : 'bg-accent-500'
 
   return (
@@ -17,20 +16,14 @@ export default function ListingPromoBanner({ offer }: { offer: PromoOffer }) {
       aria-label={`Shop ${offer.title}`}
       className="group relative block w-full h-[clamp(9rem,26vw,13rem)] rounded-2xl overflow-hidden bg-[#0d0d0d] shadow-sm"
     >
-      {blurhash && (
-        <div className="absolute inset-0">
-          <BlurhashCanvas hash={blurhash} />
-        </div>
-      )}
-      <picture>
-        <source media="(min-width: 640px)" srcSet={desktopImg} />
-        <img
-          src={mobileImg}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-[1.02]"
-        />
-      </picture>
+      <SlideImage
+        src={desktopImg}
+        mobileSrc={mobileImg}
+        blurhash={offer.blurhash}
+        blurhashMobile={offer.blurhash_mobile}
+        loading="lazy"
+        className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-[1.02]"
+      />
       <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/40 to-transparent" />
       <div className="relative z-10 h-full flex flex-col justify-center items-start gap-1.5 px-5 sm:px-8 max-w-[85%] sm:max-w-[60%]">
         {offer.badge_text && (

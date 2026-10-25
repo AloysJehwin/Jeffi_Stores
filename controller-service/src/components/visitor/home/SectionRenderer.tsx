@@ -136,7 +136,13 @@ export default function SectionRenderer({
     case 'category_showcase':
       if (data.categoryShowcase.length === 0) return null
       return (
-        <CategoryShowcase items={data.categoryShowcase} gstEnabled={data.gstEnabled} title={section.title} eyebrow={section.eyebrow} />
+        <CategoryShowcase
+          items={data.categoryShowcase}
+          gstEnabled={data.gstEnabled}
+          title={section.title}
+          eyebrow={section.eyebrow}
+          carousel={carousel}
+        />
       )
 
     case 'deal_of_the_day':

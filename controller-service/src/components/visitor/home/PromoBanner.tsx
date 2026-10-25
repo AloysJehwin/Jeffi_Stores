@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
+import SlideImage from '@/components/visitor/slides/SlideImage'
 
 interface PromoBannerProps {
   title?: string | null
@@ -34,11 +34,13 @@ export default function PromoBanner({
         <div className="relative rounded-2xl overflow-hidden shadow-xl min-h-[14rem] md:min-h-[20rem] bg-[#0d0d0d]">
           {mobileImg ? (
             <>
-              {blurhash && <BlurhashCanvas hash={blurhash} />}
-              <picture>
-                <source media="(min-width: 1024px)" srcSet={desktopImg ?? mobileImg} />
-                <img src={mobileImg} alt="" className="absolute inset-0 w-full h-full object-cover object-center" />
-              </picture>
+              <SlideImage
+                src={desktopImg}
+                mobileSrc={mobileImg}
+                blurhash={blurhash}
+                breakpoint={1024}
+                className="absolute inset-0 w-full h-full object-cover object-center"
+              />
               <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] from-10% via-[#0d0d0d]/70 via-55% to-transparent" />
             </>
           ) : (
