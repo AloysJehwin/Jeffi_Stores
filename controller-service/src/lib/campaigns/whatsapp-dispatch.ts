@@ -192,6 +192,16 @@ export async function sendCampaignWhatsApp(
   }
 }
 
+// Site Controls WhatsApp toggle; the library-template path below calls sendByTemplate directly.
+async function whatsappOn(): Promise<boolean> {
+  try {
+    const { getFeatureFlags } = await import('@/lib/catalog/site-controls')
+    return (await getFeatureFlags()).whatsappEnabled
+  } catch {
+    return process.env.WHATSAPP_DISABLED !== 'true'
+  }
+}
+
 // WhatsApp: a linked library template (approved) with the admin's {{n}} values, else the built-in
 // per-kind template.
 async function sendWhatsAppPart(
@@ -203,6 +213,7 @@ async function sendWhatsAppPart(
   missing: (t: string) => string[],
   waSentId: string
 ): Promise<boolean> {
+  if (!(await whatsappOn())) return false
   const entity = { entityType: 'campaign', entityId: kind }
   const { buildClickTrackingUrl } = await import('@/lib/shared/marketing')
   const { apiBaseUrl } = await import('@/lib/shared/customer-links')

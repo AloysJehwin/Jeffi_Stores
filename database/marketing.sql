@@ -144,6 +144,8 @@ CREATE TABLE public.campaign_drafts (
 
 --
 -- Name: email_campaign_logs; Type: TABLE; Schema: public; Owner: -
+-- One row per recipient and channel; a push row is one app install (push_device_id; user_id is NULL when
+-- signed out). status: sent | failed | skipped, or deferred (quiet hours) until send_after.
 --
 
 CREATE TABLE public.email_campaign_logs (
@@ -154,7 +156,10 @@ CREATE TABLE public.email_campaign_logs (
     error text,
     sent_at timestamp with time zone DEFAULT now(),
     channel character varying(16) DEFAULT 'email'::character varying NOT NULL,
-    to_address character varying(255)
+    to_address character varying(255),
+    push_device_id uuid,
+    user_id uuid,
+    send_after timestamp with time zone
 );
 
 

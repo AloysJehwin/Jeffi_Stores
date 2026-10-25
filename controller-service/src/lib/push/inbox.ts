@@ -67,11 +67,26 @@ export async function markRead(userId: string, opts: { ids?: string[]; all?: boo
   return unreadCount(userId)
 }
 
-/** Tap tracking: the first open wins; opening also marks it read. */
+/**
+ * Tap tracking: the first open wins; opening also marks it read. A scenario push's open also counts
+ * as the click on its push:<kind> send, so attributeConversion credits an order to it like an email.
+ */
 export async function markOpened(userId: string, id: string): Promise<boolean> {
-  const r = await queryOne<{ id: string }>(
-    `UPDATE notifications SET opened_at = COALESCE(opened_at, now()), is_read = true WHERE id = $1 AND user_id = $2 RETURNING id`,
+  const r = await queryOne<{ id: string; source: string | null; source_ref: string | null }>(
+    `UPDATE notifications SET opened_at = COALESCE(opened_at, now()), is_read = true WHERE id = $1 AND user_id = $2
+     RETURNING id, source, source_ref`,
     [id, userId]
   )
+  if (r?.source === 'scenario' && r.source_ref) {
+    await query(
+      // A tap older than the latest (re)send belongs to an earlier cycle.
+      `UPDATE email_campaigns_sent
+          SET opened_at = CASE WHEN opened_at IS NULL OR opened_at < sent_at THEN now() ELSE opened_at END,
+              clicked_at = CASE WHEN clicked_at IS NULL OR clicked_at < sent_at THEN now() ELSE clicked_at END
+        WHERE campaign_kind = $1 AND user_id = $2 AND reference_id = $3
+          AND unsubscribed_at IS NULL AND bounced_at IS NULL AND complained_at IS NULL`,
+      [r.source_ref, userId, `push:${r.source_ref}`]
+    ).catch(() => {})
+  }
   return !!r
 }

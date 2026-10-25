@@ -5,6 +5,7 @@ import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/li
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
 import { apiBaseUrl } from '@/lib/shared/customer-links'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
@@ -13,6 +14,7 @@ interface Params extends Record<string, unknown> {
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
   smsEnabled: boolean
+  pushEnabled?: boolean
 }
 
 interface Row {
@@ -31,6 +33,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
     smsEnabled: false,
+    pushEnabled: false,
   },
   paramSchema: {
     lookbackDays: {
@@ -57,6 +60,11 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via SMS',
       description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
+    pushEnabled: {
+      type: 'boolean',
+      label: 'Also send as an app push',
+      description: 'Additionally notify the customer in the store app (quiet hours and the 2-a-day push limit apply)',
     },
   },
 
@@ -159,6 +167,15 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
         orderNumber: row.order_number,
         url: feedbackUrl,
       }, cooldownMinutes(params)).catch(() => {})
+    }
+    if (params.pushEnabled) {
+      // The order page, not the tokenised review link: push payloads pass through FCM.
+      sendCampaignPush(
+        campaign.kind,
+        row.user_id,
+        { orderNumber: row.order_number, imageUrl: items.find(i => i.image_url)?.image_url ?? undefined, url: `${user.baseUrl}/account/orders/${encodeURIComponent(row.id)}` },
+        cooldownMinutes(params)
+      ).catch(() => {})
     }
     return emailResult
   },

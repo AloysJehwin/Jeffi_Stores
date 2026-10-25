@@ -247,7 +247,7 @@ SELECT
   (SELECT COUNT(*) FROM users u JOIN seg ON seg.id = u.id WHERE NULLIF(TRIM(u.phone), '') IS NOT NULL) AS has_phone,
   (SELECT COUNT(*) FROM users u JOIN seg ON seg.id = u.id WHERE u.marketing_opt_out = false) AS marketing_opt_in,
   (SELECT COUNT(*) FROM email_campaign_logs l WHERE l.sent_at >= ${w.startExpr} AND l.status = 'sent' AND l.error IS NULL) AS campaign_sent,
-  (SELECT COUNT(*) FROM email_campaign_logs l WHERE l.sent_at >= ${w.startExpr} AND (l.status <> 'sent' OR l.error IS NOT NULL)) AS campaign_failed
+  (SELECT COUNT(*) FROM email_campaign_logs l WHERE l.sent_at >= ${w.startExpr} AND (l.status = 'failed' OR (l.status = 'sent' AND l.error IS NOT NULL))) AS campaign_failed
 `
 
 export const intentSql = (s: CrmSegment) => `

@@ -265,6 +265,36 @@ CREATE TABLE public.notification_preferences (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+
+--
+-- Name: push_sends; Type: TABLE; Schema: public; Owner: -
+-- Marketing pushes delivered, one row per person (or signed-out install) per send, for the daily cap
+-- shared by the Mailer and scenarios. event_ref: the Mailer campaign id or the scenario's inbox row id.
+--
+
+CREATE TABLE public.push_sends (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid,
+    push_device_id uuid,
+    source character varying(16) NOT NULL,
+    event_ref character varying(120) NOT NULL,
+    sent_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: push_queue; Type: TABLE; Schema: public; Owner: -
+-- Scenario pushes held for quiet hours; the inbox row carries the payload.
+--
+
+CREATE TABLE public.push_queue (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    notification_id uuid NOT NULL,
+    push_device_id uuid NOT NULL,
+    send_after timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 CREATE TABLE public.admin_notifications (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     type character varying(50) NOT NULL,

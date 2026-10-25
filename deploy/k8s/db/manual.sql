@@ -125,3 +125,39 @@ DO $$ BEGIN
   END IF;
 END $$;
 ALTER TABLE public.notification_preferences VALIDATE CONSTRAINT notification_preferences_user_id_fkey;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'push_sends_user_id_fkey' AND conrelid = 'public.push_sends'::regclass) THEN
+    ALTER TABLE ONLY public.push_sends ADD CONSTRAINT push_sends_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+END $$;
+ALTER TABLE public.push_sends VALIDATE CONSTRAINT push_sends_user_id_fkey;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'push_sends_push_device_id_fkey' AND conrelid = 'public.push_sends'::regclass) THEN
+    ALTER TABLE ONLY public.push_sends ADD CONSTRAINT push_sends_push_device_id_fkey FOREIGN KEY (push_device_id) REFERENCES public.push_devices(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+END $$;
+ALTER TABLE public.push_sends VALIDATE CONSTRAINT push_sends_push_device_id_fkey;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'push_queue_notification_id_fkey' AND conrelid = 'public.push_queue'::regclass) THEN
+    ALTER TABLE ONLY public.push_queue ADD CONSTRAINT push_queue_notification_id_fkey FOREIGN KEY (notification_id) REFERENCES public.notifications(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+END $$;
+ALTER TABLE public.push_queue VALIDATE CONSTRAINT push_queue_notification_id_fkey;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'push_queue_push_device_id_fkey' AND conrelid = 'public.push_queue'::regclass) THEN
+    ALTER TABLE ONLY public.push_queue ADD CONSTRAINT push_queue_push_device_id_fkey FOREIGN KEY (push_device_id) REFERENCES public.push_devices(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+END $$;
+ALTER TABLE public.push_queue VALIDATE CONSTRAINT push_queue_push_device_id_fkey;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'email_campaign_logs_push_device_id_fkey' AND conrelid = 'public.email_campaign_logs'::regclass) THEN
+    ALTER TABLE ONLY public.email_campaign_logs ADD CONSTRAINT email_campaign_logs_push_device_id_fkey FOREIGN KEY (push_device_id) REFERENCES public.push_devices(id) ON DELETE SET NULL NOT VALID;
+  END IF;
+END $$;
+ALTER TABLE public.email_campaign_logs VALIDATE CONSTRAINT email_campaign_logs_push_device_id_fkey;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'email_campaign_logs_user_id_fkey' AND conrelid = 'public.email_campaign_logs'::regclass) THEN
+    ALTER TABLE ONLY public.email_campaign_logs ADD CONSTRAINT email_campaign_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL NOT VALID;
+  END IF;
+END $$;
+ALTER TABLE public.email_campaign_logs VALIDATE CONSTRAINT email_campaign_logs_user_id_fkey;
