@@ -9,12 +9,13 @@ import TopNav from '../src/components/layout/TopNav'
 import CompareBar from '../src/components/catalog/CompareBar'
 import { CompareAddButton, CompareChangeButton } from '../src/components/catalog/CompareSearch'
 import { PhotoIcon } from '../src/components/catalog/icons'
-import { Breadcrumb, Pulse } from '../src/components/catalog/Paged'
+import { Breadcrumb } from '../src/components/catalog/Paged'
 import { useStoreConfig } from '../src/hooks/useStoreConfig'
 import { absUrl } from '../src/lib/links'
 import { inr } from '../src/lib/format'
 import { useCompareStore } from '../src/stores/compareStore'
 import { useTokens } from '../src/theme'
+import { Skeleton } from '../src/ui'
 
 // Mirror of controller-service app/(storefront)/compare/page.tsx at the mobile breakpoint (the table
 // scrolls sideways inside its card, min-w-[640px]).
@@ -174,6 +175,45 @@ function ProductHead({ p, gstEnabled, ids, onChange }: { p: ProductRow; gstEnabl
   )
 }
 
+/** The comparison table while it loads: a product head per column, then striped spec rows. Clipped, not scrolled. */
+function CompareTableSkeleton({ cols, tableW, labelW }: { cols: number; tableW: number; labelW: number }) {
+  const colW = (tableW - labelW) / cols
+  const cells = Array.from({ length: cols })
+  return (
+    <View className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-sm">
+      <View style={{ width: tableW }}>
+        <View className="flex-row border-b border-border-default">
+          <View className="bg-surface-secondary p-4" style={{ width: labelW }} />
+          {cells.map((_, i) => (
+            <View key={i} className="gap-2 p-4" style={{ width: colW }}>
+              <View className="items-center">
+                <Skeleton width={Math.min(120, colW - 32)} aspectRatio={1} />
+              </View>
+              <Skeleton height={13} />
+              <Skeleton height={13} width="65%" />
+              <Skeleton height={16} width="45%" />
+              <Skeleton height={20} width={76} rounded="rounded-full" />
+              <Skeleton height={12} width={56} rounded="rounded" />
+            </View>
+          ))}
+        </View>
+        {Array.from({ length: 6 }).map((_, r) => (
+          <View key={r} className={`flex-row ${r < 5 ? 'border-b border-border-default' : ''} ${r % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}>
+            <View className="bg-surface-secondary p-4" style={{ width: labelW }}>
+              <Skeleton height={10} width="65%" rounded="rounded" />
+            </View>
+            {cells.map((_, i) => (
+              <View key={i} className="p-4" style={{ width: colW }}>
+                <Skeleton height={12} width="55%" rounded="rounded" />
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
 export default function CompareScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -287,13 +327,7 @@ export default function CompareScreen() {
             </View>
 
             {loading ? (
-              <View key="skeleton" className="gap-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Pulse key={i} delay={i * 40}>
-                    <View className="h-10 rounded bg-surface-secondary" />
-                  </Pulse>
-                ))}
-              </View>
+              <CompareTableSkeleton key="skeleton" cols={Math.min(4, Math.max(2, (entries ?? idList).length))} tableW={tableW} labelW={labelW} />
             ) : (
               // Own key: reusing the skeleton's View would add shadow-sm's CSS variables after mount (a css-interop remount).
               <View key="table" className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-sm">

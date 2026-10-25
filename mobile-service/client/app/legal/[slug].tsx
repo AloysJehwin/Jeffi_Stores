@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import TopNav from '../../src/components/layout/TopNav'
-import Spinner from '../../src/ui/Spinner'
+import { Skeleton, SkeletonText } from '../../src/ui'
 import { Glyph, CHEVRON_LEFT, DOWNLOAD } from '../../src/components/info/Glyph'
 import { SolidButton } from '../../src/components/info/common'
 import { openPolicyPdf } from '../../src/components/info/policy'
@@ -11,6 +11,34 @@ import { getPolicy } from '../../src/api/info'
 import { openHref } from '../../src/lib/links'
 
 // Mirror of controller-service app/(marketing)/legal/[slug]/page.tsx at the mobile breakpoint.
+
+// Title strip with the download button, then section cards.
+function PolicyLoading() {
+  return (
+    <View>
+      <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
+        <Skeleton height={12} width={110} rounded="rounded" className="mb-3" />
+        <View className="flex-row items-start gap-4">
+          <View className="flex-1 gap-2">
+            <Skeleton height={28} width="90%" />
+            <Skeleton height={28} width="55%" />
+            <Skeleton height={12} width="95%" className="mt-1" />
+            <Skeleton height={10} width={130} rounded="rounded" />
+          </View>
+          <Skeleton height={36} width={140} rounded="rounded-lg" />
+        </View>
+      </View>
+      <View className="gap-4 px-4 py-8">
+        {[0, 1, 2].map(i => (
+          <View key={i} className="rounded-xl border border-border-default bg-surface-elevated p-6">
+            <Skeleton height={16} width="50%" className="mb-4" />
+            <SkeletonText lines={4} />
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
 
 export default function PolicyScreen() {
   const router = useRouter()
@@ -34,7 +62,7 @@ export default function PolicyScreen() {
     <View className="flex-1 bg-surface">
       <TopNav />
       {isLoading ? (
-        <Spinner />
+        <PolicyLoading />
       ) : isError || !policy ? (
         <View className="flex-1 items-center justify-center gap-4 px-8">
           <Text className="text-center text-lg font-bold text-foreground">Policy not found</Text>

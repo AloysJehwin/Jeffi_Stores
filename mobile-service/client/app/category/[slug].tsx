@@ -8,9 +8,8 @@ import TopNav from '../../src/components/layout/TopNav'
 import CategoryIcon from '../../src/components/catalog/CategoryIcon'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import PagedProductGrid from '../../src/components/catalog/PagedProductGrid'
-import { Breadcrumb, EmptyCard, InfiniteFooter } from '../../src/components/catalog/Paged'
+import { Breadcrumb, EmptyCard, InfiniteFooter, ListingPageSkeleton } from '../../src/components/catalog/Paged'
 import { Grid } from '../../src/components/home/layout'
-import Spinner from '../../src/ui/Spinner'
 import { accent } from '../../src/theme'
 
 // Mirror of controller-service app/(storefront)/categories/[slug]/page.tsx at the mobile breakpoint.
@@ -51,7 +50,7 @@ export default function CategoryScreen() {
     return (
       <View className="flex-1 bg-surface">
         <TopNav />
-        <Spinner />
+        <ListingPageSkeleton cols={2} gap={12} />
       </View>
     )
   }

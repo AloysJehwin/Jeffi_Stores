@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Animated, Pressable, Text, TextInput, View, type TextInputProps } from 'react-native'
+import { useState, type ReactNode } from 'react'
+import { ActivityIndicator, Pressable, Text, TextInput, View, type TextInputProps } from 'react-native'
 import { useRouter } from 'expo-router'
 import HeroIcon from './HeroIcon'
 import { accent, useTokens } from '../../theme'
@@ -176,22 +176,6 @@ export function PrimaryButton({
       <Text className="text-white font-semibold">{loading && loadingLabel ? loadingLabel : label}</Text>
     </Pressable>
   )
-}
-
-/** animate-pulse block. */
-export function Pulse({ className = '', style }: { className?: string; style?: object }) {
-  const v = useRef(new Animated.Value(1)).current
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(v, { toValue: 0.5, duration: 1000, useNativeDriver: true }),
-        Animated.timing(v, { toValue: 1, duration: 1000, useNativeDriver: true }),
-      ])
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [v])
-  return <Animated.View className={className} style={[{ opacity: v }, style]} />
 }
 
 /** The admin kit's InfiniteFooter: load-more state + "Showing N of M noun". */

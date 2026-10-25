@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { getTracking, type TrackingData, type TrackingScan } from '../../api/account'
 import HeroIcon from './HeroIcon'
 import { accent, useTokens } from '../../theme'
+import { Skeleton } from '../../ui'
 
 // Mirror of controller-service components/DelhiveryTracking.tsx (customer variant).
 
@@ -176,7 +177,6 @@ function History({ scans, onClose }: { scans: TrackingScan[]; onClose: () => voi
 }
 
 export default function OrderTracking({ orderId, trackPath = 'track' }: { orderId: string; trackPath?: string }) {
-  const t = useTokens()
   const [showHistory, setShowHistory] = useState(false)
   const { data, isLoading, isError } = useQuery({
     queryKey: ['order-tracking', orderId, trackPath],
@@ -185,10 +185,23 @@ export default function OrderTracking({ orderId, trackPath = 'track' }: { orderI
   })
 
   if (isLoading) {
+    // The stepper, then the status pill and AWB.
     return (
-      <View className="flex-row items-center gap-2 py-2">
-        <ActivityIndicator size="small" color={t.foregroundSecondary} />
-        <Text className="text-sm text-foreground-secondary">Loading tracking…</Text>
+      <View className="gap-4">
+        <View className="overflow-hidden">
+          <View className="flex-row items-start" style={{ minWidth: 480 }}>
+            {STEPS.map(step => (
+              <View key={step} className="flex-1 items-center gap-2">
+                <Skeleton width={28} height={28} rounded="rounded-full" />
+                <Skeleton width="70%" height={10} rounded="rounded" />
+              </View>
+            ))}
+          </View>
+        </View>
+        <View className="flex-row items-center gap-3">
+          <Skeleton width={96} height={24} rounded="rounded-full" />
+          <Skeleton width={140} height={13} />
+        </View>
       </View>
     )
   }

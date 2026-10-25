@@ -21,7 +21,7 @@ import Animated, {
 import Svg, { Circle, Defs, LinearGradient, Path, Polygon, Rect, Stop, Text as SvgText } from 'react-native-svg'
 import { GUTTER } from './layout'
 import { postJson } from '../../api/account'
-import { Pulse } from '../account/ui'
+import { Skeleton } from '../../ui'
 import { inr } from '../../lib/format'
 import { useAuthStore } from '../../stores/authStore'
 import { showToast } from '../../stores/toastStore'
@@ -201,9 +201,9 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
 
           {loading ? (
             game.mode === 'wheel' ? (
-              <Pulse className="mt-5 self-center bg-surface-secondary" style={{ width: wheelSize, height: wheelSize, borderRadius: wheelSize / 2 }} />
+              <Skeleton width={wheelSize} height={wheelSize} rounded="rounded-full" className="mt-5 self-center" />
             ) : (
-              <Pulse className="mt-5 rounded-xl bg-surface-secondary" style={{ height: SCRATCH_H }} />
+              <Skeleton height={SCRATCH_H} rounded="rounded-xl" className="mt-5" />
             )
           ) : null}
 

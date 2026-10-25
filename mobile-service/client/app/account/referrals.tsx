@@ -9,11 +9,12 @@ import AccountMobileHeader from '../../src/components/account/AccountMobileHeade
 import Gradient from '../../src/components/account/Gradient'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
-import { InfiniteFooter, Pulse } from '../../src/components/account/ui'
+import { InfiniteFooter } from '../../src/components/account/ui'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { SITE_URL } from '../../src/lib/links'
 import { showToast } from '../../src/stores/toastStore'
 import { accent, useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountReferrals.tsx (mobile layout).
 
@@ -162,6 +163,48 @@ function HowItWorks({ program }: { program: ReferralsData['program'] }) {
   )
 }
 
+// Share card, the 2x2 stats grid and the friends card, as loaded.
+function ReferralsLoading() {
+  return (
+    <View className="gap-4">
+      <View className="rounded-xl border border-border-default bg-surface-elevated p-4">
+        <Skeleton width={80} height={10} rounded="rounded" />
+        <Skeleton width="85%" height={18} className="mt-2" />
+        <Skeleton height={12} className="mt-2" />
+        <Skeleton width="60%" height={12} className="mt-1.5" />
+        <Skeleton height={42} className="mt-4" />
+        <View className="mt-3 flex-row gap-2">
+          <Skeleton height={40} className="flex-1" />
+          <Skeleton height={40} className="flex-1" />
+        </View>
+        <Skeleton width={170} height={12} rounded="rounded" className="mt-3" />
+      </View>
+      <View className="flex-row flex-wrap overflow-hidden rounded-xl border border-border-default bg-border-default" style={{ gap: 1 }}>
+        {[0, 1, 2, 3].map(i => (
+          <View key={i} className="gap-1.5 bg-surface-elevated px-4 py-3" style={{ width: '49.8%', flexGrow: 1 }}>
+            <Skeleton width={40} height={22} />
+            <Skeleton width={80} height={10} rounded="rounded" />
+          </View>
+        ))}
+      </View>
+      <View className={CARD}>
+        <Skeleton width={100} height={15} />
+        <View className="mt-2">
+          {[0, 1, 2].map(i => (
+            <View key={i} className={`flex-row items-center justify-between gap-3 py-3 ${i > 0 ? 'border-t border-border-default' : ''}`}>
+              <View className="flex-1 gap-1.5">
+                <Skeleton width="55%" height={13} />
+                <Skeleton width={110} height={10} rounded="rounded" />
+              </View>
+              <Skeleton width={84} height={24} rounded="rounded-full" />
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  )
+}
+
 export default function ReferralsScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
@@ -201,11 +244,7 @@ export default function ReferralsScreen() {
         <AccountMobileHeader />
         <View className="px-4 pt-4">
           {loading ? (
-            <View className="gap-4">
-              <Pulse className="h-44 rounded-xl bg-surface-elevated border border-border-default" />
-              <Pulse className="h-20 rounded-xl bg-surface-elevated border border-border-default" />
-              <Pulse className="h-56 rounded-xl bg-surface-elevated border border-border-default" />
-            </View>
+            <ReferralsLoading />
           ) : unavailable || !data ? (
             <View className={`${CARD} items-center py-12`} style={SHADOW}>
               <Text className="text-foreground font-medium text-center">{failed ? 'Could not load your referrals' : 'Referrals are not available for this account'}</Text>

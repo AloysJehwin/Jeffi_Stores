@@ -7,8 +7,9 @@ import { listTransactions, type Transaction } from '../../src/api/account'
 import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
-import { FilterChip, InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, Pulse, StatusPill } from '../../src/components/account/ui'
+import { FilterChip, InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, StatusPill } from '../../src/components/account/ui'
 import { useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/shared/AccountTransactions.tsx (visitor).
 
@@ -24,21 +25,34 @@ function methodLabel(method: string, gateway: string) {
   return method ? method.charAt(0).toUpperCase() + method.slice(1) : 'N/A'
 }
 
-function Skeleton() {
+// Status chips, then transaction cards: pills, amount + order, date.
+function TransactionsLoading() {
   return (
-    <View className="px-4 pt-4 pb-8 gap-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <View key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <View className="flex-row items-center justify-between mb-2">
-            <Pulse className="h-3 bg-surface-secondary rounded w-32" />
-            <Pulse className="h-5 bg-surface-secondary rounded-full w-16" />
+    <View className="pt-4">
+      <View className="mb-4 flex-row flex-wrap gap-1.5 px-4">
+        {[36, 80, 64, 52, 72].map((w, i) => (
+          <Skeleton key={i} width={w} height={24} rounded="rounded-full" />
+        ))}
+      </View>
+      <View className="gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <View key={i} className="mx-4 rounded-lg border border-border-default bg-surface-elevated p-4">
+            <View className="mb-2 flex-row gap-2">
+              <Skeleton height={20} width={80} rounded="rounded-full" />
+              <Skeleton height={20} width={72} rounded="rounded-full" />
+            </View>
+            <View className="flex-row items-center gap-4">
+              <Skeleton height={20} width={100} />
+              <Skeleton height={13} width={110} />
+            </View>
+            <Skeleton height={10} width="60%" rounded="rounded" className="mt-2" />
+            <View className="mt-4 gap-1.5">
+              <Skeleton height={12} width={90} />
+              <Skeleton height={10} width={56} rounded="rounded" />
+            </View>
           </View>
-          <View className="flex-row items-center justify-between">
-            <Pulse className="h-4 bg-surface-secondary rounded w-24" />
-            <Pulse className="h-4 bg-surface-secondary rounded w-20" />
-          </View>
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   )
 }
@@ -99,7 +113,7 @@ export default function TransactionsScreen() {
     <View className="flex-1 bg-surface">
       <TopNav />
       {!user || list.loading ? (
-        <FlatList data={[]} renderItem={null} ListHeaderComponent={<><AccountMobileHeader /><Skeleton /></>} />
+        <FlatList data={[]} renderItem={null} ListHeaderComponent={<><AccountMobileHeader /><TransactionsLoading /></>} />
       ) : (
         <FlatList
           data={filtered}

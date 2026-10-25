@@ -12,11 +12,46 @@ import AccountMobileHeader from '../../src/components/account/AccountMobileHeade
 import FeaturedProducts from '../../src/components/account/FeaturedProducts'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useRequireAuth } from '../../src/components/account/hooks'
-import { FilterChip, Pulse } from '../../src/components/account/ui'
+import { FilterChip } from '../../src/components/account/ui'
 import AddressForm, { emptyAddressForm as emptyForm, usePincodeLookup, type AddressFormData as FormData } from '../../src/components/account/AddressForm'
 import { useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/shared/AccountAddresses.tsx + AccountAddressForm.tsx (visitor).
+
+// The loaded page: filter chips + add button, then address cards.
+function AddressesLoading() {
+  return (
+    <View className="px-4 pt-4">
+      <View className="mb-4 flex-row items-center justify-between gap-3">
+        <View className="flex-row gap-1.5">
+          {[36, 68, 56].map((w, i) => (
+            <Skeleton key={i} width={w} height={24} rounded="rounded-full" />
+          ))}
+        </View>
+        <Skeleton width={150} height={36} rounded="rounded-lg" />
+      </View>
+      <View className="gap-4">
+        {[0, 1, 2].map(i => (
+          <View key={i} className="rounded-lg border border-border-default bg-surface-elevated p-4">
+            <Skeleton width={72} height={24} rounded="rounded" className="mb-3" />
+            <View className="gap-2.5">
+              <Skeleton height={14} width="45%" />
+              <Skeleton height={14} width="85%" />
+              <Skeleton height={14} width="65%" />
+              <Skeleton height={14} width="30%" />
+              <Skeleton height={14} width="50%" className="mt-2" />
+            </View>
+            <View className="mt-4 flex-row gap-2">
+              <Skeleton width={60} height={36} rounded="rounded-lg" />
+              <Skeleton width={76} height={36} rounded="rounded-lg" />
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
 
 export default function AddressesScreen() {
   const insets = useSafeAreaInsets()
@@ -107,18 +142,10 @@ export default function AddressesScreen() {
       <TopNav />
       <KeyboardScroll contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         {!user || isLoading ? (
-          <View className="px-4 pt-4 pb-8 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <View key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4">
-                <Pulse className="h-4 bg-surface-secondary rounded w-24 mb-3" />
-                <View className="gap-2">
-                  <Pulse className="h-3 bg-surface-secondary rounded w-full" />
-                  <Pulse className="h-3 bg-surface-secondary rounded w-3/4" />
-                  <Pulse className="h-3 bg-surface-secondary rounded w-1/2" />
-                </View>
-              </View>
-            ))}
-          </View>
+          <>
+            <AccountMobileHeader />
+            <AddressesLoading />
+          </>
         ) : (
           <>
             <AccountMobileHeader />

@@ -7,9 +7,10 @@ import { listBrandsWithCounts, type BrandWithCount } from '../../src/api/brands'
 import TopNav from '../../src/components/layout/TopNav'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRightIcon, TagIcon } from '../../src/components/catalog/icons'
-import { EmptyCard, InfiniteFooter, Pulse } from '../../src/components/catalog/Paged'
+import { EmptyCard, InfiniteFooter } from '../../src/components/catalog/Paged'
 import { absUrl } from '../../src/lib/links'
 import { accent, useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/brands/page.tsx at the mobile breakpoint.
 
@@ -53,6 +54,25 @@ function BrandCard({ brand }: { brand: BrandWithCount }) {
   )
 }
 
+function BrandCardSkeleton() {
+  return (
+    <View className="rounded-lg border border-border-default bg-surface-elevated p-4">
+      <View className="mb-4 flex-row items-start gap-4">
+        <Skeleton width={64} height={64} rounded="rounded-lg" />
+        <View className="flex-1 gap-2 pt-1">
+          <Skeleton height={20} width="55%" />
+          <Skeleton height={12} width={80} rounded="rounded" />
+        </View>
+      </View>
+      <View className="mb-4 gap-2">
+        <Skeleton height={12} />
+        <Skeleton height={12} width="70%" />
+      </View>
+      <Skeleton height={14} width={130} rounded="rounded" />
+    </View>
+  )
+}
+
 export default function BrandsScreen() {
   const insets = useSafeAreaInsets()
   const t = useTokens()
@@ -77,9 +97,7 @@ export default function BrandsScreen() {
             {isLoading ? (
               <View className="gap-4 px-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Pulse key={i} delay={i * 60}>
-                    <View className="h-36 rounded-lg border border-border-default bg-surface-elevated" />
-                  </Pulse>
+                  <BrandCardSkeleton key={i} />
                 ))}
               </View>
             ) : null}

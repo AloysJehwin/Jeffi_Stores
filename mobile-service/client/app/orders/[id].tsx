@@ -27,7 +27,8 @@ import OrderAddressChange from '../../src/components/account/OrderAddressChange'
 import OrderTracking from '../../src/components/account/OrderTracking'
 import ReviewModal from '../../src/components/account/ReviewModal'
 import { useRequireAuth } from '../../src/components/account/hooks'
-import { NEUTRAL_TONE, ORDER_STATUS_TONE, orderStatusLabel, Pulse, Select, StatusPill } from '../../src/components/account/ui'
+import { NEUTRAL_TONE, ORDER_STATUS_TONE, orderStatusLabel, Select, StatusPill } from '../../src/components/account/ui'
+import { Skeleton } from '../../src/ui'
 import WarningBadges from '../../src/components/cart/WarningBadges'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { absUrl } from '../../src/lib/links'
@@ -116,31 +117,60 @@ function ActionPill({ label, icon, bg, onPress, disabled }: { label: string; ico
   )
 }
 
-function Skeleton() {
+// The loaded page's cards: order header, delivery estimate, items + totals, address.
+function OrderLoading() {
   return (
     <View className="px-4 py-4 gap-4">
       <View className={CARD}>
-        <Pulse className="h-6 w-48 bg-surface-secondary rounded mb-2" />
-        <Pulse className="h-4 w-64 bg-surface-secondary rounded mb-3" />
-        <View className="flex-row gap-2">
-          <Pulse className="h-6 w-20 bg-surface-secondary rounded-full" />
-          <Pulse className="h-6 w-24 bg-surface-secondary rounded-full" />
+        <Skeleton height={22} width={200} />
+        <Skeleton height={13} width="80%" className="mt-2" />
+        <View className="mt-4 flex-row gap-2">
+          <Skeleton height={26} width={90} rounded="rounded-full" />
+          <Skeleton height={26} width={120} rounded="rounded-full" />
+        </View>
+      </View>
+      <View className={`${CARD} flex-row items-center gap-3`}>
+        <Skeleton width={20} height={20} rounded="rounded-md" />
+        <View className="gap-1.5">
+          <Skeleton height={13} width={140} />
+          <Skeleton height={10} width={100} rounded="rounded" />
         </View>
       </View>
       <View className={CARD}>
-        <Pulse className="h-5 w-40 bg-surface-secondary rounded mb-4" />
-        {[0, 1].map(i => (
-          <View key={i} className="flex-row gap-4 mb-4">
-            <Pulse className="w-20 h-20 bg-surface-secondary rounded-lg" />
-            <View className="flex-1 gap-2">
-              <Pulse className="h-4 w-3/4 bg-surface-secondary rounded" />
-              <Pulse className="h-3 w-1/2 bg-surface-secondary rounded" />
-              <Pulse className="h-4 w-1/3 bg-surface-secondary rounded" />
+        <Skeleton height={18} width={170} className="mb-4" />
+        <View className="gap-4">
+          {[0, 1].map(i => (
+            <View key={i} className={`flex-row gap-4 pb-4 ${i === 0 ? 'border-b border-border-default' : ''}`}>
+              <Skeleton width={80} height={80} rounded="rounded-lg" />
+              <View className="flex-1 gap-2">
+                <Skeleton height={14} width="80%" />
+                <Skeleton height={12} width="40%" />
+                <Skeleton height={13} width="65%" />
+              </View>
             </View>
+          ))}
+        </View>
+        <View className="mt-6 gap-3 border-t-2 border-border-default pt-4">
+          {[0, 1].map(i => (
+            <View key={i} className="flex-row justify-between">
+              <Skeleton height={12} width={80} />
+              <Skeleton height={12} width={72} />
+            </View>
+          ))}
+          <View className="flex-row items-center justify-between pt-2">
+            <Skeleton height={18} width={60} />
+            <Skeleton height={26} width={110} />
           </View>
-        ))}
+        </View>
       </View>
-      <Pulse className="h-32 bg-surface-elevated rounded-lg border border-border-default" />
+      <View className={CARD}>
+        <Skeleton height={18} width={150} className="mb-4" />
+        <View className="gap-2">
+          <Skeleton height={13} width="45%" />
+          <Skeleton height={13} width="85%" />
+          <Skeleton height={13} width="60%" />
+        </View>
+      </View>
     </View>
   )
 }
@@ -360,7 +390,7 @@ export default function OrderDetailScreen() {
         <TopNav />
         <ScrollView>
           <AccountMobileHeader />
-          <Skeleton />
+          <OrderLoading />
         </ScrollView>
       </View>
     )

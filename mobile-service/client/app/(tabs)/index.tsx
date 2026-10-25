@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import TopNav from '../../src/components/layout/TopNav'
 import SectionRenderer from '../../src/components/home/SectionRenderer'
 import { HomeScrollContext } from '../../src/components/home/scroll-context'
-import Spinner from '../../src/ui/Spinner'
+import { HomeSkeleton } from '../../src/ui'
 import { getHome } from '../../src/api/home'
 
 // The storefront home: the admin-configured sections from GET /api/home, rendered like the web's page.
@@ -26,7 +26,9 @@ export default function HomeScreen() {
     <View className="flex-1 bg-surface">
       <TopNav />
       {isLoading ? (
-        <Spinner />
+        <View className="flex-1 overflow-hidden">
+          <HomeSkeleton />
+        </View>
       ) : isError || !data ? (
         <View className="flex-1 items-center justify-center px-8">
           <Text className="text-center text-foreground-muted">Couldn't load the store. Pull down to try again.</Text>

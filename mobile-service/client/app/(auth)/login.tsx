@@ -4,11 +4,11 @@ import { useRouter } from 'expo-router'
 import { googleAuth, googleSignInIdToken, GOOGLE_WEB_CLIENT_ID, requestOtp, type OtpChannel } from '../../src/api/auth'
 import { AuthScreen, BigButton, FieldError, Frame, GoogleRow, TermsNote, TextAction } from '../../src/components/account/AuthScreen'
 import { ChannelChips } from '../../src/components/account/ChannelChips'
-import { Pulse } from '../../src/components/account/ui'
 import { useFeatureFlagsState, useLeaveAuth, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
 import { finishSignIn, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
 import { useTokens } from '../../src/theme'
+import { Skeleton } from '../../src/ui'
 
 // Same flow as controller-service app/(auth)/login/page.tsx (identifier → OTP, Google, not-found → sign-up),
 // laid out the app's way: mobile number first when SMS or WhatsApp is on, email behind one tap.
@@ -122,8 +122,8 @@ export default function LoginScreen() {
     <AuthScreen title="Login or sign up" subtitle={mode ? subtitle : undefined}>
       {mode === null ? (
         <View className="gap-4">
-          <Pulse className="h-14 rounded-2xl bg-surface-secondary" />
-          <Pulse className="h-14 rounded-2xl bg-surface-secondary" />
+          <Skeleton height={56} rounded="rounded-2xl" />
+          <Skeleton height={56} rounded="rounded-2xl" />
         </View>
       ) : (
         <View className="gap-4">

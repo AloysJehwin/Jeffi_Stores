@@ -14,10 +14,11 @@ import CompareBar, { CompareStrip } from '../../src/components/catalog/CompareBa
 import FilterSheet, { FiltersButton } from '../../src/components/catalog/FilterSheet'
 import ListingPromoBanner from '../../src/components/catalog/ListingPromoBanner'
 import ProductTable from '../../src/components/catalog/ProductTable'
-import { EmptyCard, InfiniteFooter, ProductGridSkeleton, type InfiniteControl } from '../../src/components/catalog/Paged'
+import { EmptyCard, InfiniteFooter, type InfiniteControl } from '../../src/components/catalog/Paged'
 import { SquaresIcon, TableIcon } from '../../src/components/catalog/icons'
 import { listingKey, readListingParams, toRouteParams, type ListingParams } from '../../src/components/catalog/listing'
 import { useCompareStore } from '../../src/stores/compareStore'
+import { ProductGridSkeleton, Skeleton } from '../../src/ui'
 import { accent, useTokens } from '../../src/theme'
 import type { HomeSection } from '../../src/types/home'
 
@@ -179,6 +180,11 @@ export default function ProductsScreen() {
 
   const empty = loading ? (
     <View className="px-4">
+      <View className="mb-6 flex-row gap-2">
+        <Skeleton width={92} height={36} />
+        <Skeleton width={150} height={36} />
+        <Skeleton width={74} height={36} />
+      </View>
       <ProductGridSkeleton />
     </View>
   ) : failed ? (

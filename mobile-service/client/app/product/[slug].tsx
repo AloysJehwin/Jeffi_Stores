@@ -23,7 +23,7 @@ import { toCard } from '../../src/lib/card'
 import { SITE_URL } from '../../src/lib/links'
 import { useTokens } from '../../src/theme'
 import TopNav from '../../src/components/layout/TopNav'
-import Spinner from '../../src/ui/Spinner'
+import { Skeleton } from '../../src/ui'
 import ProductCard from '../../src/components/product/ProductCard'
 import { Grid } from '../../src/components/home/layout'
 import { Glyph, P } from '../../src/components/pdp/Glyph'
@@ -56,7 +56,7 @@ export default function ProductDetailScreen() {
     return (
       <View className="flex-1 bg-surface">
         <TopNav />
-        <Spinner />
+        <PdpLoading />
       </View>
     )
   }
@@ -74,6 +74,55 @@ export default function ProductDetailScreen() {
     )
   }
   return <ProductDetail key={product.id} product={product} initialSku={typeof sku === 'string' ? sku : undefined} />
+}
+
+/** The loaded page's shape: breadcrumb bar, then the details card (gallery, title, price block, buttons). */
+function PdpLoading() {
+  return (
+    <View className="flex-1 overflow-hidden">
+      <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
+        <Skeleton height={14} width={160} rounded="rounded" />
+      </View>
+      <View className="px-4 pt-4">
+        <View className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
+          <View className="gap-4 p-4">
+            <Skeleton aspectRatio={5 / 3} rounded="rounded-xl" className="mb-4" />
+            <View>
+              <View className="mb-4 flex-row items-start justify-between gap-3">
+                <View className="flex-1 gap-2">
+                  <Skeleton height={24} />
+                  <Skeleton height={24} width="60%" />
+                </View>
+                <View className="mt-1 flex-row gap-2">
+                  <Skeleton width={40} height={40} rounded="rounded-full" />
+                  <Skeleton width={40} height={40} rounded="rounded-full" />
+                </View>
+              </View>
+              <Skeleton height={14} width={170} rounded="rounded" className="mb-4" />
+              <View className="gap-4">
+                <View className="gap-3 rounded-lg bg-surface p-6">
+                  <Skeleton height={36} width={160} />
+                  <Skeleton height={14} width="55%" rounded="rounded" />
+                  <Skeleton height={12} width="40%" rounded="rounded" />
+                </View>
+                <View className="gap-2">
+                  <View className="flex-row justify-between">
+                    <Skeleton height={14} width={70} rounded="rounded" />
+                    <Skeleton height={14} width={80} rounded="rounded" />
+                  </View>
+                  <Skeleton height={36} width={150} />
+                </View>
+                <View className="gap-3">
+                  <Skeleton height={56} />
+                  <Skeleton height={56} />
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  )
 }
 
 /** The page's displayPrice / GST-rebased MRP, shared by the recently-viewed entry and the compare section. */

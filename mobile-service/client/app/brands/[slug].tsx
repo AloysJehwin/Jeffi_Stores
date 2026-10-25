@@ -7,8 +7,7 @@ import { listBrands, type BrandDetail } from '../../src/api/brands'
 import TopNav from '../../src/components/layout/TopNav'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import PagedProductGrid from '../../src/components/catalog/PagedProductGrid'
-import { Breadcrumb, EmptyCard } from '../../src/components/catalog/Paged'
-import Spinner from '../../src/ui/Spinner'
+import { Breadcrumb, EmptyCard, ListingPageSkeleton } from '../../src/components/catalog/Paged'
 import { absUrl } from '../../src/lib/links'
 
 // Mirror of controller-service app/(storefront)/brands/[slug]/page.tsx at the mobile breakpoint.
@@ -26,7 +25,7 @@ export default function BrandScreen() {
     return (
       <View className="flex-1 bg-surface">
         <TopNav />
-        <Spinner />
+        <ListingPageSkeleton logo cols={1} gap={16} />
       </View>
     )
   }

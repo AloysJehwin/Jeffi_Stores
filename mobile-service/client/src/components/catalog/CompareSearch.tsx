@@ -8,6 +8,7 @@ import { searchProducts, type ProductSearchResult } from '../../api/products'
 import { absUrl } from '../../lib/links'
 import { inr } from '../../lib/format'
 import { accent, useTokens } from '../../theme'
+import { Skeleton } from '../../ui'
 
 // The compare page's product pickers: CompareAddButton ("Add product") and CompareChangeButton ("Change").
 // The web opens them as a dropdown under the button; here the same panel opens as a modal card.
@@ -82,7 +83,7 @@ function SearchPanel({
               className="flex-1 p-0 text-sm text-foreground"
               returnKeyType="search"
             />
-            {loading ? <ActivityIndicator size="small" color={accent[500]} /> : null}
+            {loading && results.length > 0 ? <ActivityIndicator size="small" color={accent[500]} /> : null}
           </View>
           {results.length > 0 ? (
             <ScrollView style={{ maxHeight: 256, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
@@ -116,7 +117,19 @@ function SearchPanel({
                 )
               })}
             </ScrollView>
-          ) : query.length >= 2 && !loading ? (
+          ) : query.length >= 2 && loading ? (
+            <View accessible accessibilityLabel="Searching">
+              {(['70%', '55%', '80%'] as const).map((w, i) => (
+                <View key={i} className="flex-row items-center gap-3 px-3 py-2.5">
+                  <Skeleton width={36} height={36} rounded="rounded" />
+                  <View className="flex-1 gap-1.5">
+                    <Skeleton height={13} width={w} />
+                    <Skeleton height={10} width="45%" rounded="rounded" />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : query.length >= 2 ? (
             <Text className="px-4 py-3 text-sm text-foreground-muted">No products found.</Text>
           ) : query.length < 2 ? (
             <Text className="px-4 py-3 text-xs text-foreground-muted">Type at least 2 characters to search.</Text>
