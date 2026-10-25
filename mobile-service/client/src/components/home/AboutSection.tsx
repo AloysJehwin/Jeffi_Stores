@@ -1,8 +1,8 @@
 import { View } from 'react-native'
 import { Button, Gradient, Overline, Text, elevationClass, useElevation } from '../../ui'
-import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { ChevronRight } from 'lucide-react-native'
+import FeedMedia from './FeedMedia'
 import { absUrl, openHref } from '../../lib/links'
 import { secondary, status } from '../../theme'
 import type { SectionProps } from '../../types/home'
@@ -29,11 +29,12 @@ export default function AboutSection({ section, data }: SectionProps) {
     <View className="bg-surface px-4 py-12">
       <View style={shadow} className={`rounded-panel bg-surface ${elevationClass('overlay')}`}>
         <View className="relative overflow-hidden rounded-panel">
-          <Image
-            source={{ uri: absUrl(copy.imageUrl || COPY.imageUrl) ?? undefined }}
+          <FeedMedia
+            image={absUrl(copy.imageUrl || COPY.imageUrl)}
+            video={copy.video}
             accessibilityLabel={`${data.storeName} team`}
             style={{ width: '100%', height: 224 }}
-            contentFit="cover"
+            transition={0}
           />
           {/* bg-gradient-to-t from-secondary-900/60 via-transparent to-transparent */}
           <Gradient dir="t" stops={[[0, secondary[900], 0.6], [0.5, secondary[900], 0], [1, secondary[900], 0]]} />

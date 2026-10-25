@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, View, useWindowDimensions, type TextLayoutEventData, type NativeSyntheticEvent } from 'react-native'
-import { Gradient, PagerDots, Text, elevationClass, useAutoplay, useElevation, useMotion, useSwipe } from '../../ui'
-import { Image } from 'expo-image'
+import { Gradient, Media, PagerDots, Text, elevationClass, useAutoplay, useElevation, useMotion, useSwipe } from '../../ui'
 import { useRouter } from 'expo-router'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
+import { useOnScreen } from './scroll-context'
 import { badgeBg } from '../../lib/badge'
 import { absUrl, openHref } from '../../lib/links'
 import { status } from '../../theme'
@@ -36,6 +36,7 @@ interface Resolved {
   badgeColor: string
   img: string | null
   blurhash: string | null
+  video: string | null
 }
 
 function resolveSlide(s: HeroSlide, i: number): Resolved {
@@ -48,6 +49,7 @@ function resolveSlide(s: HeroSlide, i: number): Resolved {
     badgeColor: s.badge_color ?? legacy?.badgeColor ?? 'bg-primary-500',
     img: absUrl(s.image_url_mobile ?? s.image_url ?? s.hero_image_mobile),
     blurhash: s.blurhash_mobile || s.blurhash || null,
+    video: s.video_url || null,
   }
 }
 
@@ -71,6 +73,7 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
   const auto = useAutoplay(() => step(1), { enabled: count > 1, intervalMs: AUTO_ADVANCE_MS })
   useEffect(() => auto.restart(), [auto, index])
   const swipe = useSwipe(step)
+  const { ref, onLayout, onScreen } = useOnScreen(slides.some(s => s.video_url))
 
   const open = () => {
     const s = slides[index]
@@ -86,7 +89,7 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
   const shadow = useElevation('floating')
 
   return (
-    <View className="bg-surface" style={{ height: boxHeight, paddingHorizontal: 12, paddingTop: 12 }}>
+    <Animated.View ref={ref} onLayout={onLayout} collapsable={false} className="bg-surface" style={{ height: boxHeight, paddingHorizontal: 12, paddingTop: 12 }}>
       <View style={shadow} className={`flex-1 rounded-sheet ${elevationClass('floating')}`}>
         <View
           className="flex-1 overflow-hidden rounded-sheet bg-black"
@@ -96,7 +99,7 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
           onTouchCancel={() => auto.hold(false)}
         >
           {resolved.map((s, i) => (
-            <Slide key={s.key} slide={s} active={i === index} cardWidth={cardWidth} titleSize={titleSize} />
+            <Slide key={s.key} slide={s} active={i === index} play={onScreen && i === index} cardWidth={cardWidth} titleSize={titleSize} />
           ))}
 
           <Pressable
@@ -111,11 +114,11 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
           <PagerDots count={count} index={index} onSelect={go} tone="white" className="absolute bottom-5 left-0 right-0" style={{ zIndex: 30 }} />
         </View>
       </View>
-    </View>
+    </Animated.View>
   )
 }
 
-function Slide({ slide: s, active, cardWidth, titleSize }: { slide: Resolved; active: boolean; cardWidth: number; titleSize: number }) {
+function Slide({ slide: s, active, play, cardWidth, titleSize }: { slide: Resolved; active: boolean; play: boolean; cardWidth: number; titleSize: number }) {
   const opacity = useSharedValue(active ? 1 : 0)
   const { animate } = useMotion()
   useEffect(() => {
@@ -129,13 +132,7 @@ function Slide({ slide: s, active, cardWidth, titleSize }: { slide: Resolved; ac
       <View className="bg-black" style={FILL}>
         {/* The image covers the right 62%; its left edge fades into the base. */}
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: imageWidth }}>
-          <Image
-            source={s.img ? { uri: s.img } : undefined}
-            placeholder={s.blurhash ? { blurhash: s.blurhash } : undefined}
-            style={FILL}
-            contentFit="cover"
-            transition={300}
-          />
+          <Media image={s.img} video={s.video} blurhash={s.blurhash} style={FILL} transition={300} active={play} />
           <Gradient dir="r" stops={[[0, status.black], [0.35, status.black, 0]]} />
         </View>
         {/* bg-gradient-to-r from-35% via-80% at 60% to-transparent, then to-b from-black/20 via-transparent to-black/30 */}

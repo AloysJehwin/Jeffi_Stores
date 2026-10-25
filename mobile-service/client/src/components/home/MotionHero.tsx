@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { View } from 'react-native'
-import { Gradient, Overline, Pager, Text, usePageParallax, usePageReveal, type PageInfo } from '../../ui'
+import { Gradient, Media, Overline, Pager, Text, usePageParallax, usePageReveal, type PageInfo } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import Animated from 'react-native-reanimated'
 import { SlideCta } from './layout'
+import { useOnScreen } from './scroll-context'
 import { absUrl, openHref } from '../../lib/links'
 import { status } from '../../theme'
 import type { MotionHeroData, MotionHeroSlide, SectionProps } from '../../types/home'
@@ -14,11 +16,17 @@ import type { MotionHeroData, MotionHeroSlide, SectionProps } from '../../types/
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const
 
 export default function MotionHero({ section, data }: SectionProps) {
-  const router = useRouter()
   const hero = data.extras[section.id] as MotionHeroData | undefined
   if (!hero?.slides.length) return null
+  return <Hero hero={hero} />
+}
+
+function Hero({ hero }: { hero: MotionHeroData }) {
+  const router = useRouter()
+  const [current, setCurrent] = useState(0)
+  const { ref, onLayout, onScreen } = useOnScreen(hero.slides.some(s => s.bgVideo))
   return (
-    <View className="bg-surface pb-4 pt-3">
+    <Animated.View ref={ref} onLayout={onLayout} collapsable={false} className="bg-surface pb-4 pt-3">
       <Pager
         data={hero.slides}
         keyExtractor={(slide, i) => `${i}-${slide.bgImage}`}
@@ -29,13 +37,14 @@ export default function MotionHero({ section, data }: SectionProps) {
         onPress={slide => openHref(router, slide.url)}
         canPress={slide => !!slide.url}
         itemLabel={slide => [slide.eyebrow, slide.headline, slide.sub, slide.ctaLabel].filter(Boolean).join(', ')}
-        renderItem={(slide, info) => <Card slide={slide} info={info} />}
+        onIndexChange={setCurrent}
+        renderItem={(slide, info) => <Card slide={slide} info={info} active={onScreen && info.index === current} />}
       />
-    </View>
+    </Animated.View>
   )
 }
 
-function Card({ slide, info }: { slide: MotionHeroSlide; info: PageInfo }) {
+function Card({ slide, info, active }: { slide: MotionHeroSlide; info: PageInfo; active: boolean }) {
   const { width: w, height: h } = info
   const bg = absUrl(slide.bgImage)
   const fg = absUrl(slide.fgImage)
@@ -49,7 +58,7 @@ function Card({ slide, info }: { slide: MotionHeroSlide; info: PageInfo }) {
   return (
     <View style={{ width: w, height: h }} className="overflow-hidden rounded-sheet bg-black">
       <Animated.View style={[FILL, bgStyle]}>
-        <Image source={bg ? { uri: bg } : undefined} style={FILL} contentFit="cover" transition={300} />
+        <Media image={bg} video={slide.bgVideo} style={FILL} transition={300} active={active} />
       </Animated.View>
       <Gradient dir="b" stops={[[0, status.black, 0.35], [0.4, status.black, 0], [1, status.black, 0.9]]} />
 

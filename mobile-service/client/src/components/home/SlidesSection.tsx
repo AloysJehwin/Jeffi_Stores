@@ -7,6 +7,7 @@ import {
   FadePager,
   GUTTER,
   Gradient,
+  Media,
   Overline,
   Pager,
   PeekPager,
@@ -22,6 +23,7 @@ import {
 } from '../../ui'
 import QuickAddButton from '../product/QuickAddButton'
 import { SHADOW_ROOM, SectionHeading, SlideBadge, SlideCta } from './layout'
+import { useOnScreen } from './scroll-context'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { productLabel } from '../../lib/a11y'
 import { inr } from '../../lib/format'
@@ -79,6 +81,7 @@ function Slides({ cfg, eyebrow, title }: { cfg: SlidesData; eyebrow?: string; ti
   const ratio = RATIO[aspect]
   // A lone card would float mid-screen; like the offer slider, it becomes a banner.
   const layout = cfg.layout === 'cards' && slides.length === 1 ? 'banner' : cfg.layout
+  const { ref, onLayout, onScreen } = useOnScreen(layout !== 'rail' && slides.some(s => s.video || s.videoCard))
 
   const inStock = (p: CardProduct) => (digitalProductsEnabled && p.isDigital) || p.effectiveStock > 0
   const open = (s: SlideCard) => openHref(router, s.href)
@@ -86,8 +89,19 @@ function Slides({ cfg, eyebrow, title }: { cfg: SlidesData; eyebrow?: string; ti
     const p = s.product
     return p && inStock(p) ? [{ name: 'quickAdd', label: p.hasVariants ? 'Choose options' : 'Quick add to cart', run: () => openQuickAdd(p) }] : []
   }
-  const card = (s: SlideCard, w: number, h: number, on: boolean, info?: PageInfo, room = true) => (
-    <SlideCardView slide={s} width={w} height={h} shape={aspect} current={on} info={info} room={room} inStock={!!s.product && inStock(s.product)} />
+  // A clip plays on the slide on show while the section is on screen; rail slides keep their posters.
+  const card = (s: SlideCard, w: number, h: number, on: boolean, info?: PageInfo, room = true, play = on && onScreen) => (
+    <SlideCardView
+      slide={s}
+      width={w}
+      height={h}
+      shape={aspect}
+      current={on}
+      play={play}
+      info={info}
+      room={room}
+      inStock={!!s.product && inStock(s.product)}
+    />
   )
   const pager = {
     data: slides,
@@ -134,7 +148,7 @@ function Slides({ cfg, eyebrow, title }: { cfg: SlidesData; eyebrow?: string; ti
         <Rail itemWidth={share}>
           {slides.map(s => (
             <RailSlide key={s.id} slide={s} onPress={() => open(s)} actions={actions(s)}>
-              {card(s, w, Math.round(w / ratio), true)}
+              {card(s, w, Math.round(w / ratio), true, undefined, true, false)}
             </RailSlide>
           ))}
         </Rail>
@@ -143,10 +157,10 @@ function Slides({ cfg, eyebrow, title }: { cfg: SlidesData; eyebrow?: string; ti
   }
 
   return (
-    <View className="bg-surface py-8">
+    <Animated.View ref={ref} onLayout={onLayout} collapsable={false} className="bg-surface py-8">
       {eyebrow || title ? <SectionHeading eyebrow={eyebrow} title={title} eyebrowClassName="text-primary-500" className="mb-4 px-4" /> : null}
       {body}
-    </View>
+    </Animated.View>
   )
 }
 
@@ -172,6 +186,7 @@ function SlideCardView({
   height,
   shape,
   current,
+  play,
   info,
   room,
   inStock,
@@ -182,6 +197,8 @@ function SlideCardView({
   shape: Shape
   /** The slide on show (Ken Burns runs only then). */
   current: boolean
+  /** Its clip may play. */
+  play: boolean
   /** The scroll pager's offset, for parallax and reveal. */
   info?: PageInfo
   /** Leave the pager's shadow room around the card. */
@@ -197,7 +214,7 @@ function SlideCardView({
   return (
     <View style={[shadow, room && { marginTop: SHADOW_ROOM.top, marginBottom: SHADOW_ROOM.bottom }]} className={`rounded-panel ${elevationClass('overlay')}`}>
       <View className="w-full overflow-hidden rounded-panel bg-black" style={{ height }}>
-        <Backdrop slide={slide} shape={shape} motion={motion} current={current} info={info} />
+        <Backdrop slide={slide} shape={shape} motion={motion} current={current} play={play} info={info} />
         <Gradient dir="t" stops={SCRIM} />
         <Caption motion={motion} current={current} info={info}>
           <SlideBadge text={slide.badge} color={slide.badgeClass} />
@@ -241,14 +258,32 @@ function ProductFoot({ slide, product, inStock }: { slide: SlideCard; product: C
   )
 }
 
-/** Portrait and square shapes take the card picture first; wide takes the wide one. */
+/** Portrait and square shapes take the card picture first; wide takes the wide one. A clip goes with its poster. */
 function pickImage(s: SlideCard, shape: Shape) {
-  if (shape === '16:9') return { src: absUrl(s.image ?? s.imageCard), blurhash: s.blurhash ?? s.blurhashCard }
-  return { src: absUrl(s.imageCard ?? s.image), blurhash: s.blurhashCard ?? s.blurhash }
+  const wide = { src: absUrl(s.image), blurhash: s.blurhash, video: s.video ?? null }
+  const card = { src: absUrl(s.imageCard), blurhash: s.blurhashCard, video: s.videoCard ?? null }
+  const [first, second] = shape === '16:9' ? [wide, card] : [card, wide]
+  const pick = first.src ? first : second
+  return { ...pick, blurhash: pick.blurhash ?? first.blurhash ?? second.blurhash }
 }
 
-function Backdrop({ slide, shape, motion, current, info }: { slide: SlideCard; shape: Shape; motion: Motion; current: boolean; info?: PageInfo }) {
-  const { src, blurhash } = pickImage(slide, shape)
+function Backdrop({
+  slide,
+  shape,
+  motion,
+  current,
+  play,
+  info,
+}: {
+  slide: SlideCard
+  shape: Shape
+  motion: Motion
+  current: boolean
+  play: boolean
+  info?: PageInfo
+}) {
+  const { src, blurhash, video } = pickImage(slide, shape)
+  const [playing, setPlaying] = useState(false)
   if (!src) {
     return (
       <View style={FILL} className="bg-secondary-700">
@@ -257,11 +292,10 @@ function Backdrop({ slide, shape, motion, current, info }: { slide: SlideCard; s
     )
   }
   if (slide.product) return <ProductShot src={src} blurhash={blurhash} />
-  const img = (
-    <Image recyclingKey={src} source={{ uri: src }} placeholder={blurhash ? { blurhash } : undefined} style={FILL} contentFit="cover" transition={200} />
-  )
+  const img = <Media image={src} video={video} blurhash={blurhash} style={FILL} active={play} onPlaying={setPlaying} />
   if (motion === 'parallax' && info) return <Parallax info={info}>{img}</Parallax>
-  if (motion === 'kenburns') return <KenBurns on={current}>{img}</KenBurns>
+  // The clip is the motion; the zoom waits for it to stop.
+  if (motion === 'kenburns') return <KenBurns on={current && !playing}>{img}</KenBurns>
   return img
 }
 

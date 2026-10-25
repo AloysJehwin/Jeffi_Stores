@@ -68,6 +68,8 @@ export interface HeroSlide {
   hero_image_desktop?: string | null
   blurhash?: string | null
   blurhash_mobile?: string | null
+  /** MP4/WebM banner; `image_url` is its poster. */
+  video_url?: string | null
   href?: string
 }
 

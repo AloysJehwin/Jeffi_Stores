@@ -22,6 +22,7 @@ export { EmptyState, ErrorState, Notice } from './States'
 export { BottomSheet, SheetFooter } from './BottomSheet'
 export { ModalSheet, SheetHeader, type ModalSheetProps } from './ModalSheet'
 export { Lightbox } from './Lightbox'
+export { Media, useVideoAllowed, type MediaProps, type MediaFit } from './Media'
 export { Gradient, type GradientStop, type GradientDir } from './Gradient'
 export { PagerDots, type PagerDotsProps, type DotTone } from './PagerDots'
 export {
