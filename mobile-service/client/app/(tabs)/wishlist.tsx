@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -16,7 +15,7 @@ import { useAuthStore } from '../../src/stores/authStore'
 import { showToast } from '../../src/stores/toastStore'
 import { openHref } from '../../src/lib/links'
 import { status, useTokens } from '../../src/theme'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, Skeleton, Text, useBottomInset } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/wishlist/page.tsx at the mobile breakpoint.
 
@@ -113,7 +112,7 @@ function EmptyCard({ title, body, action, onAction }: { title: string; body: str
 }
 
 export default function WishlistScreen() {
-  const insets = useSafeAreaInsets()
+  const bottomInset = useBottomInset()
   const router = useRouter()
   const qc = useQueryClient()
   const t = useTokens()
@@ -197,24 +196,21 @@ export default function WishlistScreen() {
 
   if (!user) {
     return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <EmptyCard
-            title="Sign in to view your wishlist"
-            body="Save your favorite items to buy them later"
-            action="Sign In"
-            onAction={() => router.push('/(auth)/login')}
-          />
-        </ScrollView>
-      </View>
+      <Screen header={<TopNav />}>
+        <EmptyCard
+          title="Sign in to view your wishlist"
+          body="Save your favorite items to buy them later"
+          action="Sign In"
+          onAction={() => router.push('/(auth)/login')}
+        />
+      </Screen>
     )
   }
 
+  // The account hero runs edge to edge, so these own their ScrollView (Screen's content has a gutter).
   if (isLoading) {
     return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
+      <Screen header={<TopNav />} mode="none">
         <ScrollView scrollEnabled={false} showsVerticalScrollIndicator={false}>
           <AccountMobileHeader />
           <View className="px-4 py-4">
@@ -229,7 +225,7 @@ export default function WishlistScreen() {
             </View>
           </View>
         </ScrollView>
-      </View>
+      </Screen>
     )
   }
 
@@ -237,9 +233,8 @@ export default function WishlistScreen() {
 
   if (items.length === 0) {
     return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        <ScrollView refreshControl={refreshControl} showsVerticalScrollIndicator={false}>
+      <Screen header={<TopNav />} mode="none">
+        <ScrollView refreshControl={refreshControl} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomInset }}>
           <AccountMobileHeader />
           <View className="px-4 py-4">
             <EmptyCard
@@ -250,14 +245,13 @@ export default function WishlistScreen() {
             />
           </View>
         </ScrollView>
-      </View>
+      </Screen>
     )
   }
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      <ScrollView refreshControl={refreshControl} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+    <Screen header={<TopNav />} mode="none">
+      <ScrollView refreshControl={refreshControl} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomInset }}>
         <AccountMobileHeader />
         <View className="px-4 py-4">
           <View className="mb-4 flex-row items-center gap-1.5">
@@ -404,6 +398,6 @@ export default function WishlistScreen() {
           <FeaturedProducts />
         </View>
       </ScrollView>
-    </View>
+    </Screen>
   )
 }

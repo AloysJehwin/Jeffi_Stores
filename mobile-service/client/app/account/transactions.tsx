@@ -1,15 +1,12 @@
 import { useMemo, useState } from 'react'
 import { FlatList, Modal, Pressable, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import TopNav from '../../src/components/layout/TopNav'
 import { listTransactions, type Transaction } from '../../src/api/account'
-import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
 import { FilterChip, InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, StatusPill } from '../../src/components/account/ui'
 import { useTokens } from '../../src/theme'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, Skeleton, Text, useBottomInset } from '../../src/ui'
 
 // Mirror of controller-service components/shared/AccountTransactions.tsx (visitor).
 
@@ -58,7 +55,7 @@ function TransactionsLoading() {
 }
 
 export default function TransactionsScreen() {
-  const insets = useSafeAreaInsets()
+  const bottom = useBottomInset()
   const router = useRouter()
   const t = useTokens()
   const user = useRequireAuth()
@@ -88,38 +85,33 @@ export default function TransactionsScreen() {
     [transactions, filterStatus, filterMethod]
   )
 
-  const header = (
-    <>
-      <AccountMobileHeader />
-      {transactions.length > 0 && (
-        <View className="px-4 pt-4 mb-4 flex-row flex-wrap items-center gap-3">
-          <View className="flex-row flex-wrap items-center gap-1.5">
-            {STATUSES.map(s => (
-              <FilterChip key={s} label={s === 'all' ? 'All' : statusLabel(s)} active={filterStatus === s} onPress={() => setFilterStatus(s)} />
-            ))}
-          </View>
-          {methods.length > 1 && (
-            <Pressable onPress={() => setMethodOpen(true)} className="flex-row items-center gap-1 px-3 py-1 rounded-full border border-border-default bg-surface-elevated">
-              <Text className="text-xs text-foreground-secondary">{filterMethod === 'all' ? 'All Methods' : filterMethod}</Text>
-              <HeroIcon name="chevronDown" size={12} color={t.foregroundSecondary} />
-            </Pressable>
-          )}
+  const header =
+    transactions.length > 0 ? (
+      <View className="px-4 pt-4 mb-4 flex-row flex-wrap items-center gap-3">
+        <View className="flex-row flex-wrap items-center gap-1.5">
+          {STATUSES.map(s => (
+            <FilterChip key={s} label={s === 'all' ? 'All' : statusLabel(s)} active={filterStatus === s} onPress={() => setFilterStatus(s)} />
+          ))}
         </View>
-      )}
-    </>
-  )
+        {methods.length > 1 && (
+          <Pressable onPress={() => setMethodOpen(true)} className="flex-row items-center gap-1 px-3 py-1 rounded-full border border-border-default bg-surface-elevated">
+            <Text className="text-xs text-foreground-secondary">{filterMethod === 'all' ? 'All Methods' : filterMethod}</Text>
+            <HeroIcon name="chevronDown" size={12} color={t.foregroundSecondary} />
+          </Pressable>
+        )}
+      </View>
+    ) : null
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
+    <Screen title="Transactions" mode="none">
       {!user || list.loading ? (
-        <FlatList data={[]} renderItem={null} ListHeaderComponent={<><AccountMobileHeader /><TransactionsLoading /></>} />
+        <FlatList data={[]} renderItem={null} ListHeaderComponent={<TransactionsLoading />} />
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={x => x.id}
           ListHeaderComponent={header}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+          contentContainerStyle={{ paddingBottom: bottom }}
           onEndReached={list.loadMore}
           onEndReachedThreshold={0.5}
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
@@ -190,6 +182,6 @@ export default function TransactionsScreen() {
           </View>
         </Pressable>
       </Modal>
-    </View>
+    </Screen>
   )
 }

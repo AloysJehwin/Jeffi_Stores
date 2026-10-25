@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, BackHandler, InteractionManager, NativeModules, Platform, Pressable, View } from 'react-native'
-import { Text } from '../../src/ui'
+import { Screen, ScreenHeader, Text } from '../../src/ui'
 import { Stack, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import RazorpayCheckout from 'react-native-razorpay'
-import TopNav from '../../src/components/layout/TopNav'
 import { useCheckoutStore, type PlaceOrderRequest } from '../../src/components/checkout/checkoutStore'
 import { createOrderDraft, placeUnpaidOrder } from '../../src/api/orders'
 import { checkPendingPayment, createRazorpayOrder, verifyPayment } from '../../src/api/razorpay'
@@ -244,10 +243,10 @@ export default function CheckoutPaymentScreen() {
     setRetrying(false)
   }
 
+  // No back button: like the hardware back, it can't abandon a payment mid-flight.
   return (
-    <View className="flex-1 bg-surface">
+    <Screen header={<ScreenHeader title="Payment" back={false} />} mode="none">
       <Stack.Screen options={{ gestureEnabled: false }} />
-      <TopNav />
       {phase === 'verifying' ? (
         <View className="flex-1 items-center justify-center px-4 py-8">
           <View className="w-full items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-8">
@@ -290,6 +289,6 @@ export default function CheckoutPaymentScreen() {
           </Text>
         </View>
       )}
-    </View>
+    </Screen>
   )
 }

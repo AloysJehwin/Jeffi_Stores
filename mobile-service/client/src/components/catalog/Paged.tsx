@@ -65,13 +65,13 @@ export { ProductGridSkeleton }
 export function ListingPageSkeleton({ logo = false, cols = 2, gap = 12 }: { logo?: boolean; cols?: 1 | 2; gap?: number }) {
   return (
     <View className="flex-1 overflow-hidden">
+      {/* The name is in the screen header; the band holds the logo and description. */}
       <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-        <Skeleton height={14} width={180} rounded="rounded" className="mb-5" />
         <View className="flex-row items-center gap-4">
           {logo ? <Skeleton width={64} height={64} rounded="rounded-lg" /> : null}
           <View className="flex-1 gap-2.5">
-            <Skeleton height={28} width="60%" />
             <Skeleton height={14} width="85%" />
+            <Skeleton height={14} width="55%" />
           </View>
         </View>
       </View>
@@ -114,22 +114,3 @@ export function EmptyCard({
   )
 }
 
-/** The Home / Section / Page breadcrumb row. */
-export function Breadcrumb({ items }: { items: { label: string; onPress?: () => void }[] }) {
-  return (
-    <View className="flex-row flex-wrap items-center gap-2">
-      {items.map((it, i) => (
-        <View key={i} className="flex-row items-center gap-2">
-          {i > 0 ? <Text className="text-sm text-foreground-muted">/</Text> : null}
-          {it.onPress ? (
-            <Pressable onPress={it.onPress}>
-              <Text className="text-sm text-foreground-muted">{it.label}</Text>
-            </Pressable>
-          ) : (
-            <Text className="text-sm font-medium text-foreground">{it.label}</Text>
-          )}
-        </View>
-      ))}
-    </View>
-  )
-}

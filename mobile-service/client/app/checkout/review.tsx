@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native'
-import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Banknote, Check, Copy, MapPin, ShieldCheck, Truck } from 'lucide-react-native'
-import TopNav from '../../src/components/layout/TopNav'
-import { Text, Skeleton, SummarySkeleton } from '../../src/ui'
+import { Screen, ScreenHeader, Skeleton, SummarySkeleton, Text } from '../../src/ui'
 import AiInsight from '../../src/components/cart/AiInsight'
 import AddressFormModal from '../../src/components/checkout/AddressFormModal'
 import CouponHintBanner from '../../src/components/checkout/CouponHintBanner'
@@ -72,14 +69,10 @@ function AddressSkeleton() {
   )
 }
 
-/** The loaded review's shape: title, address card, item rows, delivery date, summary. */
+/** The loaded review's shape: address card, item rows, delivery date, summary. */
 function ReviewLoading() {
   return (
     <View className="flex-1 overflow-hidden px-4 pt-4">
-      <View className="mb-4 gap-2">
-        <Skeleton height={32} width={200} />
-        <Skeleton height={14} width="80%" rounded="rounded" />
-      </View>
       <View className="gap-6">
         <View className={CARD}>
           <View className="mb-4 flex-row items-center justify-between">
@@ -121,7 +114,6 @@ export default function CheckoutReviewScreen() {
   const router = useRouter()
   const qc = useQueryClient()
   const t = useTokens()
-  const insets = useSafeAreaInsets()
   const params = useLocalSearchParams<{ intent?: string; couponCode?: string; addressId?: string }>()
   const intentToken = params.intent || null
   const couponFromParams = params.couponCode || null
@@ -383,21 +375,17 @@ export default function CheckoutReviewScreen() {
   }
 
   // ── render ──
+  const header = <ScreenHeader title="Order Review" />
   if (!user || authLoading || cartQ.isLoading || intentPending) {
     return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        {!authLoading && !user ? (
-          <View className="flex-1 items-center justify-center px-8">
-            <Text className="mb-4 text-center text-foreground-secondary">Sign in to review your order</Text>
-            <Pressable onPress={() => router.push('/(auth)/login')} className="rounded-lg bg-accent-500 px-6 py-2.5">
-              <Text className="font-semibold text-white">Sign In</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <ReviewLoading />
-        )}
-      </View>
+      <Screen header={header} mode="none" loading={authLoading || !!user} skeleton={<ReviewLoading />}>
+        <View className="flex-1 items-center justify-center px-8">
+          <Text className="mb-4 text-center text-foreground-secondary">Sign in to review your order</Text>
+          <Pressable onPress={() => router.push('/(auth)/login')} className="rounded-lg bg-accent-500 px-6 py-2.5">
+            <Text className="font-semibold text-white">Sign In</Text>
+          </Pressable>
+        </View>
+      </Screen>
     )
   }
 
@@ -420,430 +408,419 @@ export default function CheckoutReviewScreen() {
       }))
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      <KeyboardScroll
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: insets.bottom + 32 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="mb-4">
-          <Text className="text-3xl font-bold text-foreground">Order Review</Text>
-          <Text className="mt-2 text-foreground-secondary">Review your order details before placing the order</Text>
-        </View>
+    <Screen header={header} mode="keyboard" scrollProps={{ showsVerticalScrollIndicator: false }}>
+      <View className="gap-4">
+        <View className="gap-6">
+          {recapItems.length > 0 && (
+            <AiInsight
+              kind="recap"
+              className="-mb-2"
+              body={{
+                cart: recapItems,
+                total: Math.round((cartSubtotal || 0) * 100) / 100,
+                itemCount: recapItems.reduce((s, c) => s + c.qty, 0),
+              }}
+            />
+          )}
 
-        <View className="gap-4">
-          <View className="gap-6">
-            {recapItems.length > 0 && (
-              <AiInsight
-                kind="recap"
-                className="-mb-2"
-                body={{
-                  cart: recapItems,
-                  total: Math.round((cartSubtotal || 0) * 100) / 100,
-                  itemCount: recapItems.reduce((s, c) => s + c.qty, 0),
-                }}
-              />
-            )}
-
-            {/* Delivery Address */}
-            <View className={CARD}>
-              <View className="mb-4 flex-row items-center justify-between">
-                <Text className="text-xl font-bold text-foreground">Delivery Address</Text>
-                <Pressable onPress={() => setShowAddressModal(true)}>
-                  <Text className="text-sm font-medium text-accent-600 dark:text-accent-400">+ Add New Address</Text>
-                </Pressable>
-              </View>
-
-              {addrQ.isLoading ? (
-                <View className="gap-3">
-                  <AddressSkeleton />
-                  <AddressSkeleton />
-                </View>
-              ) : addresses.length === 0 ? (
-                <View className="items-center py-8">
-                  <View className="mb-4">
-                    <MapPin size={64} color={t.foregroundMuted} strokeWidth={1} />
-                  </View>
-                  <Text className="mb-4 text-foreground-secondary">No saved addresses found</Text>
-                  <Pressable onPress={() => setShowAddressModal(true)} className="rounded-lg bg-accent-500 px-6 py-2 active:bg-accent-600">
-                    <Text className="font-medium text-white">Add Delivery Address</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <View className="gap-3">
-                  {addresses.map(address => {
-                    const selected = selectedAddress?.id === address.id
-                    return (
-                      <Pressable
-                        key={address.id}
-                        onPress={() => setSelectedAddress(address)}
-                        className={`flex-row items-start gap-4 rounded-lg border-2 p-4 ${selected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default'}`}
-                      >
-                        <Radio checked={selected} className="mt-1" />
-                        <View className="flex-1">
-                          <View className="mb-1 flex-row flex-wrap items-center gap-2">
-                            <Text className="font-semibold text-foreground">{address.full_name}</Text>
-                            {address.is_default ? (
-                              <View className="rounded bg-green-100 px-2 py-0.5 dark:bg-green-900/30">
-                                <Text className="text-xs text-green-800 dark:text-green-300">Default</Text>
-                              </View>
-                            ) : null}
-                            <View className="rounded bg-surface-secondary px-2 py-0.5">
-                              <Text className="text-xs capitalize text-foreground-secondary">{address.address_type}</Text>
-                            </View>
-                          </View>
-                          <Text className="text-sm text-foreground-secondary">
-                            {address.address_line1}
-                            {address.address_line2 ? `, ${address.address_line2}` : ''}
-                          </Text>
-                          {address.landmark ? <Text className="text-sm text-foreground-secondary">Landmark: {address.landmark}</Text> : null}
-                          <Text className="text-sm text-foreground-secondary">
-                            {address.city}, {address.state} {address.postal_code}
-                          </Text>
-                          <Text className="mt-1 text-sm text-foreground-secondary">Phone: {address.phone}</Text>
-                        </View>
-                      </Pressable>
-                    )
-                  })}
-                </View>
-              )}
+          {/* Delivery Address */}
+          <View className={CARD}>
+            <View className="mb-4 flex-row items-center justify-between">
+              <Text className="text-xl font-bold text-foreground">Delivery Address</Text>
+              <Pressable onPress={() => setShowAddressModal(true)}>
+                <Text className="text-sm font-medium text-accent-600 dark:text-accent-400">+ Add New Address</Text>
+              </Pressable>
             </View>
 
-            {/* Order Items */}
-            <View className={CARD}>
-              <Text className="mb-6 text-xl font-bold text-foreground">
-                {isBuyNow ? 'Item' : `Order Items (${cartCount} ${cartCount === 1 ? 'item' : 'items'})`}
-              </Text>
-              <View className="gap-4">
-                {isBuyNow ? (
-                  <BuyNowReviewRow item={buyNow!} imageUrl={imageQ.data ?? null} gstEnabled={gstEnabled} />
+            {addrQ.isLoading ? (
+              <View className="gap-3">
+                <AddressSkeleton />
+                <AddressSkeleton />
+              </View>
+            ) : addresses.length === 0 ? (
+              <View className="items-center py-8">
+                <View className="mb-4">
+                  <MapPin size={64} color={t.foregroundMuted} strokeWidth={1} />
+                </View>
+                <Text className="mb-4 text-foreground-secondary">No saved addresses found</Text>
+                <Pressable onPress={() => setShowAddressModal(true)} className="rounded-lg bg-accent-500 px-6 py-2 active:bg-accent-600">
+                  <Text className="font-medium text-white">Add Delivery Address</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View className="gap-3">
+                {addresses.map(address => {
+                  const selected = selectedAddress?.id === address.id
+                  return (
+                    <Pressable
+                      key={address.id}
+                      onPress={() => setSelectedAddress(address)}
+                      className={`flex-row items-start gap-4 rounded-lg border-2 p-4 ${selected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default'}`}
+                    >
+                      <Radio checked={selected} className="mt-1" />
+                      <View className="flex-1">
+                        <View className="mb-1 flex-row flex-wrap items-center gap-2">
+                          <Text className="font-semibold text-foreground">{address.full_name}</Text>
+                          {address.is_default ? (
+                            <View className="rounded bg-green-100 px-2 py-0.5 dark:bg-green-900/30">
+                              <Text className="text-xs text-green-800 dark:text-green-300">Default</Text>
+                            </View>
+                          ) : null}
+                          <View className="rounded bg-surface-secondary px-2 py-0.5">
+                            <Text className="text-xs capitalize text-foreground-secondary">{address.address_type}</Text>
+                          </View>
+                        </View>
+                        <Text className="text-sm text-foreground-secondary">
+                          {address.address_line1}
+                          {address.address_line2 ? `, ${address.address_line2}` : ''}
+                        </Text>
+                        {address.landmark ? <Text className="text-sm text-foreground-secondary">Landmark: {address.landmark}</Text> : null}
+                        <Text className="text-sm text-foreground-secondary">
+                          {address.city}, {address.state} {address.postal_code}
+                        </Text>
+                        <Text className="mt-1 text-sm text-foreground-secondary">Phone: {address.phone}</Text>
+                      </View>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            )}
+          </View>
+
+          {/* Order Items */}
+          <View className={CARD}>
+            <Text className="mb-6 text-xl font-bold text-foreground">
+              {isBuyNow ? 'Item' : `Order Items (${cartCount} ${cartCount === 1 ? 'item' : 'items'})`}
+            </Text>
+            <View className="gap-4">
+              {isBuyNow ? (
+                <BuyNowReviewRow item={buyNow!} imageUrl={imageQ.data ?? null} gstEnabled={gstEnabled} />
+              ) : (
+                cartItems.map((item, i) => (
+                  <CartReviewRow key={item.id} item={item} gstEnabled={gstEnabled} last={i === cartItems.length - 1} />
+                ))
+              )}
+            </View>
+            {!isBuyNow && (
+              <Pressable onPress={() => router.navigate('/(tabs)/cart')} className="mt-4">
+                <Text className="text-center font-medium text-accent-600 dark:text-accent-400">← Modify Cart</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {/* Expected Delivery Date */}
+          <View className="rounded-lg border border-border-default bg-surface-elevated p-4">
+            <View className="flex-row items-start gap-4">
+              <View className="mt-0.5">
+                <Truck size={32} color={t.accent500} strokeWidth={1.5} />
+              </View>
+              <View className="flex-1">
+                {allDigital ? (
+                  <>
+                    <Text className="text-sm text-foreground-secondary">Delivery</Text>
+                    <Text className="text-lg font-semibold text-foreground">Delivered to your vault</Text>
+                    <Text className="text-sm text-foreground-muted">Available to open as soon as payment completes</Text>
+                  </>
+                ) : !selectedAddress ? (
+                  <Text className="text-sm text-foreground-muted">Select a delivery address to see expected delivery date</Text>
+                ) : eddQ.isLoading ? (
+                  <View className="gap-2 py-0.5">
+                    <Skeleton height={12} width={110} rounded="rounded" />
+                    <Skeleton height={20} width={180} />
+                  </View>
+                ) : eddQ.data?.edd ? (
+                  <>
+                    <Text className="text-sm text-foreground-secondary">Expected Delivery</Text>
+                    <Text className="text-lg font-semibold text-foreground">{eddLabel(eddQ.data.edd)}</Text>
+                  </>
                 ) : (
-                  cartItems.map((item, i) => (
-                    <CartReviewRow key={item.id} item={item} gstEnabled={gstEnabled} last={i === cartItems.length - 1} />
-                  ))
+                  <Text className="text-sm text-foreground-muted">Delivery date unavailable for this pincode</Text>
                 )}
               </View>
-              {!isBuyNow && (
-                <Pressable onPress={() => router.navigate('/(tabs)/cart')} className="mt-4">
-                  <Text className="text-center font-medium text-accent-600 dark:text-accent-400">← Modify Cart</Text>
-                </Pressable>
-              )}
             </View>
+          </View>
 
-            {/* Expected Delivery Date */}
+          {/* Delivery Promise */}
+          {!allDigital && (
             <View className="rounded-lg border border-border-default bg-surface-elevated p-4">
               <View className="flex-row items-start gap-4">
                 <View className="mt-0.5">
-                  <Truck size={32} color={t.accent500} strokeWidth={1.5} />
+                  <Copy size={32} color={t.accent500} strokeWidth={1.5} />
                 </View>
                 <View className="flex-1">
-                  {allDigital ? (
-                    <>
-                      <Text className="text-sm text-foreground-secondary">Delivery</Text>
-                      <Text className="text-lg font-semibold text-foreground">Delivered to your vault</Text>
-                      <Text className="text-sm text-foreground-muted">Available to open as soon as payment completes</Text>
-                    </>
-                  ) : !selectedAddress ? (
-                    <Text className="text-sm text-foreground-muted">Select a delivery address to see expected delivery date</Text>
-                  ) : eddQ.isLoading ? (
-                    <View className="gap-2 py-0.5">
-                      <Skeleton height={12} width={110} rounded="rounded" />
-                      <Skeleton height={20} width={180} />
-                    </View>
-                  ) : eddQ.data?.edd ? (
-                    <>
-                      <Text className="text-sm text-foreground-secondary">Expected Delivery</Text>
-                      <Text className="text-lg font-semibold text-foreground">{eddLabel(eddQ.data.edd)}</Text>
-                    </>
-                  ) : (
-                    <Text className="text-sm text-foreground-muted">Delivery date unavailable for this pincode</Text>
-                  )}
+                  <Text className="mb-2 font-semibold text-foreground">Our Delivery Promise</Text>
+                  <View className="gap-1.5">
+                    {PROMISES.map(p => (
+                      <View key={p} className="flex-row items-center gap-2">
+                        <Check size={16} color={status.success} strokeWidth={3} />
+                        <Text className="flex-1 text-sm text-foreground-secondary">{p}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               </View>
             </View>
+          )}
+        </View>
 
-            {/* Delivery Promise */}
-            {!allDigital && (
-              <View className="rounded-lg border border-border-default bg-surface-elevated p-4">
-                <View className="flex-row items-start gap-4">
-                  <View className="mt-0.5">
-                    <Copy size={32} color={t.accent500} strokeWidth={1.5} />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="mb-2 font-semibold text-foreground">Our Delivery Promise</Text>
-                    <View className="gap-1.5">
-                      {PROMISES.map(p => (
-                        <View key={p} className="flex-row items-center gap-2">
-                          <Check size={16} color={status.success} strokeWidth={3} />
-                          <Text className="flex-1 text-sm text-foreground-secondary">{p}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
+        {/* Order Summary */}
+        <View className={CARD}>
+          <Text className="mb-6 text-xl font-bold text-foreground">Order Summary</Text>
+
+          <View className="mb-6 gap-3">
+            <View className="flex-row justify-between">
+              <Text className="text-foreground-secondary">Subtotal{!isBuyNow ? ` (${cartCount} items)` : ''}</Text>
+              <Text className="text-foreground-secondary">{money(cartSubtotal)}</Text>
+            </View>
+            {!isBuyNow && gstEnabled && (
+              <View className="flex-row justify-between">
+                <Text className="text-sm text-foreground-muted">Incl. GST</Text>
+                <Text className="text-sm text-foreground-muted">{money(tax)}</Text>
+              </View>
+            )}
+            {appliedCoupon && (
+              <View className="flex-row justify-between">
+                <Text className="text-sm font-medium text-green-600 dark:text-green-400">Coupon ({appliedCoupon.code})</Text>
+                <Text className="text-sm font-medium text-green-600 dark:text-green-400">−{money(appliedCoupon.discountAmount)}</Text>
+              </View>
+            )}
+            {businessDiscountAmount > 0 && (
+              <View className="flex-row justify-between">
+                <Text className="text-sm font-medium text-green-600 dark:text-green-400">Business Discount</Text>
+                <Text className="text-sm font-medium text-green-600 dark:text-green-400">−{money(businessDiscountAmount)}</Text>
+              </View>
+            )}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-foreground-secondary">Delivery Charges</Text>
+              {allDigital ? (
+                <Text className="font-medium text-green-600 dark:text-green-400">Delivered to your vault</Text>
+              ) : isLoadingShipping ? (
+                <Skeleton height={14} width={64} />
+              ) : shippingError ? (
+                <Text className="text-sm text-yellow-600 dark:text-yellow-400">Unavailable</Text>
+              ) : shippingCharge != null ? (
+                shippingCharge === 0 ? (
+                  <Text className="font-medium text-green-600 dark:text-green-400">Free</Text>
+                ) : (
+                  <Text className="font-medium text-foreground-secondary">{money(shippingCharge)}</Text>
+                )
+              ) : (
+                <Text className="text-sm text-foreground-muted">Select address</Text>
+              )}
+            </View>
+            {shippingCharge === 0 && shippingMeta?.source === 'free_threshold' && shippingMeta.freeShippingThreshold ? (
+              <Text className="-mt-1 text-xs text-green-600 dark:text-green-400">
+                Free delivery on orders above ₹{shippingMeta.freeShippingThreshold.toLocaleString('en-IN')}
+              </Text>
+            ) : null}
+            {shippingCharge === 0 && shippingMeta?.source === 'admin_disabled' ? (
+              <Text className="-mt-1 text-xs text-green-600 dark:text-green-400">Free delivery on every order</Text>
+            ) : null}
+            {isCod && codFee > 0 && (
+              <View className="flex-row justify-between">
+                <Text className="text-sm text-foreground-secondary">COD handling fee</Text>
+                <Text className="text-sm text-foreground-secondary">{money(codFee)}</Text>
+              </View>
+            )}
+            <View className="border-t border-border-default pt-3">
+              <View className="flex-row justify-between">
+                <Text className="text-xl font-bold text-foreground">Total</Text>
+                <Text className="text-xl font-bold text-foreground">{money(finalTotal)}</Text>
+              </View>
+              {gstEnabled && <Text className="mt-1 text-xs text-foreground-muted">Price inclusive of all taxes</Text>}
+            </View>
+          </View>
+
+          {/* Coupon */}
+          <View className="mb-6">
+            {appliedCoupon ? (
+              <View className="flex-row items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800 dark:bg-green-900/20">
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code}</Text>
+                  {appliedCoupon.description ? (
+                    <Text className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</Text>
+                  ) : null}
                 </View>
+                <Pressable
+                  onPress={() => {
+                    setAppliedCoupon(null)
+                    setCouponCode('')
+                    setCouponError('')
+                  }}
+                  className="ml-3"
+                >
+                  <Text className="text-xs font-medium text-red-500">Remove</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View>
+                <CouponHintBanner hidden={!!couponFromParams || !!hintCode} onApply={setHintCode} />
+                <Text className="mb-1.5 text-sm font-medium text-foreground-secondary">Have a coupon?</Text>
+                <View className="flex-row gap-2">
+                  <TextInput
+                    value={couponCode}
+                    onChangeText={v => {
+                      setCouponCode(v.toUpperCase())
+                      setCouponError('')
+                    }}
+                    onSubmitEditing={handleApplyCoupon}
+                    placeholder="Enter code"
+                    placeholderTextColor={t.foregroundMuted}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    className="flex-1 rounded-lg border border-border-secondary bg-surface px-3 py-2 text-sm text-foreground"
+                  />
+                  <Pressable
+                    onPress={handleApplyCoupon}
+                    disabled={isApplyingCoupon || !couponCode.trim()}
+                    className={`justify-center rounded-lg px-4 py-2 ${isApplyingCoupon || !couponCode.trim() ? 'bg-accent-300' : 'bg-accent-500 active:bg-accent-600'}`}
+                  >
+                    <Text className="text-sm font-semibold text-white">{isApplyingCoupon ? '...' : 'Apply'}</Text>
+                  </Pressable>
+                </View>
+                {couponError ? <Text className="mt-1 text-xs text-red-500">{couponError}</Text> : null}
               </View>
             )}
           </View>
 
-          {/* Order Summary */}
-          <View className={CARD}>
-            <Text className="mb-6 text-xl font-bold text-foreground">Order Summary</Text>
+          {belowMinimum && (
+            <Text className="mb-3 text-center text-xs font-medium text-red-500">
+              Minimum order ₹{minOrderAmount} — add {money(minOrderAmount - cartSubtotal)} more to proceed.
+            </Text>
+          )}
 
-            <View className="mb-6 gap-3">
-              <View className="flex-row justify-between">
-                <Text className="text-foreground-secondary">Subtotal{!isBuyNow ? ` (${cartCount} items)` : ''}</Text>
-                <Text className="text-foreground-secondary">{money(cartSubtotal)}</Text>
-              </View>
-              {!isBuyNow && gstEnabled && (
-                <View className="flex-row justify-between">
-                  <Text className="text-sm text-foreground-muted">Incl. GST</Text>
-                  <Text className="text-sm text-foreground-muted">{money(tax)}</Text>
-                </View>
-              )}
-              {appliedCoupon && (
-                <View className="flex-row justify-between">
-                  <Text className="text-sm font-medium text-green-600 dark:text-green-400">Coupon ({appliedCoupon.code})</Text>
-                  <Text className="text-sm font-medium text-green-600 dark:text-green-400">−{money(appliedCoupon.discountAmount)}</Text>
-                </View>
-              )}
-              {businessDiscountAmount > 0 && (
-                <View className="flex-row justify-between">
-                  <Text className="text-sm font-medium text-green-600 dark:text-green-400">Business Discount</Text>
-                  <Text className="text-sm font-medium text-green-600 dark:text-green-400">−{money(businessDiscountAmount)}</Text>
-                </View>
-              )}
-              <View className="flex-row items-center justify-between">
-                <Text className="text-foreground-secondary">Delivery Charges</Text>
-                {allDigital ? (
-                  <Text className="font-medium text-green-600 dark:text-green-400">Delivered to your vault</Text>
-                ) : isLoadingShipping ? (
-                  <Skeleton height={14} width={64} />
-                ) : shippingError ? (
-                  <Text className="text-sm text-yellow-600 dark:text-yellow-400">Unavailable</Text>
-                ) : shippingCharge != null ? (
-                  shippingCharge === 0 ? (
-                    <Text className="font-medium text-green-600 dark:text-green-400">Free</Text>
-                  ) : (
-                    <Text className="font-medium text-foreground-secondary">{money(shippingCharge)}</Text>
-                  )
-                ) : (
-                  <Text className="text-sm text-foreground-muted">Select address</Text>
-                )}
-              </View>
-              {shippingCharge === 0 && shippingMeta?.source === 'free_threshold' && shippingMeta.freeShippingThreshold ? (
-                <Text className="-mt-1 text-xs text-green-600 dark:text-green-400">
-                  Free delivery on orders above ₹{shippingMeta.freeShippingThreshold.toLocaleString('en-IN')}
-                </Text>
-              ) : null}
-              {shippingCharge === 0 && shippingMeta?.source === 'admin_disabled' ? (
-                <Text className="-mt-1 text-xs text-green-600 dark:text-green-400">Free delivery on every order</Text>
-              ) : null}
-              {isCod && codFee > 0 && (
-                <View className="flex-row justify-between">
-                  <Text className="text-sm text-foreground-secondary">COD handling fee</Text>
-                  <Text className="text-sm text-foreground-secondary">{money(codFee)}</Text>
-                </View>
-              )}
-              <View className="border-t border-border-default pt-3">
-                <View className="flex-row justify-between">
-                  <Text className="text-xl font-bold text-foreground">Total</Text>
-                  <Text className="text-xl font-bold text-foreground">{money(finalTotal)}</Text>
-                </View>
-                {gstEnabled && <Text className="mt-1 text-xs text-foreground-muted">Price inclusive of all taxes</Text>}
-              </View>
-            </View>
+          {/* Order Notes */}
+          <View className="mb-4">
+            <Text className="mb-1.5 text-sm font-medium text-foreground-secondary">Order Notes (Optional)</Text>
+            <TextInput
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+              placeholder="Any special instructions..."
+              placeholderTextColor={t.foregroundMuted}
+              className="min-h-[72px] w-full rounded-lg border border-border-secondary bg-surface px-3 py-2 text-sm text-foreground"
+            />
+          </View>
 
-            {/* Coupon */}
-            <View className="mb-6">
-              {appliedCoupon ? (
-                <View className="flex-row items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800 dark:bg-green-900/20">
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code}</Text>
-                    {appliedCoupon.description ? (
-                      <Text className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</Text>
-                    ) : null}
-                  </View>
-                  <Pressable
-                    onPress={() => {
-                      setAppliedCoupon(null)
-                      setCouponCode('')
-                      setCouponError('')
-                    }}
-                    className="ml-3"
-                  >
-                    <Text className="text-xs font-medium text-red-500">Remove</Text>
-                  </Pressable>
-                </View>
-              ) : (
+          {/* Payment Method */}
+          <View className="mb-4 gap-2">
+            <Text className="text-sm font-medium text-foreground-secondary">Payment Method</Text>
+            {razorpayEnabled && (
+              <Pressable
+                onPress={() => setPaymentMethod('razorpay')}
+                className={`flex-row items-center gap-3 rounded-lg border-2 p-3 ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default'}`}
+              >
+                <Radio checked={paymentMethod === 'razorpay'} />
                 <View>
-                  <CouponHintBanner hidden={!!couponFromParams || !!hintCode} onApply={setHintCode} />
-                  <Text className="mb-1.5 text-sm font-medium text-foreground-secondary">Have a coupon?</Text>
-                  <View className="flex-row gap-2">
-                    <TextInput
-                      value={couponCode}
-                      onChangeText={v => {
-                        setCouponCode(v.toUpperCase())
-                        setCouponError('')
-                      }}
-                      onSubmitEditing={handleApplyCoupon}
-                      placeholder="Enter code"
-                      placeholderTextColor={t.foregroundMuted}
-                      autoCapitalize="characters"
-                      autoCorrect={false}
-                      returnKeyType="done"
-                      className="flex-1 rounded-lg border border-border-secondary bg-surface px-3 py-2 text-sm text-foreground"
-                    />
-                    <Pressable
-                      onPress={handleApplyCoupon}
-                      disabled={isApplyingCoupon || !couponCode.trim()}
-                      className={`justify-center rounded-lg px-4 py-2 ${isApplyingCoupon || !couponCode.trim() ? 'bg-accent-300' : 'bg-accent-500 active:bg-accent-600'}`}
-                    >
-                      <Text className="text-sm font-semibold text-white">{isApplyingCoupon ? '...' : 'Apply'}</Text>
-                    </Pressable>
-                  </View>
-                  {couponError ? <Text className="mt-1 text-xs text-red-500">{couponError}</Text> : null}
+                  <Text className="text-sm font-semibold text-foreground">Pay Online</Text>
+                  <Text className="text-xs text-foreground-secondary">UPI, Cards, Net Banking</Text>
                 </View>
-              )}
-            </View>
-
-            {belowMinimum && (
-              <Text className="mb-3 text-center text-xs font-medium text-red-500">
-                Minimum order ₹{minOrderAmount} — add {money(minOrderAmount - cartSubtotal)} more to proceed.
+              </Pressable>
+            )}
+            {codAvailable && (
+              <Pressable
+                onPress={() => setPaymentMethod('cod')}
+                className={`flex-row items-center gap-3 rounded-lg border-2 p-3 ${paymentMethod === 'cod' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default'}`}
+              >
+                <Radio checked={paymentMethod === 'cod'} />
+                <View>
+                  <Text className="text-sm font-semibold text-foreground">Cash on Delivery</Text>
+                  <Text className="text-xs text-foreground-secondary">Pay when your order arrives</Text>
+                </View>
+              </Pressable>
+            )}
+            {noPaymentMethod && <Text className="text-xs text-red-600 dark:text-red-400">No payment method is available for this order.</Text>}
+            {!serviceable && (
+              <Text className="text-xs text-red-600 dark:text-red-400">
+                Delivery is not available to this pincode. Please use a different delivery address.
               </Text>
             )}
+          </View>
 
-            {/* Order Notes */}
-            <View className="mb-4">
-              <Text className="mb-1.5 text-sm font-medium text-foreground-secondary">Order Notes (Optional)</Text>
-              <TextInput
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-                placeholder="Any special instructions..."
-                placeholderTextColor={t.foregroundMuted}
-                className="min-h-[72px] w-full rounded-lg border border-border-secondary bg-surface px-3 py-2 text-sm text-foreground"
-              />
-            </View>
-
-            {/* Payment Method */}
-            <View className="mb-4 gap-2">
-              <Text className="text-sm font-medium text-foreground-secondary">Payment Method</Text>
-              {razorpayEnabled && (
-                <Pressable
-                  onPress={() => setPaymentMethod('razorpay')}
-                  className={`flex-row items-center gap-3 rounded-lg border-2 p-3 ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default'}`}
-                >
-                  <Radio checked={paymentMethod === 'razorpay'} />
-                  <View>
-                    <Text className="text-sm font-semibold text-foreground">Pay Online</Text>
-                    <Text className="text-xs text-foreground-secondary">UPI, Cards, Net Banking</Text>
-                  </View>
-                </Pressable>
-              )}
-              {codAvailable && (
-                <Pressable
-                  onPress={() => setPaymentMethod('cod')}
-                  className={`flex-row items-center gap-3 rounded-lg border-2 p-3 ${paymentMethod === 'cod' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default'}`}
-                >
-                  <Radio checked={paymentMethod === 'cod'} />
-                  <View>
-                    <Text className="text-sm font-semibold text-foreground">Cash on Delivery</Text>
-                    <Text className="text-xs text-foreground-secondary">Pay when your order arrives</Text>
-                  </View>
-                </Pressable>
-              )}
-              {noPaymentMethod && <Text className="text-xs text-red-600 dark:text-red-400">No payment method is available for this order.</Text>}
-              {!serviceable && (
-                <Text className="text-xs text-red-600 dark:text-red-400">
-                  Delivery is not available to this pincode. Please use a different delivery address.
-                </Text>
+          {submitError ? (
+            <View className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-800 dark:bg-red-900/30">
+              <Text className="text-sm text-red-700 dark:text-red-300">{submitError}</Text>
+              {existingOrder && (
+                <View className="mt-2 flex-row flex-wrap gap-2">
+                  <Pressable
+                    onPress={() => router.push(`/orders/${existingOrder.id}`)}
+                    className="rounded-lg bg-accent-500 px-3 py-1.5 active:bg-accent-600"
+                  >
+                    <Text className="text-xs font-medium text-white">Go to Order #{existingOrder.orderNumber}</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleCancelPrevious}
+                    disabled={cancellingPrevious}
+                    className={`rounded-lg px-3 py-1.5 ${cancellingPrevious ? 'bg-red-300' : 'bg-red-600 active:bg-red-700'}`}
+                  >
+                    <Text className="text-xs font-medium text-white">{cancellingPrevious ? 'Cancelling...' : 'Cancel Previous Order'}</Text>
+                  </Pressable>
+                </View>
               )}
             </View>
+          ) : null}
 
-            {submitError ? (
-              <View className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-800 dark:bg-red-900/30">
-                <Text className="text-sm text-red-700 dark:text-red-300">{submitError}</Text>
-                {existingOrder && (
-                  <View className="mt-2 flex-row flex-wrap gap-2">
-                    <Pressable
-                      onPress={() => router.push(`/orders/${existingOrder.id}`)}
-                      className="rounded-lg bg-accent-500 px-3 py-1.5 active:bg-accent-600"
-                    >
-                      <Text className="text-xs font-medium text-white">Go to Order #{existingOrder.orderNumber}</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={handleCancelPrevious}
-                      disabled={cancellingPrevious}
-                      className={`rounded-lg px-3 py-1.5 ${cancellingPrevious ? 'bg-red-300' : 'bg-red-600 active:bg-red-700'}`}
-                    >
-                      <Text className="text-xs font-medium text-white">{cancellingPrevious ? 'Cancelling...' : 'Cancel Previous Order'}</Text>
-                    </Pressable>
+          {noPaymentMethod ? (
+            <View className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-800 dark:bg-red-900/30">
+              <Text className="text-sm text-red-700 dark:text-red-300">
+                We are unable to accept orders right now due to a technical issue. Please try again later or contact support.
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={handleSubmit}
+              disabled={placeDisabled}
+              className={`w-full flex-row items-center justify-center rounded-lg px-6 py-3 ${placeDisabled ? 'bg-gray-300 dark:bg-gray-700' : 'bg-accent-500 active:bg-accent-600'}`}
+            >
+              {isLoadingShipping ? (
+                <>
+                  <ActivityIndicator size="small" color={status.white} />
+                  <Text className="ml-2 font-semibold text-white">Calculating delivery…</Text>
+                </>
+              ) : paymentMethod === 'razorpay' && razorpayEnabled ? (
+                <>
+                  <ShieldCheck size={20} color={status.white} strokeWidth={2} />
+                  <Text className="ml-2 font-semibold text-white">Pay {money(finalTotal)}</Text>
+                </>
+              ) : paymentMethod === 'cod' ? (
+                <>
+                  <Text className="font-semibold text-white">Place Order — Pay on Delivery</Text>
+                  <View className="ml-2">
+                    <Banknote size={20} color={status.white} strokeWidth={2} />
                   </View>
-                )}
-              </View>
-            ) : null}
+                </>
+              ) : (
+                <>
+                  <Text className="font-semibold text-white">Place Order</Text>
+                  <View className="ml-2">
+                    <Check size={20} color={status.white} strokeWidth={2} />
+                  </View>
+                </>
+              )}
+            </Pressable>
+          )}
 
-            {noPaymentMethod ? (
-              <View className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-800 dark:bg-red-900/30">
-                <Text className="text-sm text-red-700 dark:text-red-300">
-                  We are unable to accept orders right now due to a technical issue. Please try again later or contact support.
-                </Text>
-              </View>
-            ) : (
-              <Pressable
-                onPress={handleSubmit}
-                disabled={placeDisabled}
-                className={`w-full flex-row items-center justify-center rounded-lg px-6 py-3 ${placeDisabled ? 'bg-gray-300 dark:bg-gray-700' : 'bg-accent-500 active:bg-accent-600'}`}
-              >
-                {isLoadingShipping ? (
-                  <>
-                    <ActivityIndicator size="small" color={status.white} />
-                    <Text className="ml-2 font-semibold text-white">Calculating delivery…</Text>
-                  </>
-                ) : paymentMethod === 'razorpay' && razorpayEnabled ? (
-                  <>
-                    <ShieldCheck size={20} color={status.white} strokeWidth={2} />
-                    <Text className="ml-2 font-semibold text-white">Pay {money(finalTotal)}</Text>
-                  </>
-                ) : paymentMethod === 'cod' ? (
-                  <>
-                    <Text className="font-semibold text-white">Place Order — Pay on Delivery</Text>
-                    <View className="ml-2">
-                      <Banknote size={20} color={status.white} strokeWidth={2} />
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <Text className="font-semibold text-white">Place Order</Text>
-                    <View className="ml-2">
-                      <Check size={20} color={status.white} strokeWidth={2} />
-                    </View>
-                  </>
-                )}
-              </Pressable>
-            )}
+          {isBuyNow ? (
+            <Pressable onPress={() => router.back()} className="mt-4">
+              <Text className="text-center font-medium text-foreground-secondary">← Go Back</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => router.navigate('/(tabs)/cart')} className="mt-4">
+              <Text className="text-center font-medium text-foreground-secondary">← Back to Cart</Text>
+            </Pressable>
+          )}
 
-            {isBuyNow ? (
-              <Pressable onPress={() => router.back()} className="mt-4">
-                <Text className="text-center font-medium text-foreground-secondary">← Go Back</Text>
-              </Pressable>
-            ) : (
-              <Pressable onPress={() => router.navigate('/(tabs)/cart')} className="mt-4">
-                <Text className="text-center font-medium text-foreground-secondary">← Back to Cart</Text>
-              </Pressable>
-            )}
-
-            <View className="mt-6 border-t border-border-default pt-6">
-              <View className="flex-row items-center gap-2">
-                <ShieldCheck size={20} color={status.success} strokeWidth={2} />
-                <Text className="text-sm text-foreground-secondary">Secure Checkout</Text>
-              </View>
+          <View className="mt-6 border-t border-border-default pt-6">
+            <View className="flex-row items-center gap-2">
+              <ShieldCheck size={20} color={status.success} strokeWidth={2} />
+              <Text className="text-sm text-foreground-secondary">Secure Checkout</Text>
             </View>
           </View>
         </View>
-      </KeyboardScroll>
+      </View>
 
       <AddressFormModal
         isOpen={showAddressModal}
@@ -855,7 +832,7 @@ export default function CheckoutReviewScreen() {
           qc.invalidateQueries({ queryKey: ['addresses'] })
         }}
       />
-    </View>
+    </Screen>
   )
 }
 

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Pressable, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useColorScheme } from 'nativewind'
@@ -18,7 +17,7 @@ import { EmptyCard, InfiniteFooter, type InfiniteControl } from '../../src/compo
 import { SquaresIcon, TableIcon } from '../../src/components/catalog/icons'
 import { listingKey, readListingParams, toRouteParams, type ListingParams } from '../../src/components/catalog/listing'
 import { useCompareStore } from '../../src/stores/compareStore'
-import { Text, ProductGridSkeleton, Skeleton } from '../../src/ui'
+import { ProductGridSkeleton, Screen, Skeleton, Text, useBottomInset } from '../../src/ui'
 import { accent, useTokens } from '../../src/theme'
 import type { HomeSection } from '../../src/types/home'
 
@@ -68,7 +67,6 @@ const pairs = (rows: ListingCard[], prefix: string): Item[] =>
   Array.from({ length: Math.ceil(rows.length / 2) }, (_, i) => ({ type: 'pair' as const, key: `${prefix}${rows[i * 2].id}`, rows: rows.slice(i * 2, i * 2 + 2) }))
 
 export default function ProductsScreen() {
-  const insets = useSafeAreaInsets()
   const router = useRouter()
   const t = useTokens()
   const dark = useColorScheme().colorScheme === 'dark'
@@ -82,6 +80,7 @@ export default function ProductsScreen() {
   const [view, setView] = useState<'grid' | 'table'>('grid')
   const grouped = params.sort === 'category'
   const compareCount = useCompareStore(s => s.compareList.length)
+  const bottomInset = useBottomInset(compareCount >= 2 ? 96 : 24)
 
   // Grouped by category the web shows one page and no pager.
   const query = useInfiniteQuery({
@@ -210,13 +209,12 @@ export default function ProductsScreen() {
         </View>
       ) : null}
       <RecentlyViewed section={RECENT} data={undefined as never} />
-      <View style={{ height: (compareCount >= 2 ? 96 : 24) + insets.bottom }} />
+      <View style={{ height: bottomInset }} />
     </View>
   )
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
+    <Screen header={<TopNav />} mode="none">
       <FlatList
         ref={listRef}
         data={items}
@@ -280,6 +278,6 @@ export default function ProductsScreen() {
         onApply={apply}
       />
       <CompareBar />
-    </View>
+    </Screen>
   )
 }

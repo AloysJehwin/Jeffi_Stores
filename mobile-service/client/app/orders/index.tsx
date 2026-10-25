@@ -1,16 +1,13 @@
 import { useState } from 'react'
 import { Alert, FlatList, Pressable, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import TopNav from '../../src/components/layout/TopNav'
 import { cancelOrder } from '../../src/api/orders'
 import { listOrdersPage, type ListOrder } from '../../src/api/account'
-import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
 import { InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, orderStatusLabel, StatusPill } from '../../src/components/account/ui'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, Skeleton, Text, useBottomInset } from '../../src/ui'
 import { useTokens } from '../../src/theme'
 
 // Mirror of controller-service app/(storefront)/account/orders/page.tsx (the sm:hidden mobile card).
@@ -156,7 +153,7 @@ function OrderCard({ order, cancelling, onCancel }: { order: ListOrder; cancelli
 }
 
 export default function OrdersScreen() {
-  const insets = useSafeAreaInsets()
+  const bottom = useBottomInset()
   const router = useRouter()
   const t = useTokens()
   const user = useRequireAuth()
@@ -194,18 +191,12 @@ export default function OrdersScreen() {
   }
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
+    <Screen title="My Orders" mode="none">
       <FlatList
         data={!user || list.loading ? [] : orders}
         keyExtractor={o => o.id}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-        ListHeaderComponent={
-          <>
-            <AccountMobileHeader />
-            <View style={{ height: 16 }} />
-          </>
-        }
+        contentContainerStyle={{ paddingBottom: bottom }}
+        ListHeaderComponent={<View style={{ height: 16 }} />}
         ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
         onEndReached={list.loadMore}
         onEndReachedThreshold={0.5}
@@ -230,6 +221,6 @@ export default function OrdersScreen() {
           </View>
         }
       />
-    </View>
+    </Screen>
   )
 }
