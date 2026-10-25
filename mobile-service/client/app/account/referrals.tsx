@@ -1,11 +1,8 @@
-import { Linking, Pressable, ScrollView, Share, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Linking, Pressable, Share, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import TopNav from '../../src/components/layout/TopNav'
 import { getReferrals, type ReferralFriend, type ReferralsData } from '../../src/api/account'
-import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import Gradient from '../../src/components/account/Gradient'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
@@ -14,7 +11,7 @@ import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { SITE_URL } from '../../src/lib/links'
 import { showToast } from '../../src/stores/toastStore'
 import { accent, useTokens } from '../../src/theme'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, Skeleton, Text } from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountReferrals.tsx (mobile layout).
 
@@ -206,7 +203,6 @@ function ReferralsLoading() {
 }
 
 export default function ReferralsScreen() {
-  const insets = useSafeAreaInsets()
   const router = useRouter()
   const qc = useQueryClient()
   const user = useRequireAuth()
@@ -231,69 +227,65 @@ export default function ReferralsScreen() {
   const unavailable = !loading && (failed || !data || !data.enabled || data.eligible === false)
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-        scrollEventThrottle={200}
-        onScroll={e => {
+    <Screen
+      title="Refer & Earn"
+      scrollProps={{
+        scrollEventThrottle: 200,
+        onScroll: e => {
           const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
           if (contentOffset.y + layoutMeasurement.height > contentSize.height - 400) friends.loadMore()
-        }}
-      >
-        <AccountMobileHeader />
-        <View className="px-4 pt-4">
-          {loading ? (
-            <ReferralsLoading />
-          ) : unavailable || !data ? (
-            <View className={`${CARD} items-center py-12`} style={SHADOW}>
-              <Text className="text-foreground font-medium text-center">{failed ? 'Could not load your referrals' : 'Referrals are not available for this account'}</Text>
-              <Pressable onPress={() => router.navigate('/(tabs)/account')} className="mt-3">
-                <Text className="text-sm text-accent-600">Back to my account</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View className="gap-4">
-              <ShareCard data={data} storeName={config.identity.name} />
-              <Stats data={data} />
-              <View className={CARD} style={SHADOW}>
-                <Text className="font-semibold text-foreground">Your friends</Text>
-                {friends.total === 0 && !friends.loading ? (
-                  <View className="mt-4 flex-row items-center gap-3 rounded-lg bg-surface-secondary p-3">
-                    <View className="h-9 w-9 rounded-full bg-accent-100 dark:bg-accent-900/40 items-center justify-center">
-                      <HeroIcon name="share" size={16} color={accent[700]} />
-                    </View>
-                    <Text className="flex-1 text-sm text-foreground-secondary">No one has joined with your link yet. Share it above to get started.</Text>
-                  </View>
-                ) : (
-                  <>
-                    <View className="mt-2">
-                      {friends.rows.map((f, i) => {
-                        const chip = statusChip(f)
-                        return (
-                          <View key={f.id} className={`flex-row items-center justify-between gap-3 py-3 ${i > 0 ? 'border-t border-border-default' : ''}`}>
-                            <View className="flex-1">
-                              <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-                                {f.name}
-                              </Text>
-                              <Text className="text-xs text-foreground-muted">Joined {formatDate(f.signedUpAt)}</Text>
-                            </View>
-                            <View className={`px-2.5 py-1 rounded-full ${chip.tone.bg}`}>
-                              <Text className={`text-xs font-medium ${chip.tone.text}`}>{chip.label}</Text>
-                            </View>
-                          </View>
-                        )
-                      })}
-                    </View>
-                    <InfiniteFooter shown={friends.rows.length} list={friends} noun="friends" />
-                  </>
-                )}
-              </View>
-              <HowItWorks program={data.program} />
-            </View>
-          )}
+        },
+      }}
+    >
+      {loading ? (
+        <ReferralsLoading />
+      ) : unavailable || !data ? (
+        <View className={`${CARD} items-center py-12`} style={SHADOW}>
+          <Text className="text-foreground font-medium text-center">{failed ? 'Could not load your referrals' : 'Referrals are not available for this account'}</Text>
+          <Pressable onPress={() => router.navigate('/(tabs)/account')} className="mt-3">
+            <Text className="text-sm text-accent-600">Back to my account</Text>
+          </Pressable>
         </View>
-      </ScrollView>
-    </View>
+      ) : (
+        <View className="gap-4">
+          <ShareCard data={data} storeName={config.identity.name} />
+          <Stats data={data} />
+          <View className={CARD} style={SHADOW}>
+            <Text className="font-semibold text-foreground">Your friends</Text>
+            {friends.total === 0 && !friends.loading ? (
+              <View className="mt-4 flex-row items-center gap-3 rounded-lg bg-surface-secondary p-3">
+                <View className="h-9 w-9 rounded-full bg-accent-100 dark:bg-accent-900/40 items-center justify-center">
+                  <HeroIcon name="share" size={16} color={accent[700]} />
+                </View>
+                <Text className="flex-1 text-sm text-foreground-secondary">No one has joined with your link yet. Share it above to get started.</Text>
+              </View>
+            ) : (
+              <>
+                <View className="mt-2">
+                  {friends.rows.map((f, i) => {
+                    const chip = statusChip(f)
+                    return (
+                      <View key={f.id} className={`flex-row items-center justify-between gap-3 py-3 ${i > 0 ? 'border-t border-border-default' : ''}`}>
+                        <View className="flex-1">
+                          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+                            {f.name}
+                          </Text>
+                          <Text className="text-xs text-foreground-muted">Joined {formatDate(f.signedUpAt)}</Text>
+                        </View>
+                        <View className={`px-2.5 py-1 rounded-full ${chip.tone.bg}`}>
+                          <Text className={`text-xs font-medium ${chip.tone.text}`}>{chip.label}</Text>
+                        </View>
+                      </View>
+                    )
+                  })}
+                </View>
+                <InfiniteFooter shown={friends.rows.length} list={friends} noun="friends" />
+              </>
+            )}
+          </View>
+          <HowItWorks program={data.program} />
+        </View>
+      )}
+    </Screen>
   )
 }

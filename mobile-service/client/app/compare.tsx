@@ -3,19 +3,16 @@ import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native'
 import { Image } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { keepPreviousData, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getListing, getProductBySlug, listProducts, type ProductRow } from '../src/api/products'
-import TopNav from '../src/components/layout/TopNav'
 import CompareBar from '../src/components/catalog/CompareBar'
 import { CompareAddButton, CompareChangeButton } from '../src/components/catalog/CompareSearch'
 import { PhotoIcon } from '../src/components/catalog/icons'
-import { Breadcrumb } from '../src/components/catalog/Paged'
 import { useStoreConfig } from '../src/hooks/useStoreConfig'
 import { absUrl } from '../src/lib/links'
 import { inr } from '../src/lib/format'
 import { useCompareStore } from '../src/stores/compareStore'
 import { useTokens } from '../src/theme'
-import { Text, Skeleton } from '../src/ui'
+import { Screen, ScreenHeader, Skeleton, Text } from '../src/ui'
 
 // Mirror of controller-service app/(storefront)/compare/page.tsx at the mobile breakpoint (the table
 // scrolls sideways inside its card, min-w-[640px]).
@@ -216,7 +213,6 @@ function CompareTableSkeleton({ cols, tableW, labelW }: { cols: number; tableW: 
 
 export default function CompareScreen() {
   const router = useRouter()
-  const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const { gstEnabled } = useStoreConfig().flags
   const { ids: idsParam, seed } = useLocalSearchParams<{ ids?: string; seed?: string }>()
@@ -293,104 +289,96 @@ export default function CompareScreen() {
   const colW = products.length ? (tableW - labelW) / products.length : 0
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      {noneToCompare ? (
-        <View className="flex-1 items-center justify-center gap-3">
-          <Text className="text-foreground-muted">No products available to compare.</Text>
-          <Pressable onPress={() => router.navigate('/(tabs)/products')}>
-            <Text className="text-sm text-accent-500">Browse Products</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 32 + insets.bottom }} showsVerticalScrollIndicator={false}>
-          <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-            <Breadcrumb
-              items={[
-                { label: 'Home', onPress: () => router.navigate('/(tabs)') },
-                { label: 'Products', onPress: () => router.navigate('/(tabs)/products') },
-                { label: 'Compare' },
-              ]}
-            />
-          </View>
-
-          <View className="px-4 py-6">
-            <View className="mb-6 flex-row items-center justify-between gap-3">
-              <Text className="shrink text-2xl font-bold text-foreground">Product Comparison</Text>
-              {!loading && products.length < 4 ? (
-                <CompareAddButton
-                  currentIds={ids}
-                  categoryId={products[0]?.category_id ?? null}
-                  onAdd={r => update([...(entries ?? []), { id: r.id, slug: r.slug }].slice(0, 4))}
-                />
-              ) : null}
-            </View>
-
-            {loading ? (
-              <CompareTableSkeleton key="skeleton" cols={Math.min(4, Math.max(2, (entries ?? idList).length))} tableW={tableW} labelW={labelW} />
-            ) : (
-              // Own key: reusing the skeleton's View would add shadow-sm's CSS variables after mount (a css-interop remount).
-              <View key="table" className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-sm">
-                <ScrollView horizontal showsHorizontalScrollIndicator>
-                  <View style={{ width: tableW }}>
-                    <View className="flex-row border-b border-border-default">
-                      <View className="bg-surface-secondary p-4" style={{ width: labelW }} />
-                      {products.map(p => (
-                        <View key={p.id} className="p-4" style={{ width: colW }}>
-                          <ProductHead
-                            p={p}
-                            gstEnabled={gstEnabled}
-                            ids={ids}
-                            onChange={e => update((entries ?? []).map(x => (x.id === p.id ? e : x)))}
-                          />
-                        </View>
-                      ))}
-                    </View>
-
-                    {visibleRows.map(({ label, values, rowIdx }, i) => {
-                      const base = values[0]
-                      const hasDiff = values.some(v => v !== base)
-                      return (
-                        <View
-                          key={label}
-                          className={`flex-row ${i < visibleRows.length - 1 ? 'border-b border-border-default' : ''} ${rowIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}
-                        >
-                          <View className="bg-surface-secondary p-4" style={{ width: labelW }}>
-                            <Text className="text-xs font-semibold uppercase text-foreground-muted" style={{ letterSpacing: 0.3 }}>
-                              {label}
-                            </Text>
-                          </View>
-                          {products.map((p, colIdx) => {
-                            const val = values[colIdx]
-                            const isDiff = hasDiff && colIdx > 0 && val !== base
-                            return (
-                              <View key={p.id} className={`p-4 ${isDiff ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`} style={{ width: colW }}>
-                                {val != null ? (
-                                  <Text selectable className="text-sm text-foreground">
-                                    {val}
-                                  </Text>
-                                ) : (
-                                  <Text className="text-sm text-foreground-muted">—</Text>
-                                )}
-                              </View>
-                            )
-                          })}
-                        </View>
-                      )
-                    })}
-                  </View>
-                </ScrollView>
-              </View>
-            )}
-
-            <View className="mt-6 items-center">
+    <View className="flex-1">
+      <Screen
+        header={<ScreenHeader title="Product Comparison" />}
+        empty={
+          noneToCompare ? (
+            <View className="flex-1 items-center justify-center gap-3">
+              <Text className="text-foreground-muted">No products available to compare.</Text>
               <Pressable onPress={() => router.navigate('/(tabs)/products')}>
-                <Text className="text-sm text-accent-500">← Back to Products</Text>
+                <Text className="text-sm text-accent-500">Browse Products</Text>
               </Pressable>
             </View>
+          ) : (
+            false
+          )
+        }
+        scrollProps={{ showsVerticalScrollIndicator: false }}
+      >
+        {!loading && products.length < 4 ? (
+          <View className="mb-4 flex-row justify-end">
+            <CompareAddButton
+              currentIds={ids}
+              categoryId={products[0]?.category_id ?? null}
+              onAdd={r => update([...(entries ?? []), { id: r.id, slug: r.slug }].slice(0, 4))}
+            />
           </View>
-        </ScrollView>
-      )}
+        ) : null}
+
+        {loading ? (
+          <CompareTableSkeleton key="skeleton" cols={Math.min(4, Math.max(2, (entries ?? idList).length))} tableW={tableW} labelW={labelW} />
+        ) : (
+          // Own key: reusing the skeleton's View would add shadow-sm's CSS variables after mount (a css-interop remount).
+          <View key="table" className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-sm">
+            <ScrollView horizontal showsHorizontalScrollIndicator>
+              <View style={{ width: tableW }}>
+                <View className="flex-row border-b border-border-default">
+                  <View className="bg-surface-secondary p-4" style={{ width: labelW }} />
+                  {products.map(p => (
+                    <View key={p.id} className="p-4" style={{ width: colW }}>
+                      <ProductHead
+                        p={p}
+                        gstEnabled={gstEnabled}
+                        ids={ids}
+                        onChange={e => update((entries ?? []).map(x => (x.id === p.id ? e : x)))}
+                      />
+                    </View>
+                  ))}
+                </View>
+
+                {visibleRows.map(({ label, values, rowIdx }, i) => {
+                  const base = values[0]
+                  const hasDiff = values.some(v => v !== base)
+                  return (
+                    <View
+                      key={label}
+                      className={`flex-row ${i < visibleRows.length - 1 ? 'border-b border-border-default' : ''} ${rowIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}
+                    >
+                      <View className="bg-surface-secondary p-4" style={{ width: labelW }}>
+                        <Text className="text-xs font-semibold uppercase text-foreground-muted" style={{ letterSpacing: 0.3 }}>
+                          {label}
+                        </Text>
+                      </View>
+                      {products.map((p, colIdx) => {
+                        const val = values[colIdx]
+                        const isDiff = hasDiff && colIdx > 0 && val !== base
+                        return (
+                          <View key={p.id} className={`p-4 ${isDiff ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`} style={{ width: colW }}>
+                            {val != null ? (
+                              <Text selectable className="text-sm text-foreground">
+                                {val}
+                              </Text>
+                            ) : (
+                              <Text className="text-sm text-foreground-muted">—</Text>
+                            )}
+                          </View>
+                        )
+                      })}
+                    </View>
+                  )
+                })}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
+        <View className="mt-6 items-center">
+          <Pressable onPress={() => router.navigate('/(tabs)/products')}>
+            <Text className="text-sm text-accent-500">← Back to Products</Text>
+          </Pressable>
+        </View>
+      </Screen>
       <CompareBar />
     </View>
   )

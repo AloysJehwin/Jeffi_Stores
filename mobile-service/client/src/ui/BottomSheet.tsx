@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BackHandler, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Animated, { Extrapolation, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
+import Animated, { Extrapolation, interpolate, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardAvoidingView, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 
@@ -47,6 +47,8 @@ export function BottomSheet({
   const closedRef = useRef(onClosed)
   closedRef.current = onClosed
   const { progress: keyboard } = useReanimatedKeyboardAnimation()
+  // Reduced motion: the sheet appears and leaves without sliding.
+  const still = useReducedMotion()
   const finish = () => {
     setMounted(false)
     closedRef.current?.()
@@ -60,9 +62,9 @@ export function BottomSheet({
         sheetH.value = winH
       }
       setMounted(true)
-      ty.value = withSpring(0, SPRING)
+      ty.value = still ? withTiming(0, { duration: 0 }) : withSpring(0, SPRING)
     } else if (mounted) {
-      ty.value = withTiming(sheetH.value || winH, { duration: 200 }, done => {
+      ty.value = withTiming(sheetH.value || winH, { duration: still ? 0 : 200 }, done => {
         if (done) runOnJS(finish)()
       })
     }

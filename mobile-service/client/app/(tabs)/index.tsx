@@ -1,16 +1,15 @@
 import { RefreshControl, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 import { useQuery } from '@tanstack/react-query'
 import TopNav from '../../src/components/layout/TopNav'
 import SectionRenderer from '../../src/components/home/SectionRenderer'
 import { HomeScrollContext } from '../../src/components/home/scroll-context'
-import { Text, HomeSkeleton } from '../../src/ui'
+import { HomeSkeleton, Screen, useBottomInset } from '../../src/ui'
 import { getHome } from '../../src/api/home'
 
 // The storefront home: the admin-configured sections from GET /api/home, rendered like the web's page.
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets()
+  const bottomInset = useBottomInset(0)
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['home'],
     queryFn: getHome,
@@ -22,24 +21,20 @@ export default function HomeScreen() {
     scrollY.value = e.contentOffset.y
   })
 
+  // A failed load gets a retry and pull to refresh (Screen's scroll mode), with the generic connection message.
+  if (!isLoading && (isError || !data)) {
+    return <Screen header={<TopNav />} error onRetry={refetch} refreshing={isRefetching} onRefresh={refetch} />
+  }
+
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      {isLoading ? (
-        <View className="flex-1 overflow-hidden">
-          <HomeSkeleton />
-        </View>
-      ) : isError || !data ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <Text className="text-center text-foreground-muted">Couldn't load the store. Pull down to try again.</Text>
-        </View>
-      ) : (
+    <Screen header={<TopNav />} mode="none" loading={isLoading} skeleton={<View className="flex-1 overflow-hidden"><HomeSkeleton /></View>}>
+      {data ? (
         <HomeScrollContext.Provider value={scrollY}>
           <Animated.ScrollView
             onScroll={onScroll}
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: insets.bottom }}
+            contentContainerStyle={{ paddingBottom: bottomInset }}
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
           >
             {data.sections.map((section, i) => (
@@ -52,7 +47,7 @@ export default function HomeScreen() {
             ))}
           </Animated.ScrollView>
         </HomeScrollContext.Provider>
-      )}
-    </View>
+      ) : null}
+    </Screen>
   )
 }

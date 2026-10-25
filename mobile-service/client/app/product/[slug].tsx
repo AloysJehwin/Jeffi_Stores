@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Pressable, ScrollView, Share, TextInput, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
@@ -22,8 +21,7 @@ import { useWishlistToggle } from '../../src/hooks/useWishlist'
 import { toCard } from '../../src/lib/card'
 import { SITE_URL } from '../../src/lib/links'
 import { useTokens } from '../../src/theme'
-import TopNav from '../../src/components/layout/TopNav'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, ScreenHeader, Skeleton, Text, useBottomInset } from '../../src/ui'
 import ProductCard from '../../src/components/product/ProductCard'
 import { Grid } from '../../src/components/home/layout'
 import { Glyph, P } from '../../src/components/pdp/Glyph'
@@ -52,37 +50,26 @@ export default function ProductDetailScreen() {
   const router = useRouter()
   const { data: product, isLoading } = useQuery({ queryKey: ['product', slug], queryFn: () => getPdpProduct(slug) })
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        <PdpLoading />
-      </View>
-    )
-  }
+  if (isLoading) return <Screen header={<ScreenHeader />} mode="none" loading skeleton={<PdpLoading />} />
   if (!product) {
     return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
+      <Screen header={<ScreenHeader />} mode="none">
         <View className="flex-1 items-center justify-center gap-3 px-4">
           <Text className="text-xl font-bold text-foreground">Product Not Found</Text>
           <Pressable onPress={() => router.push('/(tabs)/products')} className="rounded-lg bg-accent-500 px-5 py-2.5">
             <Text className="font-semibold text-white">Browse products</Text>
           </Pressable>
         </View>
-      </View>
+      </Screen>
     )
   }
   return <ProductDetail key={product.id} product={product} initialSku={typeof sku === 'string' ? sku : undefined} />
 }
 
-/** The loaded page's shape: breadcrumb bar, then the details card (gallery, title, price block, buttons). */
+/** The loaded page's shape: the details card (gallery, title, price block, buttons). */
 function PdpLoading() {
   return (
     <View className="flex-1 overflow-hidden">
-      <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-        <Skeleton height={14} width={160} rounded="rounded" />
-      </View>
       <View className="px-4 pt-4">
         <View className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
           <View className="gap-4 p-4">
@@ -159,8 +146,7 @@ function compareItem(p: PdpProduct, gstEnabled: boolean): CompareItem {
 }
 
 function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSku?: string }) {
-  const insets = useSafeAreaInsets()
-  const router = useRouter()
+  const bottomInset = useBottomInset(80)
   const t = useTokens()
   const user = useAuthStore(s => s.user)
   const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
@@ -291,9 +277,7 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
   const discountPct = product.discount_pct != null ? Number(product.discount_pct) : null
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-
+    <Screen header={<ScreenHeader title={product.name} />} mode="none">
       <KeyboardScroll
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -303,26 +287,7 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
         onScroll={e => setPastControls(buyBottom != null && e.nativeEvent.contentOffset.y >= buyBottom)}
       >
         <View ref={contentRef} collapsable={false}>
-          {/* Breadcrumb: category and product name collapse to "..." below sm. */}
-          <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-            <View className="flex-row items-center gap-2">
-              <Text onPress={() => router.push('/(tabs)')} className="text-sm text-foreground-muted">
-                Home
-              </Text>
-              <Text className="text-sm text-foreground-muted">/</Text>
-              <Text onPress={() => router.push('/(tabs)/products')} className="text-sm text-foreground-muted">
-                Products
-              </Text>
-              {product.categories ? (
-                <>
-                  <Text className="text-sm text-foreground-muted">/</Text>
-                  <Text className="text-sm text-foreground-muted">...</Text>
-                </>
-              ) : null}
-            </View>
-          </View>
-
-          <View className="px-4 pt-4" style={{ paddingBottom: 80 + insets.bottom + (compareCount >= 2 ? 73 : 0) }}>
+          <View className="px-4 pt-4" style={{ paddingBottom: bottomInset + (compareCount >= 2 ? 73 : 0) }}>
             {/* Product details card */}
             <View className="mb-4 overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
               <View className="gap-4 p-4">
@@ -490,6 +455,6 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
         aboveCompareBar={compareCount >= 2}
       />
       <CompareBar />
-    </View>
+    </Screen>
   )
 }

@@ -1,10 +1,8 @@
 import { useEffect } from 'react'
-import { Pressable, ScrollView, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
-import TopNav from '../../src/components/layout/TopNav'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, ScreenHeader, Skeleton, Text } from '../../src/ui'
 import AiInsight from '../../src/components/cart/AiInsight'
 import OrderCelebration from '../../src/components/checkout/OrderCelebration'
 import RecommendedProducts from '../../src/components/checkout/RecommendedProducts'
@@ -41,7 +39,7 @@ function statusLabel(s: string) {
 /** The loaded page's shape: celebration card, order summary, shipping address. */
 function ConfirmationLoading() {
   return (
-    <View className="flex-1 overflow-hidden px-4 pt-12">
+    <View className="flex-1 overflow-hidden px-4 pt-4">
       <View className="mb-8 items-center rounded-lg border-2 border-border-default bg-surface-elevated p-4">
         <Skeleton width={64} height={64} rounded="rounded-full" className="mb-4" />
         <Skeleton height={30} width={220} className="mb-3" />
@@ -87,7 +85,6 @@ function ConfirmationLoading() {
 
 export default function OrderConfirmationScreen() {
   const router = useRouter()
-  const insets = useSafeAreaInsets()
   const { orderId } = useLocalSearchParams<{ orderId?: string }>()
   const { data: order, isLoading, error } = useQuery({
     queryKey: ['orders', 'detail', orderId],
@@ -118,19 +115,12 @@ export default function OrderConfirmationScreen() {
     })
   }, [order])
 
-  if (isLoading || !orderId) {
-    return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        <ConfirmationLoading />
-      </View>
-    )
-  }
+  const header = <ScreenHeader title="Order Confirmation" />
+  if (isLoading || !orderId) return <Screen header={header} mode="none" loading skeleton={<ConfirmationLoading />} />
 
   if (error || !order) {
     return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
+      <Screen header={header} mode="none">
         <View className="flex-1 items-center justify-center px-4">
           <View className="w-full items-center rounded-lg bg-surface-elevated p-4 shadow-md">
             <Text className="mb-4 text-5xl text-red-500">!</Text>
@@ -143,7 +133,7 @@ export default function OrderConfirmationScreen() {
             </Pressable>
           </View>
         </View>
-      </View>
+      </Screen>
     )
   }
 
@@ -156,103 +146,97 @@ export default function OrderConfirmationScreen() {
   const status = String(order.status)
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: insets.bottom + 48 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <OrderCelebration orderId={order.id} orderNumber={order.orderNumber} />
+    <Screen header={header} scrollProps={{ showsVerticalScrollIndicator: false }}>
+      <OrderCelebration orderId={order.id} orderNumber={order.orderNumber} />
 
-        <View className="mb-6 rounded-lg bg-surface-elevated p-4 shadow-md">
-          <Text className="mb-4 text-xl font-bold text-foreground">Order Summary</Text>
-          <View className="mb-6 gap-4">
-            {order.items.map((item, i) => {
-              const fractional = (!!item.buyMode && item.buyMode !== 'unit') || (!!item.buyUnit && item.buyUnit !== 'unit')
-              const unit = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : item.buyMode && item.buyMode !== 'unit' ? item.buyMode : null
-              const qty = fractional ? qtyText(item.quantity) : String(Math.round(Number(item.quantity)))
-              const unitSuffix = unit ? ` ${unitText(unit)}` : ''
-              return (
-                <View
-                  key={item.id}
-                  className={`flex-row items-center justify-between gap-3 pb-4 ${i === order.items.length - 1 ? '' : 'border-b border-border-default'}`}
-                >
-                  <View className="flex-1">
-                    <Text className="font-medium text-foreground">{item.productName}</Text>
-                    <Text className="text-sm text-foreground-secondary">
-                      Quantity: {qty}
-                      {unitSuffix}
-                    </Text>
-                    <Text className="text-sm text-foreground-secondary">
-                      {money(item.unitPrice)}
-                      {unit ? ` / ${unitText(unit)}` : ''} × {qty}
-                      {unitSuffix}
-                    </Text>
-                  </View>
-                  <Text className="font-semibold text-foreground">{money(Number(item.unitPrice) * Number(item.quantity))}</Text>
+      <View className="mb-6 rounded-lg bg-surface-elevated p-4 shadow-md">
+        <Text className="mb-4 text-xl font-bold text-foreground">Order Summary</Text>
+        <View className="mb-6 gap-4">
+          {order.items.map((item, i) => {
+            const fractional = (!!item.buyMode && item.buyMode !== 'unit') || (!!item.buyUnit && item.buyUnit !== 'unit')
+            const unit = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : item.buyMode && item.buyMode !== 'unit' ? item.buyMode : null
+            const qty = fractional ? qtyText(item.quantity) : String(Math.round(Number(item.quantity)))
+            const unitSuffix = unit ? ` ${unitText(unit)}` : ''
+            return (
+              <View
+                key={item.id}
+                className={`flex-row items-center justify-between gap-3 pb-4 ${i === order.items.length - 1 ? '' : 'border-b border-border-default'}`}
+              >
+                <View className="flex-1">
+                  <Text className="font-medium text-foreground">{item.productName}</Text>
+                  <Text className="text-sm text-foreground-secondary">
+                    Quantity: {qty}
+                    {unitSuffix}
+                  </Text>
+                  <Text className="text-sm text-foreground-secondary">
+                    {money(item.unitPrice)}
+                    {unit ? ` / ${unitText(unit)}` : ''} × {qty}
+                    {unitSuffix}
+                  </Text>
                 </View>
-              )
-            })}
-          </View>
-          <View className="border-t-2 border-border-default pt-4">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-foreground">Total</Text>
-              <Text className="text-2xl font-bold text-accent-600 dark:text-accent-400">{money(total)}</Text>
-            </View>
+                <Text className="font-semibold text-foreground">{money(Number(item.unitPrice) * Number(item.quantity))}</Text>
+              </View>
+            )
+          })}
+        </View>
+        <View className="border-t-2 border-border-default pt-4">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-lg font-bold text-foreground">Total</Text>
+            <Text className="text-2xl font-bold text-accent-600 dark:text-accent-400">{money(total)}</Text>
           </View>
         </View>
+      </View>
 
-        <View className="mb-6 rounded-lg bg-surface-elevated p-4 shadow-md">
-          <Text className="mb-4 text-xl font-bold text-foreground">Shipping Address</Text>
-          {line1 ? <Text className="text-foreground-secondary">{line1}</Text> : null}
-          {line2 ? <Text className="text-foreground-secondary">{line2}</Text> : null}
+      <View className="mb-6 rounded-lg bg-surface-elevated p-4 shadow-md">
+        <Text className="mb-4 text-xl font-bold text-foreground">Shipping Address</Text>
+        {line1 ? <Text className="text-foreground-secondary">{line1}</Text> : null}
+        {line2 ? <Text className="text-foreground-secondary">{line2}</Text> : null}
+        <Text className="text-foreground-secondary">
+          {addr.city}, {addr.state} {pin}
+        </Text>
+        <Text className="mt-2 text-foreground-secondary">Phone: {addr.phone}</Text>
+      </View>
+
+      <View className="mb-8 rounded-lg bg-surface-elevated p-4 shadow-md">
+        <Text className="mb-4 text-xl font-bold text-foreground">Order Status</Text>
+        <View className="flex-row flex-wrap items-center gap-3">
+          <View className={`rounded-full px-4 py-2 ${STATUS_PILL[status] ?? 'bg-surface-secondary'}`}>
+            <Text className={`font-semibold ${STATUS_TEXT[status] ?? 'text-foreground'}`}>{statusLabel(status)}</Text>
+          </View>
           <Text className="text-foreground-secondary">
-            {addr.city}, {addr.state} {pin}
-          </Text>
-          <Text className="mt-2 text-foreground-secondary">Phone: {addr.phone}</Text>
-        </View>
-
-        <View className="mb-8 rounded-lg bg-surface-elevated p-4 shadow-md">
-          <Text className="mb-4 text-xl font-bold text-foreground">Order Status</Text>
-          <View className="flex-row flex-wrap items-center gap-3">
-            <View className={`rounded-full px-4 py-2 ${STATUS_PILL[status] ?? 'bg-surface-secondary'}`}>
-              <Text className={`font-semibold ${STATUS_TEXT[status] ?? 'text-foreground'}`}>{statusLabel(status)}</Text>
-            </View>
-            <Text className="text-foreground-secondary">
-              Placed on{' '}
-              {new Date(order.createdAt).toLocaleDateString('en-IN', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
-          </View>
-        </View>
-
-        <View className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/30">
-          <Text className="text-sm text-blue-900 dark:text-blue-300">
-            A confirmation email has been sent to your email address with your order details.
+            Placed on{' '}
+            {new Date(order.createdAt).toLocaleDateString('en-IN', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
           </Text>
         </View>
+      </View>
 
-        <AiInsight kind="affirmation" className="mb-6" body={{ itemNames: order.items.map(i => i.productName) }} />
+      <View className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/30">
+        <Text className="text-sm text-blue-900 dark:text-blue-300">
+          A confirmation email has been sent to your email address with your order details.
+        </Text>
+      </View>
 
-        <View className="gap-4">
-          <Pressable onPress={() => router.push('/orders')} className="rounded-lg bg-accent-600 px-6 py-3 active:bg-accent-700">
-            <Text className="text-center font-semibold text-white">View All Orders</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.navigate('/(tabs)')}
-            className="rounded-lg border-2 border-border-secondary bg-surface-elevated px-6 py-3 active:bg-surface-secondary"
-          >
-            <Text className="text-center font-semibold text-foreground-secondary">Continue Shopping</Text>
-          </Pressable>
-        </View>
+      <AiInsight kind="affirmation" className="mb-6" body={{ itemNames: order.items.map(i => i.productName) }} />
 
-        <RecommendedProducts title="Shop More Products" limit={4} />
-      </ScrollView>
-    </View>
+      <View className="gap-4">
+        <Pressable onPress={() => router.push('/orders')} className="rounded-lg bg-accent-600 px-6 py-3 active:bg-accent-700">
+          <Text className="text-center font-semibold text-white">View All Orders</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.navigate('/(tabs)')}
+          className="rounded-lg border-2 border-border-secondary bg-surface-elevated px-6 py-3 active:bg-surface-secondary"
+        >
+          <Text className="text-center font-semibold text-foreground-secondary">Continue Shopping</Text>
+        </Pressable>
+      </View>
+
+      <RecommendedProducts title="Shop More Products" limit={4} />
+    </Screen>
   )
 }

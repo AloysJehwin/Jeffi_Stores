@@ -1,20 +1,10 @@
 import { useId, type ReactNode } from 'react'
-import { Pressable, View } from 'react-native'
+import { Pressable } from 'react-native'
 import { Text } from '../../ui'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { primary } from '../../theme'
 
 export const SHADOW_SM = '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-
-/** The marketing pages' title band: bg-surface-elevated border-b, container px-4 py-4. */
-export function PageHeader({ title, subtitle, subtitleClassName = 'text-base text-foreground-secondary' }: { title: string; subtitle: string; subtitleClassName?: string }) {
-  return (
-    <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-      <Text className="mb-2 text-3xl font-bold text-secondary-500 dark:text-foreground">{title}</Text>
-      <Text className={subtitleClassName}>{subtitle}</Text>
-    </View>
-  )
-}
 
 /** bg-gradient-to-r from-primary-600 to-primary-800, filling a rounded, overflow-hidden parent. */
 export function PrimaryGradient() {

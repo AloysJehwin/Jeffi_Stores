@@ -1,19 +1,15 @@
 import { useState } from 'react'
 import { Pressable, Share, TextInput, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import TopNav from '../../src/components/layout/TopNav'
 import { getLoyalty, redeemPoints, type RewardCoupon, type RewardsData, type RewardsHistoryEntry } from '../../src/api/account'
-import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import Gradient from '../../src/components/account/Gradient'
 import { useInfiniteList, useRequireAuth, type InfiniteList } from '../../src/components/account/hooks'
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { showToast } from '../../src/stores/toastStore'
 import { useTokens } from '../../src/theme'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, Skeleton, Text } from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountRewards.tsx (mobile layout).
 
@@ -307,7 +303,6 @@ function RewardsLoading() {
 }
 
 export default function RewardsScreen() {
-  const insets = useSafeAreaInsets()
   const router = useRouter()
   const qc = useQueryClient()
   const user = useRequireAuth()
@@ -347,38 +342,35 @@ export default function RewardsScreen() {
   }
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      <KeyboardScroll
-        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-        scrollEventThrottle={200}
-        onScroll={e => {
+    <Screen
+      title="Rewards"
+      mode="keyboard"
+      scrollProps={{
+        scrollEventThrottle: 200,
+        onScroll: e => {
           const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
           if (contentOffset.y + layoutMeasurement.height > contentSize.height - 400) history.loadMore()
-        }}
-      >
-        <AccountMobileHeader />
-        <View className="px-4 pt-4">
-          {loading ? (
-            <RewardsLoading />
-          ) : unavailable || !data ? (
-            <View className={`${CARD} items-center py-12`} style={SHADOW}>
-              <Text className="text-foreground font-medium text-center">{failed ? 'Could not load your rewards' : 'Rewards are not available for this account'}</Text>
-              <Pressable onPress={() => router.navigate('/(tabs)/account')} className="mt-3">
-                <Text className="text-sm text-accent-600">Back to my account</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View className="gap-4">
-              <TierCard data={data} />
-              <RedeemCard data={data} onRedeemed={reload} />
-              <CouponList list={coupons} />
-              <History list={history} />
-              <HowItWorks program={data.program} />
-            </View>
-          )}
+        },
+      }}
+    >
+      {loading ? (
+        <RewardsLoading />
+      ) : unavailable || !data ? (
+        <View className={`${CARD} items-center py-12`} style={SHADOW}>
+          <Text className="text-foreground font-medium text-center">{failed ? 'Could not load your rewards' : 'Rewards are not available for this account'}</Text>
+          <Pressable onPress={() => router.navigate('/(tabs)/account')} className="mt-3">
+            <Text className="text-sm text-accent-600">Back to my account</Text>
+          </Pressable>
         </View>
-      </KeyboardScroll>
-    </View>
+      ) : (
+        <View className="gap-4">
+          <TierCard data={data} />
+          <RedeemCard data={data} onRedeemed={reload} />
+          <CouponList list={coupons} />
+          <History list={history} />
+          <HowItWorks program={data.program} />
+        </View>
+      )}
+    </Screen>
   )
 }

@@ -1,9 +1,6 @@
 import { Linking, Pressable, View, useWindowDimensions } from 'react-native'
-import { Text } from '../../src/ui'
-import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
+import { Screen, ScreenHeader, Text } from '../../src/ui'
 import { useRouter } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import TopNav from '../../src/components/layout/TopNav'
 import SupportChat from '../../src/components/info/SupportChat'
 import { Glyph, CHAT, CHEVRON_RIGHT } from '../../src/components/info/Glyph'
 import { SHADOW_SM, SolidButton } from '../../src/components/info/common'
@@ -62,95 +59,83 @@ function LinkCard({ title, links }: { title: string; links: Array<{ label: strin
 
 export default function SupportScreen() {
   const router = useRouter()
-  const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
   const { identity } = useStoreConfig()
   const { user, isLoading } = useAuthStore()
   const chatHeight = Math.min(680, Math.max(480, Math.round(height * 0.65)))
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      <KeyboardScroll
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom }}
-      >
-        <View className="px-4 py-8">
-          <View className="mb-6">
-            <Text className="mb-1 text-xs font-bold uppercase text-accent-500" style={{ letterSpacing: 1.2 }}>
-              Help &amp; Support
-            </Text>
-            <Text className="text-3xl font-extrabold text-foreground">How can we help?</Text>
-            <Text className="mt-1.5 text-sm text-foreground-secondary">Chat with our support bot or reach us directly.</Text>
-          </View>
+    <Screen header={<ScreenHeader title="Help & Support" />} mode="keyboard" scrollProps={{ showsVerticalScrollIndicator: false }}>
+      <View className="mb-6">
+        <Text className="text-3xl font-extrabold text-foreground">How can we help?</Text>
+        <Text className="mt-1.5 text-sm text-foreground-secondary">Chat with our support bot or reach us directly.</Text>
+      </View>
 
-          <View className="mb-8 gap-4">
-            <View className="gap-4 rounded-xl border border-border-default bg-surface-elevated p-5">
-              <Text className="text-sm font-bold text-foreground">Contact Us</Text>
-              <View>
-                <Text className="mb-1 text-xs text-foreground-muted">Phone</Text>
-                <Text className="text-sm font-medium text-foreground" onPress={() => Linking.openURL(`tel:${identity.phone}`)}>
-                  {identity.phone}
-                </Text>
-              </View>
-              <View>
-                <Text className="mb-1 text-xs text-foreground-muted">Email</Text>
-                <Text className="text-sm font-medium text-foreground" onPress={() => Linking.openURL(`mailto:${identity.email}`)}>
-                  {identity.email}
-                </Text>
-              </View>
-              <View>
-                <Text className="mb-1 text-xs text-foreground-muted">Address</Text>
-                <Text className="text-sm font-medium leading-snug text-foreground">
-                  Sanjay Gandhi Chowk, Station Road, Raipur, CG 490092
-                </Text>
-              </View>
-              <View className="border-t border-border-default pt-1">
-                <Text className="mb-1.5 text-xs text-foreground-muted">Business Hours</Text>
-                <View className="gap-1">
-                  {HOURS.map(h => (
-                    <View key={h.day} className="flex-row justify-between">
-                      <Text className="text-xs text-foreground-secondary">{h.day}</Text>
-                      <Text className={h.closed ? 'text-xs font-medium text-red-500' : 'text-xs font-medium text-foreground'}>{h.time}</Text>
-                    </View>
-                  ))}
+      <View className="mb-8 gap-4">
+        <View className="gap-4 rounded-xl border border-border-default bg-surface-elevated p-5">
+          <Text className="text-sm font-bold text-foreground">Contact Us</Text>
+          <View>
+            <Text className="mb-1 text-xs text-foreground-muted">Phone</Text>
+            <Text className="text-sm font-medium text-foreground" onPress={() => Linking.openURL(`tel:${identity.phone}`)}>
+              {identity.phone}
+            </Text>
+          </View>
+          <View>
+            <Text className="mb-1 text-xs text-foreground-muted">Email</Text>
+            <Text className="text-sm font-medium text-foreground" onPress={() => Linking.openURL(`mailto:${identity.email}`)}>
+              {identity.email}
+            </Text>
+          </View>
+          <View>
+            <Text className="mb-1 text-xs text-foreground-muted">Address</Text>
+            <Text className="text-sm font-medium leading-snug text-foreground">
+              Sanjay Gandhi Chowk, Station Road, Raipur, CG 490092
+            </Text>
+          </View>
+          <View className="border-t border-border-default pt-1">
+            <Text className="mb-1.5 text-xs text-foreground-muted">Business Hours</Text>
+            <View className="gap-1">
+              {HOURS.map(h => (
+                <View key={h.day} className="flex-row justify-between">
+                  <Text className="text-xs text-foreground-secondary">{h.day}</Text>
+                  <Text className={h.closed ? 'text-xs font-medium text-red-500' : 'text-xs font-medium text-foreground'}>{h.time}</Text>
                 </View>
-              </View>
+              ))}
             </View>
-
-            <LinkCard title="Quick Links" links={QUICK_LINKS} />
-            <LinkCard title="Legal & Policies" links={LEGAL_LINKS} />
           </View>
-
-          <View className="mb-2">
-            <Text className="mb-1 text-xs font-bold uppercase text-accent-500" style={{ letterSpacing: 1.2 }}>
-              Support Chat
-            </Text>
-            <Text className="mb-4 text-xl font-extrabold text-foreground">Chat with us</Text>
-          </View>
-
-          {isLoading ? null : user ? (
-            <View className="overflow-hidden rounded-2xl border border-border-default" style={{ height: chatHeight, boxShadow: SHADOW_SM }}>
-              <SupportChat />
-            </View>
-          ) : (
-            <View className="items-center rounded-2xl border border-border-default bg-surface-elevated py-16" style={{ boxShadow: SHADOW_SM }}>
-              <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30">
-                <Glyph d={CHAT} size={32} className="text-primary-500" />
-              </View>
-              <Text className="mb-2 text-lg font-bold text-foreground">Sign in to use Support Chat</Text>
-              <Text className="mb-6 text-center text-sm text-foreground-secondary">
-                Log in to chat with our support bot and get help with your orders and account.
-              </Text>
-              <SolidButton
-                label="Sign In"
-                onPress={() => openHref(router, '/login')}
-                className="bg-primary-500 px-8 py-2.5 active:bg-primary-600"
-              />
-            </View>
-          )}
         </View>
-      </KeyboardScroll>
-    </View>
+
+        <LinkCard title="Quick Links" links={QUICK_LINKS} />
+        <LinkCard title="Legal & Policies" links={LEGAL_LINKS} />
+      </View>
+
+      <View className="mb-2">
+        <Text className="mb-1 text-xs font-bold uppercase text-accent-500" style={{ letterSpacing: 1.2 }}>
+          Support Chat
+        </Text>
+        <Text className="mb-4 text-xl font-extrabold text-foreground">Chat with us</Text>
+      </View>
+
+      {isLoading ? null : user ? (
+        <View className="overflow-hidden rounded-2xl border border-border-default" style={{ height: chatHeight, boxShadow: SHADOW_SM }}>
+          <SupportChat />
+        </View>
+      ) : (
+        <View className="items-center rounded-2xl border border-border-default bg-surface-elevated py-16" style={{ boxShadow: SHADOW_SM }}>
+          <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30">
+            <Glyph d={CHAT} size={32} className="text-primary-500" />
+          </View>
+          <Text className="mb-2 text-lg font-bold text-foreground">Sign in to use Support Chat</Text>
+          <Text className="mb-6 text-center text-sm text-foreground-secondary">
+            Log in to chat with our support bot and get help with your orders and account.
+          </Text>
+          <SolidButton
+            label="Sign In"
+            onPress={() => openHref(router, '/login')}
+            className="bg-primary-500 px-8 py-2.5 active:bg-primary-600"
+          />
+        </View>
+      )}
+    </Screen>
   )
 }

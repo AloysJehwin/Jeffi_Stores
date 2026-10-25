@@ -2,15 +2,13 @@ import { FlatList, Pressable, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { listBrandsWithCounts, type BrandWithCount } from '../../src/api/brands'
-import TopNav from '../../src/components/layout/TopNav'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRightIcon, TagIcon } from '../../src/components/catalog/icons'
 import { EmptyCard, InfiniteFooter } from '../../src/components/catalog/Paged'
 import { absUrl } from '../../src/lib/links'
 import { accent, useTokens } from '../../src/theme'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, ScreenHeader, Skeleton, Text, useBottomInset } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/brands/page.tsx at the mobile breakpoint.
 
@@ -74,25 +72,20 @@ function BrandCardSkeleton() {
 }
 
 export default function BrandsScreen() {
-  const insets = useSafeAreaInsets()
+  const bottomInset = useBottomInset(32)
   const t = useTokens()
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['brands', 'counts'], queryFn: listBrandsWithCounts, staleTime: 5 * 60_000 })
   const brands = data ?? []
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
+    <Screen header={<ScreenHeader title="All Brands" subtitle="Browse products by brand" />} mode="none">
       <FlatList
         data={brands}
         keyExtractor={b => b.id}
-        contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}
+        contentContainerStyle={{ paddingBottom: bottomInset }}
         ItemSeparatorComponent={() => <View className="h-4" />}
         ListHeaderComponent={
           <>
-            <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-              <Text className="mb-2 text-3xl font-bold text-secondary-500 dark:text-foreground">All Brands</Text>
-              <Text className="text-foreground-secondary">Browse products by brand</Text>
-            </View>
             <View className="h-4" />
             {isLoading ? (
               <View className="gap-4 px-4">
@@ -125,6 +118,6 @@ export default function BrandsScreen() {
         showsVerticalScrollIndicator={false}
       />
       <CompareBar />
-    </View>
+    </Screen>
   )
 }

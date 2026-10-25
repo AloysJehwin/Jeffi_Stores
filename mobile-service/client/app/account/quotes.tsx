@@ -1,16 +1,13 @@
 import { useEffect } from 'react'
 import { FlatList, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import TopNav from '../../src/components/layout/TopNav'
 import { listRfqs, type Rfq } from '../../src/api/account'
-import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useAccountUser, useInfiniteList } from '../../src/components/account/hooks'
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { useAuthStore } from '../../src/stores/authStore'
 import { useTokens } from '../../src/theme'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, Skeleton, Text, useBottomInset } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/account/quotes/page.tsx.
 
@@ -47,7 +44,7 @@ function QuotesLoading() {
 }
 
 export default function QuotesScreen() {
-  const insets = useSafeAreaInsets()
+  const bottom = useBottomInset()
   const router = useRouter()
   const t = useTokens()
   const user = useAccountUser()
@@ -69,32 +66,18 @@ export default function QuotesScreen() {
   })
   const rfqs = list.rows
 
-  if (isLoading || !allowed || list.loading) {
-    return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        <AccountMobileHeader />
-        <QuotesLoading />
-      </View>
-    )
-  }
-
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
+    <Screen title="My Quotes" mode="none" loading={isLoading || !allowed || list.loading} skeleton={<QuotesLoading />}>
       <FlatList
         data={rfqs}
         keyExtractor={r => r.id}
         onEndReached={list.loadMore}
         onEndReachedThreshold={0.5}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingBottom: bottom }}
         ListHeaderComponent={
-          <>
-            <AccountMobileHeader />
-            <View className="mx-4 mt-4 bg-surface-elevated rounded-t-lg border border-border-default px-6 py-4">
-              <Text className="text-sm text-foreground-secondary">Track your RFQ submissions. Our team will review and respond.</Text>
-            </View>
-          </>
+          <View className="mx-4 mt-4 bg-surface-elevated rounded-t-lg border border-border-default px-6 py-4">
+            <Text className="text-sm text-foreground-secondary">Track your RFQ submissions. Our team will review and respond.</Text>
+          </View>
         }
         ListEmptyComponent={
           <View className="mx-4 bg-surface-elevated border-x border-border-default p-12 items-center">
@@ -139,6 +122,6 @@ export default function QuotesScreen() {
           </View>
         }
       />
-    </View>
+    </Screen>
   )
 }

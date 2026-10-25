@@ -1,16 +1,14 @@
 import { FlatList, Pressable, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { listCategories, withDetails, type CategoryDetail } from '../../src/api/categories'
 import { getHome } from '../../src/api/home'
-import TopNav from '../../src/components/layout/TopNav'
 import CategoryIcon from '../../src/components/catalog/CategoryIcon'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRightIcon } from '../../src/components/catalog/icons'
 import { InfiniteFooter } from '../../src/components/catalog/Paged'
 import { accent } from '../../src/theme'
-import { Text, Skeleton } from '../../src/ui'
+import { Screen, ScreenHeader, Skeleton, Text, useBottomInset } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/categories/page.tsx at the mobile breakpoint.
 
@@ -95,7 +93,7 @@ function CategoryCardSkeleton() {
 }
 
 export default function CategoriesScreen() {
-  const insets = useSafeAreaInsets()
+  const bottomInset = useBottomInset(32)
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
   const { data: home } = useQuery({ queryKey: ['home'], queryFn: getHome, staleTime: 120_000 })
   const categories = withDetails(data ?? [], home?.data.mainCategories as Record<string, any>[] | undefined)
@@ -103,19 +101,14 @@ export default function CategoriesScreen() {
   const subsOf = (id: string) => categories.filter(c => c.parent_category_id === id)
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
+    <Screen header={<ScreenHeader title="All Categories" subtitle="Browse our complete range of product categories" />} mode="none">
       <FlatList
         data={main}
         keyExtractor={c => c.id}
-        contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}
+        contentContainerStyle={{ paddingBottom: bottomInset }}
         ItemSeparatorComponent={() => <View className="h-4" />}
         ListHeaderComponent={
           <>
-            <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-              <Text className="mb-2 text-3xl font-bold text-secondary-500 dark:text-foreground">All Categories</Text>
-              <Text className="text-foreground-secondary">Browse our complete range of product categories</Text>
-            </View>
             <View className="h-4" />
             {isLoading ? (
               <View className="gap-4 px-4">
@@ -141,6 +134,6 @@ export default function CategoriesScreen() {
         showsVerticalScrollIndicator={false}
       />
       <CompareBar />
-    </View>
+    </Screen>
   )
 }
