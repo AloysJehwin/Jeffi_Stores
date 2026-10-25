@@ -6,6 +6,7 @@ import IconButton from '@/components/ui/IconButton'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import VideoUrlInput from '@/components/admin/media/VideoUrlInput'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, api, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
@@ -184,11 +185,34 @@ function EditPost({ post, onDone }: { post: Post; onDone: (saved: boolean) => vo
         </div>
         <div>
           <label className={lbl}>Image URL</label>
-          <ImageUrlInput value={imageUrl} onChange={setImageUrl} className={inputCls} />
+          <ImageUrlInput
+            value={imageUrl}
+            onChange={setImageUrl}
+            className={inputCls}
+            ai={{
+              feature: 'social_image',
+              size: post.platform === 'ig_reel' ? ['story', 'portrait', 'square'] : ['square', 'portrait', 'landscape', 'story'],
+              defaultPrompt: caption.slice(0, 160) || undefined,
+              usageRef: post.id,
+            }}
+          />
         </div>
         <div>
           <label className={lbl}>Video URL</label>
-          <input className={inputCls} value={videoUrl} onChange={e => setVideoUrl(e.target.value)} />
+          <VideoUrlInput
+            value={videoUrl}
+            onChange={setVideoUrl}
+            className={inputCls}
+            ai={
+              (post.platform === 'ig_reel' || post.platform === 'youtube') && {
+                feature: 'social_video',
+                defaultPrompt: caption.slice(0, 160) || undefined,
+                imageUrl: /^https?:\/\//i.test(imageUrl) ? imageUrl : undefined,
+                aspect: post.platform === 'youtube' ? '16:9' : '9:16',
+                usageRef: post.id,
+              }
+            }
+          />
         </div>
         <div>
           <label className={lbl}>Scheduled for</label>

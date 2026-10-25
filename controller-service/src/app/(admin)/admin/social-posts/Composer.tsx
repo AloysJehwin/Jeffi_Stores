@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Hash, Plus } from 'lucide-react'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
-import AiMediaButton from '@/components/admin/ai/AiMediaButton'
-import AiVideoButton from '@/components/admin/ai/AiVideoButton'
-import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
+import VideoUrlInput from '@/components/admin/media/VideoUrlInput'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
@@ -479,53 +477,37 @@ export default function Composer({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <div className="mb-1 flex items-center justify-between">
-                <label className={lbl}>Image URL</label>
-                <AiMediaButton
-                  feature="social_image"
-                  compact
-                  defaultPrompt={product?.name ? `${product.name}, product shot` : caption.slice(0, 160)}
-                  sizes={
-                    platforms.includes('ig_reel')
-                      ? [AI_SIZE_PRESETS.story, AI_SIZE_PRESETS.portrait, AI_SIZE_PRESETS.square]
-                      : [
-                          AI_SIZE_PRESETS.square,
-                          AI_SIZE_PRESETS.portrait,
-                          AI_SIZE_PRESETS.landscape,
-                          AI_SIZE_PRESETS.story,
-                        ]
-                  }
-                  referenceImageUrl={allImages[0]?.startsWith('http') ? allImages[0] : undefined}
-                  saveToGallery
-                  onPick={img => setImageUrl(img.url)}
-                />
-              </div>
+              <label className={lbl}>Image URL</label>
               <ImageUrlInput
                 value={imageUrl}
                 onChange={setImageUrl}
                 className={inputCls}
                 placeholder="https://... or upload"
+                ai={{
+                  feature: 'social_image',
+                  defaultPrompt: product?.name ? `${product.name}, product shot` : caption.slice(0, 160),
+                  size: platforms.includes('ig_reel')
+                    ? ['story', 'portrait', 'square']
+                    : ['square', 'portrait', 'landscape', 'story'],
+                  referenceImageUrl: allImages[0]?.startsWith('http') ? allImages[0] : undefined,
+                }}
               />
             </div>
             <div>
-              <div className="mb-1 flex items-center justify-between">
-                <label className={lbl}>Video URL (Reels, YouTube)</label>
-                {platforms.some(p => p === 'ig_reel' || p === 'youtube') && (
-                  <AiVideoButton
-                    feature="social_video"
-                    compact
-                    defaultPrompt={caption.slice(0, 160)}
-                    defaultImageUrl={imageUrl || undefined}
-                    defaultAspect="9:16"
-                    onPick={v => setVideoUrl(v.url)}
-                  />
-                )}
-              </div>
-              <input
-                className={inputCls}
+              <label className={lbl}>Video URL (Reels, YouTube)</label>
+              <VideoUrlInput
                 value={videoUrl}
-                onChange={e => setVideoUrl(e.target.value)}
-                placeholder="https://..."
+                onChange={setVideoUrl}
+                className={inputCls}
+                placeholder="https://... or upload"
+                ai={
+                  platforms.some(p => p === 'ig_reel' || p === 'youtube') && {
+                    feature: 'social_video',
+                    defaultPrompt: caption.slice(0, 160),
+                    imageUrl: imageUrl || undefined,
+                    aspect: '9:16',
+                  }
+                }
               />
             </div>
             <div className="sm:col-span-2">

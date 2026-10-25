@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Bell, ChevronDown, ImageIcon, Images, Link2, Loader2, Search, Smartphone } from 'lucide-react'
+import { Bell, ChevronDown, ImageIcon, Link2, Loader2, Search, Smartphone } from 'lucide-react'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
-import GalleryPicker from '@/components/admin/GalleryPicker'
 import { VarInput } from '@/components/admin/campaigns/WaParamsForm'
 import { renderConditionals, renderTemplate } from '@/lib/templates/variables-shared'
 import { PUSH_BODY_MAX, PUSH_TITLE_MAX, validPushLink, type PushChannel } from '@/lib/push/copy'
@@ -230,7 +229,6 @@ export function PushFields({
   /** What this push is about, for AI Enrich. */
   context?: string
 }) {
-  const [gallery, setGallery] = useState(false)
   const set = (patch: Partial<PushChannel>) => onChange({ ...value, ...patch })
   return (
     <div className="space-y-4 rounded-lg border border-border-default p-4">
@@ -269,32 +267,21 @@ export function PushFields({
           <label className={`${labelClass} flex items-center gap-1.5`}>
             <ImageIcon className="h-3.5 w-3.5" /> Image (optional)
           </label>
-          <div className="flex items-start gap-2">
-            <div className="min-w-0 flex-1">
-              <ImageUrlInput value={value.image_url ?? ''} onChange={v => set({ image_url: v.trim() || undefined })} placeholder="https://… or upload" className={inputClass} />
-            </div>
-            <button
-              type="button"
-              onClick={() => setGallery(true)}
-              className="inline-flex h-control shrink-0 items-center gap-1.5 rounded-lg border border-border-default px-3 text-xs font-semibold text-foreground hover:bg-surface-secondary"
-            >
-              <Images className="h-3.5 w-3.5" /> Gallery
-            </button>
-          </div>
+          <ImageUrlInput
+            value={value.image_url ?? ''}
+            onChange={v => set({ image_url: v.trim() || undefined })}
+            placeholder="https://… or upload"
+            className={inputClass}
+            ai={{
+              feature: 'campaign_image',
+              size: ['landscape', 'wide', 'square'],
+              defaultPrompt: context ? `Wide promo banner for: ${context}` : undefined,
+            }}
+          />
           {value.image_url && !/^https:\/\//i.test(value.image_url) && (
             <p className="mt-1 text-xs text-red-600">Android shows only https:// images.</p>
           )}
           <p className="mt-1 text-[11px] text-foreground-muted">Wide images (2:1) look best when the notification is expanded.</p>
-          {gallery && (
-            <GalleryPicker
-              mode="single"
-              onClose={() => setGallery(false)}
-              onConfirm={imgs => {
-                if (imgs[0]) set({ image_url: imgs[0].image_url })
-                setGallery(false)
-              }}
-            />
-          )}
         </div>
       )}
       <div>

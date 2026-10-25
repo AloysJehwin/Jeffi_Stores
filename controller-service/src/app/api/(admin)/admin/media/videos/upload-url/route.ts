@@ -7,8 +7,8 @@ import { GALLERY_VIDEO_MAX_BYTES, presignGalleryVideoUpload } from '@/lib/shared
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-// Gallery media is shared by the homepage, offer, product and social editors.
-const WRITE_SCOPES = ['settings:write', 'coupons:write', 'products:write', 'social:write'] as const
+// Gallery media is shared by the homepage, offer, product, social and WhatsApp template editors.
+const WRITE_SCOPES = ['settings:write', 'coupons:write', 'products:write', 'social:write', 'templates:write'] as const
 
 const Body = z.object({
   mimeType: z.enum(['video/mp4', 'video/webm']),

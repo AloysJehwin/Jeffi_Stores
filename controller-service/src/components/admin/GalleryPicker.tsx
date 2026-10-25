@@ -59,6 +59,8 @@ interface Props {
   onPickVideo?: (video: GalleryVideo) => void
   /** Tab to open on when videos are offered. */
   initialTab?: 'images' | 'videos'
+  /** Only the Videos list (a video-only slot); needs onPickVideo. */
+  videosOnly?: boolean
 }
 
 const PANEL_INPUT = fieldInputCls
@@ -69,8 +71,18 @@ const PANEL_INPUT = fieldInputCls
  * they span all pages, not just the loaded one). Used by product images,
  * variant images, and the bulk product-controls image op.
  */
-export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, onClose, pageSize = 24, onPickVideo, initialTab = 'images' }: Props) {
-  const [tab, setTab] = useState<'images' | 'videos'>(onPickVideo ? initialTab : 'images')
+export default function GalleryPicker({
+  mode = 'multi',
+  maxSelect,
+  onConfirm,
+  onClose,
+  pageSize = 24,
+  onPickVideo,
+  initialTab = 'images',
+  videosOnly = false,
+}: Props) {
+  const onlyVideos = videosOnly && !!onPickVideo
+  const [tab, setTab] = useState<'images' | 'videos'>(onlyVideos ? 'videos' : onPickVideo ? initialTab : 'images')
   const [categories, setCategories] = useState<Category[]>([])
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
@@ -80,7 +92,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
 
   // Pages of pageSize append on scroll; search + category reset to page 1.
   const list = useInfiniteList<GalleryImage>({
-    key: `${query}|${category}`,
+    key: onlyVideos ? null : `${query}|${category}`,
     pageSize,
     getKey: g => g.id,
     fetchPage: async (p, signal) => {
@@ -152,7 +164,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
       onClose={onClose}
       zIndex="z-[300]"
       size="xl"
-      title="Choose from Gallery"
+      title={onlyVideos ? 'Choose a video' : 'Choose from Gallery'}
       footer={
         mode === 'multi' && !showVideos ? (
           <>
@@ -172,7 +184,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
       }
     >
       <div className="-m-5">
-        {onPickVideo && (
+        {onPickVideo && !onlyVideos && (
           <div role="tablist" className="flex gap-0.5 px-5 border-b border-border-default">
             {(['images', 'videos'] as const).map(t => (
               <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={tabCls(tab === t)}>

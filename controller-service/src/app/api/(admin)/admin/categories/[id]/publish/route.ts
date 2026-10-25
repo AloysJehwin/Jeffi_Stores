@@ -50,6 +50,7 @@ export async function POST(req: NextRequest, { params }: Params) {
            replacement_window_days = $12::integer,
            google_product_category = $13,
            icon_name = $14,
+           image_url = CASE WHEN $15::boolean THEN $16 ELSE image_url END,
            updated_at = NOW()
          WHERE id = $1`,
         [
@@ -67,6 +68,8 @@ export async function POST(req: NextRequest, { params }: Params) {
           f.replacement_window_days != null ? parseInt(f.replacement_window_days) : null,
           f.google_product_category || null,
           f.icon_name || null,
+          'image_url' in f,
+          f.image_url || null,
         ]
       )
 

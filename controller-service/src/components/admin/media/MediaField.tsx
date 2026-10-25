@@ -10,6 +10,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { AI_SIZE_PRESETS, nearestVideoAspect, type AiImageFeature, type AiVideoFeature } from '@/lib/ai/media-features'
 import { AI_FEATURE_SCOPES } from '@/lib/ai/scope-map'
+import { IMAGE_MAX, IMAGE_TYPES, VIDEO_MAX, VIDEO_TYPES, galleryUpload, uploadGalleryVideo } from './media-upload'
 
 /** A media slot: an image (also the poster when there is a video), an optional MP4/WebM, and the image's blurhash. */
 export interface MediaValue {
@@ -43,91 +44,8 @@ interface Props {
   disabled?: boolean
 }
 
-const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
-const VIDEO_TYPES = ['video/mp4', 'video/webm']
-const IMAGE_MAX = 5 * 1024 * 1024
-const VIDEO_MAX = 50 * 1024 * 1024
 const btn =
   'control-md inline-flex items-center gap-1.5 border border-border-default text-xs font-semibold text-foreground hover:bg-surface-secondary disabled:opacity-50'
-
-async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const j = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(j.error || `Request failed (${res.status})`)
-  return j as T
-}
-
-/** Uploads to the gallery (keeps GIF animation, returns the blurhash). */
-async function galleryUpload(file: Blob, name: string): Promise<{ url: string; blurhash: string | null }> {
-  const form = new FormData()
-  form.append('file', file, name)
-  const res = await fetch('/api/gallery/upload', { method: 'POST', credentials: 'include', body: form })
-  const j = await res.json().catch(() => ({}))
-  if (!res.ok || !j.image_url) throw new Error(j.error || 'Upload failed')
-  return { url: j.image_url, blurhash: j.blurhash ?? null }
-}
-
-interface VideoFileInfo {
-  durationSec: number | null
-  width: number | null
-  height: number | null
-  poster: Blob | null
-}
-
-/** Reads duration and size from a local video file and draws a frame as a JPEG poster. The file is a
- * blob URL, so the canvas is never tainted; any failure just means no poster. */
-function readVideoFile(file: File): Promise<VideoFileInfo> {
-  return new Promise(resolve => {
-    const src = URL.createObjectURL(file)
-    const v = document.createElement('video')
-    v.muted = true
-    v.playsInline = true
-    v.preload = 'auto'
-    let settled = false
-    const info = (): Omit<VideoFileInfo, 'poster'> => ({
-      durationSec: Number.isFinite(v.duration) && v.duration > 0 ? v.duration : null,
-      width: v.videoWidth || null,
-      height: v.videoHeight || null,
-    })
-    const done = (poster: Blob | null) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      const out = { ...info(), poster }
-      URL.revokeObjectURL(src)
-      resolve(out)
-    }
-    const timer = setTimeout(() => done(null), 10_000)
-    v.onerror = () => done(null)
-    v.onloadedmetadata = () => {
-      const d = Number.isFinite(v.duration) ? v.duration : 0
-      v.currentTime = d > 0 ? Math.min(1, d / 3) : 0.1
-    }
-    v.onseeked = () => {
-      try {
-        const w = v.videoWidth
-        const h = v.videoHeight
-        if (!w || !h) return done(null)
-        const scale = Math.min(1, 1920 / Math.max(w, h))
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.round(w * scale)
-        canvas.height = Math.round(h * scale)
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return done(null)
-        ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
-        canvas.toBlob(b => done(b), 'image/jpeg', 0.85)
-      } catch {
-        done(null)
-      }
-    }
-    v.src = src
-  })
-}
 
 /**
  * One control for a card or banner media slot: preview (image, GIF or a muted looping video), Upload,
@@ -193,27 +111,8 @@ export default function MediaField({
     if (file.size > VIDEO_MAX) return showToast('Video must be under 50 MB', 'error')
     setBusy('video')
     try {
-      const meta = await readVideoFile(file)
-      const up = await postJson<{ uploadUrl: string; key: string }>('/api/admin/media/videos/upload-url', {
-        mimeType: file.type,
-        size: file.size,
-      })
-      const put = await fetch(up.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
-      if (!put.ok) throw new Error(`Upload to storage failed (${put.status})`)
-      const base = file.name.replace(/\.[^.]+$/, '') || 'video'
-      const poster = meta.poster ? await galleryUpload(meta.poster, `${base}-poster.jpg`).catch(() => null) : null
-      const fallback = image && /^https?:\/\//i.test(image) ? image : null
-      const posterUrl = poster?.url ?? fallback
-      const { video: row } = await postJson<{ video: GalleryVideo }>('/api/admin/media/videos', {
-        key: up.key,
-        mimeType: file.type,
-        durationSeconds: meta.durationSec,
-        width: meta.width,
-        height: meta.height,
-        posterUrl,
-        posterBlurhash: poster?.blurhash ?? (posterUrl === image ? value.blurhash : null) ?? null,
-        label: file.name.slice(0, 200),
-      })
+      const fallback = image && /^https?:\/\//i.test(image) ? { url: image, blurhash: value.blurhash } : null
+      const { video: row, poster } = await uploadGalleryVideo(file, fallback)
       onChange(withVideo(row.url, poster))
       showToast('Video updated', 'success')
     } catch (err) {

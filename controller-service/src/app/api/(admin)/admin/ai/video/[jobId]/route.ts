@@ -27,6 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const admin =
     feature === 'offer_video' ? await requireAdminScope(request, 'coupons:write')
     : feature === 'homepage_video' ? await requireAdminScope(request, 'settings:write')
+    : feature === 'template_video' ? await requireAdminScope(request, 'templates:write')
     : await requireAdminScope(request, 'social:write')
   if (admin instanceof NextResponse) return admin
   const denied = aiDenial(admin.role, admin.scopes, AI_FEATURE_SCOPES[feature])

@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Upload } from 'lucide-react'
+import { Images, Loader2, Upload } from 'lucide-react'
 import Select from '@/components/ui/Select'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import GalleryPicker from '@/components/admin/GalleryPicker'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { uploadImage } from '@/components/admin/ImageUrlInput'
 import { api, btnGhost, btnPrimary, inputCls } from '@/components/admin/channels/ui'
@@ -112,6 +113,7 @@ function ProductSearch({ onPick }: { onPick: (p: Product) => void }) {
 function ImageChoice({ photos, value, onChange, prompt }: { photos: string[]; value: string; onChange: (url: string) => void; prompt: string }) {
   const file = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
+  const [picker, setPicker] = useState(false)
   const toast = useActionToast()
   const reference = photos.includes(value) ? value : photos[0]
   async function upload(f: File | undefined) {
@@ -149,6 +151,9 @@ function ImageChoice({ photos, value, onChange, prompt }: { photos: string[]; va
         <button type="button" className={btnGhost} disabled={busy} onClick={() => file.current?.click()}>
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Upload
         </button>
+        <button type="button" className={btnGhost} disabled={busy} onClick={() => setPicker(true)}>
+          <Images className="w-4 h-4" /> Gallery
+        </button>
         <AiMediaButton
           feature="meta_ads_image"
           sizes={AI_SIZES}
@@ -160,6 +165,16 @@ function ImageChoice({ photos, value, onChange, prompt }: { photos: string[]; va
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {value && !photos.includes(value) && <img src={value} alt="Chosen image" className="w-16 h-16 rounded object-cover border border-border-default" />}
       </div>
+      {picker && (
+        <GalleryPicker
+          mode="single"
+          onClose={() => setPicker(false)}
+          onConfirm={imgs => {
+            setPicker(false)
+            if (imgs[0]) onChange(imgs[0].image_url)
+          }}
+        />
+      )}
     </div>
   )
 }

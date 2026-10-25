@@ -38,6 +38,8 @@ interface Props {
   label?: string
   /** When true the trigger is a small inline link rather than a filled button. */
   compact?: boolean
+  /** Replaces the trigger's classes (to match a sibling control). */
+  triggerClassName?: string
 }
 
 const SCOPE_BY_FEATURE: Record<Props['feature'], string> = {
@@ -50,6 +52,11 @@ const SCOPE_BY_FEATURE: Record<Props['feature'], string> = {
   meta_ads_image: 'meta_ads_campaigns',
   generate_image: 'settings',
   homepage_image: 'settings',
+  brand_image: 'brands',
+  category_image: 'categories',
+  logo_image: 'settings',
+  campaign_image: 'campaigns',
+  template_image: 'templates',
 }
 
 export default function AiMediaButton(props: Props) {
@@ -58,9 +65,11 @@ export default function AiMediaButton(props: Props) {
   const canUseAi = useCanUseAi(scope)
   const [open, setOpen] = useState(false)
   if (!canWrite || !canUseAi) return null
-  const btnCls = props.compact
-    ? 'inline-flex items-center gap-1 text-xs text-accent-600 hover:text-accent-700'
-    : 'control-md inline-flex items-center gap-1.5 border border-border-default text-xs font-semibold text-foreground hover:bg-surface-secondary'
+  const btnCls =
+    props.triggerClassName ??
+    (props.compact
+      ? 'inline-flex items-center gap-1 text-xs text-accent-600 hover:text-accent-700'
+      : 'control-md inline-flex items-center gap-1.5 border border-border-default text-xs font-semibold text-foreground hover:bg-surface-secondary')
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={btnCls}>

@@ -7,8 +7,8 @@ import { GalleryVideoError, listGalleryVideos, registerGalleryVideo } from '@/li
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-// Gallery media is shared by the homepage, offer, product and social editors.
-const WRITE_SCOPES = ['settings:write', 'coupons:write', 'products:write', 'social:write'] as const
+// Gallery media is shared by the homepage, offer, product, social and WhatsApp template editors.
+const WRITE_SCOPES = ['settings:write', 'coupons:write', 'products:write', 'social:write', 'templates:write'] as const
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // GET /api/admin/media/videos?page=&limit=&search= — gallery videos, newest first.
