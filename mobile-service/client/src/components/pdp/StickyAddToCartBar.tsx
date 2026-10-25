@@ -1,11 +1,11 @@
-import { ActivityIndicator, Pressable, View } from 'react-native'
-import { Text } from '../../ui'
+import { View } from 'react-native'
 import { Image } from 'expo-image'
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { ShoppingCart, Zap } from 'lucide-react-native'
+import { Button, Text, elevationClass, useElevation, useEntering } from '../../ui'
 import { unitText, type StickyBarAction } from './pdp'
 import { inr } from '../../lib/format'
-import { status } from '../../theme'
 
 // Mirror of controller-service components/visitor/pdp/StickyAddToCartBar.tsx: shown once the main buttons scroll away.
 
@@ -39,23 +39,28 @@ export default function StickyAddToCartBar({
   aboveCompareBar?: boolean
 }) {
   const insets = useSafeAreaInsets()
+  const shadow = useElevation('floating')
+  const entering = useEntering(SlideInDown.duration(250))
+  const exiting = useEntering(SlideOutDown.duration(200))
   if (!action || !visible) return null
   const unit = unitLabel ? unitText(unitLabel) : null
 
   return (
     <Animated.View
-      entering={SlideInDown.duration(250)}
-      exiting={SlideOutDown.duration(200)}
+      entering={entering}
+      exiting={exiting}
       accessibilityLabel={buyNow ? 'Quick buy' : 'Quick add to cart'}
-      className="absolute inset-x-0 z-30 border-t border-border-default bg-surface-elevated"
-      style={{
-        bottom: aboveCompareBar ? COMPARE_BAR_HEIGHT + insets.bottom : 0,
-        paddingBottom: aboveCompareBar ? 0 : insets.bottom,
-        boxShadow: '0 -8px 24px -12px rgba(0,0,0,0.25)',
-      }}
+      className={`absolute inset-x-0 z-30 rounded-t-sheet bg-surface-elevated ${elevationClass('floating')}`}
+      style={[
+        shadow,
+        {
+          bottom: aboveCompareBar ? COMPARE_BAR_HEIGHT + insets.bottom : 0,
+          paddingBottom: aboveCompareBar ? 0 : insets.bottom,
+        },
+      ]}
     >
-      <View className="flex-row items-center gap-3 px-4 py-2">
-        <View className="h-11 w-11 shrink-0 overflow-hidden rounded-md border border-border-default bg-surface-secondary">
+      <View className="flex-row items-center gap-3 px-4 py-3">
+        <View className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
           {image ? <Image source={{ uri: image }} style={{ width: '100%', height: '100%' }} contentFit="contain" /> : null}
         </View>
         <View className="min-w-0 flex-1">
@@ -63,7 +68,7 @@ export default function StickyAddToCartBar({
             {name}
           </Text>
           <View className="flex-row items-baseline gap-x-2 overflow-hidden">
-            <Text numberOfLines={1} className="text-sm font-bold text-primary-600 dark:text-primary-400">
+            <Text numberOfLines={1} className="text-base font-extrabold text-primary-600 dark:text-primary-400">
               Rs. {inr(price)}
             </Text>
             {unit ? <Text className="text-xs text-foreground-secondary">/ {unit}</Text> : null}
@@ -71,20 +76,18 @@ export default function StickyAddToCartBar({
           </View>
         </View>
         {action === 'add' ? (
-          <Pressable
+          <Button
+            label={buyNow ? 'Buy Now' : 'Add to Cart'}
+            loadingLabel={buyNow ? 'Processing...' : 'Adding...'}
+            icon={buyNow ? Zap : ShoppingCart}
+            loading={adding}
+            size="md"
+            block={false}
+            haptics
             onPress={onAdd}
-            disabled={adding}
-            className={`shrink-0 flex-row items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 ${adding ? 'opacity-60' : ''}`}
-          >
-            {adding ? <ActivityIndicator size="small" color={status.white} /> : null}
-            <Text className="text-sm font-semibold text-white">
-              {buyNow ? (adding ? 'Processing...' : 'Buy Now') : adding ? 'Adding...' : 'Add to Cart'}
-            </Text>
-          </Pressable>
+          />
         ) : (
-          <Pressable onPress={onChoose} className="shrink-0 rounded-lg bg-accent-500 px-4 py-2.5">
-            <Text className="text-sm font-semibold text-white">Choose options</Text>
-          </Pressable>
+          <Button label="Choose options" size="md" block={false} onPress={onChoose} />
         )}
       </View>
     </Animated.View>

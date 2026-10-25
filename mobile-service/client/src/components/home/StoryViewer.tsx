@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BackHandler, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
-import { Text } from '../../ui'
+import { BackHandler, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Button, IconButton, Text, haptic } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import * as Haptics from 'expo-haptics'
 import { ShoppingBag, X } from 'lucide-react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
@@ -81,7 +80,7 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
   useEffect(() => {
     if (prevGroup.current === pos.g) return
     prevGroup.current = pos.g
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    haptic.tap()
   }, [pos.g])
 
   // The next image is warm before its slide starts.
@@ -206,9 +205,7 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
             <Text className="flex-1 text-sm font-bold text-white" numberOfLines={1}>
               {group.title}
             </Text>
-            <Pressable onPress={close} hitSlop={10} accessibilityLabel="Close" className="h-9 w-9 items-center justify-center rounded-full bg-white/20">
-              <X size={20} color={status.white} />
-            </Pressable>
+            <IconButton icon={X} label="Close" variant="overlay" size="sm" onPress={close} />
           </View>
         </View>
 
@@ -224,10 +221,7 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
               </Text>
             ) : null}
             {slide.url ? (
-              <Pressable onPress={shop} className="h-12 flex-row items-center justify-center gap-2 rounded-xl bg-white active:bg-white/90">
-                <ShoppingBag size={18} color={status.black} />
-                <Text className="text-base font-bold text-black">{slide.ctaLabel ?? 'Shop'}</Text>
-              </Pressable>
+              <Button label={slide.ctaLabel ?? 'Shop'} icon={ShoppingBag} size="md" onPress={shop} />
             ) : null}
           </View>
         ) : null}

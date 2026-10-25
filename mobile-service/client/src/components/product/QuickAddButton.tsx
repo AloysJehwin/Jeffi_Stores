@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { Pressable, View } from 'react-native'
+import { View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated'
 import { Plus } from 'lucide-react-native'
 import { openQuickAdd, useQuickAddStore } from '../../stores/quickAddStore'
-import { status, useTokens } from '../../theme'
+import { useTokens } from '../../theme'
+import { IconButton } from '../../ui'
 import type { CardProduct } from '../../types/home'
 
 /** The web's round "+" button: opens the quick-add sheet (options, quantity) and bounces once an item lands in the cart. */
@@ -32,14 +33,13 @@ export default function QuickAddButton({ product, inStock }: { product: CardProd
 
   return (
     <Animated.View style={style}>
-      <Pressable
+      <IconButton
+        icon={Plus}
+        label={product.hasVariants ? `Choose options for ${product.name}` : `Quick add ${product.name} to cart`}
+        size="xs"
+        variant="solid"
         onPress={() => openQuickAdd(product)}
-        hitSlop={6}
-        accessibilityLabel={product.hasVariants ? `Choose options for ${product.name}` : `Quick add ${product.name} to cart`}
-        className="h-7 w-7 items-center justify-center rounded-full bg-accent-500 shadow-sm active:bg-accent-600"
-      >
-        <Plus size={14} color={status.white} strokeWidth={2.5} />
-      </Pressable>
+      />
     </Animated.View>
   )
 }

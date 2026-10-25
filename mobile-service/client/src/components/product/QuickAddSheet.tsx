@@ -4,14 +4,12 @@ import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { Image } from 'expo-image'
 import { ChevronRight, Heart, Share2, X } from 'lucide-react-native'
-import * as Haptics from 'expo-haptics'
 import { getPdpProduct, getVaultOwned, type PdpProduct } from '../../api/pdp'
 import { useProductPurchase, MODE_LABELS } from '../pdp/useProductPurchase'
 import QuantityInput, { InCartQtyHint } from '../pdp/QuantityInput'
 import { OptionChips } from '../pdp/OptionChips'
 import { unitText } from '../pdp/pdp'
-import { BottomSheet, SheetFooter } from '../../ui/BottomSheet'
-import { Text, Skeleton } from '../../ui'
+import { Badge, BottomSheet, Button, Chip, ChipGroup, IconButton, SheetFooter, Skeleton, Text, TextButton, haptic } from '../../ui'
 import { useWishlistToggle } from '../../hooks/useWishlist'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { useAuthStore } from '../../stores/authStore'
@@ -54,7 +52,7 @@ function ErrorBody({ seed, retry }: { seed: CardProduct; retry?: () => void }) {
   return (
     <View>
       <SheetFooter>
-        <FooterButton
+        <Button
           label="View product"
           onPress={() => {
             close()
@@ -65,11 +63,7 @@ function ErrorBody({ seed, retry }: { seed: CardProduct; retry?: () => void }) {
       <Header name={seed.name} brand={seed.brandName} image={seed.primaryImage?.thumbnail_url || seed.primaryImage?.image_url || null} productId={seed.id} slug={seed.slug} />
       <View className="mt-5 items-start gap-2">
         <Text className="text-sm text-foreground-secondary">Couldn’t load the options right now.</Text>
-        {retry ? (
-          <Pressable onPress={retry} hitSlop={6}>
-            <Text className="text-sm font-semibold text-accent-600 dark:text-accent-400">Try again</Text>
-          </Pressable>
-        ) : null}
+        {retry ? <TextButton label="Try again" onPress={retry} /> : null}
       </View>
     </View>
   )
@@ -80,7 +74,7 @@ function LoadingBody({ seed }: { seed: CardProduct }) {
   return (
     <View className="gap-5">
       <SheetFooter>
-        <Skeleton height={56} rounded="rounded-2xl" />
+        <Skeleton height={56} rounded="rounded-field" />
       </SheetFooter>
       <Header name={seed.name} brand={seed.brandName} image={seed.primaryImage?.thumbnail_url || seed.primaryImage?.image_url || null} productId={seed.id} slug={seed.slug} />
       <View className="flex-row items-center gap-2">
@@ -98,12 +92,10 @@ function LoadingBody({ seed }: { seed: CardProduct }) {
       <View className="gap-2">
         <Skeleton height={14} width={70} rounded="rounded" />
         <View className="flex-row items-center gap-2">
-          <Skeleton width={36} height={36} rounded="rounded-full" />
-          <Skeleton width={64} height={36} />
-          <Skeleton width={36} height={36} rounded="rounded-full" />
+          <Skeleton width={128} height={44} rounded="rounded-full" />
         </View>
       </View>
-      <Skeleton height={44} rounded="rounded-2xl" />
+      <Skeleton height={44} rounded="rounded-field" />
     </View>
   )
 }
@@ -132,7 +124,9 @@ function Header({ name, brand, image, productId, slug }: { name: string; brand: 
           close()
           router.push(`/product/${slug}`)
         }}
-        className="h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-2xl border border-border-default bg-surface"
+        accessibilityRole="imagebutton"
+        accessibilityLabel={`View ${name}`}
+        className="h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-field border border-border-default bg-surface"
       >
         {image ? <Image source={{ uri: image }} style={{ width: 72, height: 72 }} contentFit="contain" transition={150} /> : null}
       </Pressable>
@@ -143,21 +137,18 @@ function Header({ name, brand, image, productId, slug }: { name: string; brand: 
         </Text>
       </View>
       <View className="flex-row items-center gap-1.5">
-        <Pressable
-          onPress={like}
+        <IconButton
+          icon={Heart}
+          label={wishlist.inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+          variant="tinted"
+          size="sm"
+          filled={wishlist.inWishlist}
+          color={wishlist.inWishlist ? status.heart : t.foregroundSecondary}
           disabled={wishlist.pending}
-          hitSlop={6}
-          accessibilityLabel={wishlist.inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-          className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary"
-        >
-          <Heart size={17} color={wishlist.inWishlist ? status.heart : t.foregroundSecondary} fill={wishlist.inWishlist ? status.heart : 'none'} />
-        </Pressable>
-        <Pressable onPress={share} hitSlop={6} accessibilityLabel="Share" className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary">
-          <Share2 size={17} color={t.foregroundSecondary} />
-        </Pressable>
-        <Pressable onPress={close} hitSlop={6} accessibilityLabel="Close" className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary">
-          <X size={18} color={t.foregroundSecondary} />
-        </Pressable>
+          onPress={like}
+        />
+        <IconButton icon={Share2} label="Share" variant="tinted" size="sm" color={t.foregroundSecondary} onPress={share} />
+        <IconButton icon={X} label="Close" variant="tinted" size="sm" color={t.foregroundSecondary} onPress={close} />
       </View>
     </View>
   )
@@ -204,24 +195,24 @@ function QuickAddBody({ product, seed }: { product: PdpProduct; seed: CardProduc
 
   const addItem = async () => {
     if (!(await p.handleAddToCart())) return
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    haptic.tap()
     markAdded(product.id)
     close()
   }
 
   const footer = !purchasable ? (
-    <FooterButton label={inStock ? 'View product' : 'Notify me when back'} onPress={viewProduct} secondary />
+    <Button label={inStock ? 'View product' : 'Notify me when back'} onPress={viewProduct} variant="outline" />
   ) : digital ? (
     alreadyOwned ? (
-      <FooterButton label="Already in your vault" onPress={viewProduct} secondary />
+      <Button label="Already in your vault" onPress={viewProduct} variant="outline" />
     ) : (
-      <FooterButton label={`Buy now · ₹${inr(total)}`} busy={p.isBuyingNow} busyLabel="Please wait…" onPress={p.handleBuyNow} />
+      <Button label={`Buy now · ₹${inr(total)}`} loading={p.isBuyingNow} loadingLabel="Please wait…" onPress={p.handleBuyNow} />
     )
   ) : (
-    <FooterButton
+    <Button
       label={p.addBlocked ? 'Max quantity in cart' : `Add item · ₹${inr(total)}`}
-      busy={p.isAddingToCart}
-      busyLabel="Adding…"
+      loading={p.isAddingToCart}
+      loadingLabel="Adding…"
       disabled={p.addBlocked}
       onPress={addItem}
     />
@@ -238,16 +229,10 @@ function QuickAddBody({ product, seed }: { product: PdpProduct; seed: CardProduc
         {p.effectiveMrp && p.effectiveMrp > p.effectivePrice ? (
           <>
             <Text className="text-sm text-foreground-muted line-through">₹{inr(p.effectiveMrp)}</Text>
-            <View className="rounded-full bg-accent-500 px-2 py-0.5">
-              <Text className="text-xs font-bold text-white">{p.mrpDiscount}% off</Text>
-            </View>
+            <Badge label={`${p.mrpDiscount}% off`} tone="accent" solid />
           </>
         ) : null}
-        <View className={`rounded-full px-2 py-0.5 ${inStock ? 'bg-accent-50 dark:bg-accent-900/30' : 'bg-surface-secondary'}`}>
-          <Text className={`text-xs font-semibold ${inStock ? 'text-accent-700 dark:text-accent-300' : 'text-foreground-muted'}`}>
-            {inStock ? 'In stock' : 'Out of stock'}
-          </Text>
-        </View>
+        <Badge label={inStock ? 'In stock' : 'Out of stock'} tone={inStock ? 'accent' : 'neutral'} />
       </View>
 
       {p.hasVariants ? (
@@ -255,17 +240,11 @@ function QuickAddBody({ product, seed }: { product: PdpProduct; seed: CardProduc
           {p.hasMultipleModes ? (
             <View>
               <Text className="mb-2 text-sm font-semibold text-foreground">Buy by</Text>
-              <View className="flex-row flex-wrap gap-2">
+              <ChipGroup>
                 {p.pricingTypes.map(pt => (
-                  <Pressable
-                    key={pt}
-                    onPress={() => p.setSelectedMode(pt)}
-                    className={`rounded-full border px-4 py-2 ${p.selectedMode === pt ? 'border-accent-500 bg-accent-500' : 'border-border-secondary bg-surface'}`}
-                  >
-                    <Text className={`text-sm font-semibold ${p.selectedMode === pt ? 'text-white' : 'text-foreground-secondary'}`}>{MODE_LABELS[pt] || pt}</Text>
-                  </Pressable>
+                  <Chip key={pt} label={MODE_LABELS[pt] || pt} selected={p.selectedMode === pt} onPress={() => p.setSelectedMode(pt)} />
                 ))}
-              </View>
+              </ChipGroup>
             </View>
           ) : null}
           <View>
@@ -313,37 +292,14 @@ function QuickAddBody({ product, seed }: { product: PdpProduct; seed: CardProduc
         </View>
       ) : null}
 
-      <Pressable onPress={viewProduct} className="flex-row items-center justify-between rounded-2xl bg-surface-secondary px-4 py-3">
+      <Pressable
+        onPress={viewProduct}
+        accessibilityRole="button"
+        className="min-h-[48px] flex-row items-center justify-between rounded-field bg-surface-secondary px-4 py-3 active:bg-border-default"
+      >
         <Text className="text-sm font-semibold text-foreground">View full details</Text>
         <ChevronRight size={18} color={t.foregroundMuted} />
       </Pressable>
     </View>
-  )
-}
-
-function FooterButton({
-  label,
-  onPress,
-  busy,
-  busyLabel,
-  disabled,
-  secondary,
-}: {
-  label: string
-  onPress: () => void
-  busy?: boolean
-  busyLabel?: string
-  disabled?: boolean
-  secondary?: boolean
-}) {
-  const off = disabled || busy
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={off}
-      className={`h-14 items-center justify-center rounded-2xl ${secondary ? 'border border-border-secondary bg-surface' : off ? 'bg-accent-500/40' : 'bg-accent-500 active:bg-accent-600'}`}
-    >
-      <Text className={`text-base font-bold ${secondary ? 'text-foreground' : 'text-white'}`}>{busy && busyLabel ? busyLabel : label}</Text>
-    </Pressable>
   )
 }

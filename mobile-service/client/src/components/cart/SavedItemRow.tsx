@@ -1,5 +1,5 @@
 import { Pressable, View } from 'react-native'
-import { Text } from '../../ui'
+import { Text, TextButton } from '../../ui'
 import { useRouter } from 'expo-router'
 import type { CartLine } from '../../api/cart'
 import LineThumb from './LineThumb'
@@ -29,7 +29,7 @@ export default function SavedItemRow({
 
   return (
     <View className={`flex-row gap-4 p-4 ${last ? '' : 'border-b border-border-default'}`}>
-      <Pressable onPress={openProduct}>
+      <Pressable onPress={openProduct} accessibilityRole="imagebutton" accessibilityLabel={item.products.name}>
         <LineThumb uri={img?.thumbnail_url || img?.image_url} blurhash={img?.blurhash} size={80} iconSize={32} />
       </Pressable>
       <View className="min-w-0 flex-1">
@@ -47,18 +47,9 @@ export default function SavedItemRow({
           {money(price)}
           {custom ? `/\u2009${unitText(item.cart_item_unit?.display_label ?? item.buy_unit ?? '')}` : ''}
         </Text>
-        <View className="mt-2 flex-row items-center gap-3">
-          <Pressable onPress={onMove} disabled={updating} className="disabled:opacity-50">
-            <Text className="text-sm font-medium text-accent-600 dark:text-accent-400">Move to cart</Text>
-          </Pressable>
-          <Pressable
-            onPress={onRemove}
-            disabled={updating}
-            accessibilityLabel={`Remove ${item.products.name} from cart`}
-            className="disabled:opacity-50"
-          >
-            <Text className="text-sm font-medium text-red-600">Remove</Text>
-          </Pressable>
+        <View className="mt-2 flex-row items-center gap-4">
+          <TextButton label="Move to cart" accessibilityLabel={`Move ${item.products.name} to cart`} onPress={onMove} disabled={updating} />
+          <TextButton label="Remove" tone="danger" accessibilityLabel={`Remove ${item.products.name} from cart`} onPress={onRemove} disabled={updating} />
         </View>
       </View>
     </View>

@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Alert, Pressable, TextInput, View } from 'react-native'
+import { View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, ShoppingCart } from 'lucide-react-native'
 import TopNav from '../../src/components/layout/TopNav'
-import { Screen, Skeleton, SummarySkeleton, Text } from '../../src/ui'
+import {
+  Button, Card, EmptyState, Notice, Screen, Skeleton, SummarySkeleton, Text, TextButton, TextField, Title, confirm, toast,
+} from '../../src/ui'
 import CartLineItem from '../../src/components/cart/CartLineItem'
 import SavedItemRow from '../../src/components/cart/SavedItemRow'
 import FreeShippingProgress from '../../src/components/cart/FreeShippingProgress'
@@ -27,15 +29,13 @@ import {
 } from '../../src/api/cart'
 import { useAuthStore } from '../../src/stores/authStore'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
-import { showToast } from '../../src/stores/toastStore'
 import { openHref } from '../../src/lib/links'
-import { status, useTokens } from '../../src/theme'
+import { status } from '../../src/theme'
 
 // Mirror of controller-service app/(storefront)/cart/page.tsx at the mobile breakpoint.
 export default function CartScreen() {
   const router = useRouter()
   const qc = useQueryClient()
-  const t = useTokens()
   const user = useAuthStore(s => s.user)
   const { gstEnabled } = useStoreConfig().flags
 
@@ -71,38 +71,37 @@ export default function CartScreen() {
     try {
       await updateCartItem(id, qty)
     } catch (e) {
-      showToast(e instanceof Error && e.message ? e.message : 'Failed to update quantity', 'error')
+      toast.error(e instanceof Error && e.message ? e.message : 'Failed to update quantity')
     } finally {
       await refresh()
       mark(id, false)
     }
   }
 
-  const handleRemove = (id: string) =>
-    Alert.alert('Remove from Cart', 'Are you sure you want to remove this item from your cart?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await removeCartItem(id)
-            await refresh()
-            showToast('Item removed from cart', 'success')
-          } catch {
-            showToast('Failed to remove item', 'error')
-          }
-        },
-      },
-    ])
+  const handleRemove = async (id: string) => {
+    const ok = await confirm({
+      title: 'Remove from cart?',
+      message: 'Are you sure you want to remove this item from your cart?',
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      await removeCartItem(id)
+      await refresh()
+      toast.success('Item removed from cart')
+    } catch {
+      toast.error('Failed to remove item')
+    }
+  }
 
   const handleSave = async (id: string) => {
     try {
       await saveForLater(id)
       await refresh()
-      showToast('Saved for later', 'success')
+      toast.success('Saved for later')
     } catch {
-      showToast('Failed to save', 'error')
+      toast.error('Failed to save')
     }
   }
 
@@ -111,9 +110,9 @@ export default function CartScreen() {
     try {
       await moveToCart(id)
       await refresh()
-      showToast('Moved to cart', 'success')
+      toast.success('Moved to cart')
     } catch {
-      showToast('Failed to move', 'error')
+      toast.error('Failed to move')
     } finally {
       mark(id, false)
     }
@@ -135,7 +134,7 @@ export default function CartScreen() {
       const data = await applyCoupon({ code, subtotal: total })
       setAppliedCoupon(data)
       setCouponCode('')
-      showToast(`Coupon "${data.code}" applied — saving ${money(data.discountAmount)}`, 'success')
+      toast.success(`Coupon "${data.code}" applied — saving ${money(data.discountAmount)}`)
     } catch (e) {
       setCouponError(e instanceof Error && e.message ? e.message : 'Invalid coupon')
     } finally {
@@ -152,7 +151,7 @@ export default function CartScreen() {
         params: appliedCoupon ? { intent, couponCode: appliedCoupon.code } : { intent },
       })
     } catch (e) {
-      showToast(e instanceof Error && e.message ? e.message : 'Could not reach the server. Please try again.', 'error')
+      toast.error(e instanceof Error && e.message ? e.message : 'Could not reach the server. Please try again.')
     } finally {
       setProceeding(false)
     }
@@ -166,16 +165,14 @@ export default function CartScreen() {
   if (cartCount === 0 && savedItems.length === 0) {
     return (
       <Screen header={<TopNav />} refreshing={refreshing} onRefresh={onRefresh}>
-        <View className="items-center py-12">
-          <View className="mb-6">
-            <ShoppingCart size={96} color={t.foregroundMuted} strokeWidth={1} />
-          </View>
-          <Text className="mb-2 self-stretch text-center text-2xl font-bold text-foreground">Your cart is empty</Text>
-          <Text className="mb-6 self-stretch text-center text-foreground-secondary">Start shopping to add items to your cart</Text>
-          <Pressable onPress={() => openHref(router, '/products')} className="rounded-lg bg-accent-500 px-8 py-3 active:bg-accent-600">
-            <Text className="font-semibold text-white">Browse Products</Text>
-          </Pressable>
-        </View>
+        <EmptyState
+          fill
+          icon={ShoppingCart}
+          title="Your cart is empty"
+          message="Start shopping to add items to your cart"
+          actionLabel="Browse Products"
+          onAction={() => openHref(router, '/products')}
+        />
       </Screen>
     )
   }
@@ -188,27 +185,25 @@ export default function CartScreen() {
       onRefresh={onRefresh}
       scrollProps={{ showsVerticalScrollIndicator: false }}
     >
-      <Text className="mb-4 text-3xl font-bold text-foreground">Shopping Cart</Text>
+      <Title className="mb-4">Shopping Cart</Title>
 
       <View className="gap-4">
         <View>
           <FreeShippingProgress subtotal={physicalTotal} />
           {cartItems.length === 0 ? (
-            <View className="items-center rounded-lg border border-border-default bg-surface-elevated p-8 shadow-sm">
-              <View className="mb-4">
-                <ShoppingCart size={64} color={t.foregroundMuted} strokeWidth={1} />
-              </View>
-              <Text className="mb-4 text-foreground-secondary">Your cart is empty.</Text>
-              <Text className="text-center text-sm text-foreground-muted">
-                Move an item from below or{' '}
-                <Text className="font-medium text-accent-600" onPress={() => openHref(router, '/products')}>
-                  browse products
+            <Card padded={false}>
+              <EmptyState icon={ShoppingCart} title="Your cart is empty.">
+                <Text className="mt-1.5 text-center text-sm text-foreground-muted">
+                  Move an item from below or{' '}
+                  <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => openHref(router, '/products')}>
+                    browse products
+                  </Text>
+                  .
                 </Text>
-                .
-              </Text>
-            </View>
+              </EmptyState>
+            </Card>
           ) : (
-            <View className="rounded-lg border border-border-default bg-surface-elevated shadow-sm">
+            <Card padded={false}>
               {cartItems.map((item, i) => (
                 <CartLineItem
                   key={item.id}
@@ -220,14 +215,14 @@ export default function CartScreen() {
                   onRemove={() => handleRemove(item.id)}
                 />
               ))}
-            </View>
+            </Card>
           )}
 
           {savedItems.length > 0 && (
-            <View className="mt-6 rounded-lg border border-border-default bg-surface-elevated shadow-sm">
+            <Card padded={false} className="mt-6">
               <View className="border-b border-border-default p-4">
-                <Text className="font-semibold text-foreground">
-                  Saved for later <Text className="font-normal text-foreground-muted">({savedItems.length})</Text>
+                <Text accessibilityRole="header" className="font-display text-base font-extrabold text-foreground">
+                  Saved for later <Text className="font-inter font-normal text-foreground-muted">({savedItems.length})</Text>
                 </Text>
               </View>
               {savedItems.map((item, i) => (
@@ -240,7 +235,7 @@ export default function CartScreen() {
                   onRemove={() => handleRemove(item.id)}
                 />
               ))}
-            </View>
+            </Card>
           )}
 
           {cartItems.length > 0 && (
@@ -264,32 +259,37 @@ export default function CartScreen() {
         </View>
 
         {cartItems.length > 0 && (
-          <View className="rounded-lg border border-border-default bg-surface-elevated p-4 shadow-sm">
-            <Text className="mb-6 text-xl font-bold text-foreground">Order Summary</Text>
+          <Card>
+            <Text accessibilityRole="header" className="mb-5 font-display text-xl font-extrabold text-foreground">
+              Order Summary
+            </Text>
 
             <View className="mb-5">
               {appliedCoupon ? (
-                <View className="flex-row items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800 dark:bg-green-900/20">
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code} applied</Text>
-                    {appliedCoupon.description ? (
-                      <Text className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</Text>
-                    ) : null}
+                <Notice tone="success">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code} applied</Text>
+                      {appliedCoupon.description ? (
+                        <Text className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</Text>
+                      ) : null}
+                    </View>
+                    <TextButton
+                      label="Remove"
+                      tone="danger"
+                      accessibilityLabel={`Remove coupon ${appliedCoupon.code}`}
+                      onPress={() => {
+                        setAppliedCoupon(null)
+                        setCouponError('')
+                      }}
+                      className="ml-3 self-center"
+                    />
                   </View>
-                  <Pressable
-                    onPress={() => {
-                      setAppliedCoupon(null)
-                      setCouponError('')
-                    }}
-                    className="ml-3"
-                  >
-                    <Text className="text-xs font-medium text-red-500">Remove</Text>
-                  </Pressable>
-                </View>
+                </Notice>
               ) : (
                 <View>
-                  <View className="flex-row gap-2">
-                    <TextInput
+                  <View className="flex-row items-start gap-2">
+                    <TextField
                       value={couponCode}
                       onChangeText={v => {
                         setCouponCode(v.toUpperCase())
@@ -297,21 +297,21 @@ export default function CartScreen() {
                       }}
                       onSubmitEditing={() => handleApplyCoupon()}
                       placeholder="Coupon code"
-                      placeholderTextColor={t.foregroundMuted}
+                      accessibilityLabel="Coupon code"
                       autoCapitalize="characters"
                       autoCorrect={false}
                       returnKeyType="done"
-                      className="flex-1 rounded-lg border border-border-secondary bg-surface px-3 py-2 text-sm text-foreground"
+                      error={couponError || null}
+                      containerClassName="flex-1"
                     />
-                    <Pressable
+                    <Button
+                      label="Apply"
+                      block={false}
+                      loading={couponLoading}
+                      disabled={!couponCode.trim()}
                       onPress={() => handleApplyCoupon()}
-                      disabled={couponLoading || !couponCode.trim()}
-                      className="justify-center rounded-lg bg-accent-500 px-4 py-2 active:bg-accent-600 disabled:opacity-50"
-                    >
-                      <Text className="text-sm font-semibold text-white">{couponLoading ? '...' : 'Apply'}</Text>
-                    </Pressable>
+                    />
                   </View>
-                  {couponError ? <Text className="mt-1 text-xs text-red-500">{couponError}</Text> : null}
                   <CouponNudge subtotal={total} signedIn={!!user} applying={couponLoading} onApply={handleApplyCoupon} />
                 </View>
               )}
@@ -347,29 +347,23 @@ export default function CartScreen() {
             </View>
 
             {user ? (
-              <Pressable
+              <Button
+                label={hasInactiveItems ? 'Remove unavailable items to checkout' : 'Proceed to Checkout'}
+                loading={proceeding}
+                loadingLabel="Starting…"
+                disabled={cartCount === 0 || hasInactiveItems}
+                size={hasInactiveItems ? 'md' : 'lg'}
+                haptics
                 onPress={proceedToCheckout}
-                disabled={proceeding || cartCount === 0 || hasInactiveItems}
-                className="w-full flex-row items-center justify-center rounded-lg bg-accent-500 px-6 py-3 active:bg-accent-600 disabled:opacity-60"
-              >
-                <Text className="font-semibold text-white">
-                  {proceeding ? 'Starting…' : hasInactiveItems ? 'Remove unavailable items to checkout' : 'Proceed to Checkout'}
-                </Text>
-                <View className="ml-2">
-                  <ChevronRight size={20} color={status.white} strokeWidth={2} />
-                </View>
-              </Pressable>
+                trailing={hasInactiveItems || proceeding ? null : <ChevronRight size={20} color={status.white} strokeWidth={2.2} />}
+              />
             ) : (
               <View className="gap-3">
-                <Pressable
+                <Button
+                  label="Login to Checkout"
                   onPress={() => router.push('/(auth)/login')}
-                  className="w-full flex-row items-center justify-center rounded-lg bg-accent-500 px-6 py-3 active:bg-accent-600"
-                >
-                  <Text className="font-semibold text-white">Login to Checkout</Text>
-                  <View className="ml-2">
-                    <ChevronRight size={20} color={status.white} strokeWidth={2} />
-                  </View>
-                </Pressable>
+                  trailing={<ChevronRight size={20} color={status.white} strokeWidth={2.2} />}
+                />
                 <Text className="text-center text-sm text-foreground-secondary">
                   New customer?{' '}
                   <Text className="font-medium text-accent-600 dark:text-accent-400" onPress={() => router.push('/(auth)/signup')}>
@@ -379,10 +373,8 @@ export default function CartScreen() {
               </View>
             )}
 
-            <Pressable onPress={() => openHref(router, '/products')} className="mt-4">
-              <Text className="text-center font-medium text-accent-600 dark:text-accent-400">Continue Shopping</Text>
-            </Pressable>
-          </View>
+            <Button label="Continue Shopping" variant="ghost" size="md" onPress={() => openHref(router, '/products')} className="mt-2" />
+          </Card>
         )}
       </View>
     </Screen>
@@ -394,16 +386,16 @@ function CartLoading() {
   return (
     <View className="flex-1 overflow-hidden px-4 pt-4">
       <Skeleton height={32} width={210} className="mb-4" />
-      <View className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
+      <View className="overflow-hidden rounded-panel bg-surface-elevated dark:border dark:border-border-default">
         {[0, 1, 2].map(i => (
           <View key={i} className={`flex-row gap-4 p-4 ${i < 2 ? 'border-b border-border-default' : ''}`}>
-            <Skeleton width={96} height={96} />
+            <Skeleton width={96} height={96} rounded="rounded-xl" />
             <View className="flex-1 gap-2">
               <Skeleton height={15} />
               <Skeleton height={15} width="60%" />
               <Skeleton height={20} width={90} className="mt-1" />
               <View className="mt-2 flex-row items-center gap-3">
-                <Skeleton height={36} width={112} />
+                <Skeleton height={44} width={128} rounded="rounded-full" />
                 <Skeleton height={12} width={80} rounded="rounded" />
               </View>
               <Skeleton height={18} width={130} className="mt-2" />

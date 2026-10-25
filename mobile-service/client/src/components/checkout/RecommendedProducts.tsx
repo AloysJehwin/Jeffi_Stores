@@ -1,5 +1,4 @@
-import { View } from 'react-native'
-import { Text } from '../../ui'
+import { Card, Text } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import ProductCard from '../product/ProductCard'
 import { Grid } from '../home/layout'
@@ -20,13 +19,15 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
   if (products.length === 0) return null
 
   return (
-    <View className="mt-8 rounded-lg border border-border-default bg-surface-elevated p-4 shadow-sm">
-      <Text className="mb-4 text-lg font-bold text-foreground">{title}</Text>
+    <Card className="mt-8">
+      <Text accessibilityRole="header" className="mb-4 font-display text-lg font-extrabold text-foreground">
+        {title}
+      </Text>
       <Grid cols={2} gap={12} inset={17}>
         {products.map(p => (
           <ProductCard key={p.card.id} product={p.card} handlingDays={p.handlingDays ?? 2} />
         ))}
       </Grid>
-    </View>
+    </Card>
   )
 }

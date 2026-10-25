@@ -1,5 +1,5 @@
 import { View } from 'react-native'
-import { Text } from '../../ui'
+import { Card, Overline, Text } from '../../ui'
 
 // The AI-enriched "Features & Use Cases" card from the PDP page.tsx (single column at the mobile breakpoint).
 
@@ -26,14 +26,14 @@ export default function FeaturesUseCases({ product }: { product: Record<string, 
   if (!hasFeatures && !hasUseCases && !whoUses && !application) return null
 
   return (
-    <View className="mb-8 rounded-lg border border-border-default bg-surface-elevated p-6 shadow-sm">
-      <Text className="mb-6 text-xl font-bold text-foreground">{'Features & Use Cases'}</Text>
+    <Card className="mb-6 p-5" padded={false}>
+      <Text accessibilityRole="header" className="mb-5 font-display text-xl font-extrabold text-foreground">
+        {'Features & Use Cases'}
+      </Text>
       <View className="gap-6">
         {hasFeatures ? (
           <View>
-            <Text className="mb-2 text-xs uppercase text-foreground-muted" style={{ letterSpacing: 0.3 }}>
-              Key Features
-            </Text>
+            <Overline className="mb-2">Key Features</Overline>
             <Bullets items={features} />
           </View>
         ) : null}
@@ -41,9 +41,7 @@ export default function FeaturesUseCases({ product }: { product: Record<string, 
           <>
             {hasFeatures ? <View className="border-t border-border-default" /> : null}
             <View>
-              <Text className="mb-2 text-xs uppercase text-foreground-muted" style={{ letterSpacing: 0.3 }}>
-                Use Cases
-              </Text>
+              <Overline className="mb-2">Use Cases</Overline>
               <Bullets items={useCases} />
             </View>
           </>
@@ -68,6 +66,6 @@ export default function FeaturesUseCases({ product }: { product: Record<string, 
           </>
         ) : null}
       </View>
-    </View>
+    </Card>
   )
 }

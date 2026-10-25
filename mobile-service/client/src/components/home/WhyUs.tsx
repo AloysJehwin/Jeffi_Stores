@@ -1,5 +1,5 @@
 import { View } from 'react-native'
-import { Text } from '../../ui'
+import { Card, Overline, Text } from '../../ui'
 import { useColorScheme } from 'nativewind'
 import { IconByName } from './Benefits'
 import { accent, primary, secondary } from '../../theme'
@@ -43,17 +43,17 @@ export default function WhyUs({ section }: SectionProps) {
   return (
     <View className="bg-surface-secondary px-4 py-12">
       <View className="mb-10 items-center">
-        <Text className="mb-2 text-center text-[10px] font-black uppercase text-primary-500" style={{ letterSpacing: 2 }}>
+        <Overline className="mb-2 text-center text-primary-500" style={{ letterSpacing: 2 }}>
           {section.copy.eyebrow || COPY.eyebrow}
-        </Text>
-        <Text className="text-center text-2xl font-black text-foreground" style={{ letterSpacing: -0.6 }}>
+        </Overline>
+        <Text accessibilityRole="header" className="text-center font-display text-2xl font-extrabold tracking-tight text-foreground">
           {section.copy.title || COPY.title}
         </Text>
       </View>
 
       <View className="gap-4">
         {tiles.map(item => (
-          <View key={item.title} className="relative overflow-hidden rounded-2xl border border-border-default bg-surface-elevated p-6">
+          <Card key={item.title} padded={false} className="relative overflow-hidden p-6">
             <View
               className={`mb-5 h-12 w-12 items-center justify-center rounded-xl ${
                 item.color === 'primary' ? ICON_BG.primary : item.color === 'accent' ? ICON_BG.accent : ICON_BG.secondary
@@ -61,9 +61,9 @@ export default function WhyUs({ section }: SectionProps) {
             >
               <IconByName name={item.icon} size={24} color={iconColor(item.color)} />
             </View>
-            <Text className="mb-2 text-lg font-black text-foreground">{item.title}</Text>
+            <Text className="mb-2 font-display text-lg font-extrabold text-foreground">{item.title}</Text>
             <Text className="text-sm leading-relaxed text-foreground-secondary">{item.desc}</Text>
-          </View>
+          </Card>
         ))}
       </View>
     </View>

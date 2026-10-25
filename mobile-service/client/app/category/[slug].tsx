@@ -1,5 +1,5 @@
-import { Pressable, View } from 'react-native'
-import { Screen, ScreenHeader, Text, useBottomInset } from '../../src/ui'
+import { View } from 'react-native'
+import { Card, Screen, ScreenHeader, Text, useBottomInset } from '../../src/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { listCategories, withDetails, type CategoryDetail } from '../../src/api/categories'
@@ -18,18 +18,22 @@ const PAGE_SIZE = 24
 function SubcategoryTile({ category }: { category: CategoryDetail }) {
   const router = useRouter()
   return (
-    <Pressable onPress={() => router.push(`/category/${category.slug}`)} className="grow">
-      <View className="flex-1 items-center gap-1.5 rounded-xl border border-border-default bg-surface-elevated p-2 shadow-sm">
-        <View className="h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-100">
-          <CategoryIcon iconName={category.icon_name} categoryName={category.name} size={20} color={accent[600]} />
-        </View>
-        <View className="min-h-[32px] items-center justify-center">
-          <Text numberOfLines={2} className="text-center text-[11px] font-semibold text-foreground" style={{ lineHeight: 13.75 }}>
-            {category.name}
-          </Text>
-        </View>
+    <Card
+      onPress={() => router.push(`/category/${category.slug}`)}
+      accessibilityLabel={category.name}
+      padded={false}
+      wrapperClassName="grow"
+      className="flex-1 items-center gap-1.5 p-2"
+    >
+      <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-100 dark:bg-accent-900/30">
+        <CategoryIcon iconName={category.icon_name} categoryName={category.name} size={20} color={accent[600]} />
       </View>
-    </Pressable>
+      <View className="min-h-[32px] items-center justify-center">
+        <Text numberOfLines={2} className="text-center text-[11px] font-semibold leading-[14px] text-foreground">
+          {category.name}
+        </Text>
+      </View>
+    </Card>
   )
 }
 
@@ -81,7 +85,9 @@ export default function CategoryScreen() {
       <View className="px-4 pt-4">
         {subcategories.length > 0 ? (
           <View className="mb-8">
-            <Text className="mb-4 text-xl font-bold text-foreground">Subcategories</Text>
+            <Text accessibilityRole="header" className="mb-4 font-display text-xl font-extrabold text-foreground">
+              Subcategories
+            </Text>
             <Grid cols={4} gap={8}>
               {subcategories.map(sub => (
                 <SubcategoryTile key={sub.id} category={sub} />
@@ -90,7 +96,9 @@ export default function CategoryScreen() {
           </View>
         ) : null}
         <View className="mb-6 flex-row items-center justify-between">
-          <Text className="text-xl font-bold text-foreground">Products ({total ?? 0})</Text>
+          <Text accessibilityRole="header" className="font-display text-xl font-extrabold text-foreground">
+            Products ({total ?? 0})
+          </Text>
         </View>
       </View>
     </>

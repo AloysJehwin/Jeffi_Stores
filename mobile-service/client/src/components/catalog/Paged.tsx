@@ -1,9 +1,7 @@
-import type { ReactNode } from 'react'
-import { ActivityIndicator, Pressable, View } from 'react-native'
+import { View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { InboxIcon } from './icons'
-import { useTokens } from '../../theme'
-import { Text, ProductGridSkeleton, Skeleton } from '../../ui'
+import { Inbox } from 'lucide-react-native'
+import { Button, Card, EmptyState, Notice, ProductGridSkeleton, Skeleton, Spinner, Text, type IconComponent } from '../../ui'
 
 // The admin kit's InfiniteFooter (ServerPagedItems / useReveal), the listing skeletons and empty card.
 
@@ -18,29 +16,26 @@ export interface InfiniteControl {
 
 /** "Loading more..." / "Load more" / "Showing X of Y products"; the list's onEndReached drives auto-loading. */
 export function InfiniteFooter({ shown, control, noun = 'products' }: { shown: number; control: InfiniteControl; noun?: string }) {
-  const t = useTokens()
   const { total, hasMore, loadingMore, error, loadMore, retry } = control
   if (!shown && !hasMore && !error) return null
   const of = total != null && total >= shown ? total : null
   return (
     <View className="px-1 pt-3">
       {error ? (
-        <View className="flex-row items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2">
-          <Text className="text-xs text-red-600 dark:text-red-400">{error}</Text>
-          <Pressable onPress={retry ?? loadMore} className="h-[26px] items-center justify-center rounded border border-red-500/40 px-2">
-            <Text className="text-xs text-red-600 dark:text-red-400">Retry</Text>
-          </Pressable>
-        </View>
+        <Notice tone="danger">
+          <View className="flex-row items-center justify-between gap-3">
+            <Text className="flex-1 text-sm leading-5 text-red-700 dark:text-red-300">{error}</Text>
+            <Button label="Retry" variant="outline" size="sm" block={false} onPress={retry ?? loadMore} />
+          </View>
+        </Notice>
       ) : loadingMore ? (
         <View className="flex-row items-center justify-center gap-2 py-2">
-          <ActivityIndicator size="small" color={t.foregroundMuted} />
+          <Spinner size="small" fill={false} />
           <Text className="text-xs text-foreground-muted">Loading more...</Text>
         </View>
       ) : hasMore ? (
         <View className="items-center py-1">
-          <Pressable onPress={loadMore} className="h-8 flex-row items-center justify-center rounded-lg border border-border-default px-3">
-            <Text className="text-sm text-foreground-secondary">Load more</Text>
-          </Pressable>
+          <Button label="Load more" variant="outline" size="sm" block={false} onPress={loadMore} />
         </View>
       ) : null}
       {shown > 0 ? (
@@ -68,7 +63,7 @@ export function ListingPageSkeleton({ logo = false, cols = 2, gap = 12 }: { logo
       {/* The name is in the screen header; the band holds the logo and description. */}
       <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
         <View className="flex-row items-center gap-4">
-          {logo ? <Skeleton width={64} height={64} rounded="rounded-lg" /> : null}
+          {logo ? <Skeleton width={64} height={64} rounded="rounded-xl" /> : null}
           <View className="flex-1 gap-2.5">
             <Skeleton height={14} width="85%" />
             <Skeleton height={14} width="55%" />
@@ -89,28 +84,24 @@ export function EmptyCard({
   body,
   cta = 'Browse All Products',
   onPress,
-  icon,
+  icon = Inbox,
 }: {
   title: string
   body: string
   cta?: string
   onPress?: () => void
-  icon?: ReactNode
+  icon?: IconComponent
 }) {
   const router = useRouter()
-  const t = useTokens()
   return (
-    <View className="items-center rounded-lg border border-border-default bg-surface-elevated p-12 shadow-sm">
-      <View className="mb-4">{icon ?? <InboxIcon size={96} strokeWidth={1} color={t.foregroundMuted} />}</View>
-      <Text className="mb-2 self-stretch text-center text-xl font-semibold text-foreground">{title}</Text>
-      <Text className="mb-6 self-stretch text-center text-foreground-secondary">{body}</Text>
-      <Pressable
-        onPress={onPress ?? (() => router.navigate({ pathname: '/(tabs)/products', params: {} }))}
-        className="rounded-lg bg-accent-500 px-6 py-3 active:bg-accent-600"
-      >
-        <Text className="font-semibold text-white">{cta}</Text>
-      </Pressable>
-    </View>
+    <Card padded={false}>
+      <EmptyState
+        icon={icon}
+        title={title}
+        message={body}
+        actionLabel={cta}
+        onAction={onPress ?? (() => router.navigate({ pathname: '/(tabs)/products', params: {} }))}
+      />
+    </Card>
   )
 }
-

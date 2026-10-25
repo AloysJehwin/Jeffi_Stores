@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View } from 'react-native'
-import { Text } from '../../ui'
+import { Display, Text } from '../../ui'
 import Animated, {
   Easing, useAnimatedProps, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming,
 } from 'react-native-reanimated'
@@ -67,17 +67,17 @@ export default function OrderCelebration({ orderId, orderNumber }: { orderId: st
 
   return (
     <Animated.View style={[{ marginBottom: 32 }, cardStyle]}>
-      <View className="items-center rounded-lg border-2 border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/30">
+      <View className="items-center rounded-panel border-2 border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/30">
         <View className="mb-4">
           <CheckmarkDraw animate={animate} />
         </View>
-        <Text className="mb-2 text-center text-3xl font-bold text-foreground">Order Confirmed!</Text>
+        <Display className="mb-2 text-center">Order Confirmed!</Display>
         <Text className="mb-4 text-center text-foreground-secondary">
           Thank you for your purchase. Your order has been successfully placed.
         </Text>
-        <View className="items-center rounded-lg bg-surface-elevated p-4">
+        <View className="items-center rounded-field bg-surface-elevated p-4">
           <Text className="mb-1 text-sm text-foreground-secondary">Order Number</Text>
-          <Text className="text-2xl font-bold text-accent-600 dark:text-accent-400">{orderNumber}</Text>
+          <Text className="font-display text-2xl font-extrabold text-accent-600 dark:text-accent-400">{orderNumber}</Text>
         </View>
       </View>
     </Animated.View>

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { Text } from '../../ui'
+import { CreditCard, Tag } from 'lucide-react-native'
+import { Overline, Text, useEntering } from '../../ui'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
-import { Glyph, P } from './Glyph'
 import { getRazorpayOffers } from '../../api/pdp'
 import { openHref } from '../../lib/links'
-import { status } from '../../theme'
+import { status, useTokens } from '../../theme'
 
 // Mirror of controller-service components/visitor/RazorpayOffers.tsx: the account's live bank offers, auto-rotating.
 
@@ -21,6 +21,9 @@ export default function RazorpayOffers() {
   const router = useRouter()
   const { data: offers = [] } = useQuery({ queryKey: ['pdp-razorpay-offers'], queryFn: getRazorpayOffers, staleTime: 300_000 })
   const [active, setActive] = useState(0)
+  const t = useTokens()
+  const fadeIn = useEntering(FadeIn.duration(500))
+  const fadeOut = useEntering(FadeOut.duration(500))
 
   useEffect(() => {
     if (offers.length < 2) return
@@ -35,21 +38,19 @@ export default function RazorpayOffers() {
   return (
     <View className="mt-4">
       <View className="mb-2 flex-row items-center gap-2">
-        <Glyph d={P.card} size={14} className="text-accent-500" />
-        <Text className="text-[10px] font-semibold uppercase text-foreground-secondary" style={{ letterSpacing: 0.25 }}>
-          Bank Offers via Razorpay
-        </Text>
+        <CreditCard size={14} color={t.accent500} />
+        <Overline className="text-foreground-secondary">Bank Offers via Razorpay</Overline>
       </View>
 
       <Pressable
         onPress={() => openHref(router, '/legal/terms-and-conditions#5a-bank-offers-cashback')}
         accessibilityLabel="Bank offer T&C"
-        className="relative h-10 overflow-hidden rounded-lg"
+        className="relative h-11 overflow-hidden rounded-field"
       >
         <Animated.View
           key={offer.id}
-          entering={FadeIn.duration(500)}
-          exiting={FadeOut.duration(500)}
+          entering={fadeIn}
+          exiting={fadeOut}
           className={`absolute inset-0 flex-row items-center gap-3 px-3 ${GRADIENTS[i % GRADIENTS.length]}`}
         >
           <Svg style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} width="100%" height="100%">
@@ -61,8 +62,8 @@ export default function RazorpayOffers() {
             </Defs>
             <Rect width="100%" height="100%" fill={`url(#rzpOffer${i})`} />
           </Svg>
-          <Glyph d={P.tag} size={14} className="text-white/70" />
-          <Text numberOfLines={1} className="flex-1 text-[11px] text-white/90">
+          <Tag size={14} color={status.white} opacity={0.7} />
+          <Text numberOfLines={1} className="flex-1 text-xs text-white/90">
             {offer.title}
           </Text>
         </Animated.View>

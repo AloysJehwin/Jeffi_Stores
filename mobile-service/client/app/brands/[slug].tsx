@@ -1,5 +1,5 @@
-import { Linking, Pressable, View } from 'react-native'
-import { Screen, ScreenHeader, Text, useBottomInset } from '../../src/ui'
+import { Linking, View } from 'react-native'
+import { Screen, ScreenHeader, Text, TextButton, useBottomInset } from '../../src/ui'
 import { Image } from 'expo-image'
 import { useLocalSearchParams } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
@@ -39,17 +39,13 @@ export default function BrandScreen() {
         <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
           <View className="flex-row items-center gap-4">
             {logo ? (
-              <View className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border-default bg-surface-secondary">
+              <View className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
                 <Image source={{ uri: logo }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={brand.name} />
               </View>
             ) : null}
             <View className="min-w-0 flex-1">
               {brand.description ? <Text className="text-foreground-secondary">{brand.description}</Text> : null}
-              {brand.website ? (
-                <Pressable onPress={() => Linking.openURL(brand.website!)} className="mt-1 self-start">
-                  <Text className="text-sm text-accent-500">{brand.website}</Text>
-                </Pressable>
-              ) : null}
+              {brand.website ? <TextButton label={brand.website} onPress={() => Linking.openURL(brand.website!)} className="mt-1" /> : null}
             </View>
           </View>
         </View>
@@ -57,7 +53,9 @@ export default function BrandScreen() {
 
       <View className="px-4 pt-4">
         <View className="mb-6 flex-row items-center justify-between">
-          <Text className="text-xl font-bold text-foreground">Products ({total ?? 0})</Text>
+          <Text accessibilityRole="header" className="font-display text-xl font-extrabold text-foreground">
+            Products ({total ?? 0})
+          </Text>
         </View>
       </View>
     </>

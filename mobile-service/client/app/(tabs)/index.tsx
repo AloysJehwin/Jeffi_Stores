@@ -6,10 +6,12 @@ import SectionRenderer from '../../src/components/home/SectionRenderer'
 import { HomeScrollContext } from '../../src/components/home/scroll-context'
 import { HomeSkeleton, Screen, useBottomInset } from '../../src/ui'
 import { getHome } from '../../src/api/home'
+import { useTokens } from '../../src/theme'
 
 // The storefront home: the admin-configured sections from GET /api/home, rendered like the web's page.
 export default function HomeScreen() {
   const bottomInset = useBottomInset(0)
+  const t = useTokens()
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['home'],
     queryFn: getHome,
@@ -35,7 +37,9 @@ export default function HomeScreen() {
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: bottomInset }}
-            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+            refreshControl={
+              <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={t.accent500} colors={[t.accent500]} progressBackgroundColor={t.surfaceElevated} />
+            }
           >
             {data.sections.map((section, i) => (
               <SectionRenderer

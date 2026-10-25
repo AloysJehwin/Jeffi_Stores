@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, View } from 'react-native'
-import { Text } from '../../ui'
+import { Button } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { GUTTER, SectionHeading } from './layout'
@@ -38,14 +38,7 @@ export default function SocialStrip({ section }: SectionProps) {
           eyebrowClassName="text-primary-500"
           className=""
         />
-        {ctaUrl ? (
-          <Pressable
-            onPress={() => openHref(router, ctaUrl)}
-            className="flex-row items-center self-start rounded-xl bg-primary-500 px-5 py-2.5 active:bg-primary-600"
-          >
-            <Text className="text-sm font-bold text-white">{section.copy.ctaLabel ?? 'Follow us'}</Text>
-          </Pressable>
-        ) : null}
+        {ctaUrl ? <Button label={section.copy.ctaLabel ?? 'Follow us'} size="md" block={false} onPress={() => openHref(router, ctaUrl)} /> : null}
       </View>
       <ScrollView
         horizontal
@@ -59,8 +52,9 @@ export default function SocialStrip({ section }: SectionProps) {
           <Pressable
             key={`${item.url}-${i}`}
             onPress={() => openHref(router, item.url)}
+            accessibilityRole="button"
             accessibilityLabel={item.caption || 'Open post'}
-            className="overflow-hidden rounded-xl bg-surface"
+            className="overflow-hidden rounded-panel bg-surface"
             style={{ width: TILE, height: TILE }}
           >
             {/* the caption overlay is hover/focus-only on the web, so it never shows on touch */}
