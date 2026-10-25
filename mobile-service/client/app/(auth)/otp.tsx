@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Text, TextInput, View } from 'react-native'
+import { View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { loginWithOtp, requestOtp, type OtpChannel } from '../../src/api/auth'
 import { updateProfile } from '../../src/api/account'
 import { showToast } from '../../src/stores/toastStore'
-import { AuthScreen, BigButton, FieldError, TextAction } from '../../src/components/account/AuthScreen'
-import { OtpBoxes } from '../../src/components/account/OtpBoxes'
+import { AuthScreen } from '../../src/components/account/AuthScreen'
+import { Button, FieldError, OtpField, Text, TextButton, type FieldRef } from '../../src/ui'
 import { PolicyConsent } from '../../src/components/account/ui'
 import { finishSignIn } from '../../src/components/account/authFlow'
 import { useLeaveAuth } from '../../src/components/account/hooks'
@@ -27,7 +27,7 @@ export default function OtpScreen() {
   const [shake, setShake] = useState(0)
   const [policyAccepted, setPolicyAccepted] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(Number(params.cooldown) || 0)
-  const inputRef = useRef<TextInput>(null)
+  const inputRef = useRef<FieldRef>(null)
   const submittedRef = useRef('')
 
   useEffect(() => {
@@ -102,24 +102,24 @@ export default function OtpScreen() {
     <AuthScreen title="Enter the code" subtitle={`We sent a 6-digit code to ${where}.`}>
       <View className="gap-5">
         <View>
-          <OtpBoxes value={otp} onChange={setOtp} inputRef={inputRef} shake={shake} />
+          <OtpField value={otp} onChange={setOtp} inputRef={inputRef} shake={shake} />
           <FieldError message={error} />
         </View>
 
         <View className="flex-row items-center justify-between">
-          <TextAction
+          <TextButton
             label={resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
-            muted={resendCooldown > 0 || isLoading}
+            tone={resendCooldown > 0 || isLoading ? 'muted' : 'accent'}
             onPress={() => {
               if (!isLoading && resendCooldown <= 0) handleResend()
             }}
           />
-          <TextAction label={channel === 'email' ? 'Change email' : 'Change number'} muted onPress={() => router.back()} />
+          <TextButton label={channel === 'email' ? 'Change email' : 'Change number'} tone="muted" onPress={() => router.back()} />
         </View>
 
         {requiresPolicy && <PolicyConsent checked={policyAccepted} onChange={setPolicyAccepted} />}
 
-        <BigButton
+        <Button
           label="Verify"
           loadingLabel="Verifying…"
           loading={isLoading}
@@ -129,7 +129,7 @@ export default function OtpScreen() {
 
         <Text className="text-center text-sm text-foreground-secondary">
           New here?{' '}
-          <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/signup')}>
+          <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/signup')}>
             Create an account
           </Text>
         </Text>

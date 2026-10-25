@@ -23,6 +23,9 @@ import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import WhatsAppTemplateEditor, { WhatsAppPreview } from '@/components/admin/campaigns/WhatsAppTemplateEditor'
+import { PushFields, PushPreview } from '@/components/admin/campaigns/PushEditor'
+import { campaignSupportsPush, defaultPushCopy, scenarioPushCopy } from '@/lib/campaigns/push-kinds'
+import { pushCopyProblem } from '@/lib/push/copy'
 import DurationField from '@/components/admin/campaigns/DurationField'
 import type { DurationUnit } from '@/lib/campaigns/duration'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
@@ -378,6 +381,18 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       ? renderBlocks(form.blocks)
       : form.body_template
   const previewBody = renderTemplate(previewBodySource, bridgedPreview)
+  const pushOn = campaignSupportsPush(varsKind) && !!form.parameters?.pushEnabled
+  const pushDefault = defaultPushCopy(varsKind)
+  const pushParam = (k: string) => (typeof form.parameters?.[k] === 'string' ? String(form.parameters[k]) : undefined)
+  const pushSent = scenarioPushCopy(varsKind, form.parameters)
+  const pushProblem = pushOn ? pushCopyProblem({ ...pushSent, link: pushSent.link || undefined }) : null
+  const pushLinkDefault =
+    varsKind === 'review_request' ? 'the order page' : pushDefault.link || 'the product page'
+  const pushVars = {
+    ...previewVars,
+    items: 'Sample Product and 1 more',
+    headline: `${SAMPLE_VARS.productName} is now ₹${SAMPLE_VARS.newPrice}`,
+  }
   // Full themed document for the preview iframe, so the selected layout (Fresh vs Promo…) renders
   // with its own shell + CSS. renderLayoutPreview also fills {store_name}/{store_web} via previewVars.
   const previewDoc = renderTemplate(renderLayoutPreview(form.template_layout, previewBody), bridgedPreview)
@@ -747,6 +762,33 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               />
             </div>
           )}
+
+          {pushOn && (
+            <div className="mt-4">
+              <PushFields
+                value={{
+                  title: pushParam('pushTitle') ?? pushDefault.title,
+                  body: pushParam('pushBody') ?? pushDefault.body,
+                  link: pushParam('pushLink') ?? '',
+                }}
+                onChange={v =>
+                  setForm(f =>
+                    f ? { ...f, parameters: { ...f.parameters, pushTitle: v.title, pushBody: v.body, pushLink: v.link ?? '' } } : f
+                  )
+                }
+                image={false}
+                linkDefault={pushLinkDefault}
+                context={currentScenario?.name ?? varsKind}
+                inputClass="field-normal w-full border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                labelClass="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1"
+              />
+              {pushProblem && <p className="mt-1 text-xs text-red-600">{pushProblem}</p>}
+              <p className="text-[10px] text-foreground-muted mt-1">
+                Empty fields use the default copy. The product photo is attached when there is one. Pushes wait out quiet
+                hours on the customer&apos;s phone and count toward the 2-a-day push limit.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
@@ -776,6 +818,18 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               <WhatsAppPreview
                 value={{ slug: form.wa_template_slug, variables: form.wa_variables }}
                 vars={previewVars}
+              />
+            </div>
+          )}
+
+          {pushOn && (
+            <div className="mt-5">
+              <p className="text-sm font-semibold uppercase tracking-wide text-foreground mb-2">App push preview</p>
+              <PushPreview
+                title={pushSent.title}
+                body={pushSent.body}
+                image={varsKind === 'birthday' ? null : String(SAMPLE_VARS.productImageUrl)}
+                vars={pushVars}
               />
             </div>
           )}

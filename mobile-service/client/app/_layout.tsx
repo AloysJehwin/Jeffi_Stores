@@ -6,16 +6,22 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
+import { useColorScheme } from 'nativewind'
 import { useAuthStore } from '../src/stores/authStore'
 import { useCartStore } from '../src/stores/cartStore'
+import { useThemeStore } from '../src/stores/themeStore'
 import { getStoredToken } from '../src/api/client'
 import { getMe } from '../src/api/auth'
 import { getCart } from '../src/api/cart'
-import Toast from '../src/components/ui/Toast'
-import UpdatePrompt from '../src/components/ui/UpdatePrompt'
+import Toast from '../src/ui/Toast'
+import UpdatePrompt from '../src/ui/UpdatePrompt'
 import { QuickAddSheetHost } from '../src/components/product/QuickAddSheet'
 import { StoryViewerHost } from '../src/components/home/StoryViewer'
+import { PushBootstrap } from '../src/components/push/PushBootstrap'
+import { PushPermissionSheetHost } from '../src/components/push/PushPermissionSheet'
 import { trackScreen } from '../src/lib/analytics'
+import { ConfirmHost } from '../src/ui'
+import { useTokens } from '../src/theme'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,7 +91,16 @@ function CartRehydrator() {
   return null
 }
 
+function ThemeRehydrator() {
+  useEffect(() => {
+    useThemeStore.getState().hydrate()
+  }, [])
+  return null
+}
+
 export default function RootLayout() {
+  const { colorScheme } = useColorScheme()
+  const t = useTokens()
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       {/* Edge-to-edge Android no longer resizes the window for the keyboard; this tracks it on both platforms. */}
@@ -95,8 +110,11 @@ export default function RootLayout() {
           <AuthRehydrator />
           <ScreenTracker />
           <CartRehydrator />
-          <StatusBar style="auto" />
-          <Stack screenOptions={{ headerShown: false }}>
+          <ThemeRehydrator />
+          <PushBootstrap />
+          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+          {/* The scene background matches the theme, so a push never flashes white in dark mode. */}
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.surface } }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
             <Stack.Screen name="product/[slug]" />
@@ -107,11 +125,15 @@ export default function RootLayout() {
             <Stack.Screen name="orders/[id]" />
             <Stack.Screen name="account/profile" />
             <Stack.Screen name="account/addresses" />
+            <Stack.Screen name="account/notifications" />
+            <Stack.Screen name="notifications" />
           </Stack>
           {/* One sheet for every "+" and long-press; lives above the stack so toasts still render over it. */}
           <QuickAddSheetHost />
           <StoryViewerHost />
+          <PushPermissionSheetHost />
           <UpdatePrompt />
+          <ConfirmHost />
           <Toast />
         </QueryClientProvider>
       </SafeAreaProvider>

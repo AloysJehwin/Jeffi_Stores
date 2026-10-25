@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Button, Card, Overline, Pill, Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Package } from 'lucide-react-native'
@@ -26,7 +27,7 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
 
   return (
     <View className="bg-surface px-4 py-10">
-      <View className="overflow-hidden rounded-2xl border border-border-default">
+      <Card padded={false} className="overflow-hidden">
         {/* bg-gradient-to-br from-primary-500/10 via-surface-elevated to-accent-500/10 */}
         <Svg style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} width="100%" height="100%">
           <Defs>
@@ -44,7 +45,8 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
             onPress={open}
             className="overflow-hidden rounded-xl bg-surface-elevated"
             style={{ width: '100%', maxWidth: 384, aspectRatio: 1 }}
-            accessibilityLabel={product.name}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
           >
             {image ? (
               <Image
@@ -59,18 +61,14 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
                 <Package size={64} color={t.foregroundMuted} />
               </View>
             )}
-            {product.mrpDiscount > 0 && (
-              <View className="absolute left-3 top-3 rounded-full bg-accent-500 px-2.5 py-1 dark:bg-accent-600">
-                <Text className="text-sm font-bold text-white">{product.mrpDiscount}% off</Text>
-              </View>
-            )}
+            {product.mrpDiscount > 0 && <Pill label={`${product.mrpDiscount}% off`} tone="accent" className="absolute left-3 top-3" />}
           </Pressable>
 
           <View className="w-full items-center gap-3">
-            <Text className="text-center text-[10px] font-black uppercase text-primary-500" style={{ letterSpacing: 2 }}>
+            <Overline className="text-center text-primary-500" style={{ letterSpacing: 2 }}>
               {section.copy.eyebrow ?? COPY.eyebrow}
-            </Text>
-            <Text className="text-center text-2xl font-black text-foreground" style={{ letterSpacing: -0.6 }}>
+            </Overline>
+            <Text accessibilityRole="header" className="text-center font-display text-2xl font-extrabold tracking-tight text-foreground">
               {section.copy.title ?? COPY.title}
             </Text>
             {product.brandName ? (
@@ -78,7 +76,7 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
                 {product.brandName}
               </Text>
             ) : null}
-            <Text onPress={open} className="text-center text-lg font-semibold text-foreground">
+            <Text accessibilityRole="link" onPress={open} className="text-center text-lg font-semibold text-foreground">
               {product.name}
             </Text>
             <View className="flex-row items-baseline gap-3">
@@ -95,12 +93,10 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
                 <DealCountdown endsAt={endsAt} />
               </View>
             ) : null}
-            <Pressable onPress={open} className="mt-2 rounded-xl bg-primary-500 px-8 py-3 shadow-lg shadow-primary-500/20 active:bg-primary-600">
-              <Text className="font-bold text-white">{section.copy.ctaLabel ?? COPY.ctaLabel}</Text>
-            </Pressable>
+            <Button label={section.copy.ctaLabel ?? COPY.ctaLabel} onPress={open} haptics className="mt-2" />
           </View>
         </View>
-      </View>
+      </Card>
     </View>
   )
 }

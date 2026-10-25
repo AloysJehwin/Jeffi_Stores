@@ -1,7 +1,8 @@
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { ChevronRightIcon, CubeIcon } from './icons'
+import { Box, ChevronRight } from 'lucide-react-native'
+import { Badge, Card, Text } from '../../ui'
 import type { ListingCard } from '../../api/products'
 import { absUrl } from '../../lib/links'
 import { inr } from '../../lib/format'
@@ -10,17 +11,13 @@ import { useTokens } from '../../theme'
 // ProductGrid's table view (TableRow + StockBadge).
 
 function StockBadge({ effectiveStock, stockStatus }: { effectiveStock: number; stockStatus: string }) {
-  const [box, txt, label] =
+  const [tone, label] =
     effectiveStock === 0 || stockStatus === 'Out of Stock'
-      ? ['bg-red-100 dark:bg-red-900/30', 'text-red-700 dark:text-red-400', 'Out of Stock']
+      ? (['danger', 'Out of Stock'] as const)
       : stockStatus === 'Low Stock'
-        ? ['bg-amber-100 dark:bg-amber-900/30', 'text-amber-700 dark:text-amber-300', 'Low Stock']
-        : ['bg-green-100 dark:bg-green-900/30', 'text-green-700 dark:text-green-400', 'In Stock']
-  return (
-    <View className={`rounded-full px-2 py-0.5 ${box}`}>
-      <Text className={`text-[11px] font-semibold ${txt}`}>{label}</Text>
-    </View>
-  )
+        ? (['warning', 'Low Stock'] as const)
+        : (['success', 'In Stock'] as const)
+  return <Badge label={label} tone={tone} size="sm" />
 }
 
 function TableRow({ product: c, stripe, last }: { product: ListingCard; stripe: boolean; last: boolean }) {
@@ -34,14 +31,16 @@ function TableRow({ product: c, stripe, last }: { product: ListingCard; stripe: 
   return (
     <Pressable
       onPress={() => router.push(`/product/${c.slug}`)}
+      accessibilityRole="button"
+      accessibilityLabel={c.name}
       className={`flex-row items-center gap-3 px-4 py-3 active:bg-accent-50 dark:active:bg-accent-900/10 ${last ? '' : 'border-b border-border-default'} ${stripe ? 'bg-surface-secondary/30' : ''}`}
     >
-      <View className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-border-default bg-surface-secondary">
+      <View className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
         {src ? (
-          <Image source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={c.name} />
+          <Image recyclingKey={src} source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={c.name} />
         ) : (
           <View className="flex-1 items-center justify-center opacity-30">
-            <CubeIcon strokeWidth={1.5} color={t.foregroundMuted} />
+            <Box size={16} strokeWidth={1.5} color={t.foregroundMuted} />
           </View>
         )}
       </View>
@@ -50,17 +49,15 @@ function TableRow({ product: c, stripe, last }: { product: ListingCard; stripe: 
           {c.name}
         </Text>
         <View className="mt-0.5 flex-row flex-wrap items-center gap-1.5">
-          {c.brandName ? <Text className="text-[10px] text-foreground-muted">{c.brandName}</Text> : null}
+          {c.brandName ? <Text className="text-[11px] text-foreground-muted">{c.brandName}</Text> : null}
           {specs.map(s => (
-            <View key={s} className="rounded border border-border-default bg-surface-secondary px-1.5 py-0.5">
-              <Text className="text-[10px] text-foreground-muted">{s}</Text>
-            </View>
+            <Badge key={s} label={s} size="sm" />
           ))}
         </View>
       </View>
       <View className="min-w-[80px] shrink-0 items-end">
         <Text className="text-sm font-bold text-foreground">₹{inr(c.displayPrice)}</Text>
-        {mrp && mrp > c.displayPrice ? <Text className="text-[10px] text-foreground-muted line-through">₹{inr(mrp)}</Text> : null}
+        {mrp && mrp > c.displayPrice ? <Text className="text-[11px] text-foreground-muted line-through">₹{inr(mrp)}</Text> : null}
       </View>
       <View className="w-10 shrink-0 items-center">
         {off > 0 ? <Text className="text-xs font-semibold text-accent-600 dark:text-accent-400">-{off}%</Text> : null}
@@ -68,15 +65,15 @@ function TableRow({ product: c, stripe, last }: { product: ListingCard; stripe: 
       <View className="shrink-0">
         <StockBadge effectiveStock={c.effectiveStock} stockStatus={c.stockStatus ?? ''} />
       </View>
-      <ChevronRightIcon size={14} color={t.foregroundMuted} />
+      <ChevronRight size={14} color={t.foregroundMuted} />
     </Pressable>
   )
 }
 
 export default function ProductTable({ products }: { products: ListingCard[] }) {
-  const head = 'text-[10px] font-semibold uppercase text-foreground-muted'
+  const head = 'text-[11px] font-semibold uppercase text-foreground-muted'
   return (
-    <View className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated">
+    <Card padded={false} className="overflow-hidden">
       <View className="flex-row items-center gap-3 border-b border-border-default bg-surface-secondary px-4 py-2.5">
         <View className="w-10 shrink-0" />
         <Text className={`flex-1 ${head}`} style={{ letterSpacing: 0.5 }}>
@@ -96,6 +93,6 @@ export default function ProductTable({ products }: { products: ListingCard[] }) 
       {products.map((p, i) => (
         <TableRow key={p.id} product={p} stripe={i % 2 !== 0} last={i === products.length - 1} />
       ))}
-    </View>
+    </Card>
   )
 }

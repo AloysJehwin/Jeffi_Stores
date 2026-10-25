@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Card, Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { Star } from 'lucide-react-native'
 import { Carousel, GUTTER, SectionHeading } from './layout'
@@ -26,7 +27,7 @@ function Stars({ rating }: { rating: number }) {
 function TestimonialCard({ t }: { t: Testimonial }) {
   const router = useRouter()
   return (
-    <View className="grow gap-3 rounded-2xl border border-border-default bg-surface-elevated p-5">
+    <Card padded={false} className="grow gap-3 p-5">
       <Stars rating={t.rating} />
       {t.title ? <Text className="text-base font-semibold text-foreground">{t.title}</Text> : null}
       <Text className="grow text-sm leading-relaxed text-foreground-secondary" numberOfLines={6}>
@@ -39,13 +40,14 @@ function TestimonialCard({ t }: { t: Testimonial }) {
         </Text>
         <Text
           onPress={() => router.push(`/product/${t.productSlug}`)}
+          accessibilityRole="link"
           className="mt-1 text-xs text-foreground-muted"
           numberOfLines={1}
         >
           {t.productName}
         </Text>
       </View>
-    </View>
+    </Card>
   )
 }
 

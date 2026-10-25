@@ -567,7 +567,7 @@ ALTER TABLE ONLY public.email_campaign_logs
     ADD CONSTRAINT email_campaign_logs_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.email_campaign_logs
-    ADD CONSTRAINT email_campaign_logs_channel_check CHECK (channel IN ('email','sms','whatsapp'));
+    ADD CONSTRAINT email_campaign_logs_channel_check CHECK (channel IN ('email','sms','whatsapp','push'));
 
 
 
@@ -1023,6 +1023,68 @@ ALTER TABLE ONLY public.hero_slides
 
 ALTER TABLE ONLY public.notifications
     ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notifications notifications_category_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+-- NULL-safe: the fan-out adds these columns to existing tables without NOT NULL.
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_category_check CHECK ((category IS NULL OR (category)::text = ANY (ARRAY['orders'::text, 'account'::text, 'offers'::text, 'price_alerts'::text])));
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_source_check CHECK ((source IS NULL OR (source)::text = ANY (ARRAY['transactional'::text, 'campaign'::text, 'scenario'::text])));
+
+
+--
+-- Name: push_devices push_devices_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_devices
+    ADD CONSTRAINT push_devices_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.push_devices
+    ADD CONSTRAINT push_devices_token_key UNIQUE (token);
+
+ALTER TABLE ONLY public.push_devices
+    ADD CONSTRAINT push_devices_platform_check CHECK ((platform IS NULL OR (platform)::text = ANY (ARRAY['android'::text, 'ios'::text])));
+
+
+--
+-- Name: notification_preferences notification_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_preferences
+    ADD CONSTRAINT notification_preferences_pkey PRIMARY KEY (user_id, category);
+
+ALTER TABLE ONLY public.notification_preferences
+    ADD CONSTRAINT notification_preferences_category_check CHECK ((category IS NULL OR (category)::text = ANY (ARRAY['orders'::text, 'account'::text, 'offers'::text, 'price_alerts'::text])));
+
+
+--
+-- Name: push_sends push_sends_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_sends
+    ADD CONSTRAINT push_sends_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.push_sends
+    ADD CONSTRAINT push_sends_source_check CHECK (((source)::text = ANY (ARRAY['campaign'::text, 'scenario'::text])));
+
+ALTER TABLE ONLY public.push_sends
+    ADD CONSTRAINT push_sends_target_check CHECK (((user_id IS NOT NULL) OR (push_device_id IS NOT NULL)));
+
+
+--
+-- Name: push_queue push_queue_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_queue
+    ADD CONSTRAINT push_queue_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.push_queue
+    ADD CONSTRAINT push_queue_notification_device_key UNIQUE (notification_id, push_device_id);
 
 
 --
@@ -2613,6 +2675,55 @@ ALTER TABLE ONLY public.invoices
 
 ALTER TABLE ONLY public.notifications
     ADD CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: push_devices push_devices_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_devices
+    ADD CONSTRAINT push_devices_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notification_preferences notification_preferences_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_preferences
+    ADD CONSTRAINT notification_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: push_sends push_sends_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_sends
+    ADD CONSTRAINT push_sends_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.push_sends
+    ADD CONSTRAINT push_sends_push_device_id_fkey FOREIGN KEY (push_device_id) REFERENCES public.push_devices(id) ON DELETE CASCADE;
+
+
+--
+-- Name: push_queue push_queue_notification_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_queue
+    ADD CONSTRAINT push_queue_notification_id_fkey FOREIGN KEY (notification_id) REFERENCES public.notifications(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.push_queue
+    ADD CONSTRAINT push_queue_push_device_id_fkey FOREIGN KEY (push_device_id) REFERENCES public.push_devices(id) ON DELETE CASCADE;
+
+
+--
+-- Name: email_campaign_logs email_campaign_logs_push_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.email_campaign_logs
+    ADD CONSTRAINT email_campaign_logs_push_device_id_fkey FOREIGN KEY (push_device_id) REFERENCES public.push_devices(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.email_campaign_logs
+    ADD CONSTRAINT email_campaign_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 

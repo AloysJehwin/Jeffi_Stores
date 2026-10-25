@@ -3,10 +3,11 @@ import formbody from '@fastify/formbody'
 import { randomUUID } from 'node:crypto'
 import { ZodError, z } from 'zod'
 import type pg from 'pg'
-import { SendMessageRequest, BatchMessageRequest, BulkMessagesRequest, UpsertTemplateRequest, UpsertLibraryTemplateRequest, UpdateLibraryTemplateRequest, TemplateQuery, Channel } from '@jeffi/api-contracts'
+import { SendMessageRequest, BatchMessageRequest, BulkMessagesRequest, SendPushRequest, UpsertTemplateRequest, UpsertLibraryTemplateRequest, UpdateLibraryTemplateRequest, TemplateQuery, Channel } from '@jeffi/api-contracts'
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
 import { mediaPriceInr, usdToInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
+import { sendPush } from '@jeffi/push'
 import { resolveServiceScope, scopeSql, inScope, verifyLink } from '@jeffi/tenancy'
 import { db, one } from './db.js'
 import { sendMessage, getMessage, resolveTemplate, systemVars, toApi as msgToApi, SendError, type MessageRow } from './send.js'
@@ -110,6 +111,24 @@ app.post<{ Body: { url?: string; data?: string; content_type?: string } }>('/med
   const debit = await wallet.debit({ tenantId, amountInr: priceInr, category: 'media', externalRef: `media:${id}`, note: 'media hosted' })
   if (!debit.ok) throw new SendError(402, 'insufficient_balance', `Wallet balance ₹${debit.balance.toFixed(2)} is below the ₹${priceInr.toFixed(2)} needed.`)
   return { id, url, charged_inr: debit.charged ? priceInr : 0 }
+})
+
+// ── push: the store's own app over FCM. Internal callers only; free, so no wallet debit. One log row per token. ──
+app.post('/push', async req => {
+  if (!req.claims.internal) throw Object.assign(new Error('internal only'), { status: 403, code: 'forbidden' })
+  const b = SendPushRequest.parse(req.body)
+  const results = await sendPush(b.tokens, { title: b.title, body: b.body, image: b.image, link: b.link, category: b.category, collapseKey: b.collapse_key, data: b.data })
+  if (results.length) {
+    await db.query(
+      `INSERT INTO messages (tenant_id, channel, to_address, subject, body, status, provider, provider_ref, price_inr, error, reference, metadata)
+       SELECT $1, 'push', t.token, $2, $3, t.status, 'fcm', t.ref, 0, t.error, $4, $5
+       FROM unnest($6::text[], $7::text[], $8::text[], $9::text[]) AS t(token, status, ref, error)`,
+      [req.claims.tenantId, b.title, b.body, b.reference ?? null, { internal: true, category: b.category, link: b.link ?? null },
+        results.map(r => r.token), results.map(r => (r.ok ? 'sent' : 'failed')),
+        results.map(r => r.messageId?.split('/').pop()?.slice(0, 80) ?? null), results.map(r => r.error ?? null)]
+    ).catch(e => app.log.error({ err: e }, 'push log failed'))
+  }
+  return { results: results.map(r => ({ token: r.token, ok: r.ok, message_id: r.messageId ?? null, error: r.error ?? null, invalid_token: r.invalidToken })) }
 })
 
 // ── bulk (async; worker below) ──

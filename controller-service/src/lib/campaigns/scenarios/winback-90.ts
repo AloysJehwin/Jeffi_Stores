@@ -15,5 +15,6 @@ export const winback90 = buildWinbackScenario({
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
     smsEnabled: false,
+    pushEnabled: false,
   },
 })

@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Pressable, Text, TextInput, View } from 'react-native'
+import { View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { googleAuth, googleSignInIdToken, GOOGLE_WEB_CLIENT_ID, requestOtp, type OtpChannel } from '../../src/api/auth'
-import { AuthScreen, BigButton, FieldError, Frame, GoogleRow, TermsNote, TextAction } from '../../src/components/account/AuthScreen'
+import { AuthScreen, GoogleRow, TermsNote } from '../../src/components/account/AuthScreen'
 import { ChannelChips } from '../../src/components/account/ChannelChips'
-import { Pulse } from '../../src/components/account/ui'
 import { useFeatureFlagsState, useLeaveAuth, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
 import { finishSignIn, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
-import { useTokens } from '../../src/theme'
+import { Button, Caption, FieldError, PhoneField, Skeleton, TextButton, TextField } from '../../src/ui'
 
 // Same flow as controller-service app/(auth)/login/page.tsx (identifier → OTP, Google, not-found → sign-up),
 // laid out the app's way: mobile number first when SMS or WhatsApp is on, email behind one tap.
@@ -18,7 +17,6 @@ type Mode = 'phone' | 'email'
 export default function LoginScreen() {
   const router = useRouter()
   useLeaveIfSignedIn()
-  const t = useTokens()
   const { flags, loaded } = useFeatureFlagsState()
   const signOut = useSignOut()
 
@@ -29,7 +27,6 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [channel, setChannel] = useState<OtpChannel | null>(null)
-  const [focus, setFocus] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
@@ -122,74 +119,52 @@ export default function LoginScreen() {
     <AuthScreen title="Login or sign up" subtitle={mode ? subtitle : undefined}>
       {mode === null ? (
         <View className="gap-4">
-          <Pulse className="h-14 rounded-2xl bg-surface-secondary" />
-          <Pulse className="h-14 rounded-2xl bg-surface-secondary" />
+          <Skeleton height={56} rounded="rounded-2xl" />
+          <Skeleton height={56} rounded="rounded-2xl" />
         </View>
       ) : (
         <View className="gap-4">
           {mode === 'phone' ? (
             <View>
-              <Frame focused={focus}>
-                <Text className="text-base font-semibold text-foreground">+91</Text>
-                <View className="mx-3 h-6 w-px bg-border-secondary" />
-                <TextInput
-                  value={phone}
-                  onChangeText={v => setPhone(v.replace(/\D/g, '').slice(0, 10))}
-                  onFocus={() => setFocus(true)}
-                  onBlur={() => setFocus(false)}
-                  keyboardType="number-pad"
-                  maxLength={10}
-                  autoFocus
-                  autoComplete="tel"
-                  textContentType="telephoneNumber"
-                  placeholder="Mobile number"
-                  placeholderTextColor={t.foregroundMuted}
-                  returnKeyType="done"
-                  onSubmitEditing={handleContinue}
-                  className="flex-1 text-lg font-semibold text-foreground"
-                  style={{ letterSpacing: 1 }}
-                />
-                {phone.length > 0 ? (
-                  <Pressable onPress={() => setPhone('')} hitSlop={8} accessibilityLabel="Clear">
-                    <Text className="text-sm font-medium text-foreground-muted">Clear</Text>
-                  </Pressable>
-                ) : null}
-              </Frame>
+              <PhoneField
+                value={phone}
+                onChange={setPhone}
+                accessibilityLabel="Mobile number"
+                placeholder="Mobile number"
+                keyboardType="number-pad"
+                autoFocus
+                clearable
+                returnKeyType="done"
+                onSubmitEditing={handleContinue}
+              />
               {phoneChannels.length > 1 ? (
                 <ChannelChips label="Get the code on" options={phoneChannels} value={activeChannel} onChange={setChannel} />
               ) : (
-                <Text className="mt-2 text-xs text-foreground-muted">
-                  We’ll send the code on {activeChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}.
-                </Text>
+                <Caption className="mt-2">We’ll send the code on {activeChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}.</Caption>
               )}
             </View>
           ) : (
-            <Frame focused={focus}>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                onFocus={() => setFocus(true)}
-                onBlur={() => setFocus(false)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus
-                autoComplete="email"
-                textContentType="emailAddress"
-                placeholder="Email address"
-                placeholderTextColor={t.foregroundMuted}
-                returnKeyType="done"
-                onSubmitEditing={handleContinue}
-                className="flex-1 text-base font-semibold text-foreground"
-              />
-            </Frame>
+            <TextField
+              value={email}
+              onChangeText={setEmail}
+              accessibilityLabel="Email address"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              autoComplete="email"
+              textContentType="emailAddress"
+              placeholder="Email address"
+              returnKeyType="done"
+              onSubmitEditing={handleContinue}
+            />
           )}
 
           <FieldError message={error} />
-          <BigButton label="Continue" loadingLabel="Sending code…" loading={isLoading} onPress={handleContinue} />
+          <Button label="Continue" loadingLabel="Sending code…" loading={isLoading} onPress={handleContinue} />
 
           {phoneFirst ? (
-            <TextAction
+            <TextButton
               label={mode === 'phone' ? 'Use email instead' : 'Use mobile number instead'}
               onPress={() => {
                 setError('')

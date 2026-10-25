@@ -1,6 +1,8 @@
 // Shared campaign presentation helpers — used by the desktop card (CampaignsListClient) and the mobile
 // list/detail sheet (CampaignsMobileList) so both render channels, rates and stats identically.
 import type { ReactNode } from 'react'
+import { Bell } from 'lucide-react'
+import { campaignSupportsPush } from '@/lib/campaigns/push-kinds'
 
 export interface CampaignRow {
   kind: string
@@ -19,7 +21,18 @@ export interface CampaignRow {
   last_run_at: string | null
   draft_fields: Record<string, unknown> | null
   updated_at: string | null
+  parameters?: Record<string, unknown> | null
+  scenario_kind?: string | null
+  // App push markers (the detail endpoint only).
+  push_sent?: string | number | null
+  push_waiting?: string | number | null
+  push_skipped?: string | number | null
+  push_failed?: string | number | null
+  push_opened?: string | number | null
+  push_converted?: string | number | null
 }
+
+export type CampaignChannel = 'email' | 'whatsapp' | 'push'
 
 const WA_KINDS = [
   'abandoned_cart',
@@ -31,8 +44,14 @@ const WA_KINDS = [
   'back_in_stock_alert',
 ]
 
-export function getChannels(kind: string): ('email' | 'whatsapp')[] {
-  return WA_KINDS.includes(kind) ? ['email', 'whatsapp'] : ['email']
+export function getChannels(
+  kind: string,
+  params?: Record<string, unknown> | null,
+  scenarioKind?: string | null
+): CampaignChannel[] {
+  const out: CampaignChannel[] = WA_KINDS.includes(kind) ? ['email', 'whatsapp'] : ['email']
+  if (params?.pushEnabled === true && (campaignSupportsPush(kind) || campaignSupportsPush(scenarioKind ?? ''))) out.push('push')
+  return out
 }
 
 export function rate(num: number, den: number): string {
@@ -40,7 +59,14 @@ export function rate(num: number, den: number): string {
   return `${((num / den) * 100).toFixed(1)}%`
 }
 
-export function ChannelChip({ channel }: { channel: 'email' | 'whatsapp' }): ReactNode {
+export function ChannelChip({ channel }: { channel: CampaignChannel }): ReactNode {
+  if (channel === 'push')
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-500/10 text-orange-700 dark:text-orange-400">
+        <Bell className="w-2.5 h-2.5" />
+        App push
+      </span>
+    )
   if (channel === 'whatsapp')
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-500/10 text-green-700 dark:text-green-400">
@@ -104,6 +130,29 @@ export function CampaignStatsGrid({ c }: { c: CampaignRow }): ReactNode {
         </p>
         <p className="text-[10px] text-foreground-muted">{rate(Number(c.total_unsubscribed), Number(c.total_sent))}</p>
       </div>
+    </div>
+  )
+}
+
+/** App push outcomes of a scenario (its push:<kind> markers). Opens are taps on the notification. */
+export function CampaignPushStats({ c }: { c: CampaignRow }): ReactNode {
+  const n = (v: unknown) => Number(v ?? 0)
+  const sent = n(c.push_sent)
+  const tile = (label: string, value: number, cls = 'text-foreground', sub?: string) => (
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-foreground-muted">{label}</p>
+      <p className={`text-lg font-bold tabular-nums ${cls}`}>{value.toLocaleString('en-IN')}</p>
+      {sub && <p className="text-[10px] text-foreground-muted">{sub}</p>}
+    </div>
+  )
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {tile('Sent', sent)}
+      {tile('Waiting', n(c.push_waiting), 'text-foreground', 'quiet hours')}
+      {tile('Skipped', n(c.push_skipped), 'text-foreground', 'daily limit, push off')}
+      {tile('Failed', n(c.push_failed), 'text-red-500')}
+      {tile('Opened', n(c.push_opened), 'text-foreground', rate(n(c.push_opened), sent))}
+      {tile('Converted', n(c.push_converted), 'text-green-600 dark:text-green-400', rate(n(c.push_converted), sent))}
     </div>
   )
 }

@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import type { BuyNowIntent, CartLine } from '../../api/cart'
 import LineThumb from '../cart/LineThumb'
 import WarningBadges from '../cart/WarningBadges'

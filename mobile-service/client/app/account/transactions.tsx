@@ -1,19 +1,17 @@
 import { useMemo, useState } from 'react'
-import { FlatList, Modal, Pressable, Text, View } from 'react-native'
+import { FlatList, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import TopNav from '../../src/components/layout/TopNav'
+import { CreditCard, Receipt } from 'lucide-react-native'
 import { listTransactions, type Transaction } from '../../src/api/account'
-import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
-import HeroIcon from '../../src/components/account/HeroIcon'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
-import { FilterChip, InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, Pulse, StatusPill } from '../../src/components/account/ui'
-import { useTokens } from '../../src/theme'
+import { InfiniteFooter } from '../../src/components/account/ui'
+import { Badge, Caption, Card, Chip, ChipGroup, EmptyState, ModalSheet, Radio, Screen, Skeleton, statusTone, Text, TextButton, useBottomInset } from '../../src/ui'
 
 // Mirror of controller-service components/shared/AccountTransactions.tsx (visitor).
 
 const STATUSES = ['all', 'completed', 'pending', 'failed', 'refunded'] as const
 const statusLabel = (s: string) => ({ completed: 'Completed', pending: 'Pending', failed: 'Failed', refunded: 'Refunded' })[s] ?? s
-const statusTone = (s: string) => (['completed', 'pending', 'failed', 'refunded'].includes(s) ? ORDER_STATUS_TONE[s] : NEUTRAL_TONE)
+const txnTone = (s: string) => (['completed', 'pending', 'failed', 'refunded'].includes(s) ? statusTone(s) : 'neutral')
 
 function methodLabel(method: string, gateway: string) {
   if (gateway === 'razorpay') return 'Razorpay'
@@ -23,28 +21,38 @@ function methodLabel(method: string, gateway: string) {
   return method ? method.charAt(0).toUpperCase() + method.slice(1) : 'N/A'
 }
 
-function Skeleton() {
+// Status chips, then transaction cards: badges, amount + order, date.
+function TransactionsLoading() {
   return (
-    <View className="px-4 pt-4 pb-8 gap-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <View key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <View className="flex-row items-center justify-between mb-2">
-            <Pulse className="h-3 bg-surface-secondary rounded w-32" />
-            <Pulse className="h-5 bg-surface-secondary rounded-full w-16" />
+    <View className="pt-4">
+      <View className="mb-4 flex-row gap-2 overflow-hidden px-4">
+        {[52, 104, 84, 70, 92].map((w, i) => (
+          <Skeleton key={i} width={w} height={38} rounded="rounded-full" />
+        ))}
+      </View>
+      <View className="gap-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <View key={i} className="mx-4 rounded-panel bg-surface-elevated p-4 dark:border dark:border-border-default">
+            <View className="mb-3 flex-row gap-2">
+              <Skeleton height={24} width={84} rounded="rounded-full" />
+              <Skeleton height={24} width={76} rounded="rounded-full" />
+            </View>
+            <View className="flex-row items-center gap-4">
+              <Skeleton height={22} width={100} />
+              <Skeleton height={13} width={110} />
+            </View>
+            <Skeleton height={10} width="60%" rounded="rounded" className="mt-2" />
+            <Skeleton height={12} width={130} className="mt-4" />
           </View>
-          <View className="flex-row items-center justify-between">
-            <Pulse className="h-4 bg-surface-secondary rounded w-24" />
-            <Pulse className="h-4 bg-surface-secondary rounded w-20" />
-          </View>
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   )
 }
 
 export default function TransactionsScreen() {
+  const bottom = useBottomInset()
   const router = useRouter()
-  const t = useTokens()
   const user = useRequireAuth()
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterMethod, setFilterMethod] = useState<string>('all')
@@ -72,51 +80,45 @@ export default function TransactionsScreen() {
     [transactions, filterStatus, filterMethod]
   )
 
-  const header = (
-    <>
-      <AccountMobileHeader />
-      {transactions.length > 0 && (
-        <View className="px-4 pt-4 mb-4 flex-row flex-wrap items-center gap-3">
-          <View className="flex-row flex-wrap items-center gap-1.5">
-            {STATUSES.map(s => (
-              <FilterChip key={s} label={s === 'all' ? 'All' : statusLabel(s)} active={filterStatus === s} onPress={() => setFilterStatus(s)} />
-            ))}
-          </View>
-          {methods.length > 1 && (
-            <Pressable onPress={() => setMethodOpen(true)} className="flex-row items-center gap-1 px-3 py-1 rounded-full border border-border-default bg-surface-elevated">
-              <Text className="text-xs text-foreground-secondary">{filterMethod === 'all' ? 'All Methods' : filterMethod}</Text>
-              <HeroIcon name="chevronDown" size={12} color={t.foregroundSecondary} />
-            </Pressable>
-          )}
-        </View>
-      )}
-    </>
-  )
+  const header =
+    transactions.length > 0 ? (
+      <ChipGroup scroll className="mb-4 pt-4">
+        {STATUSES.map(s => (
+          <Chip key={s} label={s === 'all' ? 'All' : statusLabel(s)} selected={filterStatus === s} onPress={() => setFilterStatus(s)} />
+        ))}
+        {methods.length > 1 && (
+          <Chip
+            label={filterMethod === 'all' ? 'All Methods' : filterMethod}
+            icon={CreditCard}
+            selected={filterMethod !== 'all'}
+            onPress={() => setMethodOpen(true)}
+          />
+        )}
+      </ChipGroup>
+    ) : null
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
+    <Screen title="Transactions" mode="none">
       {!user || list.loading ? (
-        <FlatList data={[]} renderItem={null} ListHeaderComponent={<><AccountMobileHeader /><Skeleton /></>} />
+        <FlatList data={[]} renderItem={null} ListHeaderComponent={<TransactionsLoading />} />
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={x => x.id}
           ListHeaderComponent={header}
-          contentContainerStyle={{ paddingBottom: 32 }}
+          contentContainerStyle={{ paddingBottom: bottom }}
           onEndReached={list.loadMore}
           onEndReachedThreshold={0.5}
-          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
           ListEmptyComponent={
             transactions.length === 0 ? (
-              <View className="mx-4 mt-4 bg-surface-elevated rounded-lg border border-border-default p-12 items-center">
-                <HeroIcon name="receipt" size={64} color={t.foregroundMuted} strokeWidth={1.5} />
-                <Text className="text-xl font-semibold text-foreground mb-2 mt-4">No transactions yet</Text>
-                <Text className="text-foreground-secondary mb-6 text-center">Your payment transactions will appear here once you place an order.</Text>
-                <Pressable onPress={() => router.navigate('/(tabs)/products')} className="px-6 py-3 bg-accent-500 rounded-lg">
-                  <Text className="text-white font-semibold">Browse Products</Text>
-                </Pressable>
-              </View>
+              <EmptyState
+                icon={Receipt}
+                title="No transactions yet"
+                message="Your payment transactions will appear here once you place an order."
+                actionLabel="Browse Products"
+                onAction={() => router.navigate('/(tabs)/products')}
+              />
             ) : null
           }
           ListFooterComponent={
@@ -125,55 +127,44 @@ export default function TransactionsScreen() {
             </View>
           }
           renderItem={({ item: txn }) => (
-            <View className="mx-4 bg-surface-elevated rounded-lg border border-border-default p-4" style={{ boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-              <View className="flex-row flex-wrap items-center gap-2 mb-2">
-                <StatusPill tone={statusTone(txn.status)} label={statusLabel(txn.status)} />
-                <StatusPill tone={{ bg: 'bg-surface-secondary', text: 'text-foreground-secondary' }} label={methodLabel(txn.paymentMethod, txn.paymentGateway)} />
+            <Card className="mx-4">
+              <View className="mb-2 flex-row flex-wrap items-center gap-2">
+                <Badge label={statusLabel(txn.status)} tone={txnTone(txn.status)} />
+                <Badge label={methodLabel(txn.paymentMethod, txn.paymentGateway)} />
               </View>
-              <View className="flex-row flex-wrap items-baseline" style={{ columnGap: 16, rowGap: 4 }}>
-                <Text className="text-lg font-bold text-foreground">{Number(txn.amount).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</Text>
-                <Text className="text-sm text-accent-600 dark:text-accent-400 font-medium" onPress={() => router.push(`/orders/${txn.orderId}`)}>
-                  Order #{txn.orderNumber}
-                </Text>
+              <View className="flex-row flex-wrap items-center" style={{ columnGap: 16, rowGap: 4 }}>
+                <Text className="font-display text-xl font-extrabold text-foreground">{Number(txn.amount).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</Text>
+                <TextButton label={`Order #${txn.orderNumber}`} onPress={() => router.push(`/orders/${txn.orderId}`)} />
               </View>
               {!!txn.transactionId && (
-                <Text className="text-xs text-foreground-muted mt-1 font-mono" numberOfLines={1}>
+                <Caption className="mt-1 font-mono" numberOfLines={1}>
                   TXN: {txn.transactionId}
-                </Text>
+                </Caption>
               )}
-              <View className="mt-4">
-                <Text className="text-sm text-foreground-muted">
-                  {new Date(txn.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </Text>
-                <Text className="text-xs text-foreground-muted">
-                  {new Date(txn.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
-                </Text>
-              </View>
-            </View>
+              <Text className="mt-3 text-[13px] text-foreground-muted">
+                {new Date(txn.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ·{' '}
+                {new Date(txn.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+              </Text>
+            </Card>
           )}
         />
       )}
 
-      <Modal visible={methodOpen} transparent animationType="fade" onRequestClose={() => setMethodOpen(false)}>
-        <Pressable className="flex-1 bg-black/40 justify-center px-8" onPress={() => setMethodOpen(false)}>
-          <View className="bg-surface-elevated rounded-xl border border-border-default py-2">
-            {['all', ...methods].map(m => (
-              <Pressable
-                key={m}
-                onPress={() => {
-                  setFilterMethod(m)
-                  setMethodOpen(false)
-                }}
-                className={`px-4 py-3 ${filterMethod === m ? 'bg-accent-50 dark:bg-accent-900/20' : ''}`}
-              >
-                <Text className={`text-sm ${filterMethod === m ? 'text-accent-600 dark:text-accent-400 font-medium' : 'text-foreground'}`}>
-                  {m === 'all' ? 'All Methods' : m}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
-    </View>
+      <ModalSheet open={methodOpen} onClose={() => setMethodOpen(false)} title="Payment method">
+        <View className="pb-2">
+          {['all', ...methods].map(m => (
+            <Radio
+              key={m}
+              selected={filterMethod === m}
+              label={m === 'all' ? 'All Methods' : m}
+              onSelect={() => {
+                setFilterMethod(m)
+                setMethodOpen(false)
+              }}
+            />
+          ))}
+        </View>
+      </ModalSheet>
+    </Screen>
   )
 }

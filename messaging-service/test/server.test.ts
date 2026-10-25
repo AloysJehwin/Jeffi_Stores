@@ -16,11 +16,14 @@ vi.mock('../src/db.js', () => ({
   }),
 }))
 vi.mock('@jeffi/wallet', () => ({ debit: vi.fn(), trueUp: vi.fn() }))
+vi.mock('@jeffi/push', () => ({ sendPush: vi.fn() }))
 vi.mock('../src/send.js', () => ({ sendMessage: vi.fn(), getMessage: vi.fn(), toApi: (m: any) => m, SendError: class extends Error {} }))
 vi.mock('../src/templates.js', () => ({ listTemplates: vi.fn(async () => []), upsertTemplate: vi.fn(), archiveTemplate: vi.fn(), toApi: (t: any) => t }))
 
 import { signServiceToken } from '@jeffi/service-auth'
 import * as wallet from '@jeffi/wallet'
+import { sendPush } from '@jeffi/push'
+import { db } from '../src/db'
 import { app } from '../src/server'
 
 const auth = (claims = {}) => ({ authorization: `Bearer ${signServiceToken({ service: 'gateway', tenantId: 't1', ...claims })}` })
@@ -60,5 +63,23 @@ describe('server', () => {
       { tenantId: 't1', amountInr: 0, externalRef: 'media:m3', note: 'refund: media for a non-delivered send' },
     ])
     expect(rows.get('m3')).toMatchObject({ status: 'failed', charged_inr: 0.2 })
+  })
+
+  it('push is internal only, logs one row per token and flags dead tokens', async () => {
+    const [a, b] = ['a'.repeat(40), 'b'.repeat(40)]
+    vi.mocked(sendPush).mockResolvedValue([
+      { token: a, ok: true, messageId: 'projects/p/messages/0:1', invalidToken: false },
+      { token: b, ok: false, error: 'UNREGISTERED', invalidToken: true },
+    ])
+    const payload = { tokens: [a, b], title: 'Shipped', body: 'On its way', category: 'orders', link: '/account/orders/1' }
+    expect((await app.inject({ method: 'POST', url: '/push', headers: auth(), payload })).statusCode).toBe(403)
+    const res = await app.inject({ method: 'POST', url: '/push', headers: auth({ internal: true }), payload })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().results).toEqual([
+      { token: a, ok: true, message_id: 'projects/p/messages/0:1', error: null, invalid_token: false },
+      { token: b, ok: false, message_id: null, error: 'UNREGISTERED', invalid_token: true },
+    ])
+    const log = vi.mocked(db.query).mock.calls.find(c => String(c[0]).includes("'push'"))!
+    expect(log[1]!.slice(5)).toEqual([[a, b], ['sent', 'failed'], ['0:1', null], [null, 'UNREGISTERED']])
   })
 })

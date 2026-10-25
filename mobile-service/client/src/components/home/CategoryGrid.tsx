@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Card, Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import {
@@ -6,7 +7,7 @@ import {
   Hammer, Hexagon, Link, Link2, Magnet, Nut, Package, PaintRoller, Paintbrush, PlugZap, Ruler, ScanLine, Scissors,
   Shield, Toolbox, Truck, Waves, Wrench, Zap, type LucideIcon,
 } from 'lucide-react-native'
-import { Carousel, Grid } from './layout'
+import { Carousel, Grid, SectionHeading } from './layout'
 import { primary } from '../../theme'
 import type { SectionProps } from '../../types/home'
 
@@ -149,31 +150,22 @@ export default function CategoryGrid({ section, data }: SectionProps) {
   if (categories.length === 0) return null
 
   const items = categories.map(category => (
-    <Pressable key={category.id} onPress={() => router.push(`/category/${category.slug}`)}>
-      <View className="items-center gap-2.5 rounded-2xl border border-border-default bg-surface-elevated p-3">
-        <View className="h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/25">
-          <CategoryIcon categoryName={category.name} color={dark ? primary[400] : primary[600]} />
-        </View>
-        <View className="min-h-[36px] min-w-0 items-center justify-center px-0.5">
-          <Text numberOfLines={2} className="text-center text-xs font-bold text-foreground" style={{ lineHeight: 15 }}>
-            {category.name}
-          </Text>
-        </View>
+    <Card key={category.id} onPress={() => router.push(`/category/${category.slug}`)} accessibilityLabel={category.name} padded={false} className="items-center gap-2.5 p-3">
+      <View className="h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/25">
+        <CategoryIcon categoryName={category.name} color={dark ? primary[400] : primary[600]} />
       </View>
-    </Pressable>
+      <View className="min-h-[36px] min-w-0 items-center justify-center px-0.5">
+        <Text numberOfLines={2} className="text-center text-xs font-bold text-foreground" style={{ lineHeight: 15 }}>
+          {category.name}
+        </Text>
+      </View>
+    </Card>
   ))
 
   // "View All" is hidden below sm on the web.
   return (
     <View className="bg-surface px-4 pb-12 pt-8">
-      <View className="mb-7">
-        <Text className="mb-1.5 text-[10px] font-black uppercase text-primary-500" style={{ letterSpacing: 2 }}>
-          {section.copy.eyebrow}
-        </Text>
-        <Text className="text-2xl font-black text-foreground" style={{ letterSpacing: -0.6 }}>
-          {section.copy.title}
-        </Text>
-      </View>
+      <SectionHeading eyebrow={section.copy.eyebrow} title={section.copy.title} eyebrowClassName="text-primary-500" />
       {section.layout === 'carousel' ? <Carousel>{items}</Carousel> : <Grid cols={2} gap={10}>{items}</Grid>}
     </View>
   )

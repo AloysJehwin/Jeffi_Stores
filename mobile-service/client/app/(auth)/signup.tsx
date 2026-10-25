@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Text, TextInput, View, type TextInputProps } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -15,69 +15,16 @@ import {
 import { referralLookup } from '../../src/api/account'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { showToast } from '../../src/stores/toastStore'
-import { AuthScreen, BigButton, FieldError, Frame, GoogleRow, Note, TermsNote, TextAction } from '../../src/components/account/AuthScreen'
+import { AuthScreen, GoogleRow, TermsNote } from '../../src/components/account/AuthScreen'
 import { ChannelChips } from '../../src/components/account/ChannelChips'
-import { OtpBoxes } from '../../src/components/account/OtpBoxes'
-import { dobRange, isValidDob, PolicyConsent } from '../../src/components/account/ui'
-import HeroIcon from '../../src/components/account/HeroIcon'
-import { DateField, formatDate } from '../../src/components/ui/DatePickerSheet'
+import { DobInput, isValidDob, PolicyConsent } from '../../src/components/account/ui'
 import { useFeatureFlags, useLeaveAuth, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
 import { finishSignIn, getPendingGoogle, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
-import { accent, useTokens } from '../../src/theme'
+import { Button, FieldError, Notice, OtpField, PhoneField, Text, TextButton, TextField, type FieldRef } from '../../src/ui'
 
 // Same flow as controller-service app/(auth)/signup/page.tsx (details → OTP → account; Google completes
 // with phone + DOB), in the app's sheet.
-
-function Field({ label, children, error, className = '' }: { label: string; children: ReactNode; error?: string; className?: string }) {
-  return (
-    <View className={className}>
-      <Text className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-foreground-muted">{label}</Text>
-      {children}
-      {error ? <FieldError message={error} /> : null}
-    </View>
-  )
-}
-
-function TextField({ prefix, locked, ...props }: TextInputProps & { prefix?: string; locked?: boolean }) {
-  const t = useTokens()
-  const [focus, setFocus] = useState(false)
-  return (
-    <Frame focused={focus} className={locked ? 'bg-surface-secondary' : ''}>
-      {prefix ? (
-        <>
-          <Text className="text-base font-semibold text-foreground">{prefix}</Text>
-          <View className="mx-3 h-6 w-px bg-border-secondary" />
-        </>
-      ) : null}
-      <TextInput
-        placeholderTextColor={t.foregroundMuted}
-        editable={!locked}
-        onFocus={() => setFocus(true)}
-        onBlur={() => setFocus(false)}
-        className={`flex-1 text-base font-semibold ${locked ? 'text-foreground-muted' : 'text-foreground'}`}
-        {...props}
-      />
-    </Frame>
-  )
-}
-
-function DobField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const t = useTokens()
-  const { min, max, initial } = dobRange()
-  return (
-    <DateField value={value} onChange={onChange} title="Date of birth" min={min} max={max} defaultView={initial} startWith="year">
-      {open => (
-        <Frame focused={open}>
-          <Text className={`flex-1 text-base font-semibold ${value ? 'text-foreground' : 'text-foreground-muted'}`}>
-            {value ? formatDate(value) : 'Select your date of birth'}
-          </Text>
-          <HeroIcon name="calendar" size={20} color={open ? accent[500] : t.foregroundMuted} />
-        </Frame>
-      )}
-    </DateField>
-  )
-}
 
 export default function SignupScreen() {
   const router = useRouter()
@@ -115,7 +62,7 @@ export default function SignupScreen() {
   const [showPhoneVerify, setShowPhoneVerify] = useState(false)
   const [googleMode, setGoogleMode] = useState(false)
   const [googleIdToken, setGoogleIdToken] = useState('')
-  const otpInputRef = useRef<TextInput>(null)
+  const otpInputRef = useRef<FieldRef>(null)
   const submittedOtpRef = useRef('')
 
   useEffect(() => {
@@ -299,55 +246,71 @@ export default function SignupScreen() {
 
   return (
     <AuthScreen title={title} subtitle={subtitle}>
-      {step === 'details' && !!invitedBy && <Note>{invitedBy} invited you to {storeName}.</Note>}
+      {step === 'details' && !!invitedBy && <Notice className="mb-4">{`${invitedBy} invited you to ${storeName}.`}</Notice>}
       {step === 'details' && googleMode && (
-        <Note>
-          No account found for <Text className="font-bold">{email}</Text>. Confirm your details to continue.
-        </Note>
+        <Notice className="mb-4">
+          <Text className="text-sm leading-5 text-accent-800 dark:text-accent-200">
+            No account found for <Text className="font-bold">{email}</Text>. Confirm your details to continue.
+          </Text>
+        </Notice>
       )}
       {step === 'details' && !googleMode && fromLogin && (!!prefillEmail || phone.length === 10) && (
-        <Note>
-          No account found for <Text className="font-bold">{prefillEmail || `+91 ${phone}`}</Text>. Create one to continue.
-        </Note>
+        <Notice className="mb-4">
+          <Text className="text-sm leading-5 text-accent-800 dark:text-accent-200">
+            No account found for <Text className="font-bold">{prefillEmail || `+91 ${phone}`}</Text>. Create one to continue.
+          </Text>
+        </Notice>
       )}
 
       {step === 'details' && (
         <View className="gap-4">
           <View className="flex-row gap-3">
-            <Field label="First name" className="flex-1">
-              <TextField value={firstName} onChangeText={setFirstName} placeholder="First" autoCapitalize="words" autoComplete="given-name" autoFocus={!googleMode} />
-            </Field>
-            <Field label="Last name" className="flex-1">
-              <TextField value={lastName} onChangeText={setLastName} placeholder="Last" autoCapitalize="words" autoComplete="family-name" />
-            </Field>
+            <TextField
+              label="First name"
+              containerClassName="flex-1"
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="First"
+              autoCapitalize="words"
+              autoComplete="given-name"
+              autoFocus={!googleMode}
+            />
+            <TextField
+              label="Last name"
+              containerClassName="flex-1"
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder="Last"
+              autoCapitalize="words"
+              autoComplete="family-name"
+            />
           </View>
-          <Field label="Email">
-            <TextField
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              locked={googleMode}
-            />
-          </Field>
-          <Field label={googleMode ? 'Mobile number' : 'Mobile number (optional)'} error={phone.length > 0 && phone.length !== 10 ? 'Enter a valid 10-digit mobile number' : ''}>
-            <TextField
-              prefix="+91"
-              value={phone}
-              onChangeText={v => setPhone(v.replace(/\D/g, '').slice(0, 10))}
-              placeholder="Mobile number"
-              keyboardType="number-pad"
-              maxLength={10}
-              autoComplete="tel"
-              textContentType="telephoneNumber"
-            />
-          </Field>
-          <Field label="Date of birth" error={dob.length > 0 && !isValidDob(dob) ? 'Enter a valid date of birth' : ''}>
-            <DobField value={dob} onChange={setDob} />
-          </Field>
+          <TextField
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            editable={!googleMode}
+          />
+          <PhoneField
+            label={googleMode ? 'Mobile number' : 'Mobile number (optional)'}
+            value={phone}
+            onChange={setPhone}
+            placeholder="Mobile number"
+            keyboardType="number-pad"
+            error={phone.length > 0 && phone.length !== 10 ? 'Enter a valid 10-digit mobile number' : null}
+          />
+          <DobInput
+            label="Date of birth"
+            value={dob}
+            onChange={setDob}
+            placeholder="Select your date of birth"
+            error={dob.length > 0 && !isValidDob(dob) ? 'Enter a valid date of birth' : null}
+          />
 
           {!googleMode && channels.length > 1 ? (
             <ChannelChips
@@ -362,7 +325,7 @@ export default function SignupScreen() {
 
           <FieldError message={error} />
           {googleMode ? (
-            <BigButton
+            <Button
               label="Continue"
               loadingLabel="Creating account…"
               loading={isLoading}
@@ -370,7 +333,7 @@ export default function SignupScreen() {
               onPress={handleGoogleSubmit}
             />
           ) : (
-            <BigButton label="Send code" loadingLabel="Sending code…" loading={isLoading} onPress={handleSendOTP} />
+            <Button label="Send code" loadingLabel="Sending code…" loading={isLoading} onPress={handleSendOTP} />
           )}
 
           {!googleMode && !!GOOGLE_WEB_CLIENT_ID && <GoogleRow label="Sign up with Google" loading={googleLoading} onPress={handleGoogle} />}
@@ -381,20 +344,20 @@ export default function SignupScreen() {
       {step === 'otp' && (
         <View className="gap-5">
           <View>
-            <OtpBoxes value={otp} onChange={setOtp} inputRef={otpInputRef} shake={shake} />
+            <OtpField value={otp} onChange={setOtp} inputRef={otpInputRef} shake={shake} />
             <FieldError message={error} />
           </View>
           <View className="flex-row items-center justify-between">
-            <TextAction
+            <TextButton
               label={resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
-              muted={resendCooldown > 0 || isLoading}
+              tone={resendCooldown > 0 || isLoading ? 'muted' : 'accent'}
               onPress={() => {
                 if (!isLoading && resendCooldown <= 0) handleResendOTP()
               }}
             />
-            <TextAction
+            <TextButton
               label="Change details"
-              muted
+              tone="muted"
               onPress={() => {
                 setStep('details')
                 setOtp('')
@@ -404,7 +367,7 @@ export default function SignupScreen() {
             />
           </View>
           <PolicyConsent checked={policyAccepted} onChange={setPolicyAccepted} />
-          <BigButton
+          <Button
             label="Create account"
             loadingLabel="Creating account…"
             loading={isLoading}
@@ -416,7 +379,7 @@ export default function SignupScreen() {
 
       <Text className="mt-6 text-center text-sm text-foreground-secondary">
         Already have an account?{' '}
-        <Text className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/login')}>
+        <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/login')}>
           Log in
         </Text>
       </Text>

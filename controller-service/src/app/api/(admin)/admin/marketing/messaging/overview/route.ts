@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
         email: num(r.email),
         whatsapp: num(r.whatsapp),
         sms: num(r.sms),
+        push: num(r.push),
         failed: num(r.failed),
       })),
       broadcasts: broadcasts.map(r => ({

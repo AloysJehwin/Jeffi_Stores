@@ -88,7 +88,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = $1 AND ecs.clicked_at IS NOT NULL), 0) AS total_clicked,
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = $1 AND ecs.converted_at IS NOT NULL), 0) AS total_converted,
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = $1 AND ecs.unsubscribed_at IS NOT NULL), 0) AS total_unsubscribed,
-        COALESCE((SELECT SUM(o.total_amount) FROM email_campaigns_sent ecs JOIN orders o ON o.id = ecs.conversion_order_id WHERE ecs.campaign_kind = $1), 0) AS revenue_attributed
+        COALESCE((SELECT SUM(o.total_amount) FROM email_campaigns_sent ecs JOIN orders o ON o.id = ecs.conversion_order_id WHERE ecs.campaign_kind = $1), 0) AS revenue_attributed,
+        p.push_sent, p.push_waiting, p.push_skipped, p.push_failed, p.push_opened, p.push_converted
+      FROM (
+        SELECT COUNT(*) FILTER (WHERE metadata->>'status' = 'sent') AS push_sent,
+               COUNT(*) FILTER (WHERE metadata->>'status' IN ('pending', 'deferred')) AS push_waiting,
+               COUNT(*) FILTER (WHERE metadata->>'status' = 'skipped') AS push_skipped,
+               COUNT(*) FILTER (WHERE metadata->>'status' = 'failed') AS push_failed,
+               COUNT(opened_at) AS push_opened,
+               COUNT(converted_at) AS push_converted
+          FROM email_campaigns_sent WHERE campaign_kind = $1 AND channel = 'push'
+      ) p
     `,
       [kind]
     ),

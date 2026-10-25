@@ -1,24 +1,56 @@
 import { useMemo, useState } from 'react'
-import { Alert, Pressable, Text, View } from 'react-native'
-import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
-import { useRouter } from 'expo-router'
+import { View } from 'react-native'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import TopNav from '../../src/components/layout/TopNav'
+import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react-native'
 import { createAddress, deleteAddress, listAddresses, updateAddress } from '../../src/api/addresses'
 import type { Address } from '../../src/types'
 import { showToast } from '../../src/stores/toastStore'
-import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import FeaturedProducts from '../../src/components/account/FeaturedProducts'
-import HeroIcon from '../../src/components/account/HeroIcon'
 import { useRequireAuth } from '../../src/components/account/hooks'
-import { FilterChip, Pulse } from '../../src/components/account/ui'
-import AddressForm, { emptyAddressForm as emptyForm, usePincodeLookup, type AddressFormData as FormData } from '../../src/components/account/AddressForm'
-import { useTokens } from '../../src/theme'
+import AddressSheet, { emptyAddressForm as emptyForm, usePincodeLookup, type AddressFormData as FormData } from '../../src/components/account/AddressSheet'
+import { status } from '../../src/theme'
+import { Badge, BodySmall, Button, Card, Chip, ChipGroup, confirm, EmptyState, IconButton, List, Screen, Skeleton, Subheading } from '../../src/ui'
 
 // Mirror of controller-service components/shared/AccountAddresses.tsx + AccountAddressForm.tsx (visitor).
 
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+// The loaded page: filter chips, then address cards.
+function AddressesLoading() {
+  return (
+    <View>
+      <View className="mb-4 flex-row gap-2">
+        {[52, 86, 72].map((w, i) => (
+          <Skeleton key={i} width={w} height={38} rounded="rounded-full" />
+        ))}
+      </View>
+      <View className="gap-3">
+        {[0, 1, 2].map(i => (
+          <View key={i} className="flex-row gap-3 rounded-panel bg-surface-elevated p-4 dark:border dark:border-border-default">
+            <View className="flex-1">
+              <View className="mb-3 flex-row gap-1.5">
+                <Skeleton width={72} height={24} rounded="rounded-full" />
+                <Skeleton width={60} height={24} rounded="rounded-full" />
+              </View>
+              <View className="gap-2">
+                <Skeleton height={16} width="45%" />
+                <Skeleton height={12} width="85%" />
+                <Skeleton height={12} width="65%" />
+                <Skeleton height={12} width="40%" />
+              </View>
+            </View>
+            <View className="flex-row gap-1">
+              <Skeleton width={36} height={36} rounded="rounded-full" />
+              <Skeleton width={36} height={36} rounded="rounded-full" />
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
 export default function AddressesScreen() {
-  const t = useTokens()
   const qc = useQueryClient()
   const user = useRequireAuth()
   const { data: addresses = [], isLoading } = useQuery({ queryKey: ['addresses'], queryFn: listAddresses, enabled: !!user })
@@ -61,6 +93,19 @@ export default function AddressesScreen() {
     }
   }
 
+  const handleAdd = () => {
+    if (!user) return
+    setEditing(null)
+    setFormData({
+      ...emptyForm,
+      full_name: [user.firstName, user.lastName].filter(Boolean).join(' '),
+      phone: (user.phone || '').replace(/^\+91/, ''),
+    })
+    setPinLookupState('idle')
+    setLocalities([])
+    setShowForm(true)
+  }
+
   const handleEdit = (a: Address) => {
     setEditing(a)
     setFormData({
@@ -81,134 +126,96 @@ export default function AddressesScreen() {
     setShowForm(true)
   }
 
-  const handleDelete = (id: string) => {
-    Alert.alert('Delete Address', 'Are you sure you want to delete this address? This action cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteAddress(id)
-            await refresh()
-            showToast('Address deleted successfully', 'success')
-          } catch (err: any) {
-            showToast(err?.message || 'Failed to delete address', 'error')
-          }
-        },
-      },
-    ])
+  const handleDelete = async (id: string) => {
+    const ok = await confirm({
+      title: 'Delete Address',
+      message: 'Are you sure you want to delete this address? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      await deleteAddress(id)
+      await refresh()
+      showToast('Address deleted successfully', 'success')
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to delete address', 'error')
+    }
+  }
+
+  const loading = !user || isLoading
+
+  const card = ({ item: a }: { item: Address }) => (
+    <Card className="flex-row items-start gap-2">
+      <View className="flex-1">
+        <View className="mb-2 flex-row flex-wrap gap-1.5">
+          <Badge label={capital(a.address_type)} />
+          {a.is_default ? <Badge label="Default" tone="success" /> : null}
+        </View>
+        <Subheading>{a.full_name}</Subheading>
+        <BodySmall className="mt-0.5 text-foreground">{a.address_line1}</BodySmall>
+        {!!a.address_line2 && <BodySmall>{a.address_line2}</BodySmall>}
+        {!!a.landmark && <BodySmall>Near: {a.landmark}</BodySmall>}
+        <BodySmall>
+          {a.city}, {a.state} {a.postal_code}
+        </BodySmall>
+        <BodySmall>{a.country}</BodySmall>
+        <BodySmall className="mt-2">Phone: {a.phone}</BodySmall>
+      </View>
+      <View className="-mr-2 -mt-2 flex-row">
+        <IconButton icon={Pencil} label={`Edit address for ${a.full_name}`} onPress={() => handleEdit(a)} />
+        <IconButton icon={Trash2} label={`Delete address for ${a.full_name}`} color={status.danger} onPress={() => handleDelete(a.id)} />
+      </View>
+    </Card>
+  )
+
+  const addButton = <Button label="Add New Address" icon={Plus} onPress={handleAdd} />
+  const sheet = (
+    <AddressSheet
+      open={showForm}
+      formData={formData}
+      setFormData={setFormData}
+      editing={!!editing}
+      isSaving={isSaving}
+      pinLookupState={pinLookupState}
+      localities={localities}
+      onPincodeChange={handlePincodeChange}
+      onSubmit={handleSubmit}
+      onCancel={() => {
+        setShowForm(false)
+        setEditing(null)
+      }}
+    />
+  )
+
+  if (loading || addresses.length === 0) {
+    return (
+      <Screen title="My Addresses" loading={loading} skeleton={<AddressesLoading />} footer={loading ? undefined : addButton}>
+        <EmptyState icon={MapPin} title="No addresses saved" message="Add an address to make checkout faster." />
+        <FeaturedProducts />
+        {sheet}
+      </Screen>
+    )
   }
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      <KeyboardScroll contentContainerStyle={{ paddingBottom: 32 }}>
-        {!user || isLoading ? (
-          <View className="px-4 pt-4 pb-8 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <View key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4">
-                <Pulse className="h-4 bg-surface-secondary rounded w-24 mb-3" />
-                <View className="gap-2">
-                  <Pulse className="h-3 bg-surface-secondary rounded w-full" />
-                  <Pulse className="h-3 bg-surface-secondary rounded w-3/4" />
-                  <Pulse className="h-3 bg-surface-secondary rounded w-1/2" />
-                </View>
-              </View>
+    <Screen title="My Addresses" mode="none" footer={addButton}>
+      <List
+        data={filtered}
+        keyExtractor={a => a.id}
+        renderItem={card}
+        gap={12}
+        footerBar
+        ListHeaderComponent={
+          <ChipGroup className="mb-4">
+            {(['all', 'shipping', 'billing'] as const).map(f => (
+              <Chip key={f} label={capital(f)} selected={filterType === f} onPress={() => setFilterType(f)} />
             ))}
-          </View>
-        ) : (
-          <>
-            <AccountMobileHeader />
-            <View className="px-4 pt-4">
-              <View className="flex-row flex-wrap items-center justify-between gap-3 mb-4">
-                <View className="flex-row items-center gap-1.5">
-                  {(['all', 'shipping', 'billing'] as const).map(f => (
-                    <FilterChip key={f} label={f === 'all' ? 'All' : f} active={filterType === f} onPress={() => setFilterType(f)} />
-                  ))}
-                </View>
-                <Pressable
-                  onPress={() => {
-                    if (showForm) return resetForm()
-                    setEditing(null)
-                    setFormData({
-                      ...emptyForm,
-                      full_name: [user.firstName, user.lastName].filter(Boolean).join(' '),
-                      phone: (user.phone || '').replace(/^\+91/, ''),
-                    })
-                    setPinLookupState('idle')
-                    setLocalities([])
-                    setShowForm(true)
-                  }}
-                  className="px-5 py-2 bg-accent-600 rounded-lg"
-                >
-                  <Text className="text-white font-semibold text-sm">{showForm ? 'Cancel' : '+ Add New Address'}</Text>
-                </Pressable>
-              </View>
-
-              {showForm && (
-                <AddressForm
-                  formData={formData}
-                  setFormData={setFormData}
-                  editing={!!editing}
-                  isSaving={isSaving}
-                  pinLookupState={pinLookupState}
-                  localities={localities}
-                  onPincodeChange={handlePincodeChange}
-                  onSubmit={handleSubmit}
-                  onCancel={() => {
-                    setShowForm(false)
-                    setEditing(null)
-                  }}
-                />
-              )}
-
-              {addresses.length === 0 ? (
-                <View className="bg-surface-elevated rounded-lg border border-border-default p-12 items-center">
-                  <HeroIcon name="location" size={64} color={t.foregroundMuted} strokeWidth={1.5} />
-                  <Text className="text-xl font-semibold text-foreground mb-2 mt-4">No addresses saved</Text>
-                  <Text className="text-foreground-secondary text-center">Add an address to make checkout faster.</Text>
-                </View>
-              ) : (
-                <View className="gap-4">
-                  {filtered.map(a => (
-                    <View key={a.id} className="bg-surface-elevated rounded-lg border border-border-default p-4 relative" style={{ boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-                      {a.is_default && (
-                        <View className="absolute top-4 right-4 px-3 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
-                          <Text className="text-green-800 dark:text-green-300 text-xs font-semibold">Default</Text>
-                        </View>
-                      )}
-                      <View className="mb-4">
-                        <View className="self-start px-3 py-1 bg-surface-secondary rounded mb-3">
-                          <Text className="text-foreground-secondary text-xs font-semibold capitalize">{a.address_type}</Text>
-                        </View>
-                        <Text className="text-foreground font-medium">{a.full_name}</Text>
-                        <Text className="text-foreground">{a.address_line1}</Text>
-                        {!!a.address_line2 && <Text className="text-foreground-secondary">{a.address_line2}</Text>}
-                        {!!a.landmark && <Text className="text-foreground-secondary text-sm">Near: {a.landmark}</Text>}
-                        <Text className="text-foreground-secondary">
-                          {a.city}, {a.state} {a.postal_code}
-                        </Text>
-                        <Text className="text-foreground-secondary">{a.country}</Text>
-                        <Text className="text-foreground-secondary mt-2">Phone: {a.phone}</Text>
-                      </View>
-                      <View className="flex-row gap-2">
-                        <Pressable onPress={() => handleEdit(a)} className="px-4 py-2 bg-surface-secondary rounded-lg">
-                          <Text className="text-foreground-secondary text-sm font-medium">Edit</Text>
-                        </Pressable>
-                        <Pressable onPress={() => handleDelete(a.id)} className="px-4 py-2 bg-red-50 dark:bg-red-900/30 rounded-lg">
-                          <Text className="text-red-600 dark:text-red-400 text-sm font-medium">Delete</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-              <FeaturedProducts />
-            </View>
-          </>
-        )}
-      </KeyboardScroll>
-    </View>
+          </ChipGroup>
+        }
+        ListFooterComponent={<FeaturedProducts />}
+      />
+      {sheet}
+    </Screen>
   )
 }

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Modal, Pressable, Text, TextInput, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Glyph, P } from './Glyph'
+import { ArrowLeftRight, Check, CircleCheck, CircleX, ExternalLink, Lock, RefreshCw, ShieldCheck, Truck } from 'lucide-react-native'
+import { Badge, Button, ModalSheet, Overline, Text, TextField, TONES, type IconComponent } from '../../ui'
 import { checkDelivery } from '../../api/pdp'
 import { openHref } from '../../lib/links'
-import { useTokens } from '../../theme'
+import { primary, status, useTokens } from '../../theme'
 
 // Mirror of the DeliveryInfo perks grid + policy popup and the PincodeChecker in ProductDetailClient.tsx.
 
@@ -18,23 +19,17 @@ export interface PolicyProps {
 }
 
 type Tone = 'blue' | 'green' | 'red' | 'orange' | 'purple'
+// Tiles from the shared tones; icons in the nearest token colour (there's no blue token, so delivery is brand).
 const TONE_BG: Record<Tone, string> = {
-  blue: 'bg-blue-50 dark:bg-blue-900/20',
-  green: 'bg-green-50 dark:bg-green-900/20',
-  red: 'bg-red-50 dark:bg-red-900/20',
-  orange: 'bg-orange-50 dark:bg-orange-900/20',
-  purple: 'bg-purple-50 dark:bg-purple-900/20',
-}
-const TONE_TEXT: Record<Tone, string> = {
-  blue: 'text-blue-600 dark:text-blue-400',
-  green: 'text-green-600 dark:text-green-400',
-  red: 'text-red-500 dark:text-red-400',
-  orange: 'text-orange-600 dark:text-orange-400',
-  purple: 'text-purple-600 dark:text-purple-400',
+  blue: TONES.accent.bg,
+  green: TONES.success.bg,
+  red: TONES.danger.bg,
+  orange: TONES.progress.bg,
+  purple: TONES.transit.bg,
 }
 
 interface Policy {
-  icon: string | string[]
+  icon: IconComponent
   label: string
   sub: string
   detail: string
@@ -45,9 +40,12 @@ interface Policy {
 }
 
 function PerkIcon({ item }: { item: Policy }) {
+  const t = useTokens()
+  const colour: Record<Tone, string> = { blue: t.accent600, green: status.success, red: status.danger, orange: primary[600], purple: status.digital }
+  const Icon = item.icon
   return (
     <View className={`h-10 w-10 shrink-0 items-center justify-center rounded-xl ${TONE_BG[item.tone]}`}>
-      <Glyph d={item.icon} size={28} strokeWidth={1.5} className={TONE_TEXT[item.tone]} />
+      <Icon size={24} strokeWidth={1.75} color={colour[item.tone]} />
     </View>
   )
 }
@@ -63,11 +61,15 @@ export function DeliveryInfo({
   freeShippingThreshold = 500,
 }: PolicyProps) {
   const router = useRouter()
+  const t = useTokens()
   const [active, setActive] = useState<Policy | null>(null)
+  // The last policy stays in the sheet while it slides away.
+  const [shown, setShown] = useState<Policy | null>(null)
+  if (active && active !== shown) setShown(active)
 
   const items: Policy[] = [
     {
-      icon: P.truck,
+      icon: Truck,
       label: 'Free Delivery',
       sub: `On orders above ₹${inrWhole(freeShippingThreshold)}`,
       detail: `Free delivery on all orders above ₹${inrWhole(freeShippingThreshold)}. Standard shipping charges apply below this threshold.`,
@@ -82,7 +84,7 @@ export function DeliveryInfo({
       hrefLabel: 'Read Shipping Policy',
     },
     {
-      icon: P.refresh,
+      icon: RefreshCw,
       label: returnAllowed ? 'Easy Returns' : 'Non-Returnable',
       sub: returnAllowed ? `${returnDays}-day return policy` : 'This product cannot be returned',
       detail: returnAllowed ? `Hassle-free returns within ${returnDays} days of delivery.` : 'This product is non-returnable due to its nature.',
@@ -104,7 +106,7 @@ export function DeliveryInfo({
       hrefLabel: 'Read Return & Refund Policy',
     },
     {
-      icon: P.swap,
+      icon: ArrowLeftRight,
       label: replacementAllowed ? 'Free Replacement' : 'Non-Replaceable',
       sub: replacementAllowed ? `${replacementDays}-day guarantee` : 'This product cannot be replaced',
       detail: replacementAllowed
@@ -128,7 +130,7 @@ export function DeliveryInfo({
       hrefLabel: 'Read Return & Refund Policy',
     },
     {
-      icon: P.shield,
+      icon: ShieldCheck,
       label: '100% Genuine',
       sub: 'Verified authentic products',
       detail: 'Every product is sourced directly from authorised distributors or manufacturers.',
@@ -143,7 +145,7 @@ export function DeliveryInfo({
       hrefLabel: 'Read Warranty Policy',
     },
     {
-      icon: P.lock,
+      icon: Lock,
       label: 'Secure Payment',
       sub: 'Encrypted & protected checkout',
       detail:
@@ -168,7 +170,9 @@ export function DeliveryInfo({
             key={i}
             onPress={() => setActive(item)}
             style={{ flexBasis: '45%', flexGrow: 1 }}
-            className="flex-row items-start gap-2.5 overflow-hidden rounded-xl border border-border-default bg-surface p-3"
+            accessibilityRole="button"
+            accessibilityLabel={`${item.label}, ${item.sub}`}
+            className="flex-row items-start gap-2.5 overflow-hidden rounded-field border border-border-default bg-surface p-3 active:bg-surface-secondary"
           >
             <View className="mt-0.5">
               <PerkIcon item={item} />
@@ -183,73 +187,61 @@ export function DeliveryInfo({
 
       <Pressable
         onPress={() => setActive(items[4])}
-        className="w-full flex-row items-center gap-2.5 rounded-xl border border-border-default bg-surface px-3 py-2.5"
+        accessibilityRole="button"
+        accessibilityLabel="Secure Payment"
+        className="w-full flex-row items-center gap-2.5 rounded-field border border-border-default bg-surface px-3 py-2.5 active:bg-surface-secondary"
       >
         <PerkIcon item={items[4]} />
         <Text className="w-10 shrink-0 text-[11px] font-medium leading-tight text-foreground-muted">Secure Payment</Text>
         <View className="ml-2 flex-1 flex-row flex-wrap items-center gap-1">
           {['UPI', 'Cards', 'Net Banking', 'Wallets'].map(m => (
-            <View key={m} className="rounded border border-border-default bg-surface-secondary px-1 py-0.5">
-              <Text className="text-[9px] font-semibold text-foreground-secondary">{m}</Text>
-            </View>
+            <Badge key={m} label={m} size="sm" />
           ))}
-          {isCodAllowed ? (
-            <View className="rounded border border-amber-200 bg-amber-50 px-1 py-0.5 dark:border-amber-700 dark:bg-amber-900/20">
-              <Text className="text-[9px] font-semibold text-amber-700 dark:text-amber-400">Cash on Delivery</Text>
-            </View>
-          ) : null}
+          {isCodAllowed ? <Badge label="Cash on Delivery" tone="warning" size="sm" /> : null}
         </View>
       </Pressable>
 
-      <Modal visible={!!active} transparent animationType="fade" onRequestClose={() => setActive(null)}>
-        <View className="flex-1 items-center justify-center p-4">
-          <Pressable className="absolute inset-0 bg-black/40" onPress={() => setActive(null)} />
-          {active ? (
-            <View className="w-full max-w-sm gap-4 rounded-2xl border border-border-default bg-surface p-5 shadow-2xl">
-              <View className="flex-row items-center gap-3">
-                <PerkIcon item={active} />
-                <View className="flex-1">
-                  <Text className="text-base font-semibold text-foreground">{active.label}</Text>
-                  <Text className="text-xs text-foreground-muted">{active.sub}</Text>
-                </View>
-              </View>
-              <Text className="text-sm leading-relaxed text-foreground-secondary">{active.detail}</Text>
-              <View className="gap-2">
-                {active.bullets.map((b, i) => (
-                  <View key={i} className="flex-row items-start gap-2">
-                    <View className="mt-0.5">
-                      <Glyph d={P.check} size={16} strokeWidth={2.5} className="text-accent-500" />
-                    </View>
-                    <Text className="flex-1 text-sm text-foreground-secondary">{b}</Text>
+      <ModalSheet
+        open={!!active}
+        onClose={() => setActive(null)}
+        title={shown?.label}
+        subtitle={shown?.sub}
+        footer={
+          shown ? (
+            <Button
+              label={shown.hrefLabel}
+              variant="secondary"
+              icon={ExternalLink}
+              onPress={() => {
+                const href = shown.href
+                setActive(null)
+                openHref(router, href)
+              }}
+            />
+          ) : null
+        }
+      >
+        {shown ? (
+          <View className="gap-4">
+            <Text className="text-[15px] leading-[22px] text-foreground-secondary">{shown.detail}</Text>
+            <View className="gap-2.5">
+              {shown.bullets.map((b, i) => (
+                <View key={i} className="flex-row items-start gap-2.5">
+                  <View className="mt-0.5">
+                    <Check size={16} strokeWidth={2.5} color={t.accent500} />
                   </View>
-                ))}
-              </View>
-              <View className="flex-row items-center justify-between pt-1">
-                <Pressable
-                  onPress={() => {
-                    const href = active.href
-                    setActive(null)
-                    openHref(router, href)
-                  }}
-                  className="flex-row items-center gap-1"
-                >
-                  <Text className="text-sm font-medium text-accent-600">{active.hrefLabel}</Text>
-                  <Glyph d={P.externalLink} size={14} className="text-accent-600" />
-                </Pressable>
-                <Pressable onPress={() => setActive(null)} className="rounded-lg px-3 py-1.5">
-                  <Text className="text-xs text-foreground-muted">Close</Text>
-                </Pressable>
-              </View>
+                  <Text className="flex-1 text-sm leading-5 text-foreground-secondary">{b}</Text>
+                </View>
+              ))}
             </View>
-          ) : null}
-        </View>
-      </Modal>
+          </View>
+        ) : null}
+      </ModalSheet>
     </View>
   )
 }
 
 export function PincodeChecker() {
-  const t = useTokens()
   const [pincode, setPincode] = useState('')
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [checking, setChecking] = useState(false)
@@ -273,12 +265,10 @@ export function PincodeChecker() {
   }
 
   return (
-    <View className="mt-3 rounded-xl border border-border-default bg-surface-elevated p-3">
-      <Text className="mb-2 text-xs font-semibold uppercase text-foreground-secondary" style={{ letterSpacing: 0.3 }}>
-        Check Delivery
-      </Text>
-      <View className="flex-row gap-2">
-        <TextInput
+    <View className="mt-3 rounded-field border border-border-default bg-surface-elevated p-3">
+      <Overline className="mb-2 text-foreground-secondary">Check Delivery</Overline>
+      <View className="flex-row items-start gap-2">
+        <TextField
           value={pincode}
           onChangeText={v => {
             setPincode(v.replace(/\D/g, ''))
@@ -288,22 +278,16 @@ export function PincodeChecker() {
           keyboardType="number-pad"
           maxLength={6}
           placeholder="Enter pincode"
-          placeholderTextColor={t.foregroundMuted}
-          className="min-w-0 flex-1 rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground"
+          accessibilityLabel="Pincode"
+          containerClassName="flex-1"
         />
-        <Pressable
-          onPress={check}
-          disabled={checking}
-          className={`shrink-0 justify-center rounded-lg border border-border-default bg-surface px-4 py-2 ${checking ? 'opacity-60' : ''}`}
-        >
-          <Text className="text-sm font-semibold text-foreground">{checking ? 'Checking…' : 'Check'}</Text>
-        </Pressable>
+        <Button label="Check" loading={checking} loadingLabel="Checking…" variant="secondary" block={false} onPress={check} />
       </View>
       {result ? (
-        <Text className={`mt-2 text-xs font-medium ${result.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {result.ok ? '✓ ' : '✗ '}
-          {result.message}
-        </Text>
+        <View accessibilityLiveRegion="polite" className="mt-2 flex-row items-center gap-1.5">
+          {result.ok ? <CircleCheck size={14} color={status.success} /> : <CircleX size={14} color={status.danger} />}
+          <Text className={`flex-1 text-xs font-medium ${result.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{result.message}</Text>
+        </View>
       ) : null}
     </View>
   )

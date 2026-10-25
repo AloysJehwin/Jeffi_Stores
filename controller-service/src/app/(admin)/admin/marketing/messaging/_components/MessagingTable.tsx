@@ -32,12 +32,14 @@ export const MESSAGE_STATUS: StatusMap = {
 }
 
 export const channelLabel = (
-  c: { template_key: string; channels?: Record<string, { slug: string }> | null },
+  c: { template_key: string; channels?: Record<string, { slug?: string; title?: string }> | null },
   labels: Record<string, string>
 ) =>
   c.template_key === 'library'
     ? Object.entries(c.channels ?? {})
-        .map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`)
+        .map(([k, v]) =>
+          k === 'push' ? `App push: ${v.title || '—'}` : `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`
+        )
         .join(' · ') || 'No channels'
     : labels[c.template_key] || c.template_key
 

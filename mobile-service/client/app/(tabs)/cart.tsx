@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Alert, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
-import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
+import { View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, ShoppingCart } from 'lucide-react-native'
 import TopNav from '../../src/components/layout/TopNav'
-import Pulse from '../../src/components/cart/Pulse'
+import {
+  Button, Card, CardSegment, EmptyState, Notice, Screen, SectionedList, Skeleton, SummarySkeleton, Text, TextButton, TextField, Title, confirm, segmentAt, toast,
+} from '../../src/ui'
 import CartLineItem from '../../src/components/cart/CartLineItem'
 import SavedItemRow from '../../src/components/cart/SavedItemRow'
 import FreeShippingProgress from '../../src/components/cart/FreeShippingProgress'
@@ -23,20 +24,21 @@ import {
   removeCartItem,
   saveForLater,
   updateCartItem,
+  type CartLine,
   type CartResponse,
   type CouponResult,
 } from '../../src/api/cart'
 import { useAuthStore } from '../../src/stores/authStore'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
-import { showToast } from '../../src/stores/toastStore'
 import { openHref } from '../../src/lib/links'
-import { status, useTokens } from '../../src/theme'
+import { status } from '../../src/theme'
+
+type CartSection = { key: 'cart' | 'saved'; data: CartLine[] }
 
 // Mirror of controller-service app/(storefront)/cart/page.tsx at the mobile breakpoint.
 export default function CartScreen() {
   const router = useRouter()
   const qc = useQueryClient()
-  const t = useTokens()
   const user = useAuthStore(s => s.user)
   const { gstEnabled } = useStoreConfig().flags
 
@@ -72,38 +74,37 @@ export default function CartScreen() {
     try {
       await updateCartItem(id, qty)
     } catch (e) {
-      showToast(e instanceof Error && e.message ? e.message : 'Failed to update quantity', 'error')
+      toast.error(e instanceof Error && e.message ? e.message : 'Failed to update quantity')
     } finally {
       await refresh()
       mark(id, false)
     }
   }
 
-  const handleRemove = (id: string) =>
-    Alert.alert('Remove from Cart', 'Are you sure you want to remove this item from your cart?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await removeCartItem(id)
-            await refresh()
-            showToast('Item removed from cart', 'success')
-          } catch {
-            showToast('Failed to remove item', 'error')
-          }
-        },
-      },
-    ])
+  const handleRemove = async (id: string) => {
+    const ok = await confirm({
+      title: 'Remove from cart?',
+      message: 'Are you sure you want to remove this item from your cart?',
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      await removeCartItem(id)
+      await refresh()
+      toast.success('Item removed from cart')
+    } catch {
+      toast.error('Failed to remove item')
+    }
+  }
 
   const handleSave = async (id: string) => {
     try {
       await saveForLater(id)
       await refresh()
-      showToast('Saved for later', 'success')
+      toast.success('Saved for later')
     } catch {
-      showToast('Failed to save', 'error')
+      toast.error('Failed to save')
     }
   }
 
@@ -112,9 +113,9 @@ export default function CartScreen() {
     try {
       await moveToCart(id)
       await refresh()
-      showToast('Moved to cart', 'success')
+      toast.success('Moved to cart')
     } catch {
-      showToast('Failed to move', 'error')
+      toast.error('Failed to move')
     } finally {
       mark(id, false)
     }
@@ -136,7 +137,7 @@ export default function CartScreen() {
       const data = await applyCoupon({ code, subtotal: total })
       setAppliedCoupon(data)
       setCouponCode('')
-      showToast(`Coupon "${data.code}" applied — saving ${money(data.discountAmount)}`, 'success')
+      toast.success(`Coupon "${data.code}" applied — saving ${money(data.discountAmount)}`)
     } catch (e) {
       setCouponError(e instanceof Error && e.message ? e.message : 'Invalid coupon')
     } finally {
@@ -153,121 +154,107 @@ export default function CartScreen() {
         params: appliedCoupon ? { intent, couponCode: appliedCoupon.code } : { intent },
       })
     } catch (e) {
-      showToast(e instanceof Error && e.message ? e.message : 'Could not reach the server. Please try again.', 'error')
+      toast.error(e instanceof Error && e.message ? e.message : 'Could not reach the server. Please try again.')
     } finally {
       setProceeding(false)
     }
   }
 
-  if (cartQuery.isLoading || savedQuery.isLoading) {
-    return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        <View className="gap-4 px-4 py-6">
-          {[0, 1, 2].map(i => (
-            <Pulse key={i} delay={i * 80}>
-              <View className="flex-row gap-4 rounded-lg border border-border-default bg-surface-elevated p-4">
-                <View className="h-20 w-20 rounded-lg bg-surface-secondary" />
-                <View className="flex-1 gap-2">
-                  <View className="h-4 w-3/4 rounded bg-surface-secondary" />
-                  <View className="h-3 w-1/2 rounded bg-surface-secondary" />
-                  <View className="h-4 w-24 rounded bg-surface-secondary" />
-                </View>
-              </View>
-            </Pulse>
-          ))}
-        </View>
-      </View>
-    )
-  }
+  if (cartQuery.isLoading || savedQuery.isLoading) return <Screen header={<TopNav />} mode="none" loading skeleton={<CartLoading />} />
 
-  const refreshControl = (
-    <RefreshControl refreshing={cartQuery.isRefetching && !updating.size} onRefresh={() => refresh()} />
-  )
+  const refreshing = cartQuery.isRefetching && !updating.size
+  const onRefresh = () => refresh()
 
   if (cartCount === 0 && savedItems.length === 0) {
     return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 64 }} refreshControl={refreshControl}>
-          <View className="items-center">
-            <View className="mb-6">
-              <ShoppingCart size={96} color={t.foregroundMuted} strokeWidth={1} />
-            </View>
-            <Text className="mb-2 self-stretch text-center text-2xl font-bold text-foreground">Your cart is empty</Text>
-            <Text className="mb-6 self-stretch text-center text-foreground-secondary">Start shopping to add items to your cart</Text>
-            <Pressable onPress={() => openHref(router, '/products')} className="rounded-lg bg-accent-500 px-8 py-3 active:bg-accent-600">
-              <Text className="font-semibold text-white">Browse Products</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </View>
+      <Screen header={<TopNav />} refreshing={refreshing} onRefresh={onRefresh}>
+        <EmptyState
+          fill
+          icon={ShoppingCart}
+          title="Your cart is empty"
+          message="Start shopping to add items to your cart"
+          actionLabel="Browse Products"
+          onAction={() => openHref(router, '/products')}
+        />
+      </Screen>
     )
   }
 
-  return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      <KeyboardScroll
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}
-        refreshControl={refreshControl}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text className="mb-4 text-3xl font-bold text-foreground">Shopping Cart</Text>
+  const sections: CartSection[] = [
+    ...(cartItems.length > 0 ? [{ key: 'cart' as const, data: cartItems }] : []),
+    ...(savedItems.length > 0 ? [{ key: 'saved' as const, data: savedItems }] : []),
+  ]
 
-        <View className="gap-4">
-          <View>
+  // Lines and saved items are rows of a list (one card each, sliced per row), so long carts stay light.
+  return (
+    <Screen header={<TopNav />} mode="none">
+      <SectionedList
+        sections={sections}
+        keyExtractor={item => item.id}
+        extraData={updating}
+        keyboard
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        showsVerticalScrollIndicator={false}
+        renderSectionHeader={({ section }) =>
+          section.key === 'saved' ? (
+            <View className="mt-6">
+              <CardSegment position="top">
+                <View className="border-b border-border-default p-4">
+                  <Text accessibilityRole="header" className="font-display text-base font-extrabold text-foreground">
+                    Saved for later <Text className="font-inter font-normal text-foreground-muted">({savedItems.length})</Text>
+                  </Text>
+                </View>
+              </CardSegment>
+            </View>
+          ) : null
+        }
+        renderItem={({ item, index, section }) => {
+          const n = section.data.length
+          return section.key === 'cart' ? (
+            <CardSegment position={segmentAt(index, n)}>
+              <CartLineItem
+                item={item}
+                last={index === n - 1}
+                updating={updating.has(item.id)}
+                onQuantity={q => handleQuantity(item.id, q)}
+                onSave={() => handleSave(item.id)}
+                onRemove={() => handleRemove(item.id)}
+              />
+            </CardSegment>
+          ) : (
+            <CardSegment position={segmentAt(index, n, { header: true })}>
+              <SavedItemRow
+                item={item}
+                last={index === n - 1}
+                updating={updating.has(item.id)}
+                onMove={() => handleMove(item.id)}
+                onRemove={() => handleRemove(item.id)}
+              />
+            </CardSegment>
+          )
+        }}
+        ListHeaderComponent={
+          <>
+            <Title className="mb-4">Shopping Cart</Title>
             <FreeShippingProgress subtotal={physicalTotal} />
             {cartItems.length === 0 ? (
-              <View className="items-center rounded-lg border border-border-default bg-surface-elevated p-8 shadow-sm">
-                <View className="mb-4">
-                  <ShoppingCart size={64} color={t.foregroundMuted} strokeWidth={1} />
-                </View>
-                <Text className="mb-4 text-foreground-secondary">Your cart is empty.</Text>
-                <Text className="text-center text-sm text-foreground-muted">
-                  Move an item from below or{' '}
-                  <Text className="font-medium text-accent-600" onPress={() => openHref(router, '/products')}>
-                    browse products
+              <Card padded={false}>
+                <EmptyState icon={ShoppingCart} title="Your cart is empty.">
+                  <Text className="mt-1.5 text-center text-sm text-foreground-muted">
+                    Move an item from below or{' '}
+                    <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => openHref(router, '/products')}>
+                      browse products
+                    </Text>
+                    .
                   </Text>
-                  .
-                </Text>
-              </View>
-            ) : (
-              <View className="rounded-lg border border-border-default bg-surface-elevated shadow-sm">
-                {cartItems.map((item, i) => (
-                  <CartLineItem
-                    key={item.id}
-                    item={item}
-                    last={i === cartItems.length - 1}
-                    updating={updating.has(item.id)}
-                    onQuantity={q => handleQuantity(item.id, q)}
-                    onSave={() => handleSave(item.id)}
-                    onRemove={() => handleRemove(item.id)}
-                  />
-                ))}
-              </View>
-            )}
-
-            {savedItems.length > 0 && (
-              <View className="mt-6 rounded-lg border border-border-default bg-surface-elevated shadow-sm">
-                <View className="border-b border-border-default p-4">
-                  <Text className="font-semibold text-foreground">
-                    Saved for later <Text className="font-normal text-foreground-muted">({savedItems.length})</Text>
-                  </Text>
-                </View>
-                {savedItems.map((item, i) => (
-                  <SavedItemRow
-                    key={item.id}
-                    item={item}
-                    last={i === savedItems.length - 1}
-                    updating={updating.has(item.id)}
-                    onMove={() => handleMove(item.id)}
-                    onRemove={() => handleRemove(item.id)}
-                  />
-                ))}
-              </View>
-            )}
-
+                </EmptyState>
+              </Card>
+            ) : null}
+          </>
+        }
+        ListFooterComponent={
+          <>
             {cartItems.length > 0 && (
               <AiInsight
                 kind="cart"
@@ -286,131 +273,154 @@ export default function CartScreen() {
             <CartUpsellRow cartProductIds={cartItems.map(i => i.product_id)} savedProductIds={savedItems.map(i => i.product_id)} />
 
             <FeaturedForYouCompact limit={4} />
-          </View>
+            {cartItems.length > 0 && (
+              <Card className="mt-4">
+                <Text accessibilityRole="header" className="mb-5 font-display text-xl font-extrabold text-foreground">
+                  Order Summary
+                </Text>
 
-          {cartItems.length > 0 && (
-            <View className="rounded-lg border border-border-default bg-surface-elevated p-4 shadow-sm">
-              <Text className="mb-6 text-xl font-bold text-foreground">Order Summary</Text>
-
-              <View className="mb-5">
-                {appliedCoupon ? (
-                  <View className="flex-row items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800 dark:bg-green-900/20">
-                    <View className="flex-1">
-                      <Text className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code} applied</Text>
-                      {appliedCoupon.description ? (
-                        <Text className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</Text>
-                      ) : null}
+                <View className="mb-5">
+                  {appliedCoupon ? (
+                    <Notice tone="success">
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-1">
+                          <Text className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code} applied</Text>
+                          {appliedCoupon.description ? (
+                            <Text className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</Text>
+                          ) : null}
+                        </View>
+                        <TextButton
+                          label="Remove"
+                          tone="danger"
+                          accessibilityLabel={`Remove coupon ${appliedCoupon.code}`}
+                          onPress={() => {
+                            setAppliedCoupon(null)
+                            setCouponError('')
+                          }}
+                          className="ml-3 self-center"
+                        />
+                      </View>
+                    </Notice>
+                  ) : (
+                    <View>
+                      <View className="flex-row items-start gap-2">
+                        <TextField
+                          value={couponCode}
+                          onChangeText={v => {
+                            setCouponCode(v.toUpperCase())
+                            setCouponError('')
+                          }}
+                          onSubmitEditing={() => handleApplyCoupon()}
+                          placeholder="Coupon code"
+                          accessibilityLabel="Coupon code"
+                          autoCapitalize="characters"
+                          autoCorrect={false}
+                          returnKeyType="done"
+                          error={couponError || null}
+                          containerClassName="flex-1"
+                        />
+                        <Button
+                          label="Apply"
+                          block={false}
+                          loading={couponLoading}
+                          disabled={!couponCode.trim()}
+                          onPress={() => handleApplyCoupon()}
+                        />
+                      </View>
+                      <CouponNudge subtotal={total} signedIn={!!user} applying={couponLoading} onApply={handleApplyCoupon} />
                     </View>
-                    <Pressable
-                      onPress={() => {
-                        setAppliedCoupon(null)
-                        setCouponError('')
-                      }}
-                      className="ml-3"
-                    >
-                      <Text className="text-xs font-medium text-red-500">Remove</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View>
-                    <View className="flex-row gap-2">
-                      <TextInput
-                        value={couponCode}
-                        onChangeText={v => {
-                          setCouponCode(v.toUpperCase())
-                          setCouponError('')
-                        }}
-                        onSubmitEditing={() => handleApplyCoupon()}
-                        placeholder="Coupon code"
-                        placeholderTextColor={t.foregroundMuted}
-                        autoCapitalize="characters"
-                        autoCorrect={false}
-                        returnKeyType="done"
-                        className="flex-1 rounded-lg border border-border-secondary bg-surface px-3 py-2 text-sm text-foreground"
-                      />
-                      <Pressable
-                        onPress={() => handleApplyCoupon()}
-                        disabled={couponLoading || !couponCode.trim()}
-                        className="justify-center rounded-lg bg-accent-500 px-4 py-2 active:bg-accent-600 disabled:opacity-50"
-                      >
-                        <Text className="text-sm font-semibold text-white">{couponLoading ? '...' : 'Apply'}</Text>
-                      </Pressable>
-                    </View>
-                    {couponError ? <Text className="mt-1 text-xs text-red-500">{couponError}</Text> : null}
-                    <CouponNudge subtotal={total} signedIn={!!user} applying={couponLoading} onApply={handleApplyCoupon} />
-                  </View>
-                )}
-              </View>
-
-              <View className="mb-6 gap-3">
-                <View className="flex-row justify-between">
-                  <Text className="text-foreground-secondary">Subtotal ({cartCount} items)</Text>
-                  <Text className="text-foreground-secondary">{money(total)}</Text>
-                </View>
-                {gstEnabled && (
-                  <View className="flex-row justify-between">
-                    <Text className="text-sm text-foreground-muted">Incl. GST</Text>
-                    <Text className="text-sm text-foreground-muted">{money(tax)}</Text>
-                  </View>
-                )}
-                {discount > 0 && (
-                  <View className="flex-row justify-between">
-                    <Text className="text-sm font-medium text-green-600 dark:text-green-400">Coupon ({appliedCoupon!.code})</Text>
-                    <Text className="text-sm font-medium text-green-600 dark:text-green-400">-{money(discount)}</Text>
-                  </View>
-                )}
-                <View className="border-t border-border-default pt-3">
-                  <View className="flex-row justify-between">
-                    <Text className="text-lg font-bold text-foreground">Total</Text>
-                    <Text className="text-lg font-bold text-foreground">{money(finalTotal)}</Text>
-                  </View>
-                  {discount > 0 && (
-                    <Text className="mt-1 text-xs text-green-600 dark:text-green-400">You save {money(discount)} with this coupon</Text>
                   )}
-                  {gstEnabled && <Text className="mt-1 text-xs text-foreground-muted">Price inclusive of all taxes</Text>}
                 </View>
-              </View>
 
-              {user ? (
-                <Pressable
-                  onPress={proceedToCheckout}
-                  disabled={proceeding || cartCount === 0 || hasInactiveItems}
-                  className="w-full flex-row items-center justify-center rounded-lg bg-accent-500 px-6 py-3 active:bg-accent-600 disabled:opacity-60"
-                >
-                  <Text className="font-semibold text-white">
-                    {proceeding ? 'Starting…' : hasInactiveItems ? 'Remove unavailable items to checkout' : 'Proceed to Checkout'}
-                  </Text>
-                  <View className="ml-2">
-                    <ChevronRight size={20} color={status.white} strokeWidth={2} />
+                <View className="mb-6 gap-3">
+                  <View className="flex-row justify-between">
+                    <Text className="text-foreground-secondary">Subtotal ({cartCount} items)</Text>
+                    <Text className="text-foreground-secondary">{money(total)}</Text>
                   </View>
-                </Pressable>
-              ) : (
-                <View className="gap-3">
-                  <Pressable
-                    onPress={() => router.push('/(auth)/login')}
-                    className="w-full flex-row items-center justify-center rounded-lg bg-accent-500 px-6 py-3 active:bg-accent-600"
-                  >
-                    <Text className="font-semibold text-white">Login to Checkout</Text>
-                    <View className="ml-2">
-                      <ChevronRight size={20} color={status.white} strokeWidth={2} />
+                  {gstEnabled && (
+                    <View className="flex-row justify-between">
+                      <Text className="text-sm text-foreground-muted">Incl. GST</Text>
+                      <Text className="text-sm text-foreground-muted">{money(tax)}</Text>
                     </View>
-                  </Pressable>
-                  <Text className="text-center text-sm text-foreground-secondary">
-                    New customer?{' '}
-                    <Text className="font-medium text-accent-600 dark:text-accent-400" onPress={() => router.push('/(auth)/signup')}>
-                      Create an account
-                    </Text>
-                  </Text>
+                  )}
+                  {discount > 0 && (
+                    <View className="flex-row justify-between">
+                      <Text className="text-sm font-medium text-green-600 dark:text-green-400">Coupon ({appliedCoupon!.code})</Text>
+                      <Text className="text-sm font-medium text-green-600 dark:text-green-400">-{money(discount)}</Text>
+                    </View>
+                  )}
+                  <View className="border-t border-border-default pt-3">
+                    <View className="flex-row justify-between">
+                      <Text className="text-lg font-bold text-foreground">Total</Text>
+                      <Text className="text-lg font-bold text-foreground">{money(finalTotal)}</Text>
+                    </View>
+                    {discount > 0 && (
+                      <Text className="mt-1 text-xs text-green-600 dark:text-green-400">You save {money(discount)} with this coupon</Text>
+                    )}
+                    {gstEnabled && <Text className="mt-1 text-xs text-foreground-muted">Price inclusive of all taxes</Text>}
+                  </View>
                 </View>
-              )}
 
-              <Pressable onPress={() => openHref(router, '/products')} className="mt-4">
-                <Text className="text-center font-medium text-accent-600 dark:text-accent-400">Continue Shopping</Text>
-              </Pressable>
+                {user ? (
+                  <Button
+                    label={hasInactiveItems ? 'Remove unavailable items to checkout' : 'Proceed to Checkout'}
+                    loading={proceeding}
+                    loadingLabel="Starting…"
+                    disabled={cartCount === 0 || hasInactiveItems}
+                    size={hasInactiveItems ? 'md' : 'lg'}
+                    haptics
+                    onPress={proceedToCheckout}
+                    trailing={hasInactiveItems || proceeding ? null : <ChevronRight size={20} color={status.white} strokeWidth={2.2} />}
+                  />
+                ) : (
+                  <View className="gap-3">
+                    <Button
+                      label="Login to Checkout"
+                      onPress={() => router.push('/(auth)/login')}
+                      trailing={<ChevronRight size={20} color={status.white} strokeWidth={2.2} />}
+                    />
+                    <Text className="text-center text-sm text-foreground-secondary">
+                      New customer?{' '}
+                      <Text accessibilityRole="link" className="font-medium text-accent-600 dark:text-accent-400" onPress={() => router.push('/(auth)/signup')}>
+                        Create an account
+                      </Text>
+                    </Text>
+                  </View>
+                )}
+
+                <Button label="Continue Shopping" variant="ghost" size="md" onPress={() => openHref(router, '/products')} className="mt-2" />
+              </Card>
+            )}
+          </>
+        }
+      />
+    </Screen>
+  )
+}
+
+/** The loaded cart's shape: title, one card of line rows (96px thumb, price, stepper, subtotal), summary. */
+function CartLoading() {
+  return (
+    <View className="flex-1 overflow-hidden px-4 pt-4">
+      <Skeleton height={32} width={210} className="mb-4" />
+      <View className="overflow-hidden rounded-panel bg-surface-elevated dark:border dark:border-border-default">
+        {[0, 1, 2].map(i => (
+          <View key={i} className={`flex-row gap-4 p-4 ${i < 2 ? 'border-b border-border-default' : ''}`}>
+            <Skeleton width={96} height={96} rounded="rounded-xl" />
+            <View className="flex-1 gap-2">
+              <Skeleton height={15} />
+              <Skeleton height={15} width="60%" />
+              <Skeleton height={20} width={90} className="mt-1" />
+              <View className="mt-2 flex-row items-center gap-3">
+                <Skeleton height={44} width={128} rounded="rounded-full" />
+                <Skeleton height={12} width={80} rounded="rounded" />
+              </View>
+              <Skeleton height={18} width={130} className="mt-2" />
             </View>
-          )}
-        </View>
-      </KeyboardScroll>
+          </View>
+        ))}
+      </View>
+      <SummarySkeleton rows={2} className="mt-4" />
     </View>
   )
 }
