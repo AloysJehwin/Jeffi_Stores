@@ -300,6 +300,8 @@ export async function getSlides(section: SectionShape, gstEnabled: boolean): Pro
     ctaLabel: null,
     imageCard: null,
     blurhashCard: null,
+    video: null,
+    videoCard: null,
     motion: 'none' as const,
   }
   const slides: SlideCard[] = []
@@ -324,6 +326,8 @@ export async function getSlides(section: SectionShape, gstEnabled: boolean): Pro
         blurhash: wide.blurhash,
         imageCard: o.image_url_card,
         blurhashCard: o.image_url_card ? o.blurhash_card : null,
+        video: safeHref(o.video_url),
+        videoCard: safeHref(o.video_url_card),
       })
     } else if (item.kind === 'category') {
       const c = categoryById.get(item.categoryId)
@@ -371,6 +375,8 @@ export async function getSlides(section: SectionShape, gstEnabled: boolean): Pro
         image: item.image,
         blurhash: null,
         imageCard: item.imageCard,
+        video: item.video ?? null,
+        videoCard: item.videoCard ?? null,
         motion: item.motion,
       })
     }

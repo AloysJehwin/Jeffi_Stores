@@ -236,6 +236,8 @@ export interface SectionCopy {
   subtitle?: string
   body?: string
   imageUrl?: string
+  /** MP4/WebM for the section's banner image (promo, about); `imageUrl` is its poster. */
+  video?: string
   ctaLabel?: string
   ctaUrl?: string
 }
@@ -428,6 +430,8 @@ const objects = (raw: unknown): Record<string, unknown>[] =>
 // Animated hero: `config.slides`, each with a background image and a headline at least.
 export interface MotionHeroSlide {
   bgImage: string
+  /** MP4/WebM behind the slide; `bgImage` is its poster. Absent when unset. */
+  bgVideo?: string
   fgImage: string | null
   eyebrow: string | null
   headline: string
@@ -442,8 +446,10 @@ export function motionHeroSlides(section: Pick<HomepageSection, 'config'>): Moti
     const bgImage = safeHref(str(r.bgImage))
     const headline = str(r.headline)
     if (!bgImage || !headline) continue
+    const bgVideo = safeHref(str(r.bgVideo))
     slides.push({
       bgImage,
+      ...(bgVideo ? { bgVideo } : {}),
       fgImage: safeHref(str(r.fgImage)),
       eyebrow: str(r.eyebrow),
       headline,
@@ -465,6 +471,8 @@ export function motionHeroIntervalMs(section: Pick<HomepageSection, 'config'>): 
 export interface StorySlide {
   id: string
   image: string
+  /** MP4/WebM for the slide; `image` is its poster. Absent when unset. */
+  video?: string
   caption: string | null
   ctaLabel: string | null
   url: string | null
@@ -490,9 +498,11 @@ export function storyGroups(section: Pick<HomepageSection, 'config'>): StoryGrou
       const image = safeHref(str(s.image))
       if (!image) return
       const secs = typeof s.seconds === 'number' ? s.seconds : parseFloat(String(s.seconds ?? ''))
+      const video = safeHref(str(s.video))
       slides.push({
         id: str(s.id) ?? `${gi}-${si}`,
         image,
+        ...(video ? { video } : {}),
         caption: str(s.caption),
         ctaLabel: str(s.ctaLabel),
         url: safeHref(str(s.url)),
@@ -522,6 +532,9 @@ export interface CustomSlide {
   kind: 'custom'
   image: string
   imageCard: string | null
+  /** MP4/WebM for `image` / `imageCard`, which are their posters. Absent when unset. */
+  video?: string
+  videoCard?: string
   eyebrow: string | null
   title: string
   sub: string | null
@@ -571,6 +584,8 @@ export function slidesConfig(section: Pick<HomepageSection, 'config'>): SlidesCo
       const image = safeHref(str(r.image))
       const title = str(r.title)
       if (image && title) {
+        const video = safeHref(str(r.video))
+        const videoCard = safeHref(str(r.videoCard))
         item = {
           id,
           kind: 'custom',
@@ -582,6 +597,8 @@ export function slidesConfig(section: Pick<HomepageSection, 'config'>): SlidesCo
           ctaLabel: str(r.ctaLabel),
           url: safeHref(str(r.url)),
           motion: oneOf(r.motion, SLIDE_MOTIONS, 'none'),
+          ...(video ? { video } : {}),
+          ...(videoCard ? { videoCard } : {}),
         }
       }
     }
@@ -616,6 +633,10 @@ export interface SlideCard {
   image: string | null
   /** The portrait 4:5 picture, when there is one. */
   imageCard: string | null
+  /** MP4/WebM for the wide slot; `image` is its poster. */
+  video: string | null
+  /** MP4/WebM for the card; `imageCard` is its poster. */
+  videoCard: string | null
   blurhash: string | null
   blurhashCard: string | null
   price?: number

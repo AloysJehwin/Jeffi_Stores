@@ -44,18 +44,26 @@ export default function PromoBannerEditor(props: EditorProps) {
   const b = useSectionBinding(props)
   const imageUrl = b.str('imageUrl')
   const imageUrlMobile = b.str('imageUrlMobile')
+  const video = b.str('video')
 
   return (
     <Grid>
       <Image
-        label="Image (desktop)"
+        label="Banner (desktop)"
         value={imageUrl}
+        video={video}
+        allowVideo
+        size={['wide', 'hero']}
+        defaultPrompt={section.title ?? ''}
         disabled={!canWrite}
-        onCommit={v => b.saveConfig({ imageUrl: v || null })}
+        hint="An MP4 or GIF works too; the image is the video's poster."
+        onCommit={(img, vid) => b.saveConfig({ imageUrl: img || null, video: vid || null })}
       />
       <Image
         label="Image (mobile)"
         value={imageUrlMobile}
+        size={['portrait', 'square']}
+        defaultPrompt={section.title ?? ''}
         disabled={!canWrite}
         hint="Optional — falls back to the desktop image."
         onCommit={v => b.saveConfig({ imageUrlMobile: v || null })}

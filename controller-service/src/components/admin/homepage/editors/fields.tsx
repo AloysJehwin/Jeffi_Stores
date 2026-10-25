@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Upload } from 'lucide-react'
-import { uploadImage } from '@/components/admin/ImageUrlInput'
 import AdminSelect from '@/components/admin/AdminSelect'
+import MediaField, { type MediaSize } from '@/components/admin/media/MediaField'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import Toggle from '@/components/ui/Toggle'
 import {
@@ -104,36 +103,64 @@ export function Text({
   )
 }
 
-/** Image URL field: paste a link, or Upload (the uploaded CDN URL is saved immediately). */
-export function Image({ label, value, disabled, hint, placeholder, onCommit }: {
-  label: string; value: string; disabled: boolean; hint?: string; placeholder?: string; onCommit: (v: string) => void
+/**
+ * A config media slot: upload, gallery or AI, plus a pasted link. With `allowVideo` it also binds the
+ * sibling video key and commits both together, so neither write overwrites the other.
+ */
+export function Image({
+  label,
+  value,
+  video = '',
+  allowVideo = false,
+  size = 'wide',
+  defaultPrompt,
+  disabled,
+  hint,
+  placeholder,
+  onCommit,
+}: {
+  label: string
+  value: string
+  /** The sibling video key's value. */
+  video?: string
+  allowVideo?: boolean
+  size?: MediaSize | MediaSize[]
+  defaultPrompt?: string
+  disabled: boolean
+  hint?: string
+  placeholder?: string
+  /** The image URL, then the video URL ('' when cleared; passed through when the slot takes no video). */
+  onCommit: (image: string, video: string) => void
 }) {
   const { draft, setDraft, focused } = useExternalValue(value)
-  const file = useRef<HTMLInputElement>(null)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  async function pick(f: File | undefined) {
-    if (!f) return
-    setBusy(true); setErr(null)
-    try { const url = await uploadImage(f); setDraft(url); onCommit(url) } catch (e: any) { setErr(e.message) } finally {
-      setBusy(false)
-      if (file.current) file.current.value = ''
-    }
-  }
   return (
-    <div>
-      <label className={LABEL_CLASS}>{label}</label>
-      <div className="flex items-center gap-2">
-        <input type="text" value={draft} disabled={disabled} placeholder={placeholder ?? 'https://… or upload'}
-          onFocus={() => { focused.current = true }} onChange={e => setDraft(e.target.value)}
-          onBlur={() => { focused.current = false; if (draft !== value) onCommit(draft) }} className={`${INPUT_CLASS} flex-1 min-w-0`} />
-        <input ref={file} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden onChange={e => pick(e.target.files?.[0])} />
-        <button type="button" disabled={disabled || busy} onClick={() => file.current?.click()}
-          className="inline-flex shrink-0 items-center gap-1.5 self-stretch rounded-lg border border-border-default px-3 text-xs font-semibold hover:bg-surface-secondary disabled:opacity-50">
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} {busy ? 'Uploading…' : 'Upload'}
-        </button>
-      </div>
-      {err ? <p className="text-[11px] text-red-600 mt-1">{err}</p> : hint && <p className="text-[11px] text-foreground-muted mt-1">{hint}</p>}
+    <div className="sm:col-span-2 space-y-1.5">
+      <MediaField
+        label={label}
+        hint={hint}
+        value={{ image: value || null, video: allowVideo ? video || null : null }}
+        onChange={next => onCommit(next.image ?? '', allowVideo ? (next.video ?? '') : video)}
+        size={size}
+        allowVideo={allowVideo}
+        defaultPrompt={defaultPrompt}
+        disabled={disabled}
+      />
+      <input
+        type="text"
+        value={draft}
+        disabled={disabled}
+        aria-label={`${label} link`}
+        placeholder={placeholder ?? 'Or paste an image link: https://… or /images/…'}
+        onFocus={() => {
+          focused.current = true
+        }}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={() => {
+          focused.current = false
+          if (draft !== value) onCommit(draft.trim(), video)
+        }}
+        className={`${INPUT_CLASS} text-xs`}
+      />
     </div>
   )
 }

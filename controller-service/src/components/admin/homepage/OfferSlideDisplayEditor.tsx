@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import MediaField, { type MediaSize, type MediaValue } from '@/components/admin/media/MediaField'
+import AiCopyButton from '@/components/admin/ai/AiCopyButton'
 
 export interface OfferSlide {
   id: string
@@ -61,6 +62,12 @@ const SLOTS: Slot[] = [
   },
 ]
 
+const COPY_FIELDS = [
+  { name: 'subtitle', label: 'Short line under the offer title, one concise sentence', type: 'text' as const },
+  { name: 'badge_text', label: 'Tiny uppercase badge, 1-2 words e.g. Diwali', type: 'text' as const },
+  { name: 'cta_label', label: 'Button label, 1-3 words e.g. Shop the offer', type: 'text' as const },
+]
+
 const BADGE_COLORS = [
   { value: 'bg-primary-500', label: 'Primary', swatch: '#7c3aed' },
   { value: 'bg-accent-500', label: 'Accent', swatch: '#84cc16' },
@@ -115,6 +122,15 @@ export default function OfferSlideDisplayEditor({
     return { url: data.url as string, blurhash: (data.blurhash as string | null) ?? null }
   }
 
+  function fillCopy(v: Record<string, string>) {
+    const patch: Partial<OfferSlide> = {}
+    if (v.subtitle) patch.subtitle = v.subtitle
+    if (v.badge_text) patch.badge_text = v.badge_text
+    if (v.cta_label) patch.cta_label = v.cta_label
+    onChange(patch)
+    save({ subtitle: patch.subtitle, badgeText: patch.badge_text, ctaLabel: patch.cta_label })
+  }
+
   function setMedia(slot: Slot, next: MediaValue) {
     const video = next.video ?? null
     onChange({ [slot.image]: next.image, [slot.hash]: next.blurhash ?? null, [slot.video]: video })
@@ -150,6 +166,14 @@ export default function OfferSlideDisplayEditor({
           <p className="text-[11px] text-foreground-muted">Without a card image, the cards show a centre crop of the wide one.</p>
         )}
       </div>
+
+      <AiCopyButton
+        scope="coupons:write"
+        context={`Homepage offer card for "${offer.title}" at ${storeName}.`}
+        defaultBrief={offer.title}
+        fields={COPY_FIELDS}
+        onFill={fillCopy}
+      />
 
       <div>
         <label className="block text-xs font-medium text-foreground-secondary mb-1">Card copy</label>

@@ -13,6 +13,8 @@ export interface SectionCopy {
   subtitle?: string
   body?: string
   imageUrl?: string
+  /** MP4/WebM for the banner image (promo, about); `imageUrl` is its poster. */
+  video?: string
   ctaLabel?: string
   ctaUrl?: string
 }
@@ -29,6 +31,7 @@ export interface HomeSection {
   display_order: number
   layout: 'grid' | 'carousel'
   copy: SectionCopy
+  /** Blog and social items may carry an optional `video` beside `imageUrl`. */
   items: Record<string, string>[] | null
 }
 
@@ -81,6 +84,9 @@ export interface ProductOffer {
   blurhash_mobile: string | null
   image_url_card?: string | null
   blurhash_card?: string | null
+  /** MP4/WebM for the card and wide slots; image_url_card / image_url are the posters. */
+  video_url_card?: string | null
+  video_url?: string | null
   cta_label: string | null
   ends_at: string | null
 }
@@ -126,6 +132,8 @@ export interface CountdownDeal {
 
 export interface MotionHeroSlide {
   bgImage: string
+  /** MP4/WebM behind the slide; `bgImage` is its poster. */
+  bgVideo?: string
   fgImage: string | null
   eyebrow: string | null
   headline: string
@@ -142,6 +150,8 @@ export interface MotionHeroData {
 export interface StorySlide {
   id: string
   image: string
+  /** MP4/WebM for the slide; `image` is its poster. */
+  video?: string
   caption: string | null
   ctaLabel: string | null
   url: string | null
@@ -181,6 +191,9 @@ export interface SlideCard {
   image: string | null
   /** Portrait 4:5 picture, when there is one. */
   imageCard: string | null
+  /** MP4/WebM for the wide slot and the card; `image` / `imageCard` are the posters. */
+  video?: string | null
+  videoCard?: string | null
   blurhash: string | null
   blurhashCard: string | null
   price?: number
