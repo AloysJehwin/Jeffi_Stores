@@ -1,6 +1,6 @@
 # Mobile app UI refactor: one design system for every screen
 
-Status: planned 2026-10-25, nothing started. Scope: the Expo app in `mobile-service/client`. Supersedes the
+Status: phase 0 in progress (2026-10-25). Scope: the Expo app in `mobile-service/client`. Supersedes the
 *visual* rules of `docs/MOBILE_PARITY_PLAN.md` (data and behaviour parity with the storefront still hold).
 
 ## Why
@@ -104,6 +104,49 @@ An audit on 2026-10-25 (32 screens) found:
 
 Phase 0 ships the library with a hidden `/dev/ui` gallery route (dev builds only) that renders every component in
 light and dark, used for screenshot review before any screen migrates.
+
+## Skeleton loading (requested 2026-10-25)
+
+Every screen that waits on data shows a skeleton shaped like the content it is about to show, never a bare
+spinner and never a blank screen. An audit on 2026-10-25 found 9 routes on a full-screen spinner and the rest on
+three different hand-rolled pulses (`account/ui` `Pulse`, `catalog/Paged` `Pulse`, `cart/Pulse`).
+
+**Primitive (phase 0).** `Skeleton` in `src/ui` is a `bg-surface-secondary` block with a shimmer band swept across it.
+One shared clock drives every block, so a page shimmers as one; it runs only while a skeleton is mounted and stays still
+with reduced motion on. Blocks hide from screen readers; the screen's loading state carries the label.
+
+**Rules**
+- The skeleton matches the real layout's sizes (card heights, image ratios, gutters), so nothing jumps when data lands.
+- Shown only on the first load. A refetch keeps the old content (pull to refresh shows its own spinner).
+- Spinners stay for actions in progress (a button that's saving, the payment hand-off), not for content.
+- Sub-sections that load on their own (reviews, related products, tracking) get their own small skeleton in place.
+
+**Building blocks** (`src/ui/skeletons.tsx`): `ProductCardSkeleton`, `ProductGridSkeleton` (columns follow the real
+grid), `ProductRailSkeleton`, `ListRowSkeleton`, `OrderCardSkeleton`, `CartLineSkeleton`, `ArticleSkeleton`,
+`FormSkeleton`, `TileGridSkeleton`, and page compositions built from them.
+
+| Screen | Today | Skeleton |
+|---|---|---|
+| Home | spinner | hero card, category row, two product rails |
+| All products, category, brand, wishlist | spinner / pulse grid | chip row + product grid |
+| Categories, brands | pulse | tile grid |
+| Product page | spinner | gallery, title and price, option chips, action bar |
+| Quick add sheet | pulse | header row, price, chips, button |
+| Cart | pulse | three cart lines + summary card |
+| Checkout review | spinner + pulses | address card, items, totals |
+| Order confirmation | pulse | status hero, items, totals |
+| Orders | pulse | order cards |
+| Order detail | spinner + pulses | status header, items, tracking, totals |
+| Order tracking (inline) | spinner | timeline rows |
+| Addresses | pulse | address cards |
+| Rewards, referrals, quotes, subscriptions, transactions | pulse | header card + list rows |
+| Delete account | spinner | notice card + rows |
+| Compare | pulse | two-column table |
+| Legal index / policy | spinner | list rows / article |
+| Product reviews (PDP) | blank | rating summary + review rows |
+| Search panel (TopNav) | spinner | result rows |
+
+The skeleton pass ships right after phase 0, before the screen-by-screen migration, as its own PR.
 
 ## Phases
 
