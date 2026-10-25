@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Overline, Title } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import ProductCard from '../product/ProductCard'
 import { Grid } from '../home/layout'
@@ -27,13 +28,9 @@ export default function FeaturedForYou() {
   return (
     <View className="py-12">
       <View className="px-4">
-        <View className="mb-7">
-          <Text className="mb-1 text-[10px] font-black uppercase text-accent-500" style={{ letterSpacing: 2 }}>
-            Picked for you
-          </Text>
-          <Text className="text-2xl font-black text-foreground" style={{ letterSpacing: -0.6 }}>
-            Featured For You
-          </Text>
+        <View className="mb-6">
+          <Overline className="mb-1 text-accent-600 dark:text-accent-400">Picked for you</Overline>
+          <Title>Featured For You</Title>
         </View>
         <Grid cols={2} gap={16} inset={16}>
           {rows.map((r, i) => (

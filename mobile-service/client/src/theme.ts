@@ -6,7 +6,7 @@ import tokens from '../../../packages/design-tokens'
 export const { primary, secondary, accent, schemes, status, radius } = tokens
 export type Scheme = typeof schemes.light
 
-export const fonts = { bebas: 'BebasNeue-Regular', inter: 'Inter' }
+export const fonts = { bebas: 'BebasNeue-Regular', inter: 'Inter', display: 'PlusJakartaSans' }
 
 /** The token set for the current colour scheme. */
 export function useTokens(): Scheme {

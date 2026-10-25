@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Pressable, Text, View } from 'react-native'
+import { FlatList, Pressable, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { useColorScheme } from 'nativewind'
+import { LayoutGrid, Rows3, Shapes } from 'lucide-react-native'
 import { getListing, type ListingCard, type ListingFacets } from '../../src/api/products'
 import { listBrands } from '../../src/api/brands'
 import TopNav from '../../src/components/layout/TopNav'
@@ -13,11 +13,11 @@ import CompareBar, { CompareStrip } from '../../src/components/catalog/CompareBa
 import FilterSheet, { FiltersButton } from '../../src/components/catalog/FilterSheet'
 import ListingPromoBanner from '../../src/components/catalog/ListingPromoBanner'
 import ProductTable from '../../src/components/catalog/ProductTable'
-import { EmptyCard, InfiniteFooter, ProductGridSkeleton, type InfiniteControl } from '../../src/components/catalog/Paged'
-import { SquaresIcon, TableIcon } from '../../src/components/catalog/icons'
+import { EmptyCard, InfiniteFooter, type InfiniteControl } from '../../src/components/catalog/Paged'
 import { listingKey, readListingParams, toRouteParams, type ListingParams } from '../../src/components/catalog/listing'
 import { useCompareStore } from '../../src/stores/compareStore'
-import { accent, useTokens } from '../../src/theme'
+import { Chip, IconButton, ProductGridSkeleton, Screen, Skeleton, Text, Title, useBottomInset } from '../../src/ui'
+import { useTokens } from '../../src/theme'
 import type { HomeSection } from '../../src/types/home'
 
 // Mirror of controller-service app/(storefront)/products/page.tsx at the mobile breakpoint: heading,
@@ -68,7 +68,6 @@ const pairs = (rows: ListingCard[], prefix: string): Item[] =>
 export default function ProductsScreen() {
   const router = useRouter()
   const t = useTokens()
-  const dark = useColorScheme().colorScheme === 'dark'
   const raw = useLocalSearchParams()
   const key = listingKey(readListingParams(raw))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,6 +78,7 @@ export default function ProductsScreen() {
   const [view, setView] = useState<'grid' | 'table'>('grid')
   const grouped = params.sort === 'category'
   const compareCount = useCompareStore(s => s.compareList.length)
+  const bottomInset = useBottomInset(compareCount >= 2 ? 96 : 24)
 
   // Grouped by category the web shows one page and no pager.
   const query = useInfiniteQuery({
@@ -142,33 +142,31 @@ export default function ProductsScreen() {
 
   const header = (
     <View className="px-4 pt-6">
-      <Text className="mb-4 text-2xl font-bold text-secondary-500 dark:text-foreground">All Products</Text>
+      <Title className="mb-4">All Products</Title>
       <CompareStrip />
       {!loading && rows.length > 0 ? (
         <View className="mb-6 flex-row flex-wrap items-center gap-2">
           <FiltersButton params={params} onPress={() => setSheetOpen(true)} />
-          <Pressable
-            onPress={toggleGrouped}
-            className={`h-9 flex-row items-center gap-1.5 rounded-lg border px-3 ${grouped ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : 'border-border-default'}`}
-          >
-            <SquaresIcon size={14} color={grouped ? (dark ? accent[400] : accent[700]) : t.foregroundSecondary} />
-            <Text className={`text-xs font-medium ${grouped ? 'text-accent-700 dark:text-accent-400' : 'text-foreground-secondary'}`}>Group by Category</Text>
-          </Pressable>
-          <View className="h-9 flex-row overflow-hidden rounded-lg border border-border-default">
-            <Pressable
+          <Chip label="Group by Category" icon={Shapes} selected={grouped} onPress={toggleGrouped} />
+          <View className="flex-row rounded-full bg-surface-secondary p-0.5">
+            <IconButton
+              icon={LayoutGrid}
+              label="Grid view"
+              size="sm"
+              variant={view === 'grid' ? 'solid' : 'plain'}
+              color={view === 'grid' ? undefined : t.foregroundMuted}
+              accessibilityState={{ selected: view === 'grid' }}
               onPress={() => setView('grid')}
-              accessibilityLabel="Grid view"
-              className={`h-full justify-center px-2.5 ${view === 'grid' ? 'bg-accent-50 dark:bg-accent-900/20' : ''}`}
-            >
-              <SquaresIcon filled size={16} color={view === 'grid' ? accent[500] : t.foregroundMuted} />
-            </Pressable>
-            <Pressable
+            />
+            <IconButton
+              icon={Rows3}
+              label="Table view"
+              size="sm"
+              variant={view === 'table' ? 'solid' : 'plain'}
+              color={view === 'table' ? undefined : t.foregroundMuted}
+              accessibilityState={{ selected: view === 'table' }}
               onPress={() => setView('table')}
-              accessibilityLabel="Table view"
-              className={`h-full justify-center border-l border-border-default px-2.5 ${view === 'table' ? 'bg-accent-50 dark:bg-accent-900/20' : ''}`}
-            >
-              <TableIcon color={view === 'table' ? accent[500] : t.foregroundMuted} />
-            </Pressable>
+            />
           </View>
         </View>
       ) : null}
@@ -177,6 +175,11 @@ export default function ProductsScreen() {
 
   const empty = loading ? (
     <View className="px-4">
+      <View className="mb-6 flex-row gap-2">
+        <Skeleton width={104} height={38} rounded="rounded-full" />
+        <Skeleton width={186} height={38} rounded="rounded-full" />
+        <Skeleton width={76} height={40} rounded="rounded-full" />
+      </View>
       <ProductGridSkeleton />
     </View>
   ) : failed ? (
@@ -202,13 +205,12 @@ export default function ProductsScreen() {
         </View>
       ) : null}
       <RecentlyViewed section={RECENT} data={undefined as never} />
-      <View style={{ height: compareCount >= 2 ? 96 : 24 }} />
+      <View style={{ height: bottomInset }} />
     </View>
   )
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
+    <Screen header={<TopNav />} mode="none">
       <FlatList
         ref={listRef}
         data={items}
@@ -231,8 +233,8 @@ export default function ProductsScreen() {
           if (item.type === 'group') {
             return (
               <View className={`mb-4 flex-row items-center gap-3 px-4 ${item.gap ? 'mt-5' : ''}`}>
-                <Pressable onPress={() => (item.slug ? router.push(`/category/${item.slug}`) : apply({}))}>
-                  <Text className="text-sm font-bold text-foreground">{item.name}</Text>
+                <Pressable accessibilityRole="link" onPress={() => (item.slug ? router.push(`/category/${item.slug}`) : apply({}))} hitSlop={8}>
+                  <Text className="font-display text-base font-extrabold text-foreground">{item.name}</Text>
                 </Pressable>
                 <View className="h-px flex-1 bg-border-default" />
                 <Text className="text-xs text-foreground-muted">{item.count} products</Text>
@@ -271,7 +273,7 @@ export default function ProductsScreen() {
         offers={first?.offers ?? []}
         onApply={apply}
       />
-      <CompareBar inTabs />
-    </View>
+      <CompareBar />
+    </Screen>
   )
 }

@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { ScrollView, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
+import { Check } from 'lucide-react-native'
 import { getTracking, type TrackingData, type TrackingScan } from '../../api/account'
-import HeroIcon from './HeroIcon'
-import { accent, useTokens } from '../../theme'
+import { status } from '../../theme'
+import { Badge, Caption, Divider, ModalSheet, Skeleton, Text, TextButton, type Tone } from '../../ui'
 
 // Mirror of controller-service components/DelhiveryTracking.tsx (customer variant).
 
@@ -41,28 +42,19 @@ const DB_TYPE: Record<string, string> = {
   rto_delivered: 'RTO-DL',
 }
 
-const BADGE: Record<string, { bg: string; text: string }> = {
-  green: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300' },
-  blue: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300' },
-  yellow: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300' },
-  orange: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-800 dark:text-orange-300' },
-  red: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300' },
-  neutral: { bg: 'bg-surface-secondary', text: 'text-foreground-secondary' },
-}
-
-function badge(type: string | null) {
+function badge(type: string | null): Tone {
   switch (type?.toUpperCase()) {
     case 'DL':
-      return BADGE.green
+      return 'success'
     case 'OT':
     case 'OD':
     case 'DISPATCHED':
-      return BADGE.blue
+      return 'info'
     case 'IT':
     case 'PU':
-      return BADGE.yellow
+      return 'warning'
     case 'NDR':
-      return BADGE.orange
+      return 'progress'
     case 'RTO':
     case 'RTO-IT':
     case 'RTO-OT':
@@ -70,9 +62,9 @@ function badge(type: string | null) {
     case 'HOLD':
     case 'MIS':
     case 'LOST':
-      return BADGE.red
+      return 'danger'
     default:
-      return BADGE.neutral
+      return 'neutral'
   }
 }
 
@@ -131,7 +123,7 @@ function Timeline({ tracking }: { tracking: TrackingData }) {
                   done ? 'bg-accent-500 border-accent-500' : current ? 'bg-surface-elevated border-accent-500' : 'bg-surface border-border-default'
                 }`}
               >
-                {done ? <HeroIcon name="check" size={14} color="white" strokeWidth={3} /> : <View className={`w-2.5 h-2.5 rounded-full ${current ? 'bg-accent-500' : 'bg-border-default'}`} />}
+                {done ? <Check size={14} color={status.white} strokeWidth={3} /> : <View className={`w-2.5 h-2.5 rounded-full ${current ? 'bg-accent-500' : 'bg-border-default'}`} />}
               </View>
               <Text className={`mt-2 text-xs text-center px-1 ${current ? 'text-accent-500 font-semibold' : done ? 'text-foreground font-medium' : 'text-foreground-muted'}`}>
                 {step}
@@ -144,39 +136,25 @@ function Timeline({ tracking }: { tracking: TrackingData }) {
   )
 }
 
-function History({ scans, onClose }: { scans: TrackingScan[]; onClose: () => void }) {
-  const t = useTokens()
+function History({ open, scans, onClose }: { open: boolean; scans: TrackingScan[]; onClose: () => void }) {
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable className="flex-1 justify-end bg-black/20" onPress={onClose}>
-        <Pressable onPress={() => {}} className="bg-surface-elevated rounded-t-xl" style={{ maxHeight: '80%' }}>
-          <View className="flex-row items-center justify-between px-5 py-4 border-b border-border-default">
-            <Text className="font-semibold text-foreground text-base">Shipment History</Text>
-            <Pressable onPress={onClose} className="w-8 h-8 rounded-full items-center justify-center">
-              <HeroIcon name="x" size={16} color={t.foregroundMuted} />
-            </Pressable>
+    <ModalSheet open={open} onClose={onClose} title="Shipment History" maxHeightRatio={0.8}>
+      <View className="ml-2 border-l-2 border-border-default">
+        {scans.map((scan, i) => (
+          <View key={i} className="pb-4 pl-4">
+            <View className={`absolute h-2 w-2 rounded-full ${i === 0 ? 'bg-accent-500' : 'bg-border-default'}`} style={{ left: -5, top: 6 }} />
+            <Caption>{scan.date ? new Date(scan.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}</Caption>
+            <Text className="text-sm font-medium text-foreground">{scan.activity || '—'}</Text>
+            {!!scan.location && <Text className="text-xs text-foreground-secondary">{scan.location}</Text>}
+            {!!scan.instructions && <Text className="text-xs italic text-foreground-muted">{scan.instructions}</Text>}
           </View>
-          <ScrollView contentContainerStyle={{ padding: 20 }}>
-            <View className="border-l-2 border-border-default ml-2">
-              {scans.map((scan, i) => (
-                <View key={i} className="pl-4 pb-4">
-                  <View className={`absolute w-2 h-2 rounded-full ${i === 0 ? 'bg-accent-500' : 'bg-border-default'}`} style={{ left: -5, top: 6 }} />
-                  <Text className="text-xs text-foreground-muted">{scan.date ? new Date(scan.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}</Text>
-                  <Text className="text-sm text-foreground font-medium">{scan.activity || '—'}</Text>
-                  {!!scan.location && <Text className="text-xs text-foreground-secondary">{scan.location}</Text>}
-                  {!!scan.instructions && <Text className="text-xs text-foreground-muted italic">{scan.instructions}</Text>}
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        ))}
+      </View>
+    </ModalSheet>
   )
 }
 
 export default function OrderTracking({ orderId, trackPath = 'track' }: { orderId: string; trackPath?: string }) {
-  const t = useTokens()
   const [showHistory, setShowHistory] = useState(false)
   const { data, isLoading, isError } = useQuery({
     queryKey: ['order-tracking', orderId, trackPath],
@@ -185,10 +163,23 @@ export default function OrderTracking({ orderId, trackPath = 'track' }: { orderI
   })
 
   if (isLoading) {
+    // The stepper, then the status pill and AWB.
     return (
-      <View className="flex-row items-center gap-2 py-2">
-        <ActivityIndicator size="small" color={t.foregroundSecondary} />
-        <Text className="text-sm text-foreground-secondary">Loading tracking…</Text>
+      <View className="gap-4">
+        <View className="overflow-hidden">
+          <View className="flex-row items-start" style={{ minWidth: 480 }}>
+            {STEPS.map(step => (
+              <View key={step} className="flex-1 items-center gap-2">
+                <Skeleton width={28} height={28} rounded="rounded-full" />
+                <Skeleton width="70%" height={10} rounded="rounded" />
+              </View>
+            ))}
+          </View>
+        </View>
+        <View className="flex-row items-center gap-3">
+          <Skeleton width={96} height={24} rounded="rounded-full" />
+          <Skeleton width={140} height={13} />
+        </View>
       </View>
     )
   }
@@ -202,7 +193,6 @@ export default function OrderTracking({ orderId, trackPath = 'track' }: { orderI
   const apiRank = RANK[fromApi?.toUpperCase() ?? ''] ?? 0
   const dbRank = RANK[fromDb?.toUpperCase() ?? ''] ?? 0
   const displayType = dbRank > apiRank ? fromDb : (fromApi ?? fromDb)
-  const tone = badge(displayType)
   const latest = tracking.scans?.[0]
 
   const facts = [
@@ -214,12 +204,10 @@ export default function OrderTracking({ orderId, trackPath = 'track' }: { orderI
 
   return (
     <View className="gap-4">
-      {showHistory && <History scans={tracking.scans} onClose={() => setShowHistory(false)} />}
+      <History open={showHistory} scans={tracking.scans} onClose={() => setShowHistory(false)} />
       <Timeline tracking={tracking} />
       <View className="flex-row flex-wrap items-start gap-3">
-        <View className={`px-3 py-1 rounded-full ${tone.bg}`}>
-          <Text className={`text-xs font-semibold ${tone.text}`}>{label(displayType)}</Text>
-        </View>
+        <Badge label={label(displayType)} tone={badge(displayType)} />
         <Text className="text-sm text-foreground-secondary">
           AWB: <Text className="font-mono text-foreground">{tracking.awb}</Text>
         </Text>
@@ -236,15 +224,15 @@ export default function OrderTracking({ orderId, trackPath = 'track' }: { orderI
         </View>
       )}
       {tracking.scans?.length > 0 && (
-        <View className="flex-row items-center justify-between border-t border-border-default pt-3 gap-2">
-          <Text className="flex-1 text-xs text-foreground-secondary">
-            Last update: {latest?.date ? new Date(latest.date).toLocaleString('en-IN') : '—'}
-            {latest?.location ? ` · ${latest.location}` : ''}
-          </Text>
-          <Pressable onPress={() => setShowHistory(true)} className="flex-row items-center gap-1">
-            <Text className="text-sm text-accent-500">View history ({tracking.scans.length})</Text>
-            <HeroIcon name="chevronRight" size={14} color={accent[500]} />
-          </Pressable>
+        <View>
+          <Divider className="mb-3" />
+          <View className="flex-row items-center justify-between gap-2">
+            <Text className="flex-1 text-xs text-foreground-secondary">
+              Last update: {latest?.date ? new Date(latest.date).toLocaleString('en-IN') : '—'}
+              {latest?.location ? ` · ${latest.location}` : ''}
+            </Text>
+            <TextButton label={`View history (${tracking.scans.length})`} onPress={() => setShowHistory(true)} />
+          </View>
         </View>
       )}
     </View>

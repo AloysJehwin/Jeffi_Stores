@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Card, Text } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 import { getFreeDeliveryRule } from '../../api/cart'
@@ -22,7 +23,7 @@ export default function FreeShippingProgress({ subtotal }: { subtotal: number })
   if (!active) return null
 
   return (
-    <View className="mb-4 rounded-lg border border-border-default bg-surface-elevated p-4 shadow-sm">
+    <Card className="mb-4">
       {unlocked ? (
         <Text className="text-sm font-semibold text-green-700 dark:text-green-400">You have unlocked free delivery</Text>
       ) : (
@@ -38,6 +39,6 @@ export default function FreeShippingProgress({ subtotal }: { subtotal: number })
       <Text className="mt-1.5 text-xs text-foreground-muted">
         Free delivery on orders of {money(rule!.freeThreshold)} or more, for parcels under {rule!.weightLimitKg} kg.
       </Text>
-    </View>
+    </Card>
   )
 }

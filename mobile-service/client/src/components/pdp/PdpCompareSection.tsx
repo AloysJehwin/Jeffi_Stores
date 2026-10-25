@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { Glyph, P } from './Glyph'
+import { Check, Columns3, ImageIcon } from 'lucide-react-native'
+import { Badge, Button, Card, ListRow, ModalSheet, Text, TextButton } from '../../ui'
 import { inr } from '../../lib/format'
+import { useTokens } from '../../theme'
 
 // Mirror of controller-service components/visitor/PdpCompareSection.tsx (scrollable table at the mobile breakpoint).
 
@@ -51,16 +53,17 @@ const LABEL_W = 96
 const MIN_TABLE_W = 480
 
 function Thumb({ p, size, current = false }: { p: CompareItem; size: number; current?: boolean }) {
+  const t = useTokens()
   return (
     <View
-      className={`overflow-hidden rounded-lg bg-surface-secondary ${current ? 'border-2 border-accent-400' : 'border border-border-default'}`}
+      className={`overflow-hidden rounded-xl bg-surface-secondary ${current ? 'border-2 border-accent-400' : 'border border-border-default'}`}
       style={{ width: size, height: size }}
     >
       {p.image ? (
-        <Image source={{ uri: p.image }} style={{ flex: 1, margin: 4 }} contentFit="contain" accessibilityLabel={p.name} />
+        <Image recyclingKey={p.image} source={{ uri: p.image }} style={{ flex: 1, margin: 4 }} contentFit="contain" accessibilityLabel={p.name} />
       ) : (
         <View className="h-full w-full items-center justify-center">
-          <Glyph d={P.photo} size={size / 2.7} strokeWidth={1} className="text-foreground-muted" />
+          <ImageIcon size={size / 2.7} strokeWidth={1} color={t.foregroundMuted} />
         </View>
       )}
     </View>
@@ -71,6 +74,9 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: {
   const router = useRouter()
   const [slots, setSlots] = useState<CompareItem[]>([currentProduct, ...relatedProducts.slice(0, 2)])
   const [swapSlot, setSwapSlot] = useState<number | null>(null)
+  // The sheet keeps the last slot's options while it slides away.
+  const [shownSlot, setShownSlot] = useState<number | null>(null)
+  if (swapSlot != null && swapSlot !== shownSlot) setShownSlot(swapSlot)
   const [width, setWidth] = useState(0)
 
   const openCompare = () => router.push({ pathname: '/compare', params: { ids: slots.map(p => p.id).join(',') } })
@@ -78,14 +84,12 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: {
   const allOptions = [currentProduct, ...relatedProducts]
   const tableW = Math.max(MIN_TABLE_W, width)
   const colW = (tableW * Math.floor(80 / slots.length)) / 100
-  const swapOptions = swapSlot == null ? [] : allOptions.filter(o => !slots.some((s, si) => si !== swapSlot && s.id === o.id))
+  const swapOptions = shownSlot == null ? [] : allOptions.filter(o => !slots.some((s, si) => si !== shownSlot && s.id === o.id))
 
   const row = (label: string, values: (string | null)[], bold = false) => (
     <View key={label} className="flex-row border-t border-border-default">
       <View style={{ width: LABEL_W }} className="justify-center py-2.5 pr-3">
-        <Text className="text-xs font-semibold uppercase text-foreground-muted" style={{ letterSpacing: 0.3 }}>
-          {label}
-        </Text>
+        <Text className="text-[11px] font-extrabold uppercase tracking-wider text-foreground-muted">{label}</Text>
       </View>
       {values.map((val, i) => {
         const isDiff = i > 0 && val !== values[0]
@@ -107,13 +111,12 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: {
   )
 
   return (
-    <View className="mb-8 rounded-lg border border-border-default bg-surface-elevated p-6 shadow-sm">
+    <Card className="mb-6 p-5" padded={false}>
       <View className="mb-5 flex-row items-center justify-between gap-2">
-        <Text className="flex-1 text-xl font-bold text-foreground">Compare Similar Products</Text>
-        <Pressable onPress={openCompare} className="flex-row items-center gap-1.5">
-          <Text className="text-sm font-medium text-accent-500">Full Comparison</Text>
-          <Glyph d={P.chevronRight} size={16} className="text-accent-500" />
-        </Pressable>
+        <Text accessibilityRole="header" className="flex-1 font-display text-xl font-extrabold text-foreground">
+          Compare Similar Products
+        </Text>
+        <TextButton label="Full Comparison" onPress={openCompare} />
       </View>
 
       <View onLayout={e => setWidth(e.nativeEvent.layout.width)} style={{ marginHorizontal: -8 }}>
@@ -134,7 +137,7 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: {
                         {p.name}
                       </Text>
                     ) : (
-                      <Pressable onPress={() => router.push(`/product/${p.slug}`)}>
+                      <Pressable accessibilityRole="link" hitSlop={4} onPress={() => router.push(`/product/${p.slug}`)}>
                         <Text numberOfLines={2} className="mb-1 text-center text-xs font-semibold leading-snug text-foreground">
                           {p.name}
                         </Text>
@@ -142,16 +145,12 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: {
                     )}
                     <View className="mb-1 flex-row flex-wrap items-baseline justify-center">
                       <Text className="text-sm font-bold text-primary-600 dark:text-primary-400">₹{inr(p.price)}</Text>
-                      {discount > 0 ? <Text className="ml-1 text-[10px] font-semibold text-green-600">{discount}% off</Text> : null}
+                      {discount > 0 ? <Text className="ml-1 text-[11px] font-semibold text-green-600 dark:text-green-400">{discount}% off</Text> : null}
                     </View>
                     {isCurrent ? (
-                      <View className="rounded-full bg-accent-50 px-2 py-0.5 dark:bg-accent-900/20">
-                        <Text className="text-[10px] font-semibold text-accent-600">Viewing</Text>
-                      </View>
+                      <Badge label="Viewing" tone="accent" size="sm" />
                     ) : (
-                      <Pressable onPress={() => setSwapSlot(i)}>
-                        <Text className="text-xs font-medium text-accent-500">Change</Text>
-                      </Pressable>
+                      <TextButton label="Change" accessibilityLabel={`Change ${p.name}`} onPress={() => setSwapSlot(i)} className="self-center" />
                     )}
                   </View>
                 )
@@ -164,43 +163,36 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: {
       </View>
 
       <View className="mt-4 items-center">
-        <Pressable onPress={openCompare} className="flex-row items-center gap-2 rounded-xl bg-accent-500 px-5 py-2.5">
-          <Glyph d={P.columns} size={16} className="text-white" />
-          <Text className="text-sm font-semibold text-white">View Full Comparison</Text>
-        </Pressable>
+        <Button label="View Full Comparison" icon={Columns3} size="md" block={false} onPress={openCompare} />
       </View>
 
-      <Modal visible={swapSlot != null} transparent animationType="fade" onRequestClose={() => setSwapSlot(null)}>
-        <View className="flex-1 items-center justify-center p-4">
-          <Pressable className="absolute inset-0 bg-black/40" onPress={() => setSwapSlot(null)} />
-          {swapSlot != null ? (
-            <View className="w-64 overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-2xl">
-              {swapOptions.map(o => {
-                const current = o.id === slots[swapSlot]?.id
-                return (
-                  <Pressable
-                    key={o.id}
-                    onPress={() => {
-                      setSlots(prev => prev.map((p, i) => (i === swapSlot ? o : p)))
-                      setSwapSlot(null)
-                    }}
-                    className={`flex-row items-center gap-2.5 px-3 py-2 ${current ? 'bg-accent-50 dark:bg-accent-900/20' : ''}`}
-                  >
-                    <Thumb p={o} size={28} />
-                    <View className="min-w-0 flex-1">
-                      <Text numberOfLines={2} className="text-xs font-medium leading-snug text-foreground">
-                        {o.name}
-                      </Text>
-                      <Text className="text-[10px] text-foreground-muted">₹{inr(o.price)}</Text>
-                    </View>
-                    {current ? <Glyph d={P.check} size={14} strokeWidth={2.5} className="text-accent-500" /> : null}
-                  </Pressable>
-                )
-              })}
-            </View>
-          ) : null}
+      <ModalSheet open={swapSlot != null} onClose={() => setSwapSlot(null)} title="Compare with">
+        <View className="-mx-5">
+          {swapOptions.map(o => {
+            const current = o.id === slots[shownSlot ?? 0]?.id
+            return (
+              <ListRow
+                key={o.id}
+                title={o.name}
+                subtitle={`₹${inr(o.price)}`}
+                leading={<Thumb p={o} size={40} />}
+                trailing={current ? <CurrentTick /> : null}
+                chevron={false}
+                onPress={() => {
+                  setSlots(prev => prev.map((p, i) => (i === shownSlot ? o : p)))
+                  setSwapSlot(null)
+                }}
+                className={current ? 'bg-accent-50 dark:bg-accent-900/20' : undefined}
+              />
+            )
+          })}
         </View>
-      </Modal>
-    </View>
+      </ModalSheet>
+    </Card>
   )
+}
+
+function CurrentTick() {
+  const t = useTokens()
+  return <Check size={18} strokeWidth={2.5} color={t.accent500} />
 }

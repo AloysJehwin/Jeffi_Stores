@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Card, Overline, Text } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import { CircleCheck, Zap } from 'lucide-react-native'
 import { api } from '../../api/client'
@@ -33,31 +34,25 @@ export default function AiInsight({ kind, body, className }: { kind: Kind; body:
 
   if (kind === 'recap') {
     return (
-      <View className={`rounded-xl border border-border-default bg-surface-elevated p-4 ${className ?? ''}`}>
+      <Card className={className}>
         <View className="mb-1.5 flex-row items-center gap-2">
           <Zap size={16} color={t.accent500} strokeWidth={2} />
-          <Text className="text-xs font-semibold uppercase text-foreground-secondary" style={{ letterSpacing: 0.3 }}>
-            Your order at a glance
-          </Text>
-          <Text className="ml-auto text-foreground-muted" style={{ fontSize: 9 }}>
-            AI summary
-          </Text>
+          <Overline className="text-foreground-secondary">Your order at a glance</Overline>
+          <Text className="ml-auto text-[11px] text-foreground-muted">AI summary</Text>
         </View>
         <Text className="text-sm leading-relaxed text-foreground">{text}</Text>
-      </View>
+      </Card>
     )
   }
 
   const Icon = kind === 'affirmation' ? CircleCheck : Zap
   return (
-    <View className={`flex-row items-start gap-2.5 rounded-xl border border-border-default bg-surface-elevated px-4 py-3 ${className ?? ''}`}>
+    <Card padded={false} className={`flex-row items-start gap-2.5 px-4 py-3 ${className ?? ''}`}>
       <View className="mt-0.5">
         <Icon size={16} color={t.accent500} strokeWidth={2} />
       </View>
       <Text className="flex-1 text-sm leading-relaxed text-foreground">{text}</Text>
-      <Text className="mt-0.5 text-foreground-muted" style={{ fontSize: 9 }}>
-        ollama
-      </Text>
-    </View>
+      <Text className="mt-0.5 text-[11px] text-foreground-muted">ollama</Text>
+    </Card>
   )
 }

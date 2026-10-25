@@ -1,5 +1,6 @@
 import { useEffect, useId } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Text } from '../../ui'
 import { Image } from 'expo-image'
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg'
 import { GUTTER, SectionHeading } from './layout'
@@ -30,7 +31,7 @@ export default function Stories({ section, data }: SectionProps) {
       <SectionHeading
         eyebrow={section.copy.eyebrow ?? COPY.eyebrow}
         title={section.copy.title ?? COPY.title}
-        titleClassName="text-xl font-black text-foreground"
+        titleClassName="font-display text-xl font-extrabold text-foreground"
         className="mb-4"
       />
       <ScrollView
@@ -74,7 +75,7 @@ function Ring({ group, seen, onPress }: { group: StoryGroup; seen: boolean; onPr
           </Svg>
         )}
         <View style={{ width: inner, height: inner, borderRadius: inner / 2 }} className="overflow-hidden bg-surface-secondary">
-          <Image source={cover ? { uri: cover } : undefined} style={{ width: inner, height: inner }} contentFit="cover" transition={200} />
+          <Image recyclingKey={cover} source={cover ? { uri: cover } : undefined} style={{ width: inner, height: inner }} contentFit="cover" transition={200} />
         </View>
       </View>
       <Text

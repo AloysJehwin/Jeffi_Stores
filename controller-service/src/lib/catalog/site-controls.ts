@@ -35,6 +35,10 @@ export interface FeatureFlags {
   // 'twilio' (default) or 'aws' (stub until onboarded). Independent per channel.
   smsProvider: 'twilio' | 'aws'
   whatsappProvider: 'twilio' | 'aws'
+  // App push (FCM). Off stops every push; marketing off stops offers / price alerts only.
+  // Either way the customer's in-app inbox still gets the notification.
+  pushEnabled: boolean
+  marketingPushEnabled: boolean
   // Master on/off for each on-device AI feature.
   ondeviceSummaryEnabled: boolean
   ondeviceFinetuneEnabled: boolean
@@ -154,6 +158,8 @@ const DEFAULTS: SiteControls = {
     whatsappEnabled: process.env.WHATSAPP_DISABLED !== 'true',
     smsProvider: 'twilio',
     whatsappProvider: 'twilio',
+    pushEnabled: true,
+    marketingPushEnabled: true,
     birthdayEnabled: true,
     digitalProductsEnabled: true,
     vaultDownloadsEnabled: false,
@@ -251,6 +257,8 @@ const KEYS = [
   'feature_whatsapp_enabled',
   'feature_sms_provider',
   'feature_whatsapp_provider',
+  'feature_push_enabled',
+  'feature_marketing_push_enabled',
   'feature_birthday_enabled',
   'feature_digital_products_enabled',
   'feature_vault_downloads_enabled',
@@ -435,6 +443,8 @@ export async function getSiteControls(): Promise<SiteControls> {
         whatsappEnabled: bool('feature_whatsapp_enabled', d.flags.whatsappEnabled),
         smsProvider: str('feature_sms_provider', d.flags.smsProvider) === 'aws' ? 'aws' : 'twilio',
         whatsappProvider: str('feature_whatsapp_provider', d.flags.whatsappProvider) === 'aws' ? 'aws' : 'twilio',
+        pushEnabled: bool('feature_push_enabled', d.flags.pushEnabled),
+        marketingPushEnabled: bool('feature_marketing_push_enabled', d.flags.marketingPushEnabled),
         birthdayEnabled: bool('feature_birthday_enabled', d.flags.birthdayEnabled),
         digitalProductsEnabled: bool('feature_digital_products_enabled', d.flags.digitalProductsEnabled),
         vaultDownloadsEnabled: bool('feature_vault_downloads_enabled', d.flags.vaultDownloadsEnabled),

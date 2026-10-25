@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
-import { Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { Pressable, View, useWindowDimensions } from 'react-native'
+import { Overline, Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { ArrowRight } from 'lucide-react-native'
@@ -121,7 +122,7 @@ function Pager({ slides, intervalMs }: { slides: MotionHeroSlide[]; intervalMs: 
       {count > 1 && (
         <View className="mt-3 flex-row items-center justify-center gap-1.5">
           {slides.map((_, i) => (
-            <Pill key={i} i={i} x={x} page={page} onPress={() => ref.current?.scrollTo({ x: i * page, animated: true })} />
+            <Pill key={i} i={i} x={x} page={page} onPress={() => ref.current?.scrollTo({ x: i * page, animated: !reduceMotion })} />
           ))}
         </View>
       )}
@@ -177,9 +178,9 @@ function Card({
       onPress={onPress}
       disabled={!onPress}
       style={{ width: w, height: h }}
-      className="overflow-hidden rounded-3xl bg-black"
+      className="overflow-hidden rounded-sheet bg-black"
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={slide.headline}
+      accessibilityLabel={[slide.eyebrow, slide.headline, slide.sub, slide.ctaLabel].filter(Boolean).join(', ')}
     >
       <Animated.View style={[FILL, bgStyle]}>
         <Image source={bg ? { uri: bg } : undefined} style={FILL} contentFit="cover" transition={300} />
@@ -206,12 +207,12 @@ function Card({
         style={[{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20, maxWidth: fg ? '64%' : '90%' }, textStyle]}
       >
         {slide.eyebrow ? (
-          <Text className="mb-2 text-[10px] font-black uppercase text-white/70" style={{ letterSpacing: 2 }}>
+          <Overline className="mb-2 text-white/70" style={{ letterSpacing: 2 }}>
             {slide.eyebrow}
-          </Text>
+          </Overline>
         ) : null}
         <Text
-          className="font-black text-white"
+          className="font-display font-extrabold text-white"
           numberOfLines={3}
           style={{ fontSize: titleSize, lineHeight: Math.round(titleSize * 1.02), letterSpacing: -titleSize * 0.02 }}
         >
@@ -241,7 +242,7 @@ function Pill({ i, x, page, onPress }: { i: number; x: SharedValue<number>; page
     opacity: interpolate(x.value, range, [0.25, 1, 0.25], Extrapolation.CLAMP),
   }))
   return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityLabel={`Go to slide ${i + 1}`}>
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Go to slide ${i + 1}`}>
       <Animated.View className="h-1.5 rounded-full bg-foreground" style={style} />
     </Pressable>
   )

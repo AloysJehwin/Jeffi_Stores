@@ -23,8 +23,13 @@ module.exports = {
         'border-default': 'var(--color-border)',
         'border-secondary': 'var(--color-border-secondary)',
       },
-      borderRadius: { card: `${tokens.radius.card}px`, button: `${tokens.radius.button}px`, hero: `${tokens.radius.hero}px` },
-      fontFamily: { bebas: ['BebasNeue-Regular'], inter: ['Inter'] },
+      // field/panel/sheet are the app's own geometry (src/ui); card/button/hero stay the web's shared tokens.
+      borderRadius: {
+        card: `${tokens.radius.card}px`, button: `${tokens.radius.button}px`, hero: `${tokens.radius.hero}px`,
+        field: '16px', panel: '20px', sheet: '28px',
+      },
+      // Families embedded at build time by the expo-font plugin (app.json), so font-bold etc. pick the real weight.
+      fontFamily: { bebas: ['BebasNeue-Regular'], inter: ['Inter'], display: ['PlusJakartaSans'] },
     },
   },
   // NativeWind reads dark variables from the prefers-color-scheme media block (it ignores a .dark rule) and

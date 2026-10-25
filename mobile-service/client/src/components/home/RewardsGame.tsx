@@ -1,7 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { Share, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useRouter } from 'expo-router'
-import * as Haptics from 'expo-haptics'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
@@ -21,10 +20,9 @@ import Animated, {
 import Svg, { Circle, Defs, LinearGradient, Path, Polygon, Rect, Stop, Text as SvgText } from 'react-native-svg'
 import { GUTTER } from './layout'
 import { postJson } from '../../api/account'
-import { Pulse } from '../account/ui'
+import { Button, Card, Overline, Skeleton, Text, TextButton, haptic, toast } from '../../ui'
 import { inr } from '../../lib/format'
 import { useAuthStore } from '../../stores/authStore'
-import { showToast } from '../../stores/toastStore'
 import { accent, primary, status, useTokens } from '../../theme'
 import type {
   HomeSection,
@@ -76,8 +74,7 @@ function comeBack(limit: RewardsGameData['playLimit'], nextPlayAt: string | null
   return limit === 'daily' ? 'Come back tomorrow' : 'Come back next week'
 }
 
-const buzz = (won: boolean) =>
-  Haptics.notificationAsync(won ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning).catch(() => {})
+const buzz = (won: boolean) => (won ? haptic.success() : haptic.warning())
 
 export default function RewardsGame({ section, data }: SectionProps) {
   const game = data.extras[section.id] as RewardsGameData | null | undefined
@@ -141,7 +138,7 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
       if (res.data.repeated || !onWheel || scratchDone) reveal(p)
       else setPhase('playing')
     } catch (e) {
-      showToast(e instanceof Error && e.message ? e.message : 'Could not play right now', 'error')
+      toast.error(e instanceof Error && e.message ? e.message : 'Could not play right now')
       setPhase('idle')
     }
   }
@@ -176,7 +173,7 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
 
   return (
     <View className="bg-surface-secondary px-4 py-10">
-      <View className="overflow-hidden rounded-2xl border border-border-default bg-surface-elevated">
+      <Card padded={false} className="overflow-hidden">
         <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
           <Defs>
             <LinearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
@@ -189,10 +186,10 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
         </Svg>
 
         <View className="p-4">
-          <Text className="text-center text-[10px] font-black uppercase text-primary-500" style={{ letterSpacing: 2 }}>
+          <Overline className="text-center text-primary-500" style={{ letterSpacing: 2 }}>
             {copy.eyebrow ?? COPY.eyebrow}
-          </Text>
-          <Text className="mt-1 text-center text-2xl font-black text-foreground" style={{ letterSpacing: -0.6 }}>
+          </Overline>
+          <Text accessibilityRole="header" className="mt-1 text-center font-display text-2xl font-extrabold tracking-tight text-foreground">
             {copy.title ?? COPY.title}
           </Text>
           <Text className="mt-1 text-center text-xs font-semibold uppercase text-foreground-muted" style={{ letterSpacing: 0.3 }}>
@@ -201,18 +198,18 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
 
           {loading ? (
             game.mode === 'wheel' ? (
-              <Pulse className="mt-5 self-center bg-surface-secondary" style={{ width: wheelSize, height: wheelSize, borderRadius: wheelSize / 2 }} />
+              <Skeleton width={wheelSize} height={wheelSize} rounded="rounded-full" className="mt-5 self-center" />
             ) : (
-              <Pulse className="mt-5 rounded-xl bg-surface-secondary" style={{ height: SCRATCH_H }} />
+              <Skeleton height={SCRATCH_H} rounded="rounded-field" className="mt-5" />
             )
           ) : null}
 
           {failed ? (
-            <View className="mt-5 items-center rounded-xl border border-border-default bg-surface px-4 py-6">
+            <View className="mt-5 items-center rounded-field border border-border-default bg-surface px-4 py-6">
               <Text className="text-sm text-foreground-secondary">Could not load your reward</Text>
-              <Pressable onPress={() => void state.refetch()} className="mt-2 px-2 py-1" accessibilityRole="button">
-                <Text className="text-sm font-semibold text-accent-600 dark:text-accent-400">Try again</Text>
-              </Pressable>
+              <View className="mt-2 flex-row justify-center">
+                <TextButton label="Try again" onPress={() => void state.refetch()} />
+              </View>
             </View>
           ) : null}
 
@@ -243,36 +240,26 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
         </View>
 
         {confetti ? <Confetti onDone={() => setConfetti(false)} /> : null}
-      </View>
+      </Card>
     </View>
   )
 }
 
 function Cta({ label, onPress, busy }: { label: string; onPress: () => void; busy?: boolean }) {
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={busy}
-      accessibilityRole="button"
-      className={`mt-5 flex-row items-center justify-center gap-2 self-center rounded-xl bg-primary-500 px-8 py-3 active:bg-primary-600 ${busy ? 'opacity-60' : ''}`}
-    >
-      {busy ? <ActivityIndicator size="small" color={status.white} /> : null}
-      <Text className="font-bold text-white">{label}</Text>
-    </Pressable>
+    <Button label={label} onPress={onPress} loading={busy} haptics className="mt-5" />
   )
 }
 
 function ResultCard({ play, limit, nextPlayAt }: { play: RewardGamePlay | null; limit: RewardsGameData['playLimit']; nextPlayAt: string | null }) {
   const c = play?.coupon ?? null
-  const share = () => Share.share({ message: c?.code ?? '' }).catch(() => showToast('Could not share the code', 'error'))
+  const share = () => Share.share({ message: c?.code ?? '' }).catch(() => toast.error('Could not share the code'))
   return (
-    <View className="mt-5 rounded-xl border border-dashed border-border-default bg-surface p-4">
+    <View className="mt-5 rounded-field border border-dashed border-border-default bg-surface p-4">
       {play ? (
         <>
-          <Text className="text-[10px] font-black uppercase text-foreground-muted" style={{ letterSpacing: 2 }}>
-            {c ? 'You won' : 'This time'}
-          </Text>
-          <Text className="mt-1 text-lg font-black text-foreground">{play.prizeLabel}</Text>
+          <Overline style={{ letterSpacing: 2 }}>{c ? 'You won' : 'This time'}</Overline>
+          <Text className="mt-1 font-display text-lg font-extrabold text-foreground">{play.prizeLabel}</Text>
         </>
       ) : null}
       {c ? (
@@ -281,9 +268,7 @@ function ResultCard({ play, limit, nextPlayAt }: { play: RewardGamePlay | null; 
             <Text className="flex-1 font-mono text-base font-semibold text-foreground" selectable numberOfLines={1}>
               {c.code}
             </Text>
-            <Pressable onPress={share} accessibilityRole="button" className="rounded-lg border border-border-default px-3 py-1.5 active:bg-surface-secondary">
-              <Text className="text-sm font-medium text-foreground-secondary">Share code</Text>
-            </Pressable>
+            <Button label="Share code" variant="outline" size="sm" block={false} onPress={share} />
           </View>
           <Text className="mt-2 text-xs text-foreground-secondary">{terms(c)}</Text>
         </>
@@ -333,7 +318,7 @@ function Wheel({
   const seg = 360 / n
   const c = size / 2
   const r = c - 6
-  const fontSize = n > 8 ? 10 : n > 5 ? 12 : 14
+  const fontSize = n > 8 ? 11 : n > 5 ? 12 : 14
 
   const rotation = useSharedValue(0)
   const glow = useSharedValue(0)
@@ -344,7 +329,7 @@ function Wheel({
   const landedCb = useRef(onLanded)
   landedCb.current = onLanded
   const landed = () => landedCb.current()
-  const tick = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+  const tick = () => haptic.tap()
 
   useEffect(() => {
     if (phase === 'posting') {
@@ -581,7 +566,7 @@ function Scratch({
         onLayout={e => {
           cardW.value = e.nativeEvent.layout.width
         }}
-        className="mt-5 overflow-hidden rounded-xl border border-border-default bg-surface"
+        className="mt-5 overflow-hidden rounded-field border border-border-default bg-surface"
         style={{ height: SCRATCH_H }}
         accessibilityLabel="Scratch card"
       >
@@ -589,10 +574,8 @@ function Scratch({
         <View style={StyleSheet.absoluteFill} className="items-center justify-center px-6">
           {play ? (
             <>
-              <Text className="text-[10px] font-black uppercase text-foreground-muted" style={{ letterSpacing: 2 }}>
-                {play.coupon ? 'You won' : 'This time'}
-              </Text>
-              <Text className="mt-1 text-center text-2xl font-black text-foreground" numberOfLines={2}>
+              <Overline style={{ letterSpacing: 2 }}>{play.coupon ? 'You won' : 'This time'}</Overline>
+              <Text className="mt-1 text-center font-display text-2xl font-extrabold text-foreground" numberOfLines={2}>
                 {play.prizeLabel}
               </Text>
               {play.coupon ? (

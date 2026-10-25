@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import {
   Award, BadgeCheck, Banknote, Boxes, Clock, CreditCard, Factory, FileText, Globe, Headphones, Heart, Lock,
   MapPin, MessageCircle, Package, PackageCheck, Percent, Phone, Receipt, Rocket, RotateCcw, ShieldCheck, Star,

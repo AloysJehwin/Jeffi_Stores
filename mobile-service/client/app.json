@@ -34,10 +34,68 @@
     "plugins": [
       "expo-dev-client",
       "expo-router",
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "Inter",
+                "fontDefinitions": [
+                  {
+                    "path": "./node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf",
+                    "weight": 500
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf",
+                    "weight": 600
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/inter/800ExtraBold/Inter_800ExtraBold.ttf",
+                    "weight": 800
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/inter/900Black/Inter_900Black.ttf",
+                    "weight": 900
+                  }
+                ]
+              },
+              {
+                "fontFamily": "PlusJakartaSans",
+                "fontDefinitions": [
+                  {
+                    "path": "./node_modules/@expo-google-fonts/plus-jakarta-sans/700Bold/PlusJakartaSans_700Bold.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/plus-jakarta-sans/800ExtraBold/PlusJakartaSans_800ExtraBold.ttf",
+                    "weight": 800
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
       "expo-secure-store",
       "@react-native-google-signin/google-signin",
-      "@react-native-firebase/app"
+      "@react-native-firebase/app",
+      "expo-updates",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#7CB900"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -48,6 +106,14 @@
         "projectId": "821b6f4c-8f52-4bbe-88f6-fcf69366efaa"
       }
     },
-    "owner": "aloysjehwin"
+    "owner": "aloysjehwin",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/821b6f4c-8f52-4bbe-88f6-fcf69366efaa",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

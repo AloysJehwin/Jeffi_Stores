@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Linking, Pressable, ScrollView, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming, Easing } from 'react-native-reanimated'
-import { Glyph, CHAT, CHEVRON_RIGHT } from './Glyph'
+import { ChevronRight, ClipboardList, Map as MapIcon, MapPin, MessageSquare, Receipt, SendHorizontal, User } from 'lucide-react-native'
+import { Badge, BodySmall, Button, Caption, Card, Chip, ChipGroup, IconButton, statusTone, Subheading, Text, TextField, useMotion, type IconComponent } from '../../ui'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { showToast } from '../../stores/toastStore'
 import { openHref } from '../../lib/links'
-import { useTokens } from '../../theme'
+import { primary, useTokens } from '../../theme'
 import {
   askBot, closeSession, getOpenSession, getSessionMessages, sendSessionMessage, startSession,
   type BotAction, type BotNavLink, type BotOrderCard, type BotPayload, type SupportMessage, type SupportSession,
@@ -25,9 +26,6 @@ const QUICK_REPLIES = [
   { label: 'Latest order', query: 'latest order' },
 ]
 
-const SHADOW_2XL = '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-const SEND = 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8'
-
 function parsePayload(message: string): BotPayload | null {
   try {
     const p = JSON.parse(message)
@@ -45,40 +43,12 @@ const botMsg = (id: string, payload: BotPayload): Message => ({ id, sender: 'bot
 
 // ─── Sub-renderers ──────────────────────────────────────────────────────────
 
-const BADGE: Record<string, { box: string; text: string }> = {
-  pending: { box: 'bg-yellow-100 dark:bg-yellow-900/40', text: 'text-yellow-800 dark:text-yellow-300' },
-  confirmed: { box: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-800 dark:text-blue-300' },
-  processing: { box: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-800 dark:text-blue-300' },
-  shipped: { box: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-800 dark:text-purple-300' },
-  dispatched: { box: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-800 dark:text-purple-300' },
-  delivered: { box: 'bg-green-100 dark:bg-green-900/40', text: 'text-green-800 dark:text-green-300' },
-  granted: { box: 'bg-green-100 dark:bg-green-900/40', text: 'text-green-800 dark:text-green-300' },
-  cancelled: { box: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-800 dark:text-red-300' },
-  returned: { box: 'bg-gray-100 dark:bg-gray-700/40', text: 'text-gray-700 dark:text-gray-300' },
-}
-const BADGE_DEFAULT = { box: 'bg-gray-100', text: 'text-gray-700' }
-
 function OrderStatusBadge({ status }: { status: string }) {
-  const c = BADGE[status] ?? BADGE_DEFAULT
-  return (
-    <View className={`rounded px-1.5 py-0.5 ${c.box}`}>
-      <Text className={`text-[10px] font-semibold capitalize ${c.text}`}>{status === 'granted' ? 'Access granted' : status}</Text>
-    </View>
-  )
+  const label = status === 'granted' ? 'Access granted' : status.replace(/\b\w/g, c => c.toUpperCase())
+  return <Badge size="sm" tone={statusTone(status)} label={label} />
 }
 
-const NAV_ICONS: Record<string, string | string[]> = {
-  orders:
-    'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-  addresses: [
-    'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z',
-    'M15 11a3 3 0 11-6 0 3 3 0 016 0z',
-  ],
-  invoices: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z',
-  track:
-    'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7',
-}
-const NAV_DEFAULT = 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+const NAV_ICONS: Record<string, IconComponent> = { orders: ClipboardList, addresses: MapPin, invoices: Receipt, track: MapIcon }
 
 /** Renders text with http(s) URLs as tappable links (web: renderTextWithLinks). */
 function Linkified({ text, className }: { text: string; className: string }) {
@@ -91,7 +61,7 @@ function Linkified({ text, className }: { text: string; className: string }) {
         const url = m ? m[1] : part
         return (
           <Text key={i}>
-            <Text className="text-accent-600 underline dark:text-accent-400" onPress={() => Linking.openURL(url)}>
+            <Text accessibilityRole="link" className="text-accent-600 underline dark:text-accent-400" onPress={() => Linking.openURL(url)}>
               {url}
             </Text>
             {m ? m[2] : ''}
@@ -102,19 +72,9 @@ function Linkified({ text, className }: { text: string; className: string }) {
   )
 }
 
-const PILL = 'border border-primary-300 bg-primary-50 active:bg-primary-100 dark:border-primary-700 dark:bg-primary-900/20 dark:active:bg-primary-900/40'
-const PILL_TEXT = 'text-xs font-medium text-primary-600 dark:text-primary-400'
-
 function ActionButton({ action, onQuery }: { action: BotAction; onQuery: (q: string) => void }) {
   const router = useRouter()
-  return (
-    <Pressable
-      className={`rounded-lg px-2.5 py-1 ${PILL}`}
-      onPress={() => (action.query ? onQuery(action.query) : openHref(router, action.url))}
-    >
-      <Text className={PILL_TEXT}>{action.label}</Text>
-    </Pressable>
-  )
+  return <Chip size="sm" label={action.label} onPress={() => (action.query ? onQuery(action.query) : openHref(router, action.url))} />
 }
 
 const orderDate = (iso: string, year = false) =>
@@ -123,14 +83,18 @@ const orderAmount = (n: string) => `₹${Number(n).toLocaleString('en-IN')}`
 
 function OrderCard({ order, onPress }: { order: BotOrderCard; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} className="w-full rounded-xl border border-border-default bg-surface px-3 py-2.5 active:bg-surface-elevated">
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      className="w-full rounded-field border border-border-default bg-surface px-3 py-2.5 active:bg-surface-secondary"
+    >
       <View className="mb-1 flex-row items-center justify-between gap-2">
-        <Text className="text-xs font-bold text-foreground">#{order.order_number}</Text>
+        <Text className="text-[13px] font-bold text-foreground">#{order.order_number}</Text>
         <OrderStatusBadge status={order.status} />
       </View>
-      <Text className="text-xs text-foreground-muted">
+      <Caption>
         {orderDate(order.created_at)} · {orderAmount(order.total_amount)}
-      </Text>
+      </Caption>
     </Pressable>
   )
 }
@@ -138,8 +102,8 @@ function OrderCard({ order, onPress }: { order: BotOrderCard; onPress: () => voi
 function DetailRow({ label, value, small }: { label: string; value: string; small?: boolean }) {
   return (
     <View className="flex-row gap-3">
-      <Text className="flex-1 text-xs text-foreground-muted">{label}</Text>
-      <Text numberOfLines={small ? 1 : undefined} className={small ? 'flex-1 text-[10px] font-medium text-foreground' : 'flex-1 text-xs font-medium capitalize text-foreground'}>
+      <Caption className="flex-1">{label}</Caption>
+      <Text numberOfLines={small ? 1 : undefined} className={small ? 'flex-1 text-[11px] font-medium text-foreground' : 'flex-1 text-xs font-medium capitalize text-foreground'}>
         {value}
       </Text>
     </View>
@@ -156,6 +120,7 @@ function PayloadRenderer({
   onOrderSelect: (order: BotOrderCard, context: string) => void
 }) {
   const router = useRouter()
+  const t = useTokens()
   const body = 'text-sm leading-relaxed text-foreground'
 
   if (payload.type === 'text') return <Text className={body}>{payload.text}</Text>
@@ -164,11 +129,11 @@ function PayloadRenderer({
     return (
       <View className="gap-2.5">
         <Text className={body}>{payload.text}</Text>
-        <View className="flex-row flex-wrap gap-1.5">
+        <ChipGroup>
           {payload.actions.map((a, i) => (
             <ActionButton key={i} action={a} onQuery={onQuery} />
           ))}
-        </View>
+        </ChipGroup>
       </View>
     )
   }
@@ -190,9 +155,9 @@ function PayloadRenderer({
     const o = payload.order
     return (
       <View className="gap-2.5">
-        <View className="gap-2 rounded-xl border border-border-default bg-surface px-3 py-2.5">
+        <View className="gap-2 rounded-field border border-border-default bg-surface px-3 py-2.5">
           <View className="flex-row items-center justify-between">
-            <Text className="text-xs font-bold text-foreground">#{o.order_number}</Text>
+            <Text className="text-[13px] font-bold text-foreground">#{o.order_number}</Text>
             <OrderStatusBadge status={o.status} />
           </View>
           <View className="gap-1">
@@ -203,11 +168,11 @@ function PayloadRenderer({
           </View>
         </View>
         {payload.actions.length > 0 ? (
-          <View className="flex-row flex-wrap gap-1.5">
+          <ChipGroup>
             {payload.actions.map((a, i) => (
               <ActionButton key={i} action={a} onQuery={onQuery} />
             ))}
-          </View>
+          </ChipGroup>
         ) : null}
       </View>
     )
@@ -218,19 +183,23 @@ function PayloadRenderer({
       <View className="gap-2">
         <Text className={body}>{payload.text}</Text>
         <View className="gap-1">
-          {payload.links.map((link: BotNavLink, i) => (
-            <Pressable
-              key={i}
-              onPress={() => (link.query ? onQuery(link.query) : openHref(router, link.url))}
-              className="w-full flex-row items-center gap-2.5 rounded-lg border border-border-default bg-surface px-3 py-2 active:bg-surface-elevated"
-            >
-              <Glyph d={NAV_ICONS[link.icon ?? ''] ?? NAV_DEFAULT} size={16} className="text-primary-500" />
-              <Text className="text-sm font-medium text-foreground">{link.label}</Text>
-              <View className="ml-auto">
-                <Glyph d={CHEVRON_RIGHT} size={14} className="text-foreground-muted" />
-              </View>
-            </Pressable>
-          ))}
+          {payload.links.map((link: BotNavLink, i) => {
+            const Icon = NAV_ICONS[link.icon ?? ''] ?? User
+            return (
+              <Pressable
+                key={i}
+                accessibilityRole="button"
+                onPress={() => (link.query ? onQuery(link.query) : openHref(router, link.url))}
+                className="min-h-[44px] w-full flex-row items-center gap-2.5 rounded-field border border-border-default bg-surface px-3 py-2 active:bg-surface-secondary"
+              >
+                <Icon size={16} color={primary[500]} />
+                <Text className="text-sm font-medium text-foreground">{link.label}</Text>
+                <View className="ml-auto">
+                  <ChevronRight size={14} color={t.foregroundMuted} />
+                </View>
+              </Pressable>
+            )
+          })}
         </View>
       </View>
     )
@@ -240,13 +209,11 @@ function PayloadRenderer({
     return (
       <View className="gap-2.5">
         <Text className={body}>{payload.text}</Text>
-        <View className="flex-row flex-wrap gap-1.5">
+        <ChipGroup>
           {payload.chips.map((c, i) => (
-            <Pressable key={i} onPress={() => onQuery(c.query)} className={`rounded-full px-3 py-1.5 ${PILL}`}>
-              <Text className={PILL_TEXT}>{c.label}</Text>
-            </Pressable>
+            <Chip key={i} size="sm" label={c.label} onPress={() => onQuery(c.query)} />
           ))}
-        </View>
+        </ChipGroup>
       </View>
     )
   }
@@ -257,7 +224,9 @@ function PayloadRenderer({
 /** Tailwind animate-bounce dot (translateY -25% ↔ 0, 1s), staggered. */
 function BounceDot({ delay }: { delay: number }) {
   const y = useSharedValue(-1.5)
+  const { animate } = useMotion()
   useEffect(() => {
+    if (!animate) return
     y.value = withDelay(
       delay,
       withRepeat(
@@ -268,7 +237,7 @@ function BounceDot({ delay }: { delay: number }) {
         -1
       )
     )
-  }, [delay, y])
+  }, [delay, y, animate])
   const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }))
   return <Animated.View className="h-1.5 w-1.5 rounded-full bg-foreground-muted" style={style} />
 }
@@ -277,7 +246,6 @@ function BounceDot({ delay }: { delay: number }) {
 
 export default function SupportChat() {
   const storeName = useStoreConfig().identity.name || 'Support'
-  const t = useTokens()
   const [mode, setMode] = useState<'bot' | 'live'>('bot')
   const [messages, setMessages] = useState<Message[]>([
     botMsg('welcome', {
@@ -463,7 +431,7 @@ export default function SupportChat() {
       <View key={msg.id} className="flex-row justify-start">
         <View className="max-w-[90%] rounded-2xl rounded-bl-sm border border-border-default bg-surface px-3.5 py-2.5">
           {msg.sender === 'admin' ? (
-            <Text className="mb-1.5 text-xs font-semibold text-primary-500">{msg.sender_name || adminName || 'Support Agent'}</Text>
+            <Text className="mb-1.5 text-xs font-semibold text-primary-600 dark:text-primary-400">{msg.sender_name || adminName || 'Support Agent'}</Text>
           ) : null}
           {payload ? (
             <PayloadRenderer payload={payload} onQuery={handleBotQuery} onOrderSelect={handleOrderSelect} />
@@ -477,23 +445,19 @@ export default function SupportChat() {
 
   return (
     <View className="relative h-full w-full overflow-hidden bg-surface-elevated">
-      <View className="shrink-0 flex-row items-center justify-between bg-primary-500 px-4 py-3">
-        <View className="flex-row items-center gap-2.5">
-          <View className="h-8 w-8 items-center justify-center rounded-full bg-white/20">
-            <Glyph d={CHAT} size={16} className="text-white" />
+      <View className="shrink-0 flex-row items-center justify-between gap-3 border-b border-border-default px-4 py-3">
+        <View className="flex-1 flex-row items-center gap-2.5">
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30">
+            <MessageSquare size={18} color={primary[500]} />
           </View>
-          <View>
-            <Text className="text-sm font-semibold leading-none text-white">{mode === 'bot' ? 'Jeffi' : adminName || 'Support Agent'}</Text>
-            <Text className="mt-0.5 text-xs text-white/70">
-              {mode === 'bot' ? 'Support Assistant' : adminName ? `${storeName} Support` : 'Connecting...'}
-            </Text>
+          <View className="flex-1">
+            <Subheading numberOfLines={1} className="leading-5">
+              {mode === 'bot' ? 'Jeffi' : adminName || 'Support Agent'}
+            </Subheading>
+            <Caption>{mode === 'bot' ? 'Support Assistant' : adminName ? `${storeName} Support` : 'Connecting...'}</Caption>
           </View>
         </View>
-        {mode === 'live' && session ? (
-          <Pressable onPress={endChat} className="rounded-lg border border-white/30 px-3 py-1.5 active:bg-white/10">
-            <Text className="text-xs text-white/80">End Chat</Text>
-          </Pressable>
-        ) : null}
+        {mode === 'live' && session ? <Button label="End Chat" variant="outline" size="sm" block={false} onPress={endChat} /> : null}
       </View>
 
       <ScrollView ref={scrollRef} nestedScrollEnabled className="flex-1" contentContainerClassName="gap-3 px-4 py-4" keyboardShouldPersistTaps="handled">
@@ -501,7 +465,7 @@ export default function SupportChat() {
 
         {isSending && mode === 'bot' ? (
           <View className="flex-row justify-start">
-            <View className="flex-row items-center gap-1 rounded-2xl rounded-bl-sm border border-border-default bg-surface px-3.5 py-2.5">
+            <View accessible accessibilityLabel="Jeffi is typing" className="flex-row items-center gap-1 rounded-2xl rounded-bl-sm border border-border-default bg-surface px-3.5 py-2.5">
               <BounceDot delay={0} />
               <BounceDot delay={150} />
               <BounceDot delay={300} />
@@ -515,13 +479,7 @@ export default function SupportChat() {
               <Text className="mb-3 text-sm text-foreground">
                 Still need help? Connect to a live support agent and we&apos;ll assist you directly.
               </Text>
-              <Pressable
-                onPress={connectToAgent}
-                disabled={isConnecting}
-                className={`w-full items-center rounded-lg bg-primary-500 py-2 active:bg-primary-600 ${isConnecting ? 'opacity-50' : ''}`}
-              >
-                <Text className="text-sm font-semibold text-white">{isConnecting ? 'Connecting...' : 'Connect to Support Agent'}</Text>
-              </Pressable>
+              <Button label="Connect to Support Agent" loadingLabel="Connecting..." loading={isConnecting} size="md" onPress={connectToAgent} />
             </View>
           </View>
         ) : null}
@@ -529,47 +487,32 @@ export default function SupportChat() {
 
       {mode === 'live' ? (
         <View className="shrink-0 border-t border-border-default px-4 pb-4 pt-2">
-          <View className="flex-row gap-2">
-            <TextInput
+          <View className="flex-row items-center gap-2">
+            <TextField
+              containerClassName="flex-1"
               value={input}
               onChangeText={setInput}
               onSubmitEditing={sendLiveMessage}
               submitBehavior="submit"
               returnKeyType="send"
+              accessibilityLabel="Message"
               placeholder="Type a message..."
-              placeholderTextColor={t.foregroundMuted}
-              className="flex-1 rounded-xl border border-border-default bg-surface px-3.5 py-2.5 text-sm text-foreground"
             />
-            <Pressable
-              onPress={sendLiveMessage}
-              disabled={isSending || !input.trim()}
-              className={`items-center justify-center rounded-xl bg-primary-500 px-4 py-2.5 active:bg-primary-600 ${isSending || !input.trim() ? 'opacity-50' : ''}`}
-            >
-              <Glyph d={SEND} size={16} className="text-white" />
-            </Pressable>
+            <IconButton icon={SendHorizontal} label="Send message" variant="solid" size="lg" disabled={isSending || !input.trim()} onPress={sendLiveMessage} />
           </View>
         </View>
       ) : null}
 
       {showEndSessionPrompt ? (
         <View className="absolute inset-0 z-10 justify-end bg-black/40 px-4 pb-6">
-          <View className="rounded-2xl bg-surface-elevated p-5" style={{ boxShadow: SHADOW_2XL }}>
-            <Text className="mb-1 text-sm font-semibold text-foreground">Session resolved</Text>
-            <Text className="mb-4 text-sm text-foreground-muted">
-              The support agent has marked your issue as resolved. Would you like to end this chat session?
-            </Text>
+          <Card elevation="floating" padded={false} className="p-5">
+            <Subheading className="mb-1">Session resolved</Subheading>
+            <BodySmall className="mb-4">The support agent has marked your issue as resolved. Would you like to end this chat session?</BodySmall>
             <View className="flex-row gap-3">
-              <Pressable onPress={endChat} className="flex-1 items-center rounded-xl bg-primary-500 py-2 active:bg-primary-600">
-                <Text className="text-sm font-semibold text-white">End Chat</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setShowEndSessionPrompt(false)}
-                className="flex-1 items-center rounded-xl border border-border-default py-2 active:bg-surface-secondary"
-              >
-                <Text className="text-sm font-semibold text-foreground-secondary">Continue</Text>
-              </Pressable>
+              <Button label="End Chat" size="md" className="flex-1" onPress={endChat} />
+              <Button label="Continue" variant="outline" size="md" className="flex-1" onPress={() => setShowEndSessionPrompt(false)} />
             </View>
-          </View>
+          </Card>
         </View>
       ) : null}
     </View>

@@ -1,7 +1,7 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import ProductCard from '../product/ProductCard'
-import { Grid } from './layout'
+import { Grid, SectionHeading } from './layout'
 import { api } from '../../api/client'
 import { toCard } from '../../lib/card'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
@@ -42,14 +42,7 @@ export default function FeaturedForYou({ section }: SectionProps) {
   // "Explore more" is hidden below sm on the web.
   return (
     <View className="px-4 py-12">
-      <View className="mb-7">
-        <Text className="mb-1 text-[10px] font-black uppercase text-accent-500" style={{ letterSpacing: 2 }}>
-          {COPY.eyebrow}
-        </Text>
-        <Text className="text-2xl font-black text-foreground" style={{ letterSpacing: -0.6 }}>
-          {section.title || COPY.title}
-        </Text>
-      </View>
+      <SectionHeading eyebrow={COPY.eyebrow} title={section.title || COPY.title} />
       <Grid cols={2} gap={16}>
         {products.map(p => (
           <ProductCard key={p.card.id} product={p.card} handlingDays={p.handlingDays} />

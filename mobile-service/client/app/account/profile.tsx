@@ -1,9 +1,6 @@
-import { View } from 'react-native'
-import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
-import TopNav from '../../src/components/layout/TopNav'
-import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import ProfileCard from '../../src/components/account/ProfileCard'
 import { useRequireAuth } from '../../src/components/account/hooks'
+import { Screen } from '../../src/ui'
 
 // The Profile section of controller-service app/(storefront)/account/page.tsx, opened for editing.
 
@@ -11,14 +8,8 @@ export default function ProfileScreen() {
   useRequireAuth()
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      <KeyboardScroll contentContainerStyle={{ paddingBottom: 32 }}>
-        <AccountMobileHeader />
-        <View className="px-4 pt-4">
-          <ProfileCard initialEditing />
-        </View>
-      </KeyboardScroll>
-    </View>
+    <Screen title="Profile" mode="keyboard">
+      <ProfileCard initialEditing />
+    </Screen>
   )
 }

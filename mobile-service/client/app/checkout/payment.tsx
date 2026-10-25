@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, BackHandler, InteractionManager, NativeModules, Platform, Pressable, Text, View } from 'react-native'
+import { BackHandler, InteractionManager, NativeModules, Platform, View } from 'react-native'
+import { Button, Card, Notice, Screen, ScreenHeader, Spinner, Text } from '../../src/ui'
 import { Stack, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import RazorpayCheckout from 'react-native-razorpay'
-import TopNav from '../../src/components/layout/TopNav'
 import { useCheckoutStore, type PlaceOrderRequest } from '../../src/components/checkout/checkoutStore'
 import { createOrderDraft, placeUnpaidOrder } from '../../src/api/orders'
 import { checkPendingPayment, createRazorpayOrder, verifyPayment } from '../../src/api/razorpay'
@@ -243,52 +243,48 @@ export default function CheckoutPaymentScreen() {
     setRetrying(false)
   }
 
+  // No back button: like the hardware back, it can't abandon a payment mid-flight.
   return (
-    <View className="flex-1 bg-surface">
+    <Screen header={<ScreenHeader title="Payment" back={false} />} mode="none">
       <Stack.Screen options={{ gestureEnabled: false }} />
-      <TopNav />
       {phase === 'verifying' ? (
         <View className="flex-1 items-center justify-center px-4 py-8">
-          <View className="w-full items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-8">
+          <Card padded={false} className="w-full items-center gap-4 p-8">
             <View className="h-12 w-12 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/30">
-              <ActivityIndicator size="small" color={accent[500]} />
+              <Spinner size="small" fill={false} />
             </View>
-            <Text className="text-center text-lg font-semibold text-foreground">Confirming your payment…</Text>
+            <Text accessibilityRole="header" className="text-center font-display text-lg font-extrabold text-foreground">
+              Confirming your payment…
+            </Text>
             <Text className="text-center text-sm text-foreground-secondary">
               Your payment was received. We&apos;re confirming your order — please don&apos;t close this page.
             </Text>
             {error ? (
-              <View className="w-full rounded-lg bg-red-50 px-4 py-3 dark:bg-red-900/20">
+              <Notice tone="danger" className="w-full">
                 <Text className="text-center text-sm text-red-600 dark:text-red-400">{error}</Text>
-              </View>
+              </Notice>
             ) : null}
             {error ? (
-              <>
-                <Pressable onPress={retry} disabled={retrying} className="disabled:opacity-50">
-                  <Text className="text-sm text-accent-600">{retrying ? 'Retrying…' : 'Retry confirmation'}</Text>
-                </Pressable>
-                <Pressable
+              <View className="w-full gap-2">
+                <Button label="Retry confirmation" size="md" loading={retrying} loadingLabel="Retrying…" onPress={retry} />
+                <Button
+                  label="Go to My Orders"
+                  variant="ghost"
+                  size="md"
                   onPress={() => {
                     done.current = true
                     if (pollTimer.current) clearTimeout(pollTimer.current)
                     if (router.canDismiss()) router.dismissAll()
                     router.push('/orders')
                   }}
-                >
-                  <Text className="text-sm font-medium text-foreground-secondary">Go to My Orders</Text>
-                </Pressable>
-              </>
+                />
+              </View>
             ) : null}
-          </View>
+          </Card>
         </View>
       ) : (
-        <View className="flex-1 items-center justify-center gap-3">
-          <ActivityIndicator size="large" color={accent[500]} />
-          <Text className="text-sm text-foreground-secondary">
-            {request?.method === 'cod' ? 'Placing Order...' : 'Processing...'}
-          </Text>
-        </View>
+        <Spinner label={request?.method === 'cod' ? 'Placing Order...' : 'Processing...'} />
       )}
-    </View>
+    </Screen>
   )
 }

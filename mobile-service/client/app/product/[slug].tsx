@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native'
-import { KeyboardScroll } from '../../src/components/ui/KeyboardScroll'
+import { ScrollView, Share, View } from 'react-native'
+import { CircleCheck, Heart, Share2 } from 'lucide-react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { pushRecentlyViewed } from '../../src/stores/recentlyViewedStore'
@@ -20,12 +20,12 @@ import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { useWishlistToggle } from '../../src/hooks/useWishlist'
 import { toCard } from '../../src/lib/card'
 import { SITE_URL } from '../../src/lib/links'
-import { useTokens } from '../../src/theme'
-import TopNav from '../../src/components/layout/TopNav'
-import Spinner from '../../src/components/ui/Spinner'
+import { status, useTokens } from '../../src/theme'
+import {
+  Badge, Button, Card, EmptyState, IconButton, KeyboardScroll, Screen, ScreenHeader, Skeleton, Text, TextField, Title, useBottomInset,
+} from '../../src/ui'
 import ProductCard from '../../src/components/product/ProductCard'
 import { Grid } from '../../src/components/home/layout'
-import { Glyph, P } from '../../src/components/pdp/Glyph'
 import { deduplicateByNameStem, nameStem, pickUnitPrice, round2 } from '../../src/components/pdp/pdp'
 import { useProductPurchase } from '../../src/components/pdp/useProductPurchase'
 import ProductImageGallery from '../../src/components/pdp/ProductImageGallery'
@@ -51,28 +51,61 @@ export default function ProductDetailScreen() {
   const router = useRouter()
   const { data: product, isLoading } = useQuery({ queryKey: ['product', slug], queryFn: () => getPdpProduct(slug) })
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        <Spinner />
-      </View>
-    )
-  }
+  if (isLoading) return <Screen header={<ScreenHeader />} mode="none" loading skeleton={<PdpLoading />} />
   if (!product) {
     return (
-      <View className="flex-1 bg-surface">
-        <TopNav />
-        <View className="flex-1 items-center justify-center gap-3 px-4">
-          <Text className="text-xl font-bold text-foreground">Product Not Found</Text>
-          <Pressable onPress={() => router.push('/(tabs)/products')} className="rounded-lg bg-accent-500 px-5 py-2.5">
-            <Text className="font-semibold text-white">Browse products</Text>
-          </Pressable>
-        </View>
-      </View>
+      <Screen header={<ScreenHeader />} mode="none">
+        <EmptyState fill title="Product Not Found" actionLabel="Browse products" onAction={() => router.push('/(tabs)/products')} />
+      </Screen>
     )
   }
   return <ProductDetail key={product.id} product={product} initialSku={typeof sku === 'string' ? sku : undefined} />
+}
+
+/** The loaded page's shape: the details card (gallery, title, price block, buttons). */
+function PdpLoading() {
+  return (
+    <View className="flex-1 overflow-hidden">
+      <View className="px-4 pt-4">
+        <Card padded={false} className="overflow-hidden">
+          <View className="gap-4 p-4">
+            <Skeleton aspectRatio={5 / 3} rounded="rounded-field" className="mb-4" />
+            <View>
+              <View className="mb-4 flex-row items-start justify-between gap-3">
+                <View className="flex-1 gap-2">
+                  <Skeleton height={24} />
+                  <Skeleton height={24} width="60%" />
+                </View>
+                <View className="flex-row gap-1">
+                  <Skeleton width={44} height={44} rounded="rounded-full" />
+                  <Skeleton width={44} height={44} rounded="rounded-full" />
+                </View>
+              </View>
+              <Skeleton height={14} width={170} rounded="rounded" className="mb-4" />
+              <View className="gap-4">
+                <View className="gap-3 rounded-field bg-surface p-5">
+                  <Skeleton height={36} width={160} />
+                  <Skeleton height={14} width="55%" rounded="rounded" />
+                  <Skeleton height={12} width="40%" rounded="rounded" />
+                </View>
+                <View className="gap-2">
+                  <View className="flex-row justify-between">
+                    <Skeleton height={14} width={70} rounded="rounded" />
+                    <Skeleton height={14} width={80} rounded="rounded" />
+                  </View>
+                  <Skeleton height={44} width={150} rounded="rounded-full" />
+                </View>
+                <View className="gap-3">
+                  <Skeleton height={56} rounded="rounded-field" />
+                  <Skeleton height={56} rounded="rounded-field" />
+                </View>
+              </View>
+            </View>
+          </View>
+        </Card>
+      </View>
+    </View>
+  )
 }
 
 /** The page's displayPrice / GST-rebased MRP, shared by the recently-viewed entry and the compare section. */
@@ -109,7 +142,7 @@ function compareItem(p: PdpProduct, gstEnabled: boolean): CompareItem {
 }
 
 function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSku?: string }) {
-  const router = useRouter()
+  const bottomInset = useBottomInset(80)
   const t = useTokens()
   const user = useAuthStore(s => s.user)
   const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
@@ -240,9 +273,7 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
   const discountPct = product.discount_pct != null ? Number(product.discount_pct) : null
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-
+    <Screen header={<ScreenHeader title={product.name} />} mode="none">
       <KeyboardScroll
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -252,28 +283,9 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
         onScroll={e => setPastControls(buyBottom != null && e.nativeEvent.contentOffset.y >= buyBottom)}
       >
         <View ref={contentRef} collapsable={false}>
-          {/* Breadcrumb: category and product name collapse to "..." below sm. */}
-          <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-            <View className="flex-row items-center gap-2">
-              <Text onPress={() => router.push('/(tabs)')} className="text-sm text-foreground-muted">
-                Home
-              </Text>
-              <Text className="text-sm text-foreground-muted">/</Text>
-              <Text onPress={() => router.push('/(tabs)/products')} className="text-sm text-foreground-muted">
-                Products
-              </Text>
-              {product.categories ? (
-                <>
-                  <Text className="text-sm text-foreground-muted">/</Text>
-                  <Text className="text-sm text-foreground-muted">...</Text>
-                </>
-              ) : null}
-            </View>
-          </View>
-
-          <View className="px-4 pt-4" style={{ paddingBottom: 80 + (compareCount >= 2 ? 73 : 0) }}>
+          <View className="px-4 pt-4" style={{ paddingBottom: bottomInset + (compareCount >= 2 ? 73 : 0) }}>
             {/* Product details card */}
-            <View className="mb-4 overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
+            <Card padded={false} className="mb-6 overflow-hidden">
               <View className="gap-4 p-4">
                 <ProductImageGallery
                   images={product.product_images || []}
@@ -284,27 +296,18 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
 
                 <View>
                   <View className="mb-4 flex-row items-start justify-between gap-3">
-                    <Text className="flex-1 text-2xl font-bold text-foreground">{product.name}</Text>
-                    <View className="mt-1 shrink-0 flex-row items-center gap-2">
-                      <Pressable
-                        onPress={wishlist.toggle}
+                    <Title className="flex-1">{product.name}</Title>
+                    <View className="shrink-0 flex-row items-center gap-1">
+                      <IconButton
+                        icon={Heart}
+                        label={wishlist.inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+                        variant="tinted"
+                        filled={wishlist.inWishlist}
+                        color={wishlist.inWishlist ? status.heart : t.foreground}
                         disabled={wishlist.pending}
-                        accessibilityLabel={wishlist.inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-                        className={`h-10 w-10 items-center justify-center rounded-full border border-border-secondary bg-surface-elevated ${wishlist.pending ? 'opacity-60' : ''}`}
-                      >
-                        {wishlist.inWishlist ? (
-                          <Glyph d={P.heart} solid size={20} className="text-red-500" />
-                        ) : (
-                          <Glyph d={P.heart} size={20} className="text-foreground" />
-                        )}
-                      </Pressable>
-                      <Pressable
-                        onPress={handleShare}
-                        accessibilityLabel="Share product"
-                        className="h-10 w-10 items-center justify-center rounded-full border border-border-secondary bg-surface-elevated"
-                      >
-                        <Glyph d={P.share} size={20} className="text-foreground-secondary" />
-                      </Pressable>
+                        onPress={wishlist.toggle}
+                      />
+                      <IconButton icon={Share2} label="Share product" variant="tinted" color={t.foregroundSecondary} onPress={handleShare} />
                     </View>
                   </View>
 
@@ -314,31 +317,26 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
 
                   {/* Low-stock urgency, or notify-me when out of stock. */}
                   <View className="mb-4">
-                    {product.stock_status === 'Low Stock' ? (
-                      <View className="self-start rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 dark:border-amber-700 dark:bg-amber-900/30">
-                        <Text className="text-xs font-semibold text-amber-700 dark:text-amber-400">Only a few left — order soon</Text>
-                      </View>
-                    ) : null}
+                    {product.stock_status === 'Low Stock' ? <Badge label="Only a few left — order soon" tone="warning" /> : null}
                     {product.stock_status === 'Out of Stock' ? (
                       notifySubmitted ? (
-                        <View className="flex-row items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-700 dark:bg-green-900/20">
-                          <Glyph d={P.checkCircleSolid} viewBox="0 0 20 20" solid evenOdd size={16} className="text-green-700 dark:text-green-400" />
+                        <View accessibilityLiveRegion="polite" className="flex-row items-center gap-2 rounded-field bg-green-50 px-4 py-3 dark:bg-green-900/20">
+                          <CircleCheck size={16} color={status.success} />
                           <Text className="flex-1 text-sm text-green-700 dark:text-green-400">We'll email you when this is back in stock.</Text>
                         </View>
                       ) : (
-                        <View className="flex-row gap-2">
-                          <TextInput
+                        <View className="flex-row items-start gap-2">
+                          <TextField
                             value={notifyEmail}
                             onChangeText={setNotifyEmail}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            autoComplete="email"
                             placeholder="Enter your email"
-                            placeholderTextColor={t.foregroundMuted}
-                            className="min-w-0 flex-1 rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-sm text-foreground"
+                            accessibilityLabel="Email for back-in-stock alert"
+                            containerClassName="flex-1"
                           />
-                          <Pressable onPress={handleNotifyMe} className="shrink-0 justify-center rounded-lg bg-primary-500 px-4 py-2">
-                            <Text className="text-sm font-semibold text-white">Notify Me</Text>
-                          </Pressable>
+                          <Button label="Notify Me" block={false} onPress={handleNotifyMe} />
                         </View>
                       )
                     ) : null}
@@ -373,7 +371,7 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
                   <PincodeChecker />
                 </View>
               </View>
-            </View>
+            </Card>
 
             <FrequentlyBoughtTogether
               current={currentCard}
@@ -396,10 +394,12 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
             ) : null}
 
             {product.description ? (
-              <View className="mb-8 rounded-lg border border-border-default bg-surface-elevated p-6 shadow-sm">
-                <Text className="mb-4 text-2xl font-bold text-foreground">Product Description</Text>
-                <Text className="leading-relaxed text-foreground-secondary">{product.description}</Text>
-              </View>
+              <Card className="mb-6 p-5" padded={false}>
+                <Text accessibilityRole="header" className="mb-4 font-display text-xl font-extrabold text-foreground">
+                  Product Description
+                </Text>
+                <Text className="text-[15px] leading-[22px] text-foreground-secondary">{product.description}</Text>
+              </Card>
             ) : null}
 
             <ProductReviews productId={product.id} productSlug={product.slug} sectionRef={reviewsRef} />
@@ -411,8 +411,8 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
             <FeaturedForYou />
 
             {relatedProducts.length >= 4 ? (
-              <View className="mt-10">
-                <Text className="mb-6 text-2xl font-bold text-foreground">Related Products</Text>
+              <View className="mt-8">
+                <Title className="mb-4">Related Products</Title>
                 <Grid cols={2} gap={16}>
                   {relatedProducts.map(r => (
                     <ProductCard key={r.id} product={toCard(r as any, gstEnabled)} handlingDays={Number(r.handling_days ?? 2)} />
@@ -439,6 +439,6 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
         aboveCompareBar={compareCount >= 2}
       />
       <CompareBar />
-    </View>
+    </Screen>
   )
 }

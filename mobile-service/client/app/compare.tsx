@@ -1,20 +1,18 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
+import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native'
 import { Image } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { keepPreviousData, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getListing, getProductBySlug, listProducts, type ProductRow } from '../src/api/products'
-import TopNav from '../src/components/layout/TopNav'
 import CompareBar from '../src/components/catalog/CompareBar'
 import { CompareAddButton, CompareChangeButton } from '../src/components/catalog/CompareSearch'
-import { PhotoIcon } from '../src/components/catalog/icons'
-import { Breadcrumb, Pulse } from '../src/components/catalog/Paged'
 import { useStoreConfig } from '../src/hooks/useStoreConfig'
 import { absUrl } from '../src/lib/links'
 import { inr } from '../src/lib/format'
 import { useCompareStore } from '../src/stores/compareStore'
+import { ImageOff } from 'lucide-react-native'
 import { useTokens } from '../src/theme'
+import { Badge, Card, EmptyState, Overline, Screen, ScreenHeader, Skeleton, Text, TextButton } from '../src/ui'
 
 // Mirror of controller-service app/(storefront)/compare/page.tsx at the mobile breakpoint (the table
 // scrolls sideways inside its card, min-w-[640px]).
@@ -142,15 +140,15 @@ function ProductHead({ p, gstEnabled, ids, onChange }: { p: ProductRow; gstEnabl
       <View className="w-full items-center">
         <View className="aspect-square w-full overflow-hidden rounded-lg border border-border-default bg-surface-secondary" style={{ maxWidth: 120 }}>
           {src ? (
-            <Image source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: 8 }} accessibilityLabel={p.name} />
+            <Image recyclingKey={src} source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: 8 }} accessibilityLabel={p.name} />
           ) : (
             <View className="flex-1 items-center justify-center">
-              <PhotoIcon size={40} strokeWidth={1} color={t.foregroundMuted} />
+              <ImageOff size={36} strokeWidth={1.5} color={t.foregroundMuted} />
             </View>
           )}
         </View>
       </View>
-      <Pressable onPress={() => router.push(`/product/${p.slug}`)}>
+      <Pressable accessibilityRole="link" hitSlop={4} onPress={() => router.push(`/product/${p.slug}`)}>
         <Text numberOfLines={2} className="text-sm font-semibold text-foreground" style={{ lineHeight: 18 }}>
           {p.name}
         </Text>
@@ -161,22 +159,53 @@ function ProductHead({ p, gstEnabled, ids, onChange }: { p: ProductRow; gstEnabl
         </Text>
         {mrp && mrp > price ? <Text className="text-xs text-foreground-muted line-through">{`  ₹${inr(mrp)}`}</Text> : null}
       </Text>
-      <View
-        className={`flex-row items-center gap-1 self-start rounded-full px-2 py-0.5 ${inStock ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}
-      >
-        <View className={`h-1.5 w-1.5 rounded-full ${inStock ? 'bg-green-500' : 'bg-red-500'}`} />
-        <Text className={`text-xs font-medium ${inStock ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-          {inStock ? 'In Stock' : 'Out of Stock'}
-        </Text>
-      </View>
+      <Badge size="sm" tone={inStock ? 'success' : 'danger'} label={inStock ? 'In Stock' : 'Out of Stock'} />
       <CompareChangeButton productId={p.id} currentIds={ids} categoryId={p.category_id ?? null} onChange={r => onChange({ id: r.id, slug: r.slug })} />
     </View>
   )
 }
 
+/** The comparison table while it loads: a product head per column, then striped spec rows. Clipped, not scrolled. */
+function CompareTableSkeleton({ cols, tableW, labelW }: { cols: number; tableW: number; labelW: number }) {
+  const colW = (tableW - labelW) / cols
+  const cells = Array.from({ length: cols })
+  return (
+    <Card padded={false} className="overflow-hidden">
+      <View style={{ width: tableW }}>
+        <View className="flex-row border-b border-border-default">
+          <View className="bg-surface-secondary p-4" style={{ width: labelW }} />
+          {cells.map((_, i) => (
+            <View key={i} className="gap-2 p-4" style={{ width: colW }}>
+              <View className="items-center">
+                <Skeleton width={Math.min(120, colW - 32)} aspectRatio={1} />
+              </View>
+              <Skeleton height={13} />
+              <Skeleton height={13} width="65%" />
+              <Skeleton height={16} width="45%" />
+              <Skeleton height={20} width={76} rounded="rounded-full" />
+              <Skeleton height={12} width={56} rounded="rounded" />
+            </View>
+          ))}
+        </View>
+        {Array.from({ length: 6 }).map((_, r) => (
+          <View key={r} className={`flex-row ${r < 5 ? 'border-b border-border-default' : ''} ${r % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}>
+            <View className="bg-surface-secondary p-4" style={{ width: labelW }}>
+              <Skeleton height={10} width="65%" rounded="rounded" />
+            </View>
+            {cells.map((_, i) => (
+              <View key={i} className="p-4" style={{ width: colW }}>
+                <Skeleton height={12} width="55%" rounded="rounded" />
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    </Card>
+  )
+}
+
 export default function CompareScreen() {
   const router = useRouter()
-  const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const { gstEnabled } = useStoreConfig().flags
   const { ids: idsParam, seed } = useLocalSearchParams<{ ids?: string; seed?: string }>()
@@ -253,110 +282,86 @@ export default function CompareScreen() {
   const colW = products.length ? (tableW - labelW) / products.length : 0
 
   return (
-    <View className="flex-1 bg-surface">
-      <TopNav />
-      {noneToCompare ? (
-        <View className="flex-1 items-center justify-center gap-3">
-          <Text className="text-foreground-muted">No products available to compare.</Text>
-          <Pressable onPress={() => router.navigate('/(tabs)/products')}>
-            <Text className="text-sm text-accent-500">Browse Products</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 32 + insets.bottom }} showsVerticalScrollIndicator={false}>
-          <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-            <Breadcrumb
-              items={[
-                { label: 'Home', onPress: () => router.navigate('/(tabs)') },
-                { label: 'Products', onPress: () => router.navigate('/(tabs)/products') },
-                { label: 'Compare' },
-              ]}
+    <View className="flex-1">
+      <Screen
+        header={<ScreenHeader title="Product Comparison" />}
+        empty={
+          noneToCompare ? (
+            <EmptyState fill title="No products available to compare." actionLabel="Browse Products" onAction={() => router.navigate('/(tabs)/products')} />
+          ) : (
+            false
+          )
+        }
+        scrollProps={{ showsVerticalScrollIndicator: false }}
+      >
+        {!loading && products.length < 4 ? (
+          <View className="mb-4 flex-row justify-end">
+            <CompareAddButton
+              currentIds={ids}
+              categoryId={products[0]?.category_id ?? null}
+              onAdd={r => update([...(entries ?? []), { id: r.id, slug: r.slug }].slice(0, 4))}
             />
           </View>
+        ) : null}
 
-          <View className="px-4 py-6">
-            <View className="mb-6 flex-row items-center justify-between gap-3">
-              <Text className="shrink text-2xl font-bold text-foreground">Product Comparison</Text>
-              {!loading && products.length < 4 ? (
-                <CompareAddButton
-                  currentIds={ids}
-                  categoryId={products[0]?.category_id ?? null}
-                  onAdd={r => update([...(entries ?? []), { id: r.id, slug: r.slug }].slice(0, 4))}
-                />
-              ) : null}
-            </View>
-
-            {loading ? (
-              <View key="skeleton" className="gap-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Pulse key={i} delay={i * 40}>
-                    <View className="h-10 rounded bg-surface-secondary" />
-                  </Pulse>
-                ))}
-              </View>
-            ) : (
-              // Own key: reusing the skeleton's View would add shadow-sm's CSS variables after mount (a css-interop remount).
-              <View key="table" className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-sm">
-                <ScrollView horizontal showsHorizontalScrollIndicator>
-                  <View style={{ width: tableW }}>
-                    <View className="flex-row border-b border-border-default">
-                      <View className="bg-surface-secondary p-4" style={{ width: labelW }} />
-                      {products.map(p => (
-                        <View key={p.id} className="p-4" style={{ width: colW }}>
-                          <ProductHead
-                            p={p}
-                            gstEnabled={gstEnabled}
-                            ids={ids}
-                            onChange={e => update((entries ?? []).map(x => (x.id === p.id ? e : x)))}
-                          />
-                        </View>
-                      ))}
+        {loading ? (
+          <CompareTableSkeleton key="skeleton" cols={Math.min(4, Math.max(2, (entries ?? idList).length))} tableW={tableW} labelW={labelW} />
+        ) : (
+          <Card key="table" padded={false} className="overflow-hidden">
+            <ScrollView horizontal showsHorizontalScrollIndicator>
+              <View style={{ width: tableW }}>
+                <View className="flex-row border-b border-border-default">
+                  <View className="bg-surface-secondary p-4" style={{ width: labelW }} />
+                  {products.map(p => (
+                    <View key={p.id} className="p-4" style={{ width: colW }}>
+                      <ProductHead
+                        p={p}
+                        gstEnabled={gstEnabled}
+                        ids={ids}
+                        onChange={e => update((entries ?? []).map(x => (x.id === p.id ? e : x)))}
+                      />
                     </View>
+                  ))}
+                </View>
 
-                    {visibleRows.map(({ label, values, rowIdx }, i) => {
-                      const base = values[0]
-                      const hasDiff = values.some(v => v !== base)
-                      return (
-                        <View
-                          key={label}
-                          className={`flex-row ${i < visibleRows.length - 1 ? 'border-b border-border-default' : ''} ${rowIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}
-                        >
-                          <View className="bg-surface-secondary p-4" style={{ width: labelW }}>
-                            <Text className="text-xs font-semibold uppercase text-foreground-muted" style={{ letterSpacing: 0.3 }}>
-                              {label}
-                            </Text>
+                {visibleRows.map(({ label, values, rowIdx }, i) => {
+                  const base = values[0]
+                  const hasDiff = values.some(v => v !== base)
+                  return (
+                    <View
+                      key={label}
+                      className={`flex-row ${i < visibleRows.length - 1 ? 'border-b border-border-default' : ''} ${rowIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}
+                    >
+                      <View className="bg-surface-secondary p-4" style={{ width: labelW }}>
+                        <Overline>{label}</Overline>
+                      </View>
+                      {products.map((p, colIdx) => {
+                        const val = values[colIdx]
+                        const isDiff = hasDiff && colIdx > 0 && val !== base
+                        return (
+                          <View key={p.id} className={`p-4 ${isDiff ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`} style={{ width: colW }}>
+                            {val != null ? (
+                              <Text selectable className="text-sm text-foreground">
+                                {val}
+                              </Text>
+                            ) : (
+                              <Text className="text-sm text-foreground-muted">—</Text>
+                            )}
                           </View>
-                          {products.map((p, colIdx) => {
-                            const val = values[colIdx]
-                            const isDiff = hasDiff && colIdx > 0 && val !== base
-                            return (
-                              <View key={p.id} className={`p-4 ${isDiff ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`} style={{ width: colW }}>
-                                {val != null ? (
-                                  <Text selectable className="text-sm text-foreground">
-                                    {val}
-                                  </Text>
-                                ) : (
-                                  <Text className="text-sm text-foreground-muted">—</Text>
-                                )}
-                              </View>
-                            )
-                          })}
-                        </View>
-                      )
-                    })}
-                  </View>
-                </ScrollView>
+                        )
+                      })}
+                    </View>
+                  )
+                })}
               </View>
-            )}
+            </ScrollView>
+          </Card>
+        )}
 
-            <View className="mt-6 items-center">
-              <Pressable onPress={() => router.navigate('/(tabs)/products')}>
-                <Text className="text-sm text-accent-500">← Back to Products</Text>
-              </Pressable>
-            </View>
-          </View>
-        </ScrollView>
-      )}
+        <View className="mt-6 items-center">
+          <TextButton label="← Back to Products" onPress={() => router.navigate('/(tabs)/products')} className="self-center" />
+        </View>
+      </Screen>
       <CompareBar />
     </View>
   )

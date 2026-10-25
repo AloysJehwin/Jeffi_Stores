@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Card, Overline, Text } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import ProductCard from '../product/ProductCard'
 import { Carousel } from '../home/layout'
@@ -36,18 +37,18 @@ export default function CartUpsellRow({ cartProductIds, savedProductIds }: { car
   if (!idsKey || products.length === 0) return null
 
   return (
-    <View className="mt-8 rounded-lg border border-border-default bg-surface-elevated p-4 shadow-sm">
+    <Card className="mt-8">
       <View className="mb-4">
-        <Text className="text-[10px] font-black uppercase text-accent-500" style={{ letterSpacing: 2 }}>
-          Customers also bought
+        <Overline className="mb-0.5 text-accent-500">Customers also bought</Overline>
+        <Text accessibilityRole="header" className="font-display text-lg font-extrabold text-foreground">
+          {TITLE}
         </Text>
-        <Text className="text-lg font-bold text-foreground">{TITLE}</Text>
       </View>
       <Carousel>
         {products.map(p => (
           <ProductCard key={p.card.id} product={p.card} handlingDays={p.handlingDays} />
         ))}
       </Carousel>
-    </View>
+    </Card>
   )
 }

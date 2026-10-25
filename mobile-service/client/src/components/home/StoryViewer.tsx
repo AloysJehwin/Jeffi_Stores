@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BackHandler, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { BackHandler, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Button, IconButton, Text, haptic, useEntering, useMotion } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import * as Haptics from 'expo-haptics'
 import { ShoppingBag, X } from 'lucide-react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
@@ -16,7 +16,6 @@ import Animated, {
   interpolate,
   runOnJS,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
@@ -53,7 +52,9 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
-  const reduceMotion = useReducedMotion()
+  const { reduced: reduceMotion } = useMotion()
+  const fadeIn = useEntering(FadeIn.duration(180))
+  const fadeOut = useEntering(FadeOut.duration(150))
   const close = useStoryStore(s => s.close)
   const markSeen = useStoryStore(s => s.markSeen)
   const [pos, setPos] = useState({ g: start, s: 0 })
@@ -80,7 +81,7 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
   useEffect(() => {
     if (prevGroup.current === pos.g) return
     prevGroup.current = pos.g
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    haptic.tap()
   }, [pos.g])
 
   // The next image is warm before its slide starts.
@@ -115,8 +116,13 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
   )
   const advance = useCallback(() => go(1), [go])
 
-  // The segment is a timer, not decoration: ReduceMotion.Never keeps it from finishing instantly.
+  // The segment is a timer, not decoration: ReduceMotion.Never keeps it from finishing instantly. With
+  // reduced motion the slides don't advance on their own; a tap moves on.
   run.current = from => {
+    if (reduceMotion) {
+      progress.value = 1
+      return
+    }
     progress.value = from
     progress.value = withTiming(
       1,
@@ -177,18 +183,29 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
   const backdropStyle = useAnimatedStyle(() => ({ opacity: interpolate(dragY.value, [0, 400], [1, 0.3], Extrapolation.CLAMP) }))
 
   return (
-    <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(150)} style={StyleSheet.absoluteFill}>
+    <Animated.View entering={fadeIn} exiting={fadeOut} style={StyleSheet.absoluteFill}>
       <StatusBar style="light" />
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} className="bg-black" />
       <Animated.View style={[StyleSheet.absoluteFill, sheetStyle]} className="overflow-hidden bg-black">
         <GestureDetector gesture={gesture}>
-          <View style={StyleSheet.absoluteFill} collapsable={false}>
+          <View
+            style={StyleSheet.absoluteFill}
+            collapsable={false}
+            accessible
+            accessibilityRole="adjustable"
+            accessibilityLabel={`${group.title}, story ${Math.min(pos.s, group.slides.length - 1) + 1} of ${group.slides.length}`}
+            accessibilityActions={[
+              { name: 'increment', label: 'Next story' },
+              { name: 'decrement', label: 'Previous story' },
+            ]}
+            onAccessibilityAction={e => go(e.nativeEvent.actionName === 'decrement' ? -1 : 1)}
+          >
             <Image
               source={image ? { uri: image } : undefined}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
               transition={reduceMotion ? 0 : 150}
-              accessibilityLabel={slide.caption ?? group.title}
+              accessible={false}
             />
             <Scrim top />
             {slide.caption || slide.url ? <Scrim /> : null}
@@ -199,15 +216,13 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
         <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, top: 0, paddingTop: insets.top + 10, paddingHorizontal: 12 }}>
           <Segments count={group.slides.length} active={pos.s} progress={progress} />
           <View className="mt-3 flex-row items-center gap-2.5">
-            <View className="h-8 w-8 overflow-hidden rounded-full border border-white/40 bg-black">
+            <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden className="h-8 w-8 overflow-hidden rounded-full border border-white/40 bg-black">
               <Image source={{ uri: absUrl(group.cover) ?? group.cover }} style={{ width: 32, height: 32 }} contentFit="cover" />
             </View>
             <Text className="flex-1 text-sm font-bold text-white" numberOfLines={1}>
               {group.title}
             </Text>
-            <Pressable onPress={close} hitSlop={10} accessibilityLabel="Close" className="h-9 w-9 items-center justify-center rounded-full bg-white/20">
-              <X size={20} color={status.white} />
-            </Pressable>
+            <IconButton icon={X} label="Close" variant="overlay" size="sm" onPress={close} />
           </View>
         </View>
 
@@ -223,10 +238,7 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
               </Text>
             ) : null}
             {slide.url ? (
-              <Pressable onPress={shop} className="h-12 flex-row items-center justify-center gap-2 rounded-xl bg-white active:bg-white/90">
-                <ShoppingBag size={18} color={status.black} />
-                <Text className="text-base font-bold text-black">{slide.ctaLabel ?? 'Shop'}</Text>
-              </Pressable>
+              <Button label={slide.ctaLabel ?? 'Shop'} icon={ShoppingBag} size="md" onPress={shop} />
             ) : null}
           </View>
         ) : null}

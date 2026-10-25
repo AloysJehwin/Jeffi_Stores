@@ -1,13 +1,12 @@
 import { useRef, useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
+import { Pressable, View, type ScrollView } from 'react-native'
 import { Image } from 'expo-image'
+import { X, Zap } from 'lucide-react-native'
 import { generateReview, postForm, type OrderReview } from '../../api/account'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { absUrl } from '../../lib/links'
 import { showToast } from '../../stores/toastStore'
-import HeroIcon from './HeroIcon'
-import { accent, useTokens } from '../../theme'
+import { Button, Chip, ChipGroup, cn, Divider, FieldError, IconButton, Label, ModalSheet, Text, TextField } from '../../ui'
 
 // Mirror of controller-service app/(storefront)/account/orders/[id]/ReviewModal.tsx.
 // No image picker in the app: existing photos can be kept or removed, new ones can't be added.
@@ -55,7 +54,9 @@ export default function ReviewModal({
   onClose: () => void
   onSuccess: (productId: string, review: OrderReview) => void
 }) {
-  const t = useTokens()
+  // Mounted while the parent shows it; closing slides the sheet away first, then tells the parent.
+  const [open, setOpen] = useState(true)
+  const close = () => setOpen(false)
   const [states, setStates] = useState<ItemState[]>(() => items.map(i => initial(reviewMap[i.productId])))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [aiOff, setAiOff] = useState(false)
@@ -116,7 +117,7 @@ export default function ReviewModal({
           update(i, { submitted: true })
         })
       )
-      onClose()
+      close()
     } catch (err: any) {
       showToast(err?.message || 'Something went wrong. Please try again.', 'error')
     } finally {
@@ -134,147 +135,124 @@ export default function ReviewModal({
   }
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Pressable className="absolute inset-0 bg-black/50" onPress={onClose} />
-        <View className="bg-surface-elevated rounded-t-2xl" style={{ maxHeight: '90%' }}>
-          <View className="border-b border-border-default px-5 py-4 flex-row items-center justify-between">
-            <Text className="text-base font-bold text-foreground">{allAlreadyReviewed ? 'Edit Your Reviews' : 'Rate Your Order'}</Text>
-            <Pressable onPress={onClose} className="p-1 rounded-full">
-              <HeroIcon name="x" size={20} color={t.foregroundMuted} />
-            </Pressable>
+    <ModalSheet
+      open={open}
+      onClose={close}
+      onClosed={onClose}
+      scrollRef={scrollRef}
+      title={allAlreadyReviewed ? 'Edit Your Reviews' : 'Rate Your Order'}
+      footer={
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <Button label="Cancel" variant="secondary" onPress={close} />
           </View>
-          <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, gap: 32 }}>
-            {items.map((item, i) => {
-              const s = states[i]
-              const img = absUrl(item.productImage)
-              return (
-                <View key={item.productId} className={i > 0 ? 'pt-8 border-t border-border-default' : ''} onLayout={e => (itemY.current[i] = e.nativeEvent.layout.y)}>
-                  <View className="flex-row items-center gap-3 mb-4">
-                    {img && <Image source={{ uri: img }} style={{ width: 48, height: 48, borderRadius: 8 }} contentFit="cover" />}
-                    <Text className="flex-1 text-sm font-semibold text-foreground" numberOfLines={2}>
-                      {item.productName}
-                    </Text>
-                  </View>
-
-                  <View className="mb-4">
-                    <Text className="text-sm font-medium text-foreground mb-2">
-                      Rating <Text className="text-red-500">*</Text>
-                    </Text>
-                    <View className="flex-row gap-1">
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <Pressable key={n} onPress={() => update(i, { rating: n })} hitSlop={4}>
-                          <Text className={`text-3xl ${s.rating >= n ? 'text-yellow-400' : 'text-gray-300'}`}>★</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-
-                  <View className="mb-4">
-                    <Text className="text-sm font-medium text-foreground mb-2">What did you like?</Text>
-                    <View className="flex-row flex-wrap gap-2">
-                      {TAGS.map(tag => {
-                        const on = s.selectedTags.includes(tag)
-                        return (
-                          <Pressable
-                            key={tag}
-                            onPress={() => toggleTag(i, tag)}
-                            className={`px-3 py-1.5 rounded-full border ${on ? 'bg-accent-500 border-accent-500' : 'bg-surface-secondary border-border-default'}`}
-                          >
-                            <Text className={`text-xs font-medium ${on ? 'text-white' : 'text-foreground-secondary'}`}>{tag}</Text>
-                          </Pressable>
-                        )
-                      })}
-                    </View>
-                  </View>
-
-                  {aiEnabled && (
-                    <Pressable
-                      onPress={() => handleGenerate(i)}
-                      disabled={!s.rating || s.isGenerating}
-                      className={`w-full flex-row items-center justify-center gap-2 py-2 px-4 rounded-lg border border-accent-400 mb-4 ${!s.rating || s.isGenerating ? 'opacity-40' : ''}`}
-                    >
-                      {s.isGenerating ? <ActivityIndicator size="small" color={accent[600]} /> : <HeroIcon name="bolt" size={16} color={accent[600]} />}
-                      <Text className="text-accent-600 dark:text-accent-400 text-sm font-medium">{s.isGenerating ? 'Generating…' : 'Generate with AI'}</Text>
-                    </Pressable>
-                  )}
-
-                  <View className="mb-4" onLayout={e => (fieldY.current[i] = e.nativeEvent.layout.y)}>
-                    <Text className="text-sm font-medium text-foreground mb-1">
-                      Title <Text className="text-foreground-muted">(optional)</Text>
-                    </Text>
-                    <TextInput
-                      value={s.title}
-                      onChangeText={v => update(i, { title: v })}
-                      onFocus={() => reveal(i)}
-                      maxLength={120}
-                      placeholder="Summarise your experience"
-                      placeholderTextColor={t.foregroundMuted}
-                      className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm"
-                    />
-                  </View>
-
-                  <View className="mb-4">
-                    <Text className="text-sm font-medium text-foreground mb-1">
-                      Your review <Text className="text-red-500">*</Text>
-                    </Text>
-                    <TextInput
-                      value={s.comment}
-                      onChangeText={v => update(i, { comment: v })}
-                      onFocus={() => reveal(i)}
-                      maxLength={2000}
-                      multiline
-                      numberOfLines={3}
-                      textAlignVertical="top"
-                      placeholder="Tell others about your experience…"
-                      placeholderTextColor={t.foregroundMuted}
-                      className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm"
-                      style={{ minHeight: 76 }}
-                    />
-                  </View>
-
-                  {s.existingImageUrls.length > 0 && (
-                    <View>
-                      <Text className="text-sm font-medium text-foreground mb-2">
-                        Photos <Text className="text-foreground-muted">(up to 3)</Text>
-                      </Text>
-                      <View className="flex-row flex-wrap gap-2">
-                        {s.existingImageUrls.map((url, j) => (
-                          <View key={`ex-${j}`} className="w-14 h-14 rounded-lg overflow-hidden border border-border-default">
-                            <Image source={{ uri: absUrl(s.existingThumbUrls[j] || url) ?? undefined }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-                            <Pressable
-                              onPress={() =>
-                                update(i, {
-                                  existingImageUrls: s.existingImageUrls.filter((_, idx) => idx !== j),
-                                  existingThumbUrls: s.existingThumbUrls.filter((_, idx) => idx !== j),
-                                })
-                              }
-                              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 items-center justify-center"
-                            >
-                              <Text className="text-white text-xs leading-none">×</Text>
-                            </Pressable>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {!!s.error && <Text className="text-sm text-red-500 mt-2">{s.error}</Text>}
-                </View>
-              )
-            })}
-
-            <View className="flex-row gap-3 pt-1 pb-4">
-              <Pressable onPress={onClose} className="flex-1 py-2.5 rounded-lg border border-border-default items-center">
-                <Text className="text-sm font-medium text-foreground-secondary">Cancel</Text>
-              </Pressable>
-              <Pressable onPress={handleSubmitAll} disabled={isSubmitting} className={`flex-1 py-2.5 rounded-lg bg-accent-500 items-center ${isSubmitting ? 'opacity-50' : ''}`}>
-                <Text className="text-white text-sm font-semibold">{isSubmitting ? 'Submitting…' : allAlreadyReviewed ? 'Update Reviews' : 'Submit Reviews'}</Text>
-              </Pressable>
-            </View>
-          </ScrollView>
+          <View className="flex-1">
+            <Button label={allAlreadyReviewed ? 'Update Reviews' : 'Submit Reviews'} loading={isSubmitting} loadingLabel="Submitting…" onPress={handleSubmitAll} />
+          </View>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      }
+    >
+      {items.map((item, i) => {
+        const s = states[i]
+        const img = absUrl(item.productImage)
+        return (
+          <View key={item.productId} className={i > 0 ? 'mt-6' : ''} onLayout={e => (itemY.current[i] = e.nativeEvent.layout.y)}>
+            {i > 0 ? <Divider className="mb-6" /> : null}
+            <View className="mb-4 flex-row items-center gap-3">
+              {img && <Image recyclingKey={img} source={{ uri: img }} style={{ width: 48, height: 48, borderRadius: 12 }} contentFit="cover" />}
+              <Text className="flex-1 text-[15px] font-semibold text-foreground" numberOfLines={2}>
+                {item.productName}
+              </Text>
+            </View>
+
+            <View className="mb-4">
+              <Label required>Rating</Label>
+              <View accessibilityRole="radiogroup" className="flex-row gap-1">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <Pressable
+                    key={n}
+                    onPress={() => update(i, { rating: n })}
+                    hitSlop={4}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${n} star${n > 1 ? 's' : ''}`}
+                    accessibilityState={{ checked: s.rating === n }}
+                    className="h-11 w-11 items-center justify-center"
+                  >
+                    <Text className={cn('text-[32px] leading-10', s.rating >= n ? 'text-yellow-400' : 'text-border-secondary')}>★</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <View className="mb-4">
+              <Label>What did you like?</Label>
+              <ChipGroup>
+                {TAGS.map(tag => (
+                  <Chip key={tag} size="sm" label={tag} selected={s.selectedTags.includes(tag)} onPress={() => toggleTag(i, tag)} />
+                ))}
+              </ChipGroup>
+            </View>
+
+            {aiEnabled && (
+              <View className="mb-4">
+                <Button
+                  label="Generate with AI"
+                  loadingLabel="Generating…"
+                  loading={s.isGenerating}
+                  disabled={!s.rating}
+                  icon={Zap}
+                  variant="outline"
+                  size="md"
+                  onPress={() => handleGenerate(i)}
+                />
+              </View>
+            )}
+
+            <View className="mb-4" onLayout={e => (fieldY.current[i] = e.nativeEvent.layout.y)}>
+              <TextField label="Title (optional)" value={s.title} onChangeText={v => update(i, { title: v })} onFocus={() => reveal(i)} maxLength={120} placeholder="Summarise your experience" />
+            </View>
+
+            <TextField
+              label="Your review"
+              required
+              value={s.comment}
+              onChangeText={v => update(i, { comment: v })}
+              onFocus={() => reveal(i)}
+              maxLength={2000}
+              multiline
+              placeholder="Tell others about your experience…"
+            />
+
+            {s.existingImageUrls.length > 0 && (
+              <View className="mt-4">
+                <Label>Photos (up to 3)</Label>
+                <View className="flex-row flex-wrap gap-3">
+                  {s.existingImageUrls.map((url, j) => (
+                    <View key={`ex-${j}`} className="h-16 w-16 overflow-hidden rounded-xl border border-border-default">
+                      <Image recyclingKey={absUrl(s.existingThumbUrls[j] || url) ?? undefined} source={{ uri: absUrl(s.existingThumbUrls[j] || url) ?? undefined }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                      <IconButton
+                        icon={X}
+                        label="Remove photo"
+                        variant="overlay"
+                        size="sm"
+                        className="absolute -right-1 -top-1"
+                        onPress={() =>
+                          update(i, {
+                            existingImageUrls: s.existingImageUrls.filter((_, idx) => idx !== j),
+                            existingThumbUrls: s.existingThumbUrls.filter((_, idx) => idx !== j),
+                          })
+                        }
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <FieldError message={s.error} className="mt-2" />
+          </View>
+        )
+      })}
+    </ModalSheet>
   )
 }

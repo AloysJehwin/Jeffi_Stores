@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react'
 import { FlatList, View } from 'react-native'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { InfiniteFooter, ProductGridSkeleton } from './Paged'
+import { InfiniteFooter } from './Paged'
+import { ProductGridSkeleton } from '../../ui'
 import { listProducts, type ProductQuery } from '../../api/products'
 import ProductCard from '../product/ProductCard'
 import { useColumnWidth } from '../home/layout'
@@ -69,7 +70,7 @@ export default function PagedProductGrid({
       ListEmptyComponent={
         loading ? (
           <View className="px-4">
-            <ProductGridSkeleton cols={cols} />
+            <ProductGridSkeleton cols={cols} gap={gap} count={cols === 1 ? 3 : 6} />
           </View>
         ) : total === 0 ? (
           <View className="px-4">{empty}</View>
