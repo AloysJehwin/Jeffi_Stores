@@ -23,6 +23,7 @@ export async function createCategory(formData: FormData) {
     ? Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
     : null
   const googleProductCategory = (formData.get('google_product_category') as string) || null
+  const imageUrl = ((formData.get('image_url') as string) || '').trim().slice(0, 500) || null
 
   const slug = name
     .toLowerCase()
@@ -34,8 +35,8 @@ export async function createCategory(formData: FormData) {
   // Create-as-draft: is_draft = true (and is_active = false) so the category lives ONLY in the
   // Drafts section, never the live list or storefront nav. "Publish" flips is_draft = false.
   await query<{ id: string }>(
-    `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, is_draft, google_product_category, icon_name, return_allowed, return_window_days, replacement_allowed, replacement_window_days)
-     VALUES ($1, $2, $3, $4, $5, $6, false, true, $7, $8, $9, $10, $11, $12) RETURNING id`,
+    `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, is_draft, google_product_category, icon_name, return_allowed, return_window_days, replacement_allowed, replacement_window_days, image_url)
+     VALUES ($1, $2, $3, $4, $5, $6, false, true, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
     [
       name,
       slug,
@@ -49,6 +50,7 @@ export async function createCategory(formData: FormData) {
       returnWindowDays,
       replacementAllowed,
       replacementWindowDays,
+      imageUrl,
     ]
   )
 

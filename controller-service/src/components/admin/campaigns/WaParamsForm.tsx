@@ -140,7 +140,8 @@ export default function WaParamsForm({ params, vars, setVars, mediaUrl, setMedia
         <div>
           <label className="flex items-center gap-1.5 text-sm font-medium text-foreground"><ImageIcon className="w-3.5 h-3.5" /> Header image</label>
           <p className="mb-1.5 text-[11px] text-foreground-muted">Upload an image, or paste a URL starting with <code>{params.media.prefix}</code> (any product or banner image from your store). Leave empty to use your store logo.</p>
-          <ImageUrlInput value={mediaUrl} onChange={v => setMediaUrl(v.trim())} placeholder={`${params.media.prefix}${params.media.sample || 'products/…/photo.jpg'}`} className={inputClass} />
+          <ImageUrlInput value={mediaUrl} onChange={v => setMediaUrl(v.trim())} placeholder={`${params.media.prefix}${params.media.sample || 'products/…/photo.jpg'}`} className={inputClass}
+            ai={{ feature: 'campaign_image', size: ['landscape', 'square'] }} />
           {badImage && <p className="mt-1 text-xs text-red-600">WhatsApp only accepts images under {params.media.prefix} for this template.</p>}
         </div>
       )}

@@ -33,12 +33,15 @@ interface Props {
   usageRef?: string
   compact?: boolean
   label?: string
+  /** Replaces the trigger's classes (to match a sibling control). */
+  triggerClassName?: string
 }
 
 const SCOPE_BY_FEATURE: Record<AiVideoFeature, string> = {
   social_video: 'social',
   homepage_video: 'settings',
   offer_video: 'coupons',
+  template_video: 'templates',
 }
 
 const ASPECT_OPTIONS: { value: AiVideoAspect; label: string }[] = [
@@ -58,15 +61,18 @@ export default function AiVideoButton({
   usageRef,
   compact,
   label,
+  triggerClassName,
 }: Props) {
   const area = scope ?? SCOPE_BY_FEATURE[feature]
   const canWrite = useCanWrite(area)
   const canUseAi = useCanUseAi(area)
   const [open, setOpen] = useState(false)
   if (!canWrite || !canUseAi) return null
-  const btnCls = compact
-    ? 'inline-flex items-center gap-1 text-xs text-accent-600 hover:text-accent-700'
-    : 'control-md inline-flex items-center gap-1.5 border border-border-default text-xs font-semibold text-foreground hover:bg-surface-secondary'
+  const btnCls =
+    triggerClassName ??
+    (compact
+      ? 'inline-flex items-center gap-1 text-xs text-accent-600 hover:text-accent-700'
+      : 'control-md inline-flex items-center gap-1.5 border border-border-default text-xs font-semibold text-foreground hover:bg-surface-secondary')
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={btnCls}>

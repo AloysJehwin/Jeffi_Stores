@@ -4,6 +4,8 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import GalleryPicker from '@/components/admin/GalleryPicker'
+import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import {
@@ -1226,6 +1228,26 @@ export default function ControlsClient({
                           Gallery
                         </button>
                       </div>
+                    </div>
+                    {/* AI image: saved to the gallery, then used like a gallery pick. */}
+                    <div className="mb-1.5 flex justify-end">
+                      <AiMediaButton
+                        feature="product_image"
+                        compact
+                        sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
+                        defaultPrompt="High-end studio product photo on seamless white, soft shadow, catalogue lighting"
+                        saveToGallery
+                        onPick={img => {
+                          if (!img.galleryId) return
+                          setImageSource('gallery')
+                          setSelectedGallery({
+                            id: img.galleryId,
+                            thumbnail_url: null,
+                            image_url: img.url,
+                            file_name: 'AI image',
+                          })
+                        }}
+                      />
                     </div>
 
                     {/* Selected preview (shared for both sources) */}

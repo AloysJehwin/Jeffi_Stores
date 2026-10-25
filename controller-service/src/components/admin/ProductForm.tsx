@@ -4214,6 +4214,14 @@ export default function ProductForm({
                   <ImageUpload
                     productId={tempProductId}
                     maxImages={5}
+                    ai={{
+                      defaultPrompt: buildProductImagePrompt({
+                        name: productName,
+                        brand: brands.find(b => b.id === brandId)?.name,
+                        category: categories.find(c => c.id === categoryId)?.name,
+                        specs: specifications,
+                      }),
+                    }}
                     existingImages={product?.product_images || []}
                     onImagesChange={(files, existingToKeep, galleryImgs, orderedKeys) => {
                       setImageFiles(files)

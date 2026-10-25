@@ -13,6 +13,10 @@ import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
 import PhonePreview from './PhonePreview'
 import ApiCurlHint from './ApiCurlHint'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import AiVideoButton from '@/components/admin/ai/AiVideoButton'
+import { VIDEO_MAX, VIDEO_TYPES, uploadGalleryVideo } from '@/components/admin/media/media-upload'
+import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import ScenarioFillDialog from './ScenarioFillDialog'
 import ResetToPlatformDialog from './ResetToPlatformDialog'
 import type { EditorFieldSnapshot, UndoHandle } from '@/lib/ai/scenario-fill-apply'
@@ -115,6 +119,9 @@ type Props = {
   /** Show "Reset to platform default" for forked tenant templates. Admin side hides it on the
    *  platform-library view (nothing to reset to); ecom side always enables it. */
   canResetToPlatform?: boolean
+  /** Header video upload and AI header media from the store gallery. Defaults on unless the
+   *  editor uploads to another console's asset route (assetsBase). */
+  galleryMedia?: boolean
 }
 
 const SMS_GSM_LIMIT = 160
@@ -147,6 +154,7 @@ export default function TemplateEditor({
   scenarioFillTheme = 'admin',
   scenarioFillEndpoint,
   canResetToPlatform,
+  galleryMedia = !assetsBase,
 }: Props) {
   const derived = campaignKind ?? (value.slug?.startsWith('campaign/') ? value.slug.slice('campaign/'.length) : null)
   const kind = isCampaignKind(derived) && value.channel !== 'whatsapp' ? derived : null
@@ -505,10 +513,11 @@ export default function TemplateEditor({
     }
   }
 
-  function pickFile(): Promise<File | null> {
+  function pickFile(accept = 'image/*'): Promise<File | null> {
     return new Promise(resolve => {
       const el = fileRef.current
       if (!el) return resolve(null)
+      el.accept = accept
       el.onchange = () => resolve(el.files?.[0] ?? null)
       el.value = ''
       el.click()
@@ -794,17 +803,7 @@ export default function TemplateEditor({
               if (url) updateCard(i, { media_url: url })
             }
 
-            const onPickHeaderMedia = async () => {
-              if (mediaLocked) {
-                showToast(
-                  `Header media type is locked to '${value.media_type}' after approval — you can swap the file, not the type.`,
-                  'info'
-                )
-              }
-              const file = await pickFile()
-              if (!file) return
-              const url = await uploadFile(file)
-              if (!url) return
+            const setHeaderMedia = (url: string) => {
               const types = { ...(waBlocks.types ?? {}), 'twilio/media': { body: value.body, media: [url] } }
               onChange({
                 ...value,
@@ -812,6 +811,41 @@ export default function TemplateEditor({
                 blocks_format: 'wa-content',
                 media_type: value.media_type ?? 'image',
               })
+            }
+
+            // A video header goes to the gallery (the template asset route takes images only).
+            const uploadHeaderVideo = async (file: File): Promise<string | null> => {
+              if (!VIDEO_TYPES.includes(file.type)) {
+                showToast('Use an MP4 or WebM video', 'error')
+                return null
+              }
+              if (file.size > VIDEO_MAX) {
+                showToast('Video must be under 50 MB', 'error')
+                return null
+              }
+              setUploading(true)
+              try {
+                return (await uploadGalleryVideo(file)).video.url
+              } catch (e) {
+                showToast((e as Error).message || 'Video upload failed', 'error')
+                return null
+              } finally {
+                setUploading(false)
+              }
+            }
+
+            const onPickHeaderMedia = async () => {
+              if (mediaLocked) {
+                showToast(
+                  `Header media type is locked to '${value.media_type}' after approval — you can swap the file, not the type.`,
+                  'info'
+                )
+              }
+              const isVideo = galleryMedia && value.media_type === 'video'
+              const file = await pickFile(isVideo ? VIDEO_TYPES.join(',') : 'image/*')
+              if (!file) return
+              const url = isVideo ? await uploadHeaderVideo(file) : await uploadFile(file)
+              if (url) setHeaderMedia(url)
             }
 
             async function onSubmitForApproval() {
@@ -923,6 +957,26 @@ export default function TemplateEditor({
                         )}
                         Upload header media
                       </button>
+                    )}
+                    {galleryMedia && value.media_type === 'image' && (
+                      <AiMediaButton
+                        feature="template_image"
+                        sizes={[AI_SIZE_PRESETS.landscape, AI_SIZE_PRESETS.square]}
+                        defaultPrompt={value.name ? `WhatsApp header image for "${value.name}", clean composition, no text` : undefined}
+                        usageRef={value.id}
+                        triggerClassName={`${TOOL} text-xs`}
+                        onPick={img => setHeaderMedia(img.url)}
+                      />
+                    )}
+                    {galleryMedia && value.media_type === 'video' && (
+                      <AiVideoButton
+                        feature="template_video"
+                        defaultPrompt={value.name ? `Short header video for "${value.name}", no text` : undefined}
+                        defaultAspect="16:9"
+                        usageRef={value.id}
+                        triggerClassName={`${TOOL} text-xs`}
+                        onPick={v => setHeaderMedia(v.url)}
+                      />
                     )}
                   </div>
                   {(waBlocks.types as any)?.['twilio/media']?.media?.[0] && (
@@ -1110,6 +1164,16 @@ export default function TemplateEditor({
                             )}
                             {card.media_url ? 'Replace media' : 'Add media'}
                           </button>
+                          {galleryMedia && (
+                            <AiMediaButton
+                              feature="template_image"
+                              sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.landscape]}
+                              defaultPrompt={card.title || undefined}
+                              usageRef={value.id}
+                              triggerClassName={`${TOOL} text-xs`}
+                              onPick={img => updateCard(i, { media_url: img.url })}
+                            />
+                          )}
                           {card.media_url && (
                             <span className="min-w-0 text-xs text-foreground-secondary truncate flex-1">{card.media_url}</span>
                           )}

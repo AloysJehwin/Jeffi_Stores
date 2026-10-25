@@ -35,7 +35,11 @@ export async function GET(request: NextRequest) {
     : feature === 'email_hero' ? await requireAdminScope(request, 'mailer:write')
     : feature === 'offer_image' || feature === 'offer_video' ? await requireAdminScope(request, 'coupons:write')
     : feature === 'meta_ads_image' ? await requireAdminScope(request, 'meta_ads_campaigns:write')
-    // hero_image, homepage_image, homepage_video, generate_image
+    : feature === 'brand_image' ? await requireAdminScope(request, 'brands:write')
+    : feature === 'category_image' ? await requireAdminScope(request, 'categories:write')
+    : feature === 'campaign_image' ? await requireAdminScope(request, 'campaigns:write')
+    : feature === 'template_image' || feature === 'template_video' ? await requireAdminScope(request, 'templates:write')
+    // hero_image, homepage_image, homepage_video, generate_image, logo_image
     : await requireAdminScope(request, 'settings:write')
   if (admin instanceof NextResponse) return admin
   const denied = aiDenial(admin.role, admin.scopes, AI_FEATURE_SCOPES[feature])

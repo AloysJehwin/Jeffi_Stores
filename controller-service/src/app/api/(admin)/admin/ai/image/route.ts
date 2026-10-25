@@ -41,7 +41,11 @@ export async function POST(request: NextRequest) {
     : feature === 'email_hero' ? await requireAdminScope(request, 'mailer:write')
     : feature === 'offer_image' ? await requireAdminScope(request, 'coupons:write')
     : feature === 'meta_ads_image' ? await requireAdminScope(request, 'meta_ads_campaigns:write')
-    // hero_image, homepage_image, generate_image
+    : feature === 'brand_image' ? await requireAdminScope(request, 'brands:write')
+    : feature === 'category_image' ? await requireAdminScope(request, 'categories:write')
+    : feature === 'campaign_image' ? await requireAdminScope(request, 'campaigns:write')
+    : feature === 'template_image' ? await requireAdminScope(request, 'templates:write')
+    // hero_image, homepage_image, generate_image, logo_image
     : await requireAdminScope(request, 'settings:write')
   if (admin instanceof NextResponse) return admin
   const denied = aiDenial(admin.role, admin.scopes, AI_FEATURE_SCOPES[feature])

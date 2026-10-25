@@ -163,7 +163,7 @@ export default async function SiteControlsPage() {
                       columns
                     >
                       <FullSpan>
-                        <LogoUploader initialUrl={c.identity.logoUrl} />
+                        <LogoUploader initialUrl={c.identity.logoUrl} storeName={c.identity.name} />
                       </FullSpan>
                       <TextControl
                         settingKey="business_name"

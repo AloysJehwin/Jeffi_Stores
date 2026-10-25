@@ -145,6 +145,14 @@ export default function BrandForm({
               onChange={setLogoUrl}
               className={fieldInputCls}
               placeholder="https://example.com/logo.png or upload"
+              ai={{
+                feature: 'brand_image',
+                size: ['square', 'landscape'],
+                defaultPrompt: brandName
+                  ? `Clean, flat logo mark for the brand ${brandName} on a plain white background`
+                  : undefined,
+                usageRef: brand?.id,
+              }}
             />
           </FormField>
 

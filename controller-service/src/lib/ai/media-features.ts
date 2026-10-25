@@ -10,10 +10,15 @@ export const AI_IMAGE_FEATURES = [
   'meta_ads_image',
   'generate_image',
   'homepage_image',
+  'brand_image',
+  'category_image',
+  'logo_image',
+  'campaign_image',
+  'template_image',
 ] as const
 export type AiImageFeature = (typeof AI_IMAGE_FEATURES)[number]
 
-export const AI_VIDEO_FEATURES = ['social_video', 'homepage_video', 'offer_video'] as const
+export const AI_VIDEO_FEATURES = ['social_video', 'homepage_video', 'offer_video', 'template_video'] as const
 export type AiVideoFeature = (typeof AI_VIDEO_FEATURES)[number]
 
 export type AiQuality = 'draft' | 'standard' | 'premium'

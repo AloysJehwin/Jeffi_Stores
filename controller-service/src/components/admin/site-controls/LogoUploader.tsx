@@ -1,23 +1,27 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { Images } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import GalleryPicker from '@/components/admin/GalleryPicker'
+import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 
-export default function LogoUploader({ initialUrl }: { initialUrl: string }) {
+const sideBtn =
+  'control-md inline-flex items-center gap-1.5 border border-border-default text-xs font-semibold text-foreground hover:bg-surface-secondary disabled:opacity-50'
+
+export default function LogoUploader({ initialUrl, storeName }: { initialUrl: string; storeName?: string }) {
   const { showToast } = useToast()
   const [url, setUrl] = useState(initialUrl)
   const [busy, setBusy] = useState(false)
+  const [picker, setPicker] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  async function save(init: RequestInit) {
     setBusy(true)
     try {
-      const form = new FormData()
-      form.append('file', file)
-      const res = await fetch('/api/admin/site-controls/logo', { method: 'POST', body: form, credentials: 'include' })
+      const res = await fetch('/api/admin/site-controls/logo', { method: 'POST', credentials: 'include', ...init })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.url) {
         setUrl(data.url)
@@ -30,6 +34,18 @@ export default function LogoUploader({ initialUrl }: { initialUrl: string }) {
       if (inputRef.current) inputRef.current.value = ''
     }
   }
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const form = new FormData()
+    form.append('file', file)
+    await save({ body: form })
+  }
+
+  // Gallery and AI images are copied server-side from our own storage.
+  const fromUrl = (imageUrl: string) =>
+    save({ headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUrl }) })
 
   return (
     <div>
@@ -64,9 +80,34 @@ export default function LogoUploader({ initialUrl }: { initialUrl: string }) {
             >
               {busy ? 'Uploading…' : url ? 'Replace logo' : 'Upload logo'}
             </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setPicker(true)} disabled={busy} className={sideBtn}>
+                <Images className="h-3.5 w-3.5" /> Gallery
+              </button>
+              <AiMediaButton
+                feature="logo_image"
+                sizes={[AI_SIZE_PRESETS.landscape, AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.wide]}
+                defaultPrompt={
+                  storeName
+                    ? `Minimal wordmark logo for the store "${storeName}", bold modern lettering, plain white background, centred`
+                    : undefined
+                }
+                onPick={img => void fromUrl(img.url)}
+              />
+            </div>
           </RequireWrite>
         </div>
       </div>
+      {picker && (
+        <GalleryPicker
+          mode="single"
+          onClose={() => setPicker(false)}
+          onConfirm={imgs => {
+            setPicker(false)
+            if (imgs[0]) void fromUrl(imgs[0].image_url)
+          }}
+        />
+      )}
     </div>
   )
 }
