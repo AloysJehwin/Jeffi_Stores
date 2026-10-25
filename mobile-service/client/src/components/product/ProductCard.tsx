@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Heart, ImageIcon } from 'lucide-react-native'

@@ -1,4 +1,4 @@
-import { Linking, Pressable, ScrollView, Share, Text, View } from 'react-native'
+import { Linking, Pressable, ScrollView, Share, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
@@ -14,7 +14,7 @@ import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { SITE_URL } from '../../src/lib/links'
 import { showToast } from '../../src/stores/toastStore'
 import { accent, useTokens } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountReferrals.tsx (mobile layout).
 

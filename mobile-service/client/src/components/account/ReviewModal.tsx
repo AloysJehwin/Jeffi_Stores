@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Modal, Pressable, ScrollView, TextInput, View } from 'react-native'
+import { Text } from '../../ui'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { Image } from 'expo-image'
 import { generateReview, postForm, type OrderReview } from '../../api/account'

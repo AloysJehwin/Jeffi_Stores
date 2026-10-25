@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Modal, Pressable, Text, TextInput, View } from 'react-native'
+import { Modal, Pressable, TextInput, View } from 'react-native'
+import { Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { Glyph, P } from './Glyph'
 import { checkDelivery } from '../../api/pdp'

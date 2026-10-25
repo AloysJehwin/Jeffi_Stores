@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import { Glyph, P } from './Glyph'
 
 // Variant / sub-variant choice chips, shared by the product page and the quick-add sheet.

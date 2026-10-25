@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { ScrollView, View } from 'react-native'
+import { Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { getBuyAgain } from '../../api/account'

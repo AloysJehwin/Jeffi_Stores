@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ActivityIndicator, Alert, Linking, Pressable, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, Linking, Pressable, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
@@ -9,7 +9,7 @@ import AccountMobileHeader from '../../src/components/account/AccountMobileHeade
 import { useRequireAuth, useSignOut } from '../../src/components/account/hooks'
 import { checkAccountDeletion, deleteAccount, type DeletionBlocker } from '../../src/api/account'
 import { useTokens } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Account deletion, as on the web account page (controller-service components/visitor/account/DeleteAccountCard.tsx).
 

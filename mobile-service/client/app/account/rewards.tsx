@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pressable, Share, Text, TextInput, View } from 'react-native'
+import { Pressable, Share, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
@@ -13,7 +13,7 @@ import { useInfiniteList, useRequireAuth, type InfiniteList } from '../../src/co
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { showToast } from '../../src/stores/toastStore'
 import { useTokens } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountRewards.tsx (mobile layout).
 

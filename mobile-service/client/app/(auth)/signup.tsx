@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Text, TextInput, View, type TextInputProps } from 'react-native'
+import { TextInput, View, type TextInputProps } from 'react-native'
+import { Text } from '../../src/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import {

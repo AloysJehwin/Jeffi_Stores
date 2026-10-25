@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Pressable, Text, TextInput, View } from 'react-native'
+import { Pressable, TextInput, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { googleAuth, googleSignInIdToken, GOOGLE_WEB_CLIENT_ID, requestOtp, type OtpChannel } from '../../src/api/auth'
 import { AuthScreen, BigButton, FieldError, Frame, GoogleRow, TermsNote, TextAction } from '../../src/components/account/AuthScreen'
@@ -8,7 +8,7 @@ import { useFeatureFlagsState, useLeaveAuth, useSignOut, useLeaveIfSignedIn } fr
 import { finishSignIn, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
 import { useTokens } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Same flow as controller-service app/(auth)/login/page.tsx (identifier → OTP, Google, not-found → sign-up),
 // laid out the app's way: mobile number first when SMS or WhatsApp is on, email behind one tap.

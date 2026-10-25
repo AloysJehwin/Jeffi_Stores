@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Pressable, Text, View } from 'react-native'
+import { FlatList, Pressable, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
@@ -18,7 +18,7 @@ import { EmptyCard, InfiniteFooter, type InfiniteControl } from '../../src/compo
 import { SquaresIcon, TableIcon } from '../../src/components/catalog/icons'
 import { listingKey, readListingParams, toRouteParams, type ListingParams } from '../../src/components/catalog/listing'
 import { useCompareStore } from '../../src/stores/compareStore'
-import { ProductGridSkeleton, Skeleton } from '../../src/ui'
+import { Text, ProductGridSkeleton, Skeleton } from '../../src/ui'
 import { accent, useTokens } from '../../src/theme'
 import type { HomeSection } from '../../src/types/home'
 

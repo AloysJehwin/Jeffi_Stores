@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AccessibilityInfo, Dimensions, Text, View } from 'react-native'
+import { AccessibilityInfo, Dimensions, View } from 'react-native'
+import { Text } from '../../ui'
 import { Grid } from './layout'
 import type { SectionProps, ValueStat } from '../../types/home'
 

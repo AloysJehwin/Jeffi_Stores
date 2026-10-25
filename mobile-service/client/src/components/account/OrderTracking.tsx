@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { Modal, Pressable, ScrollView, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { getTracking, type TrackingData, type TrackingScan } from '../../api/account'
 import HeroIcon from './HeroIcon'
 import { accent, useTokens } from '../../theme'
-import { Skeleton } from '../../ui'
+import { Text, Skeleton } from '../../ui'
 
 // Mirror of controller-service components/DelhiveryTracking.tsx (customer variant).
 

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
-import { Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { Pressable, View, useWindowDimensions } from 'react-native'
+import { Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { ArrowRight } from 'lucide-react-native'

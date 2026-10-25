@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import ProductCard from '../product/ProductCard'
 import { Grid, SectionHeading } from './layout'
 import type { SectionProps } from '../../types/home'

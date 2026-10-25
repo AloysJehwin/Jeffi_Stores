@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import { Diamond, Flame, TriangleAlert } from 'lucide-react-native'
 import { status } from '../../theme'
 

@@ -1,4 +1,5 @@
-import { Linking, Pressable, Text, View } from 'react-native'
+import { Linking, Pressable, View } from 'react-native'
+import { Text } from '../../src/ui'
 import { Image } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'

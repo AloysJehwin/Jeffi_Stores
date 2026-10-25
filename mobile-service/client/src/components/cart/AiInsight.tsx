@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import { CircleCheck, Zap } from 'lucide-react-native'
 import { api } from '../../api/client'

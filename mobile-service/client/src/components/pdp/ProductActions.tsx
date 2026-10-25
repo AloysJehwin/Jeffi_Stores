@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react'
-import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native'
+import { ActivityIndicator, Linking, Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { Glyph, P } from './Glyph'
 import QuantityInput, { InCartQtyHint } from './QuantityInput'

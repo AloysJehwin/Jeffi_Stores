@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import {
-  Animated, Easing, Modal, Pressable, ScrollView, Text, TextInput,
-  TouchableOpacity, View, useWindowDimensions,
-} from 'react-native'
+import { Animated, Easing, Modal, Pressable, ScrollView, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardEvents } from 'react-native-keyboard-controller'
@@ -20,7 +17,7 @@ import { useThemeStore } from '../../stores/themeStore'
 import { openHref } from '../../lib/links'
 import { inr } from '../../lib/format'
 import { accent, useTokens } from '../../theme'
-import { Skeleton } from '../../ui'
+import { Text, Skeleton } from '../../ui'
 
 // Mirror of controller-service visitor/Header.tsx + MobileDrawer.tsx + SearchBar.tsx at the mobile breakpoint.
 

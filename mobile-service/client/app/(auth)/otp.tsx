@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Text, TextInput, View } from 'react-native'
+import { TextInput, View } from 'react-native'
+import { Text } from '../../src/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { loginWithOtp, requestOtp, type OtpChannel } from '../../src/api/auth'
 import { updateProfile } from '../../src/api/account'

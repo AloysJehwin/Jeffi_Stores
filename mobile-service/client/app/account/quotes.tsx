@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { FlatList, Text, View } from 'react-native'
+import { FlatList, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import TopNav from '../../src/components/layout/TopNav'
@@ -10,7 +10,7 @@ import { useAccountUser, useInfiniteList } from '../../src/components/account/ho
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { useAuthStore } from '../../src/stores/authStore'
 import { useTokens } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/account/quotes/page.tsx.
 

@@ -1,5 +1,5 @@
 import { useState, type RefObject } from 'react'
-import { Linking, Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { Linking, Modal, Pressable, ScrollView, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
@@ -8,7 +8,7 @@ import { getProductReviews, type PdpReview } from '../../api/pdp'
 import { SITE_URL } from '../../lib/links'
 import { useAuthStore } from '../../stores/authStore'
 import { showToast } from '../../stores/toastStore'
-import { Skeleton, SkeletonText } from '../../ui'
+import { Text, Skeleton, SkeletonText } from '../../ui'
 
 // Mirror of controller-service components/visitor/ProductReviews.tsx (list, rating summary, filter, sort,
 // read-more and photo views). Writing/editing posts multipart images, so it hands off to the storefront page.

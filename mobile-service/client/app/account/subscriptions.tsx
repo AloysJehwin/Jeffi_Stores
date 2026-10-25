@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
+import { Alert, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
@@ -13,7 +13,7 @@ import { useRequireAuth } from '../../src/components/account/hooks'
 import { absUrl } from '../../src/lib/links'
 import { showToast } from '../../src/stores/toastStore'
 import { useTokens } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/subscriptions/MySubscriptions.tsx (visitor).
 

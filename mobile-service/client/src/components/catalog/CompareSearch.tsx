@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Modal, Pressable, ScrollView, TextInput, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
@@ -8,7 +8,7 @@ import { searchProducts, type ProductSearchResult } from '../../api/products'
 import { absUrl } from '../../lib/links'
 import { inr } from '../../lib/format'
 import { accent, useTokens } from '../../theme'
-import { Skeleton } from '../../ui'
+import { Text, Skeleton } from '../../ui'
 
 // The compare page's product pickers: CompareAddButton ("Add product") and CompareChangeButton ("Change").
 // The web opens them as a dropdown under the button; here the same panel opens as a modal card.

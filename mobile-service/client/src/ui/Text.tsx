@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { createContext, forwardRef, useContext } from 'react'
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native'
 import { cn } from './cn'
 
@@ -19,20 +19,30 @@ function withDefaults(className = '', colour = 'text-foreground', family = 'font
   return cn(!hasFamily(className) && family, !hasColour(className) && colour, className)
 }
 
+// Nested Text inherits its parent's colour and family, so only the outermost one gets the defaults.
+const Nested = createContext(false)
+
 /** React Native's Text in the app's body face (Inter). Use it wherever a raw Text would go. */
-export const Text = forwardRef<RNText, TextProps>(function Text({ className, ...props }, ref) {
-  return <RNText ref={ref} className={withDefaults(className)} {...props} />
+export const Text = forwardRef<RNText, TextProps>(function Text({ className, children, ...props }, ref) {
+  const nested = useContext(Nested)
+  return (
+    <RNText ref={ref} className={nested ? className : withDefaults(className)} {...props}>
+      <Nested.Provider value>{children}</Nested.Provider>
+    </RNText>
+  )
 })
 
 function preset(base: string, opts: { colour?: string; family?: string; header?: boolean } = {}) {
-  return forwardRef<RNText, TextProps>(function Preset({ className, ...props }, ref) {
+  return forwardRef<RNText, TextProps>(function Preset({ className, children, ...props }, ref) {
     return (
       <RNText
         ref={ref}
         accessibilityRole={opts.header ? 'header' : undefined}
         className={cn(base, withDefaults(className, opts.colour, opts.family))}
         {...props}
-      />
+      >
+        <Nested.Provider value>{children}</Nested.Provider>
+      </RNText>
     )
   })
 }

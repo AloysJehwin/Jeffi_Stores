@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Linking, Pressable, ScrollView, TextInput, View } from 'react-native'
+import { Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming, Easing } from 'react-native-reanimated'
 import { Glyph, CHAT, CHEVRON_RIGHT } from './Glyph'

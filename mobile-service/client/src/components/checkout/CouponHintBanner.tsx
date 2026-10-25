@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import { getReviewCoupon } from '../../api/cart'
 import { useAuthStore } from '../../stores/authStore'

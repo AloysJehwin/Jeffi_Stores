@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../../src/ui'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { Image } from 'expo-image'

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { ActivityIndicator, Pressable, View, useWindowDimensions } from 'react-native'
+import { Text } from '../../ui'
 import Animated, {
   Easing,
   SlideInDown,

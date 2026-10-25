@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Alert, Pressable, Text, View } from 'react-native'
+import { Alert, Pressable, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
@@ -15,7 +15,7 @@ import { useRequireAuth } from '../../src/components/account/hooks'
 import { FilterChip } from '../../src/components/account/ui'
 import AddressForm, { emptyAddressForm as emptyForm, usePincodeLookup, type AddressFormData as FormData } from '../../src/components/account/AddressForm'
 import { useTokens } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/shared/AccountAddresses.tsx + AccountAddressForm.tsx (visitor).
 

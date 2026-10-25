@@ -1,4 +1,5 @@
-import { Pressable, Text, TextInput, View } from 'react-native'
+import { Pressable, TextInput, View } from 'react-native'
+import { Text } from '../../ui'
 import { Glyph, P } from './Glyph'
 import { fmtQty, unitText } from './pdp'
 import { unitCapError, type PickerQtyCap } from './useProductPurchase'

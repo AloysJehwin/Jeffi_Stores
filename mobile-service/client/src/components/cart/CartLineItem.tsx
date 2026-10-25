@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, TextInput, View } from 'react-native'
+import { Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { Minus, Plus } from 'lucide-react-native'
 import type { CartLine } from '../../api/cart'

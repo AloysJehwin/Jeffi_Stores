@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, View } from 'react-native'
+import { Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import Svg, { Path } from 'react-native-svg'
 import ProductCard from '../product/ProductCard'
