@@ -218,7 +218,51 @@ CREATE TABLE public.notifications (
     message text,
     link character varying(500),
     is_read boolean DEFAULT false,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    category character varying(24),
+    image_url character varying(500),
+    source character varying(16),
+    source_ref character varying(120),
+    opened_at timestamp with time zone
+);
+
+
+--
+-- Name: push_devices; Type: TABLE; Schema: public; Owner: -
+-- App installs that can receive a push. user_id is NULL for a signed-out install.
+--
+
+CREATE TABLE public.push_devices (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid,
+    token text NOT NULL,
+    platform character varying(16) NOT NULL,
+    app_version character varying(40),
+    os_version character varying(40),
+    locale character varying(35),
+    timezone character varying(64) DEFAULT 'Asia/Kolkata'::character varying,
+    offers_opt_in boolean DEFAULT false NOT NULL,
+    offers_opt_in_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    disabled_at timestamp with time zone,
+    disabled_reason character varying(64)
+);
+
+
+--
+-- Name: notification_preferences; Type: TABLE; Schema: public; Owner: -
+-- Per-category channel choices. A missing row means the category default.
+--
+
+CREATE TABLE public.notification_preferences (
+    user_id uuid NOT NULL,
+    category character varying(24) NOT NULL,
+    push boolean DEFAULT true NOT NULL,
+    email boolean DEFAULT true NOT NULL,
+    sms boolean DEFAULT true NOT NULL,
+    whatsapp boolean DEFAULT true NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 CREATE TABLE public.admin_notifications (

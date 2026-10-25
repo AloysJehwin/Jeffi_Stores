@@ -1055,6 +1055,12 @@ CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (c
 
 CREATE INDEX idx_notifications_user_id ON public.notifications USING btree (user_id);
 
+CREATE INDEX idx_notifications_user_created ON public.notifications USING btree (user_id, created_at DESC);
+
+CREATE INDEX idx_notifications_user_unread ON public.notifications USING btree (user_id) WHERE (is_read = false);
+
+CREATE INDEX idx_push_devices_user_active ON public.push_devices USING btree (user_id) WHERE (disabled_at IS NULL);
+
 CREATE INDEX idx_admin_notifications_unread ON public.admin_notifications USING btree (is_read, created_at DESC);
 
 CREATE INDEX idx_admin_notifications_entity ON public.admin_notifications USING btree (entity_type, entity_id);

@@ -21,6 +21,7 @@
     "@jeffi/api-contracts": "*",
     "@jeffi/bulk": "*",
     "@jeffi/pricing": "*",
+    "@jeffi/push": "*",
     "@jeffi/service-auth": "*",
     "@jeffi/tenancy": "*",
     "@jeffi/wallet": "*",
