@@ -73,6 +73,8 @@
 
   html {
     @apply bg-surface;
+    /* No rubber-band past the page ends, which showed a pale strip under the dark footer. */
+    overscroll-behavior-y: none;
   }
 
   body {
