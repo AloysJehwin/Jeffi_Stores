@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Modal, Pressable, ScrollView, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardEvents } from 'react-native-keyboard-controller'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, CircleX, Clock, ImageIcon, Layers, Menu, Search, ShoppingCart, User, X } from 'lucide-react-native'
+import { Bell, ChevronRight, CircleX, Clock, ImageIcon, Layers, Menu, Search, ShoppingCart, User, X } from 'lucide-react-native'
 import { api } from '../../api/client'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
+import { useUnreadCount } from '../../hooks/useNotifications'
 import { useCartStore } from '../../stores/cartStore'
 import { useAuthStore } from '../../stores/authStore'
 import { inr } from '../../lib/format'
@@ -86,6 +87,9 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
   const cartCount = useCartStore(s => s.count)
   const user = useAuthStore(s => s.user)
   const { identity } = useStoreConfig()
+  const unread = useUnreadCount()
+  const refreshUnread = unread.refresh
+  useFocusEffect(useCallback(() => refreshUnread(), [refreshUnread]))
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -179,6 +183,14 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
 
           <View className="flex-row items-center gap-1 shrink-0">
             <IconButton icon={Search} label="Search" color={iconColor} onPress={openSearch} />
+            <IconButton
+              icon={Bell}
+              label="Notifications"
+              badge={unread.count}
+              accessibilityLabel={unread.count > 0 ? `Notifications, ${unread.count} unread` : 'Notifications'}
+              color={iconColor}
+              onPress={() => router.push('/notifications')}
+            />
             <IconButton
               icon={ShoppingCart}
               label="Cart"
