@@ -152,6 +152,7 @@ function Slide({ slide, layout, aspect, seconds, preview }: SlideProps) {
         blurhashCard={hash}
         alt={slide.title}
         loading={current ? 'eager' : 'lazy'}
+        sizes={wide ? '100vw' : undefined}
         className={cls}
       />
     </PromoMedia>

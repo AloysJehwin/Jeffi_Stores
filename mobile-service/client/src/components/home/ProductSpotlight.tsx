@@ -10,7 +10,7 @@ import { Eyebrow } from './layout'
 import { useHomeScrollY } from './scroll-context'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { inr } from '../../lib/format'
-import { absUrl } from '../../lib/links'
+import { useImageSource } from '../../hooks/useImageSource'
 import { openQuickAdd } from '../../stores/quickAddStore'
 import { useTokens } from '../../theme'
 import type { SectionCopy, SectionProps, SpotlightData } from '../../types/home'
@@ -40,7 +40,7 @@ function Card({ spot, copy }: { spot: SpotlightData; copy: SectionCopy }) {
   const inStock = (digitalProductsEnabled && product.isDigital) || product.effectiveStock > 0
   const animate = !!scrollY && !reduceMotion
   const img = product.primaryImage
-  const uri = img ? (absUrl(img.image_url) ?? img.image_url) : null
+  const source = useImageSource()(img?.image_url, width - 72)
   const showMrp = product.mrp != null && product.mrp > product.displayPrice
   const title = headline ?? product.name
   const viewportBottom = height - TAB_BAR - insets.bottom
@@ -84,9 +84,9 @@ function Card({ spot, copy }: { spot: SpotlightData; copy: SectionCopy }) {
     <View className="bg-surface px-4 py-8">
       <View ref={ref} collapsable={false} onLayout={measure} className="overflow-hidden rounded-sheet bg-surface-secondary p-5">
         <Animated.View style={imageStyle} className="aspect-square w-full items-center justify-center overflow-hidden rounded-panel bg-surface-elevated">
-          {uri ? (
+          {source ? (
             <Image
-              source={{ uri }}
+              source={source}
               placeholder={img?.blurhash ? { blurhash: img.blurhash } : undefined}
               style={{ width: '100%', height: '100%' }}
               contentFit="contain"

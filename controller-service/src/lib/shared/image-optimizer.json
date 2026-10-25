@@ -1,0 +1,12 @@
+{
+  "hosts": [
+    "dm9rri2wgl1e.cloudfront.net",
+    "jeffi-stores-bucket.s3.us-east-1.amazonaws.com",
+    "jeffi-stores-bucket.s3.amazonaws.com",
+    "jeffi-tenant-*.s3.us-east-1.amazonaws.com",
+    "jeffi-tenant-*.s3.amazonaws.com"
+  ],
+  "deviceSizes": [640, 750, 828, 1080, 1200, 1440, 1920],
+  "imageSizes": [32, 48, 64, 96, 128, 256, 384],
+  "quality": 70
+}

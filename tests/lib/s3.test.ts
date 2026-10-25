@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockSend } = vi.hoisted(() => {
+const { mockSend, encoded } = vi.hoisted(() => {
   const mockSend = vi.fn().mockResolvedValue({})
-  return { mockSend }
+  // toBuffer({ resolveWithObject }) resolves { data, info } like sharp's.
+  const encoded = (width: number, height: number) =>
+    vi
+      .fn()
+      .mockImplementation(async (o?: { resolveWithObject?: boolean }) =>
+        o?.resolveWithObject ? { data: Buffer.from('img'), info: { width, height } } : Buffer.from('thumb')
+      )
+  return { mockSend, encoded }
 })
 
 vi.mock('@aws-sdk/client-s3', () => {
@@ -30,7 +37,8 @@ vi.mock('sharp', () => {
     resize: vi.fn().mockReturnThis(),
     jpeg: vi.fn().mockReturnThis(),
     png: vi.fn().mockReturnThis(),
-    toBuffer: vi.fn().mockResolvedValue(Buffer.from('thumb')),
+    webp: vi.fn().mockReturnThis(),
+    toBuffer: encoded(800, 600),
     metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
   }
   return { default: vi.fn().mockReturnValue(instance) }
@@ -207,18 +215,25 @@ describe('uploadGalleryImage', () => {
     const buf = Buffer.from('img data')
     const result = await uploadGalleryImage(buf, 'my image!.png')
     expect(result.s3Key).toContain('gallery/')
+    expect(result.s3Key).toMatch(/\.webp$/)
     expect(result.s3ThumbnailKey).toContain('gallery/thumbnails/')
-    expect(result.fileName).toContain('.png')
+    expect(result.fileName).toContain('.webp')
+    expect(result.mimeType).toBe('image/webp')
+    expect(result.width).toBe(800)
+    const png = await uploadGalleryImage(buf, 'mail.jpg', { format: 'png' })
+    expect(png.fileName).toBe('mail.png')
+    expect(png.mimeType).toBe('image/png')
   })
 
-  it('returns 0 for width when metadata.width is falsy', async () => {
+  it('returns 0 for width when the encoded width is falsy', async () => {
     const sharp = ((await import('sharp')) as any).default
     const instance = {
       rotate: vi.fn().mockReturnThis(),
       resize: vi.fn().mockReturnThis(),
       jpeg: vi.fn().mockReturnThis(),
       png: vi.fn().mockReturnThis(),
-      toBuffer: vi.fn().mockResolvedValue(Buffer.from('thumb')),
+      webp: vi.fn().mockReturnThis(),
+      toBuffer: encoded(0, 0),
       metadata: vi.fn().mockResolvedValue({ width: 0, height: 0 }),
     }
     sharp.mockReturnValueOnce(instance).mockReturnValueOnce(instance)

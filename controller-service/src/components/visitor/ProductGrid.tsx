@@ -9,6 +9,7 @@ import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 import { round2 } from '@/lib/catalog/gst'
 import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { onImgError, responsiveImg } from '@/lib/shared/image-url'
 
 interface ProductItem {
   is_digital?: boolean
@@ -205,7 +206,8 @@ function CategoryBannerRow({
                       <div className="aspect-square overflow-hidden rounded-md bg-surface flex items-center justify-center">
                         {img ? (
                           <img
-                            src={img.thumbnail_url || img.image_url}
+                            {...responsiveImg(img.thumbnail_url || img.image_url, '(min-width: 768px) 120px, 25vw')}
+                            onError={onImgError}
                             alt={p.name}
                             className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                           />
@@ -250,7 +252,8 @@ function TableRow({
       <div className="w-10 h-10 shrink-0 rounded-lg bg-surface-secondary border border-border-default overflow-hidden">
         {img ? (
           <img
-            src={img.thumbnail_url || img.image_url}
+            {...responsiveImg(img.thumbnail_url || img.image_url, '40px')}
+            onError={onImgError}
             alt={product.name}
             className="w-full h-full object-contain p-1"
           />

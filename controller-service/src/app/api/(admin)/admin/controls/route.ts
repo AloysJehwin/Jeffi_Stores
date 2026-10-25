@@ -724,7 +724,7 @@ async function handleBulkImages(request: NextRequest, admin: { email?: string | 
             s3ThumbnailKey: c.s3ThumbnailKey,
             fileName: gallery!.file_name,
             fileSize: gallery!.file_size,
-            mimeType: gallery!.mime_type,
+            mimeType: c.mimeType ?? gallery!.mime_type,
             width: gallery!.width,
             height: gallery!.height,
           }

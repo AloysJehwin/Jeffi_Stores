@@ -1,4 +1,4 @@
-import { Linking } from 'react-native'
+import { Linking, PixelRatio } from 'react-native'
 import type { Router } from 'expo-router'
 
 // Storefront assets (/images/…) are served by the web host, not the API host.
@@ -10,6 +10,51 @@ export function absUrl(url: string | null | undefined): string | null {
   if (!u) return null
   if (/^https?:\/\//i.test(u)) return u
   return u.startsWith('/') ? `${SITE_URL}${u}` : null
+}
+
+// Mirrors controller-service/src/lib/shared/image-optimizer.json: the hosts the web host's /_next/image
+// fetches and the widths it serves.
+const RESIZE_HOSTS = [
+  /^dm9rri2wgl1e\.cloudfront\.net$/i,
+  /^jeffi-stores-bucket\.s3(?:\.us-east-1)?\.amazonaws\.com$/i,
+  /^jeffi-tenant-[a-z0-9-]+\.s3(?:\.us-east-1)?\.amazonaws\.com$/i,
+]
+const RESIZE_WIDTHS = [32, 48, 64, 96, 128, 256, 384, 640, 750, 828, 1080, 1200, 1440, 1920]
+const MAX_WIDTH = RESIZE_WIDTHS[RESIZE_WIDTHS.length - 1]
+const NO_RESIZE = /\.(?:gif|svg)$/i
+const SITE_PREFIX = `${SITE_URL}/`
+const RESIZED = `${SITE_URL}/_next/image?url=`
+// /_next/image answers in WebP only when Accept names it; the native loaders send image/* or nothing.
+const WEBP_ACCEPT = { Accept: 'image/webp,image/*;q=0.8' }
+
+/**
+ * A storefront image resized by the web host (/_next/image, WebP) to the smallest served width that
+ * covers `width` dp at this screen density. GIFs, SVGs and other hosts keep their absUrl. `resize` is
+ * the backend's image_resize flag (useImageSource). One URL per width, so expo-image caches it.
+ */
+export function imageUri(url: string | null | undefined, width: number, resize: boolean): string | null {
+  const abs = absUrl(url)
+  if (!abs || !resize || !(width > 0)) return abs
+  const m = /^https:\/\/([^/?#]+)(\/[^?#]*)?/i.exec(abs)
+  if (!m || NO_RESIZE.test(m[2] ?? '')) return abs
+  const site = abs.startsWith(SITE_PREFIX)
+  if (site ? abs.startsWith(`${SITE_URL}/_next/`) : !RESIZE_HOSTS.some(re => re.test(m[1]))) return abs
+  const px = Math.min(Math.ceil(width * PixelRatio.get()), MAX_WIDTH)
+  const w = RESIZE_WIDTHS.find(x => x >= px) ?? MAX_WIDTH
+  const src = site ? abs.slice(SITE_URL.length) : abs
+  return `${RESIZED}${encodeURIComponent(src)}&w=${w}&q=70`
+}
+
+export interface RemoteImage {
+  uri: string
+  headers?: Record<string, string>
+}
+
+/** imageUri as an image source (expo-image, react-native-svg). */
+export function imageSource(url: string | null | undefined, width: number, resize: boolean): RemoteImage | undefined {
+  const uri = imageUri(url, width, resize)
+  if (!uri) return undefined
+  return uri.startsWith(RESIZED) ? { uri, headers: WEBP_ACCEPT } : { uri }
 }
 
 const PRODUCT_PARAMS = ['category', 'brand', 'search', 'q', 'grade', 'material', 'minPrice', 'maxPrice', 'inStock', 'onSale', 'offer', 'sort']

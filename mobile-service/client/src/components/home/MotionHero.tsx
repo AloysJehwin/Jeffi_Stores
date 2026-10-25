@@ -7,7 +7,8 @@ import { useRouter } from 'expo-router'
 import Animated from 'react-native-reanimated'
 import { SlideCta } from './layout'
 import { useOnScreen } from './scroll-context'
-import { absUrl, openHref } from '../../lib/links'
+import { absUrl, openHref, type RemoteImage } from '../../lib/links'
+import { useImageSource } from '../../hooks/useImageSource'
 import { radius, status } from '../../theme'
 import type { MotionHeroData, MotionHeroSlide, SectionProps } from '../../types/home'
 
@@ -49,6 +50,7 @@ function Card({ slide, info, active }: { slide: MotionHeroSlide; info: PageInfo;
   const { width: w, height: h } = info
   const bg = absUrl(slide.bgImage)
   const fg = absUrl(slide.fgImage)
+  const imgSource = useImageSource()
   const frame = slide.fgFrame ?? 'none'
   const titleSize = Math.min(40, Math.max(26, Math.round(w * 0.085)))
 
@@ -60,18 +62,18 @@ function Card({ slide, info, active }: { slide: MotionHeroSlide; info: PageInfo;
   return (
     <View style={{ width: w, height: h }} className="overflow-hidden rounded-sheet bg-black">
       <Animated.View style={[FILL, bgStyle]}>
-        <Media image={bg} video={slide.bgVideo} style={FILL} transition={300} active={active} />
+        <Media image={bg} video={slide.bgVideo} style={FILL} width={w * 1.12} transition={300} active={active} />
       </Animated.View>
       <Gradient dir="b" stops={[[0, status.black, 0.35], [0.4, status.black, 0], [1, status.black, 0.9]]} />
 
       {fg && frame === 'none' ? (
         <Animated.View pointerEvents="none" style={[{ position: 'absolute', right: 0, bottom: 0, width: w * 0.5, height: h * 0.72 }, fgStyle]}>
-          <Image source={{ uri: fg }} style={{ width: '100%', height: '100%' }} contentFit="contain" contentPosition="bottom right" transition={300} />
+          <Image source={imgSource(fg, w * 0.5)} style={{ width: '100%', height: '100%' }} contentFit="contain" contentPosition="bottom right" transition={300} />
         </Animated.View>
       ) : fg ? (
         // A framed photo sits top right, clear of the copy at the bottom.
         <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 16, right: 16, width: w * 0.46, height: h * 0.44, alignItems: 'flex-end' }, fgStyle]}>
-          <Framed uri={fg} fade={frame === 'fade'} boxW={w * 0.46} boxH={h * 0.44} />
+          <Framed source={imgSource(fg, w * 0.46)} fade={frame === 'fade'} boxW={w * 0.46} boxH={h * 0.44} />
         </Animated.View>
       ) : null}
 
@@ -105,7 +107,7 @@ function Card({ slide, info, active }: { slide: MotionHeroSlide; info: PageInfo;
 const FEATHER = [0, 0.14, 0.86, 1] as const
 
 // Hugs the photo's own aspect so the rounded corners or the feathered edges follow it, not the box.
-function Framed({ uri, fade, boxW, boxH }: { uri: string; fade: boolean; boxW: number; boxH: number }) {
+function Framed({ source, fade, boxW, boxH }: { source?: RemoteImage; fade: boolean; boxW: number; boxH: number }) {
   const [ratio, setRatio] = useState<number | null>(null)
   const id = `f${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const fit = ratio == null ? null : ratio > boxW / boxH ? { width: boxW, height: boxW / ratio } : { width: boxH * ratio, height: boxH }
@@ -130,7 +132,7 @@ function Framed({ uri, fade, boxW, boxH }: { uri: string; fade: boolean; boxW: n
             <Rect width="100%" height="100%" fill={`url(#${id}v)`} />
           </Mask>
         </Defs>
-        <SvgImage href={{ uri }} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" mask={`url(#${id})`} />
+        <SvgImage href={source} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" mask={`url(#${id})`} />
       </Svg>
     )
   }
@@ -141,7 +143,7 @@ function Framed({ uri, fade, boxW, boxH }: { uri: string; fade: boolean; boxW: n
       style={{ width: fit?.width ?? boxW, height: fit?.height ?? boxH, borderRadius: radius.hero, opacity: fit ? 1 : 0 }}
     >
       <Image
-        source={{ uri }}
+        source={source}
         style={{ width: '100%', height: '100%' }}
         contentFit="cover"
         transition={300}

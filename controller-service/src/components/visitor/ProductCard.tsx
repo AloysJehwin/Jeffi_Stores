@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import { backdropImg, onImgError } from '@/lib/shared/image-url'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
@@ -36,6 +37,9 @@ interface ProductCardProps {
   isDigital?: boolean
   portal?: 'storefront' | 'business'
 }
+
+// Two columns on phones, two or three beside the filters on wider screens.
+const CARD_SIZES = '(min-width: 1280px) 30vw, (min-width: 768px) 40vw, 50vw'
 
 export default function ProductCard({
   id,
@@ -191,7 +195,8 @@ export default function ProductCard({
           {primaryImage ? (
             <>
               <img
-                src={primaryImage.image_url}
+                {...backdropImg(primaryImage.image_url)}
+                onError={onImgError}
                 alt=""
                 aria-hidden="true"
                 className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60 transition-opacity duration-300 group-hover:opacity-80"
@@ -201,6 +206,7 @@ export default function ProductCard({
                   src={primaryImage.image_url}
                   alt={name}
                   blurhash={primaryImage.blurhash}
+                  sizes={CARD_SIZES}
                   className="w-full h-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
                 />
               </div>

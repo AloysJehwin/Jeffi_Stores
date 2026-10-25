@@ -5,6 +5,7 @@ import { listAccounts } from '@/lib/social/accounts'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { metaAdsGraph, type MetaGraph } from './client'
 import { utmLink, type MadsNewAd, type MadsSwapImage } from './creative-spec'
+import { asJpegOrPng } from '@/lib/shared/image-compat'
 
 // Image ads: upload the image to the ad account (image_hash), create a creative on the store's
 // connected Page (and Instagram account), then create the ad or point an existing ad at it.
@@ -49,6 +50,7 @@ export function isOwnMediaUrl(raw: string): boolean {
   return /^[a-z0-9][a-z0-9.-]*\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/i.test(u.host)
 }
 
+/** Our own media's bytes as stored; ad uploads pass them through asJpegOrPng (Meta takes JPEG/PNG). */
 export async function fetchImageBytes(url: string): Promise<Buffer> {
   if (!isOwnMediaUrl(url)) throw new Error('Use a product photo, an upload or an AI image (our own media only).')
   const res = await fetch(url, { redirect: 'error' })
@@ -179,7 +181,7 @@ export async function runMadsNewAd(a: MadsNewAd, actor: ChangeActor, preview: bo
   const build = async (validateOnly: boolean) => {
     const { graph, cfg } = await metaAdsGraph()
     const account = cfg.ad_account_id
-    const hash = await uploadAdImage(graph, account, await fetchImageBytes(a.imageUrl))
+    const hash = await uploadAdImage(graph, account, await asJpegOrPng(await fetchImageBytes(a.imageUrl)))
     const spec = objectStorySpec({ pageId: page!.pageId, igUserId: page!.igUserId, imageHash: hash, ...copy })
     const creativeName = `${a.name} creative`
     if (validateOnly) {
@@ -234,7 +236,7 @@ export async function runMadsSwapImage(a: MadsSwapImage, actor: ChangeActor, pre
     const { graph, cfg } = await metaAdsGraph()
     const cur = await currentLinkSpec(graph, a.adId)
     if (typeof cur === 'string') throw new Error(cur)
-    const hash = await uploadAdImage(graph, cfg.ad_account_id, await fetchImageBytes(a.imageUrl))
+    const hash = await uploadAdImage(graph, cfg.ad_account_id, await asJpegOrPng(await fetchImageBytes(a.imageUrl)))
     const spec = withImage(cur.spec, hash)
     if (validateOnly) {
       await createAdCreative(graph, cfg.ad_account_id, cur.name, spec, true)

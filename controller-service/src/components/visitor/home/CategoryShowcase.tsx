@@ -2,6 +2,7 @@ import Link from 'next/link'
 import SectionCarousel from '@/components/visitor/SectionCarousel'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
+import { responsiveImg } from '@/lib/shared/image-url'
 
 const COPY = SECTION_COPY_DEFAULTS.category_showcase
 
@@ -63,7 +64,7 @@ export default function CategoryShowcase({
               <div className="aspect-square overflow-hidden rounded-lg bg-surface-secondary flex items-center justify-center">
                 {img ? (
                   <img
-                    src={img.thumbnail_url || img.image_url}
+                    {...responsiveImg(img.thumbnail_url || img.image_url, '(min-width: 768px) 160px, 33vw')}
                     alt={p.name}
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                   />

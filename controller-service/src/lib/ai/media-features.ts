@@ -18,6 +18,18 @@ export const AI_IMAGE_FEATURES = [
 ] as const
 export type AiImageFeature = (typeof AI_IMAGE_FEATURES)[number]
 
+// Images for clients that can't rely on WebP (email, WhatsApp, push, social and ad networks) and
+// product photos, which feed all of those; they are stored as PNG. Everything else is WebP.
+export const PNG_IMAGE_FEATURES: readonly string[] = [
+  'email_hero',
+  'campaign_image',
+  'template_image',
+  'social_image',
+  'ads_image',
+  'meta_ads_image',
+  'product_image',
+] satisfies readonly AiImageFeature[]
+
 export const AI_VIDEO_FEATURES = ['social_video', 'homepage_video', 'offer_video', 'template_video'] as const
 export type AiVideoFeature = (typeof AI_VIDEO_FEATURES)[number]
 

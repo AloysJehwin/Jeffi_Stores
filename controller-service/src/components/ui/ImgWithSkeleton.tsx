@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import BlurhashCanvas from './BlurhashCanvas'
+import { fallBackToOriginal, srcSetFor } from '@/lib/shared/image-url'
 
 interface ImgWithSkeletonProps {
   src: string
@@ -10,11 +11,14 @@ interface ImgWithSkeletonProps {
   /** Colour placeholder shown while loading. Falls back to the shimmer when absent or invalid. */
   blurhash?: string | null
   loading?: 'eager' | 'lazy'
+  /** Rendered width; with it storefront photos get a resized srcset (lib/shared/image-url). */
+  sizes?: string
 }
 
-export default function ImgWithSkeleton({ src, alt, className, blurhash, loading }: ImgWithSkeletonProps) {
+export default function ImgWithSkeleton({ src, alt, className, blurhash, loading, sizes }: ImgWithSkeletonProps) {
   const [loaded, setLoaded] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
+  const srcSet = sizes ? srcSetFor(src, sizes) : undefined
 
   useEffect(() => {
     setLoaded(false)
@@ -44,12 +48,16 @@ export default function ImgWithSkeleton({ src, alt, className, blurhash, loading
         ))}
       <img
         ref={imgRef}
+        sizes={srcSet ? sizes : undefined}
+        srcSet={srcSet}
         src={src}
         alt={alt}
         loading={loading}
         className={`${className ?? ''} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(true)}
+        onError={e => {
+          if (!fallBackToOriginal(e.currentTarget)) setLoaded(true)
+        }}
       />
     </div>
   )

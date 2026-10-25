@@ -3,12 +3,22 @@ import { api } from './client'
 export interface AppConfig {
   min_app_version: string
   site_url: string
+  /** The web host resizes our images (/_next/image); absent on older backends. */
+  image_resize?: boolean
 }
 
 /** mobile-service GET /v1/app/config: the oldest app build the backend still serves. */
 export function getAppConfig(): Promise<AppConfig> {
   return api<AppConfig>('/v1/app/config', { token: null })
 }
+
+/** One cached config for every reader (UpdatePrompt, useImageSource). */
+export const appConfigQuery = {
+  queryKey: ['app-config'],
+  queryFn: getAppConfig,
+  staleTime: 60 * 60_000,
+  retry: 0,
+} as const
 
 /** True when `current` (x.y.z) is older than `min`. Unknown versions never count as old. */
 export function isOlderVersion(current: string | null | undefined, min: string | null | undefined): boolean {

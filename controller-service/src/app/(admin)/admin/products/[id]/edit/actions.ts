@@ -1076,7 +1076,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
               copied.s3ThumbnailKey,
               gimg.custom_name || gimg.file_name,
               gimg.file_size,
-              gimg.mime_type,
+              copied.mimeType ?? gimg.mime_type,
               gimg.width,
               gimg.height,
             ]

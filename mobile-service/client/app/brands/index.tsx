@@ -7,6 +7,7 @@ import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRight, Tag } from 'lucide-react-native'
 import { EmptyCard } from '../../src/components/catalog/Paged'
 import { absUrl } from '../../src/lib/links'
+import { useImageSource } from '../../src/hooks/useImageSource'
 import { useTokens } from '../../src/theme'
 import { Card, ErrorState, Screen, ScreenHeader, Skeleton, Text, useBottomInset } from '../../src/ui'
 
@@ -17,13 +18,14 @@ function BrandCard({ brand }: { brand: BrandWithCount }) {
   const t = useTokens()
   const n = brand.product_count
   const logo = absUrl(brand.logo_url)
+  const logoSource = useImageSource()(logo, 56)
 
   return (
     <Card onPress={() => router.push(`/brands/${brand.slug}`)} accessibilityLabel={`${brand.name}, ${n} ${n === 1 ? 'product' : 'products'}`}>
       <View className="mb-4 flex-row items-start gap-4">
         <View className="h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
           {logo ? (
-            <Image recyclingKey={logo} source={{ uri: logo }} contentFit="contain" style={{ width: '100%', height: '100%', margin: 4 }} />
+            <Image recyclingKey={logo} source={logoSource} contentFit="contain" style={{ width: '100%', height: '100%', margin: 4 }} />
           ) : (
             <Tag size={32} strokeWidth={1.5} color={t.foregroundMuted} />
           )}

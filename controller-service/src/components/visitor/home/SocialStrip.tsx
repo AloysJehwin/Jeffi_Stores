@@ -57,6 +57,7 @@ export default function SocialStrip({ items, eyebrow, title, ctaLabel, ctaUrl }:
                 image={item.imageUrl}
                 video={item.video}
                 alt={item.caption}
+                sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 160px"
                 wrapperClassName="absolute inset-0"
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />

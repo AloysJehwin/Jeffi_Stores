@@ -3,6 +3,8 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { uploadTemplateAsset } from '@jeffi/tenancy'
 import { readUpload } from '@/lib/shared/form-file'
+import { fetchImageBytes } from '@/lib/meta-ads/creative'
+import { toPng } from '@/lib/shared/image-compat'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -27,6 +29,22 @@ export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!EDIT_SCOPES.some(s => hasScope(admin.role, admin.scopes, s))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // JSON { imageUrl }: a gallery image (our own media only) copied as PNG for a field whose clients
+  // can't show WebP (email, WhatsApp, push, social).
+  if ((req.headers.get('content-type') || '').includes('application/json')) {
+    const body = await req.json().catch(() => ({}))
+    if (typeof body.imageUrl !== 'string') return NextResponse.json({ error: 'imageUrl is required' }, { status: 400 })
+    let png: Buffer
+    try {
+      png = await toPng(await fetchImageBytes(body.imageUrl))
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message || 'Could not read the image' }, { status: 400 })
+    }
+    if (png.length > MAX_BYTES) return NextResponse.json({ error: 'Image too large (max 5 MB)' }, { status: 413 })
+    const r = await uploadTemplateAsset(png, null, 'image/png')
+    return NextResponse.json({ url: r.url, key: r.key })
+  }
 
   const up = await readUpload(req, 'admin/uploads/image')
   if ('error' in up) return NextResponse.json({ error: up.error }, { status: 400 })

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { mrpDiscountPct } from '@/lib/catalog/pricing'
+import { onImgError, responsiveImg } from '@/lib/shared/image-url'
 
 interface Product {
   id: string
@@ -47,7 +48,8 @@ export default function FeaturedProducts() {
               <div className="relative aspect-square bg-surface overflow-hidden">
                 {image ? (
                   <img
-                    src={image.thumbnail_url}
+                    {...responsiveImg(image.thumbnail_url, '(min-width: 768px) 200px, 50vw')}
+                    onError={onImgError}
                     alt={p.name}
                     className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
                   />

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { AppState, View, type StyleProp, type ViewStyle } from 'react-native'
+import { AppState, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native'
 import { requireOptionalNativeModule, useEventListener } from 'expo'
 import { Image } from 'expo-image'
 import { absUrl } from '../lib/links'
+import { useImageSource } from '../hooks/useImageSource'
 import { useMotion, useScreenReader } from './motion'
 
 // A picture, or a muted looping clip over it as its poster. Binaries built before expo-video have no
@@ -33,6 +34,8 @@ export interface MediaProps {
   contentFit?: MediaFit
   /** The box; poster and clip fill it. */
   style?: StyleProp<ViewStyle>
+  /** The box's width in dp, for the resized poster; defaults to the screen width. */
+  width?: number
   /** The clip plays only while true (the page on show); otherwise its player is released. */
   active?: boolean
   /** Holds a playing clip, e.g. a finger down on a story. */
@@ -56,8 +59,9 @@ export function useVideoAllowed() {
 }
 
 export function Media(props: MediaProps) {
-  const { image, video, blurhash, contentFit = 'cover', style, transition = 200, accessibilityLabel } = props
-  const src = absUrl(image)
+  const { image, video, blurhash, contentFit = 'cover', style, width, transition = 200, accessibilityLabel } = props
+  const screen = useWindowDimensions().width
+  const source = useImageSource()(image, width ?? screen)
   const uri = absUrl(video)
   return (
     <View
@@ -66,7 +70,7 @@ export function Media(props: MediaProps) {
       {...(accessibilityLabel ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel } : null)}
     >
       <Image
-        source={src ? { uri: src } : undefined}
+        source={source}
         placeholder={blurhash ? { blurhash } : undefined}
         style={FILL}
         contentFit={contentFit}

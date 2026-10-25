@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import StoreImage from '@/components/visitor/StoreImage'
+import { optimizedUrl } from '@/lib/shared/image-url'
 
 const REDUCED = '(prefers-reduced-motion: reduce)'
 const GIF = /\.gif(?:[?#]|$)/i
@@ -95,7 +96,8 @@ export default function StoreMedia({
         <Clip
           key={video}
           src={video}
-          poster={image}
+          // The picture shows through until the first frame, so a resized poster is plenty.
+          poster={image ? optimizedUrl(image, 1080) : image}
           // The picture carries the name; a clip without one is named itself.
           label={image ? undefined : alt || undefined}
           className={cls}

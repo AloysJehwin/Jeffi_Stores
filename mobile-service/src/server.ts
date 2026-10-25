@@ -71,6 +71,36 @@ await app.register(rateLimit, {
 // ── Native: what the app needs before it can do anything else ──
 // Bump MIN_APP_VERSION to force an update; the app compares against its own version on launch.
 const MIN_APP_VERSION = process.env.MIN_APP_VERSION || '1.0.0'
+// The web host's /_next/image serves the app's resized images; APP_IMAGE_RESIZE=false sends it the originals.
+const IMAGE_RESIZE = process.env.APP_IMAGE_RESIZE !== 'false'
+// On only once the web host resizes a real gallery image: a release can roll this service out before the controller
+// that allows the CDN host. Re-checked hourly when on, every 5 minutes while off.
+let resizeProbe: { at: number; ok: boolean } | null = null
+async function imageResizeReady(): Promise<boolean> {
+  if (!IMAGE_RESIZE) return false
+  if (resizeProbe && Date.now() - resizeProbe.at < (resizeProbe.ok ? 3_600_000 : 300_000)) return resizeProbe.ok
+  let ok = false
+  try {
+    const row = (
+      await db().query<{ url: string }>(
+        `SELECT thumbnail_url AS url FROM gallery_images WHERE thumbnail_url LIKE 'https://%' ORDER BY created_at DESC LIMIT 1`,
+      )
+    ).rows[0]
+    if (row) {
+      const res = await undici(`${CONTROLLER_URL}/_next/image?url=${encodeURIComponent(row.url)}&w=64&q=70`, {
+        headers: { host: SITE_HOST, accept: 'image/webp' },
+        headersTimeout: 5000,
+        bodyTimeout: 5000,
+      })
+      ok = res.statusCode === 200
+      await res.body.dump()
+    }
+  } catch {
+    ok = false
+  }
+  resizeProbe = { at: Date.now(), ok }
+  return ok
+}
 const SETTING_KEYS = ['business_name', 'business_logo_url', 'business_phone', 'business_email', 'feature_razorpay_enabled', 'feature_cod_enabled']
 let configCache: { at: number; value: unknown } | null = null
 app.get('/v1/app/config', async (_req, reply) => {
@@ -83,6 +113,7 @@ app.get('/v1/app/config', async (_req, reply) => {
     site_url: PUBLIC_SITE_URL,
     store: { name: m.get('business_name') || 'Jeffi Stores', logo_url: m.get('business_logo_url') || '', phone: m.get('business_phone') || '', email: m.get('business_email') || '' },
     features: { razorpay: bool('feature_razorpay_enabled', true), cod: bool('feature_cod_enabled', true) },
+    image_resize: await imageResizeReady(),
   }
   configCache = { at: Date.now(), value }
   return reply.header('cache-control', 'public, max-age=60').send(value)

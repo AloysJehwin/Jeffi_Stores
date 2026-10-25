@@ -53,7 +53,7 @@ function Offers({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
           itemLabel={shopLabel}
           dots={{ tone: 'primary', label: i => `Go to offer ${i + 1}`, className: 'mt-1' }}
           onIndexChange={setCurrent}
-          renderItem={(o, { width: w, index }) => <OfferCard offer={o} height={Math.round(w / ASPECT)} active={onScreen && index === current} />}
+          renderItem={(o, { width: w, index }) => <OfferCard offer={o} width={w} height={Math.round(w / ASPECT)} active={onScreen && index === current} />}
         />
       )}
     </Animated.View>
@@ -67,13 +67,13 @@ function cardImage(o: ProductOffer) {
   return { src: absUrl(o.image_url), blurhash: o.blurhash || null }
 }
 
-function OfferCard({ offer, height, active }: { offer: ProductOffer; height: number; active: boolean }) {
+function OfferCard({ offer, width, height, active }: { offer: ProductOffer; width: number; height: number; active: boolean }) {
   const shadow = useElevation('overlay')
   const { src, blurhash } = cardImage(offer)
   return (
     <View style={[shadow, { marginTop: SHADOW_ROOM.top }]} className={`rounded-panel ${elevationClass('overlay')}`}>
       <View className="w-full overflow-hidden rounded-panel bg-black" style={{ height }}>
-        <Media image={src} video={offer.video_url_card} blurhash={blurhash} style={FILL} active={active} />
+        <Media image={src} video={offer.video_url_card} blurhash={blurhash} style={FILL} width={width} active={active} />
         <Gradient dir="t" stops={[[0, status.black, 0.8], [0.45, status.black, 0.25], [1, status.black, 0]]} />
 
         <View pointerEvents="none" className="absolute bottom-0 left-0 right-0 p-4">
