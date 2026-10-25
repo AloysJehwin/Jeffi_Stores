@@ -2,9 +2,7 @@ import { Pressable, View, useWindowDimensions } from 'react-native'
 import { Gradient, PeekPager, Text, Title, elevationClass, useElevation } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { ArrowRight } from 'lucide-react-native'
-import { SectionHeading } from './layout'
-import { badgeBg } from '../../lib/badge'
+import { SHADOW_ROOM, SectionHeading, SlideBadge, SlideCta } from './layout'
 import { absUrl, openHref } from '../../lib/links'
 import { status } from '../../theme'
 import type { ProductOffer, SectionProps } from '../../types/home'
@@ -15,9 +13,6 @@ import type { ProductOffer, SectionProps } from '../../types/home'
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const
 const ASPECT = 4 / 5
 const MAX_CARD = 360 // card width cap on tablets
-// Room in each page for the card's shadow; the pager's ScrollView clips its content.
-const SHADOW_TOP = 8
-const SHADOW_BOTTOM = 16
 
 export default function OfferSlider({ section, data }: SectionProps) {
   if (data.offers.length === 0) return null
@@ -49,7 +44,7 @@ function Offers({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
           data={offers}
           keyExtractor={o => o.id}
           peek={Math.min(0.72, MAX_CARD / width)}
-          height={w => Math.round(w / ASPECT) + SHADOW_TOP + SHADOW_BOTTOM}
+          height={w => Math.round(w / ASPECT) + SHADOW_ROOM.top + SHADOW_ROOM.bottom}
           onPress={o => open(o)}
           itemLabel={shopLabel}
           dots={{ tone: 'primary', label: i => `Go to offer ${i + 1}`, className: 'mt-1' }}
@@ -67,22 +62,11 @@ function cardImage(o: ProductOffer) {
   return { src: absUrl(o.image_url), blurhash: o.blurhash || null }
 }
 
-function OfferBadge({ offer, shape = 'rounded-full' }: { offer: ProductOffer; shape?: string }) {
-  if (!offer.badge_text) return null
-  return (
-    <View className={`mb-3 self-start px-3 py-1.5 ${shape} ${badgeBg(offer.badge_color, 'bg-primary-500')}`}>
-      <Text className="text-[11px] font-extrabold uppercase text-white" style={{ letterSpacing: 1.5 }}>
-        {offer.badge_text}
-      </Text>
-    </View>
-  )
-}
-
 function OfferCard({ offer, height }: { offer: ProductOffer; height: number }) {
   const shadow = useElevation('overlay')
   const { src, blurhash } = cardImage(offer)
   return (
-    <View style={[shadow, { marginTop: SHADOW_TOP }]} className={`rounded-panel ${elevationClass('overlay')}`}>
+    <View style={[shadow, { marginTop: SHADOW_ROOM.top }]} className={`rounded-panel ${elevationClass('overlay')}`}>
       <View className="w-full overflow-hidden rounded-panel bg-black" style={{ height }}>
         <Image
           recyclingKey={src}
@@ -95,7 +79,7 @@ function OfferCard({ offer, height }: { offer: ProductOffer; height: number }) {
         <Gradient dir="t" stops={[[0, status.black, 0.8], [0.45, status.black, 0.25], [1, status.black, 0]]} />
 
         <View pointerEvents="none" className="absolute bottom-0 left-0 right-0 p-4">
-          <OfferBadge offer={offer} />
+          <SlideBadge text={offer.badge_text} color={offer.badge_color} />
           <Title className="text-white" numberOfLines={3}>
             {offer.title}
           </Title>
@@ -104,12 +88,7 @@ function OfferCard({ offer, height }: { offer: ProductOffer; height: number }) {
               {offer.subtitle}
             </Text>
           ) : null}
-          {offer.cta_label ? (
-            <View className="mt-3 flex-row items-center gap-1.5 self-start rounded-full bg-white px-4 py-2">
-              <Text className="text-xs font-bold text-black">{offer.cta_label}</Text>
-              <ArrowRight size={14} color={status.black} strokeWidth={2.5} />
-            </View>
-          ) : null}
+          <SlideCta label={offer.cta_label} />
         </View>
       </View>
     </View>
@@ -138,7 +117,7 @@ function OfferBanner({ offer, width }: { offer: ProductOffer; width: number }) {
         <Gradient dir="t" stops={[[0, status.black, 0.7], [0.5, status.black, 0.1], [1, status.black, 0]]} />
 
         <View pointerEvents="none" className="absolute bottom-0 left-0 right-0 p-5">
-          <OfferBadge offer={offer} shape="rounded-lg" />
+          <SlideBadge text={offer.badge_text} color={offer.badge_color} shape="rounded-lg" />
           <Text className="font-display font-extrabold text-white" style={{ fontSize: titleSize, lineHeight: titleSize * 1.25, letterSpacing: -titleSize * 0.025 }}>
             {offer.title}
           </Text>
