@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Linking, Platform, Pressable, Text, View } from 'react-native'
+import { Linking, Platform, View } from 'react-native'
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
@@ -7,6 +7,11 @@ import Constants from 'expo-constants'
 import { X } from 'lucide-react-native'
 import { getAppConfig, isOlderVersion } from '../api/appConfig'
 import { useTokens } from '../theme'
+import { Button, IconButton } from './Button'
+import { Caption, Text } from './Text'
+import { cn } from './cn'
+import { elevationClass, useElevation } from './elevation'
+import { useMotion } from './motion'
 
 const PACKAGE = 'com.jeffistores.app'
 const STORE_URL = Platform.select({
@@ -18,6 +23,8 @@ const STORE_URL = Platform.select({
 export default function UpdatePrompt() {
   const insets = useSafeAreaInsets()
   const t = useTokens()
+  const shadow = useElevation('floating')
+  const { animate } = useMotion()
   const [dismissed, setDismissed] = useState(false)
   const { data } = useQuery({ queryKey: ['app-config'], queryFn: getAppConfig, staleTime: 60 * 60_000, retry: 0 })
   const current = Constants.expoConfig?.version
@@ -25,22 +32,17 @@ export default function UpdatePrompt() {
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 132 }}>
       <Animated.View
-        entering={FadeInDown.duration(220)}
-        exiting={FadeOutDown.duration(160)}
-        className="flex-row items-center gap-3 rounded-2xl border border-border-default bg-surface-elevated px-4 py-3 shadow-lg"
+        entering={animate ? FadeInDown.duration(220) : undefined}
+        exiting={animate ? FadeOutDown.duration(160) : undefined}
+        style={shadow}
+        className={cn('flex-row items-center gap-3 rounded-panel bg-surface-elevated py-3 pl-4 pr-2', elevationClass('floating'))}
       >
         <View className="flex-1">
-          <Text className="text-sm font-semibold text-foreground">A newer version is available</Text>
-          <Text className="text-xs text-foreground-secondary">Update to keep everything working smoothly.</Text>
+          <Text className="text-sm font-semibold">A newer version is available</Text>
+          <Caption className="text-foreground-secondary">Update to keep everything working smoothly.</Caption>
         </View>
-        {STORE_URL ? (
-          <Pressable onPress={() => Linking.openURL(STORE_URL).catch(() => {})} className="rounded-full bg-accent-500 px-3.5 py-2">
-            <Text className="text-xs font-bold text-white">Update</Text>
-          </Pressable>
-        ) : null}
-        <Pressable onPress={() => setDismissed(true)} hitSlop={8} accessibilityLabel="Dismiss">
-          <X size={18} color={t.foregroundMuted} />
-        </Pressable>
+        {STORE_URL ? <Button label="Update" size="sm" block={false} onPress={() => Linking.openURL(STORE_URL).catch(() => {})} /> : null}
+        <IconButton icon={X} label="Dismiss" size="sm" color={t.foregroundMuted} onPress={() => setDismissed(true)} />
       </Animated.View>
     </View>
   )

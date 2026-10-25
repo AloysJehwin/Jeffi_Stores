@@ -6,13 +6,13 @@ import { keepPreviousData, useQueries, useQuery, useQueryClient, type QueryClien
 import { getListing, getProductBySlug, listProducts, type ProductRow } from '../src/api/products'
 import CompareBar from '../src/components/catalog/CompareBar'
 import { CompareAddButton, CompareChangeButton } from '../src/components/catalog/CompareSearch'
-import { PhotoIcon } from '../src/components/catalog/icons'
 import { useStoreConfig } from '../src/hooks/useStoreConfig'
 import { absUrl } from '../src/lib/links'
 import { inr } from '../src/lib/format'
 import { useCompareStore } from '../src/stores/compareStore'
+import { ImageOff } from 'lucide-react-native'
 import { useTokens } from '../src/theme'
-import { Screen, ScreenHeader, Skeleton, Text } from '../src/ui'
+import { Badge, Card, EmptyState, Overline, Screen, ScreenHeader, Skeleton, Text, TextButton } from '../src/ui'
 
 // Mirror of controller-service app/(storefront)/compare/page.tsx at the mobile breakpoint (the table
 // scrolls sideways inside its card, min-w-[640px]).
@@ -143,12 +143,12 @@ function ProductHead({ p, gstEnabled, ids, onChange }: { p: ProductRow; gstEnabl
             <Image source={{ uri: src }} contentFit="contain" style={{ flex: 1, margin: 8 }} accessibilityLabel={p.name} />
           ) : (
             <View className="flex-1 items-center justify-center">
-              <PhotoIcon size={40} strokeWidth={1} color={t.foregroundMuted} />
+              <ImageOff size={36} strokeWidth={1.5} color={t.foregroundMuted} />
             </View>
           )}
         </View>
       </View>
-      <Pressable onPress={() => router.push(`/product/${p.slug}`)}>
+      <Pressable accessibilityRole="link" onPress={() => router.push(`/product/${p.slug}`)}>
         <Text numberOfLines={2} className="text-sm font-semibold text-foreground" style={{ lineHeight: 18 }}>
           {p.name}
         </Text>
@@ -159,14 +159,7 @@ function ProductHead({ p, gstEnabled, ids, onChange }: { p: ProductRow; gstEnabl
         </Text>
         {mrp && mrp > price ? <Text className="text-xs text-foreground-muted line-through">{`  ₹${inr(mrp)}`}</Text> : null}
       </Text>
-      <View
-        className={`flex-row items-center gap-1 self-start rounded-full px-2 py-0.5 ${inStock ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}
-      >
-        <View className={`h-1.5 w-1.5 rounded-full ${inStock ? 'bg-green-500' : 'bg-red-500'}`} />
-        <Text className={`text-xs font-medium ${inStock ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-          {inStock ? 'In Stock' : 'Out of Stock'}
-        </Text>
-      </View>
+      <Badge size="sm" tone={inStock ? 'success' : 'danger'} label={inStock ? 'In Stock' : 'Out of Stock'} />
       <CompareChangeButton productId={p.id} currentIds={ids} categoryId={p.category_id ?? null} onChange={r => onChange({ id: r.id, slug: r.slug })} />
     </View>
   )
@@ -177,7 +170,7 @@ function CompareTableSkeleton({ cols, tableW, labelW }: { cols: number; tableW: 
   const colW = (tableW - labelW) / cols
   const cells = Array.from({ length: cols })
   return (
-    <View className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-sm">
+    <Card padded={false} className="overflow-hidden">
       <View style={{ width: tableW }}>
         <View className="flex-row border-b border-border-default">
           <View className="bg-surface-secondary p-4" style={{ width: labelW }} />
@@ -207,7 +200,7 @@ function CompareTableSkeleton({ cols, tableW, labelW }: { cols: number; tableW: 
           </View>
         ))}
       </View>
-    </View>
+    </Card>
   )
 }
 
@@ -294,12 +287,7 @@ export default function CompareScreen() {
         header={<ScreenHeader title="Product Comparison" />}
         empty={
           noneToCompare ? (
-            <View className="flex-1 items-center justify-center gap-3">
-              <Text className="text-foreground-muted">No products available to compare.</Text>
-              <Pressable onPress={() => router.navigate('/(tabs)/products')}>
-                <Text className="text-sm text-accent-500">Browse Products</Text>
-              </Pressable>
-            </View>
+            <EmptyState fill title="No products available to compare." actionLabel="Browse Products" onAction={() => router.navigate('/(tabs)/products')} />
           ) : (
             false
           )
@@ -319,8 +307,7 @@ export default function CompareScreen() {
         {loading ? (
           <CompareTableSkeleton key="skeleton" cols={Math.min(4, Math.max(2, (entries ?? idList).length))} tableW={tableW} labelW={labelW} />
         ) : (
-          // Own key: reusing the skeleton's View would add shadow-sm's CSS variables after mount (a css-interop remount).
-          <View key="table" className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-sm">
+          <Card key="table" padded={false} className="overflow-hidden">
             <ScrollView horizontal showsHorizontalScrollIndicator>
               <View style={{ width: tableW }}>
                 <View className="flex-row border-b border-border-default">
@@ -346,9 +333,7 @@ export default function CompareScreen() {
                       className={`flex-row ${i < visibleRows.length - 1 ? 'border-b border-border-default' : ''} ${rowIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}
                     >
                       <View className="bg-surface-secondary p-4" style={{ width: labelW }}>
-                        <Text className="text-xs font-semibold uppercase text-foreground-muted" style={{ letterSpacing: 0.3 }}>
-                          {label}
-                        </Text>
+                        <Overline>{label}</Overline>
                       </View>
                       {products.map((p, colIdx) => {
                         const val = values[colIdx]
@@ -370,13 +355,11 @@ export default function CompareScreen() {
                 })}
               </View>
             </ScrollView>
-          </View>
+          </Card>
         )}
 
         <View className="mt-6 items-center">
-          <Pressable onPress={() => router.navigate('/(tabs)/products')}>
-            <Text className="text-sm text-accent-500">← Back to Products</Text>
-          </Pressable>
+          <TextButton label="← Back to Products" onPress={() => router.navigate('/(tabs)/products')} className="self-center" />
         </View>
       </Screen>
       <CompareBar />

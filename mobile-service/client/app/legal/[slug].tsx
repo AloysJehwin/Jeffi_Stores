@@ -1,9 +1,8 @@
-import { Pressable, View } from 'react-native'
+import { View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { Screen, ScreenHeader, Skeleton, SkeletonText, Text } from '../../src/ui'
-import { Glyph, DOWNLOAD } from '../../src/components/info/Glyph'
-import { SolidButton } from '../../src/components/info/common'
+import { Download, FileQuestion } from 'lucide-react-native'
+import { BodySmall, Button, Caption, Card, EmptyState, Screen, ScreenHeader, Skeleton, SkeletonText, Subheading, Text } from '../../src/ui'
 import { openPolicyPdf } from '../../src/components/info/policy'
 import { getPolicy } from '../../src/api/info'
 import { openHref } from '../../src/lib/links'
@@ -25,10 +24,10 @@ function PolicyLoading() {
       </View>
       <View className="gap-4 px-4 py-8">
         {[0, 1, 2].map(i => (
-          <View key={i} className="rounded-xl border border-border-default bg-surface-elevated p-6">
+          <Card key={i}>
             <Skeleton height={16} width="50%" className="mb-4" />
             <SkeletonText lines={4} />
-          </View>
+          </Card>
         ))}
       </View>
     </View>
@@ -46,10 +45,10 @@ export default function PolicyScreen() {
   })
 
   const supportCard = (
-    <View className="items-center rounded-xl border border-border-default bg-surface-elevated p-6">
-      <Text className="mb-3 text-center text-xs text-foreground-muted">Have questions about our policies?</Text>
-      <SolidButton label="Contact Support" onPress={() => openHref(router, '/support')} />
-    </View>
+    <Card className="items-center">
+      <Caption className="mb-3 text-center">Have questions about our policies?</Caption>
+      <Button label="Contact Support" size="md" onPress={() => openHref(router, '/support')} />
+    </Card>
   )
 
   const header = <ScreenHeader title={policy?.title} />
@@ -57,10 +56,7 @@ export default function PolicyScreen() {
   if (isError || !policy) {
     return (
       <Screen header={header} mode="none">
-        <View className="flex-1 items-center justify-center gap-4 px-8">
-          <Text className="text-center text-lg font-bold text-foreground">Policy not found</Text>
-          <SolidButton label="Legal & Policies" onPress={() => router.dismissTo('/legal')} />
-        </View>
+        <EmptyState fill icon={FileQuestion} title="Policy not found" actionLabel="Legal & Policies" onAction={() => router.dismissTo('/legal')} />
       </Screen>
     )
   }
@@ -71,23 +67,17 @@ export default function PolicyScreen() {
       <View className="-mt-4 border-b border-border-default bg-surface-elevated px-4 py-4">
         <View className="flex-row items-start gap-4">
           <View className="min-w-0 flex-1">
-            <Text className="text-sm text-foreground-secondary">{policy.description}</Text>
-            <Text className="mt-1 text-xs text-foreground-muted">Last updated: {policy.lastUpdated}</Text>
+            <BodySmall>{policy.description}</BodySmall>
+            <Caption className="mt-1">Last updated: {policy.lastUpdated}</Caption>
           </View>
-          <Pressable
-            onPress={() => openPolicyPdf(policy.slug)}
-            className="shrink-0 flex-row items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 active:bg-primary-600"
-          >
-            <Glyph d={DOWNLOAD} size={16} className="text-white" />
-            <Text className="text-sm font-semibold text-white">Download PDF</Text>
-          </Pressable>
+          <Button label="Download PDF" icon={Download} size="sm" block={false} onPress={() => openPolicyPdf(policy.slug)} />
         </View>
       </View>
 
       <View className="gap-4 px-4 py-8">
         {policy.sections.map((section, i) => (
-          <View key={i} className="rounded-xl border border-border-default bg-surface-elevated p-6">
-            <Text className="mb-3 text-base font-bold text-foreground">{section.heading}</Text>
+          <Card key={i}>
+            <Subheading className="mb-3">{section.heading}</Subheading>
             {Array.isArray(section.body) ? (
               <View className="gap-2">
                 {section.body.map((item, j) => (
@@ -100,7 +90,7 @@ export default function PolicyScreen() {
             ) : (
               <Text className="text-sm leading-relaxed text-foreground-secondary">{section.body}</Text>
             )}
-          </View>
+          </Card>
         ))}
         {supportCard}
       </View>

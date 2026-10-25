@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, { FadeIn, FadeInLeft, FadeInRight, ZoomIn } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics'
-import HeroIcon from '../components/account/HeroIcon'
+import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react-native'
 import { BottomSheet } from './BottomSheet'
 import { useTokens } from '../theme'
 
@@ -167,7 +167,7 @@ function Picker({ value, onChange, title, min, max, defaultView, startWith = 'da
           </Text>
         </View>
         <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary">
-          <HeroIcon name="x" size={18} color={t.foregroundSecondary} />
+          <X size={18} color={t.foregroundSecondary} strokeWidth={2} />
         </Pressable>
       </View>
 
@@ -367,7 +367,7 @@ function ModeChip({ label, active, onPress }: { label: string; active: boolean; 
     >
       <Text className={`text-[15px] font-bold ${active ? 'text-accent-700 dark:text-accent-300' : 'text-foreground'}`}>{label}</Text>
       <View style={{ transform: [{ rotate: active ? '180deg' : '0deg' }] }}>
-        <HeroIcon name="chevronDown" size={14} color={t.foregroundMuted} strokeWidth={2.5} />
+        <ChevronDown size={14} color={t.foregroundMuted} strokeWidth={2.5} />
       </View>
     </Pressable>
   )
@@ -384,7 +384,7 @@ function RoundButton({ icon, label, disabled, onPress }: { icon: 'chevronLeft' |
       accessibilityLabel={label}
       className={`h-10 w-10 items-center justify-center rounded-full bg-surface-secondary ${disabled ? 'opacity-40' : 'active:opacity-70'}`}
     >
-      <HeroIcon name={icon} size={18} color={t.foreground} strokeWidth={2.5} />
+      {icon === 'chevronLeft' ? <ChevronLeft size={18} color={t.foreground} strokeWidth={2.5} /> : <ChevronRight size={18} color={t.foreground} strokeWidth={2.5} />}
     </Pressable>
   )
 }

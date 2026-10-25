@@ -1,29 +1,19 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, View, useWindowDimensions } from 'react-native'
-import { Text } from '../../ui'
-import Animated, {
-  Easing,
-  SlideInDown,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated'
+import { View, useWindowDimensions } from 'react-native'
+import Animated, { Easing, SlideInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
-import { KeyboardScroll } from '../../ui/KeyboardScroll'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { Image } from 'expo-image'
 import { X } from 'lucide-react-native'
+import { Button, Caption, Divider, IconButton, KeyboardScroll, Text, Title } from '../../ui'
 import Gradient from './Gradient'
-import { GoogleLogo } from './HeroIcon'
+import { GoogleMark } from '../brand/Marks'
 import { listCategories } from '../../api/categories'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { useLeaveAuth } from './hooks'
-import { accent, status, useTokens } from '../../theme'
+import { accent } from '../../theme'
 
 // The app's own sign-in frame (not the web card): a brand panel with a drifting mosaic of what the
 // store sells, and a sheet that rises from the bottom with the form. The panel folds up while the
@@ -56,9 +46,7 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
           <Mosaic top={compactHeight + 8} />
         </Animated.View>
         <View style={{ paddingTop: insets.top + 8 }} className="flex-row items-center gap-3 px-4">
-          <Pressable onPress={close} hitSlop={8} accessibilityLabel="Close" className="h-10 w-10 items-center justify-center rounded-full bg-white/20">
-            <X size={20} color={status.white} />
-          </Pressable>
+          <IconButton icon={X} label="Close" variant="glass" onPress={close} />
           <BrandMark logoUrl={config.identity.logoUrl} name={storeName} />
           <Text numberOfLines={1} className="flex-1 text-lg font-bold text-white">
             {storeName}
@@ -72,7 +60,7 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
           showsVerticalScrollIndicator={false}
         >
           <View className="mb-5">
-            <Text className="text-[26px] font-black leading-8 tracking-tight text-foreground">{title}</Text>
+            <Title>{title}</Title>
             {subtitle ? <Text className="mt-1.5 text-[15px] leading-5 text-foreground-secondary">{subtitle}</Text> : null}
           </View>
           {children}
@@ -136,91 +124,17 @@ function MosaicRow({ images, direction, offset }: { images: string[]; direction:
   )
 }
 
-/** The sheet's main action: tall, rounded, presses down a touch. */
-export function BigButton({
-  label,
-  loadingLabel,
-  loading,
-  disabled,
-  onPress,
-}: {
-  label: string
-  loadingLabel?: string
-  loading?: boolean
-  disabled?: boolean
-  onPress: () => void
-}) {
-  const scale = useSharedValue(1)
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
-  const off = disabled || loading
-  return (
-    <Animated.View style={style}>
-      <Pressable
-        onPress={onPress}
-        disabled={off}
-        onPressIn={() => (scale.value = withSpring(0.97, { damping: 18, stiffness: 260 }))}
-        onPressOut={() => (scale.value = withSpring(1, { damping: 18, stiffness: 260 }))}
-        className={`h-14 w-full flex-row items-center justify-center gap-2 rounded-2xl ${off ? 'bg-accent-500/40' : 'bg-accent-500'}`}
-      >
-        {loading ? <ActivityIndicator size="small" color={status.white} /> : null}
-        <Text className="text-base font-bold text-white">{loading && loadingLabel ? loadingLabel : label}</Text>
-      </Pressable>
-    </Animated.View>
-  )
-}
-
-/** "or" rule + a white Google button. */
+/** "or" rule + a Google button. */
 export function GoogleRow({ label, loading, onPress }: { label: string; loading: boolean; onPress: () => void }) {
-  const t = useTokens()
   return (
     <View className="mt-5">
       <View className="mb-5 flex-row items-center gap-3">
-        <View className="h-px flex-1 bg-border-default" />
-        <Text className="text-xs font-medium uppercase tracking-wider text-foreground-muted">or</Text>
-        <View className="h-px flex-1 bg-border-default" />
+        <Divider className="flex-1" />
+        <Caption className="uppercase tracking-wider">or</Caption>
+        <Divider className="flex-1" />
       </View>
-      <Pressable
-        onPress={onPress}
-        disabled={loading}
-        className={`h-14 w-full flex-row items-center justify-center gap-3 rounded-2xl border border-border-secondary bg-surface ${loading ? 'opacity-60' : 'active:bg-surface-secondary'}`}
-      >
-        {loading ? <ActivityIndicator size="small" color={t.foregroundMuted} /> : <GoogleLogo size={22} />}
-        <Text className="text-base font-semibold text-foreground">{label}</Text>
-      </Pressable>
+      <Button label={label} variant="outline" icon={GoogleMark} loading={loading} onPress={onPress} />
     </View>
-  )
-}
-
-/** The form's input frame: tall, rounded, accent ring while focused. */
-export function Frame({ focused, children, className = '' }: { focused: boolean; children: ReactNode; className?: string }) {
-  return (
-    <View className={`h-14 flex-row items-center rounded-2xl border-2 px-4 ${focused ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : 'border-border-secondary bg-surface'} ${className}`}>
-      {children}
-    </View>
-  )
-}
-
-/** Soft note above a form ("No account found for …"). */
-export function Note({ children }: { children: ReactNode }) {
-  return (
-    <View className="mb-4 rounded-2xl bg-accent-50 px-4 py-3 dark:bg-accent-900/20">
-      <Text className="text-sm leading-5 text-accent-800 dark:text-accent-200">{children}</Text>
-    </View>
-  )
-}
-
-/** Inline error under a field or button. */
-export function FieldError({ message }: { message: string }) {
-  if (!message) return null
-  return <Text className="mt-2 text-sm font-medium text-red-600 dark:text-red-400">{message}</Text>
-}
-
-/** A text link row ("Use email instead"). */
-export function TextAction({ label, onPress, muted }: { label: string; onPress: () => void; muted?: boolean }) {
-  return (
-    <Pressable onPress={onPress} hitSlop={6} className="self-start py-1">
-      <Text className={`text-sm font-semibold ${muted ? 'text-foreground-secondary' : 'text-accent-600 dark:text-accent-400'}`}>{label}</Text>
-    </Pressable>
   )
 }
 

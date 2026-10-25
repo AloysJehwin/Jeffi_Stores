@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Share2, UserPlus } from 'lucide-react-native'
 import { getReferrals, type ReferralFriend, type ReferralsData } from '../../src/api/account'
 import Gradient from '../../src/components/account/Gradient'
-import HeroIcon from '../../src/components/account/HeroIcon'
+import { WhatsAppMark } from '../../src/components/brand/Marks'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
@@ -14,13 +14,10 @@ import { showToast } from '../../src/stores/toastStore'
 import { accent, useTokens } from '../../src/theme'
 import {
   Badge, BodySmall, Button, Caption, Card, cn, Divider, elevationClass, EmptyState, Heading, Overline, Screen, Skeleton, Text, TextButton, useElevation,
-  type IconComponent, type Tone,
+  type Tone,
 } from '../../src/ui'
 
 // Mirror of controller-service components/visitor/AccountReferrals.tsx (mobile layout).
-
-// The WhatsApp brand mark, shaped as an icon for Button.
-const WhatsAppIcon: IconComponent = ({ size, color }) => <HeroIcon name="whatsapp" size={size} color={color ?? 'currentColor'} />
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -68,7 +65,7 @@ function ShareCard({ data, storeName }: { data: ReferralsData; storeName: string
 
       <View className="mt-3 flex-row gap-2">
         <View className="flex-1">
-          <Button label="WhatsApp" icon={WhatsAppIcon} variant="secondary" size="md" onPress={whatsapp} />
+          <Button label="WhatsApp" icon={WhatsAppMark} variant="secondary" size="md" onPress={whatsapp} />
         </View>
         <View className="flex-1">
           <Button label="Share" icon={Share2} size="md" onPress={share} />

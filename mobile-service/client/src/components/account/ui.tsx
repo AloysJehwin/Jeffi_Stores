@@ -43,7 +43,21 @@ export function dobRange(): { min: string; max: string; initial: string } {
 }
 
 /** A date-of-birth field that opens the app's date picker. */
-export function DobInput({ value, onChange, label, required, error }: { value: string; onChange: (v: string) => void; label?: string; required?: boolean; error?: string | null }) {
+export function DobInput({
+  value,
+  onChange,
+  label,
+  required,
+  error,
+  placeholder = 'Select date',
+}: {
+  value: string
+  onChange: (v: string) => void
+  label?: string
+  required?: boolean
+  error?: string | null
+  placeholder?: string
+}) {
   const t = useTokens()
   const { min, max, initial } = dobRange()
   return (
@@ -52,7 +66,7 @@ export function DobInput({ value, onChange, label, required, error }: { value: s
       <DateField value={value} onChange={onChange} title="Date of birth" min={min} max={max} defaultView={initial} startWith="year">
         {open => (
           <FieldFrame focused={open} invalid={!!error}>
-            <Text className={cn('flex-1 text-base', value ? 'text-foreground' : 'text-foreground-muted')}>{value ? formatDate(value) : 'Select date'}</Text>
+            <Text className={cn('flex-1 text-base', value ? 'text-foreground' : 'text-foreground-muted')}>{value ? formatDate(value) : placeholder}</Text>
             <Calendar size={18} color={open ? t.accent500 : t.foregroundMuted} />
           </FieldFrame>
         )}

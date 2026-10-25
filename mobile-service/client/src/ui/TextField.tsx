@@ -64,6 +64,9 @@ export function FieldFrame({
   )
 }
 
+/** What a field's ref points at (focus(), blur()). */
+export type FieldRef = TextInput
+
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label?: string
   required?: boolean

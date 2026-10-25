@@ -1,4 +1,4 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { View } from 'react-native'
 import { CircleCheck, CircleX } from 'lucide-react-native'
 import { createAddress, lookupPincode } from '../../api/addresses'
@@ -156,22 +156,39 @@ export function AddAddressSheet({
   onClose,
   onSaved,
   defaults,
+  strict,
 }: {
   isOpen: boolean
   onClose: () => void
   onSaved: (address: Address) => void
   defaults?: Partial<AddressFormData>
+  /** Checkout's form: refilled from `defaults` on every open, all required fields checked, blank optionals sent as null, a toast on save. */
+  strict?: boolean
 }) {
   const [formData, setFormData] = useState<AddressFormData>({ ...emptyAddressForm, ...defaults })
   const [isSaving, setIsSaving] = useState(false)
   const pin = usePincodeLookup(setFormData)
+  const { setPinLookupState, setLocalities } = pin
+  const defaultsRef = useRef(defaults)
+  defaultsRef.current = defaults
+  useEffect(() => {
+    if (!strict || !isOpen) return
+    setFormData({ ...emptyAddressForm, ...defaultsRef.current })
+    setPinLookupState('idle')
+    setLocalities([])
+  }, [strict, isOpen, setPinLookupState, setLocalities])
   const submit = async () => {
     if (formData.phone.length !== 10) return showToast('Enter a valid 10-digit mobile number', 'error')
+    if (strict && (!formData.full_name.trim() || !formData.address_line1.trim() || formData.postal_code.length !== 6 || !formData.city || !formData.state)) {
+      return showToast('Please fill in all required fields', 'error')
+    }
     setIsSaving(true)
     try {
-      const saved = await createAddress(formData as unknown as Omit<Address, 'id'>)
+      const payload = strict ? { ...formData, address_line2: formData.address_line2 || null, landmark: formData.landmark || null } : formData
+      const saved = await createAddress(payload as unknown as Omit<Address, 'id'>)
       setFormData({ ...emptyAddressForm, ...defaults })
       pin.setPinLookupState('idle')
+      if (strict) showToast('Address saved', 'success')
       onSaved(saved)
     } catch (err: any) {
       showToast(err?.message || 'Failed to save address', 'error')

@@ -93,7 +93,8 @@ export interface IconButtonProps extends Omit<PressableProps, 'children' | 'styl
   /** Read out by screen readers; icon-only buttons have no other name. */
   label: string
   onPress?: () => void
-  variant?: 'plain' | 'tinted' | 'solid' | 'overlay'
+  /** overlay sits on photos; glass on an accent panel. */
+  variant?: 'plain' | 'tinted' | 'solid' | 'overlay' | 'glass'
   /** xs (28) is for dense cards only; its hit slop still makes a 44pt target. */
   size?: 'xs' | 'sm' | 'md' | 'lg'
   color?: string
@@ -108,6 +109,7 @@ const ICON_FRAME = {
   tinted: 'bg-surface-secondary active:bg-border-default',
   solid: 'bg-accent-500 active:bg-accent-600',
   overlay: 'bg-black/35 active:bg-black/50',
+  glass: 'bg-white/20 active:bg-white/30',
 }
 
 /** A round icon-only button with a 44pt touch target. */
@@ -117,7 +119,7 @@ const ICON_SIZE = { xs: 14, sm: 18, md: 22, lg: 24 }
 export function IconButton({ icon: Icon, label, onPress, variant = 'plain', size = 'md', color, filled, badge, className, ...rest }: IconButtonProps) {
   const t = useTokens()
   const press = usePressScale(0.92)
-  const fg = color ?? (variant === 'solid' || variant === 'overlay' ? status.white : t.foreground)
+  const fg = color ?? (variant === 'solid' || variant === 'overlay' || variant === 'glass' ? status.white : t.foreground)
   return (
     <Animated.View style={press.style} className={className}>
       <Pressable

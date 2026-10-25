@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Modal, Pressable, ScrollView, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native'
+import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardEvents } from 'react-native-keyboard-controller'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, ChevronRight, CircleX, Clock, ImageIcon, Layers, Menu, Search, ShoppingCart, User, X } from 'lucide-react-native'
+import { Bell, ChevronRight, Clock, ImageIcon, Layers, Menu, Search, ShoppingCart, User, X } from 'lucide-react-native'
 import { api } from '../../api/client'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { useUnreadCount } from '../../hooks/useNotifications'
@@ -14,7 +14,7 @@ import { useCartStore } from '../../stores/cartStore'
 import { useAuthStore } from '../../stores/authStore'
 import { inr } from '../../lib/format'
 import { accent, useTokens } from '../../theme'
-import { IconButton, Text, Skeleton, useElevation, useMotion } from '../../ui'
+import { Button, Card, EmptyState, IconButton, Overline, Overlay, Skeleton, Text, TextButton, TextField, useElevation, type FieldRef } from '../../ui'
 import { MenuSheet } from './MenuSheet'
 import { StoreLogo } from './StoreLogo'
 
@@ -80,10 +80,8 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
   const qc = useQueryClient()
   const { colorScheme } = useColorScheme()
   const isDark = colorScheme === 'dark'
-  const { animate } = useMotion()
   const barShadow = useElevation('raised')
   const fieldShadow = useElevation('overlay')
-  const panelShadow = useElevation('floating')
   const cartCount = useCartStore(s => s.count)
   const user = useAuthStore(s => s.user)
   const { identity } = useStoreConfig()
@@ -96,8 +94,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
   const [kb, setKb] = useState(0)
-  const inputRef = useRef<TextInput>(null)
-
+  const inputRef = useRef<FieldRef>(null)
 
   // Recent searches, refetched each time the overlay opens (web: GET on open).
   const historyKey = ['search-history', user?.id ?? null]
@@ -163,7 +160,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
   const showHistoryPanel = searchOpen && query.trim().length === 0 && history.length > 0
   const showResultsPanel = searchOpen && !showHistoryPanel && (query.trim().length >= 2 || isLoading)
   const hasResults = categories.length > 0 || products.length > 0
-  const panelMax = Math.min(height - 128, height - insets.top - 12 - 46 - 12 - kb - 16)
+  const panelMax = Math.min(height - 128, height - insets.top - 12 - 56 - 12 - kb - 16)
 
   const iconColor = t.foregroundSecondary
 
@@ -211,176 +208,154 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
       </View>
 
       {/* Search overlay */}
-      <Modal visible={searchOpen} transparent animationType={animate ? 'fade' : 'none'} statusBarTranslucent onRequestClose={closeSearch}>
-        <View className="flex-1">
-          <Pressable className="absolute inset-0 bg-slate-900/35" onPress={closeSearch} accessibilityLabel="Close search" />
-          <View style={{ position: 'absolute', top: insets.top + 12, left: 16, right: 16, alignSelf: 'center', maxWidth: 640 }}>
-            <View className="justify-center">
-              <TextInput
-                ref={inputRef}
-                autoFocus
-                value={query}
-                onChangeText={setQuery}
-                onSubmitEditing={submit}
-                placeholder="Search products, categories..."
-                placeholderTextColor={t.foregroundMuted}
-                returnKeyType="search"
-                autoCorrect={false}
-                autoCapitalize="none"
-                className="h-[46px] pl-11 pr-24 py-0 rounded-full border border-border-secondary bg-surface-elevated text-foreground"
-                style={[fieldShadow, { fontSize: 14 }]}
-              />
-              <View pointerEvents="none" className="absolute left-4">
-                <Search size={20} color={t.foregroundMuted} />
-              </View>
-              <View className="absolute right-2 flex-row items-center gap-1">
-                {query.length > 0 && (
-                  <Pressable
-                    onPress={() => { setQuery(''); setDebounced(''); inputRef.current?.focus() }}
-                    className="p-1.5 rounded-full"
-                    accessibilityLabel="Clear text"
-                  >
-                    <CircleX size={16} color={t.surfaceElevated} fill={t.foregroundMuted} />
-                  </Pressable>
-                )}
-                <Pressable onPress={closeSearch} className="p-1.5 rounded-full" accessibilityLabel="Close search">
-                  <X size={16} color={t.foregroundSecondary} />
-                </Pressable>
-              </View>
-            </View>
-
-            {showHistoryPanel && (
-              <View className="mt-3 rounded-2xl" style={panelShadow}>
-                <View className="bg-surface-elevated rounded-2xl border border-border-default overflow-hidden">
-                  <View className="px-4 pt-3 pb-1 flex-row items-center justify-between">
-                    <Text className="text-xs font-semibold uppercase text-foreground-muted" style={{ letterSpacing: 0.6 }}>
-                      Recent Searches
-                    </Text>
-                    <Pressable onPress={clearHistory} hitSlop={8}>
-                      <Text className="text-xs text-foreground-muted">Clear</Text>
-                    </Pressable>
-                  </View>
-                  <View className="py-1">
-                    {history.map(q => (
-                      <TouchableOpacity key={q} activeOpacity={0.7} onPress={() => searchFor(q)} className="flex-row items-center gap-3 px-4 py-2.5">
-                        <View className="w-7 h-7 rounded-md bg-surface-secondary items-center justify-center">
-                          <Clock size={14} color={t.foregroundMuted} />
-                        </View>
-                        <Text className="text-sm text-foreground">{q}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+      <Overlay open={searchOpen} onClose={closeSearch} closeLabel="Close search">
+        <View style={{ position: 'absolute', top: insets.top + 12, left: 16, right: 16, alignSelf: 'center', maxWidth: 640 }}>
+          {/* Opaque under the field's translucent focus tint. */}
+          <View style={fieldShadow} className="rounded-field bg-surface-elevated">
+            <TextField
+              ref={inputRef}
+              autoFocus
+              icon={Search}
+              value={query}
+              onChangeText={setQuery}
+              onSubmitEditing={submit}
+              accessibilityLabel="Search"
+              placeholder="Search products, categories..."
+              returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="none"
+              suffix={
+                <View className="ml-1 flex-row items-center gap-1">
+                  {query.length > 0 ? (
+                    <IconButton
+                      icon={X}
+                      label="Clear text"
+                      variant="tinted"
+                      size="xs"
+                      onPress={() => {
+                        setQuery('')
+                        setDebounced('')
+                        inputRef.current?.focus()
+                      }}
+                    />
+                  ) : null}
+                  <IconButton icon={X} label="Close search" size="sm" color={t.foregroundSecondary} onPress={closeSearch} />
                 </View>
-              </View>
-            )}
-
-            {showResultsPanel && (
-              <View className="mt-3 rounded-2xl" style={panelShadow}>
-                <View className="bg-surface-elevated rounded-2xl border border-border-default overflow-hidden">
-                  <ScrollView style={{ maxHeight: Math.max(panelMax, 120) }} keyboardShouldPersistTaps="handled">
-                    {isLoading ? (
-                      <ResultsSkeleton />
-                    ) : hasResults ? (
-                      <View className="py-1">
-                        {categories.length > 0 && (
-                          <>
-                            <Text className="px-4 pt-2 pb-1 text-xs font-semibold uppercase text-foreground-muted" style={{ letterSpacing: 0.6 }}>
-                              Categories
-                            </Text>
-                            {categories.map(cat => (
-                              <TouchableOpacity
-                                key={cat.id}
-                                activeOpacity={0.7}
-                                onPress={() => {
-                                  saveHistory(query)
-                                  closeSearch()
-                                  router.push(`/category/${cat.slug}`)
-                                }}
-                                className="flex-row items-center gap-3 px-4 py-2.5"
-                              >
-                                <View className="w-7 h-7 rounded-md bg-accent-100 dark:bg-accent-900/30 items-center justify-center">
-                                  <Layers size={14} color={isDark ? accent[400] : accent[600]} />
-                                </View>
-                                <Text className="text-sm text-foreground flex-1">
-                                  <Highlight text={cat.name} query={query} />
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </>
-                        )}
-
-                        {products.length > 0 && (
-                          <>
-                            <Text className="px-4 pt-3 pb-1 text-xs font-semibold uppercase text-foreground-muted" style={{ letterSpacing: 0.6 }}>
-                              Products
-                            </Text>
-                            {products.map(product => {
-                              const img = product.product_images?.find(i => i.is_primary) || product.product_images?.[0]
-                              const price = product.has_variants && product.variant_min_price
-                                ? product.variant_min_price
-                                : product.price_ex_gst || product.base_price
-                              return (
-                                <TouchableOpacity
-                                  key={product.id}
-                                  activeOpacity={0.7}
-                                  onPress={() => {
-                                    saveHistory(query)
-                                    closeSearch()
-                                    router.push(`/product/${product.slug}`)
-                                  }}
-                                  className="flex-row items-center gap-3 px-4 py-2.5"
-                                >
-                                  <View className="w-10 h-10 bg-surface-secondary rounded-lg overflow-hidden border border-border-default items-center justify-center">
-                                    {img ? (
-                                      <Image source={{ uri: img.thumbnail_url }} contentFit="contain" style={{ width: 36, height: 36 }} />
-                                    ) : (
-                                      <ImageIcon size={20} strokeWidth={1} color={t.foregroundMuted} />
-                                    )}
-                                  </View>
-                                  <View className="flex-1 min-w-0">
-                                    <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-                                      <Highlight text={product.name} query={query} />
-                                    </Text>
-                                    <Text className="text-xs text-accent-600 dark:text-accent-400 font-semibold mt-0.5">
-                                      {product.has_variants ? 'From ' : ''}₹{inr(price)}
-                                    </Text>
-                                  </View>
-                                  <ChevronRight size={16} color={t.foregroundMuted} />
-                                </TouchableOpacity>
-                              )
-                            })}
-                          </>
-                        )}
-
-                        <View className="border-t border-border-default p-3">
-                          <TouchableOpacity
-                            activeOpacity={0.7}
-                            onPress={() => { saveHistory(query); searchFor(query) }}
-                            className="flex-row items-center justify-center gap-1.5"
-                          >
-                            <Search size={16} color={isDark ? accent[400] : accent[600]} />
-                            <Text className="text-sm text-accent-600 dark:text-accent-400 font-medium" numberOfLines={1}>
-                              See all results for &quot;{query}&quot;
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ) : query.trim().length >= 2 ? (
-                      <View className="py-10 items-center">
-                        <View className="mb-3" style={{ opacity: 0.4 }}>
-                          <Search size={40} strokeWidth={1} color={t.foregroundMuted} />
-                        </View>
-                        <Text className="text-sm font-medium text-foreground-muted text-center">No results for &quot;{query}&quot;</Text>
-                        <Text className="text-xs mt-1 text-foreground-muted text-center" style={{ opacity: 0.7 }}>Try a different term</Text>
-                      </View>
-                    ) : null}
-                  </ScrollView>
-                </View>
-              </View>
-            )}
+              }
+            />
           </View>
+
+          {showHistoryPanel && (
+            <Card elevation="floating" padded={false} className="mt-3 overflow-hidden">
+              <View className="flex-row items-center justify-between px-4 pb-1 pt-3">
+                <Overline>Recent Searches</Overline>
+                <TextButton label="Clear" tone="muted" onPress={clearHistory} accessibilityLabel="Clear recent searches" />
+              </View>
+              <View className="py-1">
+                {history.map(q => (
+                  <Pressable key={q} accessibilityRole="button" onPress={() => searchFor(q)} className="min-h-[44px] flex-row items-center gap-3 px-4 py-2.5 active:bg-surface-secondary">
+                    <View className="h-7 w-7 items-center justify-center rounded-md bg-surface-secondary">
+                      <Clock size={14} color={t.foregroundMuted} />
+                    </View>
+                    <Text className="text-sm text-foreground">{q}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </Card>
+          )}
+
+          {showResultsPanel && (
+            <Card elevation="floating" padded={false} className="mt-3 overflow-hidden">
+              <ScrollView style={{ maxHeight: Math.max(panelMax, 120) }} keyboardShouldPersistTaps="handled">
+                {isLoading ? (
+                  <ResultsSkeleton />
+                ) : hasResults ? (
+                  <View className="py-1">
+                    {categories.length > 0 && (
+                      <>
+                        <Overline className="px-4 pb-1 pt-2">Categories</Overline>
+                        {categories.map(cat => (
+                          <Pressable
+                            key={cat.id}
+                            accessibilityRole="button"
+                            onPress={() => {
+                              saveHistory(query)
+                              closeSearch()
+                              router.push(`/category/${cat.slug}`)
+                            }}
+                            className="min-h-[44px] flex-row items-center gap-3 px-4 py-2.5 active:bg-surface-secondary"
+                          >
+                            <View className="h-7 w-7 items-center justify-center rounded-md bg-accent-100 dark:bg-accent-900/30">
+                              <Layers size={14} color={isDark ? accent[400] : accent[600]} />
+                            </View>
+                            <Text className="flex-1 text-sm text-foreground">
+                              <Highlight text={cat.name} query={query} />
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </>
+                    )}
+
+                    {products.length > 0 && (
+                      <>
+                        <Overline className="px-4 pb-1 pt-3">Products</Overline>
+                        {products.map(product => {
+                          const img = product.product_images?.find(i => i.is_primary) || product.product_images?.[0]
+                          const price = product.has_variants && product.variant_min_price ? product.variant_min_price : product.price_ex_gst || product.base_price
+                          return (
+                            <Pressable
+                              key={product.id}
+                              accessibilityRole="button"
+                              onPress={() => {
+                                saveHistory(query)
+                                closeSearch()
+                                router.push(`/product/${product.slug}`)
+                              }}
+                              className="min-h-[44px] flex-row items-center gap-3 px-4 py-2.5 active:bg-surface-secondary"
+                            >
+                              <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-border-default bg-surface-secondary">
+                                {img ? (
+                                  <Image source={{ uri: img.thumbnail_url }} contentFit="contain" style={{ width: 36, height: 36 }} />
+                                ) : (
+                                  <ImageIcon size={20} strokeWidth={1} color={t.foregroundMuted} />
+                                )}
+                              </View>
+                              <View className="min-w-0 flex-1">
+                                <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+                                  <Highlight text={product.name} query={query} />
+                                </Text>
+                                <Text className="mt-0.5 text-xs font-semibold text-accent-600 dark:text-accent-400">
+                                  {product.has_variants ? 'From ' : ''}₹{inr(price)}
+                                </Text>
+                              </View>
+                              <ChevronRight size={16} color={t.foregroundMuted} />
+                            </Pressable>
+                          )
+                        })}
+                      </>
+                    )}
+
+                    <View className="border-t border-border-default px-3 py-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Search}
+                        label={`See all results for "${query}"`}
+                        onPress={() => {
+                          saveHistory(query)
+                          searchFor(query)
+                        }}
+                      />
+                    </View>
+                  </View>
+                ) : query.trim().length >= 2 ? (
+                  <EmptyState icon={Search} title={`No results for "${query}"`} message="Try a different term" />
+                ) : null}
+              </ScrollView>
+            </Card>
+          )}
         </View>
-      </Modal>
+      </Overlay>
 
       <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
     </>

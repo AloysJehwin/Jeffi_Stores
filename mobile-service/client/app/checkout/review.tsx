@@ -8,7 +8,7 @@ import {
   toast,
 } from '../../src/ui'
 import AiInsight from '../../src/components/cart/AiInsight'
-import AddressFormModal from '../../src/components/checkout/AddressFormModal'
+import { AddAddressSheet } from '../../src/components/account/AddressSheet'
 import CouponHintBanner from '../../src/components/checkout/CouponHintBanner'
 import { BuyNowReviewRow, CartReviewRow } from '../../src/components/checkout/CheckoutItemRow'
 import { useCheckoutStore, type PayMethod } from '../../src/components/checkout/checkoutStore'
@@ -768,8 +768,14 @@ export default function CheckoutReviewScreen() {
         </Card>
       </View>
 
-      <AddressFormModal
+      <AddAddressSheet
         isOpen={showAddressModal}
+        strict
+        defaults={{
+          full_name: user ? [user.firstName, user.lastName].filter(Boolean).join(' ') : '',
+          phone: user?.phone ? user.phone.replace(/^\+91/, '') : '',
+          is_default: true,
+        }}
         onClose={() => setShowAddressModal(false)}
         onSaved={address => {
           setShowAddressModal(false)
