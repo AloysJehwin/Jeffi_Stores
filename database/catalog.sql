@@ -633,6 +633,8 @@ CREATE TABLE public.product_offers (
     image_url_mobile text,
     blurhash character varying(64),
     blurhash_mobile character varying(64),
+    image_url_card text,
+    blurhash_card character varying(64),
     cta_label character varying(100),
     starts_at timestamp with time zone,
     ends_at timestamp with time zone,

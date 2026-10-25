@@ -79,6 +79,8 @@ export interface ProductOffer {
   image_url_mobile: string | null
   blurhash: string | null
   blurhash_mobile: string | null
+  image_url_card?: string | null
+  blurhash_card?: string | null
   cta_label: string | null
   ends_at: string | null
 }
