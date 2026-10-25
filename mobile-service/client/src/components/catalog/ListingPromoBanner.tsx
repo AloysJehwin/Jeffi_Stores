@@ -2,11 +2,10 @@ import { Pressable, View } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { badgeBg } from '../../lib/badge'
 import { absUrl, openHref } from '../../lib/links'
 import { status } from '../../theme'
-import { Text, elevationClass, useElevation, usePressScale } from '../../ui'
+import { Gradient, Text, elevationClass, useElevation, usePressScale } from '../../ui'
 import type { PromoOffer } from '../../api/products'
 
 // Mirror of controller-service components/visitor/listing/ListingPromoBanner.tsx at the mobile breakpoint
@@ -34,16 +33,7 @@ export default function ListingPromoBanner({ offer }: { offer: PromoOffer }) {
       >
         <Image source={{ uri: src }} placeholder={blurhash ? { blurhash } : undefined} style={FILL} contentFit="cover" transition={200} />
         {/* bg-gradient-to-r from-black/75 via-black/40 to-transparent */}
-        <Svg style={FILL} width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="promo" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor={status.black} stopOpacity={0.75} />
-              <Stop offset="0.5" stopColor={status.black} stopOpacity={0.4} />
-              <Stop offset="1" stopColor={status.black} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#promo)" />
-        </Svg>
+        <Gradient dir="r" stops={[[0, status.black, 0.75], [0.5, status.black, 0.4], [1, status.black, 0]]} />
         <View className="h-full items-start justify-center gap-1.5 px-5" style={{ maxWidth: '85%' }}>
           {offer.badge_text ? (
             <View className={`rounded-full px-2.5 py-1 ${badgeBg(offer.badge_color)}`}>

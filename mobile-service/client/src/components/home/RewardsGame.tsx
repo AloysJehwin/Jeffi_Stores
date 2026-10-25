@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Share, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -17,10 +17,10 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, LinearGradient, Path, Polygon, Rect, Stop, Text as SvgText } from 'react-native-svg'
+import Svg, { Circle, Path, Polygon, Text as SvgText } from 'react-native-svg'
 import { GUTTER } from './layout'
 import { postJson } from '../../api/account'
-import { Button, Card, Overline, Skeleton, Text, TextButton, haptic, toast } from '../../ui'
+import { Button, Card, Gradient, Overline, Skeleton, Text, TextButton, haptic, toast } from '../../ui'
 import { inr } from '../../lib/format'
 import { useAuthStore } from '../../stores/authStore'
 import { accent, primary, status, useTokens } from '../../theme'
@@ -89,7 +89,6 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
   const reduceMotion = useReducedMotion()
   const { width } = useWindowDimensions()
   const user = useAuthStore(s => s.user)
-  const gid = `rg${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const innerW = width - GUTTER * 2 - 32
   const wheelSize = Math.min(innerW, 300)
 
@@ -174,16 +173,7 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
   return (
     <View className="bg-surface-secondary px-4 py-10">
       <Card padded={false} className="overflow-hidden">
-        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
-          <Defs>
-            <LinearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor={accent[500]} stopOpacity={0.14} />
-              <Stop offset="0.55" stopColor={t.surfaceElevated} stopOpacity={0} />
-              <Stop offset="1" stopColor={primary[500]} stopOpacity={0.14} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill={`url(#${gid})`} />
-        </Svg>
+        <Gradient stops={[[0, accent[500], 0.14], [0.55, t.surfaceElevated, 0], [1, primary[500], 0.14]]} />
 
         <View className="p-4">
           <Overline className="text-center text-primary-500" style={{ letterSpacing: 2 }}>

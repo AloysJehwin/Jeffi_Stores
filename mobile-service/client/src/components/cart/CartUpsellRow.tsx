@@ -1,8 +1,7 @@
 import { View } from 'react-native'
-import { Card, Overline, Text } from '../../ui'
+import { Card, Overline, Rail, Text } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import ProductCard from '../product/ProductCard'
-import { Carousel } from '../home/layout'
 import { api } from '../../api/client'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { rowsToCards } from './cards'
@@ -44,11 +43,11 @@ export default function CartUpsellRow({ cartProductIds, savedProductIds }: { car
           {TITLE}
         </Text>
       </View>
-      <Carousel>
+      <Rail>
         {products.map(p => (
           <ProductCard key={p.card.id} product={p.card} handlingDays={p.handlingDays} />
         ))}
-      </Carousel>
+      </Rail>
     </Card>
   )
 }

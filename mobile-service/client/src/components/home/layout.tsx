@@ -1,10 +1,10 @@
 import { Children, type ReactNode } from 'react'
-import { ScrollView, View, useWindowDimensions } from 'react-native'
-import { Overline, Text } from '../../ui'
+import { View, useWindowDimensions } from 'react-native'
+import { GUTTER, Overline, Text } from '../../ui'
 
-// Shared building blocks for the home sections (web: container px-4, SectionCarousel, grid-cols-N).
+// Shared building blocks for the home sections (web: container px-4, grid-cols-N). The snap row is ui's Rail.
 
-export const GUTTER = 16
+export { GUTTER }
 
 /** Width of one column in an N-column grid inside the px-4 container. */
 export function useColumnWidth(cols: number, gap: number, inset = 0): number {
@@ -23,28 +23,6 @@ export function Grid({ cols = 2, gap = 12, inset = 0, children }: { cols?: numbe
         </View>
       ))}
     </View>
-  )
-}
-
-/** SectionCarousel at the mobile breakpoint: snap-scrolling row, items w-[45%], gap-3. */
-export function Carousel({ itemWidth = 0.45, gap = 12, children }: { itemWidth?: number; gap?: number; children: ReactNode }) {
-  const { width } = useWindowDimensions()
-  const w = Math.floor((width - GUTTER * 2) * itemWidth)
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      snapToInterval={w + gap}
-      decelerationRate="fast"
-      style={{ marginHorizontal: -GUTTER }}
-      contentContainerStyle={{ paddingHorizontal: GUTTER, gap }}
-    >
-      {Children.toArray(children).map((child, i) => (
-        <View key={i} style={{ width: w }}>
-          {child}
-        </View>
-      ))}
-    </ScrollView>
   )
 }
 
