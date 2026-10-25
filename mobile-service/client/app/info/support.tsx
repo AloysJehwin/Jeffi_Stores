@@ -1,4 +1,5 @@
-import { Linking, Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { Linking, Pressable, View, useWindowDimensions } from 'react-native'
+import { Text } from '../../src/ui'
 import { KeyboardScroll } from '../../src/ui/KeyboardScroll'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'

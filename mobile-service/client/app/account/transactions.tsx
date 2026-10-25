@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FlatList, Modal, Pressable, Text, View } from 'react-native'
+import { FlatList, Modal, Pressable, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import TopNav from '../../src/components/layout/TopNav'
@@ -9,7 +9,7 @@ import HeroIcon from '../../src/components/account/HeroIcon'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
 import { FilterChip, InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, StatusPill } from '../../src/components/account/ui'
 import { useTokens } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Mirror of controller-service components/shared/AccountTransactions.tsx (visitor).
 

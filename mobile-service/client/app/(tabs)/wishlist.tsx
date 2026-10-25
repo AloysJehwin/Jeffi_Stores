@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
@@ -16,7 +16,7 @@ import { useAuthStore } from '../../src/stores/authStore'
 import { showToast } from '../../src/stores/toastStore'
 import { openHref } from '../../src/lib/links'
 import { status, useTokens } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/wishlist/page.tsx at the mobile breakpoint.
 

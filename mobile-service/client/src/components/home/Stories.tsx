@@ -1,5 +1,6 @@
 import { useEffect, useId } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Text } from '../../ui'
 import { Image } from 'expo-image'
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg'
 import { GUTTER, SectionHeading } from './layout'

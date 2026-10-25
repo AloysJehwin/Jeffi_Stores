@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native'
+import { Text } from '../../ui'
 import { listAddresses } from '../../api/addresses'
 import { requestAddressChange, withdrawAddressChange, type AddressChangeInfo, type AddressLike } from '../../api/account'
 import type { Address } from '../../types'

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
+import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native'
 import { Image } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { keepPreviousData, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
@@ -15,7 +15,7 @@ import { absUrl } from '../src/lib/links'
 import { inr } from '../src/lib/format'
 import { useCompareStore } from '../src/stores/compareStore'
 import { useTokens } from '../src/theme'
-import { Skeleton } from '../src/ui'
+import { Text, Skeleton } from '../src/ui'
 
 // Mirror of controller-service app/(storefront)/compare/page.tsx at the mobile breakpoint (the table
 // scrolls sideways inside its card, min-w-[640px]).

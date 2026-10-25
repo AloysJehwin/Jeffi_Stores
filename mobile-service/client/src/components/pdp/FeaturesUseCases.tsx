@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 
 // The AI-enriched "Features & Use Cases" card from the PDP page.tsx (single column at the mobile breakpoint).
 

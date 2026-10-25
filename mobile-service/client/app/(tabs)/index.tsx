@@ -1,11 +1,11 @@
-import { RefreshControl, Text, View } from 'react-native'
+import { RefreshControl, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 import { useQuery } from '@tanstack/react-query'
 import TopNav from '../../src/components/layout/TopNav'
 import SectionRenderer from '../../src/components/home/SectionRenderer'
 import { HomeScrollContext } from '../../src/components/home/scroll-context'
-import { HomeSkeleton } from '../../src/ui'
+import { Text, HomeSkeleton } from '../../src/ui'
 import { getHome } from '../../src/api/home'
 
 // The storefront home: the admin-configured sections from GET /api/home, rendered like the web's page.

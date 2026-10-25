@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native'
+import { Text } from '../../ui'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { abandonSignup, acceptPolicies, phoneSendOtp, phoneVerifyOtp, updateProfile } from '../../api/account'
 import { refreshUser } from './hooks'

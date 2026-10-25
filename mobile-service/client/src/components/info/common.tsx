@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { primary } from '../../theme'
 

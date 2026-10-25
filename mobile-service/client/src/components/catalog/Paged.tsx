@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
-import { ActivityIndicator, Pressable, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { InboxIcon } from './icons'
 import { useTokens } from '../../theme'
-import { ProductGridSkeleton, Skeleton } from '../../ui'
+import { Text, ProductGridSkeleton, Skeleton } from '../../ui'
 
 // The admin kit's InfiniteFooter (ServerPagedItems / useReveal), the listing skeletons and empty card.
 

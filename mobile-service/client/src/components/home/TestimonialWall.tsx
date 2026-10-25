@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { Star } from 'lucide-react-native'
 import { Carousel, GUTTER, SectionHeading } from './layout'

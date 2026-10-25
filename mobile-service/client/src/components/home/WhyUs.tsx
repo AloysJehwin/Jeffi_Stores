@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import { useColorScheme } from 'nativewind'
 import { IconByName } from './Benefits'
 import { accent, primary, secondary } from '../../theme'

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 import { getFreeDeliveryRule } from '../../api/cart'

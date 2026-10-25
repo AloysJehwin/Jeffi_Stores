@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import { Image } from 'expo-image'
 import { usePathname, useRouter } from 'expo-router'
 import HeroIcon from './HeroIcon'

@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import type { CartLine } from '../../api/cart'
 import LineThumb from './LineThumb'

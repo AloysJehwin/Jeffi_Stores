@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { PanResponder, Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { PanResponder, Pressable, View, useWindowDimensions } from 'react-native'
+import { Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, ChevronRight } from 'lucide-react-native'

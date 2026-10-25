@@ -1,5 +1,6 @@
 import { Children, type ReactNode } from 'react'
-import { ScrollView, Text, View, useWindowDimensions } from 'react-native'
+import { ScrollView, View, useWindowDimensions } from 'react-native'
+import { Text } from '../../ui'
 
 // Shared building blocks for the home sections (web: container px-4, SectionCarousel, grid-cols-N).
 

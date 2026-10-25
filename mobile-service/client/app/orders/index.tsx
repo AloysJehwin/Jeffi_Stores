@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, FlatList, Pressable, Text, View } from 'react-native'
+import { Alert, FlatList, Pressable, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
@@ -10,7 +10,7 @@ import AccountMobileHeader from '../../src/components/account/AccountMobileHeade
 import HeroIcon from '../../src/components/account/HeroIcon'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
 import { InfiniteFooter, NEUTRAL_TONE, ORDER_STATUS_TONE, orderStatusLabel, StatusPill } from '../../src/components/account/ui'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 import { useTokens } from '../../src/theme'
 
 // Mirror of controller-service app/(storefront)/account/orders/page.tsx (the sm:hidden mobile card).

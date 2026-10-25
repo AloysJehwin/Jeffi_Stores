@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
-import { Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { Pressable, View, useWindowDimensions } from 'react-native'
+import { Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { Check, Package, Plus } from 'lucide-react-native'

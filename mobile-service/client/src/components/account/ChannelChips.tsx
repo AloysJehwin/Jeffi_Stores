@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import HeroIcon, { type HeroIconName } from './HeroIcon'
 import { status, useTokens } from '../../theme'
 import type { OtpChannel } from '../../api/auth'

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import { Image } from 'expo-image'
 import * as SecureStore from 'expo-secure-store'
 import { updateProfile } from '../../api/account'

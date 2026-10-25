@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, BackHandler, InteractionManager, NativeModules, Platform, Pressable, Text, View } from 'react-native'
+import { ActivityIndicator, BackHandler, InteractionManager, NativeModules, Platform, Pressable, View } from 'react-native'
+import { Text } from '../../src/ui'
 import { Stack, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import RazorpayCheckout from 'react-native-razorpay'

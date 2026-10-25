@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, Text, TextInput, View, type TextInputProps } from 'react-native'
+import { ActivityIndicator, Pressable, TextInput, View, type TextInputProps } from 'react-native'
+import { Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import HeroIcon from './HeroIcon'
 import { accent, useTokens } from '../../theme'

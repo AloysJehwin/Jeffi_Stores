@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Modal, Pressable, Text, View } from 'react-native'
+import { Modal, Pressable, View } from 'react-native'
+import { Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import Animated, { Easing, SlideInDown } from 'react-native-reanimated'

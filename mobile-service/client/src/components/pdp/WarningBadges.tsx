@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import { Glyph } from './Glyph'
 
 // Mirror of controller-service components/shared/ProductWarningBadges.tsx (size sm).

@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 
 // The brand / SKU / variant chips the web shows under a cart or checkout line name.
 export function BrandChip({ name, small }: { name: string; small?: boolean }) {

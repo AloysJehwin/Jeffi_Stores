@@ -1,4 +1,4 @@
-import { FlatList, Pressable, Text, View } from 'react-native'
+import { FlatList, Pressable, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -10,7 +10,7 @@ import CompareBar from '../../src/components/catalog/CompareBar'
 import { ChevronRightIcon } from '../../src/components/catalog/icons'
 import { InfiniteFooter } from '../../src/components/catalog/Paged'
 import { accent } from '../../src/theme'
-import { Skeleton } from '../../src/ui'
+import { Text, Skeleton } from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/categories/page.tsx at the mobile breakpoint.
 

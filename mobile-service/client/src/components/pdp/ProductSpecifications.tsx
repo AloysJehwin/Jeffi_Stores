@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../../ui'
 import { Flame, Timer, TriangleAlert, Wine, type LucideIcon } from 'lucide-react-native'
 import { Tinted } from './Glyph'
 import { buildSpecGroups, type HandlingFlag, type SpecRow } from './specGroups'
