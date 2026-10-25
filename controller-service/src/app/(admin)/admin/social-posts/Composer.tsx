@@ -507,7 +507,7 @@ export default function Composer({
                     defaultPrompt={caption.slice(0, 160)}
                     defaultImageUrl={imageUrl || undefined}
                     defaultAspect="9:16"
-                    onPick={url => setVideoUrl(url)}
+                    onPick={v => setVideoUrl(v.url)}
                   />
                 )}
               </div>

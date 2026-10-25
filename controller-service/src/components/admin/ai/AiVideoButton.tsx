@@ -9,22 +9,59 @@ import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import Select from '@/components/ui/Select'
 import { ap } from '@/lib/shared/admin-path'
-import { AI_VIDEO_DURATIONS, type AiVideoAspect } from '@/lib/ai/media-features'
+import { AI_VIDEO_DURATIONS, type AiVideoAspect, type AiVideoFeature } from '@/lib/ai/media-features'
+
+export interface AiVideoPick {
+  url: string
+  galleryVideoId?: string | null
+  durationSec?: number | null
+  /** The image the video started from (the gallery poster), when there was one. */
+  posterUrl?: string | null
+}
 
 interface Props {
-  feature: 'social_video'
-  defaultPrompt?: string
-  defaultImageUrl?: string
-  defaultAspect?: AiVideoAspect
+  feature?: AiVideoFeature
+  /** Area whose :write scope gates the button; defaults from the feature. */
   scope?: string
-  onPick: (videoUrl: string) => void
+  defaultPrompt?: string
+  /** Image-to-video source; `referenceImageUrl` wins over `defaultImageUrl`. */
+  defaultImageUrl?: string
+  referenceImageUrl?: string
+  defaultAspect?: AiVideoAspect
+  onPick: (video: AiVideoPick) => void
+  /** Logged on the usage row (slide id, offer id). */
+  usageRef?: string
   compact?: boolean
   label?: string
 }
 
-export default function AiVideoButton({ feature, defaultPrompt = '', defaultImageUrl, defaultAspect = '9:16', scope = 'social', onPick, compact, label }: Props) {
-  const canWrite = useCanWrite(scope)
-  const canUseAi = useCanUseAi(scope)
+const SCOPE_BY_FEATURE: Record<AiVideoFeature, string> = {
+  social_video: 'social',
+  homepage_video: 'settings',
+  offer_video: 'coupons',
+}
+
+const ASPECT_OPTIONS: { value: AiVideoAspect; label: string }[] = [
+  { value: '9:16', label: '9:16 (vertical)' },
+  { value: '16:9', label: '16:9 (wide)' },
+  { value: '1:1', label: '1:1 (square)' },
+]
+
+export default function AiVideoButton({
+  feature = 'social_video',
+  scope,
+  defaultPrompt = '',
+  defaultImageUrl,
+  referenceImageUrl,
+  defaultAspect = '9:16',
+  onPick,
+  usageRef,
+  compact,
+  label,
+}: Props) {
+  const area = scope ?? SCOPE_BY_FEATURE[feature]
+  const canWrite = useCanWrite(area)
+  const canUseAi = useCanUseAi(area)
   const [open, setOpen] = useState(false)
   if (!canWrite || !canUseAi) return null
   const btnCls = compact
@@ -40,8 +77,9 @@ export default function AiVideoButton({ feature, defaultPrompt = '', defaultImag
         <VideoDialog
           feature={feature}
           defaultPrompt={defaultPrompt}
-          defaultImageUrl={defaultImageUrl}
+          defaultImageUrl={referenceImageUrl ?? defaultImageUrl}
           defaultAspect={defaultAspect}
+          usageRef={usageRef}
           onPick={onPick}
           onClose={() => setOpen(false)}
         />
@@ -55,14 +93,16 @@ function VideoDialog({
   defaultPrompt,
   defaultImageUrl,
   defaultAspect,
+  usageRef,
   onPick,
   onClose,
 }: {
-  feature: 'social_video'
+  feature: AiVideoFeature
   defaultPrompt?: string
   defaultImageUrl?: string
   defaultAspect: AiVideoAspect
-  onPick: (videoUrl: string) => void
+  usageRef?: string
+  onPick: (video: AiVideoPick) => void
   onClose: () => void
 }) {
   const { showToast } = useToast()
@@ -75,6 +115,7 @@ function VideoDialog({
   const [starting, setStarting] = useState(false)
   const [progress, setProgress] = useState<'queued' | 'running' | 'done' | 'failed' | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [done, setDone] = useState<Omit<AiVideoPick, 'url'>>({})
   const [error, setError] = useState<string | null>(null)
   const [walletNotice, setWalletNotice] = useState<{ balanceInr: number; neededInr: number } | null>(null)
   const [price, setPrice] = useState<number | null>(null)
@@ -133,7 +174,7 @@ function VideoDialog({
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feature, prompt: prompt.trim(), imageUrl: imageUrl.trim() || undefined, aspect, durationSec }),
+        body: JSON.stringify({ feature, prompt: prompt.trim(), imageUrl: imageUrl.trim() || undefined, aspect, durationSec, ref: usageRef }),
       })
       const j = await res.json().catch(() => ({}))
       if (res.status === 402) {
@@ -155,7 +196,9 @@ function VideoDialog({
     if (pollRef.current) clearInterval(pollRef.current)
     pollRef.current = setInterval(async () => {
       try {
-        const url = `/api/admin/ai/video/${encodeURIComponent(jobId)}${usageId ? `?usageId=${encodeURIComponent(usageId)}` : ''}`
+        const qs = new URLSearchParams({ feature })
+        if (usageId) qs.set('usageId', usageId)
+        const url = `/api/admin/ai/video/${encodeURIComponent(jobId)}?${qs}`
         const r = await fetch(url, { credentials: 'include' })
         const j = await r.json().catch(() => ({}))
         if (!r.ok) throw new Error(j.error || 'Video poll failed')
@@ -163,6 +206,7 @@ function VideoDialog({
         if (j.status === 'done') {
           if (pollRef.current) clearInterval(pollRef.current)
           setVideoUrl(j.videoUrl)
+          setDone({ galleryVideoId: j.galleryVideoId ?? null, durationSec: j.durationSec ?? null, posterUrl: j.posterUrl ?? (imageUrl.trim() || null) })
           if (typeof j.priceInr === 'number') setCharged(j.priceInr)
         } else if (j.status === 'failed') {
           if (pollRef.current) clearInterval(pollRef.current)
@@ -177,7 +221,7 @@ function VideoDialog({
 
   function use() {
     if (!videoUrl) return
-    onPick(videoUrl)
+    onPick({ url: videoUrl, ...done })
     showToast('Video added', 'success')
     onClose()
   }
@@ -261,10 +305,7 @@ function VideoDialog({
                 aria-label="Aspect"
                 value={aspect}
                 onChange={setAspect}
-                options={[
-                  { value: '9:16', label: '9:16 (vertical)' },
-                  { value: '16:9', label: '16:9 (wide)' },
-                ]}
+                options={ASPECT_OPTIONS}
               />
             </div>
             <div>

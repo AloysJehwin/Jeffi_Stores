@@ -10,7 +10,7 @@ vi.mock('@/lib/auth/plan-gate', () => ({ currentTenantPlanGate: vi.fn().mockReso
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 
 const { mockUpload, mockGenerate } = vi.hoisted(() => ({ mockUpload: vi.fn(), mockGenerate: vi.fn() }))
-vi.mock('@/lib/shared/s3', () => ({ uploadGalleryImage: mockUpload }))
+vi.mock('@/lib/shared/s3', () => ({ uploadGalleryMedia: mockUpload }))
 vi.mock('@/lib/ai/media', () => ({ generateImage: mockGenerate, AiMediaError: class extends Error { status = 502 } }))
 vi.mock('@/lib/ai/billing', () => ({ AiWalletError: class extends Error { status = 402 } }))
 
@@ -248,8 +248,8 @@ describe('POST /api/admin/hero-slides/[id]/image', () => {
   })
 
   it('rejects an unsupported file type', async () => {
-    const gif = new File(['gif'], 'a.gif', { type: 'image/gif' })
-    expect((await UPLOAD(uploadReq({ file: gif }), paramsFor(S1))).status).toBe(400)
+    const svg = new File(['<svg/>'], 'a.svg', { type: 'image/svg+xml' })
+    expect((await UPLOAD(uploadReq({ file: svg }), paramsFor(S1))).status).toBe(400)
     expect(mockUpload).not.toHaveBeenCalled()
   })
 

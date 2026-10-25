@@ -43,6 +43,11 @@ export const DEFAULT_PRESETS: Preset[] = [
     prompt: 'Bold discount visual for {productName} with a ribbon in {brandAccent}, confetti accents, high contrast tuned for mobile.' },
   { kind: 'image', feature: 'offer_image', scenario: 'festive',
     prompt: 'Festive seasonal composition around {productName}, warm lights, garland or floral motifs, brand accent {brandAccent}.' },
+  // ----- image: homepage_image -----
+  { kind: 'image', feature: 'homepage_image', scenario: 'section_banner',
+    prompt: 'Homepage section banner for {productName}; clean composition, brand accent {brandAccent}, calm space for a headline.' },
+  { kind: 'image', feature: 'homepage_image', scenario: 'story_cover',
+    prompt: 'Vertical story cover of {productName}, bold and close-up, soft gradient in {brandAccent}, space at the top for a caption.' },
   // ----- image: email_hero -----
   { kind: 'image', feature: 'email_hero', scenario: 'newsletter_banner',
     prompt: 'Clean email header banner for {productName}; wide 2:1 aspect, subtle brand gradient {brandAccent}, large copy-safe area on the right.' },
@@ -75,6 +80,15 @@ export const DEFAULT_PRESETS: Preset[] = [
     prompt: 'Looping subtle background with {productName} softly out of focus, slow pan, brand accent {brandAccent} haze for a testimonial overlay.' },
   { kind: 'video', feature: 'social_video', scenario: 'seasonal_highlight',
     prompt: 'Seasonal highlight reel of {productName} with falling confetti or petals in {brandAccent}, warm cinematic grade.' },
+  // ----- video: homepage_video, offer_video -----
+  { kind: 'video', feature: 'homepage_video', scenario: 'ambient_loop',
+    prompt: 'Calm, seamlessly looping banner of {productName}: slow drift of light across the subject, no cuts, brand accent {brandAccent}.' },
+  { kind: 'video', feature: 'homepage_video', scenario: 'hero_push_in',
+    prompt: 'Slow cinematic push-in on {productName} with soft particles, dark backdrop, space for a headline, loopable.' },
+  { kind: 'video', feature: 'offer_video', scenario: 'offer_sparkle',
+    prompt: 'Festive offer loop around {productName}: sparkles and warm bokeh in {brandAccent}, the product steady and centred.' },
+  { kind: 'video', feature: 'offer_video', scenario: 'offer_reveal',
+    prompt: 'Quick reveal of {productName} as a light sweep crosses it, dark studio, subject in the upper two thirds, loopable.' },
   // ----- video: globals (no feature) -----
   { kind: 'video', scenario: 'logo_flourish',
     prompt: 'Elegant logo flourish motion with {brandAccent} ribbons sweeping in, finishing on {productName}.' },

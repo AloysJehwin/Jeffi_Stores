@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { uploadGalleryImage } from '@/lib/shared/s3'
+import { uploadGalleryMedia } from '@/lib/shared/s3'
 import { applyDraftPatch, getEditableHomepage, withHomepageDraft } from '@/lib/catalog/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 
-const ALLOWED = ['image/png', 'image/jpeg', 'image/webp']
+const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 const MAX = 5 * 1024 * 1024
 
 // POST /api/admin/hero-slides/[id]/image — upload a slide banner image onto the draft slide.
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (file.size > MAX) return NextResponse.json({ error: 'Image must be under 5 MB' }, { status: 400 })
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const { url, blurhash } = await uploadGalleryImage(buffer, file.name)
+    const { url, blurhash } = await uploadGalleryMedia(buffer, file.name, file.type)
     const hashField = field === 'image_url_mobile' ? 'blurhash_mobile' : 'blurhash'
 
     const saved = await withHomepageDraft(admin.adminId, draft => {

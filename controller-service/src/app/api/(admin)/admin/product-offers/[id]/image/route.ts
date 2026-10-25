@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'
-import { uploadGalleryImage } from '@/lib/shared/s3'
+import { uploadGalleryMedia } from '@/lib/shared/s3'
 
 export const dynamic = 'force-dynamic'
 
-const ALLOWED = ['image/png', 'image/jpeg', 'image/webp']
+const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 const MAX = 5 * 1024 * 1024
 const BLURHASH_FOR = { image_url: 'blurhash', image_url_mobile: 'blurhash_mobile', image_url_card: 'blurhash_card' } as const
 const imageField = (v: unknown): keyof typeof BLURHASH_FOR =>
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (file.size > MAX) return NextResponse.json({ error: 'Image must be under 5 MB' }, { status: 400 })
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const { url, blurhash } = await uploadGalleryImage(buffer, file.name)
+    const { url, blurhash } = await uploadGalleryMedia(buffer, file.name, file.type)
     const hashField = BLURHASH_FOR[field]
 
     await query(`UPDATE product_offers SET ${field} = $1, ${hashField} = $2, updated_at = NOW() WHERE id = $3`, [

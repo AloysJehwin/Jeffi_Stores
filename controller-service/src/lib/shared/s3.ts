@@ -8,6 +8,7 @@ import {
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3'
+import { randomUUID } from 'crypto'
 import sharp from 'sharp'
 import { encode as encodeBlurhash } from 'blurhash'
 import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
@@ -291,6 +292,118 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
     width: metadata.width || 0,
     height: metadata.height || 0,
     blurhash,
+  }
+}
+
+export interface GalleryMediaResult extends GalleryUploadResult {
+  /** What was stored: image/gif or image/webp when the animation was kept, else image/png. */
+  mimeType: string
+  animated: boolean
+}
+
+const ANIMATED_FORMATS: Record<string, { mime: string; ext: string }> = {
+  gif: { mime: 'image/gif', ext: 'gif' },
+  webp: { mime: 'image/webp', ext: 'webp' },
+}
+
+/**
+ * Gallery upload that keeps animation: an animated GIF or WebP is stored byte-for-byte (a PNG
+ * re-encode would keep only the first frame) with a first-frame PNG thumbnail and blurhash.
+ * Anything else takes the uploadGalleryImage PNG path. `mime` is a hint; sharp decides.
+ */
+export async function uploadGalleryMedia(buffer: Buffer, fileName: string, mime: string): Promise<GalleryMediaResult> {
+  const maybeAnimated = !mime || mime === 'image/gif' || mime === 'image/webp' || mime === 'application/octet-stream'
+  const meta = maybeAnimated ? await sharp(buffer, { animated: true }).metadata().catch(() => null) : null
+  const fmt = meta?.format ? ANIMATED_FORMATS[meta.format] : undefined
+  if (!meta || !fmt || (meta.pages ?? 1) <= 1) {
+    return { ...(await uploadGalleryImage(buffer, fileName)), mimeType: 'image/png', animated: false }
+  }
+
+  const BUCKET_NAME = await resolveBucket()
+  const timestamp = Date.now()
+  const baseName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '')
+  const s3Key = `gallery/${timestamp}-${baseName}.${fmt.ext}`
+  const s3ThumbnailKey = `gallery/thumbnails/${timestamp}-${baseName}.png`
+  // Without { animated: true } sharp reads only the first frame.
+  const thumbnailBuffer = await sharp(buffer).resize(300, 300, { fit: 'cover' }).png({ compressionLevel: 8 }).toBuffer()
+  const blurhash = await computeBlurhash(buffer)
+
+  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: buffer, ContentType: fmt.mime }))
+  await s3Client.send(
+    new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnailBuffer, ContentType: 'image/png' })
+  )
+
+  return {
+    url: await getS3Url(s3Key),
+    thumbnailUrl: await getS3Url(s3ThumbnailKey),
+    s3Key,
+    s3ThumbnailKey,
+    fileName: `${baseName}.${fmt.ext}`,
+    fileSize: buffer.length,
+    width: meta.width || 0,
+    // Animated metadata stacks the frames: height is per page.
+    height: meta.pageHeight || meta.height || 0,
+    blurhash,
+    mimeType: fmt.mime,
+    animated: true,
+  }
+}
+
+export const GALLERY_VIDEO_MAX_BYTES = 50 * 1024 * 1024
+export const GALLERY_VIDEO_TYPES = { 'video/mp4': 'mp4', 'video/webm': 'webm' } as const
+export type GalleryVideoMime = keyof typeof GALLERY_VIDEO_TYPES
+export const GALLERY_VIDEO_KEY_RE = /^media\/video\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(mp4|webm)$/
+
+// Presigning with the default client signs a CRC32 of the empty body into the URL, which fails the
+// real upload; checksums only when an operation requires them.
+let presignClient: S3Client | null = null
+
+/**
+ * A presigned PUT for a gallery video, so the browser sends the bytes straight to S3. The content
+ * type and length are signed in, so the PUT must match what was declared.
+ */
+export async function presignGalleryVideoUpload(
+  mime: GalleryVideoMime,
+  bytes: number,
+  ttlSeconds = 10 * 60
+): Promise<{ uploadUrl: string; key: string; url: string; expiresIn: number }> {
+  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
+  presignClient ??= new S3Client({
+    region: AWS_REGION,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+    },
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+  })
+  const key = `media/video/${randomUUID()}.${GALLERY_VIDEO_TYPES[mime]}`
+  const uploadUrl = await getSignedUrl(
+    presignClient,
+    new PutObjectCommand({ Bucket: await resolveBucket(), Key: `${KEY_PREFIX}${key}`, ContentType: mime, ContentLength: bytes }),
+    // The presigner leaves content-type unsigned unless asked.
+    { expiresIn: ttlSeconds, signableHeaders: new Set(['content-type']) }
+  )
+  return { uploadUrl, key, url: await getS3Url(key), expiresIn: ttlSeconds }
+}
+
+/** Size, content type and leading bytes of an uploaded object; null when it is not there. */
+export async function inspectObject(
+  canonicalKey: string,
+  headBytes = 64
+): Promise<{ size: number; contentType: string | null; head: Buffer } | null> {
+  const Bucket = await resolveBucket()
+  const Key = `${KEY_PREFIX}${canonicalKey}`
+  try {
+    const meta = await s3Client.send(new HeadObjectCommand({ Bucket, Key }))
+    const size = meta.ContentLength ?? 0
+    let head = Buffer.alloc(0)
+    if (size > 0) {
+      const res = await s3Client.send(new GetObjectCommand({ Bucket, Key, Range: `bytes=0-${headBytes - 1}` }))
+      head = Buffer.from((await res.Body?.transformToByteArray()) ?? [])
+    }
+    return { size, contentType: meta.ContentType ?? null, head }
+  } catch {
+    return null
   }
 }
 
