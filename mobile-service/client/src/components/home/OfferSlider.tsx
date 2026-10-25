@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Pressable, View, useWindowDimensions } from 'react-native'
-import { Gradient, PeekPager, Text, Title, elevationClass, useElevation } from '../../ui'
-import { Image } from 'expo-image'
+import { Gradient, Media, PeekPager, Text, Title, elevationClass, useElevation } from '../../ui'
 import { useRouter } from 'expo-router'
+import Animated from 'react-native-reanimated'
 import { SHADOW_ROOM, SectionHeading, SlideBadge, SlideCta } from './layout'
+import { useOnScreen } from './scroll-context'
 import { absUrl, openHref } from '../../lib/links'
 import { status } from '../../theme'
 import type { ProductOffer, SectionProps } from '../../types/home'
@@ -26,9 +28,11 @@ function Offers({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
   const { width } = useWindowDimensions()
   const open = (o: ProductOffer) => openHref(router, `/products?offer=${encodeURIComponent(o.slug)}`)
   const single = offers.length === 1
+  const [current, setCurrent] = useState(0)
+  const { ref, onLayout, onScreen } = useOnScreen(offers.some(o => (single ? o.video_url : o.video_url_card)))
 
   return (
-    <View className="bg-surface py-8">
+    <Animated.View ref={ref} onLayout={onLayout} collapsable={false} className="bg-surface py-8">
       {eyebrow || title ? (
         <SectionHeading eyebrow={eyebrow} title={title} eyebrowClassName="text-primary-500" className={single ? 'mb-5 px-4' : 'mb-4 px-4'} />
       ) : null}
@@ -36,7 +40,7 @@ function Offers({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
       {single ? (
         <View className="px-3">
           <Pressable onPress={() => open(offers[0])} accessibilityRole="button" accessibilityLabel={shopLabel(offers[0])}>
-            <OfferBanner offer={offers[0]} width={width} />
+            <OfferBanner offer={offers[0]} width={width} active={onScreen} />
           </Pressable>
         </View>
       ) : (
@@ -48,10 +52,11 @@ function Offers({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
           onPress={o => open(o)}
           itemLabel={shopLabel}
           dots={{ tone: 'primary', label: i => `Go to offer ${i + 1}`, className: 'mt-1' }}
-          renderItem={(o, { width: w }) => <OfferCard offer={o} height={Math.round(w / ASPECT)} />}
+          onIndexChange={setCurrent}
+          renderItem={(o, { width: w, index }) => <OfferCard offer={o} height={Math.round(w / ASPECT)} active={onScreen && index === current} />}
         />
       )}
-    </View>
+    </Animated.View>
   )
 }
 
@@ -62,20 +67,13 @@ function cardImage(o: ProductOffer) {
   return { src: absUrl(o.image_url), blurhash: o.blurhash || null }
 }
 
-function OfferCard({ offer, height }: { offer: ProductOffer; height: number }) {
+function OfferCard({ offer, height, active }: { offer: ProductOffer; height: number; active: boolean }) {
   const shadow = useElevation('overlay')
   const { src, blurhash } = cardImage(offer)
   return (
     <View style={[shadow, { marginTop: SHADOW_ROOM.top }]} className={`rounded-panel ${elevationClass('overlay')}`}>
       <View className="w-full overflow-hidden rounded-panel bg-black" style={{ height }}>
-        <Image
-          recyclingKey={src}
-          source={src ? { uri: src } : undefined}
-          placeholder={blurhash ? { blurhash } : undefined}
-          style={FILL}
-          contentFit="cover"
-          transition={200}
-        />
+        <Media image={src} video={offer.video_url_card} blurhash={blurhash} style={FILL} active={active} />
         <Gradient dir="t" stops={[[0, status.black, 0.8], [0.45, status.black, 0.25], [1, status.black, 0]]} />
 
         <View pointerEvents="none" className="absolute bottom-0 left-0 right-0 p-4">
@@ -95,7 +93,7 @@ function OfferCard({ offer, height }: { offer: ProductOffer; height: number }) {
   )
 }
 
-function OfferBanner({ offer, width }: { offer: ProductOffer; width: number }) {
+function OfferBanner({ offer, width, active }: { offer: ProductOffer; width: number; active: boolean }) {
   const shadow = useElevation('overlay')
   const height = Math.min(352, Math.max(176, width * 0.44)) // h-[clamp(11rem,44vw,22rem)]
   const titleSize = Math.min(36, Math.max(20, width * 0.032))
@@ -105,14 +103,7 @@ function OfferBanner({ offer, width }: { offer: ProductOffer; width: number }) {
   return (
     <View style={shadow} className={`rounded-panel ${elevationClass('overlay')}`}>
       <View className="w-full overflow-hidden rounded-panel bg-black" style={{ height }}>
-        <Image
-          recyclingKey={src}
-          source={src ? { uri: src } : undefined}
-          placeholder={blurhash ? { blurhash } : undefined}
-          style={FILL}
-          contentFit="cover"
-          transition={200}
-        />
+        <Media image={src} video={offer.video_url} blurhash={blurhash} style={FILL} active={active} />
         {/* bg-gradient-to-t from-black/70 via-black/10 to-transparent */}
         <Gradient dir="t" stops={[[0, status.black, 0.7], [0.5, status.black, 0.1], [1, status.black, 0]]} />
 
