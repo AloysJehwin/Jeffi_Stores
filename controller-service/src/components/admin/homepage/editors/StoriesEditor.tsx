@@ -4,7 +4,7 @@ import { safeHref, storyGroups } from '@/lib/catalog/homepage-sections'
 import { Grid, HeadingFields, Image, LABEL_CLASS, Note, Text, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { type Tile } from './TileListEditor'
 
-const MAX_GROUPS = 12
+const MAX_GROUPS = 24
 const MAX_SLIDES = 12
 // `id` rides along as a hidden tile key so the storefront's "seen" state survives edits.
 const SLIDE_KEYS = ['id', 'image', 'caption', 'ctaLabel', 'url', 'seconds']
