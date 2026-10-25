@@ -71,7 +71,9 @@ New tables go in a topic file (`database/notifications.sql`), with PK/CHECK in `
 - **`push_devices`**
   - Columns: `id`, `user_id` (nullable for signed-out installs; FK users ON DELETE CASCADE), `token` (unique),
     `platform` (CHECK android/ios), `app_version`, `os_version`, `locale`, `timezone` (default `Asia/Kolkata`),
-    `created_at`, `last_seen_at`, `disabled_at`, `disabled_reason`.
+    `offers_opt_in` and `offers_opt_in_at` (the marketing consent of a signed-out install), `created_at`,
+    `last_seen_at`, `disabled_at`, `disabled_reason`.
+  - When a signed-out install signs in, its opt-in carries over to the user's preferences.
   - Index on `user_id` where `disabled_at IS NULL`.
 - **`notification_preferences`**
   - Columns: `user_id`, `category`, `push`, `email`, `sms`, `whatsapp`, `updated_at`; PK `(user_id, category)`.
@@ -113,6 +115,7 @@ forwarding.
   state). It fits the top bar now that the bottom tabs are gone.
 - **Settings:** an Account → Notifications screen with the categories × channels toggles and a link to Android's
   notification settings when the permission is off.
+  - Signed out, it is reachable from the menu and shows just the offers toggle for this device.
 - **Native build:** adding `expo-notifications` needs a Play build. Also add the notification icon (monochrome) and
   accent colour.
 
@@ -140,16 +143,18 @@ like SMS and WhatsApp templates.
   - Fields: title (up to 65 characters), body (up to 240), optional image from the gallery (AI-platform images
     included), and a link picker (product, category, offer, collection or storefront path).
   - A live Android preview, collapsed and expanded.
-- **Audience:** the existing segments, plus "All signed-in app users" and "All installs, including signed out". Reach
-  counts only active devices whose user allows `offers` and isn't opted out of marketing. `resolveAudience` gets a
-  per-channel reachability rule instead of always requiring an email address.
+- **Audience:** the existing segments, plus "All signed-in app users" and "All installs, including signed out".
+  - Reach counts active devices whose user allows `offers` and isn't opted out of marketing, plus signed-out devices
+    with `offers_opt_in`.
+  - `resolveAudience` gets a per-channel reachability rule instead of always requiring an email address.
 - **Sending:**
   - Schedule through the existing dispatcher. Send in batches of up to 500 tokens per FCM call, with one log row per
     device.
   - FCM `UNREGISTERED` or `INVALID_ARGUMENT` disables the device.
 - **Guardrails:**
-  - Quiet hours 21:00 to 09:00 in the device's time zone (configurable); sends inside the window wait for it to end.
-  - A frequency cap of one marketing push per user per day (configurable), shared with scenario pushes.
+  - Quiet hours 00:00 to 09:00 in the device's time zone (configurable); sends inside the window wait for it to end.
+  - A frequency cap of two marketing pushes per person or signed-out device per day (configurable), shared with
+    scenario pushes.
   - Collapse keys so a newer offer replaces an older one.
 - **Reporting:** sent, delivered, failed, opened (tap API), and converted (an order within 24 hours of the open,
   attributed like email's `converted_at`).
@@ -210,9 +215,14 @@ like SMS and WhatsApp templates.
 - **Phase 3:** the dry run lists eligible users; a second run in the cooldown sends nothing (dedup).
 - **Every phase:** the CI check set and the app typecheck; schema applied to the local database only.
 
+## Decisions (2026-10-25)
+
+- **Signed-out installs** receive marketing pushes when they opted in on the device.
+- **Quiet hours** are 00:00 to 09:00, recorded from "12pm–9am" as midnight to 9 am; noon to 9 am would leave only
+  three hours a day.
+- **Frequency cap:** at most two marketing pushes a day.
+
 ## Open decisions
 
-1. **Signed-out installs.** Send marketing pushes to them ("All installs") or only to signed-in users.
-2. **Quiet hours and frequency cap** defaults: 21:00–09:00 and one marketing push a day are proposed.
-3. **Web push.** Add browser push to the storefront later, or keep push app-only.
-4. **Cost saving.** Should order updates eventually go push-first, with SMS only when the push isn't delivered?
+1. **Web push.** Add browser push to the storefront later, or keep push app-only.
+2. **Cost saving.** Should order updates eventually go push-first, with SMS only when the push isn't delivered?

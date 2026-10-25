@@ -58,14 +58,14 @@ An audit on 2026-10-25 (32 screens) found:
 | Theme | Persist the choice (system, light or dark) with AsyncStorage. Set the expo-router `ThemeProvider` and `Stack contentStyle` background from the tokens, and drive `StatusBar` style from the theme. |
 
 **Typography**
-- Load Inter (400/500/600/700/800) through the `expo-font` config plugin (`android.fonts`) so weights map natively.
-  Optionally add one display face for page titles and hero copy (decision 1 below).
+- Load Inter (400/500/600/700/800) for text and Plus Jakarta Sans (700/800) for display copy, through the
+  `expo-font` config plugin (`android.fonts`) so weights map natively.
 - Text components:
 
   | Component | Size and weight |
   |---|---|
-  | `Display` | 30/800 |
-  | `Title` (page) | 24/800 |
+  | `Display` (Plus Jakarta Sans) | 30/800 |
+  | `Title` (page, Plus Jakarta Sans) | 24/800 |
   | `Heading` (section) | 18/700 |
   | `Subheading` | 16/600 |
   | `Body` | 15/400 |
@@ -99,7 +99,7 @@ An audit on 2026-10-25 (32 screens) found:
 - `Screen`: background, `ScreenHeader` or `TopNav`, safe-area bottom padding, `scroll` / `keyboard` / `list` modes
   (`KeyboardScroll`, `FlatList`), optional pull-to-refresh, and `loading` / `empty` / `error` slots.
 - `ScreenHeader` for stack screens: back button, title, up to two actions, large-title variant for top-level pages.
-  `TopNav` (brand, search, cart, menu) stays on home, products, cart and wishlist only.
+  `TopNav` (brand, search, cart, account, menu) stays on home, products, cart and wishlist only.
 - `Section`: heading, optional "See all", gutter. The home `SectionHeading` becomes this.
 
 Phase 0 ships the library with a hidden `/dev/ui` gallery route (dev builds only) that renders every component in
@@ -109,16 +109,23 @@ light and dark, used for screenshot review before any screen migrates.
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| 0. Foundations | `src/ui/` library, tokens and elevation, Inter fonts (native: needs a Play build), theme persistence and navigation theme, `/dev/ui` gallery | Gallery reviewed in light and dark at 360dp and 412dp, font scale 1.0 and 1.3 |
+| 0. Foundations | `src/ui/` library, tokens and elevation, fonts (native), `expo-updates` (native), theme persistence and navigation theme, `/dev/ui` gallery | Gallery reviewed in light and dark at 360dp and 412dp, font scale 1.0 and 1.3; an OTA update reaches a release build |
 | 1. Shell and navigation | `Screen` + `ScreenHeader` on all 32 routes; drawer redesigned as a sheet menu built from `ListRow`s; TopNav cleanup (Reanimated, `IconButton`); home error state gets pull-to-refresh | Every stack screen has a back header; no screen sets its own bottom inset |
 | 2. Commerce core | Home sections, products and category listing, `ProductCard` (one ribbon/pill), PDP (`Glyph` to lucide, `Chip`s, sticky bar), cart, checkout review, payment, confirmation, `QuickAddSheet` | Zero `PrimaryButton`/`BigButton`/raw `TextInput` in these screens |
 | 3. Account and orders | Account hub as `ListRow`s, orders list, order detail (split the 1,126-line file into sections), one `AddressSheet` replacing both address modals, profile, rewards, referrals, subscriptions, quotes, transactions, delete account, review and tracking sheets | Both address modals deleted; zero `Modal` imports in `account/` |
 | 4. Remaining screens | Auth screens onto the shared primitives (they set the look), support chat, compare, categories, brands, info, legal | Dead code removed: `ui/Button.tsx` (old), `AccountHeader`, both `Glyph.tsx`, `catalog/icons.tsx`, `HeroIcon` |
 | 5. Quality pass | Accessibility (labels, roles and states on every touchable; 44px targets; TalkBack pass on home, PDP, cart and checkout); a `useMotion()` helper so every autoplay, pulse and `entering` animation honours reduced motion; long lists to `FlatList` (wishlist, cart lines, order items, rewards, referrals, subscriptions); `recyclingKey` on images in lists; dark-mode gaps (`CouponHintBanner`, `info/about`, SupportChat tints) | Label coverage on touchables near 100%; no `ScrollView`+`map` over unbounded data |
 
-Each phase is one or more PRs grouped by screen. Phase 0 needs a native build (fonts); the rest is JavaScript but
-still ships through a Play build because the app has no over-the-air updates. Consider adding `expo-updates` in
-phase 0 so phases 1 to 5 can reach users without a store review each time (decision 3).
+Each phase is one or more PRs grouped by screen. Phase 0 needs one native build (fonts and `expo-updates`).
+
+**Over-the-air updates (EAS Update).**
+- Phase 0 adds `expo-updates` with a fingerprint runtime version, so an update only reaches builds with matching
+  native code.
+- The main-merge pipeline checks the fingerprint:
+  - unchanged native code → `eas update --branch production`, which reaches phones within minutes, no Play review;
+  - changed native code → the existing EAS build and Play submit.
+- Phases 1 to 5 are JavaScript only, so they ship over the air.
+- Rollback is republishing the previous update.
 
 ## Rules for every PR
 
@@ -135,11 +142,13 @@ phase 0 so phases 1 to 5 can reach users without a store review each time (decis
 - Phase 5: a TalkBack walk through browse → product → add to cart → checkout.
 - Keep a short changelog per phase in this file (what moved, what was deleted, counts).
 
+## Decisions (2026-10-25)
+
+- **Fonts:** Inter for text, Plus Jakarta Sans for titles and hero copy.
+- **Over-the-air updates:** yes, EAS Update from phase 0.
+- **Account entry:** a person button in the top bar, between cart and menu (shipped with PR #578).
+
 ## Open decisions
 
-1. **Display face.** Inter for everything, or Inter plus a display face (for example Plus Jakarta Sans or Manrope) for
-   titles and hero copy.
-2. **Header on top-level pages.** Keep the brand `TopNav` on home, products, cart and wishlist, or use a large-title
+1. **Header on top-level pages.** Keep the brand `TopNav` on home, products, cart and wishlist, or use a large-title
    `ScreenHeader` there too and keep the brand only on home.
-3. **Over-the-air updates.** Add `expo-updates` (EAS Update) so UI phases ship without a Play review each time.
-4. **Account entry.** With the bottom bar gone, add an account avatar button to the top bar or keep it in the menu.
