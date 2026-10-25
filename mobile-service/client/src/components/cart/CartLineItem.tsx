@@ -1,12 +1,10 @@
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native'
-import { Text } from '../../ui'
+import { Pressable, View } from 'react-native'
+import { Badge, Stepper, Text, TextButton } from '../../ui'
 import { useRouter } from 'expo-router'
-import { Minus, Plus } from 'lucide-react-native'
 import type { CartLine } from '../../api/cart'
 import LineThumb from './LineThumb'
 import WarningBadges from './WarningBadges'
 import { BrandChip, SkuText, VariantChips } from './Chips'
-import { accent, useTokens } from '../../theme'
 import { inr } from '../../lib/format'
 import { inclusiveUnit, isCustomQty, isDigitalLine, lineSku, money, primaryImage, qtyText, unitFactor, unitText } from './lines'
 
@@ -27,7 +25,6 @@ export default function CartLineItem({
   onRemove: () => void
 }) {
   const router = useRouter()
-  const t = useTokens()
   const img = primaryImage(item)
   const custom = isCustomQty(item)
   const factor = unitFactor(item)
@@ -67,7 +64,7 @@ export default function CartLineItem({
   return (
     <View className={`p-4 ${last ? '' : 'border-b border-border-default'}`}>
       <View className="flex-row gap-4">
-        <Pressable onPress={openProduct}>
+        <Pressable onPress={openProduct} accessibilityRole="imagebutton" accessibilityLabel={item.products.name}>
           <LineThumb uri={img?.thumbnail_url || img?.image_url} blurhash={img?.blurhash} size={96} iconSize={48} />
         </Pressable>
 
@@ -78,11 +75,7 @@ export default function CartLineItem({
           <View className="mt-0.5 flex-row flex-wrap items-center gap-2">
             {item.products.brand_name ? <BrandChip name={item.products.brand_name} /> : null}
             {sku ? <SkuText sku={sku} /> : null}
-            {inactive ? (
-              <View className="rounded-full bg-red-100 px-2 py-0.5 dark:bg-red-900/30">
-                <Text className="text-xs font-semibold text-red-700 dark:text-red-300">Unavailable</Text>
-              </View>
-            ) : null}
+            {inactive ? <Badge label="Unavailable" tone="danger" /> : null}
             <WarningBadges
               fragile={item.products?.fragile}
               hazardous={item.products?.hazardous}
@@ -101,9 +94,7 @@ export default function CartLineItem({
             {showMrp ? (
               <>
                 <Text className="text-sm text-foreground-muted line-through">{money(Number(mrp) * factor)}</Text>
-                <View className="rounded-full bg-accent-100 px-2 py-0.5 dark:bg-accent-900/30">
-                  <Text className="text-xs font-semibold text-accent-700 dark:text-accent-400">{discountPct}% off</Text>
-                </View>
+                <Badge label={`${discountPct}% off`} tone="accent" />
               </>
             ) : null}
           </View>
@@ -114,13 +105,14 @@ export default function CartLineItem({
                 <Text className="text-sm text-foreground-secondary">Qty 1 · Digital</Text>
               ) : custom ? (
                 <View className="flex-row flex-wrap items-center gap-2">
-                  <TextInput
-                    key={`${item.id}:${qty}`}
+                  <Stepper
+                    inputKey={`${item.id}:${qty}`}
                     defaultValue={qtyText(qty)}
-                    keyboardType="decimal-pad"
-                    editable={!updating}
+                    decimal
+                    disabled={updating}
+                    itemName={item.products.name}
+                    width={72}
                     onEndEditing={e => commit(e.nativeEvent.text)}
-                    className="w-24 rounded-lg border border-border-secondary bg-surface px-3 py-2 text-center text-sm font-semibold text-foreground disabled:opacity-50"
                   />
                   <Text className="text-sm text-foreground-muted">{unitText(unitLabel || item.buy_unit)}</Text>
                   <Text className="text-xs text-foreground-muted">
@@ -128,47 +120,23 @@ export default function CartLineItem({
                   </Text>
                 </View>
               ) : (
-                <View className="flex-row items-center rounded-lg border border-border-secondary">
-                  <Pressable
-                    onPress={() => onQuantity(qty - qtyStep)}
-                    disabled={updating || qty <= qtyMin}
-                    accessibilityLabel={`Decrease quantity for ${item.products.name}`}
-                    className="px-3 py-2 disabled:opacity-50"
-                  >
-                    <Minus size={16} color={t.foreground} strokeWidth={2} />
-                  </Pressable>
-                  {updating ? (
-                    <View className="min-w-[60px] items-center justify-center border-x border-border-secondary px-4 py-2">
-                      <ActivityIndicator size="small" color={accent[500]} />
-                    </View>
-                  ) : (
-                    <TextInput
-                      key={`${item.id}:${qty}`}
-                      defaultValue={String(Math.round(qty))}
-                      keyboardType="number-pad"
-                      onEndEditing={e => commit(e.nativeEvent.text)}
-                      className="w-16 border-x border-border-secondary bg-surface px-1 py-2 text-center font-semibold text-foreground"
-                    />
-                  )}
-                  <Pressable
-                    onPress={() => onQuantity(qty + qtyStep)}
-                    disabled={updating || (qtyMax !== undefined && qty >= qtyMax)}
-                    accessibilityLabel={`Increase quantity for ${item.products.name}`}
-                    className="px-3 py-2 disabled:opacity-50"
-                  >
-                    <Plus size={16} color={t.foreground} strokeWidth={2} />
-                  </Pressable>
-                </View>
+                <Stepper
+                  inputKey={`${item.id}:${qty}`}
+                  defaultValue={String(Math.round(qty))}
+                  busy={updating}
+                  itemName={item.products.name}
+                  onEndEditing={e => commit(e.nativeEvent.text)}
+                  onDecrement={() => onQuantity(qty - qtyStep)}
+                  onIncrement={() => onQuantity(qty + qtyStep)}
+                  canDecrement={qty > qtyMin}
+                  canIncrement={!(qtyMax !== undefined && qty >= qtyMax)}
+                />
               )}
 
               {!custom && showUnitLabel ? <Text className="text-sm text-foreground-muted">{unitText(unitLabel)}</Text> : null}
 
-              <Pressable onPress={onSave} accessibilityLabel={`Save ${item.products.name} for later`}>
-                <Text className="text-sm font-medium text-foreground-secondary">Save for later</Text>
-              </Pressable>
-              <Pressable onPress={onRemove} accessibilityLabel={`Remove ${item.products.name} from cart`}>
-                <Text className="text-sm font-medium text-red-600">Remove</Text>
-              </Pressable>
+              <TextButton label="Save for later" tone="muted" accessibilityLabel={`Save ${item.products.name} for later`} onPress={onSave} className="self-center" />
+              <TextButton label="Remove" tone="danger" accessibilityLabel={`Remove ${item.products.name} from cart`} onPress={onRemove} className="self-center" />
             </View>
             {hint.length > 0 ? (
               <Text className="mt-1 text-xs text-foreground-muted">

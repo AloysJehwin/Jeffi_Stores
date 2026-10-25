@@ -1,8 +1,8 @@
 import { useEffect, useState, type RefObject } from 'react'
-import { ActivityIndicator, Linking, Pressable, View } from 'react-native'
-import { Text } from '../../ui'
+import { Linking, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Glyph, P } from './Glyph'
+import { Check, CircleCheck, CircleX, ShoppingCart, Zap } from 'lucide-react-native'
+import { Badge, Button, Chip, ChipGroup, ListRow, ModalSheet, Text } from '../../ui'
 import QuantityInput, { InCartQtyHint } from './QuantityInput'
 import { OptionChips } from './OptionChips'
 import { MODE_LABELS, type ProductPurchase } from './useProductPurchase'
@@ -13,39 +13,10 @@ import { resolveEdd } from '../../lib/edd'
 import { inr, shortDate } from '../../lib/format'
 import { SITE_URL } from '../../lib/links'
 import { useAuthStore } from '../../stores/authStore'
-import { status } from '../../theme'
+import { status, useTokens } from '../../theme'
 import type { Address } from '../../types'
 
 // Mirror of controller-service components/visitor/ProductActions.tsx at the mobile breakpoint.
-
-function PrimaryButton({
-  onPress,
-  disabled,
-  busy,
-  busyLabel,
-  label,
-  icon,
-  className,
-}: {
-  onPress: () => void
-  disabled: boolean
-  busy: boolean
-  busyLabel: string
-  label: string
-  icon: string
-  className: string
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      className={`w-full flex-row items-center justify-center gap-2 rounded-lg px-6 py-4 ${className} ${disabled ? 'opacity-50' : ''}`}
-    >
-      {busy ? <ActivityIndicator size="small" color={status.white} /> : <Glyph d={icon} size={20} className="text-white" />}
-      <Text className="font-semibold text-white">{busy ? busyLabel : label}</Text>
-    </Pressable>
-  )
-}
 
 export default function ProductActions({
   p,
@@ -73,6 +44,7 @@ export default function ProductActions({
   buyRef: RefObject<View | null>
 }) {
   const router = useRouter()
+  const t = useTokens()
   const user = useAuthStore(s => s.user)
   const [showAllVariants, setShowAllVariants] = useState(false)
   const [showAllSubs, setShowAllSubs] = useState(false)
@@ -132,19 +104,11 @@ export default function ProductActions({
           {p.hasMultipleModes ? (
             <View>
               <Text className="mb-2 text-sm font-medium text-foreground-secondary">Buy by</Text>
-              <View className="flex-row flex-wrap gap-2">
+              <ChipGroup>
                 {p.pricingTypes.map(pt => (
-                  <Pressable
-                    key={pt}
-                    onPress={() => p.setSelectedMode(pt)}
-                    className={`rounded-lg border px-4 py-2 ${p.selectedMode === pt ? 'border-primary-600 bg-primary-600' : 'border-border-secondary bg-surface-elevated'}`}
-                  >
-                    <Text className={`text-sm font-semibold ${p.selectedMode === pt ? 'text-white' : 'text-foreground-secondary'}`}>
-                      {MODE_LABELS[pt] || pt}
-                    </Text>
-                  </Pressable>
+                  <Chip key={pt} label={MODE_LABELS[pt] || pt} selected={p.selectedMode === pt} onPress={() => p.setSelectedMode(pt)} />
                 ))}
-              </View>
+              </ChipGroup>
             </View>
           ) : null}
 
@@ -175,7 +139,7 @@ export default function ProductActions({
       ) : null}
 
       {/* Price block: big price per base unit, selling-unit line, total, savings, tax note. */}
-      <View className="rounded-lg bg-surface p-6">
+      <View className="rounded-field bg-surface p-5">
         <View className="mb-1 flex-row flex-wrap items-baseline gap-2">
           <Text className="text-4xl font-bold text-primary-600 dark:text-primary-400">Rs. {inr(p.effectivePrice)}</Text>
           {p.showPerUnit ? <Text className="text-sm text-foreground-secondary">/ {unitText(p.perUnitLabel)}</Text> : null}
@@ -199,9 +163,7 @@ export default function ProductActions({
         </View>
         {p.mrpDiscount > 0 ? (
           <View className="mb-2 flex-row flex-wrap items-center gap-2">
-            <View className="rounded-full bg-accent-100 px-3 py-1 dark:bg-accent-900/30">
-              <Text className="text-sm font-semibold text-accent-700 dark:text-accent-400">{p.mrpDiscount}% off</Text>
-            </View>
+            <Badge label={`${p.mrpDiscount}% off`} tone="accent" />
             <Text className="text-sm text-foreground-secondary">
               You save Rs. {inr((p.effectiveMrp! - p.effectivePrice) * p.unitFactor * p.quantity)}
             </Text>
@@ -223,18 +185,14 @@ export default function ProductActions({
             {p.effectiveStock > 0 ? (
               <View className="flex-row flex-wrap items-center justify-end gap-2">
                 <View className="flex-row items-center gap-1.5">
-                  <Glyph d={P.checkCircleSolid} viewBox="0 0 20 20" solid evenOdd size={20} className="text-green-600 dark:text-green-400" />
+                  <CircleCheck size={20} color={status.success} />
                   <Text className="font-semibold text-green-700 dark:text-green-400">In Stock</Text>
                 </View>
-                {isCodAllowed ? (
-                  <View className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 dark:border-amber-700 dark:bg-amber-900/20">
-                    <Text className="text-[10px] font-semibold text-amber-700 dark:text-amber-400">COD</Text>
-                  </View>
-                ) : null}
+                {isCodAllowed ? <Badge label="COD" tone="warning" size="sm" /> : null}
               </View>
             ) : (
               <View className="flex-row items-center justify-end gap-2">
-                <Glyph d={P.xCircleSolid} viewBox="0 0 20 20" solid evenOdd size={20} className="text-red-600 dark:text-red-400" />
+                <CircleX size={20} color={status.danger} />
                 <Text className="font-semibold text-red-700 dark:text-red-400">Out of Stock</Text>
               </View>
             )}
@@ -246,7 +204,7 @@ export default function ProductActions({
                     {' · '}
                     <Text className="font-medium">{selectedPin}</Text>
                     {addresses.length > 0 ? (
-                      <Text onPress={() => setShowAddressPicker(v => !v)} className="text-primary-600 underline dark:text-primary-400">
+                      <Text onPress={() => setShowAddressPicker(true)} accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400">
                         {' '}Change
                       </Text>
                     ) : null}
@@ -257,18 +215,20 @@ export default function ProductActions({
           </View>
         </View>
 
-        {showAddressPicker ? (
-          <View className="mb-2 self-end rounded-lg border border-border-default bg-surface py-1 shadow-lg" style={{ width: 256 }}>
+        <ModalSheet open={showAddressPicker} onClose={() => setShowAddressPicker(false)} title="Deliver to">
+          <View className="-mx-5">
             {addresses.map((a, i) => (
-              <Pressable key={a.id ?? i} onPress={() => pickAddress(a.postal_code)} className="px-3 py-2">
-                <Text className="text-xs font-medium text-foreground">{a.full_name}</Text>
-                <Text className="text-xs text-foreground-secondary">
-                  {a.city}, {a.state} – {a.postal_code}
-                </Text>
-              </Pressable>
+              <ListRow
+                key={a.id ?? i}
+                title={a.full_name}
+                subtitle={`${a.city}, ${a.state} – ${a.postal_code}`}
+                trailing={a.postal_code === selectedPin ? <Check size={18} strokeWidth={2.5} color={t.accent500} /> : null}
+                chevron={false}
+                onPress={() => pickAddress(a.postal_code)}
+              />
             ))}
           </View>
-        ) : null}
+        </ModalSheet>
 
         {!digital ? (
           <View className="gap-1">
@@ -289,7 +249,7 @@ export default function ProductActions({
       </View>
 
       {p.isPreLaunch && launchDate ? (
-        <View className="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-900/20">
+        <View className="rounded-field bg-amber-50 px-4 py-3 dark:bg-amber-900/20">
           <Text className="text-sm font-medium text-amber-600 dark:text-amber-400">
             Coming Soon — Available from{' '}
             {new Date(launchDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -297,50 +257,38 @@ export default function ProductActions({
         </View>
       ) : null}
       {p.isDiscontinued ? (
-        <View className="rounded-lg bg-gray-100 px-3 py-2 dark:bg-gray-800">
-          <Text className="text-sm font-medium text-gray-500 dark:text-gray-400">This product has been discontinued</Text>
+        <View className="rounded-field bg-surface-secondary px-4 py-3">
+          <Text className="text-sm font-medium text-foreground-muted">This product has been discontinued</Text>
         </View>
       ) : null}
 
       <View ref={buyRef} collapsable={false} className="gap-3">
         {alreadyOwned ? (
-          <Pressable
-            onPress={() => Linking.openURL(vaultUrl || `${SITE_URL}/api/vault/handoff`)}
-            className="w-full flex-row items-center justify-center gap-2 rounded-lg bg-primary-600 px-6 py-4"
-          >
-            <Text className="font-semibold text-white">Open in vault</Text>
-          </Pressable>
+          <Button label="Open in vault" onPress={() => Linking.openURL(vaultUrl || `${SITE_URL}/api/vault/handoff`)} />
         ) : (
           <>
-            <PrimaryButton
-              onPress={p.handleBuyNow}
-              disabled={disabledBase || p.isBuyingNow}
-              busy={p.isBuyingNow}
-              busyLabel="Processing..."
+            <Button
               label="Buy Now"
-              icon={P.bolt}
-              className="bg-accent-500"
+              icon={Zap}
+              loading={p.isBuyingNow}
+              loadingLabel="Processing..."
+              disabled={disabledBase}
+              haptics
+              onPress={p.handleBuyNow}
             />
             {!digital ? (
-              <PrimaryButton
-                onPress={p.handleAddToCart}
-                disabled={disabledBase || p.isAddingToCart || p.addBlocked}
-                busy={p.isAddingToCart}
-                busyLabel="Adding..."
+              <Button
                 label={p.cartCap.full ? 'Max quantity already in cart' : 'Add to Cart'}
-                icon={P.cart}
-                className="bg-primary-600"
+                icon={ShoppingCart}
+                variant="outline"
+                loading={p.isAddingToCart}
+                loadingLabel="Adding..."
+                disabled={disabledBase || p.addBlocked}
+                haptics
+                onPress={p.handleAddToCart}
               />
             ) : null}
-            {p.inCart && !digital ? (
-              <Pressable
-                onPress={() => router.push('/(tabs)/cart')}
-                className="w-full flex-row items-center justify-center gap-2 rounded-lg border border-primary-600 px-6 py-4"
-              >
-                <Glyph d={P.cart} size={20} className="text-primary-600 dark:text-primary-400" />
-                <Text className="font-semibold text-primary-600 dark:text-primary-400">View cart</Text>
-              </Pressable>
-            ) : null}
+            {p.inCart && !digital ? <Button label="View cart" icon={ShoppingCart} variant="ghost" size="md" onPress={() => router.push('/(tabs)/cart')} /> : null}
           </>
         )}
       </View>

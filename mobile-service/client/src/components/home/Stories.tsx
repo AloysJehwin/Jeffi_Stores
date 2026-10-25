@@ -31,7 +31,7 @@ export default function Stories({ section, data }: SectionProps) {
       <SectionHeading
         eyebrow={section.copy.eyebrow ?? COPY.eyebrow}
         title={section.copy.title ?? COPY.title}
-        titleClassName="text-xl font-black text-foreground"
+        titleClassName="font-display text-xl font-extrabold text-foreground"
         className="mb-4"
       />
       <ScrollView

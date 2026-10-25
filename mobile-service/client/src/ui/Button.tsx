@@ -9,7 +9,7 @@ import { usePressScale } from './motion'
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive'
 type Size = 'sm' | 'md' | 'lg'
-export type IconComponent = ComponentType<{ size?: number; color?: string; strokeWidth?: number }>
+export type IconComponent = ComponentType<{ size?: number; color?: string; strokeWidth?: number; fill?: string }>
 
 const FRAME: Record<Variant, { on: string; off: string }> = {
   primary: { on: 'bg-accent-500 active:bg-accent-600', off: 'bg-accent-500/40' },
@@ -79,7 +79,7 @@ export function Button({
         className={cn('flex-row items-center justify-center gap-2', HEIGHT[size], off ? FRAME[variant].off : FRAME[variant].on)}
       >
         {loading ? <ActivityIndicator size="small" color={fg} /> : Icon ? <Icon size={ICON[size]} color={fg} strokeWidth={2.2} /> : null}
-        <Text numberOfLines={1} className={cn('font-bold', TEXT[size], LABEL[variant])}>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} className={cn('shrink font-bold', TEXT[size], LABEL[variant])}>
           {loading && loadingLabel ? loadingLabel : label}
         </Text>
         {trailing}
@@ -94,8 +94,11 @@ export interface IconButtonProps extends Omit<PressableProps, 'children' | 'styl
   label: string
   onPress?: () => void
   variant?: 'plain' | 'tinted' | 'solid' | 'overlay'
-  size?: 'sm' | 'md' | 'lg'
+  /** xs (28) is for dense cards only; its hit slop still makes a 44pt target. */
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   color?: string
+  /** Fill the icon with its colour (a set heart). */
+  filled?: boolean
   badge?: number
   className?: string
 }
@@ -108,23 +111,25 @@ const ICON_FRAME = {
 }
 
 /** A round icon-only button with a 44pt touch target. */
-export function IconButton({ icon: Icon, label, onPress, variant = 'plain', size = 'md', color, badge, className, ...rest }: IconButtonProps) {
+const ICON_BOX = { xs: 'h-7 w-7', sm: 'h-9 w-9', md: 'h-11 w-11', lg: 'h-12 w-12' }
+const ICON_SIZE = { xs: 14, sm: 18, md: 22, lg: 24 }
+
+export function IconButton({ icon: Icon, label, onPress, variant = 'plain', size = 'md', color, filled, badge, className, ...rest }: IconButtonProps) {
   const t = useTokens()
   const press = usePressScale(0.92)
-  const box = size === 'sm' ? 'h-9 w-9' : size === 'lg' ? 'h-12 w-12' : 'h-11 w-11'
   const fg = color ?? (variant === 'solid' || variant === 'overlay' ? status.white : t.foreground)
   return (
     <Animated.View style={press.style} className={className}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={badge ? `${label}, ${badge}` : label}
-        hitSlop={size === 'sm' ? 6 : 2}
+        hitSlop={size === 'xs' ? 8 : size === 'sm' ? 6 : 2}
         onPress={onPress}
         {...press.handlers}
         {...rest}
-        className={cn('items-center justify-center rounded-full', box, ICON_FRAME[variant], rest.disabled && 'opacity-40')}
+        className={cn('items-center justify-center rounded-full', ICON_BOX[size], ICON_FRAME[variant], rest.disabled && 'opacity-40')}
       >
-        <Icon size={size === 'sm' ? 18 : size === 'lg' ? 24 : 22} color={fg} strokeWidth={2} />
+        <Icon size={ICON_SIZE[size]} color={fg} strokeWidth={2} fill={filled ? fg : 'none'} />
         {badge ? (
           <View className="absolute right-0.5 top-0.5 h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent-500 px-1">
             <Text className="text-[11px] font-bold leading-[14px] text-white">{badge > 99 ? '99+' : badge}</Text>
@@ -136,10 +141,33 @@ export function IconButton({ icon: Icon, label, onPress, variant = 'plain', size
 }
 
 /** An inline text link ("Use email instead", "See all"). */
-export function TextButton({ label, onPress, tone = 'accent', className }: { label: string; onPress: () => void; tone?: 'accent' | 'muted' | 'danger'; className?: string }) {
+export function TextButton({
+  label,
+  onPress,
+  tone = 'accent',
+  disabled,
+  accessibilityLabel,
+  className,
+}: {
+  label: string
+  onPress: () => void
+  tone?: 'accent' | 'muted' | 'danger'
+  disabled?: boolean
+  /** When the visible label needs context ("Remove" → "Remove Drill from cart"). */
+  accessibilityLabel?: string
+  className?: string
+}) {
   const colour = tone === 'muted' ? 'text-foreground-secondary' : tone === 'danger' ? 'text-red-600 dark:text-red-400' : 'text-accent-600 dark:text-accent-400'
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} hitSlop={8} className={cn('self-start py-1', className)}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={8}
+      className={cn('self-start py-1', disabled && 'opacity-50', className)}
+    >
       <Text className={cn('text-sm font-semibold', colour)}>{label}</Text>
     </Pressable>
   )

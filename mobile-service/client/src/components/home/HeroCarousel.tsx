@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PanResponder, Pressable, View, useWindowDimensions, type TextLayoutEventData, type NativeSyntheticEvent } from 'react-native'
-import { Text } from '../../ui'
+import { Text, elevationClass, useElevation } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
@@ -102,12 +102,13 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
   const boxHeight = Math.min(512, Math.max(320, height * 0.6))
   const cardWidth = width - 24
   const titleSize = Math.min(64, Math.max(32, width * 0.05)) // text-[clamp(2rem,5vw,4rem)]
+  const shadow = useElevation('floating')
 
   return (
     <View className="bg-surface" style={{ height: boxHeight, paddingHorizontal: 12, paddingTop: 12 }}>
-      <View className="flex-1 rounded-2xl shadow-2xl">
+      <View style={shadow} className={`flex-1 rounded-sheet ${elevationClass('floating')}`}>
         <View
-          className="flex-1 overflow-hidden rounded-2xl bg-black"
+          className="flex-1 overflow-hidden rounded-sheet bg-black"
           {...pan.panHandlers}
           onTouchStart={() => (paused.current = true)}
           onTouchEnd={() => (paused.current = false)}
@@ -117,7 +118,7 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
             <Slide key={s.key} slide={s} active={i === index} cardWidth={cardWidth} titleSize={titleSize} />
           ))}
 
-          <Pressable style={[FILL, { zIndex: 20 }]} onPress={open} accessibilityLabel={`Shop ${resolved[index].title}`} />
+          <Pressable style={[FILL, { zIndex: 20 }]} onPress={open} accessibilityRole="button" accessibilityLabel={`Shop ${resolved[index].title}`} />
 
           {count > 1 && (
             <View className="absolute bottom-5 left-0 right-0 flex-row items-center justify-center gap-2" style={{ zIndex: 30 }}>
@@ -183,8 +184,8 @@ function Slide({ slide: s, active, cardWidth, titleSize }: { slide: Resolved; ac
 
       <View style={{ height: '100%', maxWidth: '55%', paddingHorizontal: 24, paddingTop: 40, paddingBottom: 64 }}>
         {s.badge ? (
-          <View className={`mb-4 self-start rounded px-3 py-1.5 ${badgeBg(s.badgeColor, 'bg-primary-500')}`}>
-            <Text className="text-[10px] font-black uppercase text-white" style={{ letterSpacing: 1.5 }}>
+          <View className={`mb-4 self-start rounded-lg px-3 py-1.5 ${badgeBg(s.badgeColor, 'bg-primary-500')}`}>
+            <Text className="text-[11px] font-extrabold uppercase text-white" style={{ letterSpacing: 1.5 }}>
               {s.badge}
             </Text>
           </View>
@@ -245,11 +246,11 @@ function HeroTitle({ text, maxWidth, fullWidth, fontSize }: { text: string; maxW
   return (
     <View className="mb-3" style={{ width: maxWidth }}>
       {!ready && (
-        <Text onTextLayout={onProbe} className="font-black" style={[style, { position: 'absolute', opacity: 0, width: 4000 }]}>
+        <Text onTextLayout={onProbe} className="font-display font-extrabold" style={[style, { position: 'absolute', opacity: 0, width: 4000 }]}>
           {probe}
         </Text>
       )}
-      <Text className="font-black text-white" style={[style, { width: fullWidth, opacity: ready ? 1 : 0 }]}>
+      <Text className="font-display font-extrabold text-white" style={[style, { width: fullWidth, opacity: ready ? 1 : 0 }]}>
         {wrapped.join('\n')}
       </Text>
     </View>
@@ -266,7 +267,7 @@ function Dot({ on, onPress, label }: { on: boolean; onPress: () => void; label: 
   }, [on, w, o])
   const style = useAnimatedStyle(() => ({ width: w.value, opacity: o.value }))
   return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityLabel={label}>
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={label}>
       <Animated.View style={[{ height: 8, borderRadius: 999, backgroundColor: status.white }, style]} />
     </Pressable>
   )

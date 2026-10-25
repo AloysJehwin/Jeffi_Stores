@@ -1,5 +1,5 @@
 import { View } from 'react-native'
-import { Text } from '../../ui'
+import { Card, Overline, Text } from '../../ui'
 import { useQuery } from '@tanstack/react-query'
 import ProductCard from '../product/ProductCard'
 import { Grid } from '../home/layout'
@@ -25,18 +25,18 @@ export default function FeaturedForYouCompact({ limit, title, inset = 0 }: { lim
   const shown = rowsToCards(typeof limit === 'number' ? rows.slice(0, limit) : rows, gstEnabled)
 
   return (
-    <View className="mt-8 rounded-lg border border-border-default bg-surface-elevated p-4 shadow-sm">
+    <Card className="mt-8">
       <View className="mb-4">
-        <Text className="text-[10px] font-black uppercase text-accent-500" style={{ letterSpacing: 2 }}>
-          {COPY.eyebrow}
+        <Overline className="mb-0.5 text-accent-500">{COPY.eyebrow}</Overline>
+        <Text accessibilityRole="header" className="font-display text-lg font-extrabold text-foreground">
+          {title || COPY.title}
         </Text>
-        <Text className="text-lg font-bold text-foreground">{title || COPY.title}</Text>
       </View>
       <Grid cols={2} gap={12} inset={17 + inset}>
         {shown.map(p => (
           <ProductCard key={p.card.id} product={p.card} handlingDays={p.handlingDays} />
         ))}
       </Grid>
-    </View>
+    </Card>
   )
 }

@@ -15,7 +15,7 @@ function useColumn(cols: number, gap: number) {
 /** ProductCard: 5:3 image, two title lines, meta, price and stock row. */
 export function ProductCardSkeleton({ width }: { width?: number }) {
   return (
-    <View style={{ width }} className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated">
+    <View style={{ width }} className="overflow-hidden rounded-panel bg-surface-elevated dark:border dark:border-border-default">
       <View className="px-3 pt-3">
         <Skeleton aspectRatio={5 / 3} rounded="rounded-lg" />
       </View>
@@ -128,7 +128,7 @@ export function ListSkeleton({ rows = 5, icon = true, className }: { rows?: numb
 /** Totals card: a few label/value rows and a total. */
 export function SummarySkeleton({ rows = 3, className }: { rows?: number; className?: string }) {
   return (
-    <View className={cn('gap-3 rounded-lg border border-border-default bg-surface-elevated p-4', className)}>
+    <View className={cn('gap-3 rounded-panel bg-surface-elevated p-4 dark:border dark:border-border-default', className)}>
       <Skeleton height={16} width={130} />
       {Array.from({ length: rows }).map((_, i) => (
         <View key={i} className="flex-row justify-between">

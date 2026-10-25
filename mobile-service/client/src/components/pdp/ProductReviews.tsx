@@ -1,14 +1,17 @@
 import { useState, type RefObject } from 'react'
-import { Linking, Modal, Pressable, ScrollView, View } from 'react-native'
+import { Linking, Pressable, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { Glyph, P } from './Glyph'
+import { Check, Pencil, Star } from 'lucide-react-native'
 import { getProductReviews, type PdpReview } from '../../api/pdp'
 import { SITE_URL } from '../../lib/links'
 import { useAuthStore } from '../../stores/authStore'
 import { showToast } from '../../stores/toastStore'
-import { Text, Skeleton, SkeletonText } from '../../ui'
+import { primary, useTokens } from '../../theme'
+import {
+  Badge, Button, Card, EmptyState, Lightbox, ModalSheet, Overline, SelectField, Skeleton, SkeletonText, Text, TextButton, Title,
+} from '../../ui'
 
 // Mirror of controller-service components/visitor/ProductReviews.tsx (list, rating summary, filter, sort,
 // read-more and photo views). Writing/editing posts multipart images, so it hands off to the storefront page.
@@ -30,14 +33,17 @@ export function reviewSummary(reviews: PdpReview[] | undefined) {
   return { approved, average, total: approved.length }
 }
 
+const STAR = primary[400]
+
 export function StarRow({ rating, size = 20 }: { rating: number; size?: number }) {
+  const t = useTokens()
   return (
     <View className="flex-row" style={{ gap: 2 }}>
       {[1, 2, 3, 4, 5].map(star =>
         star <= rating ? (
-          <Glyph key={star} d={P.star} solid size={size} className="text-yellow-400" />
+          <Star key={star} size={size} color={STAR} fill={STAR} />
         ) : (
-          <Glyph key={star} d={P.star} size={size} strokeWidth={1.5} className="text-gray-300 dark:text-gray-600" />
+          <Star key={star} size={size} strokeWidth={1.5} color={t.border} />
         )
       )}
     </View>
@@ -48,11 +54,12 @@ export function StarRow({ rating, size = 20 }: { rating: number; size?: number }
 export function ReviewSummaryLink({ average, total, onPress }: { average: number; total: number; onPress: () => void }) {
   if (total <= 0) return null
   const noun = total === 1 ? 'review' : 'reviews'
+  const t = useTokens()
   const fill = Math.min(100, Math.max(0, (average / 5) * 100))
-  const row = (cls: string) => (
+  const row = (colour: string) => (
     <View className="flex-row" style={{ width: 80 }}>
       {[0, 1, 2, 3, 4].map(i => (
-        <Glyph key={i} d={P.star} solid size={16} className={cls} />
+        <Star key={i} size={16} color={colour} fill={colour} />
       ))}
     </View>
   )
@@ -60,13 +67,15 @@ export function ReviewSummaryLink({ average, total, onPress }: { average: number
     <View className="-mt-2 mb-4">
       <Pressable
         onPress={onPress}
+        accessibilityRole="link"
         accessibilityLabel={`Rated ${average.toFixed(1)} out of 5 from ${total} ${noun}. Go to reviews`}
+        hitSlop={6}
         className="flex-row items-center gap-2 self-start"
       >
         <View className="relative">
-          {row('text-gray-300 dark:text-gray-600')}
+          {row(t.border)}
           <View className="absolute bottom-0 left-0 top-0 overflow-hidden" style={{ width: `${fill}%` }}>
-            {row('text-yellow-400')}
+            {row(STAR)}
           </View>
         </View>
         <Text className="text-sm font-semibold text-foreground">{average.toFixed(1)}</Text>
@@ -84,12 +93,15 @@ function RatingBar({ star, count, total, isActive, onPress }: { star: number; co
     <Pressable
       onPress={onPress}
       disabled={count === 0}
-      className={`w-full flex-row items-center gap-2 rounded px-1 py-0.5 ${isActive ? 'bg-accent-50 dark:bg-accent-900/20' : ''} ${count === 0 ? 'opacity-50' : ''}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isActive, disabled: count === 0 }}
+      accessibilityLabel={`${star} star, ${count} ${count === 1 ? 'review' : 'reviews'}`}
+      className={`w-full flex-row items-center gap-2 rounded-lg px-1.5 py-1 ${isActive ? 'bg-accent-50 dark:bg-accent-900/20' : ''} ${count === 0 ? 'opacity-50' : ''}`}
     >
       <Text className={`w-3 text-right text-xs ${isActive ? 'font-semibold text-accent-600 dark:text-accent-400' : 'text-foreground-muted'}`}>{star}</Text>
-      <Glyph d={P.star} solid size={14} className="text-yellow-400" />
+      <Star size={14} color={STAR} fill={STAR} />
       <View className="h-1.5 flex-1 overflow-hidden rounded-full bg-border-default">
-        <View className="h-full rounded-full bg-yellow-400" style={{ width: `${pct}%` }} />
+        <View className="h-full rounded-full bg-primary-400" style={{ width: `${pct}%` }} />
       </View>
       <Text className="w-6 text-xs text-foreground-muted">{count}</Text>
     </Pressable>
@@ -103,7 +115,7 @@ function EmptyStars({ size }: { size: number }) {
   return (
     <View className="flex-row opacity-30" style={{ gap: 2 }}>
       {[1, 2, 3, 4, 5].map(s => (
-        <Glyph key={s} d={P.star} solid size={size} className="text-yellow-400" />
+        <Star key={s} size={size} color={STAR} fill={STAR} />
       ))}
     </View>
   )
@@ -123,9 +135,11 @@ export default function ProductReviews({
   const { data: reviews = [], isLoading } = useReviews(productId)
   const [filterStar, setFilterStar] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<Sort>('recent')
-  const [sortOpen, setSortOpen] = useState(false)
   const [visibleCount, setVisibleCount] = useState(5)
   const [expanded, setExpanded] = useState<PdpReview | null>(null)
+  // The last review stays in the sheet while it slides away.
+  const [shown, setShown] = useState<PdpReview | null>(null)
+  if (expanded && expanded !== shown) setShown(expanded)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   const { approved, average } = reviewSummary(reviews)
@@ -162,72 +176,45 @@ export default function ProductReviews({
   }
 
   return (
-    <View ref={sectionRef} collapsable={false} className="mt-10">
-      <View className="mb-4 gap-2 bg-surface py-3">
+    <View ref={sectionRef} collapsable={false} className="mt-8">
+      <View className="mb-4 gap-3 bg-surface py-3">
         <View>
-          <Text className="mb-0.5 text-xs font-bold uppercase text-accent-500" style={{ letterSpacing: 1.2 }}>
-            What buyers say
-          </Text>
-          <Text className="text-xl font-extrabold text-foreground">Customer Reviews</Text>
+          <Overline className="mb-0.5 text-accent-600 dark:text-accent-400">What buyers say</Overline>
+          <Title>Customer Reviews</Title>
         </View>
         <View className="flex-row items-start gap-3">
           {reviews.length > 0 ? (
-            <View className="w-36">
-              <Pressable
-                onPress={() => setSortOpen(o => !o)}
-                className="flex-row items-center justify-between rounded-lg border border-border-default bg-surface-elevated px-3 py-2"
-              >
-                <Text className="text-sm text-foreground">{SORTS.find(s => s.value === sortBy)?.label}</Text>
-                <Glyph d={P.chevronDown} size={14} className="text-foreground-muted" />
-              </Pressable>
-              {sortOpen ? (
-                <View className="mt-1 rounded-lg border border-border-default bg-surface-elevated py-1 shadow-lg">
-                  {SORTS.map(s => (
-                    <Pressable
-                      key={s.value}
-                      onPress={() => {
-                        setSortBy(s.value)
-                        setVisibleCount(5)
-                        setSortOpen(false)
-                      }}
-                      className={`px-3 py-2 ${s.value === sortBy ? 'bg-surface-secondary' : ''}`}
-                    >
-                      <Text className="text-sm text-foreground">{s.label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-            </View>
+            <SelectField
+              value={sortBy}
+              options={SORTS}
+              onChange={v => {
+                setSortBy(v as Sort)
+                setVisibleCount(5)
+              }}
+              sheetTitle="Sort reviews"
+              className="flex-1"
+            />
           ) : null}
           {ownReview ? (
-            <Pressable onPress={write} className="flex-row items-center gap-2 rounded-lg border border-border-secondary bg-surface-elevated px-4 py-2">
-              <Glyph d={P.pencil} size={16} className="text-foreground" />
-              <Text className="text-sm font-semibold text-foreground">Edit</Text>
-            </Pressable>
+            <Button label="Edit" icon={Pencil} variant="outline" block={false} onPress={write} />
           ) : (
-            <Pressable onPress={write} className="flex-row items-center gap-2 rounded-lg bg-accent-500 px-4 py-2">
-              <Glyph d={P.pencil} size={16} className="text-white" />
-              <Text className="text-sm font-semibold text-white">Review</Text>
-            </Pressable>
+            <Button label="Review" icon={Pencil} block={false} onPress={write} />
           )}
         </View>
       </View>
 
       {!isLoading && reviews.length === 0 ? (
-        <View className="items-center gap-4 rounded-xl border border-border-default bg-surface-elevated p-8">
-          <View className="h-16 w-16 items-center justify-center rounded-full bg-surface-secondary">
-            <Glyph d={P.star} size={32} strokeWidth={1.5} className="text-foreground-muted" />
-          </View>
-          <View className="items-center">
-            <Text className="text-base font-semibold text-foreground">No reviews yet</Text>
-            <Text className="mt-1 text-center text-sm text-foreground-muted">Be the first to share your experience with this product.</Text>
-          </View>
-          <EmptyStars size={24} />
-        </View>
+        <Card padded={false}>
+          <EmptyState icon={Star} title="No reviews yet" message="Be the first to share your experience with this product.">
+            <View className="mt-4">
+              <EmptyStars size={24} />
+            </View>
+          </EmptyState>
+        </Card>
       ) : (
         <View className="gap-6">
           {isLoading ? (
-            <View className="rounded-xl border border-border-default bg-surface-elevated p-4 shadow-sm">
+            <Card>
               <View className="mb-4 flex-row items-center gap-3">
                 <Skeleton width={72} height={44} />
                 <View className="gap-1.5">
@@ -244,9 +231,9 @@ export default function ProductReviews({
                   </View>
                 ))}
               </View>
-            </View>
+            </Card>
           ) : approved.length > 0 ? (
-            <View className="rounded-xl border border-border-default bg-surface-elevated p-4 shadow-sm">
+            <Card>
               <View className="mb-4 flex-row items-center gap-3">
                 <Text className="text-5xl font-black text-foreground" style={{ lineHeight: 48 }}>
                   {average.toFixed(1)}
@@ -273,29 +260,22 @@ export default function ProductReviews({
                   />
                 ))}
               </View>
-              {filterStar ? (
-                <Pressable onPress={clearFilter} className="mt-2 self-start">
-                  <Text className="text-xs text-accent-600 dark:text-accent-400">Clear filter</Text>
-                </Pressable>
-              ) : null}
-            </View>
+              {filterStar ? <TextButton label="Clear filter" onPress={clearFilter} className="mt-2" /> : null}
+            </Card>
           ) : (
-            <View className="items-center gap-3 rounded-xl border border-border-default bg-surface-elevated p-5 shadow-sm">
-              <View className="h-12 w-12 items-center justify-center rounded-full bg-surface-secondary">
-                <Glyph d={P.star} size={24} strokeWidth={1.5} className="text-foreground-muted" />
-              </View>
-              <View className="items-center">
-                <Text className="text-sm font-semibold text-foreground">No ratings yet</Text>
-                <Text className="mt-0.5 text-xs text-foreground-muted">Be the first to rate</Text>
-              </View>
-              <EmptyStars size={20} />
-            </View>
+            <Card padded={false}>
+              <EmptyState icon={Star} title="No ratings yet" message="Be the first to rate" className="py-8">
+                <View className="mt-3">
+                  <EmptyStars size={20} />
+                </View>
+              </EmptyState>
+            </Card>
           )}
 
           {isLoading ? (
             <View className="gap-4">
               {[1, 2].map(i => (
-                <View key={i} className="rounded-xl border border-border-default bg-surface-elevated p-4">
+                <Card key={i}>
                   <View className="mb-3 flex-row items-center gap-3">
                     <Skeleton width={36} height={36} rounded="rounded-full" />
                     <View className="flex-1 flex-row items-center gap-2">
@@ -305,23 +285,21 @@ export default function ProductReviews({
                     </View>
                   </View>
                   <SkeletonText lines={2} />
-                </View>
+                </Card>
               ))}
             </View>
           ) : (
             <View className="gap-4">
               {filterStar ? (
-                <View className="flex-row flex-wrap items-center justify-between gap-3 rounded-lg bg-accent-50 px-3 py-2 dark:bg-accent-900/20">
-                  <Text className="text-xs text-foreground-muted">
+                <View className="flex-row flex-wrap items-center justify-between gap-3 rounded-field bg-accent-50 px-4 py-2 dark:bg-accent-900/20">
+                  <Text className="text-xs text-foreground-secondary">
                     Showing {sorted.length} {sorted.length === 1 ? 'review' : 'reviews'} with {filterStar} star{filterStar > 1 ? 's' : ''}
                   </Text>
-                  <Pressable onPress={clearFilter}>
-                    <Text className="text-xs font-medium text-accent-600 dark:text-accent-400">Clear filter</Text>
-                  </Pressable>
+                  <TextButton label="Clear filter" onPress={clearFilter} />
                 </View>
               ) : null}
               {visible.map(review => (
-                <View key={review.id} className="rounded-xl border border-border-default bg-surface-elevated p-4">
+                <Card key={review.id}>
                   <View className="mb-3 flex-row items-start gap-3">
                     <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/40">
                       <Text className="text-sm font-bold text-accent-700 dark:text-accent-300">{initialsOf(review)}</Text>
@@ -329,21 +307,11 @@ export default function ProductReviews({
                     <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
                       <Text className="text-sm font-semibold text-foreground">{nameOf(review)}</Text>
                       <StarRow rating={review.rating} size={16} />
-                      {review.is_approved ? (
-                        <View className="flex-row items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 dark:bg-green-900/30">
-                          <Glyph d={P.check} size={12} strokeWidth={2.5} className="text-green-700 dark:text-green-400" />
-                          <Text className="text-xs font-medium text-green-700 dark:text-green-400">Verified</Text>
-                        </View>
-                      ) : null}
+                      {review.is_approved ? <Badge label="Verified" tone="success" icon={Check} size="sm" /> : null}
                       <Text className="ml-auto shrink-0 text-xs text-foreground-muted">
                         {new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </Text>
-                      {user && review.user_id === user.id ? (
-                        <Pressable onPress={write} className="shrink-0 flex-row items-center gap-1">
-                          <Glyph d={P.pencil} size={12} className="text-accent-600 dark:text-accent-400" />
-                          <Text className="text-xs font-medium text-accent-600 dark:text-accent-400">Edit</Text>
-                        </Pressable>
-                      ) : null}
+                      {user && review.user_id === user.id ? <TextButton label="Edit" accessibilityLabel="Edit your review" onPress={write} /> : null}
                     </View>
                   </View>
                   {review.title ? <Text className="mb-1 text-sm font-semibold text-foreground">{review.title}</Text> : null}
@@ -352,108 +320,79 @@ export default function ProductReviews({
                       <Text numberOfLines={2} className="text-sm leading-relaxed text-foreground-secondary">
                         {review.comment}
                       </Text>
-                      {review.comment.length > 120 ? (
-                        <Pressable onPress={() => setExpanded(review)} className="mt-0.5 self-start">
-                          <Text className="text-xs font-medium text-accent-600 dark:text-accent-400">Read more</Text>
-                        </Pressable>
-                      ) : null}
+                      {review.comment.length > 120 ? <TextButton label="Read more" onPress={() => setExpanded(review)} /> : null}
                     </View>
                     {(review.image_urls?.length ?? 0) > 0 ? (
                       <View className="shrink-0 flex-row gap-1.5">
                         {review.image_urls!.slice(0, 3).map((url, idx) => (
-                          <Pressable key={idx} onPress={() => setLightboxUrl(url)} className="h-16 w-16 overflow-hidden rounded-lg border border-border-secondary">
+                          <Pressable
+                            key={idx}
+                            onPress={() => setLightboxUrl(url)}
+                            accessibilityRole="imagebutton"
+                            accessibilityLabel={`Review photo ${idx + 1}`}
+                            className="h-16 w-16 overflow-hidden rounded-xl border border-border-secondary"
+                          >
                             <Image source={{ uri: review.image_thumbnail_urls?.[idx] || url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                           </Pressable>
                         ))}
                       </View>
                     ) : null}
                   </View>
-                </View>
+                </Card>
               ))}
               {visible.length === 0 ? (
-                <View className="items-center gap-2 rounded-xl border border-border-default bg-surface-elevated py-10">
+                <Card className="items-center gap-2 py-10">
                   <Text className="text-sm text-foreground-muted">No {filterStar}-star reviews</Text>
-                  <Pressable onPress={clearFilter}>
-                    <Text className="text-sm text-accent-600 dark:text-accent-400">Clear filter</Text>
-                  </Pressable>
-                </View>
+                  <TextButton label="Clear filter" onPress={clearFilter} className="self-center" />
+                </Card>
               ) : null}
               {hasMore ? (
-                <Pressable onPress={() => setVisibleCount(c => c + 5)} className="w-full items-center rounded-xl border border-border-secondary py-3">
-                  <Text className="text-sm font-semibold text-foreground">Show more reviews ({sorted.length - visibleCount} remaining)</Text>
-                </Pressable>
+                <Button label={`Show more reviews (${sorted.length - visibleCount} remaining)`} variant="outline" size="md" onPress={() => setVisibleCount(c => c + 5)} />
               ) : null}
             </View>
           )}
         </View>
       )}
 
-      <Modal visible={!!expanded} transparent animationType="fade" onRequestClose={() => setExpanded(null)}>
-        <View className="flex-1 items-center justify-center p-4">
-          <Pressable className="absolute inset-0 bg-black/60" onPress={() => setExpanded(null)} />
-          {expanded ? (
-            <View className="w-full max-w-lg overflow-hidden rounded-xl border border-border-default bg-surface-elevated shadow-2xl" style={{ maxHeight: '90%' }}>
-              <View className="flex-row items-center justify-between border-b border-border-default px-5 py-4">
-                <View className="min-w-0 flex-1 flex-row items-center gap-3">
-                  <View className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/40">
-                    <Text className="text-sm font-bold text-accent-700 dark:text-accent-300">{initialsOf(expanded)}</Text>
-                  </View>
-                  <View className="min-w-0 flex-1">
-                    <Text numberOfLines={1} className="text-sm font-semibold text-foreground">
-                      {nameOf(expanded)}
-                    </Text>
-                    <View className="flex-row items-center gap-2">
-                      <StarRow rating={expanded.rating} size={16} />
-                      {expanded.is_approved ? <Text className="text-xs font-medium text-green-600 dark:text-green-400">Verified</Text> : null}
-                    </View>
-                  </View>
-                </View>
-                <Pressable onPress={() => setExpanded(null)} hitSlop={8} className="ml-3 shrink-0 rounded-lg p-1" accessibilityLabel="Close">
-                  <Glyph d={P.close} size={20} className="text-foreground-muted" />
-                </Pressable>
-              </View>
-              <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-                {expanded.title ? <Text className="font-semibold text-foreground">{expanded.title}</Text> : null}
-                <Text className="text-sm leading-relaxed text-foreground-secondary">{expanded.comment}</Text>
-                {(expanded.image_urls?.length ?? 0) > 0 ? (
-                  <View className="flex-row flex-wrap gap-2 pt-1">
-                    {expanded.image_urls!.map((url, idx) => (
-                      <Pressable
-                        key={idx}
-                        onPress={() => {
-                          setExpanded(null)
-                          setLightboxUrl(url)
-                        }}
-                        className="h-20 w-20 overflow-hidden rounded-lg border border-border-secondary"
-                      >
-                        <Image source={{ uri: expanded.image_thumbnail_urls?.[idx] || url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
-                <Text className="text-xs text-foreground-muted">
-                  {new Date(expanded.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </Text>
-              </ScrollView>
+      <ModalSheet open={!!expanded} onClose={() => setExpanded(null)} title={shown ? nameOf(shown) || 'Review' : undefined}>
+        {shown ? (
+          <View className="gap-4">
+            <View className="-mt-2 flex-row flex-wrap items-center gap-2">
+              <StarRow rating={shown.rating} size={16} />
+              {shown.is_approved ? <Badge label="Verified" tone="success" icon={Check} size="sm" /> : null}
             </View>
-          ) : null}
-        </View>
-      </Modal>
-
-      <Modal visible={!!lightboxUrl} transparent animationType="fade" onRequestClose={() => setLightboxUrl(null)}>
-        <Pressable onPress={() => setLightboxUrl(null)} className="flex-1 items-center justify-center bg-black/80 p-4">
-          {lightboxUrl ? <Image source={{ uri: lightboxUrl }} style={{ width: '100%', height: '90%', borderRadius: 8 }} contentFit="contain" /> : null}
-          <Pressable
-            onPress={() => setLightboxUrl(null)}
-            className="absolute right-4 top-12 h-9 w-9 items-center justify-center rounded-full bg-black/60"
-            accessibilityLabel="Close"
-          >
-            <Text className="text-xl text-white" style={{ lineHeight: 22 }}>
-              ×
+            {shown.title ? <Text className="text-base font-semibold text-foreground">{shown.title}</Text> : null}
+            <Text className="text-[15px] leading-[22px] text-foreground-secondary">{shown.comment}</Text>
+            {(shown.image_urls?.length ?? 0) > 0 ? (
+              <View className="flex-row flex-wrap gap-2 pt-1">
+                {shown.image_urls!.map((url, idx) => (
+                  <Pressable
+                    key={idx}
+                    onPress={() => {
+                      setExpanded(null)
+                      setLightboxUrl(url)
+                    }}
+                    accessibilityRole="imagebutton"
+                    accessibilityLabel={`Review photo ${idx + 1}`}
+                    className="h-20 w-20 overflow-hidden rounded-xl border border-border-secondary"
+                  >
+                    <Image source={{ uri: shown.image_thumbnail_urls?.[idx] || url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <Text className="text-xs text-foreground-muted">
+              {new Date(shown.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
             </Text>
-          </Pressable>
+          </View>
+        ) : null}
+      </ModalSheet>
+
+      <Lightbox open={!!lightboxUrl} onClose={() => setLightboxUrl(null)}>
+        <Pressable onPress={() => setLightboxUrl(null)} accessibilityLabel="Close" className="flex-1 items-center justify-center p-4">
+          {lightboxUrl ? <Image source={{ uri: lightboxUrl }} style={{ width: '100%', height: '90%', borderRadius: 16 }} contentFit="contain" /> : null}
         </Pressable>
-      </Modal>
+      </Lightbox>
     </View>
   )
 }

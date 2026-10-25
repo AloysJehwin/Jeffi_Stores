@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PanResponder, Pressable, View, useWindowDimensions } from 'react-native'
-import { Text } from '../../ui'
+import { IconButton, Text, elevationClass, useElevation } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, ChevronRight } from 'lucide-react-native'
@@ -56,28 +56,18 @@ function Slider({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
       ) : null}
 
       <View {...pan.panHandlers}>
-        <Pressable onPress={() => openHref(router, `/products?offer=${encodeURIComponent(current.slug)}`)} accessibilityLabel={`Shop ${current.title}`}>
+        <Pressable onPress={() => openHref(router, `/products?offer=${encodeURIComponent(current.slug)}`)} accessibilityRole="button" accessibilityLabel={`Shop ${current.title}`}>
           <OfferCard offer={current} height={cardHeight} titleSize={Math.min(36, Math.max(20, width * 0.032))} />
         </Pressable>
 
         {!single && (
           <>
-            <Pressable
-              onPress={() => go(index - 1)}
-              accessibilityLabel="Previous offer"
-              className="absolute left-1 z-20 h-9 w-9 items-center justify-center rounded-full bg-black/50 active:bg-black/70"
-              style={{ top: arrowTop }}
-            >
-              <ChevronLeft size={18} strokeWidth={2.5} color={status.white} />
-            </Pressable>
-            <Pressable
-              onPress={() => go(index + 1)}
-              accessibilityLabel="Next offer"
-              className="absolute right-1 z-20 h-9 w-9 items-center justify-center rounded-full bg-black/50 active:bg-black/70"
-              style={{ top: arrowTop }}
-            >
-              <ChevronRight size={18} strokeWidth={2.5} color={status.white} />
-            </Pressable>
+            <View className="absolute left-1 z-20" style={{ top: arrowTop }}>
+              <IconButton icon={ChevronLeft} label="Previous offer" variant="overlay" size="sm" onPress={() => go(index - 1)} />
+            </View>
+            <View className="absolute right-1 z-20" style={{ top: arrowTop }}>
+              <IconButton icon={ChevronRight} label="Next offer" variant="overlay" size="sm" onPress={() => go(index + 1)} />
+            </View>
 
             <View className="flex-row items-center justify-center gap-2" style={{ marginTop: 16 }}>
               {offers.map((_, i) => (
@@ -100,7 +90,7 @@ function Dot({ on, onPress, label }: { on: boolean; onPress: () => void; label: 
   }, [on, w])
   const style = useAnimatedStyle(() => ({ width: w.value }))
   return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityLabel={label}>
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={label}>
       <Animated.View
         style={[{ height: 8, borderRadius: 999 }, style, on ? { backgroundColor: primary[500] } : { backgroundColor: t.foreground, opacity: 0.2 }]}
       />
@@ -111,10 +101,11 @@ function Dot({ on, onPress, label }: { on: boolean; onPress: () => void; label: 
 function OfferCard({ offer, height, titleSize }: { offer: ProductOffer; height: number; titleSize: number }) {
   const src = absUrl(offer.image_url_mobile ?? offer.image_url)
   const blurhash = offer.blurhash_mobile || offer.blurhash || null
+  const shadow = useElevation('overlay')
 
   return (
-    <View className="rounded-2xl shadow-xl">
-      <View className="w-full overflow-hidden rounded-2xl bg-black" style={{ height }}>
+    <View style={shadow} className={`rounded-panel ${elevationClass('overlay')}`}>
+      <View className="w-full overflow-hidden rounded-panel bg-black" style={{ height }}>
         <Image
           source={src ? { uri: src } : undefined}
           placeholder={blurhash ? { blurhash } : undefined}
@@ -137,18 +128,18 @@ function OfferCard({ offer, height, titleSize }: { offer: ProductOffer; height: 
 
         <View pointerEvents="none" className="absolute bottom-0 left-0 right-0 p-5">
           {offer.badge_text ? (
-            <View className={`mb-3 self-start rounded px-3 py-1.5 ${badgeBg(offer.badge_color, 'bg-primary-500')}`}>
-              <Text className="text-[10px] font-black uppercase text-white" style={{ letterSpacing: 1.5 }}>
+            <View className={`mb-3 self-start rounded-lg px-3 py-1.5 ${badgeBg(offer.badge_color, 'bg-primary-500')}`}>
+              <Text className="text-[11px] font-extrabold uppercase text-white" style={{ letterSpacing: 1.5 }}>
                 {offer.badge_text}
               </Text>
             </View>
           ) : null}
-          <Text className="font-black text-white" style={{ fontSize: titleSize, lineHeight: titleSize * 1.25, letterSpacing: -titleSize * 0.025 }}>
+          <Text className="font-display font-extrabold text-white" style={{ fontSize: titleSize, lineHeight: titleSize * 1.25, letterSpacing: -titleSize * 0.025 }}>
             {offer.title}
           </Text>
           {offer.subtitle ? <Text className="mt-1 text-xs leading-relaxed text-white/70">{offer.subtitle}</Text> : null}
           {offer.cta_label ? (
-            <View className="mt-3 self-start rounded-lg bg-white px-4 py-2">
+            <View className="mt-3 self-start rounded-xl bg-white px-4 py-2">
               <Text className="text-xs font-bold text-black">{offer.cta_label}</Text>
             </View>
           ) : null}

@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import { View } from 'react-native'
-import { Text } from '../../ui'
+import { Card, Overline, Text } from '../../ui'
 import {
   Award, BadgeCheck, Banknote, Boxes, Clock, CreditCard, Factory, FileText, Globe, Headphones, Heart, Lock, MapPin,
   MessageCircle, Package, PackageCheck, Percent, Phone, Receipt, Rocket, RotateCcw, ShieldCheck, Star, Tag, ThumbsUp,
@@ -46,12 +46,12 @@ export default function Benefits({ section }: SectionProps) {
       {title || eyebrow ? (
         <View className="mb-6 items-center">
           {eyebrow ? (
-            <Text className="mb-2 text-center text-[10px] font-black uppercase text-accent-500" style={{ letterSpacing: 2 }}>
+            <Overline className="mb-2 text-center text-accent-500" style={{ letterSpacing: 2 }}>
               {eyebrow}
-            </Text>
+            </Overline>
           ) : null}
           {title ? (
-            <Text className="text-center text-2xl font-black text-foreground" style={{ letterSpacing: -0.6 }}>
+            <Text accessibilityRole="header" className="text-center font-display text-2xl font-extrabold tracking-tight text-foreground">
               {title}
             </Text>
           ) : null}
@@ -59,15 +59,15 @@ export default function Benefits({ section }: SectionProps) {
       ) : null}
       <View className="gap-4">
         {tiles.map((item, i) => (
-          <View key={i} className="flex-row items-start gap-3 rounded-xl border border-border-default bg-surface-elevated p-4">
-            <View className="h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-500/10">
+          <Card key={i} className="flex-row items-start gap-3">
+            <View className="h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-500/10">
               <IconByName name={item.icon} size={20} color={accent[500]} />
             </View>
             <View className="flex-1">
               <Text className="text-sm font-bold text-foreground">{item.title}</Text>
               <Text className="mt-0.5 text-xs leading-relaxed text-foreground-secondary">{item.sub}</Text>
             </View>
-          </View>
+          </Card>
         ))}
       </View>
     </View>

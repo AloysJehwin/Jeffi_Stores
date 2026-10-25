@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
-import { Pressable, View, useWindowDimensions } from 'react-native'
-import { Text } from '../../ui'
+import { View, useWindowDimensions } from 'react-native'
+import { Badge, Button, IconButton, Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { Check, Package, Plus } from 'lucide-react-native'
@@ -12,7 +12,7 @@ import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { inr } from '../../lib/format'
 import { absUrl } from '../../lib/links'
 import { openQuickAdd } from '../../stores/quickAddStore'
-import { status, useTokens } from '../../theme'
+import { useTokens } from '../../theme'
 import type { SectionCopy, SectionProps, SpotlightData } from '../../types/home'
 
 // One product, large: the image settles in and the callouts rise one after another as the card
@@ -82,8 +82,8 @@ function Card({ spot, copy }: { spot: SpotlightData; copy: SectionCopy }) {
 
   return (
     <View className="bg-surface px-4 py-8">
-      <View ref={ref} collapsable={false} onLayout={measure} className="overflow-hidden rounded-3xl bg-surface-secondary p-5">
-        <Animated.View style={imageStyle} className="aspect-square w-full items-center justify-center overflow-hidden rounded-2xl bg-surface-elevated">
+      <View ref={ref} collapsable={false} onLayout={measure} className="overflow-hidden rounded-sheet bg-surface-secondary p-5">
+        <Animated.View style={imageStyle} className="aspect-square w-full items-center justify-center overflow-hidden rounded-panel bg-surface-elevated">
           {uri ? (
             <Image
               source={{ uri }}
@@ -100,7 +100,7 @@ function Card({ spot, copy }: { spot: SpotlightData; copy: SectionCopy }) {
 
         <View className="mt-5">
           <Eyebrow>{copy.eyebrow ?? COPY.eyebrow}</Eyebrow>
-          <Text className="text-2xl font-black leading-7 text-foreground" style={{ letterSpacing: -0.5 }} onPress={open}>
+          <Text accessibilityRole="header" className="font-display text-2xl font-extrabold leading-7 tracking-tight text-foreground" onPress={open}>
             {title}
           </Text>
           {product.brandName ? (
@@ -118,11 +118,7 @@ function Card({ spot, copy }: { spot: SpotlightData; copy: SectionCopy }) {
               {product.hasVariants ? 'From ' : ''}₹{inr(product.displayPrice)}
             </Text>
             {showMrp ? <Text className="text-base text-foreground-muted line-through">₹{inr(product.mrp)}</Text> : null}
-            {product.mrpDiscount > 0 ? (
-              <View className="rounded-full bg-accent-500 px-2 py-0.5 dark:bg-accent-600">
-                <Text className="text-xs font-bold text-white">{product.mrpDiscount}% off</Text>
-              </View>
-            ) : null}
+            {product.mrpDiscount > 0 ? <Badge label={`${product.mrpDiscount}% off`} tone="accent" solid /> : null}
           </View>
         </View>
 
@@ -135,17 +131,15 @@ function Card({ spot, copy }: { spot: SpotlightData; copy: SectionCopy }) {
         ) : null}
 
         <View className="mt-5 flex-row items-center gap-3">
-          <Pressable onPress={open} className="h-12 flex-1 items-center justify-center rounded-xl bg-primary-500 active:bg-primary-600" accessibilityRole="button">
-            <Text className="text-base font-bold text-white">{copy.ctaLabel ?? COPY.ctaLabel}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => openQuickAdd(product)}
+          <Button label={copy.ctaLabel ?? COPY.ctaLabel} size="md" onPress={open} className="flex-1" />
+          <IconButton
+            icon={Plus}
+            label={product.hasVariants ? `Choose options for ${product.name}` : `Quick add ${product.name} to cart`}
+            variant="solid"
+            size="lg"
             disabled={!inStock}
-            accessibilityLabel={product.hasVariants ? `Choose options for ${product.name}` : `Quick add ${product.name} to cart`}
-            className={`h-12 w-12 items-center justify-center rounded-full ${inStock ? 'bg-accent-500 active:bg-accent-600' : 'border border-border-default bg-surface-elevated opacity-60'}`}
-          >
-            <Plus size={22} color={inStock ? status.white : t.foregroundMuted} strokeWidth={2.5} />
-          </Pressable>
+            onPress={() => openQuickAdd(product)}
+          />
         </View>
       </View>
     </View>

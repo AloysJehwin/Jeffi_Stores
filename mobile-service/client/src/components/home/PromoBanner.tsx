@@ -1,8 +1,9 @@
-import { Pressable, View, useWindowDimensions } from 'react-native'
-import { Text } from '../../ui'
+import { View, useWindowDimensions } from 'react-native'
+import { Button, Overline, Text, elevationClass, useElevation } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg'
+import { ChevronRight } from 'lucide-react-native'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { absUrl, openHref } from '../../lib/links'
 import { primary, status } from '../../theme'
 import type { SectionProps } from '../../types/home'
@@ -22,6 +23,7 @@ export default function PromoBanner({ section }: SectionProps) {
   const blurhash = str(cfg.blurhash)
   const mobileImg = imageUrlMobile ?? imageUrl ?? null
   const showCta = !!(ctaUrl && ctaLabel)
+  const shadow = useElevation('overlay')
 
   if (!title && !subtitle && !eyebrow && !mobileImg && !showCta) return null
   const src = absUrl(mobileImg)
@@ -29,8 +31,8 @@ export default function PromoBanner({ section }: SectionProps) {
 
   return (
     <View className="bg-surface px-4 py-8">
-      <View className="rounded-2xl shadow-xl">
-        <View className="min-h-[14rem] overflow-hidden rounded-2xl bg-black">
+      <View style={shadow} className={`rounded-panel ${elevationClass('overlay')}`}>
+        <View className="min-h-[14rem] overflow-hidden rounded-panel bg-black">
           {mobileImg ? (
             <>
               <Image
@@ -66,26 +68,25 @@ export default function PromoBanner({ section }: SectionProps) {
 
           <View className="gap-3 px-6 py-10" style={{ maxWidth: '90%' }}>
             {eyebrow ? (
-              <Text className="text-[10px] font-black uppercase text-white/70" style={{ letterSpacing: 2 }}>
+              <Overline className="text-white/70" style={{ letterSpacing: 2 }}>
                 {eyebrow}
-              </Text>
+              </Overline>
             ) : null}
             {title ? (
-              <Text className="font-black text-white" style={{ fontSize: titleSize, lineHeight: titleSize * 1.05, letterSpacing: -titleSize * 0.025 }}>
+              <Text className="font-display font-extrabold text-white" style={{ fontSize: titleSize, lineHeight: titleSize * 1.05, letterSpacing: -titleSize * 0.025 }}>
                 {title}
               </Text>
             ) : null}
             {subtitle ? <Text className="text-sm leading-relaxed text-white/60">{subtitle}</Text> : null}
             {showCta ? (
-              <Pressable
+              <Button
+                label={ctaLabel}
+                size="md"
+                block={false}
+                className="mt-2"
+                trailing={<ChevronRight size={16} color={status.white} strokeWidth={2.2} />}
                 onPress={() => openHref(router, ctaUrl)}
-                className="mt-2 flex-row items-center gap-2 self-start rounded-xl bg-white px-6 py-3 shadow-lg active:bg-white/90"
-              >
-                <Text className="text-sm font-bold text-black">{ctaLabel}</Text>
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                  <Path d="M9 5l7 7-7 7" stroke={status.black} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-              </Pressable>
+              />
             ) : null}
           </View>
         </View>

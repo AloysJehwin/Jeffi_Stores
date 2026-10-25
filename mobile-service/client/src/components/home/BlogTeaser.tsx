@@ -1,5 +1,5 @@
-import { Pressable, View } from 'react-native'
-import { Text } from '../../ui'
+import { View } from 'react-native'
+import { Card, Text, TextButton } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { BookOpen } from 'lucide-react-native'
@@ -38,10 +38,12 @@ export default function BlogTeaser({ section }: SectionProps) {
         {items.map((item, i) => {
           const img = absUrl(item.imageUrl)
           return (
-            <Pressable
+            <Card
               key={`${item.url}-${i}`}
               onPress={() => openHref(router, item.url)}
-              className="overflow-hidden rounded-2xl border border-border-default bg-surface-elevated active:border-accent-300"
+              accessibilityLabel={item.title}
+              padded={false}
+              className="overflow-hidden"
             >
               <View className="relative overflow-hidden bg-surface-secondary" style={{ aspectRatio: 16 / 9 }}>
                 {img ? (
@@ -63,17 +65,15 @@ export default function BlogTeaser({ section }: SectionProps) {
                     {item.excerpt}
                   </Text>
                 ) : null}
-                <Text className="mt-auto pt-2 text-sm font-semibold text-accent-500">Read more</Text>
+                <Text className="mt-auto pt-2 text-sm font-semibold text-accent-600 dark:text-accent-400">Read more</Text>
               </View>
-            </Pressable>
+            </Card>
           )
         })}
       </View>
       {ctaUrl && ctaLabel ? (
-        <View className="mt-6 items-center">
-          <Pressable onPress={() => openHref(router, ctaUrl)} hitSlop={8}>
-            <Text className="text-sm font-semibold text-accent-500">{ctaLabel}</Text>
-          </Pressable>
+        <View className="mt-6 flex-row justify-center">
+          <TextButton label={ctaLabel} onPress={() => openHref(router, ctaUrl)} />
         </View>
       ) : null}
     </View>

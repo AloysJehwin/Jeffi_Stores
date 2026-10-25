@@ -1,25 +1,26 @@
 import { useState } from 'react'
-import { Modal, Pressable, View } from 'react-native'
-import { Text } from '../../ui'
+import { Pressable, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import Animated, { Easing, SlideInDown } from 'react-native-reanimated'
-import { Glyph, P } from './Glyph'
+import { ImageIcon } from 'lucide-react-native'
+import { Badge, Button, Card, ModalSheet, Pill, Text, Title } from '../../ui'
 import { Grid } from '../home/layout'
 import { absUrl } from '../../lib/links'
 import { inr } from '../../lib/format'
 import { useRecentlyViewedStore, type RecentProduct } from '../../stores/recentlyViewedStore'
+import { useTokens } from '../../theme'
 
 // Mirror of controller-service components/visitor/RecentlyViewed.tsx as the PDP renders it (excludeId, minItems 2).
 
 const noDecimals = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 0 })
 
 function Photo({ uri, label, cover }: { uri: string | null; label: string; cover?: boolean }) {
+  const t = useTokens()
   return uri ? (
     <Image source={{ uri }} contentFit={cover ? 'cover' : 'contain'} style={cover ? { width: '100%', height: '100%' } : { flex: 1, margin: 4 }} accessibilityLabel={label} />
   ) : (
     <View className="h-full w-full items-center justify-center">
-      <Glyph d={P.photo} size={32} strokeWidth={1} className="text-foreground-muted" />
+      <ImageIcon size={32} strokeWidth={1} color={t.foregroundMuted} />
     </View>
   )
 }
@@ -28,30 +29,36 @@ export default function PdpRecentlyViewed({ excludeId, limit = 6, minItems = 2 }
   const router = useRouter()
   const stored = useRecentlyViewedStore(s => s.items)
   const [quickView, setQuickView] = useState<RecentProduct | null>(null)
+  // The last product stays in the sheet while it slides away.
+  const [shown, setShown] = useState<RecentProduct | null>(null)
+  if (quickView && quickView !== shown) setShown(quickView)
   const products = stored.filter(p => p.id !== excludeId).slice(0, limit)
   if (products.length === 0 || products.length < minItems) return null
   const open = (slug: string) => router.push(`/product/${slug}`)
-  const qvDiscount = quickView?.mrp && quickView.mrp > quickView.price ? Math.round(((quickView.mrp - quickView.price) / quickView.mrp) * 100) : 0
+  const qvDiscount = shown?.mrp && shown.mrp > shown.price ? Math.round(((shown.mrp - shown.price) / shown.mrp) * 100) : 0
 
   return (
     <>
-      <View className="mt-10">
-        <Text className="mb-6 text-2xl font-bold text-foreground">Recently Viewed</Text>
+      <View className="mt-8">
+        <Title className="mb-4">Recently Viewed</Title>
         <Grid cols={2} gap={12}>
           {products.map(product => {
             const discount = product.mrp && product.mrp > product.price ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : 0
             return (
-              <Pressable key={product.id} className="flex-1" onPress={() => open(product.slug)} onLongPress={() => setQuickView(product)} delayLongPress={450}>
-                <View className="flex-1 overflow-hidden rounded-xl border border-border-default bg-surface-elevated">
+              <Pressable
+                key={product.id}
+                accessibilityRole="button"
+                accessibilityLabel={product.name}
+                accessibilityHint="Long press for a quick view"
+                className="flex-1 active:opacity-90"
+                onPress={() => open(product.slug)}
+                onLongPress={() => setQuickView(product)}
+                delayLongPress={450}
+              >
+                <Card padded={false} className="flex-1 overflow-hidden">
                   <View className="relative aspect-square overflow-hidden bg-surface">
                     <Photo uri={absUrl(product.image)} label={product.name} cover />
-                    {discount > 0 ? (
-                      <View className="absolute left-1.5 top-1.5 rounded-full bg-accent-500 px-1.5 py-0.5 shadow">
-                        <Text className="text-xs font-bold text-white" style={{ lineHeight: 12 }}>
-                          {discount}% off
-                        </Text>
-                      </View>
-                    ) : null}
+                    {discount > 0 ? <Pill label={`${discount}% off`} tone="accent" className="absolute left-1.5 top-1.5" /> : null}
                   </View>
                   <View className="flex-1 gap-0.5 p-2">
                     {product.brand ? (
@@ -71,58 +78,51 @@ export default function PdpRecentlyViewed({ excludeId, limit = 6, minItems = 2 }
                       ) : null}
                     </View>
                   </View>
-                </View>
+                </Card>
               </Pressable>
             )
           })}
         </Grid>
       </View>
 
-      <Modal visible={!!quickView} transparent animationType="fade" onRequestClose={() => setQuickView(null)}>
-        <View className="flex-1 justify-end">
-          <Pressable className="absolute inset-0 bg-black/50" onPress={() => setQuickView(null)} />
-          {quickView ? (
-            <Animated.View entering={SlideInDown.duration(280).easing(Easing.bezier(0.32, 0.72, 0, 1))} className="rounded-t-2xl bg-surface-elevated p-5 pb-8 shadow-2xl">
-              <View className="mx-auto mb-4 h-1 w-10 rounded-full bg-border-default" />
-              <View className="mb-4 flex-row gap-4">
-                <View className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
-                  <Photo uri={absUrl(quickView.image)} label={quickView.name} />
-                </View>
-                <View className="min-w-0 flex-1">
-                  <Text className="mb-1 text-base font-semibold text-foreground" style={{ lineHeight: 22 }}>
-                    {quickView.name}
-                  </Text>
-                  {quickView.brand ? <Text className="text-xs text-foreground-muted">{quickView.brand}</Text> : null}
-                </View>
+      <ModalSheet
+        open={!!quickView}
+        onClose={() => setQuickView(null)}
+        footer={
+          <Button
+            label="View Full Details"
+            onPress={() => {
+              if (!shown) return
+              setQuickView(null)
+              open(shown.slug)
+            }}
+          />
+        }
+      >
+        {shown ? (
+          <View className="pt-1">
+            <View className="mb-4 flex-row gap-4">
+              <View className="h-20 w-20 shrink-0 overflow-hidden rounded-field border border-border-default bg-surface-secondary">
+                <Photo uri={absUrl(shown.image)} label={shown.name} />
               </View>
-              <View className="mb-4 flex-row items-center gap-3">
-                <Text className="text-2xl font-bold text-primary-600 dark:text-primary-400">₹{inr(quickView.price)}</Text>
-                {quickView.mrp && quickView.mrp > quickView.price ? (
-                  <>
-                    <Text className="text-sm text-foreground-muted line-through">₹{inr(quickView.mrp)}</Text>
-                    {qvDiscount > 0 ? (
-                      <View className="rounded-full bg-accent-500 px-2 py-0.5">
-                        <Text className="text-xs font-semibold text-white">{qvDiscount}% off</Text>
-                      </View>
-                    ) : null}
-                  </>
-                ) : null}
+              <View className="min-w-0 flex-1">
+                <Text className="mb-1 text-base font-bold leading-[22px] text-foreground">{shown.name}</Text>
+                {shown.brand ? <Text className="text-xs text-foreground-muted">{shown.brand}</Text> : null}
               </View>
-              <Text className="mb-5 text-xs text-foreground-muted">Incl. all taxes</Text>
-              <Pressable
-                className="w-full rounded-xl bg-accent-500 py-3"
-                onPress={() => {
-                  const slug = quickView.slug
-                  setQuickView(null)
-                  open(slug)
-                }}
-              >
-                <Text className="text-center font-semibold text-white">View Full Details</Text>
-              </Pressable>
-            </Animated.View>
-          ) : null}
-        </View>
-      </Modal>
+            </View>
+            <View className="mb-1 flex-row flex-wrap items-center gap-x-3 gap-y-1">
+              <Text className="text-2xl font-extrabold text-primary-600 dark:text-primary-400">₹{inr(shown.price)}</Text>
+              {shown.mrp && shown.mrp > shown.price ? (
+                <>
+                  <Text className="text-sm text-foreground-muted line-through">₹{inr(shown.mrp)}</Text>
+                  {qvDiscount > 0 ? <Badge label={`${qvDiscount}% off`} tone="accent" solid /> : null}
+                </>
+              ) : null}
+            </View>
+            <Text className="text-xs text-foreground-muted">Incl. all taxes</Text>
+          </View>
+        ) : null}
+      </ModalSheet>
     </>
   )
 }

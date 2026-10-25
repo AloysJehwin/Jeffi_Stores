@@ -1,6 +1,6 @@
 import { Children, type ReactNode } from 'react'
 import { ScrollView, View, useWindowDimensions } from 'react-native'
-import { Text } from '../../ui'
+import { Overline, Text } from '../../ui'
 
 // Shared building blocks for the home sections (web: container px-4, SectionCarousel, grid-cols-N).
 
@@ -48,13 +48,13 @@ export function Carousel({ itemWidth = 0.45, gap = 12, children }: { itemWidth?:
   )
 }
 
-/** The storefront's small all-caps eyebrow (text-[10px] font-black uppercase tracking-[0.2em]). */
+/** The small all-caps eyebrow over a section title. */
 export function Eyebrow({ children, className = 'text-accent-500', spacing = 2 }: { children: ReactNode; className?: string; spacing?: number }) {
   if (!children) return null
   return (
-    <Text className={`mb-1 text-[10px] font-black uppercase ${className}`} style={{ letterSpacing: spacing }}>
+    <Overline className={`mb-1 ${className}`} style={{ letterSpacing: spacing }}>
       {children}
-    </Text>
+    </Overline>
   )
 }
 
@@ -63,7 +63,7 @@ export function SectionHeading({
   eyebrow,
   title,
   eyebrowClassName,
-  titleClassName = 'text-2xl font-black text-foreground',
+  titleClassName = 'font-display text-2xl font-extrabold leading-8 tracking-tight text-foreground',
   barClassName,
   className = 'mb-7',
 }: {
@@ -78,7 +78,7 @@ export function SectionHeading({
     <View className="shrink">
       <Eyebrow className={eyebrowClassName}>{eyebrow}</Eyebrow>
       {title ? (
-        <Text className={titleClassName} style={{ letterSpacing: -0.5 }}>
+        <Text accessibilityRole="header" className={titleClassName}>
           {title}
         </Text>
       ) : null}

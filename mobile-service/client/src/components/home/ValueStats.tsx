@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, Dimensions, View } from 'react-native'
-import { Text } from '../../ui'
+import { Card, Overline, Text } from '../../ui'
 import { Grid } from './layout'
 import type { SectionProps, ValueStat } from '../../types/home'
 
@@ -78,18 +78,18 @@ export default function ValueStats({ section, data }: SectionProps) {
   return (
     <View ref={ref} collapsable={false} onLayout={onLayout} className="bg-surface px-4 py-12">
       <View className="mb-8 items-center">
-        <Text className="mb-1 text-center text-[10px] font-black uppercase text-primary-500" style={{ letterSpacing: 2 }}>
+        <Overline className="mb-1 text-center text-primary-500" style={{ letterSpacing: 2 }}>
           {section.copy.eyebrow ?? 'By the numbers'}
-        </Text>
-        <Text className="text-center text-2xl font-black text-foreground" style={{ letterSpacing: -0.6 }}>
+        </Overline>
+        <Text accessibilityRole="header" className="text-center font-display text-2xl font-extrabold tracking-tight text-foreground">
           {section.copy.title ?? 'Trusted by our customers'}
         </Text>
       </View>
       <Grid cols={2} gap={16}>
         {stats.map(s => (
-          <View key={s.metric} className="grow rounded-2xl border border-border-default bg-surface-elevated p-5">
+          <Card key={s.metric} padded={false} className="grow p-5">
             <Text
-              className="text-center text-3xl font-black text-primary-600 dark:text-primary-400"
+              className="text-center font-display text-3xl font-extrabold text-primary-600 dark:text-primary-400"
               style={{ fontVariant: ['tabular-nums'] }}
             >
               {progress >= 1 ? friendlyCount(s.value) : Math.round(s.value * progress).toLocaleString('en-IN')}
@@ -100,7 +100,7 @@ export default function ValueStats({ section, data }: SectionProps) {
             >
               {s.label}
             </Text>
-          </View>
+          </Card>
         ))}
       </Grid>
     </View>

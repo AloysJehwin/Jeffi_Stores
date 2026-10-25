@@ -41,7 +41,7 @@ export function DealCountdown({ endsAt }: { endsAt: string }) {
           <Text className="text-sm font-black leading-none text-white" style={{ fontVariant: ['tabular-nums'] }}>
             {part.value}
           </Text>
-          <Text className="mt-0.5 text-[9px] font-bold uppercase leading-none text-white opacity-80" style={{ letterSpacing: 0.45 }}>
+          <Text className="mt-0.5 text-[11px] font-bold uppercase leading-none text-white opacity-80" style={{ letterSpacing: 0.45 }}>
             {part.label}
           </Text>
         </View>

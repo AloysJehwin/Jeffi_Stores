@@ -1,9 +1,7 @@
-import { Pressable, TextInput, View } from 'react-native'
-import { Text } from '../../ui'
-import { Glyph, P } from './Glyph'
+import { View } from 'react-native'
+import { Stepper, Text } from '../../ui'
 import { fmtQty, unitText } from './pdp'
 import { unitCapError, type PickerQtyCap } from './useProductPurchase'
-import { useTokens } from '../../theme'
 
 // Mirror of controller-service components/shared/QuantityInput.tsx + InCartQtyHint.tsx.
 // Count units get the round stepper; length/weight/volume/area use the decimal stepper (the web's
@@ -35,22 +33,8 @@ function QtyHint({ qtyMin, qtyMax, qtyStep, unitLabel, defaultStep }: { qtyMin: 
   )
 }
 
-function RoundStep({ onPress, disabled, label, d }: { onPress: () => void; disabled: boolean; label: string; d: string }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityLabel={label}
-      className={`h-9 w-9 items-center justify-center rounded-full border border-border-default bg-surface-secondary ${disabled ? 'opacity-40' : ''}`}
-    >
-      <Glyph d={d} size={16} className="text-foreground" />
-    </Pressable>
-  )
-}
-
 export default function QuantityInput(props: Props) {
   const { dimension, quantity, quantityRaw, unitLabel, effectiveStock, qtyStep, qtyMin, qtyMax, onChange } = props
-  const t = useTokens()
   const ceiling = Math.min(effectiveStock, qtyMax ?? effectiveStock)
   const count = !(dimension === 'length' || dimension === 'weight' || dimension === 'volume' || dimension === 'area')
 
@@ -83,20 +67,17 @@ export default function QuantityInput(props: Props) {
   return (
     <View className="gap-1">
       <View className="flex-row items-center gap-2">
-        <View className="flex-row items-center gap-1.5">
-          <RoundStep label="Decrease quantity" disabled={quantity <= qtyMin} onPress={dec} d={P.minus} />
-          <TextInput
-            value={quantityRaw}
-            onChangeText={onText}
-            onEndEditing={onBlur}
-            keyboardType={count ? 'number-pad' : 'decimal-pad'}
-            selectTextOnFocus
-            placeholderTextColor={t.foregroundMuted}
-            className={`${count ? 'w-12' : 'w-16'} min-h-[36px] text-center text-base font-semibold text-foreground`}
-            style={{ fontVariant: ['tabular-nums'] }}
-          />
-          <RoundStep label="Increase quantity" disabled={quantity >= ceiling} onPress={inc} d={P.plus} />
-        </View>
+        <Stepper
+          value={quantityRaw}
+          onChangeText={onText}
+          onEndEditing={onBlur}
+          onDecrement={dec}
+          onIncrement={inc}
+          canDecrement={quantity > qtyMin}
+          canIncrement={quantity < ceiling}
+          decimal={!count}
+          width={count ? 48 : 64}
+        />
         {unitLabel ? (
           <Text className={`text-sm ${count ? 'text-foreground-muted' : 'text-foreground-secondary'}`}>{unitText(unitLabel)}</Text>
         ) : null}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native'
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -12,10 +12,11 @@ import { money } from '../../src/components/cart/lines'
 import { getWishlist, removeFromWishlist } from '../../src/api/wishlist'
 import { addToCart, createBuyNowIntent } from '../../src/api/cart'
 import { useAuthStore } from '../../src/stores/authStore'
-import { showToast } from '../../src/stores/toastStore'
 import { openHref } from '../../src/lib/links'
 import { status, useTokens } from '../../src/theme'
-import { Screen, Skeleton, Text, useBottomInset } from '../../src/ui'
+import {
+  Button, Card, Chip, ChipGroup, EmptyState, IconButton, Pill, Screen, Skeleton, Text, confirm, toast, useBottomInset,
+} from '../../src/ui'
 
 // Mirror of controller-service app/(storefront)/wishlist/page.tsx at the mobile breakpoint.
 
@@ -76,9 +77,9 @@ function wishlistBadges(i: {
 /** A wishlist card while the list loads: image, remove button, title, price, stock and the cart button. */
 function WishlistCardSkeleton() {
   return (
-    <View className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated">
+    <View className="overflow-hidden rounded-panel bg-surface-elevated dark:border dark:border-border-default">
       <View className="mx-3 mt-3">
-        <Skeleton aspectRatio={5 / 3} />
+        <Skeleton aspectRatio={5 / 3} rounded="rounded-xl" />
       </View>
       <View className="p-4">
         <Skeleton width={28} height={28} rounded="rounded-full" className="mb-1 self-end" />
@@ -87,27 +88,19 @@ function WishlistCardSkeleton() {
           <Skeleton height={15} width="65%" />
         </View>
         <Skeleton height={24} width="40%" className="mb-2 mt-1" />
-        <Skeleton height={10} width={110} rounded="rounded" className="mb-3" />
+        <Skeleton height={11} width={110} rounded="rounded" className="mb-3" />
         <Skeleton height={12} width={64} rounded="rounded" className="mb-3" />
-        <Skeleton height={36} />
+        <Skeleton height={48} rounded="rounded-field" />
       </View>
     </View>
   )
 }
 
 function EmptyCard({ title, body, action, onAction }: { title: string; body: string; action: string; onAction: () => void }) {
-  const t = useTokens()
   return (
-    <View className="items-center rounded-lg border border-border-default bg-surface-elevated p-12 shadow-sm">
-      <View className="mb-4">
-        <Heart size={64} color={t.foregroundMuted} strokeWidth={1.5} />
-      </View>
-      <Text className="mb-2 text-center text-xl font-semibold text-foreground">{title}</Text>
-      <Text className="mb-6 text-center text-foreground-secondary">{body}</Text>
-      <Pressable onPress={onAction} className="rounded-lg bg-accent-500 px-8 py-3 active:bg-accent-600">
-        <Text className="font-semibold text-white">{action}</Text>
-      </Pressable>
-    </View>
+    <Card padded={false}>
+      <EmptyState icon={Heart} title={title} message={body} actionLabel={action} onAction={onAction} />
+    </Card>
   )
 }
 
@@ -142,23 +135,22 @@ export default function WishlistScreen() {
       return next
     })
 
-  const handleRemove = (productId: string) =>
-    Alert.alert('Remove from Wishlist', 'Are you sure you want to remove this item from your wishlist?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await removeFromWishlist(productId)
-            await qc.invalidateQueries({ queryKey: ['wishlist'] })
-            showToast('Item removed from wishlist', 'success')
-          } catch {
-            showToast('Failed to remove item', 'error')
-          }
-        },
-      },
-    ])
+  const handleRemove = async (productId: string) => {
+    const ok = await confirm({
+      title: 'Remove from wishlist?',
+      message: 'Are you sure you want to remove this item from your wishlist?',
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      await removeFromWishlist(productId)
+      await qc.invalidateQueries({ queryKey: ['wishlist'] })
+      toast.success('Item removed from wishlist')
+    } catch {
+      toast.error('Failed to remove item')
+    }
+  }
 
   // Digital products never enter the cart: Buy Now, or pick options on the product page.
   const handleBuyNow = async (productId: string, slug: string, hasVariants: boolean) => {
@@ -168,7 +160,7 @@ export default function WishlistScreen() {
       const intent = await createBuyNowIntent({ productId, qty: 1 })
       router.push({ pathname: '/checkout/review', params: { intent } })
     } catch (e) {
-      showToast(e instanceof Error && e.message ? e.message : 'Failed to start checkout', 'error')
+      toast.error(e instanceof Error && e.message ? e.message : 'Failed to start checkout')
     } finally {
       mark(productId, false)
     }
@@ -183,12 +175,12 @@ export default function WishlistScreen() {
       try {
         await removeFromWishlist(productId)
         await qc.invalidateQueries({ queryKey: ['wishlist'] })
-        showToast('Moved to cart', 'success')
+        toast.success('Moved to cart')
       } catch {
-        showToast('Item added to cart!', 'success')
+        toast.success('Item added to cart!')
       }
     } catch (e) {
-      showToast(e instanceof Error && e.message ? e.message : 'Failed to add to cart', 'error')
+      toast.error(e instanceof Error && e.message ? e.message : 'Failed to add to cart')
     } finally {
       mark(productId, false)
     }
@@ -214,9 +206,9 @@ export default function WishlistScreen() {
         <ScrollView scrollEnabled={false} showsVerticalScrollIndicator={false}>
           <AccountMobileHeader />
           <View className="px-4 py-4">
-            <View className="mb-4 flex-row gap-1.5">
-              {[40, 72, 98].map((w, i) => (
-                <Skeleton key={i} width={w} height={24} rounded="rounded-full" />
+            <View className="mb-4 flex-row gap-2">
+              {[50, 82, 106].map((w, i) => (
+                <Skeleton key={i} width={w} height={32} rounded="rounded-full" />
               ))}
             </View>
             <View className="gap-4">
@@ -229,7 +221,9 @@ export default function WishlistScreen() {
     )
   }
 
-  const refreshControl = <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+  const refreshControl = (
+    <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={t.accent500} colors={[t.accent500]} progressBackgroundColor={t.surfaceElevated} />
+  )
 
   if (items.length === 0) {
     return (
@@ -254,17 +248,11 @@ export default function WishlistScreen() {
       <ScrollView refreshControl={refreshControl} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomInset }}>
         <AccountMobileHeader />
         <View className="px-4 py-4">
-          <View className="mb-4 flex-row items-center gap-1.5">
+          <ChipGroup className="mb-4">
             {FILTERS.map(([val, label]) => (
-              <Pressable
-                key={val}
-                onPress={() => setFilter(val)}
-                className={`rounded-full px-3 py-1 ${filter === val ? 'bg-accent-500' : 'border border-border-default bg-surface-elevated'}`}
-              >
-                <Text className={`text-xs font-medium ${filter === val ? 'text-white' : 'text-foreground-secondary'}`}>{label}</Text>
-              </Pressable>
+              <Chip key={val} label={label} size="sm" selected={filter === val} onPress={() => setFilter(val)} />
             ))}
-          </View>
+          </ChipGroup>
 
           <View className="gap-4">
             {filtered.map(item => {
@@ -291,10 +279,12 @@ export default function WishlistScreen() {
               const open = () => router.push(`/product/${p.slug}`)
 
               return (
-                <View key={item.id} className="overflow-hidden rounded-lg border border-border-default bg-surface-elevated shadow-sm">
+                <Card key={item.id} padded={false}>
                   <Pressable
                     onPress={open}
-                    className="relative mx-3 mt-3 overflow-hidden rounded-lg border-b border-border-default"
+                    accessibilityRole="imagebutton"
+                    accessibilityLabel={p.name}
+                    className="relative mx-3 mt-3 overflow-hidden rounded-xl border border-border-default"
                     style={{ aspectRatio: 5 / 3 }}
                   >
                     {image ? (
@@ -312,36 +302,24 @@ export default function WishlistScreen() {
                         <ImageIcon size={80} color={t.foregroundMuted} strokeWidth={1} />
                       </View>
                     )}
-                    {mrpDiscount > 0 && (
-                      <View className="absolute right-3 top-3 rounded-full bg-accent-500 px-2 py-1">
-                        <Text className="text-xs font-semibold text-white">{mrpDiscount}% off</Text>
-                      </View>
-                    )}
+                    {mrpDiscount > 0 && <Pill label={`${mrpDiscount}% off`} tone="accent" className="absolute right-3 top-3" />}
                     {(badges.backInStock || badges.priceDrop) && (
                       <View className="absolute left-3 top-3 items-start gap-1">
-                        {badges.backInStock && (
-                          <View className="rounded-full bg-emerald-600 px-2 py-1">
-                            <Text className="text-xs font-semibold text-white">Back in stock</Text>
-                          </View>
-                        )}
-                        {badges.priceDrop && (
-                          <View className="rounded-full bg-rose-600 px-2 py-1">
-                            <Text className="text-xs font-semibold text-white">Price dropped {badges.priceDrop.pct}%</Text>
-                          </View>
-                        )}
+                        {badges.backInStock && <Pill label="Back in stock" tone="success" />}
+                        {badges.priceDrop && <Pill label={`Price dropped ${badges.priceDrop.pct}%`} tone="danger" />}
                       </View>
                     )}
                   </Pressable>
 
                   <View className="p-4">
-                    <Pressable
+                    <IconButton
+                      icon={X}
+                      size="xs"
+                      color={status.heart}
+                      label={`Remove ${p.name} from wishlist`}
                       onPress={() => handleRemove(item.product_id)}
-                      accessibilityLabel="Remove from wishlist"
-                      hitSlop={6}
-                      className="mb-1 self-end rounded-full p-1.5 active:bg-red-50 dark:active:bg-red-900/30"
-                    >
-                      <X size={16} color={status.heart} strokeWidth={2} />
-                    </Pressable>
+                      className="mb-1 self-end"
+                    />
 
                     <Pressable onPress={open}>
                       <Text className="mb-2 min-h-[48px] text-base font-semibold text-foreground" numberOfLines={2}>
@@ -362,7 +340,7 @@ export default function WishlistScreen() {
                         Was <Text className="line-through">{money(badges.priceDrop.was)}</Text>
                       </Text>
                     )}
-                    <Text className="mb-3 text-[10px] text-foreground-muted">Inclusive of all taxes</Text>
+                    <Text className="mb-3 text-[11px] text-foreground-muted">Inclusive of all taxes</Text>
 
                     <View className="mb-3 flex-row items-center justify-between">
                       <Text className={`text-xs font-medium ${inStock ? 'text-green-600' : 'text-red-600'}`}>
@@ -370,27 +348,17 @@ export default function WishlistScreen() {
                       </Text>
                     </View>
 
-                    <Pressable
+                    <Button
+                      label={isDigital ? 'Buy Now' : 'Add to Cart'}
+                      icon={ShoppingCart}
+                      size="md"
+                      loading={adding}
+                      loadingLabel={isDigital ? 'Processing...' : 'Adding...'}
+                      disabled={!inStock}
                       onPress={() => (isDigital ? handleBuyNow(item.product_id, p.slug, hasVariants) : handleAddToCart(item.product_id))}
-                      disabled={!inStock || adding}
-                      className={`w-full flex-row items-center justify-center gap-2 rounded-lg px-4 py-2 ${!inStock || adding ? 'bg-border-default' : 'bg-accent-500 active:bg-accent-600'}`}
-                    >
-                      {adding ? (
-                        <>
-                          <ActivityIndicator size="small" color={t.foregroundMuted} />
-                          <Text className="text-sm font-semibold text-foreground-muted">{isDigital ? 'Processing...' : 'Adding...'}</Text>
-                        </>
-                      ) : (
-                        <>
-                          <ShoppingCart size={16} color={inStock ? status.white : t.foregroundMuted} strokeWidth={2} />
-                          <Text className={`text-sm font-semibold ${inStock ? 'text-white' : 'text-foreground-muted'}`}>
-                            {isDigital ? 'Buy Now' : 'Add to Cart'}
-                          </Text>
-                        </>
-                      )}
-                    </Pressable>
+                    />
                   </View>
-                </View>
+                </Card>
               )
             })}
           </View>
