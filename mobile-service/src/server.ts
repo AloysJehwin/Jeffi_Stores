@@ -8,7 +8,7 @@ import { Readable } from 'node:stream'
 import rateLimit from '@fastify/rate-limit'
 import Redis from 'ioredis'
 import { request as undici } from 'undici'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, timingSafeEqual } from 'node:crypto'
 import type pg from 'pg'
 import { mainPool } from '@jeffi/tenancy'
 
@@ -38,6 +38,24 @@ app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body,
 
 const fail = (reply: FastifyReply, status: number, error: string, message: string) => reply.code(status).send({ error, message })
 
+// Behind CloudFront the peer is an edge, so the user is in CloudFront-Viewer-Address ("ip:port"). Trusted only when
+// the request carries the origin secret CloudFront adds; anything else (direct hits) keeps the socket address.
+const EDGE_SECRET = Buffer.from(process.env.EDGE_ORIGIN_SECRET || '')
+function fromEdge(req: FastifyRequest): boolean {
+  const got = req.headers['x-jeffi-edge']
+  if (!EDGE_SECRET.length || typeof got !== 'string') return false
+  const b = Buffer.from(got)
+  return b.length === EDGE_SECRET.length && timingSafeEqual(b, EDGE_SECRET)
+}
+function clientIp(req: FastifyRequest): string {
+  const viewer = req.headers['cloudfront-viewer-address']
+  if (typeof viewer === 'string' && fromEdge(req)) {
+    const i = viewer.lastIndexOf(':')
+    if (i > 0) return viewer.slice(0, i).replace(/^\[|\]$/g, '')
+  }
+  return req.ip
+}
+
 app.get('/healthz', async () => ({ ok: true, service: 'mobile' }))
 app.get('/api/health', async () => ({ ok: true, service: 'mobile' }))
 
@@ -46,6 +64,7 @@ await app.register(rateLimit, {
   redis: redis ?? undefined,
   max: 240,
   timeWindow: '1 minute',
+  keyGenerator: clientIp,
   addHeaders: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true, 'x-ratelimit-reset': true, 'retry-after': true },
 })
 
@@ -70,7 +89,7 @@ app.get('/v1/app/config', async (_req, reply) => {
 })
 
 // ── Forwarded: the storefront API, same paths the web uses ──
-const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'te', 'trailer', 'upgrade', 'proxy-authorization', 'proxy-authenticate', 'host', 'content-length'])
+const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'te', 'trailer', 'upgrade', 'proxy-authorization', 'proxy-authenticate', 'host', 'content-length', 'x-jeffi-edge'])
 async function forward(req: FastifyRequest, reply: FastifyReply) {
   const headers: Record<string, string> = {}
   for (const [k, v] of Object.entries(req.headers)) if (v && !HOP.has(k)) headers[k] = Array.isArray(v) ? v.join(', ') : v
@@ -78,7 +97,7 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
   headers.host = SITE_HOST
   headers['x-forwarded-host'] = SITE_HOST
   headers['x-forwarded-proto'] = 'https'
-  headers['x-forwarded-for'] = req.ip
+  headers['x-forwarded-for'] = clientIp(req)
   headers['x-request-id'] = req.id
   headers['x-jeffi-client'] = 'mobile'
   // Auth responses are rewritten below (token injection), so ask for them uncompressed.
