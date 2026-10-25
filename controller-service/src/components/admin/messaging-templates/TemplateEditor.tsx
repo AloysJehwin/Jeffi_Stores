@@ -712,9 +712,10 @@ export default function TemplateEditor({
                     ctaHref={kind ? '{ctaUrl}' : '{storeUrl}'}
                     extraVariables={composerVars}
                   />
+                  {/* Bottom corner: the top-right holds the composer's "Edit HTML source" button. */}
                   <AIEnrichButton
                     placement="in-field"
-                    anchorClassName="absolute right-2 top-2 z-10"
+                    anchorClassName="absolute right-2 bottom-2 z-10"
                     fieldLabel="Email body (HTML)"
                     value={typeof value.body === 'string' ? value.body : ''}
                     onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
