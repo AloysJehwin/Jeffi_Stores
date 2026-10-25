@@ -1,15 +1,20 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
-import { getProductCards, getProductCardsByIds } from '@/lib/catalog/product-cards'
+import { cardPropsFor, getProductCards, getProductCardsByIds } from '@/lib/catalog/product-cards'
+import { listOffersByIds, offerHref } from '@/lib/catalog/product-offers'
 import { VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import {
   configId,
   configIds,
   configNumber,
+  safeHref,
   sectionLimit,
+  slidesConfig,
   spotlightConfig,
   valueStatMetrics,
   type HomepageSection,
   type SectionType,
+  type SlideCard,
+  type SlidesData,
   type ValueStatMetric,
 } from '@/lib/catalog/homepage-sections'
 
@@ -234,6 +239,145 @@ export async function getSpotlightProduct(section: SectionShape, gstEnabled: boo
   return product ? { product } : null
 }
 
+interface SlideCategory {
+  id: string
+  name: string
+  slug: string
+  image_url: string | null
+  product_image: string | null
+  product_blurhash: string | null
+  product_count: number
+}
+
+// Active categories with their live product count; the tree's lead product (featured, then best
+// selling) supplies a picture for categories without one of their own.
+async function getSlideCategories(ids: string[]): Promise<SlideCategory[]> {
+  if (ids.length === 0) return []
+  return queryMany<SlideCategory>(
+    `WITH RECURSIVE tree AS (
+       SELECT id AS root, id FROM categories WHERE id = ANY($1::uuid[]) AND is_active = true
+       UNION ALL
+       SELECT t.root, c.id FROM categories c JOIN tree t ON c.parent_category_id = t.id WHERE c.is_active = true
+     )
+     SELECT c.id, c.name, c.slug, c.image_url, top.image_url AS product_image, top.blurhash AS product_blurhash,
+            (SELECT count(*)::int FROM products p WHERE p.is_active = true
+               AND p.category_id IN (SELECT t.id FROM tree t WHERE t.root = c.id)) AS product_count
+     FROM categories c
+     LEFT JOIN LATERAL (
+       SELECT pi.image_url, pi.blurhash
+       FROM products p
+       JOIN product_images pi ON pi.product_id = p.id
+       WHERE p.is_active = true AND p.category_id IN (SELECT t.id FROM tree t WHERE t.root = c.id)
+       ORDER BY p.is_featured DESC, p.sales_count DESC NULLS LAST, p.created_at DESC,
+                pi.is_primary DESC, pi.display_order ASC
+       LIMIT 1
+     ) top ON true
+     WHERE c.id = ANY($1::uuid[]) AND c.is_active = true AND c.is_draft = false`,
+    [ids]
+  )
+}
+
+const unique = (ids: string[]) => [...new Set(ids)]
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+/** The section's slides with each reference resolved; anything gone, paused or empty is dropped. */
+export async function getSlides(section: SectionShape, gstEnabled: boolean): Promise<SlidesData> {
+  const { items, ...settings } = slidesConfig(section)
+  const [offers, categories, productRows] = await Promise.all([
+    listOffersByIds(unique(items.flatMap(i => (i.kind === 'offer' ? [i.offerId] : [])))),
+    getSlideCategories(unique(items.flatMap(i => (i.kind === 'category' ? [i.categoryId] : [])))),
+    getProductCardsByIds(unique(items.flatMap(i => (i.kind === 'product' ? [i.productId] : []))), gstEnabled),
+  ])
+  const offerById = new Map(offers.map(o => [o.id, o]))
+  const categoryById = new Map(categories.map(c => [c.id, c]))
+  const productById = new Map(cardPropsFor(productRows, gstEnabled).map(p => [p.id, p]))
+
+  const base = {
+    eyebrow: null,
+    sub: null,
+    badge: null,
+    badgeClass: null,
+    ctaLabel: null,
+    imageCard: null,
+    blurhashCard: null,
+    motion: 'none' as const,
+  }
+  const slides: SlideCard[] = []
+  for (const item of items) {
+    if (item.kind === 'offer') {
+      const o = offerById.get(item.offerId)
+      if (!o) continue
+      const wide = o.image_url
+        ? { image: o.image_url, blurhash: o.blurhash }
+        : { image: o.image_url_mobile, blurhash: o.blurhash_mobile }
+      slides.push({
+        ...base,
+        id: item.id,
+        kind: 'offer',
+        href: offerHref(o.slug),
+        title: o.title,
+        sub: o.subtitle,
+        badge: o.badge_text,
+        badgeClass: o.badge_color?.startsWith('bg-') ? o.badge_color : null,
+        ctaLabel: o.cta_label,
+        image: wide.image,
+        blurhash: wide.blurhash,
+        imageCard: o.image_url_card,
+        blurhashCard: o.image_url_card ? o.blurhash_card : null,
+      })
+    } else if (item.kind === 'category') {
+      const c = categoryById.get(item.categoryId)
+      if (!c || c.product_count === 0) continue
+      const own = safeHref(c.image_url)
+      slides.push({
+        ...base,
+        id: item.id,
+        kind: 'category',
+        href: `/categories/${encodeURIComponent(c.slug)}`,
+        title: c.name,
+        sub: plural(c.product_count, 'product'),
+        image: own ?? c.product_image,
+        blurhash: own ? null : c.product_blurhash,
+      })
+    } else if (item.kind === 'product') {
+      const p = productById.get(item.productId)
+      if (!p) continue
+      slides.push({
+        ...base,
+        id: item.id,
+        kind: 'product',
+        href: `/products/${encodeURIComponent(p.slug)}`,
+        title: p.name,
+        eyebrow: p.brandName ?? p.categoryName,
+        badge: p.mrpDiscount > 0 ? `${p.mrpDiscount}% off` : null,
+        image: p.primaryImage?.image_url ?? null,
+        blurhash: p.primaryImage?.blurhash ?? null,
+        price: p.displayPrice,
+        mrp: p.mrp,
+        productId: p.id,
+        productSlug: p.slug,
+        product: p,
+      })
+    } else {
+      slides.push({
+        ...base,
+        id: item.id,
+        kind: 'custom',
+        href: item.url,
+        title: item.title,
+        eyebrow: item.eyebrow,
+        sub: item.sub,
+        ctaLabel: item.ctaLabel,
+        image: item.image,
+        blurhash: null,
+        imageCard: item.imageCard,
+        motion: item.motion,
+      })
+    }
+  }
+  return { ...settings, slides }
+}
+
 const LOADERS: Partial<Record<SectionType, (s: SectionShape, gstEnabled: boolean) => Promise<unknown>>> = {
   countdown_deal: (s, gst) => getCountdownDeal(s, gst),
   product_spotlight: getSpotlightProduct,
@@ -242,6 +386,7 @@ const LOADERS: Partial<Record<SectionType, (s: SectionShape, gstEnabled: boolean
   bundle_spotlight: getBundles,
   back_in_stock: getBackInStock,
   value_stats: s => getValueStats(s),
+  slides: getSlides,
 }
 
 /** Data for the section types that load their own, keyed by section id. A failing section is skipped. */

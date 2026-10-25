@@ -995,7 +995,7 @@ ALTER TABLE ONLY public.homepage_sections
         'countdown_deal'::text, 'testimonials'::text, 'recently_viewed'::text, 'category_tabs'::text,
         'bundle_spotlight'::text, 'back_in_stock'::text, 'blog_teaser'::text, 'social_strip'::text,
         'value_stats'::text, 'motion_hero'::text, 'stories'::text, 'product_spotlight'::text,
-        'rewards_game'::text])));
+        'rewards_game'::text, 'slides'::text])));
 
 
 --

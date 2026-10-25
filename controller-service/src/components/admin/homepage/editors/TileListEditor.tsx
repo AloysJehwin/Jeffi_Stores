@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
+import type { SelectOption } from '@/components/admin/AdminSelect'
 import IconByName from '@/components/visitor/home/IconByName'
 import { ICON_OPTIONS } from './icon-options'
 import { LABEL_CLASS, Image, Select, Text, TextArea } from './fields'
@@ -10,9 +11,12 @@ export type Tile = Record<string, string>
 export interface TileField {
   key: string
   label: string
-  kind?: 'text' | 'textarea' | 'select' | 'image'
-  options?: { value: string; label: string }[]
+  kind?: 'text' | 'textarea' | 'select' | 'image' | 'custom'
+  options?: SelectOption[]
   placeholder?: string
+  hint?: string
+  /** For `custom`: draws the control for this key (e.g. a product picker). */
+  render?: (value: string, onCommit: (v: string) => void) => React.ReactNode
 }
 
 interface TileListEditorProps {
@@ -21,7 +25,8 @@ interface TileListEditorProps {
   tiles: Tile[]
   /** Built-in tiles the storefront shows while none are saved; shown and editable in their place. */
   defaults?: Tile[]
-  fields: TileField[]
+  /** The same fields for every tile, or per tile (fields that depend on a tile's kind). */
+  fields: TileField[] | ((tile: Tile) => TileField[])
   blank: Tile
   disabled: boolean
   max?: number
@@ -173,13 +178,18 @@ export default function TileListEditor({
                   onChange={v => replace(i, { icon: v })}
                 />
               )}
-              {fields.map(f =>
-                f.kind === 'textarea' ? (
+              {(typeof fields === 'function' ? fields(tile) : fields).map(f =>
+                f.kind === 'custom' ? (
+                  <Fragment key={`${i}-${f.key}`}>
+                    {f.render?.(tile[f.key] ?? '', v => replace(i, { [f.key]: v }))}
+                  </Fragment>
+                ) : f.kind === 'textarea' ? (
                   <TextArea
                     key={`${i}-${f.key}`}
                     label={f.label}
                     value={tile[f.key] ?? ''}
                     disabled={disabled}
+                    hint={f.hint}
                     rows={2}
                     onCommit={v => replace(i, { [f.key]: v })}
                   />
@@ -189,6 +199,7 @@ export default function TileListEditor({
                     label={f.label}
                     value={tile[f.key] ?? ''}
                     disabled={disabled}
+                    hint={f.hint}
                     placeholder={f.placeholder}
                     onCommit={v => replace(i, { [f.key]: v })}
                   />
@@ -199,6 +210,8 @@ export default function TileListEditor({
                     value={tile[f.key] ?? ''}
                     options={f.options ?? []}
                     disabled={disabled}
+                    hint={f.hint}
+                    placeholder={f.placeholder}
                     onChange={v => replace(i, { [f.key]: v })}
                   />
                 ) : (
@@ -207,6 +220,7 @@ export default function TileListEditor({
                     label={f.label}
                     value={tile[f.key] ?? ''}
                     disabled={disabled}
+                    hint={f.hint}
                     placeholder={f.placeholder}
                     onCommit={v => replace(i, { [f.key]: v })}
                   />

@@ -21,6 +21,7 @@ import ProductSpotlightEditor from './editors/ProductSpotlightEditor'
 import PromoBannerEditor from './editors/PromoBannerEditor'
 import RecentlyViewedEditor from './editors/RecentlyViewedEditor'
 import RewardsGameEditor from './editors/RewardsGameEditor'
+import SlidesEditor from './editors/SlidesEditor'
 import SocialStripEditor from './editors/SocialStripEditor'
 import StoriesEditor from './editors/StoriesEditor'
 import TestimonialsEditor from './editors/TestimonialsEditor'
@@ -49,6 +50,7 @@ const EDITORS: Partial<Record<SectionType, (props: EditorProps) => React.ReactEl
   promo_banner: PromoBannerEditor,
   recently_viewed: RecentlyViewedEditor,
   rewards_game: RewardsGameEditor,
+  slides: SlidesEditor,
   social_strip: SocialStripEditor,
   stories: StoriesEditor,
   testimonials: TestimonialsEditor,
