@@ -137,13 +137,13 @@ export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
 
   if (count === 0) return null
 
-  // A card inset by the page gutter with rounded corners, like the app's hero (not full bleed).
+  // A rounded card with the same inset as the business card (BusinessCta), not full bleed.
   return (
-    <div className="container mx-auto px-4 pt-4 sm:pt-6">
+    <div className="px-3 pt-3 sm:px-6 md:px-8 md:pt-6">
       <section
         aria-roledescription="carousel"
         aria-label="Featured"
-        className="relative isolate h-[clamp(20rem,56svh,36rem)] w-full select-none overflow-hidden rounded-[1.75rem] bg-gray-950 text-white shadow-xl shadow-black/10 md:h-[clamp(26rem,64vh,46rem)] md:rounded-[2rem]"
+        className="relative isolate h-[clamp(20rem,56svh,36rem)] w-full select-none overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl md:h-[clamp(26rem,64vh,46rem)]"
         onPointerMove={onPointerMove}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
