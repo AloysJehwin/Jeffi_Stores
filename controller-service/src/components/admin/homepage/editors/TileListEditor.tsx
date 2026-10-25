@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from 'react'
 import type { SelectOption } from '@/components/admin/AdminSelect'
+import type { MediaSize } from '@/components/admin/media/MediaField'
 import IconByName from '@/components/visitor/home/IconByName'
 import { ICON_OPTIONS } from './icon-options'
 import { LABEL_CLASS, Image, Select, Text, TextArea } from './fields'
@@ -15,8 +16,14 @@ export interface TileField {
   options?: SelectOption[]
   placeholder?: string
   hint?: string
-  /** For `custom`: draws the control for this key (e.g. a product picker). */
-  render?: (value: string, onCommit: (v: string) => void) => React.ReactNode
+  /** For `image`: the size preset(s) for the preview and AI. */
+  size?: MediaSize | MediaSize[]
+  /** For `image`: a sibling key holding the slot's MP4/WebM; the slot then accepts video. */
+  videoKey?: string
+  /** For `image`: the AI prompt to start from. */
+  defaultPrompt?: string
+  /** For `custom`: draws the control for this key (e.g. a product picker); `patch` sets several keys at once. */
+  render?: (value: string, onCommit: (v: string) => void, patch: (p: Tile) => void) => React.ReactNode
 }
 
 interface TileListEditorProps {
@@ -181,7 +188,11 @@ export default function TileListEditor({
               {(typeof fields === 'function' ? fields(tile) : fields).map(f =>
                 f.kind === 'custom' ? (
                   <Fragment key={`${i}-${f.key}`}>
-                    {f.render?.(tile[f.key] ?? '', v => replace(i, { [f.key]: v }))}
+                    {f.render?.(
+                      tile[f.key] ?? '',
+                      v => replace(i, { [f.key]: v }),
+                      p => replace(i, p)
+                    )}
                   </Fragment>
                 ) : f.kind === 'textarea' ? (
                   <TextArea
@@ -198,10 +209,16 @@ export default function TileListEditor({
                     key={`${i}-${f.key}`}
                     label={f.label}
                     value={tile[f.key] ?? ''}
+                    video={f.videoKey ? (tile[f.videoKey] ?? '') : ''}
+                    allowVideo={!!f.videoKey}
+                    size={f.size}
+                    defaultPrompt={f.defaultPrompt}
                     disabled={disabled}
                     hint={f.hint}
                     placeholder={f.placeholder}
-                    onCommit={v => replace(i, { [f.key]: v })}
+                    onCommit={(img, vid) =>
+                      replace(i, f.videoKey ? { [f.key]: img, [f.videoKey]: vid } : { [f.key]: img })
+                    }
                   />
                 ) : f.kind === 'select' ? (
                   <Select

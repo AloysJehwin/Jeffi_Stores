@@ -381,8 +381,14 @@ function sectionItems(s: HomepageSection, data: SectionData): Record<string, str
   if (!keys) return null
   let rows = validTiles(cfg.items, keys)
   if (s.type === 'blog_teaser' || s.type === 'social_strip') {
+    // `video` is optional, so it is checked here rather than in TILE_KEYS.
     rows = (rows ?? [])
-      .map(i => ({ ...i, url: safeHref(i.url) ?? '', imageUrl: safeHref(i.imageUrl) ?? '' }))
+      .map(i => ({
+        ...i,
+        url: safeHref(i.url) ?? '',
+        imageUrl: safeHref(i.imageUrl) ?? '',
+        ...(typeof i.video === 'string' ? { video: safeHref(i.video) ?? '' } : {}),
+      }))
       .filter(i => i.url && (s.type === 'social_strip' ? i.imageUrl : (i as Record<string, string>).title?.trim()))
     return rows.length ? rows : null
   }
@@ -434,6 +440,7 @@ export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
   }
   const sectionsJson: HomeSectionJson[] = sections.map(s => {
     const d = sectionCopyDefaults(s.type)
+    const video = safeHref(typeof s.config?.video === 'string' ? s.config.video : null)
     return {
       ...s,
       layout: sectionLayout(s),
@@ -443,6 +450,7 @@ export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
         subtitle: (s.type === 'about' ? s.subtitle || data.aboutCopy : s.subtitle) ?? d.subtitle,
         body: (typeof s.config?.body === 'string' ? s.config.body : null) ?? d.body,
         imageUrl: (typeof s.config?.imageUrl === 'string' ? s.config.imageUrl : null) ?? d.imageUrl,
+        ...(video ? { video } : {}),
         ctaLabel: s.cta_label ?? d.ctaLabel,
         ctaUrl: s.cta_url ?? d.ctaUrl,
       },

@@ -4,13 +4,13 @@ import { safeHref } from '@/lib/catalog/homepage-sections'
 import { CtaFields, Grid, HeadingFields, Note, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
 
-const KEYS = ['title', 'excerpt', 'url', 'imageUrl']
+const KEYS = ['title', 'excerpt', 'url', 'imageUrl', 'video']
 
 export default function BlogTeaserEditor(props: EditorProps) {
   const { canWrite } = props
   const b = useSectionBinding(props)
   const items = readTiles(b.cfg.items, KEYS)
-  const badLinks = items.filter(i => (i.url && !safeHref(i.url)) || (i.imageUrl && !safeHref(i.imageUrl))).length
+  const badLinks = items.filter(i => [i.url, i.imageUrl, i.video].some(v => v && !safeHref(v))).length
 
   return (
     <Grid>
@@ -23,9 +23,9 @@ export default function BlogTeaserEditor(props: EditorProps) {
           { key: 'title', label: 'Title', placeholder: 'How to choose the right drill bit' },
           { key: 'excerpt', label: 'Summary', kind: 'textarea' },
           { key: 'url', label: 'Link', placeholder: 'https://… or /page' },
-          { key: 'imageUrl', label: 'Image', kind: 'image', placeholder: 'https://… or upload' },
+          { key: 'imageUrl', label: 'Image', kind: 'image', size: ['wide', 'landscape'], videoKey: 'video' },
         ]}
-        blank={{ title: '', excerpt: '', url: '', imageUrl: '' }}
+        blank={{ title: '', excerpt: '', url: '', imageUrl: '', video: '' }}
         disabled={!canWrite}
         max={6}
         showIcon={false}

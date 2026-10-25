@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import type { SelectOption } from '@/components/admin/AdminSelect'
+import AiCopyButton from '@/components/admin/ai/AiCopyButton'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { MAX_SLIDES, safeHref, slidesConfig } from '@/lib/catalog/homepage-sections'
 import {
   Grid,
@@ -42,7 +44,13 @@ const MOTION_OPTIONS = [
 const MAX_SECONDS = 20
 
 const REF_KEY: Record<string, string> = { offer: 'offerId', category: 'categoryId', product: 'productId' }
-const CUSTOM_KEYS = ['image', 'imageCard', 'eyebrow', 'title', 'sub', 'ctaLabel', 'url', 'motion']
+const CUSTOM_KEYS = ['image', 'video', 'imageCard', 'videoCard', 'eyebrow', 'title', 'sub', 'ctaLabel', 'url', 'motion']
+const COPY_FIELDS = [
+  { name: 'eyebrow', label: 'Tiny label above the title, 1-3 words', type: 'text' as const },
+  { name: 'title', label: 'Slide title, 2-5 punchy words', type: 'text' as const },
+  { name: 'sub', label: 'Supporting line, one concise sentence', type: 'text' as const },
+  { name: 'ctaLabel', label: 'Button label, 1-3 words e.g. Shop now', type: 'text' as const },
+]
 // `id` rides along as a hidden tile key so a slide keeps its identity across edits.
 const KEYS = ['id', 'kind', ...Object.values(REF_KEY), ...CUSTOM_KEYS]
 const BLANK: Tile = { ...Object.fromEntries(KEYS.map(k => [k, ''])), kind: 'offer' }
@@ -130,13 +138,14 @@ const placeholder = (status: 'loading' | 'ready' | 'failed', ready: string, plur
 export default function SlidesEditor(props: EditorProps) {
   const { section, canWrite } = props
   const b = useSectionBinding(props)
+  const storeName = useStoreConfig().identity.name || 'an online store'
   const config = slidesConfig(section)
   const tiles: Tile[] = readTiles(b.cfg.items, KEYS).map(t => ({ ...t, kind: t.kind || 'offer' }))
   const offers = useOptions('/api/admin/product-offers', 'offers', offerOptions)
   const categories = useOptions('/api/categories', 'categories', categoryOptions)
   const unused = tiles.length - config.items.length
   const badLinks = tiles.filter(
-    t => t.kind === 'custom' && [t.image, t.imageCard, t.url].some(v => v && !safeHref(v))
+    t => t.kind === 'custom' && [t.image, t.video, t.imageCard, t.videoCard, t.url].some(v => v && !safeHref(v))
   ).length
 
   const kindField: TileField = { key: 'kind', label: 'Shows', kind: 'select', options: KIND_OPTIONS }
@@ -187,13 +196,35 @@ export default function SlidesEditor(props: EditorProps) {
             key: 'image',
             label: 'Image',
             kind: 'image',
-            hint: 'Wide, about 1600×900. Used by every layout without a card image.',
+            size: ['wide', 'hero'],
+            videoKey: 'video',
+            defaultPrompt: tile.title,
+            hint: 'Wide, about 1600×900. Used by every layout without a card image. A video plays over it.',
           },
           {
             key: 'imageCard',
             label: 'Card image (optional)',
             kind: 'image',
+            size: ['portrait', 'square'],
+            videoKey: 'videoCard',
+            defaultPrompt: tile.title,
             hint: 'Portrait 4:5, about 1080×1350, for the Cards layout.',
+          },
+          {
+            key: 'copy',
+            label: 'Write with AI',
+            kind: 'custom',
+            render: (_v, _c, patch) => (
+              <AiCopyButton
+                className="sm:col-span-2"
+                scope="settings:write"
+                disabled={!canWrite}
+                context={`Homepage slide for ${storeName}.`}
+                defaultBrief={tile.title || tile.sub}
+                fields={COPY_FIELDS}
+                onFill={patch}
+              />
+            ),
           },
           { key: 'eyebrow', label: 'Eyebrow', placeholder: 'New season' },
           { key: 'title', label: 'Title', placeholder: 'Built to last' },

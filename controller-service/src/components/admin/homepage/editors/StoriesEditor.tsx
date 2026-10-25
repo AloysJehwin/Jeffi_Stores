@@ -1,5 +1,7 @@
 'use client'
 
+import AiCopyButton from '@/components/admin/ai/AiCopyButton'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { safeHref, storyGroups } from '@/lib/catalog/homepage-sections'
 import { Grid, HeadingFields, Image, LABEL_CLASS, Note, Text, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { type Tile } from './TileListEditor'
@@ -7,8 +9,8 @@ import TileListEditor, { type Tile } from './TileListEditor'
 const MAX_GROUPS = 24
 const MAX_SLIDES = 12
 // `id` rides along as a hidden tile key so the storefront's "seen" state survives edits.
-const SLIDE_KEYS = ['id', 'image', 'caption', 'ctaLabel', 'url', 'seconds']
-const BLANK_SLIDE: Tile = { id: '', image: '', caption: '', ctaLabel: '', url: '', seconds: '' }
+const SLIDE_KEYS = ['id', 'image', 'video', 'caption', 'ctaLabel', 'url', 'seconds']
+const BLANK_SLIDE: Tile = { id: '', image: '', video: '', caption: '', ctaLabel: '', url: '', seconds: '' }
 
 const BTN_CLASS =
   'px-2 py-1 text-xs font-medium rounded-md border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed'
@@ -47,6 +49,7 @@ function serialize(groups: GroupDraft[]) {
       return {
         id: s.id || crypto.randomUUID(),
         image: s.image,
+        ...(s.video ? { video: s.video } : {}),
         caption: s.caption,
         ctaLabel: s.ctaLabel,
         url: s.url,
@@ -59,10 +62,11 @@ function serialize(groups: GroupDraft[]) {
 export default function StoriesEditor(props: EditorProps) {
   const { section, canWrite } = props
   const b = useSectionBinding(props)
+  const storeName = useStoreConfig().identity.name || 'an online store'
   const groups = readGroups(b.cfg.groups)
   const shown = storyGroups(section).length
   const badLinks = groups.filter(
-    g => (g.cover && !safeHref(g.cover)) || g.slides.some(s => [s.image, s.url].some(v => v && !safeHref(v)))
+    g => (g.cover && !safeHref(g.cover)) || g.slides.some(s => [s.image, s.video, s.url].some(v => v && !safeHref(v)))
   ).length
 
   const commit = (next: GroupDraft[]) => b.saveConfig({ groups: serialize(next) })
@@ -147,15 +151,44 @@ export default function StoriesEditor(props: EditorProps) {
                 <Image
                   label="Cover image"
                   value={g.cover}
+                  size="square"
+                  defaultPrompt={g.title}
                   disabled={!canWrite}
                   hint="Shown inside the ring; square crops work best."
                   onCommit={v => update(i, { cover: v })}
                 />
+                {g.slides.length > 0 && (
+                  <AiCopyButton
+                    className="sm:col-span-2"
+                    label="Write captions with AI"
+                    scope="settings:write"
+                    disabled={!canWrite}
+                    context={`Full-screen story slides on the homepage of ${storeName}, ${g.slides.length} in the story "${g.title || 'untitled'}". Captions read as one short sequence.`}
+                    defaultBrief={g.title}
+                    fields={g.slides.map((_, j) => ({
+                      name: `caption_${j + 1}`,
+                      label: `Caption for slide ${j + 1}, one short line`,
+                      type: 'text' as const,
+                    }))}
+                    onFill={v =>
+                      update(i, {
+                        slides: g.slides.map((s, j) => ({ ...s, caption: v[`caption_${j + 1}`] ?? s.caption })),
+                      })
+                    }
+                  />
+                )}
                 <TileListEditor
                   label="Slides"
                   tiles={g.slides}
                   fields={[
-                    { key: 'image', label: 'Image', kind: 'image', placeholder: 'https://… or upload' },
+                    {
+                      key: 'image',
+                      label: 'Image or video',
+                      kind: 'image',
+                      size: ['story', 'portrait'],
+                      videoKey: 'video',
+                      defaultPrompt: g.title,
+                    },
                     { key: 'caption', label: 'Caption', kind: 'textarea' },
                     { key: 'ctaLabel', label: 'Button label', placeholder: 'Shop now' },
                     { key: 'url', label: 'Link', placeholder: 'https://… or /products' },
