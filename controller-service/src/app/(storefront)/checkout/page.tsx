@@ -12,6 +12,7 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import CopySku from '@/components/ui/CopySku'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
+import MobileCheckoutBar from '@/components/visitor/cart/MobileCheckoutBar'
 import { trackBeginCheckout } from '@/lib/client/analytics'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
@@ -831,6 +832,11 @@ function CheckoutPage() {
       : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false))
 
   const noPaymentMethod = !isRazorpayEnabled && !codAvailable
+  const submitDisabled =
+    isSubmitting ||
+    !serviceable ||
+    (paymentMethod === 'razorpay' && (!isRazorpayEnabled || !razorpayLoaded)) ||
+    (paymentMethod === 'cod' && !codAvailable)
 
   return (
     <div className="bg-surface min-h-screen py-4 sm:py-6 lg:py-8">
@@ -1433,13 +1439,9 @@ function CheckoutPage() {
                   </div>
                 ) : (
                   <button
+                    id="checkout-summary-cta"
                     type="submit"
-                    disabled={
-                      isSubmitting ||
-                      !serviceable ||
-                      (paymentMethod === 'razorpay' && (!isRazorpayEnabled || !razorpayLoaded)) ||
-                      (paymentMethod === 'cod' && !codAvailable)
-                    }
+                    disabled={submitDisabled}
                     className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
                   >
                     {isSubmitting ? (
@@ -1492,6 +1494,22 @@ function CheckoutPage() {
               </div>
             </div>
           </div>
+
+          {!noPaymentMethod && (
+            <MobileCheckoutBar
+              watchId="checkout-summary-cta"
+              label={paymentMethod === 'cod' ? 'Total · Pay on delivery' : 'Total'}
+              amount={`₹${finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            >
+              <button
+                type="submit"
+                disabled={submitDisabled}
+                className="shrink-0 min-h-[44px] px-5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Placing…' : paymentMethod === 'razorpay' ? 'Pay now' : 'Place order'}
+              </button>
+            </MobileCheckoutBar>
+          )}
         </form>
       </div>
       <div className="container mx-auto px-4 pb-8">

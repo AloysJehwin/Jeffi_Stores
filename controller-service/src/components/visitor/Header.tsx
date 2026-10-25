@@ -35,11 +35,15 @@ export default function Header() {
       <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default fixed top-0 left-0 right-0 z-40 w-full pt-[env(safe-area-inset-top,0px)]">
         <div className="container mx-auto px-3 sm:px-4 relative">
           <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20 gap-3">
-            {/* Logo */}
-            <Link href="/" className="flex items-center shrink-0">
-              <div className="flex items-center gap-2 sm:gap-3">
+            {/* Logo: the name truncates on phones so the icon row always fits */}
+            <Link href="/" className="flex items-center min-w-0 lg:shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 {identity.logoUrl ? (
-                  <img src={identity.logoUrl} alt={`${identity.name} Logo`} className="h-8 sm:h-10 lg:h-12 w-auto" />
+                  <img
+                    src={identity.logoUrl}
+                    alt={`${identity.name} Logo`}
+                    className="h-8 sm:h-10 lg:h-12 w-auto max-w-[6rem] sm:max-w-none object-contain shrink-0"
+                  />
                 ) : (
                   <span
                     aria-hidden
@@ -48,12 +52,14 @@ export default function Header() {
                     {identity.name.trim().charAt(0).toUpperCase() || 'S'}
                   </span>
                 )}
-                <div>
-                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400">
+                <div className="min-w-0">
+                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 truncate">
                     {identity.name}
                   </div>
                   {storefront.metaTagline && (
-                    <div className="hidden sm:block text-xs text-foreground-muted">{storefront.metaTagline}</div>
+                    <div className="hidden sm:block text-xs text-foreground-muted truncate">
+                      {storefront.metaTagline}
+                    </div>
                   )}
                 </div>
               </div>
@@ -98,7 +104,7 @@ export default function Header() {
             </nav>
 
             {/* Right Actions */}
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-0 sm:gap-4 shrink-0">
               {/* Search Bar */}
               <SearchBar isOpen={searchOpen} onOpen={() => setSearchOpen(true)} onClose={() => setSearchOpen(false)} />
 
@@ -109,7 +115,7 @@ export default function Header() {
               <Link
                 href="/wishlist"
                 aria-label={wishlistCount > 0 ? `Wishlist, ${wishlistCount} items` : 'Wishlist'}
-                className="hidden min-[400px]:flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all hover:scale-110 active:scale-95 relative"
+                className="flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all hover:scale-110 active:scale-95 relative"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -129,7 +135,8 @@ export default function Header() {
               {/* Cart Icon */}
               <Link
                 href="/cart"
-                className="hidden min-[400px]:flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group"
+                aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : 'Cart'}
+                className="flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group"
               >
                 <svg
                   className="w-6 h-6 transition-transform group-hover:scale-110"
@@ -153,10 +160,7 @@ export default function Header() {
                 )}
               </Link>
 
-              {/* User Menu (hidden on small mobile) */}
-              <div className="hidden sm:block">
-                <UserMenu />
-              </div>
+              <UserMenu />
 
               {/* Theme Toggle (desktop only) */}
               <div className="hidden lg:block">

@@ -333,10 +333,44 @@ html[data-no-ads] .google-auto-placed {
   display: none !important;
 }
 
-/* The storefront footer strip makes room for a fixed bottom bar only while one is on screen. */
+/* The storefront footer pads for the home indicator itself, so the body's inset would double it. */
+body:has([data-footer-strip]) {
+  padding-bottom: 0;
+}
+
+/* The storefront footer makes room for a fixed bottom bar only while one is on screen. */
 body:has([data-bottom-bar]) [data-footer-strip] {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 }
-body:has([data-bottom-bar='cart']):has([data-bottom-bar='compare']) [data-footer-strip] {
+body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-bottom-bar='compare']) [data-footer-strip] {
   padding-bottom: calc(10rem + env(safe-area-inset-bottom));
+}
+
+/* Toasts clear the home indicator and sit above any fixed bottom bar. */
+[data-toast] {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+body:has([data-bottom-bar]) [data-toast] {
+  margin-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-bottom-bar='compare']) [data-toast] {
+  margin-bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 639px) {
+  /* Full-width storefront toasts on phones. */
+  body:has([data-storefront]) [data-toast] {
+    left: 1rem;
+  }
+
+  /* 16px text fields on storefront phones (portalled sheets too) so iOS Safari doesn't zoom on focus.
+     Larger text (OTP boxes) is left alone. */
+  body:has([data-storefront])
+    :is(
+      input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='button'], [type='submit'], [type='reset'], [type='image']),
+      select,
+      textarea
+    ):not(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl) {
+    font-size: 16px;
+  }
 }

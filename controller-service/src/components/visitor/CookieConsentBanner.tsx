@@ -134,21 +134,3 @@ export function CookieSettingsLink({ className }: { className?: string }) {
     </button>
   )
 }
-
-/** Slim storefront footer strip carrying the policies and cookie-settings links. */
-export function StorefrontFooterBar() {
-  const link = 'hover:text-accent-500 transition-colors'
-  return (
-    <footer data-footer-strip className="border-t border-border-default bg-surface">
-      <div className="container mx-auto px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-foreground-muted">
-        <Link href="/legal" className={link}>
-          Policies
-        </Link>
-        <Link href="/legal/privacy-policy" className={link}>
-          Privacy
-        </Link>
-        <CookieSettingsLink className={link} />
-      </div>
-    </footer>
-  )
-}
