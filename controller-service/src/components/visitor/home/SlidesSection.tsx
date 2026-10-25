@@ -9,7 +9,6 @@ import {
   CARD_IMAGE,
   PromoBanner,
   PromoCard,
-  PromoHeading,
   type PromoFaceProps,
 } from '@/components/visitor/slides/PromoCard'
 import { KEN_BURNS, RevealWords, headlineVariants, usePointerParallax } from '@/components/visitor/slides/slide-motion'
@@ -78,25 +77,38 @@ export default function SlidesSection({ data, eyebrow, title, preview = false }:
   if (slides.length === 0) return null
 
   return (
-    <section className="bg-surface px-3 sm:px-6 md:px-8 py-6 md:py-8">
-      <PromoHeading eyebrow={eyebrow} title={title} />
-      <Slides
-        layout={layout}
-        ariaLabel={title ?? 'Slides'}
-        autoplay={data.autoplay ? data.intervalSeconds * 1000 : false}
-        {...layoutProps(layout, aspect, slides.length)}
-      >
-        {slides.map(s => (
-          <Slide
-            key={s.id}
-            slide={s}
-            layout={layout}
-            aspect={aspect}
-            seconds={data.intervalSeconds}
-            preview={preview}
-          />
-        ))}
-      </Slides>
+    <section className="bg-surface py-6 md:py-8">
+      {(eyebrow || title) && (
+        // Lined up with the other home sections' headings.
+        <div className="container mx-auto mb-5 flex items-center gap-4 px-4 md:mb-7">
+          <div className="h-10 w-1 rounded-full bg-primary-500" />
+          <div>
+            {eyebrow && (
+              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary-500">{eyebrow}</p>
+            )}
+            {title && <h2 className="text-2xl font-black tracking-tight text-foreground md:text-4xl">{title}</h2>}
+          </div>
+        </div>
+      )}
+      <div className="px-3 sm:px-6 md:px-8">
+        <Slides
+          layout={layout}
+          ariaLabel={title ?? 'Slides'}
+          autoplay={data.autoplay ? data.intervalSeconds * 1000 : false}
+          {...layoutProps(layout, aspect, slides.length)}
+        >
+          {slides.map(s => (
+            <Slide
+              key={s.id}
+              slide={s}
+              layout={layout}
+              aspect={aspect}
+              seconds={data.intervalSeconds}
+              preview={preview}
+            />
+          ))}
+        </Slides>
+      </div>
     </section>
   )
 }
@@ -153,7 +165,9 @@ function Slide({ slide, layout, aspect, seconds, preview }: SlideProps) {
         className="block"
         variants={headlineVariants(reduced)}
         initial="hidden"
-        {...(rail ? { whileInView: 'show', viewport: { once: true } } : { animate: current ? 'show' : 'hidden' })}
+        {...(rail || layout === 'cards'
+          ? { whileInView: 'show', viewport: { once: true } }
+          : { animate: current ? 'show' : 'hidden' })}
       >
         <RevealWords text={slide.title} reduced={reduced} />
       </motion.span>
