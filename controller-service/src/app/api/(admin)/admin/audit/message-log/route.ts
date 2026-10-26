@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryCount } from '@/lib/shared/db'
+import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { queryMany } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
+import { SMS_LOG_ENTITY, WHATSAPP_LOG_ENTITY, messageLogEntity } from '@/lib/filters/entities/audit'
+import { LOG_COUNT_CAP } from '@/lib/filters/fields/audit'
+import { cappedCount } from '@/lib/filters/run'
+import { listWindow } from '@/lib/filters/window'
 
 export const dynamic = 'force-dynamic'
 
+const ANY_CHANNEL = messageLogEntity()
+
 // Outbound SMS / WhatsApp log. `channel` query param scopes to 'sms' or 'whatsapp'.
-// OTP is never stored, so it never appears here.
+// OTP codes are redacted before they are stored.
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, null)
   if (admin instanceof NextResponse) return admin
@@ -14,45 +21,27 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
   const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize') || '25', 10)))
   const channel = url.searchParams.get('channel') || ''
-  const kind = url.searchParams.get('kind') || ''
-  const status = url.searchParams.get('status') || ''
-  const search = url.searchParams.get('q') || ''
+  const entity = channel === 'sms' ? SMS_LOG_ENTITY : channel === 'whatsapp' ? WHATSAPP_LOG_ENTITY : ANY_CHANNEL
 
-  const where: string[] = []
-  const params: unknown[] = []
-  if (channel === 'sms' || channel === 'whatsapp') {
-    params.push(channel)
-    where.push(`channel = $${params.length}`)
-  }
-  if (kind && kind !== 'all') {
-    params.push(kind)
-    where.push(`kind = $${params.length}`)
-  }
-  if (status && status !== 'all') {
-    params.push(status)
-    where.push(`status = $${params.length}`)
-  }
-  if (search) {
-    params.push(`%${search}%`)
-    where.push(`(to_number ILIKE $${params.length} OR body ILIKE $${params.length})`)
-  }
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  // The list filters (old ?q= and 'all' sentinels included); without dates, the last 7 days.
+  const sp = new URLSearchParams(url.searchParams)
+  if (sp.get('kind') === 'all') sp.delete('kind')
+  const { q, window } = listWindow(entity, normalizeQuery(entity, sp))
+  const w = buildWhere(entity, q)
+  const params = [...w.params, pageSize, (page - 1) * pageSize]
 
-  params.push(pageSize)
-  params.push((page - 1) * pageSize)
-
-  const [rows, total] = await Promise.all([
+  const [rows, counted] = await Promise.all([
     queryMany(
-      `SELECT id, channel, to_number, from_number, body, kind, entity_type, entity_id,
-              status, error, provider_sid, sent_at
-       FROM message_logs
-       ${whereSql}
-       ORDER BY sent_at DESC
+      `SELECT m.id, m.channel, m.to_number, m.from_number, m.body, m.kind, m.entity_type, m.entity_id,
+              m.status, m.error, m.provider_sid, m.sent_at, m.direction, m.provider, m.delivery_status
+       FROM message_logs m
+       ${w.where}
+       ORDER BY m.sent_at DESC
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     ),
-    queryCount(`SELECT COUNT(*) FROM message_logs ${whereSql}`, params.slice(0, params.length - 2)),
+    cappedCount(entity, q, LOG_COUNT_CAP),
   ])
 
-  return NextResponse.json({ rows, total, page, pageSize })
+  return NextResponse.json({ rows, total: counted.count, capped: counted.capped, window, page, pageSize })
 }

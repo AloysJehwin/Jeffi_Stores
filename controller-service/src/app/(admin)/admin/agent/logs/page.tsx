@@ -4,6 +4,10 @@ import { useState } from 'react'
 import { Bot, RefreshCw, CheckCircle2, XCircle } from 'lucide-react'
 import { PageHeader } from '@/components/admin/kit/layout'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
+import { AGENT_LOG_FIELDS } from '@/lib/filters/fields/agent'
+import { LOG_COUNT_CAP } from '@/lib/filters/fields/audit'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface ToolLogMessage {
   id: string
@@ -26,13 +30,20 @@ function relTime(iso: string) {
 
 export default function AgentLogsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const canExport = useCanWrite('agent')
+  // The filters live in the URL; without dates the log shows its last 30 days.
+  const filters = useFilterQuery(AGENT_LOG_FIELDS, { search: false })
+  const [meta, setMeta] = useState<{ window: { days: number } | null; capped: boolean } | null>(null)
   const list = useInfiniteList<ToolLogMessage>({
-    key: 'tool-logs',
+    key: filters,
     pageSize: 50,
     getKey: m => m.id,
     fetchPage: async (p, signal) => {
-      const qs = new URLSearchParams({ page: String(p), pageSize: '50' })
+      const qs = new URLSearchParams(filters)
+      qs.set('page', String(p))
+      qs.set('pageSize', '50')
       const data = await fetchJson(`/api/admin/agent/tool-logs?${qs.toString()}`, signal)
+      if (p === 1) setMeta({ window: data?.window ?? null, capped: !!data?.capped })
       return { rows: data.messages || [], total: data.total || 0 }
     },
   })
@@ -57,6 +68,16 @@ export default function AgentLogsPage() {
         </button>
       </div>
 
+      <ListFilters entity="agent.actions" fields={AGENT_LOG_FIELDS} noun="Responses" exportable={canExport} />
+      {(meta?.window || meta?.capped) && (
+        <p className="text-xs text-foreground-muted">
+          {meta.window ? `Showing the last ${meta.window.days} days. Pick dates to see older tool calls.` : ''}
+          {meta.capped
+            ? ` Over ${LOG_COUNT_CAP.toLocaleString('en-IN')} responses match; narrow the filters to count them all.`
+            : ''}
+        </p>
+      )}
+
       {loading && toolLogs.length === 0 ? (
         <div className="space-y-2 animate-pulse">
           {[...Array(8)].map((_, i) => (
@@ -79,7 +100,13 @@ export default function AgentLogsPage() {
           ))}
         </div>
       ) : toolLogs.length === 0 ? (
-        <p className="text-sm text-foreground-muted italic">No tool calls logged yet.</p>
+        <p className="text-sm text-foreground-muted italic">
+          {filters
+            ? 'No tool calls match these filters.'
+            : meta?.window
+              ? `No tool calls in the last ${meta.window.days} days.`
+              : 'No tool calls logged yet.'}
+        </p>
       ) : (
         <>
           <div className="space-y-2">

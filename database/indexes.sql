@@ -115,6 +115,14 @@ CREATE INDEX idx_admin_audit_admin_created ON public.admin_audit_log USING btree
 
 
 --
+-- Name: idx_admin_audit_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON public.admin_audit_log USING btree (created_at DESC);
+
+
+
+--
 -- Name: idx_admin_audit_entity; Type: INDEX; Schema: public; Owner: -
 --
 
