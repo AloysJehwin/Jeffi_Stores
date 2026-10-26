@@ -1,16 +1,20 @@
 import { Suspense } from 'react'
+import { canonicalQuery, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
+import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { headers } from 'next/headers'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryCount } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
+import { getCouponsSummary, queryCoupons } from '@/lib/queries/coupons'
+import { COUPONS_ENTITY } from '@/lib/filters/entities/coupons'
+import { COUPON_ALIASES, COUPON_FIELDS, COUPON_SEARCH } from '@/lib/filters/fields/coupons'
 import CouponsTable, { type CouponRow } from './_components/CouponsTable'
-import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import { resolveListTab } from '@/lib/overviews/marketing'
 import OverviewTabs from './_components/OverviewTabs'
 import CouponsOverview from './_components/CouponsOverview'
 
@@ -19,73 +23,14 @@ export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-const COUPON_SORT_COLS: Record<string, string> = {
-  code: 'code',
-  type: 'discount_type',
-  value: 'discount_value',
-  min_purchase: 'min_purchase_amount',
-  usage: 'times_used',
-  valid_until: 'valid_until',
-  status: 'is_active',
-}
+type SP = { [key: string]: string | undefined }
 
-async function getFilteredCoupons(filters: {
-  is_active?: string
-  search?: string
-  campaign?: string
-  page?: number
-  sort?: string
-  dir?: string
-}) {
-  const conditions: string[] = []
-  const params: unknown[] = []
-  let i = 1
-
-  // Never-published drafts live only in the Drafts section, never the live list.
-  conditions.push(`is_draft = false`)
-
-  if (filters.is_active === 'true' || filters.is_active === 'false') {
-    conditions.push(`is_active = $${i++}`)
-    params.push(filters.is_active === 'true')
-  }
-  if (filters.search) {
-    conditions.push(`(code ILIKE $${i} OR description ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
-  }
-  if (filters.campaign === '__manual__') {
-    conditions.push(`(auto_generated = false OR auto_generated IS NULL)`)
-  } else if (filters.campaign) {
-    conditions.push(`generated_for_campaign = $${i++}`)
-    params.push(filters.campaign)
-  }
-
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  const limit = PAGE_SIZE
-  const offset = ((filters.page || 1) - 1) * limit
-
-  const safeCol = filters.sort && COUPON_SORT_COLS[filters.sort] ? COUPON_SORT_COLS[filters.sort] : 'created_at'
-  const safeDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
-  const orderBy = `ORDER BY ${safeCol} ${safeDir}`
-
-  const [coupons, total] = await Promise.all([
-    queryMany(`SELECT * FROM coupons ${where} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`, [...params, limit, offset]),
-    queryCount(`SELECT COUNT(*) FROM coupons ${where}`, params),
-  ])
-
-  return { coupons, total }
-}
-
-const LIST_KEYS = ['is_active', 'search', 'campaign', 'page', 'sort', 'dir'] as const
-
-export default async function CouponsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | undefined }>
-}) {
+export default async function CouponsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams
-  const tab = resolveListTab(sp, LIST_KEYS)
+  const tab = isListUrl(sp, COUPON_FIELDS, { aliases: COUPON_ALIASES }) ? 'list' : 'overview'
   const host = await getHost()
+  const href = (t: string) => ap(tabHref('/admin/coupons', t, sp, COUPON_FIELDS, { aliases: COUPON_ALIASES }), host)
+  const q = normalizeQuery(COUPONS_ENTITY, sp)
   return (
     <PageBody>
       <PageHeader title="Coupons" description="Manage discount coupons" />
@@ -95,6 +40,7 @@ export default async function CouponsPage({
         active={tab}
         sp={sp}
         listLabel="Coupons"
+        hrefs={{ overview: href('overview'), list: href('list') }}
         actions={
           <Suspense fallback={null}>
             <AddCouponButton />
@@ -108,34 +54,21 @@ export default async function CouponsPage({
         </Suspense>
       ) : (
         <>
-          <Suspense fallback={<KpiRowSkeleton />}>
-            <CouponsStats />
+          <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
+            <CouponsStats q={q} />
           </Suspense>
 
-          <DataToolbar
-            search={{ placeholder: 'Search by code or description...', param: 'search', suggestType: 'coupons' }}
-            filters={[
-              {
-                name: 'is_active',
-                label: 'Status',
-                options: [
-                  { value: 'true', label: 'Active' },
-                  { value: 'false', label: 'Inactive' },
-                ],
-              },
-              {
-                name: 'campaign',
-                label: 'Source',
-                options: [
-                  { value: '__manual__', label: 'Manual' },
-                  { value: 'winback_90', label: 'Winback 90d' },
-                  { value: 'winback_180', label: 'Winback 180d' },
-                ],
-              },
-            ]}
+          <ListFilters
+            entity="coupons"
+            fields={COUPON_FIELDS}
+            aliases={COUPON_ALIASES}
+            search={COUPON_SEARCH}
+            noun="Coupons"
+            tab="list"
+            exportable
           />
 
-          <CouponsListSection searchParams={searchParams} />
+          <CouponsListSection resolvedSearchParams={sp} />
         </>
       )}
     </PageBody>
@@ -162,14 +95,15 @@ async function AddCouponButton() {
   return <TabAction href={ap('/admin/coupons/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Coupon" />
 }
 
-async function CouponsStats() {
+/** KPIs over every coupon the filters match (not just the page shown). */
+async function CouponsStats({ q }: { q: FilterQuery }) {
   const host = await getHost()
   const h = await headers()
   const role = h.get('x-user-role') || ''
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'coupons:write')
-  const [allStats, editDrafts, createDrafts] = await Promise.all([
-    getFilteredCoupons({}),
+  const [summary, editDrafts, createDrafts] = await Promise.all([
+    getCouponsSummary(q),
     // Edit-drafts: unpublished CHANGES staged against a live coupon (coupon_drafts).
     queryMany<{ coupon_id: string; code: string; updated_at: string }>(
       `SELECT cd.coupon_id, c.code, cd.updated_at
@@ -189,12 +123,7 @@ async function CouponsStats() {
   const pendingDrafts = editDrafts
   const pendingDraftsCount = editDrafts.length + createDrafts.length
 
-  const totalCoupons = allStats.total
-  const activeCoupons = (allStats.coupons as { is_active: boolean }[]).filter(c => c.is_active).length
-  const expiredCoupons = (allStats.coupons as { valid_until: string | null; is_active: boolean }[]).filter(
-    c => c.valid_until && new Date(c.valid_until) < new Date()
-  ).length
-  const campaignCoupons = (allStats.coupons as { auto_generated: boolean }[]).filter(c => c.auto_generated).length
+  const { total: totalCoupons, active: activeCoupons, expired: expiredCoupons, campaign: campaignCoupons } = summary
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -279,11 +208,9 @@ async function CouponsStats() {
   )
 }
 
-// Resolves searchParams (no DB — near-instant) then keys the table Suspense
-// on the query string so filter/pagination changes re-trigger the shimmer
+// Keys the table Suspense on the query string so filter/pagination changes re-trigger the shimmer
 // while the stats + filters above stay mounted.
-async function CouponsListSection({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
-  const resolvedSearchParams = await searchParams
+function CouponsListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
@@ -292,30 +219,16 @@ async function CouponsListSection({ searchParams }: { searchParams: Promise<{ [k
   )
 }
 
-async function CouponsListContent({
-  resolvedSearchParams,
-}: {
-  resolvedSearchParams: { [key: string]: string | undefined }
-}) {
+async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
-  const campaign = resolvedSearchParams.campaign
+  const q = normalizeQuery(COUPONS_ENTITY, resolvedSearchParams)
 
-  const { coupons, total } = await getFilteredCoupons({
-    is_active: resolvedSearchParams.is_active,
-    search: resolvedSearchParams.search,
-    campaign,
-    page,
-    sort,
-    dir,
-  })
+  const { coupons, total } = await queryCoupons(q, { page, limit: PAGE_SIZE, sort, dir })
 
   const currentListUrl = (() => {
-    const params = new URLSearchParams({ tab: 'list' })
-    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (campaign) params.set('campaign', campaign)
+    const params = new URLSearchParams(`tab=list&${canonicalQuery(q, COUPON_FIELDS)}`)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (page > 1) params.set('page', String(page))
@@ -328,7 +241,7 @@ async function CouponsListContent({
       total={total}
       page={page}
       pageSize={PAGE_SIZE}
-      query={{ is_active: resolvedSearchParams.is_active, search: resolvedSearchParams.search, campaign, sort, dir }}
+      query={{ ...q, sort, dir }}
       backUrl={currentListUrl}
     />
   )

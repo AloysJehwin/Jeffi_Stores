@@ -1,6 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import type { FilterField } from '@jeffi/list-filters/client'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { PRODUCT_SEARCH } from '@/lib/filters/fields/products'
 import { ap } from '@/lib/shared/admin-path'
 import { AttentionList } from '@/components/admin/overview/kit'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, count, money, pct, when } from '@/components/admin/channels/ui'
@@ -89,9 +92,19 @@ const bucketLabel = (b: string, bucket: ProductsOverviewData['bucket']) =>
     ? new Date(b).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })
     : new Date(b).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
-export default function ProductsOverview() {
+/** Sales, views and catalogue health for the products the list's filters match. */
+export default function ProductsOverview({ fields }: { fields: FilterField[] }) {
+  const query = useFilterQuery(fields)
   return (
-    <OverviewFrame<ProductsOverviewData> endpoint="/api/admin/products/overview">{d => <Body d={d} />}</OverviewFrame>
+    <OverviewFrame<ProductsOverviewData>
+      endpoint="/api/admin/products/overview"
+      query={query}
+      filters={
+        <ListFilters entity="products" fields={fields} search={PRODUCT_SEARCH} period noun="Products" tab="overview" />
+      }
+    >
+      {d => <Body d={d} />}
+    </OverviewFrame>
   )
 }
 

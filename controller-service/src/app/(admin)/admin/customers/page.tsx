@@ -1,14 +1,17 @@
 import { Suspense } from 'react'
+import { canonicalQuery, filterScope, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
-import { getCustomers, getCustomerStats, getCustomerSegments, getCustomerChannelMix } from '@/lib/queries'
+import { isListUrl, tabHref } from '@/lib/admin/filter-url'
+import { getCustomerChannelMix, getCustomerSegments, getCustomersSummary, queryCustomers } from '@/lib/queries'
+import { CUSTOMERS_ENTITY } from '@/lib/filters/entities/customers'
+import { CUSTOMER_FIELDS, CUSTOMER_SEARCH } from '@/lib/filters/fields/customers'
 import CustomersTable from './_components/CustomersTable'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import CustomerEngagementChart from '@/components/admin/CustomerEngagementChart'
 import CustomersOverview from './_components/CustomersOverview'
 import OverviewTabs from '../coupons/_components/OverviewTabs'
-import { resolveListTab } from '@/lib/overviews/marketing'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -17,11 +20,13 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function CustomersStats() {
+/** KPIs and the engagement chart over every customer the filters match. */
+async function CustomersStats({ q }: { q: FilterQuery }) {
+  const scope = filterScope(CUSTOMERS_ENTITY, q)
   const [stats, segments, channelMix] = await Promise.all([
-    getCustomerStats(),
-    getCustomerSegments(),
-    getCustomerChannelMix(),
+    getCustomersSummary(q),
+    getCustomerSegments(scope),
+    getCustomerChannelMix(scope),
   ])
 
   return (
@@ -37,17 +42,23 @@ async function CustomersStats() {
   )
 }
 
-const LIST_KEYS = ['status', 'segment', 'health', 'tag', 'search', 'page', 'sort', 'dir'] as const
-
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams
-  const tab = resolveListTab(sp, LIST_KEYS)
+  const tab = isListUrl(sp, CUSTOMER_FIELDS) ? 'list' : 'overview'
   const host = await getHost()
+  const href = (t: string) => ap(tabHref('/admin/customers', t, sp, CUSTOMER_FIELDS), host)
+  const q = normalizeQuery(CUSTOMERS_ENTITY, sp)
   return (
     <PageBody>
       <PageHeader title="Customers" description="View and manage customer accounts" />
 
-      <OverviewTabs basePath={ap('/admin/customers', host)} active={tab} sp={sp} listLabel="Customers" />
+      <OverviewTabs
+        basePath={ap('/admin/customers', host)}
+        active={tab}
+        sp={sp}
+        listLabel="Customers"
+        hrefs={{ overview: href('overview'), list: href('list') }}
+      />
 
       {tab === 'overview' ? (
         <Suspense fallback={null}>
@@ -55,51 +66,20 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         </Suspense>
       ) : (
         <>
-          <Suspense fallback={<KpiRowSkeleton />}>
-            <CustomersStats />
+          <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
+            <CustomersStats q={q} />
           </Suspense>
 
-          <DataToolbar
-            search={{ placeholder: 'Search by name, email or phone...', param: 'search', suggestType: 'customers' }}
-            filters={[
-              {
-                name: 'status',
-                label: 'Status',
-                options: [
-                  { value: 'active', label: 'Active' },
-                  { value: 'inactive', label: 'Inactive' },
-                  { value: 'flagged', label: 'Flagged' },
-                ],
-              },
-              {
-                name: 'segment',
-                label: 'Segment',
-                options: [
-                  { value: 'vip', label: 'VIP (₹50k+)' },
-                  { value: 'loyal', label: 'Loyal' },
-                  { value: 'repeat', label: 'Repeat (3+)' },
-                  { value: 'one_time', label: 'One-time' },
-                  { value: 'new', label: 'New (<30d)' },
-                  { value: 'at_risk', label: 'At Risk (90-180d)' },
-                  { value: 'dormant', label: 'Dormant (180d+)' },
-                  { value: 'b2b', label: 'B2B' },
-                  { value: 'lead', label: 'Lead (no orders)' },
-                ],
-              },
-              {
-                name: 'health',
-                label: 'Health',
-                options: [
-                  { value: 'healthy', label: 'Healthy (≥70)' },
-                  { value: 'at_risk', label: 'At Risk (40-69)' },
-                  { value: 'critical', label: 'Critical (<40)' },
-                  { value: 'unknown', label: 'Not scored' },
-                ],
-              },
-            ]}
+          <ListFilters
+            entity="customers"
+            fields={CUSTOMER_FIELDS}
+            search={CUSTOMER_SEARCH}
+            noun="Customers"
+            tab="list"
+            exportable
           />
 
-          <CustomersListSection searchParams={searchParams} />
+          <CustomersListSection resolvedSearchParams={sp} />
         </>
       )}
     </PageBody>
@@ -116,11 +96,9 @@ function KpiRowSkeleton() {
   )
 }
 
-// Resolves searchParams (no DB — near-instant) then keys the table Suspense
-// on the query string so filter/pagination changes re-trigger the shimmer
+// Keys the table Suspense on the query string so filter/pagination changes re-trigger the shimmer
 // while the stats + filters above stay mounted.
-async function CustomersListSection({ searchParams }: { searchParams: Promise<SP> }) {
-  const resolvedSearchParams = await searchParams
+function CustomersListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
@@ -133,36 +111,16 @@ async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchPa
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
+  const q = normalizeQuery(CUSTOMERS_ENTITY, resolvedSearchParams)
 
-  const { customers, total } = await getCustomers({
-    search: resolvedSearchParams.search,
-    status: resolvedSearchParams.status,
-    segment: resolvedSearchParams.segment,
-    tag: resolvedSearchParams.tag,
-    health: resolvedSearchParams.health,
-    page,
-    limit: PAGE_SIZE,
-    sort,
-    dir,
-  })
-
-  const query = {
-    status: resolvedSearchParams.status,
-    search: resolvedSearchParams.search,
-    segment: resolvedSearchParams.segment,
-    tag: resolvedSearchParams.tag,
-    health: resolvedSearchParams.health,
-    sort,
-    dir,
-  }
+  const { customers, total } = await queryCustomers(q, { page, limit: PAGE_SIZE, sort, dir })
 
   const currentListUrl = (() => {
-    const params = new URLSearchParams({ tab: 'list' })
-    for (const k of ['status', 'search', 'segment', 'tag', 'health', 'sort', 'dir'] as const)
-      if (query[k]) params.set(k, query[k]!)
+    const params = new URLSearchParams(`tab=list&${canonicalQuery(q, CUSTOMER_FIELDS)}`)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
     if (page > 1) params.set('page', String(page))
-    const qs = params.toString()
-    return `/admin/customers${qs ? `?${qs}` : ''}`
+    return `/admin/customers?${params}`
   })()
 
   return (
@@ -171,7 +129,7 @@ async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchPa
       total={total}
       page={page}
       pageSize={PAGE_SIZE}
-      query={query}
+      query={{ ...q, sort, dir }}
       backUrl={currentListUrl}
     />
   )

@@ -20,6 +20,8 @@ export {
   getBrandsWithProducts,
   getFilteredProducts,
   getFilteredCategories,
+  getProductsSummary,
+  getFeaturedProductCount,
 } from './catalog'
 export {
   getBrochureProductsByCategories,
@@ -29,7 +31,7 @@ export {
 } from './brochure'
 export { getAllOrders, getFilteredOrders, queryOrders, getOrdersSummary, getRecentOrders, getOrder, getReturnRequest } from './orders'
 export type { OrdersSummary } from './orders'
-export { getCustomers, getCustomerById } from './customers'
+export { getCustomers, queryCustomers, getCustomersSummary, getCustomerById } from './customers'
 export { getDashboardStats, getDashboardMetrics, getDashboardAnalytics, type DashboardAnalytics } from './dashboard'
 export {
   getRevenueTrendBySource,

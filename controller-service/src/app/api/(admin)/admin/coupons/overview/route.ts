@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { canonicalQuery, filterScope, normalizeQuery } from '@jeffi/list-filters'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, parsePeriod, previousPeriod } from '@/lib/overview/period'
 import { byPeriod, num, periodArgs, str } from '@/lib/overviews/marketing'
+import { bindScope } from '@/lib/overview/filter-scope'
+import { COUPONS_ENTITY } from '@/lib/filters/entities/coupons'
+import { COUPON_FIELDS } from '@/lib/filters/fields/coupons'
 import {
-  EXPIRING_SQL,
-  KPI_SQL,
-  SOURCE_SQL,
-  STATE_SQL,
-  TOP_SQL,
-  UNUSED_SQL,
   couponAttention,
+  expiringSql,
+  kpiSql,
   seriesSql,
+  sourceSql,
+  stateSql,
+  topSql,
+  unusedSql,
   toState,
   toTopCoupon,
   toTotals,
@@ -29,15 +33,21 @@ export async function GET(request: NextRequest) {
   const bucket = bucketFor(period)
   const args = periodArgs(period, previous)
 
+  // The list's filters (not its created date: the period owns from/to), after each query's own args.
+  const q = normalizeQuery(COUPONS_ENTITY, sp)
+  const scope = filterScope(COUPONS_ENTITY, q, { omit: ['created'] })
+  const fa = bindScope(scope, args.length + 1)
+  const f1 = bindScope(scope, 1)
+
   try {
     const [kpis, series, top, sources, state, expiring, unused] = await Promise.all([
-      queryMany<Record<string, unknown>>(KPI_SQL, args),
-      queryMany<Record<string, unknown>>(seriesSql(bucket), args),
-      queryMany<Record<string, unknown>>(TOP_SQL, args),
-      queryMany<Record<string, unknown>>(SOURCE_SQL, args),
-      queryOne<Record<string, unknown>>(STATE_SQL),
-      queryMany<Record<string, unknown>>(EXPIRING_SQL),
-      queryMany<Record<string, unknown>>(UNUSED_SQL),
+      queryMany<Record<string, unknown>>(kpiSql(fa), [...args, ...fa.params]),
+      queryMany<Record<string, unknown>>(seriesSql(bucket, fa), [...args, ...fa.params]),
+      queryMany<Record<string, unknown>>(topSql(fa), [...args, ...fa.params]),
+      queryMany<Record<string, unknown>>(sourceSql(fa), [...args, ...fa.params]),
+      queryOne<Record<string, unknown>>(stateSql(f1), f1.params),
+      queryMany<Record<string, unknown>>(expiringSql(f1), f1.params),
+      queryMany<Record<string, unknown>>(unusedSql(f1), f1.params),
     ])
     const totals = byPeriod(kpis, toTotals)
     const st = toState(state ?? undefined)
@@ -68,7 +78,8 @@ export async function GET(request: NextRequest) {
         created_at: r.created_at,
         valid_until: r.valid_until,
       })),
-      attention: couponAttention(st, totals.current),
+      filtered: !scope.empty,
+      attention: couponAttention(st, totals.current, canonicalQuery(q, COUPON_FIELDS, { omit: ['from', 'to'] })),
     })
   } catch (err) {
     console.error('[coupons/overview]', err)

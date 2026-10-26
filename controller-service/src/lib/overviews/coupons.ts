@@ -1,16 +1,18 @@
 import type { AttentionItem } from '@/lib/overview/attention'
 import type { Bucket } from '@/lib/overview/period'
 import { ratio } from '@/lib/overview/period'
+import { NO_SCOPE, filteredHref, type BoundScope } from '@/lib/overview/filter-scope'
 import { BOUNDS, bucketsCte, inBucket, num, numOrNull, periodCase, realized, str } from './marketing'
 
 // Coupon redemptions come from coupon_usage; revenue counts only realized orders (CRM rule).
+// `f` carries the list's filters onto coupon ids; store-wide order totals stay unscoped.
 
-export const KPI_SQL = `
+export const kpiSql = (f: BoundScope = NO_SCOPE) => `
 WITH ${BOUNDS},
 u AS (
   SELECT cu.*, ${periodCase('cu.created_at')} AS period
     FROM coupon_usage cu, b
-   WHERE cu.created_at >= b.p0 AND cu.created_at < b.c1
+   WHERE cu.created_at >= b.p0 AND cu.created_at < b.c1${f.ids('cu.coupon_id')}
 ),
 ord AS (
   SELECT DISTINCT u.period, o.id, o.total_amount
@@ -30,20 +32,21 @@ SELECT p.period,
           AND o.created_at >= b.p0 AND o.created_at < b.c1) AS all_revenue
   FROM (VALUES ('cur'), ('prev')) p(period), b
 `
+export const KPI_SQL = kpiSql()
 
-export const seriesSql = (bucket: Bucket) => `
+export const seriesSql = (bucket: Bucket, f: BoundScope = NO_SCOPE) => `
 WITH ${BOUNDS}, ${bucketsCte(bucket)}
 SELECT to_char(k.bucket, 'YYYY-MM-DD') AS label,
        COUNT(cu.id) AS redemptions,
        COALESCE(SUM(cu.discount_amount), 0) AS discount
   FROM k CROSS JOIN b
-  LEFT JOIN coupon_usage cu ON cu.created_at >= b.c0 AND cu.created_at < b.c1 AND ${inBucket('cu.created_at', bucket)}
+  LEFT JOIN coupon_usage cu ON cu.created_at >= b.c0 AND cu.created_at < b.c1 AND ${inBucket('cu.created_at', bucket)}${f.ids('cu.coupon_id')}
  GROUP BY k.bucket ORDER BY k.bucket
 `
 
-export const TOP_SQL = `
+export const topSql = (f: BoundScope = NO_SCOPE) => `
 WITH ${BOUNDS},
-u AS (SELECT cu.* FROM coupon_usage cu, b WHERE cu.created_at >= b.c0 AND cu.created_at < b.c1)
+u AS (SELECT cu.* FROM coupon_usage cu, b WHERE cu.created_at >= b.c0 AND cu.created_at < b.c1${f.ids('cu.coupon_id')})
 SELECT c.id, c.code, c.discount_type, c.discount_value, c.auto_generated, c.generated_for_campaign,
        COUNT(u.id) AS redemptions,
        COUNT(DISTINCT u.user_id) AS customers,
@@ -55,19 +58,21 @@ SELECT c.id, c.code, c.discount_type, c.discount_value, c.auto_generated, c.gene
  ORDER BY redemptions DESC, discount DESC
  LIMIT 10
 `
+export const TOP_SQL = topSql()
 
-export const SOURCE_SQL = `
+export const sourceSql = (f: BoundScope = NO_SCOPE) => `
 WITH ${BOUNDS}
 SELECT COALESCE(NULLIF(c.generated_for_campaign, ''), CASE WHEN c.auto_generated THEN 'auto' ELSE 'manual' END) AS source,
        COUNT(cu.id) AS redemptions,
        COALESCE(SUM(cu.discount_amount), 0) AS discount
   FROM coupon_usage cu JOIN coupons c ON c.id = cu.coupon_id, b
- WHERE cu.created_at >= b.c0 AND cu.created_at < b.c1
+ WHERE cu.created_at >= b.c0 AND cu.created_at < b.c1${f.ids('cu.coupon_id')}
  GROUP BY 1 ORDER BY redemptions DESC
 `
+export const SOURCE_SQL = sourceSql()
 
 // Live state, not period-bound. Personal auto-generated coupons are left out of the "unused" list.
-export const STATE_SQL = `
+export const stateSql = (f: BoundScope = NO_SCOPE) => `
 SELECT COUNT(*) FILTER (WHERE is_active AND NOT is_draft AND (valid_until IS NULL OR valid_until > NOW())) AS active,
        COUNT(*) FILTER (WHERE is_draft) AS drafts,
        COUNT(*) FILTER (WHERE is_active AND NOT is_draft AND valid_until > NOW() AND valid_until <= NOW() + INTERVAL '7 days') AS expiring,
@@ -77,23 +82,26 @@ SELECT COUNT(*) FILTER (WHERE is_active AND NOT is_draft AND (valid_until IS NUL
                           AND times_used >= usage_limit * 0.8) AS near_limit,
        COUNT(*) FILTER (WHERE is_active AND NOT is_draft AND NOT COALESCE(auto_generated, false) AND times_used = 0
                           AND created_at < NOW() - INTERVAL '14 days' AND (valid_until IS NULL OR valid_until > NOW())) AS unused
-  FROM coupons
+  FROM coupons${f.ids('id') ? ` WHERE TRUE${f.ids('id')}` : ''}
 `
+export const STATE_SQL = stateSql()
 
-export const EXPIRING_SQL = `
+export const expiringSql = (f: BoundScope = NO_SCOPE) => `
 SELECT id, code, valid_until, times_used, usage_limit
   FROM coupons
- WHERE is_active AND NOT is_draft AND valid_until > NOW() AND valid_until <= NOW() + INTERVAL '7 days'
+ WHERE is_active AND NOT is_draft AND valid_until > NOW() AND valid_until <= NOW() + INTERVAL '7 days'${f.ids('id')}
  ORDER BY valid_until LIMIT 8
 `
+export const EXPIRING_SQL = expiringSql()
 
-export const UNUSED_SQL = `
+export const unusedSql = (f: BoundScope = NO_SCOPE) => `
 SELECT id, code, created_at, valid_until, discount_type, discount_value
   FROM coupons
  WHERE is_active AND NOT is_draft AND NOT COALESCE(auto_generated, false) AND times_used = 0
-   AND created_at < NOW() - INTERVAL '14 days' AND (valid_until IS NULL OR valid_until > NOW())
+   AND created_at < NOW() - INTERVAL '14 days' AND (valid_until IS NULL OR valid_until > NOW())${f.ids('id')}
  ORDER BY created_at LIMIT 8
 `
+export const UNUSED_SQL = unusedSql()
 
 export interface CouponTotals {
   redemptions: number
@@ -166,9 +174,10 @@ export const toTopCoupon = (r: Record<string, unknown>) => ({
 /** Above this share of gross price given away, coupons are flagged. */
 export const HIGH_DISCOUNT_RATE = 0.2
 
-export function couponAttention(state: CouponState, cur: CouponTotals): AttentionItem[] {
+/** `query`: the list's canonical filters, carried into the links. */
+export function couponAttention(state: CouponState, cur: CouponTotals, query = ''): AttentionItem[] {
   const out: AttentionItem[] = []
-  const list = '/admin/coupons?tab=list&is_active=true'
+  const list = filteredHref('/admin/coupons', { tab: 'list', is_active: 'true' }, query)
   if (state.exhausted)
     out.push({
       key: 'exhausted',
@@ -197,7 +206,7 @@ export function couponAttention(state: CouponState, cur: CouponTotals): Attentio
       severity: 'warning',
       title: `Coupons gave away ${(cur.discount_rate * 100).toFixed(1)}% of the price on coupon orders`,
       sub: 'Check the high-value coupons in the top list.',
-      href: '/admin/coupons?tab=list',
+      href: filteredHref('/admin/coupons', { tab: 'list' }, query),
     })
   if (state.unused)
     out.push({
