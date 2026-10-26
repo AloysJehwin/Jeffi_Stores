@@ -1,30 +1,36 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
-import AdminTypeahead from '@/components/admin/AdminTypeahead'
-import AdminSelect from '@/components/admin/AdminSelect'
+import { useSearchParams } from 'next/navigation'
+import { canonicalQuery } from '@jeffi/list-filters/client'
 import { ap } from '@/lib/shared/admin-path'
+import { ListFilters } from '@/components/admin/kit/list-filters'
+import { SUPPLIER_FIELDS, SUPPLIER_SEARCH } from '@/lib/filters/fields/suppliers'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { DataTable, type DataCol } from '@/components/admin/kit/data-table'
 import { fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { StatusBadge, ACTIVE_STATUS } from '@/components/admin/kit/status'
 import SuppliersMobileList from './SuppliersMobileList'
-import { labelCls, PAGE_SIZE, type Supplier } from '@/components/admin/purchasing/shared'
+import { PAGE_SIZE, type Supplier } from '@/components/admin/purchasing/shared'
 
 export default function SuppliersTab() {
   const canWriteSuppliers = useCanWrite('inventory')
-  const [search, setSearch] = useState('')
-  const [showAll, setShowAll] = useState(false)
+  // The list's filters from the URL; all=true so no Status choice means every supplier.
+  const sp = useSearchParams()
+  const query = canonicalQuery(sp, SUPPLIER_FIELDS)
+  const q = new URLSearchParams(query)
+  const search = q.get('search') || ''
+  const active = q.get('active')
 
   const list = useInfiniteList<Supplier>({
-    key: `${search}|${showAll}`,
+    key: query,
     pageSize: PAGE_SIZE,
     getKey: s => s.id,
     fetchPage: async (pg, signal) => {
-      const params = new URLSearchParams({ page: String(pg), limit: String(PAGE_SIZE) })
-      if (search) params.set('search', search)
-      if (showAll) params.set('all', 'true')
+      const params = new URLSearchParams(query)
+      params.set('all', 'true')
+      params.set('page', String(pg))
+      params.set('limit', String(PAGE_SIZE))
       const json = await fetchJson(`/api/admin/inventory/suppliers?${params}`, signal)
       return { rows: json?.suppliers || [], total: json?.total || 0 }
     },
@@ -38,7 +44,8 @@ export default function SuppliersTab() {
       body: JSON.stringify({ is_active: !s.is_active }),
     })
     if (!res.ok) return
-    if (!showAll && s.is_active) list.setRows(rows => rows.filter(r => r.id !== s.id))
+    // A row that no longer matches the Status filter leaves the list.
+    if (active === String(s.is_active)) list.setRows(rows => rows.filter(r => r.id !== s.id))
     else list.setRows(rows => rows.map(r => (r.id === s.id ? { ...r, is_active: !s.is_active } : r)))
   }
 
@@ -64,30 +71,7 @@ export default function SuppliersTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex-1 min-w-[200px]">
-          <label className={labelCls}>Search suppliers</label>
-          <AdminTypeahead
-            type="suppliers"
-            value={search}
-            onChange={setSearch}
-            placeholder="Name, GSTIN, contact..."
-            inputClassName="w-full field-sm pr-9 bg-surface border border-border-secondary text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
-          />
-        </div>
-        <div className="flex flex-col">
-          <AdminSelect
-            label="Status"
-            value={showAll ? 'all' : 'active'}
-            onChange={v => setShowAll(v === 'all')}
-            options={[
-              { value: 'active', label: 'Active only' },
-              { value: 'all', label: 'Show inactive' },
-            ]}
-            sm
-          />
-        </div>
-      </div>
+      <ListFilters entity="suppliers" fields={SUPPLIER_FIELDS} search={SUPPLIER_SEARCH} noun="Suppliers" tab="suppliers" exportable />
 
       {/* Pages of PAGE_SIZE load on scroll; column sort applies to the loaded rows. */}
       <DataTable<Supplier>

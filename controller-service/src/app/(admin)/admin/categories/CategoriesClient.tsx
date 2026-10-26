@@ -566,12 +566,15 @@ export default function CategoriesClient({
   productCounts = {},
   initialSearch = '',
   initialType = '',
+  filtered = false,
   backUrl = '/admin/categories',
 }: {
   initialCategories: Category[]
   productCounts?: Record<string, number>
   initialSearch?: string
   initialType?: string
+  /** Only some categories are loaded: reordering would renumber them against the hidden ones. */
+  filtered?: boolean
   backUrl?: string
 }) {
   const [categories, setCategories] = useState<Category[]>(initialCategories)
@@ -586,7 +589,7 @@ export default function CategoriesClient({
   const toast = useActionToast()
 
   const search = searchParams.get('search') || ''
-  const typeFilter = searchParams.get('type') || ''
+  const typeFilter = searchParams.get('level') || searchParams.get('type') || ''
   const PAGE_SIZE = 10
 
   useEffect(() => {
@@ -678,6 +681,10 @@ export default function CategoriesClient({
     const { active, over } = e
     setActiveId(null)
     if (!over || active.id === over.id) return
+    if (filtered) {
+      toast.error('Clear the filters to reorder categories')
+      return
+    }
 
     const activeId = active.id as string
     const overId = over.id as string

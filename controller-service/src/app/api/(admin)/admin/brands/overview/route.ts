@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { filterScope, normalizeQuery } from '@jeffi/list-filters'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { parsePeriod, previousPeriod } from '@/lib/overview/period'
 import { num, periodArgs } from '@/lib/overviews/catalog'
-import { classifyGroups, groupAttention, toGroupRow } from '@/lib/overviews/categories'
-import { BRANDS_SQL, UNBRANDED_SQL } from '@/lib/overviews/brands'
+import { classifyGroups, groupAttention, groupSql, toGroupRow } from '@/lib/overviews/categories'
+import { UNBRANDED_SQL } from '@/lib/overviews/brands'
+import { BRANDS_ENTITY } from '@/lib/filters/entities/brands'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,9 +18,13 @@ export async function GET(request: NextRequest) {
   const period = parsePeriod(sp.get('from'), sp.get('to'))
   const previous = previousPeriod(period)
 
+  // The list's filters (not its created date: the period owns from / to); none leaves the SQL unchanged.
+  const q = normalizeQuery(BRANDS_ENTITY, sp)
+  const s5 = filterScope(BRANDS_ENTITY, q, { omit: ['created'] }).inIds('g.id', 5)
+
   try {
     const [raw, unassigned] = await Promise.all([
-      queryMany<Record<string, unknown>>(BRANDS_SQL, periodArgs(period, previous)),
+      queryMany<Record<string, unknown>>(groupSql('brand', s5.sql), [...periodArgs(period, previous), ...s5.params]),
       queryOne<Record<string, unknown>>(UNBRANDED_SQL),
     ])
     const rows = raw.map(toGroupRow)

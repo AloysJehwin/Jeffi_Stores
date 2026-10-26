@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne, query } from '@/lib/shared/db'
-import { buildSearchClause } from '@/lib/catalog/search'
+import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { SUPPLIERS_ENTITY } from '@/lib/filters/entities/suppliers'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
 const PostSchema = z.object({
@@ -31,42 +32,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
-    const includeInactive = searchParams.get('all') === 'true'
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = (page - 1) * limit
 
-    const conditions = ['1=1']
-    const params: any[] = []
-    let i = 1
+    // The list's filters; without ?all=true or a Status choice only active suppliers (PO pickers).
+    const sp = new URLSearchParams(searchParams)
+    if (sp.get('all') !== 'true' && !sp.has('active')) sp.set('active', 'true')
+    const w = buildWhere(SUPPLIERS_ENTITY, normalizeQuery(SUPPLIERS_ENTITY, sp))
 
-    if (!includeInactive) {
-      conditions.push('s.is_active = TRUE')
-    }
-    if (search) {
-      const sc = buildSearchClause(search, ['s.name', 's.gstin', 's.contact_name'], i)
-      conditions.push(sc.clause)
-      params.push(...sc.params)
-      i = sc.nextIdx
-    }
-
-    const where = conditions.join(' AND ')
-    const countRow = await queryOne<{ total: number }>(
-      `SELECT COUNT(DISTINCT s.id)::int AS total FROM suppliers s WHERE ${where}`,
-      params
-    )
+    const countRow = await queryOne<{ total: number }>(`SELECT COUNT(*)::int AS total FROM suppliers s ${w.where}`, w.params)
     const total = countRow?.total || 0
 
     const rows = await queryMany(
-      `SELECT s.*, COUNT(po.id)::int AS po_count
+      `SELECT s.*, (SELECT COUNT(*)::int FROM purchase_orders po WHERE po.supplier_id = s.id) AS po_count
        FROM suppliers s
-       LEFT JOIN purchase_orders po ON po.supplier_id = s.id
-       WHERE ${where}
-       GROUP BY s.id
+       ${w.where}
        ORDER BY s.name
-       LIMIT $${i} OFFSET $${i + 1}`,
-      [...params, limit, offset]
+       LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
+      [...w.params, limit, offset]
     )
 
     return NextResponse.json({ suppliers: rows || [], total, page, limit })

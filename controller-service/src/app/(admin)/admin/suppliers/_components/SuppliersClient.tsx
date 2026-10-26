@@ -1,10 +1,13 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import { canonicalQuery } from '@jeffi/list-filters/client'
 import { Plus } from 'lucide-react'
 import { TabAction, TabActionsHost, Tabs } from '@/components/admin/kit/core'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
+import { tabHref } from '@/lib/admin/filter-url'
+import { SUPPLIER_FIELDS, SUPPLIER_LIST_PRESET } from '@/lib/filters/fields/suppliers'
 import SuppliersOverview from './SuppliersOverview'
 import SuppliersTab from './SuppliersTab'
 
@@ -18,9 +21,14 @@ const TABS: { id: Tab; label: string }[] = [
 export default function SuppliersClient() {
   const sp = useSearchParams()
   const router = useRouter()
-  const tab: Tab = sp.get('tab') === 'suppliers' ? 'suppliers' : 'overview'
+  const listQuery = canonicalQuery(sp, SUPPLIER_FIELDS, { omit: ['from', 'to'] })
+  const tab: Tab = sp.get('tab') === 'suppliers' || (!sp.get('tab') && listQuery) ? 'suppliers' : 'overview'
 
-  const go = (t: Tab) => router.push(ap(`/admin/suppliers?tab=${t}`), { scroll: false })
+  // Tabs keep the filters; the list opens on active suppliers unless filters came along.
+  const go = (t: Tab) => {
+    const href = tabHref('/admin/suppliers', t, sp, SUPPLIER_FIELDS)
+    router.push(ap(t === 'suppliers' && !listQuery ? `${href}&${SUPPLIER_LIST_PRESET}` : href), { scroll: false })
+  }
 
   return (
     <TabActionsHost>

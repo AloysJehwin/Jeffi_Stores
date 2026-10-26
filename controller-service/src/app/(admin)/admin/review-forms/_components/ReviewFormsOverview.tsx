@@ -13,6 +13,8 @@ import { Badge, Banner, Kpi, KpiGrid, Section, Table, count, pct } from '@/compo
 import { delta } from '@/lib/overview/period'
 import type { ReviewFormState, ReviewFormTotals } from '@/lib/overviews/review-forms'
 import { ap } from '@/lib/shared/admin-path'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { REVIEW_FORM_FIELDS, REVIEW_FORM_SEARCH } from '@/lib/filters/fields/review-forms'
 
 interface Form {
   id: string
@@ -34,8 +36,10 @@ interface Data {
 
 export default function ReviewFormsOverview() {
   const [period, setPeriod] = usePeriod()
+  // Follows the list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(REVIEW_FORM_FIELDS, { omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/review-forms/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/review-forms/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
   const c = data?.current
   const p = data?.previous_totals
@@ -43,6 +47,14 @@ export default function ReviewFormsOverview() {
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="review_forms"
+        fields={REVIEW_FORM_FIELDS}
+        search={REVIEW_FORM_SEARCH}
+        noun="Forms"
+        tab="overview"
+        period
+      />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
         !error && <OverviewSkeleton />

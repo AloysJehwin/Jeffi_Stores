@@ -13,6 +13,8 @@ import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct } from '@/compon
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
+import { SUPPLIER_FIELDS, SUPPLIER_SEARCH } from '@/lib/filters/fields/suppliers'
 
 interface Data {
   kpis: OverviewKpi[]
@@ -46,13 +48,16 @@ const SERIES: SeriesDef[] = [
 
 export default function SuppliersOverview() {
   const [period, setPeriod] = usePeriod()
+  // Follows the Suppliers list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(SUPPLIER_FIELDS, { omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/suppliers/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/suppliers/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
 
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters entity="suppliers" fields={SUPPLIER_FIELDS} search={SUPPLIER_SEARCH} noun="Suppliers" tab="overview" period />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (
         !error && <OverviewSkeleton />

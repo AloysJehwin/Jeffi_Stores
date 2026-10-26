@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { filterScope, normalizeQuery, type ScopeSql } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { istDate } from '@/lib/channels/report-store'
 import { parsePeriod, previousPeriod } from '@/lib/reviews/overview-period'
+import { REVIEWS_ENTITY } from '@/lib/filters/entities/reviews'
 
 // IST day bounds: $1 previous-period start, $2 current start, $3 current end (inclusive day).
 const BOUNDS = `b AS (
@@ -24,19 +26,19 @@ export interface PeriodStats {
 }
 
 // All reviews up to period end, products with at least MIN_PRODUCT_REVIEWS.
-function productRanking(args: string[], dir: 'ASC' | 'DESC') {
+function productRanking(args: string[], dir: 'ASC' | 'DESC', scope: ScopeSql) {
   return queryMany<Record<string, unknown>>(
     `WITH ${BOUNDS}
      SELECT p.id, p.name, p.slug, COUNT(*) AS reviews,
             ROUND(AVG(pr.rating)::numeric, 2) AS avg_rating,
             COUNT(*) FILTER (WHERE pr.created_at >= b.c0) AS new_reviews
      FROM product_reviews pr JOIN products p ON p.id = pr.product_id, b
-     WHERE pr.created_at < b.c1
+     WHERE pr.created_at < b.c1${scope.sql}
      GROUP BY p.id
      HAVING COUNT(*) >= ${MIN_PRODUCT_REVIEWS}
      ORDER BY AVG(pr.rating) ${dir}, COUNT(*) DESC
      LIMIT 6`,
-    args
+    [...args, ...scope.params]
   )
 }
 
@@ -65,6 +67,12 @@ export async function GET(request: NextRequest) {
   const previous = previousPeriod(period)
   const args = [previous.from, period.from, period.to]
   const withForms = hasScope(admin.role, admin.scopes, 'review_forms:read')
+  // The list's filters (not its date: the period owns from / to), after each query's own args.
+  // Its Pending / Approved switch stays on the list: the overview splits by it.
+  const scope = filterScope(REVIEWS_ENTITY, normalizeQuery(REVIEWS_ENTITY, sp), { omit: ['created', 'approval'] })
+  const s4 = scope.and(args.length + 1)
+  const own = scope.inIds('id', 1)
+  const a4 = [...args, ...s4.params]
 
   try {
     const [kpiRows, pending, allTime, dist, trend, top, lowest, negatives, drops, recentNegative, funnel, forms] =
@@ -80,28 +88,30 @@ export async function GET(request: NextRequest) {
                   COUNT(*) FILTER (WHERE pr.is_verified_purchase) AS verified,
                   COUNT(*) FILTER (WHERE pr.is_approved) AS approved
            FROM product_reviews pr, b
-           WHERE pr.created_at >= b.p0 AND pr.created_at < b.c1
+           WHERE pr.created_at >= b.p0 AND pr.created_at < b.c1${s4.sql}
            GROUP BY 1`,
-          args
+          a4
         ),
         queryOne<Record<string, unknown>>(
           `SELECT COUNT(*) AS count,
                   COUNT(*) FILTER (WHERE rating <= 2) AS negative,
                   MIN(created_at) AS oldest
-           FROM product_reviews WHERE is_approved = false`
+           FROM product_reviews WHERE is_approved = false${own.sql}`,
+          ...(scope.empty ? [] : [own.params])
         ),
         queryOne<Record<string, unknown>>(
           `SELECT COUNT(*) AS reviews, ROUND(AVG(rating)::numeric, 2) AS avg_rating
-           FROM product_reviews WHERE is_approved = true`
+           FROM product_reviews WHERE is_approved = true${own.sql}`,
+          ...(scope.empty ? [] : [own.params])
         ),
         queryMany<Record<string, unknown>>(
           `WITH ${BOUNDS}
            SELECT s.r AS rating, COUNT(pr.id) AS count
            FROM generate_series(1, 5) s(r)
            CROSS JOIN b
-           LEFT JOIN product_reviews pr ON pr.rating = s.r AND pr.created_at >= b.c0 AND pr.created_at < b.c1
+           LEFT JOIN product_reviews pr ON pr.rating = s.r AND pr.created_at >= b.c0 AND pr.created_at < b.c1${s4.sql}
            GROUP BY s.r ORDER BY s.r`,
-          args
+          a4
         ),
         queryMany<Record<string, unknown>>(
           `WITH ${BOUNDS}
@@ -111,12 +121,12 @@ export async function GET(request: NextRequest) {
                   ROUND(AVG(pr.rating)::numeric, 2) AS avg_rating
            FROM generate_series($2::date, $3::date, interval '1 day') d
            LEFT JOIN product_reviews pr
-             ON (pr.created_at AT TIME ZONE 'Asia/Kolkata')::date = d::date
+             ON (pr.created_at AT TIME ZONE 'Asia/Kolkata')::date = d::date${s4.sql}
            GROUP BY d ORDER BY d`,
-          args
+          a4
         ),
-        productRanking(args, 'DESC'),
-        productRanking(args, 'ASC'),
+        productRanking(args, 'DESC', s4),
+        productRanking(args, 'ASC', s4),
         queryMany<Record<string, unknown>>(
           `WITH ${BOUNDS}
            SELECT p.id, p.name, p.slug,
@@ -124,12 +134,12 @@ export async function GET(request: NextRequest) {
                   COUNT(*) AS reviews,
                   ROUND(AVG(pr.rating)::numeric, 2) AS avg_rating
            FROM product_reviews pr JOIN products p ON p.id = pr.product_id, b
-           WHERE pr.created_at >= b.c0 AND pr.created_at < b.c1
+           WHERE pr.created_at >= b.c0 AND pr.created_at < b.c1${s4.sql}
            GROUP BY p.id
            HAVING COUNT(*) FILTER (WHERE pr.rating <= 2) > 0
            ORDER BY negative DESC, avg_rating ASC
            LIMIT 8`,
-          args
+          a4
         ),
         // Cumulative rating at period start vs at period end, for products reviewed in the period.
         queryMany<Record<string, unknown>>(
@@ -142,7 +152,7 @@ export async function GET(request: NextRequest) {
                     COUNT(*) FILTER (WHERE pr.created_at >= b.c0) AS new_count,
                     AVG(pr.rating) FILTER (WHERE pr.created_at >= b.c0) AS new_avg
              FROM product_reviews pr, b
-             WHERE pr.created_at < b.c1
+             WHERE pr.created_at < b.c1${s4.sql}
              GROUP BY pr.product_id
            )
            SELECT p.id, p.name, p.slug,
@@ -154,7 +164,7 @@ export async function GET(request: NextRequest) {
            WHERE agg.new_count > 0 AND agg.before_count >= 2 AND agg.after_avg <= agg.before_avg - 0.2
            ORDER BY agg.after_avg - agg.before_avg ASC
            LIMIT 8`,
-          args
+          a4
         ),
         queryMany<Record<string, unknown>>(
           `WITH ${BOUNDS}
@@ -165,10 +175,10 @@ export async function GET(request: NextRequest) {
            CROSS JOIN b
            LEFT JOIN products p ON p.id = pr.product_id
            LEFT JOIN users u ON u.id = pr.user_id
-           WHERE pr.rating <= 2 AND pr.created_at >= b.c0 AND pr.created_at < b.c1
+           WHERE pr.rating <= 2 AND pr.created_at >= b.c0 AND pr.created_at < b.c1${s4.sql}
            ORDER BY pr.created_at DESC
            LIMIT 10`,
-          args
+          a4
         ),
         // Review request / reminder messages; an order counts as reviewed once its buyer reviews one of its items after the send.
         queryMany<Record<string, unknown>>(
@@ -284,6 +294,7 @@ export async function GET(request: NextRequest) {
         clicked: n(r?.clicked),
         reviewed: n(r?.reviewed),
       })),
+      filtered: !scope.empty,
       forms: withForms
         ? {
             ...byPeriod(forms, r => ({ submissions: n(r?.submissions), coupons: n(r?.coupons), pending: n(r?.pending) })),
