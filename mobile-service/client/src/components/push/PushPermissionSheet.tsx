@@ -11,6 +11,7 @@ import { useTokens } from '../../theme'
 // The soft ask: explains push first, and only "Turn on" shows the Android 13 system prompt.
 
 const COPY: Record<PushPromptReason, { title: string; subtitle: string }> = {
+  welcome: { title: 'Stay in the loop', subtitle: 'Get order updates, offers and price drops as they happen. You choose what you get.' },
   order: { title: 'Get delivery updates', subtitle: "We'll let you know when your order ships, is out for delivery and arrives." },
   settings: { title: 'Turn on notifications', subtitle: 'Order and account updates as they happen. You choose what else you get.' },
 }
