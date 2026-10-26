@@ -32,7 +32,12 @@ export interface ListFiltersProps {
   noun?: string
   /** Pins ?tab, so filtering (or clearing) on a URL without one never flips the page's tab. */
   tab?: string
-  /** Controls at the toolbar's right end (saved views, share and export plug in here). */
+  /** Saved views menu and share link (on unless turned off). */
+  views?: boolean
+  share?: boolean
+  /** Export CSV of the filtered rows; set when the entity has export columns. */
+  exportable?: boolean
+  /** Extra controls at the toolbar's right end. */
   children?: ReactNode
 }
 
