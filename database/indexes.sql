@@ -1673,6 +1673,14 @@ CREATE INDEX idx_return_requests_status ON public.return_requests USING btree (s
 
 
 --
+-- Name: idx_return_requests_type_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_return_requests_type_created ON public.return_requests USING btree (type, created_at DESC);
+
+
+
+--
 -- Name: idx_return_requests_user_id; Type: INDEX; Schema: public; Owner: -
 --
 

@@ -1,3 +1,4 @@
+import type { FilterScope, ScopeSql } from '@jeffi/list-filters'
 import type { AttentionItem } from '@/lib/overview/attention'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { previousPeriod, type Period } from '@/lib/overview/period'
@@ -40,7 +41,13 @@ export function packingAttention(s: PackingSnapshot, handlingDays: number): Atte
   return out
 }
 
-export async function loadPackingStrip(period: Period, handlingDays: number) {
+const NONE: ScopeSql = { sql: '', params: [] }
+
+/** `scope`: the slips list's filters (on o), appended after each query's own args. */
+export async function loadPackingStrip(period: Period, handlingDays: number, scope?: FilterScope) {
+  const s4 = scope?.and(4) ?? NONE
+  const s2 = scope?.and(2) ?? NONE
+  const s1 = scope?.and(1) ?? NONE
   const [shipped, snap, today] = await Promise.all([
     queryMany<Row>(
       `WITH ${BOUNDS}
@@ -48,22 +55,22 @@ export async function loadPackingStrip(period: Period, handlingDays: number) {
               AVG(EXTRACT(EPOCH FROM o.shipped_at - COALESCE(o.confirmed_at, o.created_at)) / 3600)
                 FILTER (WHERE o.shipped_at >= COALESCE(o.confirmed_at, o.created_at)) AS dispatch_hours
        FROM orders o, b
-       WHERE ${inBoth('o.shipped_at')} AND o.status NOT IN ('draft', 'cancelled') AND ${NEEDS_SHIP_SQL}
+       WHERE ${inBoth('o.shipped_at')} AND o.status NOT IN ('draft', 'cancelled') AND ${NEEDS_SHIP_SQL}${s4.sql}
        GROUP BY 1`,
-      boundArgs(period)
+      [...boundArgs(period), ...s4.params]
     ),
     queryOne<Row>(
       `SELECT COUNT(*) AS to_pack,
               COUNT(*) FILTER (WHERE COALESCE(o.confirmed_at, o.created_at) < NOW() - make_interval(days => $1::int)) AS late,
               MIN(COALESCE(o.confirmed_at, o.created_at)) AS oldest
        FROM orders o
-       WHERE o.status IN ('confirmed', 'processing') AND o.shipped_at IS NULL AND ${NEEDS_SHIP_SQL}`,
-      [handlingDays]
+       WHERE o.status IN ('confirmed', 'processing') AND o.shipped_at IS NULL AND ${NEEDS_SHIP_SQL}${s2.sql}`,
+      [handlingDays, ...s2.params]
     ),
-    queryOne<Row>(
+    (s1.params.length ? (sql: string) => queryOne<Row>(sql, s1.params) : (sql: string) => queryOne<Row>(sql))(
       `SELECT COUNT(*) AS shipped_today FROM orders o
        WHERE o.shipped_at >= (NOW() AT TIME ZONE 'Asia/Kolkata')::date::timestamp AT TIME ZONE 'Asia/Kolkata'
-         AND o.status NOT IN ('draft', 'cancelled') AND ${NEEDS_SHIP_SQL}`
+         AND o.status NOT IN ('draft', 'cancelled') AND ${NEEDS_SHIP_SQL}${s1.sql}`
     ),
   ])
   const s = byPeriod(shipped, r => r)
@@ -106,6 +113,7 @@ export async function loadPackingStrip(period: Period, handlingDays: number) {
     previous: previousPeriod(period),
     kpis,
     snapshot,
+    filtered: !!scope && !scope.empty,
     attention: packingAttention(snapshot, handlingDays),
   }
 }

@@ -3,6 +3,7 @@ import { isValuesField, normalizeQuery } from '@jeffi/list-filters'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { getEntity } from '@/lib/filters/registry'
 import { getFilterValues } from '@/lib/filters/run'
+import { withDefaultWindow } from '@/lib/filters/window'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const field = sp.get('field') || ''
   if (!isValuesField(entity, field)) return NextResponse.json({ error: 'Invalid field' }, { status: 400 })
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10) || 1)
-  const q = normalizeQuery(entity, new URLSearchParams(sp.get('context') || ''))
+  const q = withDefaultWindow(entity, normalizeQuery(entity, new URLSearchParams(sp.get('context') || '')))
   try {
     const res = await getFilterValues(entity, field, q, { search: sp.get('search') || '', page })
     return NextResponse.json({ field, page, ...res })

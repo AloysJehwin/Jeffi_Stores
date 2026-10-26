@@ -130,23 +130,20 @@ describe('GET /api/admin/inventory/stock', () => {
     expect(body.items).toBeDefined()
   })
 
-  it('passes search/category/brand/stock_status params to getStockValuation', async () => {
+  it('passes search, paging and the category/brand/stock filters to getStockValuation', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockGetStockValuation.mockResolvedValue({ items: [], total: 0, totalValue: 0 } as any)
     await GET(
-      makeGetReq('?view=valuation&search=bolt&category=Fasteners&brand=Unbrako&stock_status=low&page=2&limit=25')
+      makeGetReq('?view=valuation&search=bolt&category=Fasteners&brand=Unbrako&stock_status=low_stock&page=2&limit=25')
     )
-    expect(mockGetStockValuation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        search: 'bolt',
-        categoryName: 'Fasteners',
-        brandName: 'Unbrako',
-        stockStatus: 'low',
-        limit: 25,
-        offset: 25,
-      })
-    )
+    const arg = mockGetStockValuation.mock.calls[0][0] as any
+    expect(arg).toMatchObject({ search: 'bolt', limit: 25, offset: 25 })
+    // The other filters arrive as a scope on the product ids (search keeps its own ranking).
+    const scoped = arg.scope.inIds('rows.id', 1)
+    expect(scoped.params).toEqual(['Fasteners', 'Unbrako'])
+    expect(scoped.sql).toContain('rows.id IN (SELECT p.id FROM products p')
+    expect(scoped.sql).toContain('l.q <= 5')
   })
 
   it('passes product_id/search/from/to params to getStockLedger', async () => {
