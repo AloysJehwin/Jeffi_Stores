@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
@@ -104,6 +104,136 @@ function EmptyCard({ title, body, action, onAction }: { title: string; body: str
   )
 }
 
+// Memoized: marking one row busy (or the list re-rendering) doesn't re-render every card.
+const WishlistCard = memo(function WishlistCard({
+  item,
+  adding,
+  onRemove,
+  onBuyNow,
+  onAdd,
+}: {
+  item: WishlistRow
+  adding: boolean
+  onRemove: (productId: string) => void
+  onBuyNow: (productId: string, slug: string, hasVariants: boolean) => void
+  onAdd: (productId: string) => void
+}) {
+  const router = useRouter()
+  const t = useTokens()
+  const p = item.products
+  const image = p.product_images?.find(i => i.is_primary) || p.product_images?.[0]
+  const hasVariants = p.has_variants
+  const price = Number(hasVariants && p.variant_min_price ? p.variant_min_price : p.price_ex_gst || p.base_price)
+  const effectiveStock = hasVariants ? Number(p.variant_stock_total) : p.stock_status !== 'Out of Stock' ? 1 : 0
+  const isDigital = !!p.is_digital
+  const inStock = isDigital || effectiveStock > 0
+  const mrp = p.mrp ? Number(p.mrp) : p.variant_min_mrp ? Number(p.variant_min_mrp) : null
+  const inclPrice = hasVariants && p.variant_min_price ? Number(p.variant_min_price) : Number(p.base_price)
+  const mrpDiscount = mrp && mrp > inclPrice ? Math.round(((mrp - inclPrice) / mrp) * 100) : 0
+  const badges = wishlistBadges({
+    hasVariants,
+    shownPrice: price,
+    shownInStock: inStock,
+    basePrice: p.base_price,
+    inventoryInStock: item.inventory_in_stock,
+    snapshotPrice: item.snapshot_price,
+    snapshotInStock: item.snapshot_in_stock,
+  })
+  const open = () => router.push(`/product/${p.slug}`)
+
+  return (
+    <Card padded={false}>
+      {/* Repeats the name link below, so screen readers skip it. */}
+      <Pressable
+        onPress={open}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        className="relative mx-3 mt-3 overflow-hidden rounded-xl border border-border-default"
+        style={{ aspectRatio: 5 / 3 }}
+      >
+        {image ? (
+          <>
+            <Image
+              source={{ uri: image.thumbnail_url }}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6, transform: [{ scale: 1.1 }] }}
+              contentFit="cover"
+              blurRadius={24}
+              recyclingKey={image.thumbnail_url}
+            />
+            <Image source={{ uri: image.thumbnail_url }} recyclingKey={image.thumbnail_url} style={{ width: '100%', height: '100%' }} contentFit="contain" />
+          </>
+        ) : (
+          <View className="flex-1 items-center justify-center">
+            <ImageIcon size={80} color={t.foregroundMuted} strokeWidth={1} />
+          </View>
+        )}
+        {mrpDiscount > 0 && <Pill label={`${mrpDiscount}% off`} tone="accent" className="absolute right-3 top-3" />}
+        {(badges.backInStock || badges.priceDrop) && (
+          <View className="absolute left-3 top-3 items-start gap-1">
+            {badges.backInStock && <Pill label="Back in stock" tone="success" />}
+            {badges.priceDrop && <Pill label={`Price dropped ${badges.priceDrop.pct}%`} tone="danger" />}
+          </View>
+        )}
+      </Pressable>
+
+      <View className="p-4">
+        <IconButton
+          icon={X}
+          size="xs"
+          color={status.heart}
+          label={`Remove ${p.name} from wishlist`}
+          onPress={() => onRemove(item.product_id)}
+          className="mb-1 self-end"
+        />
+
+        <Pressable
+          onPress={open}
+          accessibilityRole="link"
+          // The pills sit on the image, which screen readers skip.
+          accessibilityLabel={[p.name, mrpDiscount > 0 && `${mrpDiscount}% off`, badges.backInStock && 'Back in stock', badges.priceDrop && `Price dropped ${badges.priceDrop.pct}%`]
+            .filter(Boolean)
+            .join(', ')}
+        >
+          <Text className="mb-2 min-h-[48px] text-base font-semibold text-foreground" numberOfLines={2}>
+            {p.name}
+          </Text>
+        </Pressable>
+        <WarningBadges fragile={p.fragile} hazardous={p.hazardous} flammable={p.flammable} size="xs" />
+
+        <View className="mb-1 mt-1 flex-row items-baseline gap-2">
+          <Text className="text-xl font-bold text-primary-600 dark:text-primary-400">
+            {hasVariants ? 'From ' : ''}
+            {money(price)}
+          </Text>
+          {mrp && mrp > price ? <Text className="text-sm text-foreground-muted line-through">{money(mrp)}</Text> : null}
+        </View>
+        {badges.priceDrop && (
+          <Text className="mb-1 text-xs font-medium text-rose-600 dark:text-rose-400">
+            Was <Text className="line-through">{money(badges.priceDrop.was)}</Text>
+          </Text>
+        )}
+        <Text className="mb-3 text-[11px] text-foreground-muted">Inclusive of all taxes</Text>
+
+        <View className="mb-3 flex-row items-center justify-between">
+          <Text className={`text-xs font-medium ${inStock ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {inStock ? 'In Stock' : 'Out of Stock'}
+          </Text>
+        </View>
+
+        <Button
+          label={isDigital ? 'Buy Now' : 'Add to Cart'}
+          icon={ShoppingCart}
+          size="md"
+          loading={adding}
+          loadingLabel={isDigital ? 'Processing...' : 'Adding...'}
+          disabled={!inStock}
+          onPress={() => (isDigital ? onBuyNow(item.product_id, p.slug, hasVariants) : onAdd(item.product_id))}
+        />
+      </View>
+    </Card>
+  )
+})
+
 export default function WishlistScreen() {
   const bottomInset = useBottomInset()
   const router = useRouter()
@@ -127,15 +257,19 @@ export default function WishlistScreen() {
     [items, filter]
   )
 
-  const mark = (id: string, on: boolean) =>
-    setBusy(prev => {
-      const next = new Set(prev)
-      if (on) next.add(id)
-      else next.delete(id)
-      return next
-    })
+  // Stable handlers, so the memoized cards don't re-render on every screen render.
+  const mark = useCallback(
+    (id: string, on: boolean) =>
+      setBusy(prev => {
+        const next = new Set(prev)
+        if (on) next.add(id)
+        else next.delete(id)
+        return next
+      }),
+    []
+  )
 
-  const handleRemove = async (productId: string) => {
+  const handleRemove = useCallback(async (productId: string) => {
     const ok = await confirm({
       title: 'Remove from wishlist?',
       message: 'Are you sure you want to remove this item from your wishlist?',
@@ -150,10 +284,10 @@ export default function WishlistScreen() {
     } catch {
       toast.error('Failed to remove item')
     }
-  }
+  }, [qc])
 
   // Digital products never enter the cart: Buy Now, or pick options on the product page.
-  const handleBuyNow = async (productId: string, slug: string, hasVariants: boolean) => {
+  const handleBuyNow = useCallback(async (productId: string, slug: string, hasVariants: boolean) => {
     if (hasVariants) return router.push(`/product/${slug}`)
     mark(productId, true)
     try {
@@ -164,9 +298,9 @@ export default function WishlistScreen() {
     } finally {
       mark(productId, false)
     }
-  }
+  }, [router, mark])
 
-  const handleAddToCart = async (productId: string) => {
+  const handleAddToCart = useCallback(async (productId: string) => {
     mark(productId, true)
     try {
       await addToCart({ product_id: productId, quantity: 1 })
@@ -184,7 +318,7 @@ export default function WishlistScreen() {
     } finally {
       mark(productId, false)
     }
-  }
+  }, [qc, mark])
 
   if (!user) {
     return (
@@ -243,121 +377,9 @@ export default function WishlistScreen() {
     )
   }
 
-  const renderItem = ({ item }: { item: WishlistRow }) => {
-    const p = item.products
-    const image = p.product_images?.find(i => i.is_primary) || p.product_images?.[0]
-    const hasVariants = p.has_variants
-    const price = Number(hasVariants && p.variant_min_price ? p.variant_min_price : p.price_ex_gst || p.base_price)
-    const effectiveStock = hasVariants ? Number(p.variant_stock_total) : p.stock_status !== 'Out of Stock' ? 1 : 0
-    const isDigital = !!p.is_digital
-    const inStock = isDigital || effectiveStock > 0
-    const mrp = p.mrp ? Number(p.mrp) : p.variant_min_mrp ? Number(p.variant_min_mrp) : null
-    const inclPrice = hasVariants && p.variant_min_price ? Number(p.variant_min_price) : Number(p.base_price)
-    const mrpDiscount = mrp && mrp > inclPrice ? Math.round(((mrp - inclPrice) / mrp) * 100) : 0
-    const adding = busy.has(item.product_id)
-    const badges = wishlistBadges({
-      hasVariants,
-      shownPrice: price,
-      shownInStock: inStock,
-      basePrice: p.base_price,
-      inventoryInStock: item.inventory_in_stock,
-      snapshotPrice: item.snapshot_price,
-      snapshotInStock: item.snapshot_in_stock,
-    })
-    const open = () => router.push(`/product/${p.slug}`)
-
-    return (
-      <Card padded={false}>
-        {/* Repeats the name link below, so screen readers skip it. */}
-        <Pressable
-          onPress={open}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
-          className="relative mx-3 mt-3 overflow-hidden rounded-xl border border-border-default"
-          style={{ aspectRatio: 5 / 3 }}
-        >
-          {image ? (
-            <>
-              <Image
-                source={{ uri: image.thumbnail_url }}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6, transform: [{ scale: 1.1 }] }}
-                contentFit="cover"
-                blurRadius={24}
-                recyclingKey={image.thumbnail_url}
-              />
-              <Image source={{ uri: image.thumbnail_url }} recyclingKey={image.thumbnail_url} style={{ width: '100%', height: '100%' }} contentFit="contain" />
-            </>
-          ) : (
-            <View className="flex-1 items-center justify-center">
-              <ImageIcon size={80} color={t.foregroundMuted} strokeWidth={1} />
-            </View>
-          )}
-          {mrpDiscount > 0 && <Pill label={`${mrpDiscount}% off`} tone="accent" className="absolute right-3 top-3" />}
-          {(badges.backInStock || badges.priceDrop) && (
-            <View className="absolute left-3 top-3 items-start gap-1">
-              {badges.backInStock && <Pill label="Back in stock" tone="success" />}
-              {badges.priceDrop && <Pill label={`Price dropped ${badges.priceDrop.pct}%`} tone="danger" />}
-            </View>
-          )}
-        </Pressable>
-
-        <View className="p-4">
-          <IconButton
-            icon={X}
-            size="xs"
-            color={status.heart}
-            label={`Remove ${p.name} from wishlist`}
-            onPress={() => handleRemove(item.product_id)}
-            className="mb-1 self-end"
-          />
-
-          <Pressable
-            onPress={open}
-            accessibilityRole="link"
-            // The pills sit on the image, which screen readers skip.
-            accessibilityLabel={[p.name, mrpDiscount > 0 && `${mrpDiscount}% off`, badges.backInStock && 'Back in stock', badges.priceDrop && `Price dropped ${badges.priceDrop.pct}%`]
-              .filter(Boolean)
-              .join(', ')}
-          >
-            <Text className="mb-2 min-h-[48px] text-base font-semibold text-foreground" numberOfLines={2}>
-              {p.name}
-            </Text>
-          </Pressable>
-          <WarningBadges fragile={p.fragile} hazardous={p.hazardous} flammable={p.flammable} size="xs" />
-
-          <View className="mb-1 mt-1 flex-row items-baseline gap-2">
-            <Text className="text-xl font-bold text-primary-600 dark:text-primary-400">
-              {hasVariants ? 'From ' : ''}
-              {money(price)}
-            </Text>
-            {mrp && mrp > price ? <Text className="text-sm text-foreground-muted line-through">{money(mrp)}</Text> : null}
-          </View>
-          {badges.priceDrop && (
-            <Text className="mb-1 text-xs font-medium text-rose-600 dark:text-rose-400">
-              Was <Text className="line-through">{money(badges.priceDrop.was)}</Text>
-            </Text>
-          )}
-          <Text className="mb-3 text-[11px] text-foreground-muted">Inclusive of all taxes</Text>
-
-          <View className="mb-3 flex-row items-center justify-between">
-            <Text className={`text-xs font-medium ${inStock ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-              {inStock ? 'In Stock' : 'Out of Stock'}
-            </Text>
-          </View>
-
-          <Button
-            label={isDigital ? 'Buy Now' : 'Add to Cart'}
-            icon={ShoppingCart}
-            size="md"
-            loading={adding}
-            loadingLabel={isDigital ? 'Processing...' : 'Adding...'}
-            disabled={!inStock}
-            onPress={() => (isDigital ? handleBuyNow(item.product_id, p.slug, hasVariants) : handleAddToCart(item.product_id))}
-          />
-        </View>
-      </Card>
-    )
-  }
+  const renderItem = ({ item }: { item: WishlistRow }) => (
+    <WishlistCard item={item} adding={busy.has(item.product_id)} onRemove={handleRemove} onBuyNow={handleBuyNow} onAdd={handleAddToCart} />
+  )
 
   return (
     <Screen header={<TopNav />} mode="none">
@@ -367,6 +389,9 @@ export default function WishlistScreen() {
         renderItem={renderItem}
         extraData={busy}
         gap={16}
+        initialNumToRender={3}
+        maxToRenderPerBatch={2}
+        windowSize={9}
         refreshing={isRefetching}
         onRefresh={refetch}
         showsVerticalScrollIndicator={false}

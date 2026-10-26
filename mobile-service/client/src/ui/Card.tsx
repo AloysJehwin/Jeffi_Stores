@@ -21,20 +21,34 @@ export interface CardProps extends ViewProps {
   wrapperClassName?: string
 }
 
-export function Card({ children, elevation = 'raised', padded = true, onPress, className, wrapperClassName, style, accessibilityLabel, ...rest }: CardProps) {
+export function Card({ onPress, ...props }: CardProps) {
+  // Only a pressable card pays for the press animation.
+  return onPress ? <PressableCard onPress={onPress} {...props} /> : <StaticCard {...props} />
+}
+
+function StaticCard({ children, elevation = 'raised', padded = true, className, wrapperClassName: _w, style, accessibilityLabel: _l, ...rest }: CardProps) {
+  const shadow = useElevation(elevation)
+  return (
+    <View style={[shadow, style]} className={cn('rounded-panel bg-surface-elevated', elevationClass(elevation), padded && 'p-4', className)} {...rest}>
+      {children}
+    </View>
+  )
+}
+
+function PressableCard({ children, elevation = 'raised', padded = true, onPress, className, wrapperClassName, style, accessibilityLabel, ...rest }: CardProps) {
   const shadow = useElevation(elevation)
   const press = usePressScale(0.985)
   const frame = cn('rounded-panel bg-surface-elevated', elevationClass(elevation), padded && 'p-4', className)
-  if (!onPress) {
-    return (
-      <View style={[shadow, style]} className={frame} {...rest}>
-        {children}
-      </View>
-    )
-  }
   return (
     <Animated.View style={[shadow, { borderRadius: 20 }, press.style, style]} className={wrapperClassName} {...rest}>
-      <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} {...press.handlers} className={cn(frame, 'active:opacity-90')}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        onPress={onPress}
+        unstable_pressDelay={80}
+        {...press.handlers}
+        className={cn(frame, 'active:opacity-90')}
+      >
         {children}
       </Pressable>
     </Animated.View>

@@ -2,7 +2,7 @@
 export { cn } from './cn'
 export { haptic } from './haptics'
 export { SPRING, SHEET_SPRING, useMotion, useScreenReader, usePressScale, useEntering } from './motion'
-export { useSwipe, useAutoplay, type Autoplay } from './paging'
+export { useSwipe, useAutoplay, setFeedScrolling, type Autoplay } from './paging'
 export { useElevation, elevationClass, type Elevation } from './elevation'
 export { TONES, statusTone, type Tone } from './tones'
 export { Text, Display, Title, Heading, Subheading, Body, BodySmall, Caption, Overline, type TextProps } from './Text'

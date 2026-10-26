@@ -2,18 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, Dimensions, View } from 'react-native'
 import { Card, Overline, Text } from '../../ui'
 import { Grid } from './layout'
+import { num } from '../../lib/format'
 import type { SectionProps, ValueStat } from '../../types/home'
 
 // Mirror of controller-service components/visitor/home/ValueStats.tsx.
 
 const DURATION_MS = 1200
 const POLL_MS = 200
+// ~30 fps: each step is a re-render, and the count-up plays while the feed is still scrolling.
+const STEP_MS = 33
 
 /** homepage-sections friendlyCount: rounds down to a figure that stays true with a "+" (1,234 → 1,200+). */
 function friendlyCount(n: number): string {
   const step = n >= 1000 ? 100 : n >= 100 ? 10 : 1
   const floored = Math.floor(n / step) * step
-  return `${floored.toLocaleString('en-IN')}${step > 1 ? '+' : ''}`
+  return `${num(floored)}${step > 1 ? '+' : ''}`
 }
 
 export default function ValueStats({ section, data }: SectionProps) {
@@ -22,14 +25,14 @@ export default function ValueStats({ section, data }: SectionProps) {
   // Final figures first; the count-up only replays for a band still below the fold (30% visible starts it).
   const [progress, setProgress] = useState(1)
   const armed = useRef(false)
-  const timers = useRef<{ poll?: ReturnType<typeof setInterval>; frame?: number; dead?: boolean }>({})
+  const timers = useRef<{ poll?: ReturnType<typeof setInterval>; frame?: ReturnType<typeof setTimeout>; dead?: boolean }>({})
 
   useEffect(() => {
     const t = timers.current
     return () => {
       t.dead = true
       if (t.poll) clearInterval(t.poll)
-      if (t.frame) cancelAnimationFrame(t.frame)
+      if (t.frame) clearTimeout(t.frame)
     }
   }, [])
 
@@ -40,9 +43,9 @@ export default function ValueStats({ section, data }: SectionProps) {
       if (t.dead) return
       const k = Math.min(1, (Date.now() - start) / DURATION_MS)
       setProgress(1 - Math.pow(1 - k, 3))
-      if (k < 1) t.frame = requestAnimationFrame(tick)
+      if (k < 1) t.frame = setTimeout(tick, STEP_MS)
     }
-    t.frame = requestAnimationFrame(tick)
+    t.frame = setTimeout(tick, STEP_MS)
   }, [])
 
   const onLayout = useCallback(async () => {
@@ -92,7 +95,7 @@ export default function ValueStats({ section, data }: SectionProps) {
               className="text-center font-display text-3xl font-extrabold text-primary-600 dark:text-primary-400"
               style={{ fontVariant: ['tabular-nums'] }}
             >
-              {progress >= 1 ? friendlyCount(s.value) : Math.round(s.value * progress).toLocaleString('en-IN')}
+              {progress >= 1 ? friendlyCount(s.value) : num(Math.round(s.value * progress))}
             </Text>
             <Text
               className="mt-2 text-center text-xs font-semibold uppercase text-foreground-secondary"

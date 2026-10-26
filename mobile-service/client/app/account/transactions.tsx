@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { FlatList, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { CreditCard, Receipt } from 'lucide-react-native'
@@ -6,12 +6,18 @@ import { listTransactions, type Transaction } from '../../src/api/account'
 import { useInfiniteList, useRequireAuth } from '../../src/components/account/hooks'
 import { InfiniteFooter } from '../../src/components/account/ui'
 import { Badge, Caption, Card, Chip, ChipGroup, EmptyState, ModalSheet, Radio, Screen, Skeleton, statusTone, Text, TextButton, useBottomInset } from '../../src/ui'
+import { dateFormat, numberFormat } from '../../src/lib/format'
 
 // Mirror of controller-service components/shared/AccountTransactions.tsx (visitor).
 
 const STATUSES = ['all', 'completed', 'pending', 'failed', 'refunded'] as const
 const statusLabel = (s: string) => ({ completed: 'Completed', pending: 'Pending', failed: 'Failed', refunded: 'Refunded' })[s] ?? s
 const txnTone = (s: string) => (['completed', 'pending', 'failed', 'refunded'].includes(s) ? statusTone(s) : 'neutral')
+// One formatter each rather than a toLocale* per row (each builds a new Intl formatter).
+const rupees = numberFormat({ style: 'currency', currency: 'INR' })
+const day = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' })
+const time = dateFormat({ hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+const Gap = () => <View style={{ height: 12 }} />
 
 function methodLabel(method: string, gateway: string) {
   if (gateway === 'razorpay') return 'Razorpay'
@@ -49,6 +55,31 @@ function TransactionsLoading() {
     </View>
   )
 }
+
+const TxnCard = memo(function TxnCard({ txn }: { txn: Transaction }) {
+  const router = useRouter()
+  const at = new Date(txn.createdAt)
+  return (
+    <Card className="mx-4">
+      <View className="mb-2 flex-row flex-wrap items-center gap-2">
+        <Badge label={statusLabel(txn.status)} tone={txnTone(txn.status)} />
+        <Badge label={methodLabel(txn.paymentMethod, txn.paymentGateway)} />
+      </View>
+      <View className="flex-row flex-wrap items-center" style={{ columnGap: 16, rowGap: 4 }}>
+        <Text className="font-display text-xl font-extrabold text-foreground">{rupees(Number(txn.amount))}</Text>
+        <TextButton label={`Order #${txn.orderNumber}`} onPress={() => router.push(`/orders/${txn.orderId}`)} />
+      </View>
+      {!!txn.transactionId && (
+        <Caption className="mt-1 font-mono" numberOfLines={1}>
+          TXN: {txn.transactionId}
+        </Caption>
+      )}
+      <Text className="mt-3 text-[13px] text-foreground-muted">
+        {day(at)} · {time(at)}
+      </Text>
+    </Card>
+  )
+})
 
 export default function TransactionsScreen() {
   const bottom = useBottomInset()
@@ -109,7 +140,7 @@ export default function TransactionsScreen() {
           contentContainerStyle={{ paddingBottom: bottom }}
           onEndReached={list.loadMore}
           onEndReachedThreshold={0.5}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          ItemSeparatorComponent={Gap}
           ListEmptyComponent={
             transactions.length === 0 ? (
               <EmptyState
@@ -126,27 +157,7 @@ export default function TransactionsScreen() {
               <InfiniteFooter shown={transactions.length} list={list} noun="transactions" />
             </View>
           }
-          renderItem={({ item: txn }) => (
-            <Card className="mx-4">
-              <View className="mb-2 flex-row flex-wrap items-center gap-2">
-                <Badge label={statusLabel(txn.status)} tone={txnTone(txn.status)} />
-                <Badge label={methodLabel(txn.paymentMethod, txn.paymentGateway)} />
-              </View>
-              <View className="flex-row flex-wrap items-center" style={{ columnGap: 16, rowGap: 4 }}>
-                <Text className="font-display text-xl font-extrabold text-foreground">{Number(txn.amount).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</Text>
-                <TextButton label={`Order #${txn.orderNumber}`} onPress={() => router.push(`/orders/${txn.orderId}`)} />
-              </View>
-              {!!txn.transactionId && (
-                <Caption className="mt-1 font-mono" numberOfLines={1}>
-                  TXN: {txn.transactionId}
-                </Caption>
-              )}
-              <Text className="mt-3 text-[13px] text-foreground-muted">
-                {new Date(txn.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ·{' '}
-                {new Date(txn.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
-              </Text>
-            </Card>
-          )}
+          renderItem={({ item }) => <TxnCard txn={item} />}
         />
       )}
 

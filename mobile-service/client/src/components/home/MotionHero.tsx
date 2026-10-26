@@ -26,14 +26,15 @@ export default function MotionHero({ section, data }: SectionProps) {
 function Hero({ hero }: { hero: MotionHeroData }) {
   const router = useRouter()
   const [current, setCurrent] = useState(0)
-  const { ref, onLayout, onScreen } = useOnScreen(hero.slides.some(s => s.bgVideo))
+  const { ref, onLayout, onScreen } = useOnScreen(hero.slides.length > 1 || hero.slides.some(s => s.bgVideo))
   return (
     <Animated.View ref={ref} onLayout={onLayout} collapsable={false} className="bg-surface pb-4 pt-3">
       <Pager
         data={hero.slides}
         keyExtractor={(slide, i) => `${i}-${slide.bgImage}`}
         height={w => Math.min(420, Math.round(w * 0.9))}
-        autoplay
+        // Off screen (or on another tab) it holds instead of paging under the feed.
+        autoplay={onScreen}
         intervalMs={hero.intervalMs}
         dots={{ size: 6 }}
         onPress={slide => openHref(router, slide.url)}
