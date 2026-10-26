@@ -55,3 +55,34 @@ export function buildVectorSearchClause(
   const clause = parts.length ? `(${parts.join(' OR ')})` : 'TRUE'
   return { clause, params, nextIdx: i }
 }
+
+// Minimum pg_trgm word_similarity for a query word to fuzzily match the closest run of words in a column.
+const WORD_SIM_THRESHOLD = 0.5
+
+/** Every word as an escaped substring somewhere across `columns`, or any word fuzzily (typos). */
+export function buildSearchClause(raw: string, columns: string[], startIdx: number = 1): SearchClause {
+  const words = raw
+    .trim()
+    .split(/\s+/)
+    .map(w => w.replace(/^[^\w]+|[^\w]+$/g, ''))
+    .filter(Boolean)
+  if (words.length === 0) return { clause: 'TRUE', params: [], nextIdx: startIdx }
+
+  const params: unknown[] = []
+  let idx = startIdx
+  const colClauses = columns.map(col => {
+    const wordClauses = words.map(word => {
+      params.push(`%${escapeLike(word)}%`)
+      return `${col} ILIKE $${idx++}`
+    })
+    return `(${wordClauses.join(' AND ')})`
+  })
+  const trgmClauses: string[] = []
+  for (const word of words) {
+    params.push(word)
+    const wi = idx++
+    for (const col of columns)
+      trgmClauses.push(`word_similarity($${wi}::text, COALESCE(${col},'')) > ${WORD_SIM_THRESHOLD}`)
+  }
+  return { clause: `(${colClauses.join(' OR ')} OR ${trgmClauses.join(' OR ')})`, params, nextIdx: idx }
+}

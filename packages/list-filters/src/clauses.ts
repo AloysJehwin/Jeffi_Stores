@@ -10,11 +10,13 @@ import {
   type KeyedField,
   type ParamSource,
 } from './client'
+import type { SearchClause } from './search'
 import type {
   Bind,
   ClauseOpts,
   Clauses,
   FieldSql,
+  FilterBranch,
   FilterCtx,
   FilterEntity,
   FilterQuery,
@@ -189,6 +191,57 @@ function fieldConditions(f: KeyedField, s: FieldSql, q: FilterQuery, bind: Bind,
   }
 }
 
+const NO_MATCH = (_q: string, idx: number): SearchClause => ({ clause: 'FALSE', params: [], nextIdx: idx })
+
+function branchView<K extends string>(entity: FilterEntity<K>, b: FilterBranch<K>): FilterEntity<K> {
+  const ex = entity.export
+  return {
+    ...entity,
+    root: b.root,
+    alias: b.alias,
+    pk: b.pk,
+    base: b.base,
+    sql: b.sql,
+    search: entity.search && { param: entity.search.param, build: b.search ?? NO_MATCH },
+    export: ex && {
+      ...ex,
+      columns: ex.columns.map(c => ({ ...c, sql: b.export?.columns[c.key] ?? 'NULL' })),
+      keyset: b.export?.keyset ?? ex.keyset,
+    },
+    branches: undefined,
+  }
+}
+
+/** The entity as each of its UNION tables (just itself when it has none). */
+export function branchesOf<K extends string>(entity: FilterEntity<K>): FilterEntity<K>[] {
+  return entity.branches?.length ? entity.branches.map(b => branchView(entity, b)) : [entity]
+}
+
+/** One branch of a UNION entity; the entity itself when it has no such branch. */
+export function branchOf<K extends string>(entity: FilterEntity<K>, key?: string): FilterEntity<K> {
+  const b = key ? entity.branches?.find(x => x.key === key) : undefined
+  return b ? branchView(entity, b) : entity
+}
+
+/** A UNION entity: the top-level root, alias, SQL and search mirror the first branch. */
+export function unionEntity<K extends string>(
+  e: Omit<FilterEntity<K>, 'root' | 'alias' | 'pk' | 'base' | 'sql' | 'search' | 'branches'> & {
+    search?: { param?: string }
+    branches: [FilterBranch<K>, ...FilterBranch<K>[]]
+  }
+): FilterEntity<K> {
+  const first = e.branches[0]
+  return {
+    ...e,
+    root: first.root,
+    alias: first.alias,
+    pk: first.pk,
+    base: first.base,
+    sql: first.sql,
+    search: e.search && { param: e.search.param, build: first.search ?? NO_MATCH },
+  }
+}
+
 /** WHERE conditions for the active fields, binding from `startIdx` (the product builder's contract). */
 export function buildClauses<K extends string>(
   entity: FilterEntity<K>,
@@ -196,6 +249,8 @@ export function buildClauses<K extends string>(
   startIdx: number,
   opts: ClauseOpts = {}
 ): Clauses {
+  if (opts.branch && entity.branches)
+    return buildClauses(branchOf(entity, opts.branch), q, startIdx, { ...opts, branch: undefined })
   const conditions: string[] = []
   const params: unknown[] = []
   const bind: Bind = value => {
@@ -217,6 +272,8 @@ export function buildWhere<K extends string>(
   startIdx = 1,
   opts: ClauseOpts & { base?: boolean } = {}
 ): Clauses & { where: string } {
+  if (opts.branch && entity.branches)
+    return buildWhere(branchOf(entity, opts.branch), q, startIdx, { ...opts, branch: undefined })
   const conditions = opts.base === false ? [] : [...(entity.base ?? [])]
   const params: unknown[] = []
   let idx = startIdx
@@ -249,21 +306,38 @@ export function filterScope<K extends string>(
   opts: ClauseOpts = {}
 ): FilterScope {
   const empty = !hasFilters(entity, q, opts.omit)
-  const pk = entity.pk ?? 'id'
   return {
     empty,
-    and(start) {
+    and(start, branch) {
       if (empty) return { sql: '', params: [] }
-      const w = buildWhere(entity, q, start, { ...opts, base: false })
+      const w = buildWhere(entity, q, start, { ...opts, base: false, branch: branch ?? opts.branch })
       return { sql: w.conditions.map(c => ` AND ${c}`).join(''), params: w.params }
     },
     inIds(col, start) {
       if (empty) return { sql: '', params: [] }
-      const w = buildWhere(entity, q, start, opts)
-      return {
-        sql: ` AND ${col} IN (SELECT ${entity.alias}.${pk} FROM ${entity.root} ${entity.alias} ${w.where})`,
-        params: w.params,
-      }
+      const params: unknown[] = []
+      const sel = branchesOf(entity).map(b => {
+        const w = buildWhere(b, q, start + params.length, { ...opts, branch: undefined })
+        params.push(...w.params)
+        return `SELECT ${b.alias}.${b.pk ?? 'id'} FROM ${b.root} ${b.alias} ${w.where}`
+      })
+      return { sql: ` AND ${col} IN (${sel.join(' UNION ALL ')})`, params }
     },
   }
+}
+
+/** Matching rows counted up to `cap` (one past it tells the caller the count was capped). */
+export function countQuery<K extends string>(
+  entity: FilterEntity<K>,
+  q: FilterQuery,
+  cap: number,
+  opts: ClauseOpts = {}
+): { sql: string; params: unknown[] } {
+  const params: unknown[] = []
+  const sel = branchesOf(entity).map(b => {
+    const w = buildWhere(b, q, params.length + 1, { ...opts, branch: undefined })
+    params.push(...w.params)
+    return `SELECT 1 FROM ${b.root} ${b.alias} ${w.where}`
+  })
+  return { sql: `SELECT count(*)::int AS n FROM (${sel.join(' UNION ALL ')} LIMIT ${cap + 1}) t`, params }
 }

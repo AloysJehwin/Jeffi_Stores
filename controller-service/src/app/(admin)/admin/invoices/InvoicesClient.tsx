@@ -3,10 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowDown, ArrowUp, Check, Download, Plus, X } from 'lucide-react'
-import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, Field, Fields, TableSkeleton, FormFooter, FormButton, fieldInputCls, InfiniteFooter, fetchJson, useInfiniteList, type StatusMap } from '@/components/admin/kit'
-import Select from '@/components/ui/Select'
+import { INVOICE_ALIASES, INVOICE_FIELDS, INVOICE_SEARCH } from '@jeffi/list-filters/fields'
+import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, Field, Fields, TableSkeleton, FormFooter, FormButton, fieldInputCls, InfiniteFooter, ListFilters, fetchJson, useFilterQuery, useInfiniteList, type StatusMap } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
-import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
 import RowActions from '@/components/admin/RowActions'
 import HoverCard from '@/components/ui/HoverCard'
@@ -158,23 +157,10 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
-  const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '')
-  const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
-  const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
-  const [toDate, setToDate] = useState(searchParams.get('to') || '')
-  const [searchQ, setSearchQ] = useState(searchParams.get('search') || '')
-  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '')
+  // Filters live in the URL (from / to is the invoice date, shared with the Overview period).
+  const filters = useFilterQuery(INVOICE_FIELDS, { aliases: INVOICE_ALIASES })
   const [sortCol, setSortCol] = useState<string | undefined>(undefined)
   const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
-
-  function syncUrl(patch: Record<string, string>) {
-    const p = new URLSearchParams(window.location.search)
-    for (const [k, v] of Object.entries(patch)) {
-      if (v) p.set(k, v)
-      else p.delete(k)
-    }
-    router.replace(ap(`/admin/invoices?${p.toString()}`), { scroll: false })
-  }
 
   function handleSort(col: string, dir: SortDir) {
     setSortCol(col || undefined)
@@ -267,16 +253,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
 
   // Rows are ordered server-side (across all invoices) via sort/dir params; 25 per page.
   const list = useInfiniteList<Invoice>({
-    key: `${sourceFilter}|${paymentFilter}|${fromDate}|${toDate}|${searchQ}|${sortCol}|${sortDir}`,
+    key: `${filters}|${sortCol}|${sortDir}`,
     pageSize: 25,
     getKey: i => i.id,
     fetchPage: async (p, signal) => {
-      const params = new URLSearchParams()
-      if (sourceFilter) params.set('source', sourceFilter)
-      if (paymentFilter) params.set('payment', paymentFilter)
-      if (fromDate) params.set('from', fromDate)
-      if (toDate) params.set('to', toDate)
-      if (searchQ) params.set('search', searchQ)
+      const params = new URLSearchParams(filters)
       if (sortCol && INVOICE_SORT_KEYS[sortCol]) {
         params.set('sort', INVOICE_SORT_KEYS[sortCol])
         params.set('dir', sortDir || 'desc')
@@ -1648,104 +1629,15 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           </TabActionsPortal>
         )}
 
-        <div className="flex items-center gap-2 overflow-x-auto -mx-4 px-4 pb-1">
-          <div className="min-w-[200px] flex-1 shrink-0">
-            <AdminTypeahead
-              type="invoices"
-              value={searchInput}
-              onChange={setSearchInput}
-              onSelect={item => {
-                setSearchInput(item.label)
-                setSearchQ(item.label)
-                syncUrl({ search: item.label })
-              }}
-              onEnter={val => {
-                setSearchQ(val)
-                syncUrl({ search: val })
-              }}
-              placeholder="Search invoice, order, customer…"
-              inputClassName={inputCls + ' pr-9'}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSearchQ(searchInput)
-              syncUrl({ search: searchInput })
-            }}
-            className="control-md shrink-0 bg-accent-500 font-medium text-white hover:bg-accent-600"
-          >
-            Search
-          </button>
-          <div className="w-[190px] shrink-0">
-            <Select<string>
-              value={sourceFilter}
-              onChange={v => {
-                setSourceFilter(v)
-                syncUrl({ source: v })
-              }}
-              options={[
-                { value: '', label: 'Source: All' },
-                { value: 'online', label: 'Source: Online' },
-                { value: 'offline', label: 'Source: Offline' },
-                { value: 'cash_sale', label: 'Source: Offline (Cash Sale)' },
-              ]}
-            />
-          </div>
-          <div className="w-[170px] shrink-0">
-            <Select<string>
-              value={paymentFilter}
-              onChange={v => {
-                setPaymentFilter(v)
-                syncUrl({ payment: v })
-              }}
-              options={[
-                { value: '', label: 'Payment: All' },
-                { value: 'paid', label: 'Payment: Paid' },
-                { value: 'unpaid', label: 'Payment: Unpaid' },
-                { value: 'refunded', label: 'Payment: Refunded' },
-                { value: 'failed', label: 'Payment: Failed' },
-              ]}
-            />
-          </div>
-          <div className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap">
-            <DatePicker
-              className="w-36"
-              value={fromDate}
-              onChange={v => {
-                setFromDate(v)
-                syncUrl({ from: v })
-              }}
-            />
-            <span className="text-xs text-foreground-muted">to</span>
-            <DatePicker
-              className="w-36"
-              value={toDate}
-              onChange={v => {
-                setToDate(v)
-                syncUrl({ to: v })
-              }}
-            />
-          </div>
-          {(searchQ || sourceFilter || paymentFilter || fromDate || toDate) && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQ('')
-                setSearchInput('')
-                setSourceFilter('')
-                setPaymentFilter('')
-                setFromDate('')
-                setToDate('')
-                syncUrl({ search: '', source: '', payment: '', from: '', to: '' })
-              }}
-              className="control-md shrink-0 border border-border-default text-foreground-secondary hover:bg-surface-secondary"
-            >
-              <X className="h-4 w-4" />
-              Clear
-            </button>
-          )}
-        </div>
+        <ListFilters
+          entity="invoices"
+          fields={INVOICE_FIELDS}
+          aliases={INVOICE_ALIASES}
+          search={INVOICE_SEARCH}
+          noun="Invoices"
+          tab="list"
+          exportable
+        />
 
         {(draftsLoading || drafts.length > 0) && (
           <section className="overflow-hidden rounded-xl border border-amber-500/40 bg-amber-500/5">

@@ -1,4 +1,4 @@
-import { buildWhere } from './clauses'
+import { branchesOf, buildWhere } from './clauses'
 import type { FilterCtx, FilterEntity, FilterQuery } from './types'
 
 export const EXPORT_BATCH = 1000
@@ -17,6 +17,7 @@ export function exportQuery<K extends string>(
 ): { sql: string; params: unknown[] } | null {
   const ex = entity.export
   if (!ex?.columns.length || !ex.keyset.length) return null
+  if (entity.branches?.length) return unionExportQuery(entity, q, opts)
   const w = buildWhere(entity, q, 1, { ctx: opts.ctx })
   const params = [...w.params]
   const conds = [...w.conditions]
@@ -32,6 +33,34 @@ export function exportQuery<K extends string>(
      FROM ${entity.root} ${entity.alias}
      ${conds.length ? `WHERE ${conds.join(' AND ')}` : ''}
      ORDER BY ${ex.keyset.join(', ')}
+     LIMIT ${Math.max(1, opts.limit ?? EXPORT_BATCH)}`
+  return { sql, params }
+}
+
+/** Each branch filtered and keyset-bounded on its own, merged and ordered on the output keys. */
+function unionExportQuery<K extends string>(
+  entity: FilterEntity<K>,
+  q: FilterQuery,
+  opts: { after?: unknown[]; limit?: number; ctx?: FilterCtx }
+): { sql: string; params: unknown[] } {
+  const params: unknown[] = []
+  const bind = (v: unknown) => {
+    params.push(v)
+    return `$${params.length}`
+  }
+  const keys = (entity.export?.keyset ?? []).map((_, i) => `"__k${i}"`)
+  const parts = branchesOf(entity).map(b => {
+    const ex = b.export ?? { columns: [], keyset: [] }
+    const w = buildWhere(b, q, params.length + 1, { ctx: opts.ctx })
+    params.push(...w.params)
+    const conds = [...w.conditions]
+    if (opts.after?.length === ex.keyset.length)
+      conds.push(`(${ex.keyset.join(', ')}) > (${opts.after.map(bind).join(', ')})`)
+    const cols = [...ex.columns.map(c => `${c.sql} AS "${c.key}"`), ...ex.keyset.map((k, i) => `${k} AS ${keys[i]}`)]
+    return `(SELECT ${cols.join(', ')} FROM ${b.root} ${b.alias}${conds.length ? ` WHERE ${conds.join(' AND ')}` : ''})`
+  })
+  const sql = `SELECT * FROM (${parts.join(' UNION ALL ')}) u
+     ORDER BY ${keys.join(', ')}
      LIMIT ${Math.max(1, opts.limit ?? EXPORT_BATCH)}`
   return { sql, params }
 }

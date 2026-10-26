@@ -136,16 +136,12 @@ describe('GET /api/admin/inventory/po', () => {
     expect(countCall[1]).toContain(SUPPLIER_UUID)
   })
 
-  it('applies search filter via buildSearchClause', async () => {
-    mockBuildSearchClause.mockReturnValue({
-      clause: '(po.po_number ILIKE $1 OR s.name ILIKE $1)',
-      params: ['%bolt%'],
-      nextIdx: 2,
-    })
-
+  it('applies the search to PO number and supplier', async () => {
     const res = await poRouteGET(makeListReq('?search=bolt'))
     expect(res.status).toBe(200)
-    expect(buildSearchClause).toHaveBeenCalledWith('bolt', expect.any(Array), expect.any(Number))
+    const [sql, params] = mockQueryOne.mock.calls[0]
+    expect(sql).toContain('po.po_number ILIKE')
+    expect(params).toEqual(expect.arrayContaining(['%bolt%', 'bolt']))
   })
 
   it('applies all three filters combined (status + supplier_id + search)', async () => {

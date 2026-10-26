@@ -3,7 +3,7 @@ import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne, withTransaction } from '@jeffi/tenancy'
 import { round2 } from '../../lib/gst'
-import { buildSearchClause } from '../../lib/search'
+import { PO_OPEN_SQL, PURCHASE_ORDERS_ENTITY, buildWhere, normalizeQuery } from '@jeffi/list-filters'
 import { z } from 'zod'
 import { parseBody, zUuid, zCurrency } from '../../lib/validate'
 
@@ -41,41 +41,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
-    const status = searchParams.get('status') || ''
-    const supplierId = searchParams.get('supplier_id') || ''
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = (page - 1) * limit
 
-    const conditions = ['1=1']
-    const params: any[] = []
-    let i = 1
+    const w = buildWhere(PURCHASE_ORDERS_ENTITY, normalizeQuery(PURCHASE_ORDERS_ENTITY, searchParams))
+    const where = w.conditions.length ? w.conditions.join(' AND ') : '1=1'
+    const { params, nextIdx: i } = w
 
-    if (status) {
-      conditions.push(`po.status = $${i++}`)
-      params.push(status)
-    }
-    if (supplierId) {
-      conditions.push(`po.supplier_id = $${i++}`)
-      params.push(supplierId)
-    }
-    if (search) {
-      const sc = buildSearchClause(search, ['po.po_number', 's.name'], i)
-      conditions.push(sc.clause)
-      params.push(...sc.params)
-      i = sc.nextIdx
-    }
-
-    const where = conditions.join(' AND ')
-    const countRow = await queryOne<{ total: number }>(
-      `SELECT COUNT(DISTINCT po.id)::int AS total
+    // Total and the KPI strip (open POs, their value) over every matching PO, not just this page.
+    const countRow = await queryOne<{ total: number; open: number; open_value: string }>(
+      `SELECT COUNT(DISTINCT po.id)::int AS total,
+              COUNT(DISTINCT po.id) FILTER (WHERE ${PO_OPEN_SQL})::int AS open,
+              COALESCE(SUM(po.total_amount) FILTER (WHERE ${PO_OPEN_SQL}), 0) AS open_value
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        WHERE ${where}`,
       params
     )
     const total = countRow?.total || 0
+    const summary = { open: countRow?.open || 0, open_value: Number(countRow?.open_value || 0) }
 
     const rows = await queryMany<any>(
       `SELECT
@@ -93,7 +78,7 @@ export async function GET(request: NextRequest) {
       [...params, limit, offset]
     )
 
-    return NextResponse.json({ purchase_orders: rows || [], total, page, limit })
+    return NextResponse.json({ purchase_orders: rows || [], total, page, limit, summary })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

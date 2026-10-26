@@ -1167,6 +1167,14 @@ CREATE INDEX idx_orders_customer_name_trgm ON public.orders USING gin (customer_
 
 
 --
+-- Name: idx_orders_invoice_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_invoice_date ON public.orders USING btree (invoice_date) WHERE (invoice_number IS NOT NULL);
+
+
+
+--
 -- Name: idx_orders_invoice_number_trgm; Type: INDEX; Schema: public; Owner: -
 --
 
