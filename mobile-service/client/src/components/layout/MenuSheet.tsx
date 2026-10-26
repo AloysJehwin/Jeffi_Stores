@@ -6,8 +6,8 @@ import { usePathname, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Bell, BellRing, CircleUser, FileText, GitCompareArrows, Heart, House, Info, LayoutGrid, LifeBuoy, LogIn, LogOut, Mail, Moon,
-  Package, RotateCcw, ShoppingBag, ShoppingCart, Smartphone, Sun, Tag, UserPlus, X,
+  Bell, BellRing, Briefcase, Building2, CircleUser, FilePlus2, FileText, GitCompareArrows, Heart, House, Info, LayoutGrid, LifeBuoy,
+  LogIn, LogOut, Mail, MonitorSmartphone, Moon, Package, RotateCcw, ShoppingBag, ShoppingCart, Smartphone, Sun, Tag, UserPlus, X,
 } from 'lucide-react-native'
 import { logout } from '../../api/auth'
 import { getWishlist } from '../../api/wishlist'
@@ -16,6 +16,7 @@ import { useUnreadCount } from '../../hooks/useNotifications'
 import { useCartStore } from '../../stores/cartStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useThemeStore, type ThemePreference } from '../../stores/themeStore'
+import { useBusiness } from '../account/hooks'
 import { useTokens } from '../../theme'
 import {
   Badge, IconButton, ListGroup, ListRow, ModalSheet, Text, cn, elevationClass, haptic, useElevation, type IconComponent,
@@ -82,6 +83,7 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
   const resetCart = useCartStore(s => s.reset)
   const user = useAuthStore(s => s.user)
   const clearAuth = useAuthStore(s => s.clearAuth)
+  const business = useBusiness()
 
   const { data: wishlist } = useQuery({ queryKey: ['wishlist'], queryFn: getWishlist, enabled: !!user, staleTime: 60_000 })
   const wishlistCount = user ? wishlist?.length ?? 0 : 0
@@ -151,7 +153,7 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
             <ListRow
               key="me"
               title={`${user.firstName} ${user.lastName}`.trim()}
-              subtitle={user.email}
+              subtitle={business.isBusiness && business.profile?.companyName ? business.profile.companyName : user.email}
               leading={
                 <View className="h-10 w-10 overflow-hidden rounded-full">
                   {avatarUrl ? (
@@ -177,9 +179,19 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
           <ListGroup>
             <ListRow key="login" title="Sign in" icon={LogIn} iconTone="accent" onPress={() => go(() => router.push('/(auth)/login'))} />
             <ListRow key="signup" title="Create account" icon={UserPlus} onPress={() => go(() => router.push('/(auth)/signup'))} />
+            <ListRow key="business" title="Business sign in" icon={Briefcase} onPress={() => go(() => router.push('/(auth)/business-login'))} />
             {row('Notification settings', BellRing, '/account/notifications', () => router.push('/account/notifications'))}
           </ListGroup>
         )}
+
+        {business.approved ? (
+          <ListGroup title="Business">
+            {row('My quotes', FileText, '/account/quotes', () => router.push('/account/quotes'))}
+            {row('New quote', FilePlus2, '/account/quotes/new', () => router.push('/account/quotes/new'))}
+            {row('Company', Building2, '/account', () => router.navigate('/(tabs)/account'))}
+            {row('Signed-in devices', MonitorSmartphone, '/account/sessions', () => router.push('/account/sessions'))}
+          </ListGroup>
+        ) : null}
 
         <ListGroup title="Shop">
           {row('Home', House, '/', () => router.navigate('/(tabs)'))}

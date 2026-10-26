@@ -30,6 +30,7 @@ export function toCard(p: Product & Record<string, any>, gstEnabled: boolean): C
     primaryImage: img?.image_url ? { image_url: img.image_url, thumbnail_url: img.thumbnail_url, blurhash: (img as any).blurhash ?? null } : null,
     brandName: p.brands?.name ?? null,
     categoryName: p.categories?.name ?? null,
+    categoryId: (p as any).category_id ?? (p.categories as any)?.id ?? null,
     discountPct: Number(p.discount_pct ?? 0),
     extraDeliveryDays: Number(p.extra_delivery_days ?? 0),
     isDigital: !!p.is_digital,

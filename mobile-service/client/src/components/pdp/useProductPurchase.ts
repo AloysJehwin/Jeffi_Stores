@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCart } from '../../api/cart'
 import { addPdpToCart, startBuyNow, type CartLine, type PdpProduct, type PdpVariant } from '../../api/pdp'
+import { applyDiscount, useBusiness } from '../account/hooks'
 import { useAuthStore } from '../../stores/authStore'
 import { showToast } from '../../stores/toastStore'
 import { num, pickUnitPrice, round2, stickyBarAction } from './pdp'
@@ -221,7 +222,7 @@ export function useProductPurchase(
     return mrpBasis != null ? round2(mrpBasis * discFactor) : null
   }
 
-  const effectivePrice = hasVariants
+  const listPrice = hasVariants
     ? (() => {
         if (selectedSubVariant) {
           const fromMrp = priceFromMrp(num(selectedSubVariant.mrp), null)
@@ -250,8 +251,13 @@ export function useProductPurchase(
         ? Number(selectedVariant.mrp)
         : mrp
     : mrp
-  const effectiveMrp =
+  const listMrp =
     !gstEnabled && effectiveMrpRaw != null && gstMultiplier > 0 ? round2(Number(effectiveMrpRaw) / gstMultiplier) : effectiveMrpRaw
+  // A business account's per-category price, shown with the regular price struck through. Display only:
+  // the order is priced on the server.
+  const businessPct = useBusiness().discountFor(product.category_id)
+  const effectivePrice = businessPct > 0 ? round2(applyDiscount(listPrice, businessPct)) : listPrice
+  const effectiveMrp = businessPct > 0 && !(listMrp != null && listMrp > listPrice) ? listPrice : listMrp
   const effectiveStock = hasVariants
     ? (selectedSubVariant ? selectedSubVariant.stock_status : selectedVariant?.stock_status) !== 'Out of Stock'
       ? 9999
@@ -429,6 +435,7 @@ export function useProductPurchase(
     inCart,
     effectivePrice,
     effectiveMrp,
+    businessPct,
     effectiveStock,
     mrpDiscount,
     perUnitRate,

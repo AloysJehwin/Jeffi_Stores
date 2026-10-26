@@ -1,7 +1,7 @@
 import { useEffect, useState, type RefObject } from 'react'
 import { Linking, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Check, CircleCheck, CircleX, ShoppingCart, Zap } from 'lucide-react-native'
+import { Check, CircleCheck, CircleX, FileText, ShoppingCart, Zap } from 'lucide-react-native'
 import { Badge, Button, Chip, ChipGroup, ListRow, ModalSheet, Text } from '../../ui'
 import QuantityInput, { InCartQtyHint } from './QuantityInput'
 import { OptionChips } from './OptionChips'
@@ -30,6 +30,7 @@ export default function ProductActions({
   launchDate,
   optionsRef,
   buyRef,
+  onRequestQuote,
 }: {
   p: ProductPurchase
   digital: boolean
@@ -42,6 +43,8 @@ export default function ProductActions({
   launchDate: string | null
   optionsRef: RefObject<View | null>
   buyRef: RefObject<View | null>
+  /** An approved business account can ask for a quote instead of buying. */
+  onRequestQuote?: () => void
 }) {
   const router = useRouter()
   const t = useTokens()
@@ -163,6 +166,7 @@ export default function ProductActions({
         </View>
         {p.mrpDiscount > 0 ? (
           <View className="mb-2 flex-row flex-wrap items-center gap-2">
+            {p.businessPct > 0 ? <Badge label={`Business ${p.businessPct}% extra off`} tone="brand" /> : null}
             <Badge label={`${p.mrpDiscount}% off`} tone="accent" />
             <Text className="text-sm text-foreground-secondary">
               You save Rs. {inr((p.effectiveMrp! - p.effectivePrice) * p.unitFactor * p.quantity)}
@@ -289,6 +293,7 @@ export default function ProductActions({
               />
             ) : null}
             {p.inCart && !digital ? <Button label="View cart" icon={ShoppingCart} variant="ghost" size="md" onPress={() => router.push('/(tabs)/cart')} /> : null}
+            {onRequestQuote && !digital ? <Button label="Request a quote" icon={FileText} variant="outline" onPress={onRequestQuote} /> : null}
           </>
         )}
       </View>

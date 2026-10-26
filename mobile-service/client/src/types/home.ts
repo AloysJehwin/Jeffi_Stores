@@ -48,6 +48,8 @@ export interface CardProduct {
   primaryImage: { image_url: string; thumbnail_url?: string; blurhash?: string | null } | null
   brandName: string | null
   categoryName: string | null
+  /** Business prices are per category (useBusiness().discountFor). */
+  categoryId?: string | null
   discountPct: number
   extraDeliveryDays: number
   isDigital: boolean

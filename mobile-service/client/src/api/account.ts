@@ -1,5 +1,6 @@
-import { api, BASE_URL, getStoredToken } from './client'
+import { api, APP_USER_AGENT, authHeaders, BASE_URL } from './client'
 import type { User } from '../types'
+import { getMe } from './auth'
 import type { CardProduct } from '../types/home'
 
 // The account pages' routes, same paths and payloads the storefront calls.
@@ -10,8 +11,15 @@ export type AccountUser = User & {
   dateOfBirth?: string | null
   avatarUrl?: string | null
   isBusiness?: boolean
-  approvalStatus?: string
+  approvalStatus?: 'pending' | 'approved' | 'rejected'
   requiresPolicyAcceptance?: boolean
+  // Business accounts (/api/business/me)
+  companyName?: string | null
+  gstNumber?: string | null
+  industry?: string | null
+  businessAddress?: string | null
+  rejectionNote?: string | null
+  businessDiscountMap?: Record<string, number>
 }
 
 export interface FeatureFlags {
@@ -91,16 +99,15 @@ export async function getPopularProducts(): Promise<PopularProduct[]> {
 export const updateProfile = (payload: { firstName?: string; lastName?: string; phone?: string; dateOfBirth?: string; notificationChannel?: string }) =>
   api<{ user: Partial<AccountUser> }>('/api/user/update', { method: 'PATCH', body: JSON.stringify(payload) })
 
-export const getMeFull = () => api<{ user: AccountUser | null }>('/api/auth/me').then(d => d.user)
+export const getMeFull = () => getMe() as Promise<AccountUser | null>
 
 // ── Phone verification / policies ──
 
 /** POST helper that keeps the status and body on failure (cooldowns, flags). */
 export async function postJson<T = any>(path: string, body: unknown, method = 'POST'): Promise<{ ok: boolean; status: number; data: T & { error?: string } }> {
-  const token = await getStoredToken()
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { 'Content-Type': 'application/json', 'User-Agent': APP_USER_AGENT, ...(await authHeaders()) },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
@@ -212,11 +219,14 @@ export interface OrderDetails {
   subtotal: number
   taxAmount: number
   discountAmount: number
+  businessDiscountAmount?: number
   shippingAmount: number
   codFeeAmount?: number
   status: string
   paymentStatus: string
   paymentMode?: string | null
+  /** A business invoice paid by scanning its UPI QR. */
+  razorpayQrImageUrl?: string | null
   createdAt: string
   updatedAt: string
   deliveredAt: string | null
@@ -355,10 +365,9 @@ export const getTracking = (orderId: string, trackPath = 'track') =>
 
 /** Multipart POST/PATCH (reviews): the shared api() always sends JSON. */
 export async function postForm<T = any>(path: string, form: FormData, method = 'POST'): Promise<T> {
-  const token = await getStoredToken()
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    headers: { 'User-Agent': APP_USER_AGENT, ...(await authHeaders()) },
     body: form,
   })
   const data = await res.json().catch(() => ({}))
@@ -527,20 +536,6 @@ export const subscriptionAction = (id: string, action: 'cancel' | 'pause' | 'res
     method: 'POST',
     body: JSON.stringify(addressId ? { action, addressId } : { action }),
   })
-
-// ── Business quotes ──
-
-export interface Rfq {
-  id: string
-  rfq_number: string
-  status: string
-  notes: string | null
-  item_count: number
-  converted_quotation_id: string | null
-  created_at: string
-}
-
-export const listRfqs = (page: number) => api<{ rfqs: Rfq[]; total: number }>(`/api/business/rfqs?page=${page}`)
 
 // ── Account deletion ──
 

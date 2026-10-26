@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import type { User } from '../types'
-import { storeToken, clearToken } from '../api/client'
+import { storeToken, clearToken, setAuthPortal, type AuthPortal } from '../api/client'
 
 interface AuthState {
   user: User | null
   token: string | null
+  portal: AuthPortal
   isLoading: boolean
-  setAuth: (user: User, token: string) => Promise<void>
+  setAuth: (user: User, token: string, portal?: AuthPortal) => Promise<void>
   clearAuth: () => Promise<void>
   setLoading: (loading: boolean) => void
 }
@@ -14,14 +15,17 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
+  portal: 'customer',
   isLoading: true,
-  setAuth: async (user, token) => {
+  setAuth: async (user, token, portal = 'customer') => {
     await storeToken(token)
-    set({ user, token })
+    await setAuthPortal(portal)
+    set({ user, token, portal })
   },
   clearAuth: async () => {
     await clearToken()
-    set({ user: null, token: null })
+    await setAuthPortal('customer')
+    set({ user: null, token: null, portal: 'customer' })
   },
   setLoading: (isLoading) => set({ isLoading }),
 }))
