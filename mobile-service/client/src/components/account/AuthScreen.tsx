@@ -22,7 +22,8 @@ import { accent } from '../../theme'
 
 const TILE = 64
 const GAP = 10
-const COMPACT_PANEL = 56
+// The header row (8 + 44) plus the 24 the sheet overlaps it by (-mt-6), so the close button stays clear.
+const COMPACT_PANEL = 84
 
 export function AuthScreen({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   const close = useLeaveAuth()
