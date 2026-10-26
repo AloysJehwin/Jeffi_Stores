@@ -15,7 +15,14 @@ k8s_tunnel
 # in_cluster prints the JSON response, then "<job> <status>"; keep the JSON, and show it when the call fails.
 call() {
   local out
-  out=$(in_cluster "$1" "$2" "$3") || { echo "$out" >&2; return 1; }
+  out=$(in_cluster "$1" "$2" "$3") || {
+    if [ "${out##* }" = 404 ]; then
+      echo "The live controller has no $2 yet: it ships with the release that adds this script. Release first, then re-run." >&2
+    else
+      echo "$out" >&2
+    fi
+    return 1
+  }
   sed '$d' <<<"$out"
 }
 step() { # <response json>: one line per blurhash batch; prints `next` (JSON) on the last line
