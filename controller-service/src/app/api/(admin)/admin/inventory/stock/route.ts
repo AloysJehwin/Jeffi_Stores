@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { filterScope, normalizeQuery } from '@jeffi/list-filters'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getStockLedger, getStockValuation, logStockMovement, recomputeStockStatusForProduct } from '@/lib/orders/inventory'
@@ -7,6 +8,9 @@ import { getClient, queryOne, query } from '@/lib/shared/db'
 import { getOrCreateOpenShelf, upsertShelfStock } from '@/lib/catalog/shelf'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { parseBody, zUuid } from '@/lib/shared/validate'
+import { addDays, istToday } from '@/lib/overview/period'
+import { LEDGER_ENTITY, VALUATION_ENTITY } from '@/lib/filters/entities/inventory'
+import { LEDGER_DEFAULT_DAYS } from '@/lib/filters/fields/inventory'
 
 const PatchSchema = z
   .object({
@@ -108,31 +112,44 @@ export async function GET(request: NextRequest) {
     if (view === 'valuation') {
       const valPage = Math.max(1, parseInt(searchParams.get('page') || '1'))
       const valLimit = parseInt(searchParams.get('limit') || '50')
+      // The list filters (old val_* names included); search keeps the valuation's own ranking.
+      const q = normalizeQuery(VALUATION_ENTITY, searchParams)
       const data = await getStockValuation({
         limit: valLimit,
         offset: (valPage - 1) * valLimit,
-        search: searchParams.get('search') || undefined,
-        categoryName: searchParams.get('category') || undefined,
-        brandName: searchParams.get('brand') || undefined,
-        stockStatus: searchParams.get('stock_status') || undefined,
+        search: q.search || undefined,
         sort: searchParams.get('sort') || undefined,
         dir: searchParams.get('dir') || undefined,
+        scope: filterScope(VALUATION_ENTITY, q, { omit: ['search'] }),
       })
       return NextResponse.json({ ...data, page: valPage, limit: valLimit })
     }
 
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = parseInt(searchParams.get('limit') || '50')
+    // The list filters (old ledger_* names included). Without dates or a product, the last 30 days.
+    const q = normalizeQuery(LEDGER_ENTITY, searchParams)
+    const productId = searchParams.get('product_id') || undefined
+    const windowed = !q.from && !q.to && !productId
+    const from = q.from || (windowed ? addDays(istToday(), 1 - LEDGER_DEFAULT_DAYS) : undefined)
     const ledger = await getStockLedger({
-      productId: searchParams.get('product_id') || undefined,
-      search: searchParams.get('search') || undefined,
-      from: searchParams.get('from') || undefined,
-      to: searchParams.get('to') || undefined,
+      productId,
+      search: q.search || undefined,
+      from,
+      to: q.to || undefined,
       limit,
       offset: (page - 1) * limit,
+      scope: filterScope(LEDGER_ENTITY, q, { omit: ['created', 'search'] }),
     })
 
-    return NextResponse.json({ transactions: ledger.rows, total: ledger.total, page, limit })
+    return NextResponse.json({
+      transactions: ledger.rows,
+      total: ledger.total,
+      capped: !!ledger.capped,
+      page,
+      limit,
+      window: windowed ? { from, days: LEDGER_DEFAULT_DAYS } : null,
+    })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

@@ -6,6 +6,8 @@ import { DonutSplit, TrendChart, type SeriesDef } from '@/components/admin/dashb
 import { delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import type { CashSaleOverview as Data } from '@/lib/overviews/cash-sale'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { CASH_SALE_ALIASES, CASH_SALE_FIELDS, CASH_SALE_SEARCH } from '@/lib/filters/fields/cash-sale'
 
 const SERIES: SeriesDef[] = [
   { key: 'sales', label: 'Sales', color: 'rgb(16 185 129)', kind: 'area', axis: 'money' },
@@ -15,8 +17,10 @@ const MODE_COLORS = ['rgb(16 185 129)', 'rgb(59 130 246)', 'rgb(168 85 247)', 'r
 
 export default function CashSaleOverview() {
   const [period, setPeriod] = usePeriod()
+  // KPIs and charts follow the sales list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(CASH_SALE_FIELDS, { aliases: CASH_SALE_ALIASES, omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/cash-sale/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/cash-sale/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
 
   return (
@@ -28,6 +32,16 @@ export default function CashSaleOverview() {
         </p>
       </div>
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="cash_sale"
+        fields={CASH_SALE_FIELDS}
+        aliases={CASH_SALE_ALIASES}
+        search={CASH_SALE_SEARCH}
+        period
+        noun="Cash sales"
+        tab="overview"
+        exportable
+      />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {!data ? loading && <OverviewSkeleton /> : <Body d={data} />}
     </div>

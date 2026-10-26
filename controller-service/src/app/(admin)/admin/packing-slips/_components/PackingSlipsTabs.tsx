@@ -1,6 +1,9 @@
 'use client'
 
 import { Tabs } from '@/components/admin/channels/ui'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { isListUrl } from '@/lib/admin/filter-url'
+import { PACKING_FIELDS, PACKING_SEARCH } from '@/lib/filters/fields/packing-slips'
 import { OverviewPanel, useTab } from '../../orders/_components/overview-shared'
 import PackingSlipsClient from '../PackingSlipsClient'
 
@@ -9,13 +12,13 @@ const TABS = [
   { id: 'slips', label: 'Packing slips' },
 ] as const
 type Tab = (typeof TABS)[number]['id']
-const LIST_PARAMS = ['from', 'to', 'customer', 'status']
 
 export default function PackingSlipsTabs() {
-  // Old links carrying the slip filters open the slips tab.
+  // Links carrying slip filters and no tab open the slips tab.
   const [tab, setTab] = useTab<Tab>(['overview', 'slips'], 'overview', {
-    legacy: sp => (LIST_PARAMS.some(k => sp.get(k)) ? 'slips' : null),
+    legacy: sp => (isListUrl(Object.fromEntries(sp), PACKING_FIELDS) ? 'slips' : null),
   })
+  const filters = useFilterQuery(PACKING_FIELDS, { omit: ['from', 'to'] })
   const bar = (
     <div className="mb-5">
       <Tabs tabs={[...TABS]} value={tab} onChange={setTab} />
@@ -29,8 +32,15 @@ export default function PackingSlipsTabs() {
         <p className="text-sm text-foreground-muted mt-1">Download packing slips to attach to parcels</p>
       </div>
       {bar}
-      {/* The slips list owns ?from&to, so the overview keeps its period locally. */}
-      <OverviewPanel endpoint="/api/admin/packing-slips/overview" local fallback="7d" />
+      {/* The period is the slips list's order date; the strip follows the other filters too. */}
+      <OverviewPanel
+        endpoint="/api/admin/packing-slips/overview"
+        fallback="7d"
+        query={filters}
+        filters={
+          <ListFilters entity="packing_slips" fields={PACKING_FIELDS} search={PACKING_SEARCH} period noun="Orders" tab="overview" exportable />
+        }
+      />
     </div>
   )
 }

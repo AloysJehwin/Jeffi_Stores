@@ -1,13 +1,28 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 import { useActionToast } from '@/components/admin/kit/toast'
-import { Dialog, EmptyState, ErrorState, TextArea, TableSkeleton, badgeCls, type Tone } from '@/components/admin/kit'
+import {
+  Dialog,
+  EmptyState,
+  ErrorState,
+  InfiniteFooter,
+  ListFilters,
+  TextArea,
+  TableSkeleton,
+  badgeCls,
+  fetchJson,
+  useFilterQuery,
+  useInfiniteList,
+  type Tone,
+} from '@/components/admin/kit'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { fmtQty } from '@/lib/shared/number-display'
+import { RETURN_FIELDS, REQUEST_SEARCH } from '@/lib/filters/fields/returns'
 
 interface ReturnRow {
   id: string
@@ -314,35 +329,41 @@ const STATUS_TABS = [
   { key: 'history', label: 'History' },
 ]
 
+const OUTCOMES = ['all', 'approved', 'rejected']
+const PAGE_SIZE = 20
+
 export default function AdminReturnsClient() {
-  const [activeTab, setActiveTab] = useState('all')
-  const [historyFilter, setHistoryFilter] = useState('all')
-  const [returns, setReturns] = useState<ReturnRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const url =
-        activeTab === 'history'
-          ? `/api/admin/returns?status=history&filter=${historyFilter}`
-          : `/api/admin/returns?status=${activeTab}`
-      const res = await fetch(url, { credentials: 'include' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed')
-      setReturns(data.returns)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
+  const sp = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  // The bucket and history outcome live in the URL beside the list filters.
+  const activeTab = STATUS_TABS.some(t => t.key === sp.get('bucket')) ? (sp.get('bucket') as string) : 'all'
+  const historyFilter = OUTCOMES.includes(sp.get('outcome') || '') ? (sp.get('outcome') as string) : 'all'
+  const filters = useFilterQuery(RETURN_FIELDS)
+  const setView = (patch: Record<string, string | null>) => {
+    const q = new URLSearchParams(sp.toString())
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) q.set(k, v)
+      else q.delete(k)
     }
-  }, [activeTab, historyFilter])
+    router.replace(`${pathname}?${q}`, { scroll: false })
+  }
 
-  useEffect(() => {
-    load()
-  }, [load])
+  const list = useInfiniteList<ReturnRow>({
+    key: `${activeTab}|${historyFilter}|${filters}`,
+    pageSize: PAGE_SIZE,
+    getKey: r => r.id,
+    fetchPage: async (page, signal) => {
+      const q = new URLSearchParams(filters)
+      q.set('bucket', activeTab)
+      if (activeTab === 'history') q.set('filter', historyFilter)
+      q.set('page', String(page))
+      q.set('limit', String(PAGE_SIZE))
+      const data = await fetchJson(`/api/admin/returns?${q}`, signal)
+      return { rows: data.returns || [], total: data.total ?? null, hasMore: data.hasMore }
+    },
+  })
+  const returns = list.rows
 
   return (
     <div className="space-y-4">
@@ -353,7 +374,7 @@ export default function AdminReturnsClient() {
             <button
               key={tab.key}
               type="button"
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => setView({ bucket: tab.key === 'all' ? null : tab.key, outcome: null })}
               className={`shrink-0 rounded-md px-3 text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? 'bg-surface-elevated text-foreground shadow-sm'
@@ -375,7 +396,7 @@ export default function AdminReturnsClient() {
               <button
                 key={f.key}
                 type="button"
-                onClick={() => setHistoryFilter(f.key)}
+                onClick={() => setView({ outcome: f.key === 'all' ? null : f.key })}
                 className={`rounded-md px-3 text-sm font-medium transition-colors ${
                   historyFilter === f.key
                     ? 'bg-surface-elevated text-foreground shadow-sm'
@@ -389,28 +410,32 @@ export default function AdminReturnsClient() {
         )}
       </div>
 
+      <ListFilters entity="returns" fields={RETURN_FIELDS} search={REQUEST_SEARCH} noun="Returns" tab="list" exportable />
 
-      {loading ? (
+      {list.loading ? (
         <TableSkeleton rows={3} cols={4} />
-      ) : error ? (
-        <ErrorState body={error} />
+      ) : list.error && !returns.length ? (
+        <ErrorState body={list.error} />
       ) : returns.length === 0 ? (
         <EmptyState
-          title={activeTab === 'history'
-            ? historyFilter === 'approved'
-              ? 'No approved returns'
-              : historyFilter === 'rejected'
-                ? 'No rejected returns'
-                : 'No completed or rejected returns'
-            : 'No active return requests'}
+          title={filters
+            ? 'No returns match these filters'
+            : activeTab === 'history'
+              ? historyFilter === 'approved'
+                ? 'No approved returns'
+                : historyFilter === 'rejected'
+                  ? 'No rejected returns'
+                  : 'No completed or rejected returns'
+              : 'No active return requests'}
         />
       ) : (
         <div className="space-y-3">
           {returns.map(row => (
-            <ReturnCard key={row.id} row={row} onValuated={load} />
+            <ReturnCard key={row.id} row={row} onValuated={list.reload} />
           ))}
         </div>
       )}
+      <InfiniteFooter shown={returns.length} control={list} noun="requests" />
     </div>
   )
 }

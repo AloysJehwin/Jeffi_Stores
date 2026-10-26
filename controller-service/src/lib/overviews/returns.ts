@@ -1,3 +1,4 @@
+import type { FilterScope, ScopeSql } from '@jeffi/list-filters'
 import type { AttentionItem } from '@/lib/overview/attention'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, previousPeriod, type Period } from '@/lib/overview/period'
@@ -97,8 +98,14 @@ export const returnRate = (requests: number, delivered: number) => (delivered ? 
 
 // ---- Loader shared by the Returns overview and the Replacements strip ----
 
-export async function loadReturnsOverview(type: RequestType, period: Period, opts: { full: boolean }) {
-  const args = [...boundArgs(period), type]
+const NONE: ScopeSql = { sql: '', params: [] }
+
+/** `scope`: the list's filters (on rr), appended after each query's own args. */
+export async function loadReturnsOverview(type: RequestType, period: Period, opts: { full: boolean }, scope?: FilterScope) {
+  const s5 = scope?.and(5) ?? NONE
+  const s2 = scope?.and(2) ?? NONE
+  const args = [...boundArgs(period), type, ...s5.params]
+  const one = [type, ...s2.params]
   const bucket = bucketFor(period)
   const [kpiRows, closed, delivered, reasons, snapshot, conditions, products, series, oldest] = await Promise.all([
     queryMany<Row>(
@@ -108,7 +115,7 @@ export async function loadReturnsOverview(type: RequestType, period: Period, opt
               COALESCE(SUM((SELECT SUM(i.refund_amount) FROM return_request_items i WHERE i.return_request_id = rr.id)), 0) AS value,
               COALESCE(SUM((SELECT SUM(i.quantity) FROM return_request_items i WHERE i.return_request_id = rr.id)), 0) AS units
        FROM return_requests rr, b
-       WHERE ${inBoth('rr.created_at')} AND rr.type = $4
+       WHERE ${inBoth('rr.created_at')} AND rr.type = $4${s5.sql}
        GROUP BY 1`,
       args
     ),
@@ -120,7 +127,7 @@ export async function loadReturnsOverview(type: RequestType, period: Period, opt
               COALESCE(SUM((SELECT SUM(i.refund_amount) FROM return_request_items i WHERE i.return_request_id = rr.id))
                 FILTER (WHERE rr.status = 'completed'), 0) AS refunded
        FROM return_requests rr, b
-       WHERE ${inBoth('rr.resolved_at')} AND rr.type = $4 AND rr.status IN ('completed', 'rejected')
+       WHERE ${inBoth('rr.resolved_at')} AND rr.type = $4 AND rr.status IN ('completed', 'rejected')${s5.sql}
        GROUP BY 1`,
       args
     ),
@@ -131,14 +138,14 @@ export async function loadReturnsOverview(type: RequestType, period: Period, opt
        WHERE ${inBoth('o.delivered_at')} AND o.status IN ('delivered', 'returned', 'return_requested', 'return_approved', 'return_received', 'return_rejected')
          AND $4::text IS NOT NULL -- binds the shared args
        GROUP BY 1`,
-      args
+      args.slice(0, 4)
     ),
     queryMany<Row>(
       `WITH ${BOUNDS}
        SELECT rr.reason, COUNT(*) AS count,
               COALESCE(SUM((SELECT SUM(i.refund_amount) FROM return_request_items i WHERE i.return_request_id = rr.id)), 0) AS value
        FROM return_requests rr, b
-       WHERE ${inCur('rr.created_at')} AND rr.type = $4
+       WHERE ${inCur('rr.created_at')} AND rr.type = $4${s5.sql}
        GROUP BY 1 ORDER BY count DESC`,
       args
     ),
@@ -152,15 +159,15 @@ export async function loadReturnsOverview(type: RequestType, period: Period, opt
                                  AND rr.valuation_status IS DISTINCT FROM 'approved') AS pending_inspection,
               COUNT(*) FILTER (WHERE ${OPEN_SQL} AND rr.valuation_status = 'approved') AS inspected_not_closed,
               COUNT(*) FILTER (WHERE ${OPEN_SQL}) AS open
-       FROM return_requests rr WHERE rr.type = $1`,
-      [type]
+       FROM return_requests rr WHERE rr.type = $1${s2.sql}`,
+      one
     ),
     opts.full
       ? queryMany<Row>(
           `WITH ${BOUNDS}
            SELECT rr.valuation_condition AS condition, COUNT(*) AS count
            FROM return_requests rr, b
-           WHERE ${inCur('rr.valuated_at')} AND rr.type = $4 AND rr.valuation_condition IS NOT NULL
+           WHERE ${inCur('rr.valuated_at')} AND rr.type = $4 AND rr.valuation_condition IS NOT NULL${s5.sql}
            GROUP BY 1 ORDER BY count DESC`,
           args
         )
@@ -172,7 +179,7 @@ export async function loadReturnsOverview(type: RequestType, period: Period, opt
                   COALESCE(SUM(i.quantity), 0) AS units, COALESCE(SUM(i.refund_amount), 0) AS value,
                   (SELECT p.slug FROM products p WHERE p.id = i.product_id) AS slug
            FROM return_requests rr JOIN return_request_items i ON i.return_request_id = rr.id, b
-           WHERE ${inCur('rr.created_at')} AND rr.type = $4
+           WHERE ${inCur('rr.created_at')} AND rr.type = $4${s5.sql}
            GROUP BY i.product_id ORDER BY requests DESC, value DESC LIMIT 8`,
           args
         )
@@ -182,7 +189,7 @@ export async function loadReturnsOverview(type: RequestType, period: Period, opt
           `WITH ${BOUNDS},
            s AS (SELECT d::date AS bucket FROM ${bucketSeriesSql(bucket)} d),
            r AS (SELECT ${bucketSql('rr.created_at', bucket)} AS bucket, COUNT(*) AS requests
-                 FROM return_requests rr, b WHERE ${inCur('rr.created_at')} AND rr.type = $4 GROUP BY 1)
+                 FROM return_requests rr, b WHERE ${inCur('rr.created_at')} AND rr.type = $4${s5.sql} GROUP BY 1)
            SELECT s.bucket::text AS bucket, COALESCE(r.requests, 0) AS requests
            FROM s LEFT JOIN r ON r.bucket = s.bucket ORDER BY s.bucket`,
           args
@@ -192,9 +199,9 @@ export async function loadReturnsOverview(type: RequestType, period: Period, opt
       `SELECT rr.id, rr.status, rr.reason, rr.created_at, o.id AS order_id, o.order_number,
               COALESCE(o.customer_name, '') AS customer
        FROM return_requests rr JOIN orders o ON o.id = rr.order_id
-       WHERE rr.type = $1 AND ${OPEN_SQL}
+       WHERE rr.type = $1 AND ${OPEN_SQL}${s2.sql}
        ORDER BY rr.created_at ASC LIMIT 6`,
-      [type]
+      one
     ),
   ])
 
@@ -260,6 +267,7 @@ export async function loadReturnsOverview(type: RequestType, period: Period, opt
       orderNumber: String(r.order_number),
       customer: String(r.customer),
     })),
+    filtered: !!scope && !scope.empty,
     attention: returnsAttention(snap, type),
   }
 }

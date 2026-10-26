@@ -3,13 +3,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import HoverCard from '@/components/ui/HoverCard'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
-import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/shared/admin-path'
 import { formatDate } from '@/lib/shared/format'
 import CopySku from '@/components/ui/CopySku'
@@ -17,8 +15,17 @@ import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { Tabs } from '@/components/admin/kit/core'
 import { TableSkeleton } from '@/components/admin/kit/states'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
+import {
+  LEDGER_ALIASES,
+  LEDGER_COUNT_CAP,
+  LEDGER_FIELDS,
+  PRODUCT_SEARCH,
+  VALUATION_ALIASES,
+  VALUATION_FIELDS,
+} from '@/lib/filters/fields/inventory'
 import InventoryOverviewTab from './_components/InventoryOverviewTab'
-import { labelCls, STOCK_PAGE_SIZE, VALUATION_PAGE_SIZE, formatINR, SummaryCard, TYPE_BADGE } from '@/components/admin/purchasing/shared'
+import { STOCK_PAGE_SIZE, VALUATION_PAGE_SIZE, formatINR, SummaryCard, TYPE_BADGE } from '@/components/admin/purchasing/shared'
 
 type StockTransaction = {
   id: string
@@ -51,8 +58,6 @@ type StockView = 'ledger' | 'valuation'
 
 function StockTab({ view }: { view: StockView }) {
   const canFinancial = useHasScope('financial:read')
-  const searchParams = useSearchParams()
-  const router = useRouter()
   const { showToast } = useToast()
   const confirm = useConfirm()
   const canWrite = useCanWrite('inventory')
@@ -65,13 +70,10 @@ function StockTab({ view }: { view: StockView }) {
     allCategories?: string[]
     allBrands?: string[]
   } | null>(null)
-  const [valSearch, setValSearch] = useState(searchParams.get('val_search') || '')
-  const [valCategory, setValCategory] = useState(searchParams.get('val_category') || '')
-  const [valBrand, setValBrand] = useState(searchParams.get('val_brand') || '')
-  const [valStockStatus, setValStockStatus] = useState(searchParams.get('val_stock') || '')
-  const [search, setSearch] = useState(searchParams.get('ledger_search') || '')
-  const [from, setFrom] = useState(searchParams.get('ledger_from') || '')
-  const [to, setTo] = useState(searchParams.get('ledger_to') || '')
+  // Each tab's filters live in the URL (old ledger_* / val_* names are rewritten).
+  const ledgerFilters = useFilterQuery(LEDGER_FIELDS, { aliases: LEDGER_ALIASES })
+  const valFilters = useFilterQuery(VALUATION_FIELDS, { aliases: VALUATION_ALIASES })
+  const [ledgerMeta, setLedgerMeta] = useState<{ window: { from: string; days: number } | null; capped: boolean } | null>(null)
   const [expandedValRows, setExpandedValRows] = useState<Record<string, any[] | null>>({})
   const [loadingBatchRow, setLoadingBatchRow] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -148,14 +150,6 @@ function StockTab({ view }: { view: StockView }) {
     setLoadingBatchRow(null)
   }
 
-  function syncUrl(patch: Record<string, string>) {
-    const p = new URLSearchParams(window.location.search)
-    for (const [k, v] of Object.entries(patch)) {
-      if (v) p.set(k, v)
-      else p.delete(k)
-    }
-    router.replace(`${ap('/admin/inventory')}?${p.toString()}`, { scroll: false })
-  }
   const [ledgerSortCol, setLedgerSortCol] = useState<string | undefined>(undefined)
   const [ledgerSortDir, setLedgerSortDir] = useState<SortDir | undefined>(undefined)
   const [valSortCol, setValSortCol] = useState<string | undefined>(undefined)
@@ -172,15 +166,16 @@ function StockTab({ view }: { view: StockView }) {
 
   // Ledger groups are rebuilt from every loaded row, so a group split across pages merges.
   const txList = useInfiniteList<StockTransaction>({
-    key: view === 'ledger' ? `${search}|${from}|${to}` : null,
+    key: view === 'ledger' ? ledgerFilters : null,
     pageSize: STOCK_PAGE_SIZE,
     getKey: t => t.id,
     fetchPage: async (pg, signal) => {
-      const params = new URLSearchParams({ view: 'ledger', page: String(pg), limit: String(STOCK_PAGE_SIZE) })
-      if (search) params.set('search', search)
-      if (from) params.set('from', from)
-      if (to) params.set('to', to)
+      const params = new URLSearchParams(ledgerFilters)
+      params.set('view', 'ledger')
+      params.set('page', String(pg))
+      params.set('limit', String(STOCK_PAGE_SIZE))
       const json = await fetchJson(`/api/admin/inventory/stock?${params}`, signal)
+      if (pg === 1) setLedgerMeta({ window: json?.window ?? null, capped: !!json?.capped })
       return { rows: json?.transactions || [], total: json?.total || 0 }
     },
   })
@@ -188,14 +183,13 @@ function StockTab({ view }: { view: StockView }) {
 
   // Totals and filter options come with page 1; later pages only add rows.
   const valList = useInfiniteList<any>({
-    key: view === 'valuation' ? `${valSearch}|${valCategory}|${valBrand}|${valStockStatus}|${valSortCol}|${valSortDir}` : null,
+    key: view === 'valuation' ? `${valFilters}|${valSortCol}|${valSortDir}` : null,
     pageSize: VALUATION_PAGE_SIZE,
     fetchPage: async (pg, signal) => {
-      const params = new URLSearchParams({ view: 'valuation', page: String(pg), limit: String(VALUATION_PAGE_SIZE) })
-      if (valSearch) params.set('search', valSearch)
-      if (valCategory) params.set('category', valCategory)
-      if (valBrand) params.set('brand', valBrand)
-      if (valStockStatus) params.set('stock_status', valStockStatus)
+      const params = new URLSearchParams(valFilters)
+      params.set('view', 'valuation')
+      params.set('page', String(pg))
+      params.set('limit', String(VALUATION_PAGE_SIZE))
       if (valSortCol) {
         params.set('sort', valSortCol)
         params.set('dir', valSortDir || 'desc')
@@ -272,13 +266,6 @@ function StockTab({ view }: { view: StockView }) {
 
   const allValRows = valList.rows
   const valTotal = valuation?.total || 0
-
-  const valCategories = (
-    valuation?.allCategories || [...new Set(allValRows.map((p: any) => p.category_name).filter(Boolean))]
-  ).sort() as string[]
-  const valBrands = (
-    valuation?.allBrands || [...new Set(allValRows.map((p: any) => p.brand_name).filter(Boolean))]
-  ).sort() as string[]
 
   // Rows are sorted server-side (across all SKUs) via the sort/dir params, so render as-is.
   const sortedValRows = allValRows
@@ -841,43 +828,23 @@ function StockTab({ view }: { view: StockView }) {
     <div className="space-y-5">
       {view === 'ledger' ? (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className={labelCls}>Search product</label>
-              <AdminTypeahead
-                type="products"
-                value={search}
-                onChange={v => {
-                  setSearch(v)
-                  syncUrl({ ledger_search: v })
-                }}
-                placeholder="Name, SKU..."
-                inputClassName="w-full field-sm pr-9 bg-surface border border-border-secondary text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
-              />
-            </div>
-            <div>
-              <label className={labelCls}>From</label>
-              <DatePicker
-                className="w-36"
-                value={from}
-                onChange={v => {
-                  setFrom(v)
-                  syncUrl({ ledger_from: v })
-                }}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>To</label>
-              <DatePicker
-                className="w-36"
-                value={to}
-                onChange={v => {
-                  setTo(v)
-                  syncUrl({ ledger_to: v })
-                }}
-              />
-            </div>
-          </div>
+          <ListFilters
+            entity="inventory.ledger"
+            fields={LEDGER_FIELDS}
+            aliases={LEDGER_ALIASES}
+            search={PRODUCT_SEARCH}
+            noun="Movements"
+            tab="ledger"
+            exportable
+          />
+          {(ledgerMeta?.window || ledgerMeta?.capped) && (
+            <p className="text-xs text-foreground-muted">
+              {ledgerMeta.window
+                ? `Showing the last ${ledgerMeta.window.days} days. Pick dates to see older movements.`
+                : ''}
+              {ledgerMeta.capped ? ` Over ${LEDGER_COUNT_CAP.toLocaleString('en-IN')} movements match; narrow the filters to count them all.` : ''}
+            </p>
+          )}
 
           {loading ? (
             <TableSkeleton rows={6} cols={6} />
@@ -947,7 +914,7 @@ function StockTab({ view }: { view: StockView }) {
                     {transactions.length === 0 && (
                       <tr>
                         <td colSpan={7} className="py-12 text-center text-foreground-secondary text-sm">
-                          {search || from || to ? 'No transactions match your filters' : 'No stock transactions yet'}
+                          {ledgerFilters ? 'No transactions match your filters' : ledgerMeta?.window ? `No stock movements in the last ${ledgerMeta.window.days} days` : 'No stock transactions yet'}
                         </td>
                       </tr>
                     )}
@@ -1481,86 +1448,15 @@ function StockTab({ view }: { view: StockView }) {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end">
-            <div className="col-span-2 sm:flex-1 sm:min-w-[200px]">
-              <label className={labelCls}>Search product</label>
-              <AdminTypeahead
-                type="products"
-                value={valSearch}
-                onChange={v => {
-                  setValSearch(v)
-                  syncUrl({ val_search: v })
-                }}
-                onSelect={item => {
-                  setValSearch(item.label)
-                  syncUrl({ val_search: item.label })
-                }}
-                placeholder="Name, SKU, variant..."
-                inputClassName="w-full field-sm pr-9 bg-surface border border-border-secondary text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
-              />
-            </div>
-            <div className="sm:w-44">
-              <label className={labelCls}>Category</label>
-              <AdminSelect
-                sm
-                value={valCategory}
-                onChange={v => {
-                  setValCategory(v)
-                  syncUrl({ val_category: v })
-                }}
-                placeholder="All categories"
-                options={[{ value: '', label: 'All categories' }, ...valCategories.map(c => ({ value: c, label: c }))]}
-              />
-            </div>
-            <div className="sm:w-40">
-              <label className={labelCls}>Brand</label>
-              <AdminSelect
-                sm
-                value={valBrand}
-                onChange={v => {
-                  setValBrand(v)
-                  syncUrl({ val_brand: v })
-                }}
-                placeholder="All brands"
-                options={[{ value: '', label: 'All brands' }, ...valBrands.map(b => ({ value: b, label: b }))]}
-              />
-            </div>
-            <div className="sm:w-40">
-              <label className={labelCls}>Stock status</label>
-              <AdminSelect
-                sm
-                value={valStockStatus}
-                onChange={v => {
-                  setValStockStatus(v)
-                  syncUrl({ val_stock: v })
-                }}
-                placeholder="All"
-                options={[
-                  { value: '', label: 'All' },
-                  { value: 'in_stock', label: 'In Stock' },
-                  { value: 'low_stock', label: 'Low Stock (≤5)' },
-                  { value: 'out_of_stock', label: 'Out of Stock' },
-                ]}
-              />
-            </div>
-            {(valSearch || valCategory || valBrand || valStockStatus) && (
-              <div className="col-span-2 flex flex-col sm:col-auto">
-                <span className={`${labelCls} hidden sm:block`}>&nbsp;</span>
-                <button
-                  onClick={() => {
-                    setValSearch('')
-                    setValCategory('')
-                    setValBrand('')
-                    setValStockStatus('')
-                      syncUrl({ val_search: '', val_category: '', val_brand: '', val_stock: '' })
-                  }}
-                  className="px-3 h-control-sm rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
-                >
-                  Clear filters
-                </button>
-              </div>
-            )}
-          </div>
+          <ListFilters
+            entity="inventory.valuation"
+            fields={VALUATION_FIELDS}
+            aliases={VALUATION_ALIASES}
+            search={PRODUCT_SEARCH}
+            noun="Products"
+            tab="valuation"
+            exportable
+          />
 
           {loading ? (
             <TableSkeleton rows={6} cols={6} />
@@ -1577,15 +1473,15 @@ function StockTab({ view }: { view: StockView }) {
                   label="Stock Value (incl. GST)"
                   value={formatINR(valuation.totalValueInclGst || 0)}
                   accent
-                  sub="all products"
+                  sub={valFilters ? 'matching the filters' : 'all products'}
                 />
-                <SummaryCard label="Total SKUs" value={String(valTotal)} sub="across all products" />
+                <SummaryCard label="Total SKUs" value={String(valTotal)} sub={valFilters ? 'matching the filters' : 'across all products'} />
                 <SummaryCard
                   label="In Stock"
                   value={String(
                     valuation.inStockCount ?? allValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length
                   )}
-                  sub="across all products"
+                  sub={valFilters ? 'matching the filters' : 'across all products'}
                 />
               </div>
               <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
@@ -1666,7 +1562,7 @@ function StockTab({ view }: { view: StockView }) {
                       {valTree.length === 0 && (
                         <tr>
                           <td colSpan={10} className="py-12 text-center text-foreground-secondary text-sm">
-                            {valSearch ? `No products match "${valSearch}"` : 'No products in stock'}
+                            {valFilters ? 'No products match these filters' : 'No products in stock'}
                           </td>
                         </tr>
                       )}
@@ -1902,15 +1798,27 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'valuation', label: 'Valuation' },
 ]
 
+// Old links without a tab land on the list their filters belong to.
+function initialTab(sp: URLSearchParams): Tab {
+  const t = sp.get('tab')
+  if (TABS.some(x => x.id === t)) return t as Tab
+  if (['ledger_search', 'ledger_from', 'ledger_to'].some(k => sp.get(k))) return 'ledger'
+  if (['val_search', 'val_category', 'val_brand', 'val_stock'].some(k => sp.get(k))) return 'valuation'
+  return 'overview'
+}
+
 export default function InventoryClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const tabParam = searchParams.get('tab')
-  const [tab, setTab] = useState<Tab>(TABS.some(t => t.id === tabParam) ? (tabParam as Tab) : 'overview')
+  const [tab, setTab] = useState<Tab>(() => initialTab(new URLSearchParams(searchParams.toString())))
 
+  // Switching tabs keeps the filters (search and from / to are shared by the tabs that have them).
   function handleTabChange(key: Tab) {
     setTab(key)
-    router.push(`${ap('/admin/inventory')}?tab=${key}`, { scroll: false })
+    const p = new URLSearchParams(searchParams.toString())
+    p.set('tab', key)
+    p.delete('page')
+    router.push(`${ap('/admin/inventory')}?${p}`, { scroll: false })
   }
 
   return (

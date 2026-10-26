@@ -1,3 +1,4 @@
+import type { FilterScope } from '@jeffi/list-filters'
 import type { Bucket, Period } from '@/lib/overview/period'
 import type { AttentionItem } from '@/lib/overview/attention'
 import { queryMany, queryOne } from '@/lib/shared/db'
@@ -22,7 +23,8 @@ const AT = 'COALESCE(cs.invoice_date, cs.created_at)'
 const LIVE = `cs.status <> 'cancelled'`
 export const CANCEL_RATE_WARN = 0.1
 
-export const CASH_SALE_SQL = {
+/** `f` / `f1`: list filters on cs, binding after the three period args / from $1. */
+export const cashSaleSql = (f = '', f1 = '') => ({
   kpis: `WITH ${BOUNDS}
     SELECT CASE WHEN ${AT} >= b.c0 THEN 'cur' ELSE 'prev' END AS period,
            COUNT(*) FILTER (WHERE ${LIVE}) AS bills,
@@ -33,13 +35,13 @@ export const CASH_SALE_SQL = {
            COALESCE(SUM(cs.total_amount) FILTER (WHERE NOT ${LIVE}), 0) AS cancelled_value,
            COUNT(DISTINCT ${istDay(AT)}) FILTER (WHERE ${LIVE}) AS trading_days
       FROM cash_sales cs, b
-     WHERE ${AT} >= b.p0 AND ${AT} < b.c1
+     WHERE ${AT} >= b.p0 AND ${AT} < b.c1${f}
      GROUP BY 1`,
   units: `WITH ${BOUNDS}
     SELECT CASE WHEN ${AT} >= b.c0 THEN 'cur' ELSE 'prev' END AS period,
            COALESCE(SUM(csi.quantity), 0) AS units, COUNT(*) AS lines
       FROM cash_sale_items csi JOIN cash_sales cs ON cs.id = csi.sale_id, b
-     WHERE ${LIVE} AND ${AT} >= b.p0 AND ${AT} < b.c1
+     WHERE ${LIVE} AND ${AT} >= b.p0 AND ${AT} < b.c1${f}
      GROUP BY 1`,
   today: `SELECT
       COUNT(*) FILTER (WHERE ${istDay(AT)} = ${TODAY_IST}) AS bills,
@@ -47,36 +49,39 @@ export const CASH_SALE_SQL = {
       COUNT(*) FILTER (WHERE ${istDay(AT)} = ${TODAY_IST} - 7) AS last_week_bills,
       COALESCE(SUM(cs.total_amount) FILTER (WHERE ${istDay(AT)} = ${TODAY_IST} - 7), 0) AS last_week_sales
     FROM cash_sales cs
-    WHERE ${LIVE} AND ${AT} >= now() - INTERVAL '9 days'`,
+    WHERE ${LIVE} AND ${AT} >= now() - INTERVAL '9 days'${f1}`,
   byMode: `WITH ${BOUNDS}
     SELECT cs.payment_mode AS mode, COUNT(*) AS n, SUM(cs.total_amount) AS amount
       FROM cash_sales cs, b
-     WHERE ${LIVE} AND ${AT} >= b.c0 AND ${AT} < b.c1
+     WHERE ${LIVE} AND ${AT} >= b.c0 AND ${AT} < b.c1${f}
      GROUP BY 1 ORDER BY amount DESC`,
   byHour: `WITH ${BOUNDS}
     SELECT h AS hour, COUNT(cs.id) AS n, COALESCE(SUM(cs.total_amount), 0) AS amount
       FROM generate_series(0, 23) h
       CROSS JOIN b
       LEFT JOIN cash_sales cs ON ${LIVE} AND ${AT} >= b.c0 AND ${AT} < b.c1
-                             AND EXTRACT(HOUR FROM ${AT} AT TIME ZONE 'Asia/Kolkata') = h
+                             AND EXTRACT(HOUR FROM ${AT} AT TIME ZONE 'Asia/Kolkata') = h${f}
      GROUP BY h ORDER BY h`,
   topItems: `WITH ${BOUNDS}
     SELECT csi.product_id, MIN(csi.product_name) AS name, COALESCE(SUM(csi.quantity), 0) AS units,
            COALESCE(SUM(csi.total_price), 0) AS amount, COUNT(DISTINCT cs.id) AS bills
       FROM cash_sale_items csi JOIN cash_sales cs ON cs.id = csi.sale_id, b
-     WHERE ${LIVE} AND ${AT} >= b.c0 AND ${AT} < b.c1
+     WHERE ${LIVE} AND ${AT} >= b.c0 AND ${AT} < b.c1${f}
      GROUP BY csi.product_id, csi.variant_id, csi.sub_variant_id, CASE WHEN csi.product_id IS NULL THEN csi.product_name END
      ORDER BY amount DESC LIMIT 10`,
   unlinked: `WITH ${BOUNDS}
     SELECT COUNT(*) AS lines, COALESCE(SUM(csi.total_price), 0) AS amount
       FROM cash_sale_items csi JOIN cash_sales cs ON cs.id = csi.sale_id, b
-     WHERE ${LIVE} AND csi.product_id IS NULL AND ${AT} >= b.c0 AND ${AT} < b.c1`,
+     WHERE ${LIVE} AND csi.product_id IS NULL AND ${AT} >= b.c0 AND ${AT} < b.c1${f}`,
   series: (bucket: Bucket) => `WITH ${BOUNDS}, ${bucketsCte(bucket)}
     SELECT to_char(k.bucket, 'YYYY-MM-DD') AS label, COUNT(cs.id) AS bills, COALESCE(SUM(cs.total_amount), 0) AS sales
       FROM k CROSS JOIN b
-      LEFT JOIN cash_sales cs ON ${LIVE} AND ${AT} >= b.c0 AND ${AT} < b.c1 AND ${inBucket(AT, bucket)}
+      LEFT JOIN cash_sales cs ON ${LIVE} AND ${AT} >= b.c0 AND ${AT} < b.c1 AND ${inBucket(AT, bucket)}${f}
      GROUP BY k.bucket ORDER BY k.bucket`,
-}
+})
+
+export const CASH_SALE_SQL = cashSaleSql()
+
 
 export interface CashSaleStats {
   bills: number
@@ -145,17 +150,22 @@ export function cashSaleAttention(a: {
   return out
 }
 
-export async function loadCashSaleOverview(period: Period) {
-  const { previous, bucket, args } = periodArgs(period)
+/** `scope`: the cash-sale list's filters, except its date. */
+export async function loadCashSaleOverview(period: Period, scope?: FilterScope) {
+  const { previous, bucket, args: periodArgsList } = periodArgs(period)
+  const s4 = scope && !scope.empty ? scope.and(4) : null
+  const s1 = scope && !scope.empty ? scope.and(1) : null
+  const SQL = s4 && s1 ? cashSaleSql(s4.sql, s1.sql) : CASH_SALE_SQL
+  const args = [...periodArgsList, ...(s4?.params ?? [])]
   const [kpiRows, unitRows, today, modes, hours, items, unlinked, series] = await Promise.all([
-    queryMany<Row>(CASH_SALE_SQL.kpis, args),
-    queryMany<Row>(CASH_SALE_SQL.units, args),
-    queryOne<Row>(CASH_SALE_SQL.today),
-    queryMany<Row>(CASH_SALE_SQL.byMode, args),
-    queryMany<Row>(CASH_SALE_SQL.byHour, args),
-    queryMany<Row>(CASH_SALE_SQL.topItems, args),
-    queryOne<Row>(CASH_SALE_SQL.unlinked, args),
-    queryMany<Row>(CASH_SALE_SQL.series(bucket), args),
+    queryMany<Row>(SQL.kpis, args),
+    queryMany<Row>(SQL.units, args),
+    s1 ? queryOne<Row>(SQL.today, s1.params) : queryOne<Row>(SQL.today),
+    queryMany<Row>(SQL.byMode, args),
+    queryMany<Row>(SQL.byHour, args),
+    queryMany<Row>(SQL.topItems, args),
+    queryOne<Row>(SQL.unlinked, args),
+    queryMany<Row>(SQL.series(bucket), args),
   ])
   const kpis = byPeriod(kpiRows, cashSaleStats)
   return {
@@ -185,6 +195,7 @@ export async function loadCashSaleOverview(period: Period) {
       bills: num(r.bills),
     })),
     series: series.map(r => ({ label: str(r.label), bills: num(r.bills), sales: num(r.sales) })),
+    filtered: !!s4,
     attention: cashSaleAttention({
       current: kpis.current,
       unlinkedLines: num(unlinked?.lines),

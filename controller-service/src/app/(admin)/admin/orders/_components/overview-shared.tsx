@@ -75,19 +75,28 @@ export function OverviewPanel<T extends StripData>({
   extra,
   local,
   fallback = '30d',
+  query,
+  filters,
 }: {
   endpoint: string
   extra?: (d: T) => React.ReactNode
   local?: boolean
   fallback?: PeriodPreset
+  /** A list's canonical filter query, appended to the fetch. */
+  query?: string
+  /** The list's filter bar, under the PeriodBar. */
+  filters?: React.ReactNode
 }) {
   const [urlPeriod, setUrlPeriod] = usePeriod(fallback)
   const [localPeriod, setLocalPeriod] = useState(() => parsePeriod(null, null, undefined, fallback))
   const [period, setPeriod] = local ? [localPeriod, setLocalPeriod] : [urlPeriod, setUrlPeriod]
-  const { data, error, loading, reload } = useOverviewData<T>(`${endpoint}?from=${period.from}&to=${period.to}`)
+  const { data, error, loading, reload } = useOverviewData<T>(
+    `${endpoint}?from=${period.from}&to=${period.to}${query ? `&${query}` : ''}`
+  )
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      {filters}
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? (
         <div className="grid grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-5 gap-3 animate-pulse">

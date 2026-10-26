@@ -4,6 +4,7 @@ import { requireAdminScope } from '@/lib/auth/jwt'
 import { getEntity } from '@/lib/filters/registry'
 import { cappedCount, filterContext, streamCsv } from '@/lib/filters/run'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
+import { withDefaultWindow } from '@/lib/filters/window'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (admin instanceof NextResponse) return admin
 
   const sp = request.nextUrl.searchParams
-  const q = normalizeQuery(entity, sp)
+  // The same default window the list shows (e.g. the stock ledger's last 30 days).
+  const q = withDefaultWindow(entity, normalizeQuery(entity, sp))
   const cap = entity.export.cap ?? EXPORT_CAP
   try {
     const ctx = await filterContext(entity, q)
