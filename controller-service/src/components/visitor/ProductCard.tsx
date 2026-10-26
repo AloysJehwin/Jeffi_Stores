@@ -125,26 +125,12 @@ export default function ProductCard({
     if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancelLongPress()
   }
 
-  const openQuickAdd = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setQuickAddSignal(n => n + 1)
-  }
-
   const { isInWishlist, wishlistLoading, handleWishlist, handleShare } = useProductLikeShare({
     id,
     slug,
     name,
     href: productHref,
   })
-
-  const quickAddLabel = !inStock
-    ? 'Out of stock'
-    : hasVariants
-      ? `Choose options for ${name}`
-      : digital
-        ? `Buy ${name}`
-        : `Quick add ${name} to cart`
 
   const wishlistIcon = (
     <svg
@@ -186,12 +172,13 @@ export default function ProductCard({
         }
       }}
     >
+      {/* Phones mirror the app's card (mobile-service ProductCard): 20px radius, soft shadow, border only in dark. */}
       <div
-        className="relative bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1 hover:border-accent-300 dark:hover:border-accent-500 h-full flex flex-col"
+        className="relative bg-surface-elevated rounded-[20px] sm:rounded-lg shadow sm:shadow-sm border border-transparent dark:border-border-default sm:border-border-default overflow-hidden transition-all duration-300 ease-out max-sm:active:scale-[0.98] hover:shadow-xl hover:-translate-y-1 hover:border-accent-300 dark:hover:border-accent-500 h-full flex flex-col"
         style={{ WebkitTouchCallout: 'none', userSelect: 'none' } as React.CSSProperties}
       >
         {/* Image */}
-        <div className="relative aspect-[4/3] sm:aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
+        <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
           {primaryImage ? (
             <>
               <img
@@ -268,46 +255,21 @@ export default function ProductCard({
             <ProductWarningBadges fragile={fragile} hazardous={hazardous} flammable={flammable} size="xs" />
           </div>
 
-          {/* Phones: 40px wishlist and quick-add on the image corners (the inline row below is sm+) */}
-          {!isBusiness && (
-            <button
-              type="button"
-              onClick={handleWishlist}
-              disabled={wishlistLoading}
-              aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-              className="sm:hidden absolute top-1.5 right-1.5 z-10 w-10 h-10 rounded-full bg-surface-elevated/90 border border-border-default shadow-sm flex items-center justify-center text-foreground-muted active:scale-95 disabled:opacity-60 [&>svg]:w-5 [&>svg]:h-5"
-            >
-              {wishlistIcon}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={openQuickAdd}
-            disabled={!inStock}
-            aria-label={quickAddLabel}
-            aria-haspopup="dialog"
-            className="sm:hidden absolute bottom-1.5 right-1.5 z-10 w-10 h-10 rounded-full bg-accent-500 text-white shadow-md flex items-center justify-center active:scale-95 disabled:bg-surface-secondary disabled:text-foreground-muted disabled:opacity-70"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
         </div>
 
         {/* Info */}
         <div className="p-2.5 sm:p-5 flex flex-col flex-grow">
-          <div className="flex items-start justify-between gap-2 mb-1 sm:mb-2">
-            <h3 className="font-semibold text-sm sm:text-base text-foreground mb-1 sm:mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
+          <div className="flex items-start justify-between gap-2 mb-1.5 sm:mb-2">
+            <h3 className="font-semibold text-sm sm:text-base text-foreground mb-1.5 sm:mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
               {/* Stretched link: the whole card opens the product; the buttons sit above it. */}
               <Link
                 href={productHref}
-                className="after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent-500"
+                className="after:absolute after:inset-0 after:rounded-[20px] sm:after:rounded-lg after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent-500"
               >
                 {name}
               </Link>
             </h3>
             <div className="relative z-10 flex-shrink-0 flex items-center gap-1.5 mt-0.5">
-              {/* Phones open this from the image-corner button; its own trigger is sm+ */}
               <QuickAddButton
                 productId={id}
                 productName={name}
@@ -323,9 +285,8 @@ export default function ProductCard({
                 openSignal={quickAddSignal}
                 isDigital={digital}
                 portal={portal}
-                triggerClassName="hidden sm:block"
               />
-              <div className="hidden sm:flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5">
                 {!isBusiness && (
                   <button
                     onClick={handleWishlist}
@@ -339,7 +300,7 @@ export default function ProductCard({
                 <button
                   onClick={handleShare}
                   aria-label="Share product"
-                  className="flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
+                  className="hidden sm:flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path
@@ -354,12 +315,9 @@ export default function ProductCard({
           </div>
           <div className="text-xs text-foreground-muted mb-2 sm:mb-3 space-y-0.5">
             {brandName && (
-              <div className="truncate">
-                <span className="hidden sm:inline">Brand: </span>
-                {brandName}
-              </div>
+              <div className="truncate">Brand: {brandName}</div>
             )}
-            {categoryName && <div className="hidden sm:block truncate">Category: {categoryName}</div>}
+            {categoryName && <div className="truncate">Category: {categoryName}</div>}
           </div>
           <div className="mt-auto">
             <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2 mb-0.5 sm:mb-1">
@@ -385,21 +343,18 @@ export default function ProductCard({
               <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mb-0.5">Your business price</p>
             )}
             {gstEnabled && (
-              <p className="hidden sm:block text-[10px] text-foreground-muted mb-3">Inclusive of all taxes</p>
+              <p className="text-[11px] sm:text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>
             )}
             <div className="flex items-center justify-between gap-1 mt-1 sm:mt-0">
               <span className={`text-xs font-medium truncate ${inStock ? 'text-green-600' : 'text-red-600'}`}>
                 {digital ? 'Instant access' : inStock ? 'In Stock' : 'Out of Stock'}
-                {eddLabel && (
-                  <span className="sm:hidden font-normal text-foreground-muted"> · Deliver by {eddLabel}</span>
-                )}
               </span>
-              <span className="hidden sm:inline text-accent-500 group-hover:text-accent-600 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all group-hover:translate-x-1">
+              <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all group-hover:translate-x-1">
                 View Details &#x2192;
               </span>
             </div>
             {eddLabel && (
-              <p className="hidden sm:block text-[10px] text-foreground-muted mt-0.5">
+              <p className="text-[11px] sm:text-[10px] text-foreground-muted mt-0.5">
                 Deliver by <span className="font-medium text-foreground">{eddLabel}</span>
               </p>
             )}
