@@ -3,19 +3,24 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query, resolveRequestTenant } from '@/lib/shared/db'
 import { isRazorpayEnabled } from '@/lib/payments/razorpay'
-import { refundAcrossPayments } from '@/lib/payments/refund'
+import { externalRefundCeiling, recordExternalRefund, refundAcrossPayments } from '@/lib/payments/refund'
+import { RAZORPAY_ONLY_METHODS, externalRefundLabel, parseExternalRefund } from '@/lib/payments/external-refund'
 import { logActivity } from '@/lib/shared/activity'
 
 export const dynamic = 'force-dynamic'
 
 // POST — issue the refund owed by an approved product adjustment (?legacy=1: an old variant change).
+// Body { external } records a refund made another way (bank transfer, dispute…) instead of calling Razorpay.
 // The row is claimed first so a double click can't refund twice; a failed refund releases the claim.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; adjId: string }> }) {
   const { id: orderId, adjId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  if (!(await isRazorpayEnabled())) return NextResponse.json({ error: 'Payment gateway is not configured.' }, { status: 400 })
+  const body = await request.json().catch(() => ({}))
+  const external = body?.external ? parseExternalRefund(body.external) : null
+  if (typeof external === 'string') return NextResponse.json({ error: external }, { status: 400 })
+  if (!external && !(await isRazorpayEnabled())) return NextResponse.json({ error: 'Payment gateway is not configured.' }, { status: 400 })
   const legacy = request.nextUrl.searchParams.get('legacy') === '1'
 
   const claimed = legacy
@@ -39,6 +44,43 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   )
   const amount = Number(claimed.amount)
   const tenant = await resolveRequestTenant()
+  if (external) {
+    const paymentOrderId = order?.original_order_id || orderId
+    const ceiling = await externalRefundCeiling(paymentOrderId)
+    try {
+      if (ceiling === null && RAZORPAY_ONLY_METHODS.includes(external.method)) throw new Error('This order has no Razorpay payment to refund.')
+      if (ceiling !== null && amount > ceiling + 0.01) throw new Error(`Only ₹${ceiling.toFixed(2)} is left to refund on this order's payments.`)
+      await recordExternalRefund({
+        orderId: paymentOrderId,
+        amount,
+        full: false,
+        refund: external,
+        purpose: legacy ? 'variant_change' : 'order_adjustment',
+        orderRef: order?.order_number ?? orderId,
+        actorId: admin.adminId,
+        tenantId: tenant?.tenantId,
+      })
+    } catch (e: any) {
+      if (legacy) await query(`UPDATE variant_change_requests SET refund_id = NULL WHERE id = $1`, [adjId])
+      else await query(`UPDATE order_adjustments SET refund_status = 'pending' WHERE id = $1`, [adjId])
+      return NextResponse.json({ error: e?.message || 'Could not record the refund' }, { status: 400 })
+    }
+    const refunds = [{ id: external.reference ?? 'external', amount, method: external.method }]
+    if (legacy) await query(`UPDATE variant_change_requests SET refund_id = $1, updated_at = NOW() WHERE id = $2`, [`external:${external.method}`, adjId])
+    else await query(`UPDATE order_adjustments SET refunds = $1::jsonb, updated_at = NOW() WHERE id = $2`, [JSON.stringify(refunds), adjId])
+    if (order?.user_id) {
+      logActivity({
+        userId: order.user_id,
+        actorId: admin.adminId,
+        kind: 'order_adjustment',
+        referenceId: orderId,
+        referenceType: 'orders',
+        summary: `Refund of ₹${amount.toFixed(2)} for the changes on #${order.order_number} recorded (${externalRefundLabel(external.method)})`,
+        metadata: { adjustmentId: adjId, legacy, external },
+      }).catch(() => {})
+    }
+    return NextResponse.json({ success: true, refunded: amount, external })
+  }
   try {
     const { refunds } = await refundAcrossPayments({
       orderId: order?.original_order_id || orderId,

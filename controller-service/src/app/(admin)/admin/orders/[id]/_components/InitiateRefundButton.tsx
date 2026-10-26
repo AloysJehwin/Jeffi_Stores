@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { Card } from '@/components/admin/kit/layout'
 import { FormButton } from '@/components/admin/kit/form'
+import ExternalRefundForm from './ExternalRefundForm'
 
 interface InitiateRefundButtonProps {
   orderId: string
@@ -16,18 +17,25 @@ interface InitiateRefundButtonProps {
   endpoint?: string
   heading?: string
   description?: string
+  /** A completed Razorpay payment can take the refund; otherwise it can only be recorded. */
+  gateway?: boolean
+  /** Order refunds: the admin sets the amount recorded and can email the customer. */
+  orderRefund?: boolean
 }
 
-export default function InitiateRefundButton({ orderId, orderNumber, amount, isReturn, endpoint, heading, description }: InitiateRefundButtonProps) {
-  const [showConfirm, setShowConfirm] = useState(false)
+const money = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+export default function InitiateRefundButton({ orderId, orderNumber, amount, isReturn, endpoint, heading, description, gateway = true, orderRefund = !endpoint }: InitiateRefundButtonProps) {
+  const [mode, setMode] = useState<'idle' | 'confirm' | 'external'>('idle')
   const [isProcessing, setIsProcessing] = useState(false)
   const { showToast } = useToast()
   const router = useRouter()
+  const url = endpoint ?? `/api/orders/${orderId}/refund`
 
   async function handleRefund() {
     setIsProcessing(true)
     try {
-      const response = await fetch(endpoint ?? `/api/orders/${orderId}/refund`, {
+      const response = await fetch(url, {
         method: 'POST',
       })
       const data = await response.json()
@@ -40,42 +48,60 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
       showToast(err.message || 'Failed to initiate refund. Please try again.', 'error')
     } finally {
       setIsProcessing(false)
-      setShowConfirm(false)
+      setMode('idle')
     }
   }
 
   return (
     <Card title={<span className="text-blue-600 dark:text-blue-400">{heading ?? 'Refund Pending'}</span>}>
-        <p className="text-sm text-foreground-secondary mb-4">
-          {description ? (
-            <>{description} <span className="font-semibold text-foreground">₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>.</>
-          ) : (<>
-          This order was {isReturn ? 'returned' : 'cancelled'} but the payment of{' '}
-          <span className="font-semibold text-foreground">
-            ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </span>{' '}
-          has not yet been refunded. Initiating a refund will trigger it via Razorpay and notify the customer by email.
-          </>)}
-        </p>
-
-        {showConfirm ? (
-          <RequireWrite scope="orders:write">
-            <div className="flex flex-wrap items-center gap-2">
-              <FormButton type="button" onClick={handleRefund} pending={isProcessing} pendingLabel="Processing...">
-                Confirm Refund
-              </FormButton>
-              <FormButton type="button" variant="secondary" onClick={() => setShowConfirm(false)} disabled={isProcessing}>
-                Cancel
-              </FormButton>
-            </div>
-          </RequireWrite>
+      <p className="text-sm text-foreground-secondary mb-4">
+        {description ? (
+          <>
+            {description} <span className="font-semibold text-foreground">₹{money(amount)}</span>.
+          </>
         ) : (
-          <RequireWrite scope="orders:write">
-            <FormButton type="button" onClick={() => setShowConfirm(true)}>
-              Initiate Refund ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </FormButton>
-          </RequireWrite>
+          <>
+            This order was {isReturn ? 'returned' : 'cancelled'} but the payment of <span className="font-semibold text-foreground">₹{money(amount)}</span> has not
+            yet been refunded.{' '}
+            {gateway
+              ? 'Initiating a refund will trigger it via Razorpay and notify the customer by email. If the money already went back another way (a Razorpay dispute, the Razorpay dashboard, bank transfer), record it instead.'
+              : 'It was not collected through Razorpay (COD, cash or marked paid by hand), so refund the customer directly and record it here.'}
+          </>
         )}
+      </p>
+
+      <RequireWrite scope="orders:write">
+        {mode === 'external' ? (
+          <ExternalRefundForm
+            endpoint={url}
+            amount={amount}
+            razorpayPaid={gateway}
+            amountEditable={orderRefund}
+            notifyOption={orderRefund}
+            onCancel={() => setMode('idle')}
+          />
+        ) : mode === 'confirm' ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <FormButton type="button" onClick={handleRefund} pending={isProcessing} pendingLabel="Processing...">
+              Confirm Refund
+            </FormButton>
+            <FormButton type="button" variant="secondary" onClick={() => setMode('idle')} disabled={isProcessing}>
+              Cancel
+            </FormButton>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            {gateway ? (
+              <FormButton type="button" onClick={() => setMode('confirm')}>
+                Initiate Refund ₹{money(amount)}
+              </FormButton>
+            ) : null}
+            <FormButton type="button" variant={gateway ? 'secondary' : 'primary'} onClick={() => setMode('external')}>
+              {gateway ? 'Refunded another way' : `Mark as refunded ₹${money(amount)}`}
+            </FormButton>
+          </div>
+        )}
+      </RequireWrite>
     </Card>
   )
 }

@@ -277,12 +277,12 @@ async function attention() {
        ORDER BY delivered_at ASC LIMIT 5`,
       [String(COD_STALE_DAYS)]
     ),
-    // Cancelled/returned but still marked paid: refund owed (Amazon refunds its own orders).
+    // Cancelled/returned but still marked paid (or COD collected): refund owed (Amazon refunds its own orders).
     queryMany(
       `SELECT id, order_number, COALESCE(customer_name, '') AS customer_name, status, total_amount::float8 AS amount,
          (${TODAY} - ${istDay('COALESCE(cancelled_at, updated_at)')})::int AS days
        FROM orders
-       WHERE status IN ('cancelled', 'returned') AND payment_status = 'paid' AND source <> 'amazon'
+       WHERE status IN ('cancelled', 'returned') AND payment_status IN ('paid', 'cod_collected') AND source <> 'amazon'
        ORDER BY COALESCE(cancelled_at, updated_at) ASC LIMIT 5`
     ),
     queryMany(
