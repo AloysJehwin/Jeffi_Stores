@@ -204,7 +204,7 @@ export default function CheckoutPaymentScreen() {
         phone: a.phone,
       },
       notes: r.notes,
-      paymentMethod: 'cod',
+      paymentMethod: r.method === 'manual' ? 'manual' : 'cod',
       couponId: r.couponId,
       discountAmount: r.discountAmount,
       shippingAmount: r.shippingAmount,
@@ -283,7 +283,7 @@ export default function CheckoutPaymentScreen() {
           </Card>
         </View>
       ) : (
-        <Spinner label={request?.method === 'cod' ? 'Placing Order...' : 'Processing...'} />
+        <Spinner label={request?.method === 'razorpay' ? 'Processing...' : 'Placing Order...'} />
       )}
     </Screen>
   )

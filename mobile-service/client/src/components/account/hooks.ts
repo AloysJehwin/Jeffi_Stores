@@ -6,7 +6,7 @@ import { logout } from '../../api/auth'
 import { useAuthStore } from '../../stores/authStore'
 import { useCartStore } from '../../stores/cartStore'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
-import { FileText, Gift, Heart, MapPin, Receipt, RefreshCw, ShoppingBag, User, UserPlus } from 'lucide-react-native'
+import { FileText, Gift, Heart, MapPin, MonitorSmartphone, Receipt, RefreshCw, ShoppingBag, User, UserPlus } from 'lucide-react-native'
 import type { IconComponent } from '../../ui'
 
 const OFF: FeatureFlags = { smsEnabled: true, whatsappEnabled: true, loyaltyEnabled: false, birthdayEnabled: false, referralEnabled: false }
@@ -66,6 +66,24 @@ export function useRequireAuth(): AccountUser | null {
   return user
 }
 
+/** The signed-in business account, as the web's business portal reads it. Business prices are per category. */
+export function useBusiness() {
+  const user = useAccountUser()
+  const isBusiness = useAuthStore(s => s.portal === 'business') && !!user
+  const approved = isBusiness && user?.approvalStatus === 'approved'
+  const map = approved ? user?.businessDiscountMap : undefined
+  return {
+    isBusiness,
+    approved,
+    profile: isBusiness ? user : null,
+    /** The extra business discount for a category, in percent (0 when none). */
+    discountFor: (categoryId?: string | null) => (map && categoryId ? map[categoryId] ?? 0 : 0),
+  }
+}
+
+/** applyDiscount in lib/catalog/pricing.ts. */
+export const applyDiscount = (price: number, pct: number) => price * (1 - pct / 100)
+
 /** AuthContext.refreshUser: re-read /api/auth/me into the store (token untouched). */
 export async function refreshUser(): Promise<AccountUser | null> {
   const user = await getMeFull().catch(() => null)
@@ -105,15 +123,16 @@ const SUBSCRIPTIONS: AccountNavItem = { href: '/account/subscriptions', route: '
 const REWARDS: AccountNavItem = { href: '/account/rewards', route: '/account/rewards', label: 'Rewards', exact: false, icon: Gift }
 const REFERRALS: AccountNavItem = { href: '/account/referrals', route: '/account/referrals', label: 'Refer & Earn', exact: false, icon: UserPlus }
 const QUOTES: AccountNavItem = { href: '/account/quotes', route: '/account/quotes', label: 'My Quotes', exact: false, icon: FileText }
+const SESSIONS: AccountNavItem = { href: '/account/sessions', route: '/account/sessions', label: 'Signed-in devices', exact: false, icon: MonitorSmartphone }
 
-/** The web's useAccountNavItems (+ the approved-business quotes tab). */
+/** The web's useAccountNavItems; a business account gets the business portal's tabs instead of rewards. */
 export function useAccountNavItems(): AccountNavItem[] {
-  const user = useAccountUser()
+  const { isBusiness, approved } = useBusiness()
   const { loyaltyEnabled, referralEnabled } = useFeatureFlags()
   const subscriptionsEnabled = useStoreConfig().flags.subscriptionsEnabled
   let items = subscriptionsEnabled ? [...NAV.slice(0, 2), SUBSCRIPTIONS, ...NAV.slice(2)] : NAV
-  if (loyaltyEnabled && !user?.isBusiness) items = referralEnabled ? [...items, REWARDS, REFERRALS] : [...items, REWARDS]
-  if (user?.isBusiness && user.approvalStatus === 'approved') items = [...items, QUOTES]
+  if (isBusiness) return approved ? [...items.slice(0, 2), QUOTES, ...items.slice(2), SESSIONS] : [NAV[0], SESSIONS]
+  if (loyaltyEnabled) items = referralEnabled ? [...items, REWARDS, REFERRALS] : [...items, REWARDS]
   return items
 }
 

@@ -6,6 +6,7 @@ import { Building2, ChevronRight, FileText, MessageCircleMore, Tag } from 'lucid
 import { absUrl, openHref } from '../../lib/links'
 import { accent, secondary, status } from '../../theme'
 import type { SectionProps } from '../../types/home'
+import { useBusiness } from '../account/hooks'
 
 // Mirror of controller-service components/visitor/home/BusinessCta.tsx at the mobile breakpoint.
 
@@ -29,6 +30,8 @@ export default function BusinessCta({ section, data }: SectionProps) {
   const router = useRouter()
   const { copy } = section
   const shadow = useElevation('floating')
+  const { isBusiness } = useBusiness()
+  if (isBusiness) return null
 
   return (
     <View className="bg-surface px-3 py-3">
@@ -75,7 +78,9 @@ export default function BusinessCta({ section, data }: SectionProps) {
                 size="sm"
                 block={false}
                 trailing={<ChevronRight size={14} color={status.white} strokeWidth={2.2} />}
-                onPress={() => openHref(router, copy.ctaUrl || data.businessSignupUrl)}
+                onPress={() =>
+                  !copy.ctaUrl || /business\/sign-?up/.test(copy.ctaUrl) ? router.push('/(auth)/business-signup') : openHref(router, copy.ctaUrl)
+                }
               />
               <Button label="Learn More" variant="outline" size="sm" block={false} onPress={() => openHref(router, data.businessLandingUrl)} />
             </View>

@@ -30,6 +30,8 @@ import {
   type CouponResult,
 } from '../../src/api/cart'
 import { useAuthStore } from '../../src/stores/authStore'
+import { useBusiness } from '../../src/components/account/hooks'
+import { setQuotePrefill } from '../../src/components/business/quotePrefill'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { openHref } from '../../src/lib/links'
 import { status } from '../../src/theme'
@@ -45,6 +47,7 @@ export default function CartScreen() {
   const user = useAuthStore(s => s.user)
   const authLoading = useAuthStore(s => s.isLoading)
   const { gstEnabled } = useStoreConfig().flags
+  const business = useBusiness()
   // ?coupon=CODE from a win card or a link (or a legacy ?couponId=).
   const params = useLocalSearchParams<{ coupon?: string; couponId?: string }>()
   const urlCode = typeof params.coupon === 'string' ? params.coupon.trim().toUpperCase() : ''
@@ -131,7 +134,7 @@ export default function CartScreen() {
     }
   }
 
-  const total = cartTotal(cartItems, gstEnabled)
+  const total = cartTotal(cartItems, gstEnabled, business.approved ? business.discountFor : undefined)
   const physicalTotal = Math.max(0, total - digitalLinesSubtotal(cartItems, gstEnabled))
   const tax = cartTax(cartItems, gstEnabled)
   const discount = appliedCoupon?.discountAmount ?? 0
@@ -189,6 +192,21 @@ export default function CartScreen() {
         )}
       </Notice>
     )
+
+  // The business cart's "Request Quote for Cart": its lines prefill a new quote.
+  const requestCartQuote = () => {
+    setQuotePrefill(
+      cartItems.map(item => ({
+        productId: item.products.id,
+        variantId: item.variant?.id,
+        subVariantId: item.sub_variant?.id,
+        description: [item.products.name, item.variant?.variant_name, item.sub_variant?.sub_variant_name].filter(Boolean).join(' — '),
+        quantity: Math.round(Number(item.quantity)) || 1,
+        unit: item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? 'Nos',
+      }))
+    )
+    router.push('/account/quotes/new')
+  }
 
   const proceedToCheckout = async () => {
     setProceeding(true)
@@ -263,6 +281,7 @@ export default function CartScreen() {
                 item={item}
                 last={index === n - 1}
                 updating={updating.has(item.id)}
+                businessPct={business.discountFor(item.products.category_id)}
                 onQuantity={q => handleQuantity(item.id, q)}
                 onSave={() => handleSave(item.id)}
                 onRemove={() => handleRemove(item.id)}
@@ -436,6 +455,9 @@ export default function CartScreen() {
                   </View>
                 )}
 
+                {business.approved ? (
+                  <Button label="Request a quote for this cart" variant="outline" size="md" onPress={requestCartQuote} className="mt-3" />
+                ) : null}
                 <Button label="Continue Shopping" variant="ghost" size="md" onPress={() => openHref(router, '/products')} className="mt-2" />
               </Card>
             )}

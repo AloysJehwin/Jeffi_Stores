@@ -16,6 +16,7 @@ import { productLabel } from '../../lib/a11y'
 import { status, useTokens } from '../../theme'
 import { IconButton, Pill, Text, elevationClass, haptic, useElevation, usePressScale } from '../../ui'
 import type { CardProduct } from '../../types/home'
+import { applyDiscount, useBusiness } from '../account/hooks'
 
 // Mirror of controller-service components/visitor/ProductCard.tsx at the mobile breakpoint.
 
@@ -39,13 +40,18 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
   const cardWidth = Math.min(screen / 2, 320)
   const shadow = useElevation('raised')
   const press = usePressScale(0.98)
+  // A business account sees its per-category price, the regular price struck through (the web's business card).
+  const bizPct = useBusiness().discountFor(product.categoryId)
+  const price = bizPct > 0 ? applyDiscount(product.displayPrice, bizPct) : product.displayPrice
+  const strike = bizPct > 0 ? (product.mrp && product.mrp > price ? product.mrp : product.displayPrice) : product.mrp
+  const offPct = bizPct > 0 ? (strike && strike > price ? Math.round(((strike - price) / strike) * 100) : 0) : product.mrpDiscount
   const stock = digital ? 'Digital, instant access' : inStock ? 'In stock' : 'Out of stock'
   const label = productLabel({
     name: product.name,
-    price: product.displayPrice,
+    price,
     from: product.hasVariants,
-    mrp: product.mrp,
-    discountPct: product.mrpDiscount || undefined,
+    mrp: strike,
+    discountPct: offPct || undefined,
     stock,
     extra: [!product.mrpDiscount && product.discountPct > 0 && 'On sale', product.badge, edd && !digital && inStock && `Deliver by ${shortDate(edd)}`],
   })
@@ -124,10 +130,11 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
               </View>
             )}
 
-            {(product.mrpDiscount > 0 || product.discountPct > 0 || product.badge || digital) && (
+            {(offPct > 0 || product.discountPct > 0 || product.badge || digital) && (
               <View pointerEvents="none" className="absolute left-2 top-2 items-start gap-1">
-                {product.mrpDiscount > 0 ? (
-                  <Pill label={`${product.mrpDiscount}% off`} tone="accent" />
+                {bizPct > 0 ? <Pill label="Business price" tone="brand" /> : null}
+                {offPct > 0 ? (
+                  <Pill label={`${offPct}% off`} tone="accent" />
                 ) : product.discountPct > 0 ? (
                   <Pill label="Sale" tone="danger" />
                 ) : null}
@@ -174,11 +181,9 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
           <View className="mt-auto">
             <View className="mb-0.5">
               <Text className="text-base font-bold leading-tight text-primary-600 dark:text-primary-400">
-                {product.hasVariants ? 'From ' : ''}₹{inr(product.displayPrice)}
+                {product.hasVariants ? 'From ' : ''}₹{inr(price)}
               </Text>
-              {product.mrp && product.mrp > Number(product.displayPrice) ? (
-                <Text className="text-xs leading-tight text-foreground-muted line-through">₹{inr(product.mrp)}</Text>
-              ) : null}
+              {strike && strike > price ? <Text className="text-xs leading-tight text-foreground-muted line-through">₹{inr(strike)}</Text> : null}
             </View>
             {gstEnabled ? <Text className="mb-2 text-[11px] text-foreground-muted">Inclusive of all taxes</Text> : null}
             <View className="flex-row items-center justify-between gap-1">

@@ -41,7 +41,8 @@ export const primaryImage = (item: CartLine) =>
 
 export const lineSku = (item: CartLine) => item.sub_variant?.sku || item.variant?.sku || item.products.sku
 
-export function cartTotal(items: CartLine[], gstEnabled: boolean): number {
+/** `discountFor`: a business account's per-category discount, in percent (the business cart's total). */
+export function cartTotal(items: CartLine[], gstEnabled: boolean, discountFor?: (categoryId: string | null) => number): number {
   return items.reduce((total, item) => {
     const custom = isCustomQty(item)
     const factor = unitFactor(item)
@@ -50,7 +51,8 @@ export function cartTotal(items: CartLine[], gstEnabled: boolean): number {
       : custom
         ? Number(item.price_at_addition)
         : inclusiveUnit(item) * factor
-    return total + price * Number(item.quantity)
+    const pct = !custom && discountFor ? discountFor(item.products.category_id) : 0
+    return total + price * (1 - pct / 100) * Number(item.quantity)
   }, 0)
 }
 

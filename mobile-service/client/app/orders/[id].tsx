@@ -110,7 +110,9 @@ export default function OrderDetailScreen() {
     if (!order) return
     if (order.status === 'cancelled' || order.status === 'cancel_requested') return
     if (order.paymentStatus !== 'failed' && order.paymentStatus !== 'unpaid') return
-    if (order.paymentMode === 'cod') return
+    // Only an online-payment checkout has a pay-by deadline; COD, manual and UPI QR orders wait.
+    if (order.paymentMode === 'cod' || order.paymentMode === 'manual' || order.paymentMode === 'upi_qr') return
+    if (order.status !== 'pending') return
     if (!isRazorpayEnabled) return
     const deadline = new Date(order.createdAt).getTime() + orderAutoCancelMinutes * 60 * 1000
     const tick = () => {
@@ -122,6 +124,15 @@ export default function OrderDetailScreen() {
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [order, handleAutoCancel, orderAutoCancelMinutes, isRazorpayEnabled])
+
+  // A UPI QR order is paid by scanning; watch for the payment like the web does.
+  useEffect(() => {
+    if (!order || order.paymentMode !== 'upi_qr' || order.paymentStatus === 'paid') return
+    if (order.status === 'cancelled' || order.status === 'cancel_requested') return
+    const interval = setInterval(fetchOrder, 5000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.paymentMode, order?.paymentStatus, order?.status, fetchOrder])
 
   const handleCancelOrder = async () => {
     setIsCancelling(true)
@@ -166,7 +177,7 @@ export default function OrderDetailScreen() {
     }
   }
 
-  const prefill = () => ({ email: user?.email || '', contact: order?.shippingAddress?.phone || '', name: order?.shippingAddress?.full_name || '' })
+  const prefill = () => ({ email: user?.email || '', contact: (order?.shippingAddress?.phone || '').replace(/\D/g, '').slice(-10), name: order?.shippingAddress?.full_name || '' })
 
   // The app's Razorpay retry flow (create-order → native Checkout → verify), on the web's copy.
   const handlePayNow = async () => {

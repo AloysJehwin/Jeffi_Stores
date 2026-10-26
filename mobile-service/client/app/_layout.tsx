@@ -10,7 +10,7 @@ import { useColorScheme } from 'nativewind'
 import { useAuthStore } from '../src/stores/authStore'
 import { useCartStore } from '../src/stores/cartStore'
 import { useThemeStore } from '../src/stores/themeStore'
-import { getStoredToken } from '../src/api/client'
+import { getStoredToken, loadAuthPortal } from '../src/api/client'
 import { getMe } from '../src/api/auth'
 import { getCart } from '../src/api/cart'
 import Toast from '../src/ui/Toast'
@@ -45,15 +45,19 @@ function ScreenTracker() {
 }
 
 function AuthRehydrator() {
-  const { setAuth, setLoading } = useAuthStore()
+  const { setAuth, clearAuth, setLoading } = useAuthStore()
 
   useEffect(() => {
     ;(async () => {
       try {
         // Bearer when a token is stored (the backend returns it at sign-in), else the session cookie.
         const token = await getStoredToken()
+        const portal = await loadAuthPortal()
         const user = await getMe()
-        await setAuth(user, token ?? '')
+        // Only an approved business account keeps a session (approval or rejection revokes the old ones).
+        const businessOk = portal !== 'business' || (user as { approvalStatus?: string } | null)?.approvalStatus === 'approved'
+        if (user && businessOk) await setAuth(user, token ?? '', portal)
+        else if (portal === 'business') await clearAuth()
       } catch {
       } finally {
         setLoading(false)
