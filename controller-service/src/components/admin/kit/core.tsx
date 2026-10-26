@@ -82,18 +82,11 @@ export function Kpi({
   )
 }
 
-// Where k cards fit across (globals.css .kpi-grid bands), n cards go in the fewest rows, spread evenly.
-function kpiCols(n: number): React.CSSProperties {
-  const vars: Record<string, number> = {}
-  for (let k = 2; k <= 6; k++) vars[`--kpi-c${k}`] = Math.ceil(n / Math.ceil(n / k))
-  return vars as React.CSSProperties
-}
-
+// Columns follow the rendered card count and the width (globals.css .kpi-grid).
 export function KpiGrid({ children }: { children: React.ReactNode }) {
-  const n = Math.max(1, React.Children.toArray(children).length)
   return (
     <div className="kpi-grid">
-      <div style={kpiCols(n)}>{children}</div>
+      <div>{children}</div>
     </div>
   )
 }
