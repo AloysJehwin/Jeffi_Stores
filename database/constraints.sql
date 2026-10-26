@@ -118,6 +118,39 @@ ALTER TABLE ONLY public.admin_mfa_recovery_codes
 
 
 --
+-- Name: admin_saved_views admin_saved_views_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_saved_views
+    ADD CONSTRAINT admin_saved_views_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: admin_saved_views admin_saved_views_name_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_saved_views
+    ADD CONSTRAINT admin_saved_views_name_check CHECK (((char_length(btrim((name)::text)) >= 1) AND (char_length((name)::text) <= 80)));
+
+
+--
+-- Name: admin_saved_views admin_saved_views_page_key_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_saved_views
+    ADD CONSTRAINT admin_saved_views_page_key_check CHECK (((page_key)::text ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$'::text));
+
+
+--
+-- Name: admin_saved_views admin_saved_views_query_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_saved_views
+    ADD CONSTRAINT admin_saved_views_query_check CHECK ((char_length(query) <= 4000));
+
+
+
+--
 -- Name: admins admins_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1865,6 +1898,15 @@ ALTER TABLE ONLY public.admin_certificates
 
 ALTER TABLE ONLY public.admin_mfa_recovery_codes
     ADD CONSTRAINT admin_mfa_recovery_codes_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.admins(id) ON DELETE CASCADE;
+
+
+
+--
+-- Name: admin_saved_views admin_saved_views_admin_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_saved_views
+    ADD CONSTRAINT admin_saved_views_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.admins(id) ON DELETE CASCADE;
 
 
 

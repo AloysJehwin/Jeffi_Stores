@@ -835,6 +835,8 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/mailer')) return 'mailer:read'
   if (pathname.startsWith('/api/admin/messaging-templates')) return 'templates:read'
   if (pathname.startsWith('/api/admin/suggest')) return null
+  // Generic list filters and saved views: the handlers check the registered list's own scope.
+  if (pathname.startsWith('/api/admin/filters') || pathname.startsWith('/api/admin/saved-views')) return null
   if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'
   if (pathname.startsWith('/api/admin/google-ads')) return 'google_ads:read'
   if (pathname.startsWith('/api/admin/integrations/google-ads')) return 'google_ads:read'

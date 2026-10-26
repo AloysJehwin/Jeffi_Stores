@@ -30,6 +30,10 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'access-request',
   // Self-service: a member marking their own notification bell read, not a scoped action.
   'notifications/read',
+  // Self-service: a member's own saved filter views, gated on the list's read scope; sharing a
+  // view with the team checks the list's :write scope (writeScopeOf) in the handler.
+  'saved-views',
+  'saved-views/[id]',
   // Owner-only team management, gated on isPlatformOwner rather than a scope.
   'users',
   'users/[id]',

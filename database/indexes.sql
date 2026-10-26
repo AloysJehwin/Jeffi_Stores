@@ -155,6 +155,22 @@ CREATE INDEX idx_admin_mfa_recovery_codes_admin_id ON public.admin_mfa_recovery_
 
 
 --
+-- Name: idx_admin_saved_views_admin_page_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_admin_saved_views_admin_page_name ON public.admin_saved_views USING btree (admin_id, page_key, lower((name)::text));
+
+
+
+--
+-- Name: idx_admin_saved_views_shared; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_saved_views_shared ON public.admin_saved_views USING btree (page_key) WHERE is_shared;
+
+
+
+--
 -- Name: idx_ai_briefing_log_date; Type: INDEX; Schema: public; Owner: -
 --
 

@@ -102,6 +102,26 @@ CREATE TABLE public.admins (
 
 
 --
+-- Name: admin_saved_views; Type: TABLE; Schema: public; Owner: -
+--
+-- A named filter set on an admin list (page_key = the filter registry key). Shared views are
+-- visible to every admin who can read that list.
+--
+
+CREATE TABLE public.admin_saved_views (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid NOT NULL,
+    page_key character varying(64) NOT NULL,
+    name character varying(80) NOT NULL,
+    query text DEFAULT ''::text NOT NULL,
+    is_shared boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+
+--
 -- Name: failed_login_attempts; Type: TABLE; Schema: public; Owner: -
 --
 

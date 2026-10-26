@@ -1,4 +1,10 @@
-import { buildVectorSearchClause, type FieldKeys, type FieldSql, type FilterEntity } from '@jeffi/list-filters'
+import {
+  buildVectorSearchClause,
+  type ExportColumn,
+  type FieldKeys,
+  type FieldSql,
+  type FilterEntity,
+} from '@jeffi/list-filters'
 import { CANCEL_REASON_SQL, NEEDS_SHIP_SQL } from '@/lib/overviews/orders'
 import { ORDER_ALIASES, ORDER_FIELDS } from '../fields/orders'
 
@@ -203,6 +209,57 @@ export const ORDER_SORTS: Record<string, string> = {
   delivered: 'o.delivered_at',
 }
 
+const ist = (e: string, time = true) => `to_char(${e} AT TIME ZONE 'Asia/Kolkata', '${time ? 'YYYY-MM-DD HH24:MI' : 'YYYY-MM-DD'}')`
+const col = (key: string, label: string, sql: string): ExportColumn => ({ key, label, sql })
+
+// One row per order, in IST, for accounts and ops spreadsheets.
+const EXPORT_COLUMNS: ExportColumn[] = [
+  col('order_number', 'Order no', 'o.order_number'),
+  col('date', 'Date', ist('o.created_at')),
+  col('status', 'Status', 'o.status'),
+  col('payment_status', 'Payment status', 'o.payment_status'),
+  col('payment_mode', 'Payment mode', 'o.payment_mode'),
+  col('shipment_status', 'Shipment status', 'o.shipment_status'),
+  col('source', 'Source', 'o.source'),
+  col('customer', 'Customer', 'o.customer_name'),
+  col('email', 'Email', 'o.customer_email'),
+  col('phone', 'Phone', 'o.customer_phone'),
+  col(
+    'customer_type',
+    'Customer type',
+    `COALESCE((SELECT CASE WHEN u.user_type = 'business' THEN 'business' WHEN u.is_guest IS NOT TRUE THEN 'registered' END
+      FROM users u WHERE u.id = o.user_id), 'guest')`
+  ),
+  col('units', 'Units', '(SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.order_id = o.id)'),
+  col('subtotal', 'Subtotal', 'o.subtotal'),
+  col('discount', 'Discount', 'o.discount_amount'),
+  col('shipping', 'Shipping', 'o.shipping_amount'),
+  col('taxable', 'Taxable value', 'o.taxable_amount'),
+  col('cgst', 'CGST', 'o.cgst_amount'),
+  col('sgst', 'SGST', 'o.sgst_amount'),
+  col('igst', 'IGST', 'o.igst_amount'),
+  col('tax', 'Total tax', 'o.tax_amount'),
+  col('total', 'Order total', 'o.total_amount'),
+  col(
+    'coupons',
+    'Coupons',
+    `(SELECT string_agg(DISTINCT c.code, ', ') FROM coupon_usage cu JOIN coupons c ON c.id = cu.coupon_id WHERE cu.order_id = o.id)`
+  ),
+  col('state', 'State', shipTo('state', 'state')),
+  col('city', 'City', shipTo('city', 'city')),
+  col('pincode', 'Pincode', shipTo('postal_code', 'postal_code')),
+  col('awb', 'AWB', 'o.awb_number'),
+  col('shipped', 'Shipped', ist('o.shipped_at')),
+  col('delivered', 'Delivered', ist('o.delivered_at')),
+  col('invoice_number', 'Invoice no', 'o.invoice_number'),
+  col('invoice_date', 'Invoice date', ist('o.invoice_date', false)),
+  col('irn_status', 'IRN status', 'o.irn_status'),
+  col('gstin', 'Buyer GSTIN', 'o.buyer_gstin'),
+  col('utm_source', 'UTM source', 'o.utm_source'),
+  col('utm_medium', 'UTM medium', 'o.utm_medium'),
+  col('utm_campaign', 'UTM campaign', 'o.utm_campaign'),
+]
+
 export const ORDERS_ENTITY: FilterEntity<OrderKey> = {
   key: 'orders',
   scope: 'orders:read',
@@ -227,6 +284,7 @@ export const ORDERS_ENTITY: FilterEntity<OrderKey> = {
   },
   sorts: ORDER_SORTS,
   facets: true,
+  export: { columns: EXPORT_COLUMNS, keyset: ['o.created_at', 'o.id'] },
   context: async q => {
     if (!q.late_to_ship) return {}
     const [{ getBusinessValues }, { eddSettingsFromValues }] = await Promise.all([

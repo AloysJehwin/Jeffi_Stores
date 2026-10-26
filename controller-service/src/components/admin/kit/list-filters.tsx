@@ -15,6 +15,7 @@ import {
 } from '@jeffi/list-filters/client'
 import AdvancedFilterPanel, { chipLabel, fieldIsActive } from '@/components/admin/AdvancedFilterPanel'
 import { DataToolbar, type FilterDef } from './data-table'
+import { ExportRowsButton, SavedViewsMenu, ShareFilterLink } from './saved-views'
 
 // One filter bar for every registered admin list: search, quick selects, a Filters toggle over the
 // full panel (a sheet on phones) and a chip per active filter, all kept in the URL.
@@ -52,6 +53,9 @@ export function ListFilters({
   period,
   noun,
   tab,
+  views = true,
+  share = true,
+  exportable = false,
   children,
 }: ListFiltersProps) {
   const sp = useSearchParams()
@@ -124,6 +128,9 @@ export function ListFilters({
           <SlidersHorizontal className="h-4 w-4" />
           Filters{active.length ? ` (${active.length})` : ''}
         </button>
+        {views && <SavedViewsMenu entity={entity} fields={allFields} search={searchParam} tab={tab} />}
+        {share && <ShareFilterLink fields={allFields} search={searchParam} tab={tab} />}
+        {exportable && <ExportRowsButton entity={entity} fields={allFields} search={searchParam} noun={noun} />}
         {children}
       </DataToolbar>
 
