@@ -106,6 +106,12 @@ export const ORDER_FIELDS = defineFields({
     ]),
   },
   gateway: vh('Gateway', 'Payment'),
+  txn: {
+    label: 'Transaction / refund ID',
+    type: 'text',
+    placeholder: 'pay_…, order_… or rfnd_…',
+    section: 'Payment',
+  },
   coupon: vh('Coupon', 'Payment'),
   has_coupon: { label: 'Coupon used', type: 'toggle', options: YES_NO, section: 'Payment' },
   cod_pending: { label: 'COD pending remittance', type: 'boolean', section: 'Payment' },
@@ -139,7 +145,13 @@ export const ORDER_FIELDS = defineFields({
   pincode: vh('Pincode', 'Shipping'),
   shipping_method: vh('Shipping method', 'Shipping'),
 
-  customer: { label: 'Customer', type: 'text', placeholder: 'Name, email or phone', section: 'Customer' },
+  customer: {
+    label: 'Customer',
+    type: 'text',
+    placeholder: 'Name, email or phone',
+    section: 'Customer',
+    suggest: 'order_customers',
+  },
   customer_type: {
     label: 'Customer type',
     type: 'multi-select',

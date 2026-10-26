@@ -22,6 +22,8 @@ export interface FilterField {
   quick?: boolean
   /** What the value-help counts ("Orders"). */
   noun?: string
+  /** A text field that suggests matches as you type, from /api/admin/suggest?type=<suggest>. */
+  suggest?: string
 }
 
 export type KeyedField<K extends string = string> = FilterField & { key: K }

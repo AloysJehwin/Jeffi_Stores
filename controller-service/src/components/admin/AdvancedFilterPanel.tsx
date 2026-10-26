@@ -8,6 +8,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import { Sheet } from './kit/dialog'
 import FilterValueHelp from './FilterValueHelp'
 import AdminSelect from './AdminSelect'
+import AdminTypeahead from './AdminTypeahead'
 import { RESERVED_PARAMS, joinFilterValues, splitFilterValues } from '@jeffi/list-filters/client'
 import type { AdvancedFilterField } from '@/lib/catalog/product-attribute-filters-shared'
 
@@ -487,6 +488,17 @@ export default function AdvancedFilterPanel({
         </div>
       )
     }
+    if (f.type === 'text' && f.suggest)
+      return (
+        <AdminTypeahead
+          type={f.suggest}
+          value={local[name] || ''}
+          onChange={v => setLocalVal(name, v)}
+          onSelect={item => setLocalVal(name, item.id)}
+          placeholder={f.placeholder || `Filter by ${f.label}`}
+          inputClassName={inputCls}
+        />
+      )
     if (f.type === 'text')
       return (
         <input
