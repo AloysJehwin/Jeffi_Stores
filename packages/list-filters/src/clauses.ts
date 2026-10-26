@@ -277,6 +277,8 @@ export function buildWhere<K extends string>(
   const conditions = opts.base === false ? [] : [...(entity.base ?? [])]
   const params: unknown[] = []
   let idx = startIdx
+  // Never skipped (unlike `base`): these carry tenant scoping.
+  for (const b of entity.boundBase ?? []) conditions.push(sqlOf(b, opts.ctx ?? {}, v => (params.push(v), `$${idx++}`)))
   const sp = searchParamOf(entity as FilterEntity)
   const term = entity.search && !opts.omit?.includes(sp) && !opts.only ? q[sp] : undefined
   if (term && entity.search) {

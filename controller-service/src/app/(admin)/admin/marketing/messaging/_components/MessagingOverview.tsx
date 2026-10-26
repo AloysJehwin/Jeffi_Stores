@@ -14,6 +14,8 @@ import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { delta, type Bucket } from '@/lib/overview/period'
 import type { MessagingState, MessagingTotals } from '@/lib/overviews/marketing-messaging'
 import { ap } from '@/lib/shared/admin-path'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messaging'
 
 interface Data {
   bucket: Bucket
@@ -49,8 +51,11 @@ const human = (s: string) => s.replace(/_/g, ' ')
 
 export default function MessagingOverview() {
   const [period, setPeriod] = usePeriod()
+  // KPIs and charts follow the broadcast list's filters (then only broadcasts count); the
+  // PeriodBar owns from / to.
+  const filters = useFilterQuery(MESSAGING_FIELDS, { omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/marketing/messaging/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/marketing/messaging/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
   const c = data?.current
   const p = data?.previous_totals
@@ -58,6 +63,8 @@ export default function MessagingOverview() {
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters entity="messaging" fields={MESSAGING_FIELDS} search={MESSAGING_SEARCH} period noun="Messages" tab="overview" exportable />
+      {filters && <p className="text-xs text-foreground-muted">Filtered: only the matching broadcasts count; automated WhatsApp and SMS are left out.</p>}
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
         !error && <OverviewSkeleton />

@@ -1,16 +1,18 @@
 import { Suspense } from 'react'
+import { normalizeQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
-import { queryMany, queryCount } from '@/lib/shared/db'
-import { DataToolbar, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
 import { TONE_CLS } from '@/components/admin/kit/tones'
 import MessagingTable, { type Campaign } from './_components/MessagingTable'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import MessagingOverview from './_components/MessagingOverview'
-import OverviewTabs from '../../coupons/_components/OverviewTabs'
-import { resolveListTab } from '@/lib/overviews/marketing'
+import { isListUrl, tabHref } from '@/lib/admin/filter-url'
+import { listCampaigns } from '@/lib/admin/messaging'
+import { MESSAGING_ENTITY } from '@/lib/filters/entities/messaging'
+import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messaging'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -33,23 +35,23 @@ const STATUS_STYLES: Record<string, string> = {
   failed: TONE_CLS.red,
 }
 
-export default async function MailerPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: string; search?: string; tab?: string; from?: string; to?: string }>
-}) {
+type SP = Record<string, string | undefined>
+
+export default async function MailerPage({ searchParams }: { searchParams: Promise<SP> }) {
   const host = await getHost()
   const sp = await searchParams
-  const tab = resolveListTab(sp, ['page', 'search'])
+  const tab = isListUrl(sp, MESSAGING_FIELDS) ? 'list' : 'overview'
+  const href = (t: string) => ap(tabHref('/admin/marketing/messaging', t, sp, MESSAGING_FIELDS), host)
   return (
     <PageBody>
       <PageHeader title="Messaging" description="Send email, SMS and WhatsApp messages to your customers" />
 
-      <OverviewTabs
-        basePath={ap('/admin/marketing/messaging', host)}
-        active={tab}
-        sp={sp}
-        listLabel="Messages"
+      <TabLinks
+        tabs={[
+          { id: 'overview', label: 'Overview', href: href('overview') },
+          { id: 'list', label: 'Messages', href: href('list') },
+        ]}
+        value={tab}
         actions={
           <TabAction
             href={ap('/admin/marketing/messaging/new', host)}
@@ -65,69 +67,35 @@ export default async function MailerPage({
         </Suspense>
       ) : (
         <>
-          <DataToolbar search={{ placeholder: 'Search by title or subject...', param: 'search' }} />
-          <MailerListSection searchParams={searchParams} />
+          <ListFilters entity="messaging" fields={MESSAGING_FIELDS} search={MESSAGING_SEARCH} noun="Messages" tab="list" exportable />
+          <Suspense key={listKey(sp)} fallback={<TableSkeleton rows={8} cols={6} />}>
+            <MailerListContent resolvedSearchParams={sp} />
+          </Suspense>
         </>
       )}
     </PageBody>
   )
 }
 
-// Resolves searchParams (no DB — near-instant) then keys the table Suspense
-// on the query string so filter/pagination changes re-trigger the shimmer
-// while the header + filters above stay mounted.
-async function MailerListSection({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
-  const resolvedSearchParams = await searchParams
-  const key = listKey(resolvedSearchParams)
-  return (
-    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>
-      <MailerListContent resolvedSearchParams={resolvedSearchParams} />
-    </Suspense>
-  )
-}
-
-async function MailerListContent({
-  resolvedSearchParams,
-}: {
-  resolvedSearchParams: { page?: string; search?: string }
-}) {
+async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const host = await getHost()
-  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
-  const search = resolvedSearchParams.search?.trim() || ''
-  const offset = (page - 1) * PAGE_SIZE
-
-  const conditions: string[] = []
-  const params: unknown[] = []
-  let i = 1
-
-  if (search) {
-    conditions.push(`(title ILIKE $${i} OR subject ILIKE $${i})`)
-    params.push(`%${search}%`)
-    i++
-  }
-
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10) || 1)
+  const q = normalizeQuery(MESSAGING_ENTITY, resolvedSearchParams)
+  const search = q.search ?? ''
 
   let campaigns: Campaign[] = []
   let total = 0
   let migrationPending = false
 
   try {
-    ;[campaigns, total] = await Promise.all([
-      queryMany<Campaign>(
-        `SELECT id, title, template_key, channels, subject, audience_type, recipient_count, status, scheduled_at, sent_at, created_at
-         FROM email_campaigns ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-        [...params, PAGE_SIZE, offset]
-      ),
-      queryCount(`SELECT COUNT(*) FROM email_campaigns ${where}`, params),
-    ])
+    ;({ campaigns, total } = await listCampaigns<Campaign>(q, page, PAGE_SIZE))
   } catch {
     migrationPending = true
   }
 
+  // Back link from a message: this tab, these filters, this page.
   const currentListUrl = (() => {
-    const params = new URLSearchParams({ tab: 'list' })
-    if (search) params.set('search', search)
+    const params = new URLSearchParams({ tab: 'list', ...q })
     if (page > 1) params.set('page', String(page))
     return `/admin/marketing/messaging?${params}`
   })()

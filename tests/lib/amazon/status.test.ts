@@ -163,14 +163,14 @@ describe('amazon/status', () => {
       const countSql = String(mockQueryOne.mock.calls[0][0])
       expect(countSql).toContain('WHERE')
       expect(countSql).toContain('ILIKE')
-      expect(countSql).toContain('status =')
+      expect(countSql).toContain('al.status IN')
     })
 
     it('ignores status="all"', async () => {
       mockQueryOne.mockResolvedValueOnce({ n: 0 })
       mockQueryMany.mockResolvedValueOnce([] as any)
       await getAmazonStatusPage({ page: 1, pageSize: 50, status: 'all' })
-      expect(String(mockQueryOne.mock.calls[0][0])).not.toContain('status =')
+      expect(String(mockQueryOne.mock.calls[0][0])).not.toContain('status IN')
     })
 
     it('clamps page/pageSize defaults and returns total 0 on null', async () => {

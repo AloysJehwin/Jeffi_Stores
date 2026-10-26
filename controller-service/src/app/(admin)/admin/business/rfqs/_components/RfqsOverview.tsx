@@ -13,6 +13,8 @@ import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct } from '@/compon
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { RFQ_FIELDS, RFQ_SEARCH } from '@/lib/filters/fields/business-rfqs'
 
 interface Totals {
   received: number
@@ -56,13 +58,23 @@ const waited = (h: number | null) => (h == null ? '-' : h < 24 ? `${Math.round(h
 
 export default function RfqsOverview() {
   const [period, setPeriod] = usePeriod()
+  // KPIs and charts follow the RFQ list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(RFQ_FIELDS, { omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/business/rfqs/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/business/rfqs/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
+  // A status row opens the list with these filters and that status.
+  const statusHref = (status: string) => {
+    const p = new URLSearchParams(filters)
+    p.set('tab', 'list')
+    p.set('status', status)
+    return ap(`/admin/business/rfqs?${p}`)
+  }
 
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters entity="business_rfqs" fields={RFQ_FIELDS} search={RFQ_SEARCH} period noun="RFQs" tab="overview" exportable />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (
         !error && <OverviewSkeleton />
@@ -100,7 +112,7 @@ export default function RfqsOverview() {
                   {data.by_status.map(s => (
                     <li key={s.status}>
                       <Link
-                        href={ap(`/admin/business/rfqs?tab=list&status=${s.status}`)}
+                        href={statusHref(s.status)}
                         className="flex items-center justify-between text-sm hover:text-accent-500"
                       >
                         <span>{STATUS_LABEL[s.status] ?? s.status}</span>

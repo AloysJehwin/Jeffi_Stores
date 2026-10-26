@@ -80,6 +80,8 @@ export interface FilterEntity<K extends string = string> {
   alias: string
   pk?: string
   base?: string[]
+  /** Base conditions bound from request context (e.g. the tenant id); applied even when `base` is skipped. */
+  boundBase?: Sql[]
   fields: KeyedField<K>[]
   sql: Record<K, FieldSql>
   /** The main date field; its params are `from` / `to`, which double as the Overview period. */

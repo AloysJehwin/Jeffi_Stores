@@ -3,6 +3,11 @@ import { INVOICES_ENTITY, PURCHASE_ORDERS_ENTITY, QUOTATIONS_ENTITY, type Filter
 import { ORDERS_ENTITY } from './entities/orders'
 import { REPLACEMENTS_ENTITY, RETURNS_ENTITY } from './entities/returns'
 import { PACKING_ENTITY } from './entities/packing-slips'
+import { RFQ_ENTITY } from './entities/business-rfqs'
+import { B2B_ENTITY } from './entities/business-customers'
+import { MESSAGING_ENTITY } from './entities/messaging'
+import { AMAZON_LISTINGS_ENTITY } from './entities/amazon-listings'
+import { WALLET_ENTITY } from './entities/wallet'
 import { CASH_SALE_ENTITY } from './entities/cash-sale'
 import { LEDGER_ENTITY, VALUATION_ENTITY } from './entities/inventory'
 import { CUSTOMERS_ENTITY } from './entities/customers'
@@ -21,6 +26,11 @@ export const FILTER_ENTITIES: Record<string, FilterEntity> = {
   orders: ORDERS_ENTITY as unknown as FilterEntity,
   returns: RETURNS_ENTITY as unknown as FilterEntity,
   replacements: REPLACEMENTS_ENTITY as unknown as FilterEntity,
+  business_rfqs: RFQ_ENTITY as unknown as FilterEntity,
+  business_customers: B2B_ENTITY as unknown as FilterEntity,
+  messaging: MESSAGING_ENTITY as unknown as FilterEntity,
+  'amazon.listings': AMAZON_LISTINGS_ENTITY as unknown as FilterEntity,
+  wallet: WALLET_ENTITY as unknown as FilterEntity,
   packing_slips: PACKING_ENTITY as unknown as FilterEntity,
   cash_sale: CASH_SALE_ENTITY as unknown as FilterEntity,
   'inventory.ledger': LEDGER_ENTITY as unknown as FilterEntity,
