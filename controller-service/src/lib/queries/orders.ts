@@ -1,5 +1,7 @@
+import { buildWhere, normalizeQuery, type FilterCtx, type FilterQuery } from '@jeffi/list-filters'
 import { queryOne, queryMany, queryCount } from './shared'
-import { buildVectorSearchClause } from '@/lib/catalog/search'
+import { ORDERS_ENTITY, ORDER_SORTS } from '@/lib/filters/entities/orders'
+import { FULFILLED_SQL } from '@/lib/orders/fulfilled-status'
 import { orderItemFactorSql, orderItemUnitSql } from '@/lib/orders/unit-conversion'
 
 export async function getAllOrders() {
@@ -16,16 +18,44 @@ export async function getAllOrders() {
   `)
 }
 
-const ORDER_SORT_COLS: Record<string, string> = {
-  order_number: 'o.order_number',
-  customer: 'o.customer_name',
-  date: 'o.created_at',
-  total: 'o.total_amount',
-  status: 'o.status',
-  payment: 'o.payment_status',
-  source: 'o.source',
+const ORDER_LIST_SELECT = `
+      SELECT
+        o.*,
+        json_build_object(
+          'id', u.id, 'email', u.email, 'first_name', u.first_name,
+          'last_name', u.last_name, 'phone', u.phone
+        ) AS users
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id`
+
+/** One page of orders for a normalised filter query, plus the matching total. */
+export async function queryOrders(
+  q: FilterQuery,
+  opts: { page?: number; limit?: number; sort?: string; dir?: string; ctx?: FilterCtx } = {}
+) {
+  const ctx = opts.ctx ?? (await ORDERS_ENTITY.context?.(q)) ?? {}
+  const w = buildWhere(ORDERS_ENTITY, q, 1, { ctx })
+  const limit = opts.limit || 25
+  const offset = ((opts.page || 1) - 1) * limit
+  const sortCol = ORDER_SORTS[opts.sort || ''] || 'o.created_at'
+  const sortDir = opts.dir === 'asc' ? 'ASC' : 'DESC'
+
+  const [orders, countResult] = await Promise.all([
+    queryMany(
+      `${ORDER_LIST_SELECT}
+      ${w.where}
+      ORDER BY ${sortCol} ${sortDir}
+      LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}
+    `,
+      [...w.params, limit, offset]
+    ),
+    queryCount(`SELECT COUNT(*) FROM orders o ${w.where}`, w.params),
+  ])
+
+  return { orders, total: countResult }
 }
 
+/** Raw URL-style filters (old names accepted) → queryOrders. */
 export async function getFilteredOrders(filters: {
   status?: string
   payment_status?: string
@@ -44,100 +74,45 @@ export async function getFilteredOrders(filters: {
   limit?: number
   sort?: string
   dir?: string
+  [param: string]: string | number | undefined
 }) {
-  const conditions: string[] = []
-  const params: any[] = []
-  let i = 1
+  const { page, limit, sort, dir, ...rest } = filters
+  return queryOrders(normalizeQuery(ORDERS_ENTITY, rest), {
+    page: typeof page === 'number' ? page : undefined,
+    limit: typeof limit === 'number' ? limit : undefined,
+    sort: typeof sort === 'string' ? sort : undefined,
+    dir: typeof dir === 'string' ? dir : undefined,
+  })
+}
 
-  if (filters.status) {
-    conditions.push(`o.status = $${i++}`)
-    params.push(filters.status)
-  }
-  if (filters.payment_status) {
-    conditions.push(`o.payment_status = $${i++}`)
-    params.push(filters.payment_status)
-  }
-  if (filters.source) {
-    conditions.push(`o.source = $${i++}`)
-    params.push(filters.source)
-  }
-  if (filters.date_from) {
-    conditions.push(`o.created_at >= $${i++}::timestamptz`)
-    params.push(filters.date_from)
-  }
-  if (filters.date_to) {
-    conditions.push(`o.created_at <= ($${i++}::date + INTERVAL '1 day')::timestamptz`)
-    params.push(filters.date_to)
-  }
-  if (filters.amount_min) {
-    conditions.push(`o.total_amount >= $${i++}::numeric`)
-    params.push(filters.amount_min)
-  }
-  if (filters.amount_max) {
-    conditions.push(`o.total_amount <= $${i++}::numeric`)
-    params.push(filters.amount_max)
-  }
-  if (filters.awb) {
-    conditions.push(`o.awb_number ILIKE '%' || $${i++} || '%'`)
-    params.push(filters.awb)
-  }
-  if (filters.shipment_status) {
-    conditions.push(`o.shipment_status = $${i++}`)
-    params.push(filters.shipment_status)
-  }
-  if (filters.payment_mode) {
-    conditions.push(`o.payment_mode = $${i++}`)
-    params.push(filters.payment_mode)
-  }
-  if (filters.coupon_code) {
-    conditions.push(`o.coupon_code ILIKE '%' || $${i++} || '%'`)
-    params.push(filters.coupon_code)
-  }
-  // COD cash collected on delivery but not yet remitted by Delhivery to the seller.
-  if (filters.cod_pending === 'true' || filters.cod_pending === '1') {
-    conditions.push(`o.payment_mode = 'cod' AND o.payment_status = 'cod_collected' AND o.cod_remitted_at IS NULL`)
-  }
-  if (filters.search) {
-    const sc = buildVectorSearchClause(
-      filters.search,
-      'o.search_vector',
-      ['o.customer_name'],
-      ['o.order_number'],
-      i,
-      'simple'
-    )
-    conditions.push(sc.clause)
-    params.push(...sc.params)
-    i = sc.nextIdx
-  }
+export interface OrdersSummary {
+  total: number
+  pending: number
+  processing: number
+  completed: number
+  paidRevenue: number
+}
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-  const limit = filters.limit || 25
-  const offset = ((filters.page || 1) - 1) * limit
-  const sortCol = ORDER_SORT_COLS[filters.sort || ''] || 'o.created_at'
-  const sortDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
-
-  const [orders, countResult] = await Promise.all([
-    queryMany(
-      `
-      SELECT
-        o.*,
-        json_build_object(
-          'id', u.id, 'email', u.email, 'first_name', u.first_name,
-          'last_name', u.last_name, 'phone', u.phone
-        ) AS users
-      FROM orders o
-      LEFT JOIN users u ON o.user_id = u.id
-      ${where}
-      ORDER BY ${sortCol} ${sortDir}
-      LIMIT $${i} OFFSET $${i + 1}
-    `,
-      [...params, limit, offset]
-    ),
-    queryCount(`SELECT COUNT(*) FROM orders o ${where}`, params),
-  ])
-
-  return { orders, total: countResult }
+/** The list's KPI strip over every matching order (not just the page shown). */
+export async function getOrdersSummary(q: FilterQuery, ctx?: FilterCtx): Promise<OrdersSummary> {
+  const w = buildWhere(ORDERS_ENTITY, q, 1, { ctx: ctx ?? (await ORDERS_ENTITY.context?.(q)) ?? {} })
+  const r = await queryOne<Record<string, string | number | null>>(
+    `SELECT COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE o.status = 'pending') AS pending,
+            COUNT(*) FILTER (WHERE o.status = 'processing') AS processing,
+            COUNT(*) FILTER (WHERE ${FULFILLED_SQL}) AS completed,
+            COALESCE(SUM(o.total_amount) FILTER (WHERE o.payment_status = 'paid'), 0) AS paid_revenue
+     FROM orders o ${w.where}`,
+    w.params
+  )
+  const n = (v: unknown) => Number(v ?? 0) || 0
+  return {
+    total: n(r?.total),
+    pending: n(r?.pending),
+    processing: n(r?.processing),
+    completed: n(r?.completed),
+    paidRevenue: n(r?.paid_revenue),
+  }
 }
 
 export async function getRecentOrders(limit: number = 10) {

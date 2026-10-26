@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { SlidersHorizontal } from 'lucide-react'
+import { activeCount, paramNamesOf } from '@jeffi/list-filters/client'
 import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
 import type { ComponentProps } from 'react'
 import { DataToolbar } from '@/components/admin/kit'
@@ -20,6 +22,7 @@ export default function ProductsAdvancedFilters({
   toolbar?: ComponentProps<typeof DataToolbar>
 }) {
   const [open, setOpen] = useState(false)
+  const sp = useSearchParams()
   const toggle = (
     <button
       type="button"
@@ -35,7 +38,9 @@ export default function ProductsAdvancedFilters({
   if (toolbar) {
     return (
       <div className="space-y-2">
-        <DataToolbar {...toolbar}>{toggle}</DataToolbar>
+        <DataToolbar {...toolbar} activeExtra={activeCount(sp, fields)} clear={fields.flatMap(paramNamesOf)}>
+          {toggle}
+        </DataToolbar>
         {open && (
           <div className="rounded-xl border border-border-default bg-surface-elevated p-4">
             <AdvancedFilterPanel fields={fields} mode="content" forceExpanded valuesEndpoint={valuesEndpoint} />

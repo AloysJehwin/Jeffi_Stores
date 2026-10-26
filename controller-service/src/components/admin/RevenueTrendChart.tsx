@@ -32,7 +32,8 @@ function shortMonth(m: string): string {
   return d.toLocaleDateString('en-IN', { month: 'short' })
 }
 
-export default function RevenueTrendChart({ data: initial }: { data: RevenueTrend }) {
+/** `query`: the list's filters, kept when the period changes. */
+export default function RevenueTrendChart({ data: initial, query = '' }: { data: RevenueTrend; query?: string }) {
   const [data, setData] = useState<RevenueTrend>(initial)
   const [period, setPeriod] = useState('12m')
   const [loading, setLoading] = useState(false)
@@ -57,7 +58,7 @@ export default function RevenueTrendChart({ data: initial }: { data: RevenueTren
     setLoading(true)
     setHover(null)
     try {
-      const res = await fetch(`/api/admin/orders/revenue-trend?period=${p}`)
+      const res = await fetch(`/api/admin/orders/revenue-trend?period=${p}${query ? `&${query}` : ''}`)
       if (res.ok) {
         const json = await res.json()
         if (json.trend) setData(json.trend)

@@ -27,7 +27,8 @@ export {
   getBrochureProductsByIds,
   type BrochureProduct,
 } from './brochure'
-export { getAllOrders, getFilteredOrders, getRecentOrders, getOrder, getReturnRequest } from './orders'
+export { getAllOrders, getFilteredOrders, queryOrders, getOrdersSummary, getRecentOrders, getOrder, getReturnRequest } from './orders'
+export type { OrdersSummary } from './orders'
 export { getCustomers, getCustomerById } from './customers'
 export { getDashboardStats, getDashboardMetrics, getDashboardAnalytics, type DashboardAnalytics } from './dashboard'
 export {
