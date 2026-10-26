@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     if (body?.all === true) {
-      await markAllRead()
+      await markAllRead(admin.adminId)
     } else if (Array.isArray(body?.ids)) {
       await markRead(body.ids.filter((id: unknown) => typeof id === 'string'))
     } else {

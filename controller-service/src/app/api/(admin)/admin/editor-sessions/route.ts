@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { openSession, RESOURCE_TYPES, type ResourceType } from '@/lib/admin/editor-sessions'
 import { zUuid } from '@/lib/shared/validate'
+import { announceDraftLock, draftLockResponse } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,8 +40,18 @@ export async function POST(req: NextRequest) {
   if (!hasScope(admin.role, admin.scopes, WRITE_SCOPE[resourceType as ResourceType]))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const session = await openSession(admin.adminId, resourceType as ResourceType, resourceId)
+  // Opening a session takes the draft lock (423 when another admin holds it).
+  const actor = { adminId: admin.adminId, role: admin.role, scopes: admin.scopes }
+  let session: Awaited<ReturnType<typeof openSession>>
+  try {
+    session = await openSession(admin.adminId, resourceType as ResourceType, resourceId, actor)
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (session.lock) await announceDraftLock(actor, resourceType as never, resourceId, session.lock)
 
   return NextResponse.json({
     session_id: session.id,
