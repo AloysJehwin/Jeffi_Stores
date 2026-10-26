@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { create } from 'zustand'
 import { Pressable, View } from 'react-native'
 import { Image } from 'expo-image'
 import { usePathname, useRouter } from 'expo-router'
@@ -219,4 +220,14 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
       <View style={{ height: insets.bottom }} />
     </ModalSheet>
   )
+}
+
+// One menu sheet for the whole app, mounted at the root; every header's MenuButton opens it.
+const useMenuStore = create<{ open: boolean; setOpen: (open: boolean) => void }>(set => ({ open: false, setOpen: open => set({ open }) }))
+export const openMenu = () => useMenuStore.getState().setOpen(true)
+const closeMenu = () => useMenuStore.getState().setOpen(false)
+
+export function MenuSheetHost() {
+  const open = useMenuStore(s => s.open)
+  return <MenuSheet open={open} onClose={closeMenu} />
 }

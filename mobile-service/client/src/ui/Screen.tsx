@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ComponentType, type ReactNode } from 'react'
 import { RefreshControl, ScrollView, View, type ScrollViewProps } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -112,6 +112,9 @@ export function ScreenFooter({ children }: { children: ReactNode }) {
   )
 }
 
+/** The app's menu button, provided at the root (the kit doesn't import app components); ScreenHeader puts it top right. */
+export const HeaderMenuContext = createContext<ComponentType | null>(null)
+
 export interface ScreenHeaderProps {
   title?: string
   subtitle?: string
@@ -122,11 +125,15 @@ export interface ScreenHeaderProps {
   actions?: ReactNode
   /** A large title under the bar, for top-level pages. */
   large?: boolean
+  /** The menu button (default on; off where leaving would abandon a flow, e.g. a payment in progress). */
+  menu?: boolean
 }
 
-export function ScreenHeader({ title, subtitle, back = true, onBack, actions, large }: ScreenHeaderProps) {
+export function ScreenHeader({ title, subtitle, back = true, onBack, actions, large, menu = true }: ScreenHeaderProps) {
   const insets = useSafeAreaInsets()
   const router = useRouter()
+  const Menu = useContext(HeaderMenuContext)
+  const showMenu = menu && !!Menu
   const goBack = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/(tabs)')))
   return (
     <View style={{ paddingTop: insets.top }} className="border-b border-border-default bg-surface-elevated">
@@ -144,7 +151,12 @@ export function ScreenHeader({ title, subtitle, back = true, onBack, actions, la
             </Text>
           ) : null}
         </View>
-        {actions ? <View className="flex-row items-center">{actions}</View> : null}
+        {actions || showMenu ? (
+          <View className="flex-row items-center">
+            {actions}
+            {showMenu && Menu ? <Menu /> : null}
+          </View>
+        ) : null}
       </View>
       {large && title ? (
         <View className="px-4 pb-4">

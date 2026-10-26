@@ -20,7 +20,9 @@ import { StoryViewerHost } from '../src/components/home/StoryViewer'
 import { PushBootstrap } from '../src/components/push/PushBootstrap'
 import { PushPermissionSheetHost } from '../src/components/push/PushPermissionSheet'
 import { trackScreen } from '../src/lib/analytics'
-import { ConfirmHost } from '../src/ui'
+import { ConfirmHost, HeaderMenuContext } from '../src/ui'
+import { MenuButton } from '../src/components/layout/MenuButton'
+import { MenuSheetHost } from '../src/components/layout/MenuSheet'
 import { useTokens } from '../src/theme'
 
 const queryClient = new QueryClient({
@@ -114,6 +116,7 @@ export default function RootLayout() {
           <PushBootstrap />
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           {/* The scene background matches the theme, so a push never flashes white in dark mode. */}
+          <HeaderMenuContext.Provider value={MenuButton}>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.surface } }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
@@ -128,6 +131,8 @@ export default function RootLayout() {
             <Stack.Screen name="account/notifications" />
             <Stack.Screen name="notifications" />
           </Stack>
+          </HeaderMenuContext.Provider>
+          <MenuSheetHost />
           {/* One sheet for every "+" and long-press; lives above the stack so toasts still render over it. */}
           <QuickAddSheetHost />
           <StoryViewerHost />
