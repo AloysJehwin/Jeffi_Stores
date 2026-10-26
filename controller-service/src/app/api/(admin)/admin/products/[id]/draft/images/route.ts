@@ -116,7 +116,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         s3_thumbnail_key: copied.s3ThumbnailKey,
         file_name: gimg.custom_name || gimg.file_name,
         file_size: gimg.file_size,
-        mime_type: gimg.mime_type,
+        mime_type: copied.mimeType ?? gimg.mime_type,
         width: gimg.width,
         height: gimg.height,
         alt_text: '',

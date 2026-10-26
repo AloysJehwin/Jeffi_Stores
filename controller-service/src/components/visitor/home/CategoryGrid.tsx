@@ -13,16 +13,17 @@ interface CategoryGridProps {
 }
 
 export default function CategoryGrid({ categories, title, eyebrow, carousel = false }: CategoryGridProps) {
+  // Phones: a compact 4-up icon grid (icon tile + label, no card); the card tile is sm and up.
   const items = categories.map(category => (
     <Link key={category.id} href={`/categories/${category.slug}`} className="group">
       <div
-        className="flex flex-col items-center text-center gap-2.5 p-3 sm:p-4 rounded-2xl bg-surface-elevated border border-border-default
-                      hover:border-primary-400/60 hover:bg-primary-50 dark:hover:bg-primary-900/10 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+        className="flex flex-col items-center text-center gap-1.5 sm:gap-2.5 p-1 sm:p-4 rounded-xl sm:rounded-2xl sm:bg-surface-elevated sm:border sm:border-border-default
+                      sm:hover:border-primary-400/60 sm:hover:bg-primary-50 dark:sm:hover:bg-primary-900/10 sm:hover:shadow-lg sm:hover:-translate-y-0.5 transition-all duration-200"
       >
-        <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/25 rounded-xl flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 transition-colors shrink-0">
+        <div className="w-14 h-14 sm:w-12 sm:h-12 bg-primary-100 dark:bg-primary-900/25 rounded-2xl sm:rounded-xl flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 group-active:scale-95 transition-all shrink-0">
           <CategoryIcon categoryName={category.name} className="w-6 h-6 text-primary-600 dark:text-primary-400" />
         </div>
-        <span className="text-xs font-bold text-foreground group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2 flex items-center justify-center min-h-[2.25rem] min-w-0 px-0.5">
+        <span className="text-[11px] sm:text-xs font-semibold sm:font-bold text-foreground group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2 flex items-start sm:items-center justify-center min-h-[2rem] sm:min-h-[2.25rem] min-w-0 px-0.5">
           {category.name}
         </span>
       </div>
@@ -41,7 +42,7 @@ export default function CategoryGrid({ categories, title, eyebrow, carousel = fa
           </div>
           <Link
             href="/categories"
-            className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors"
+            className="flex items-center gap-1 min-h-[44px] sm:min-h-0 -my-2 sm:my-0 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 whitespace-nowrap transition-colors"
           >
             View All
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -51,11 +52,11 @@ export default function CategoryGrid({ categories, title, eyebrow, carousel = fa
         </div>
 
         {carousel ? (
-          <SectionCarousel ariaLabel={title ?? COPY.title} itemClassName="w-[45%] sm:w-[22%] lg:w-[12%]">
+          <SectionCarousel ariaLabel={title ?? COPY.title} itemClassName="w-[22%] sm:w-[22%] lg:w-[12%]">
             {items}
           </SectionCarousel>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 lg:grid-cols-8">{items}</div>
+          <div className="grid grid-cols-4 gap-x-2 gap-y-3 sm:gap-3 lg:grid-cols-8">{items}</div>
         )}
       </div>
     </section>

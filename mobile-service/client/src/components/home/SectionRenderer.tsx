@@ -24,6 +24,7 @@ import MotionHero from './MotionHero'
 import Stories from './Stories'
 import ProductSpotlight from './ProductSpotlight'
 import RewardsGame from './RewardsGame'
+import SlidesSection from './SlidesSection'
 
 // Mirror of controller-service components/visitor/home/SectionRenderer.tsx.
 const SIMPLE = {
@@ -32,6 +33,7 @@ const SIMPLE = {
   stories: Stories,
   product_spotlight: ProductSpotlight,
   rewards_game: RewardsGame,
+  slides: SlidesSection,
   offer_slider: OfferSlider,
   trust_strip: TrustStrip,
   promo_banner: PromoBanner,

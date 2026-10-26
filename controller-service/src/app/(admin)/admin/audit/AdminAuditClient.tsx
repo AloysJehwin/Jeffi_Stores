@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
   ShieldCheck,
@@ -11,7 +11,6 @@ import {
   Ticket,
   MailOpen,
   ScrollText,
-  Filter,
   ArrowRight,
   Image as ImageIcon,
   Truck,
@@ -39,12 +38,24 @@ import {
   ArrowDownLeft,
   Lock,
 } from 'lucide-react'
-import AdminSelect from '@/components/admin/AdminSelect'
 import IconButton from '@/components/ui/IconButton'
 import { Tabs } from '@/components/admin/channels/ui'
 import { EmptyState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
+import {
+  AUDIT_FIELDS,
+  AUDIT_SEARCH,
+  EMAIL_LOG_ALIASES,
+  EMAIL_LOG_FIELDS,
+  EMAIL_LOG_SEARCH,
+  LOG_COUNT_CAP,
+  MESSAGE_LOG_ALIASES,
+  MESSAGE_LOG_FIELDS,
+  MESSAGE_LOG_SEARCH,
+} from '@/lib/filters/fields/audit'
 
 interface AuditEvent {
   id: string
@@ -111,6 +122,44 @@ function relTime(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+/** What page 1 of a log reports: the default date window it used, and whether the count stopped at the cap. */
+type LogMeta = { window: { from: string; days: number } | null; capped: boolean } | null
+
+const metaOf = (json: any): LogMeta => ({ window: json?.window ?? null, capped: !!json?.capped })
+
+function LogWindowNote({ meta, noun }: { meta: LogMeta; noun: string }) {
+  if (!meta?.window && !meta?.capped) return null
+  return (
+    <p className="text-xs text-foreground-muted mb-3">
+      {meta.window ? `Showing the last ${meta.window.days} days. Pick dates to see older ${noun}.` : ''}
+      {meta.capped
+        ? ` Over ${LOG_COUNT_CAP.toLocaleString('en-IN')} ${noun} match; narrow the filters to count them all.`
+        : ''}
+    </p>
+  )
+}
+
+/** Empty-list text: filters set, or the default window, or nothing logged at all. */
+const emptyText = (filters: string, meta: LogMeta, noun: string, none: string) =>
+  filters
+    ? `No ${noun} match these filters.`
+    : meta?.window
+      ? `No ${noun} in the last ${meta.window.days} days.`
+      : none
+
+/** Page 1's meta goes to `setMeta`; the list rows and total are returned. */
+async function fetchLog(
+  url: string,
+  rowsKey: string,
+  page: number,
+  setMeta: Dispatch<SetStateAction<LogMeta>>,
+  signal: AbortSignal
+) {
+  const data = await fetchJson(url, signal)
+  if (page === 1) setMeta(metaOf(data))
+  return { rows: data?.[rowsKey] || [], total: data?.total || 0 }
+}
+
 interface CronJob {
   id: string
   name: string
@@ -133,9 +182,17 @@ export default function AdminAuditClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const [entityFilter, setEntityFilter] = useState<string>('all')
-  const [actionFilter, setActionFilter] = useState<string>('all')
   const pageSize = 50
+  // Logs hold emails and numbers: exporting them needs audit:write.
+  const canExport = useCanWrite('audit')
+  // Each list's filters live in the URL; the tabs share from / to (the date), nothing else.
+  const auditFilters = useFilterQuery(AUDIT_FIELDS)
+  const mailFilters = useFilterQuery(EMAIL_LOG_FIELDS, { aliases: EMAIL_LOG_ALIASES })
+  const messageFilters = useFilterQuery(MESSAGE_LOG_FIELDS, { aliases: MESSAGE_LOG_ALIASES })
+  const [auditMeta, setAuditMeta] = useState<LogMeta>(null)
+  const [mailMeta, setMailMeta] = useState<LogMeta>(null)
+  const [smsMeta, setSmsMeta] = useState<LogMeta>(null)
+  const [waMeta, setWaMeta] = useState<LogMeta>(null)
 
   const initialTab = (): PageTab => {
     const t = searchParams?.get('tab')
@@ -178,26 +235,20 @@ export default function AdminAuditClient() {
     body_size: number
   }
   const mailPageSize = 25
-  const [mailKind, setMailKind] = useState<string>('all')
-  const [mailStatus, setMailStatus] = useState<string>('all')
-  const [mailQuery, setMailQuery] = useState<string>('')
-  const [mailQueryDebounced, setMailQueryDebounced] = useState<string>('')
   const [expandedMailId, setExpandedMailId] = useState<string | null>(null)
   const [mailBodies, setMailBodies] = useState<
     Record<string, { html: string | null; text: string | null; metadata: any; loading: boolean }>
   >({})
 
   const mailList = useInfiniteList<MailLogRow>({
-    key: pageTab === 'mail_log' ? [mailKind, mailStatus, mailQueryDebounced].join('|') : null,
+    key: pageTab === 'mail_log' ? mailFilters : null,
     pageSize: mailPageSize,
     getKey: r => r.id,
-    fetchPage: async (p, signal) => {
-      const qs = new URLSearchParams({ page: String(p), pageSize: String(mailPageSize) })
-      if (mailKind !== 'all') qs.set('kind', mailKind)
-      if (mailStatus !== 'all') qs.set('status', mailStatus)
-      if (mailQueryDebounced) qs.set('q', mailQueryDebounced)
-      const data = await fetchJson(`/api/admin/audit/mail-log?${qs.toString()}`, signal)
-      return { rows: data.rows || [], total: data.total || 0 }
+    fetchPage: (p, signal) => {
+      const qs = new URLSearchParams(mailFilters)
+      qs.set('page', String(p))
+      qs.set('pageSize', String(mailPageSize))
+      return fetchLog(`/api/admin/audit/mail-log?${qs}`, 'rows', p, setMailMeta, signal)
     },
   })
   const mailRows = mailList.rows
@@ -252,23 +303,18 @@ export default function AdminAuditClient() {
   }
 
   const smsPageSize = 25
-  const [smsKind, setSmsKind] = useState<string>('all')
-  const [smsStatus, setSmsStatus] = useState<string>('all')
-  const [smsQuery, setSmsQuery] = useState<string>('')
-  const [smsQueryDebounced, setSmsQueryDebounced] = useState<string>('')
   const [expandedSmsId, setExpandedSmsId] = useState<string | null>(null)
 
   const smsList = useInfiniteList<MessageLogRow>({
-    key: pageTab === 'sms_log' ? [smsKind, smsStatus, smsQueryDebounced].join('|') : null,
+    key: pageTab === 'sms_log' ? messageFilters : null,
     pageSize: smsPageSize,
     getKey: r => r.id,
-    fetchPage: async (p, signal) => {
-      const qs = new URLSearchParams({ channel: 'sms', page: String(p), pageSize: String(smsPageSize) })
-      if (smsKind !== 'all') qs.set('kind', smsKind)
-      if (smsStatus !== 'all') qs.set('status', smsStatus)
-      if (smsQueryDebounced) qs.set('q', smsQueryDebounced)
-      const data = await fetchJson(`/api/admin/audit/message-log?${qs.toString()}`, signal)
-      return { rows: data.rows || [], total: data.total || 0 }
+    fetchPage: (p, signal) => {
+      const qs = new URLSearchParams(messageFilters)
+      qs.set('channel', 'sms')
+      qs.set('page', String(p))
+      qs.set('pageSize', String(smsPageSize))
+      return fetchLog(`/api/admin/audit/message-log?${qs}`, 'rows', p, setSmsMeta, signal)
     },
   })
   const smsRows = smsList.rows
@@ -277,23 +323,18 @@ export default function AdminAuditClient() {
 
 
   const waPageSize = 25
-  const [waKind, setWaKind] = useState<string>('all')
-  const [waStatus, setWaStatus] = useState<string>('all')
-  const [waQuery, setWaQuery] = useState<string>('')
-  const [waQueryDebounced, setWaQueryDebounced] = useState<string>('')
   const [expandedWaId, setExpandedWaId] = useState<string | null>(null)
 
   const waList = useInfiniteList<MessageLogRow>({
-    key: pageTab === 'whatsapp_log' ? [waKind, waStatus, waQueryDebounced].join('|') : null,
+    key: pageTab === 'whatsapp_log' ? messageFilters : null,
     pageSize: waPageSize,
     getKey: r => r.id,
-    fetchPage: async (p, signal) => {
-      const qs = new URLSearchParams({ channel: 'whatsapp', page: String(p), pageSize: String(waPageSize) })
-      if (waKind !== 'all') qs.set('kind', waKind)
-      if (waStatus !== 'all') qs.set('status', waStatus)
-      if (waQueryDebounced) qs.set('q', waQueryDebounced)
-      const data = await fetchJson(`/api/admin/audit/message-log?${qs.toString()}`, signal)
-      return { rows: data.rows || [], total: data.total || 0 }
+    fetchPage: (p, signal) => {
+      const qs = new URLSearchParams(messageFilters)
+      qs.set('channel', 'whatsapp')
+      qs.set('page', String(p))
+      qs.set('pageSize', String(waPageSize))
+      return fetchLog(`/api/admin/audit/message-log?${qs}`, 'rows', p, setWaMeta, signal)
     },
   })
   const waRows = waList.rows
@@ -302,15 +343,14 @@ export default function AdminAuditClient() {
 
 
   const auditList = useInfiniteList<AuditEvent>({
-    key: `${entityFilter}|${actionFilter}`,
+    key: pageTab === 'audit' ? auditFilters : null,
     pageSize,
     getKey: e => e.id,
-    fetchPage: async (p, signal) => {
-      const qs = new URLSearchParams({ page: String(p), pageSize: String(pageSize) })
-      if (entityFilter !== 'all') qs.set('entity_type', entityFilter)
-      if (actionFilter !== 'all') qs.set('action', actionFilter)
-      const data = await fetchJson(`/api/admin/audit?${qs.toString()}`, signal)
-      return { rows: data.events || [], total: data.total || 0 }
+    fetchPage: (p, signal) => {
+      const qs = new URLSearchParams(auditFilters)
+      qs.set('page', String(p))
+      qs.set('pageSize', String(pageSize))
+      return fetchLog(`/api/admin/audit?${qs}`, 'events', p, setAuditMeta, signal)
     },
   })
   const events = auditList.rows
@@ -365,72 +405,6 @@ export default function AdminAuditClient() {
   useEffect(() => {
     if (pageTab === 'cron') loadCronJobs()
   }, [pageTab])
-  useEffect(() => {
-    const id = setTimeout(() => setMailQueryDebounced(mailQuery), 300)
-    return () => clearTimeout(id)
-  }, [mailQuery])
-
-  useEffect(() => {
-    const id = setTimeout(() => setSmsQueryDebounced(smsQuery), 300)
-    return () => clearTimeout(id)
-  }, [smsQuery])
-
-  useEffect(() => {
-    const id = setTimeout(() => setWaQueryDebounced(waQuery), 300)
-    return () => clearTimeout(id)
-  }, [waQuery])
-
-  const entityOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All entities' },
-      { value: 'products', label: 'Products' },
-      { value: 'product_variants', label: 'Variants' },
-      { value: 'product_sub_variants', label: 'Sub-variants' },
-      { value: 'product_images', label: 'Product images' },
-      { value: 'variant_images', label: 'Variant images' },
-      { value: 'brands', label: 'Brands' },
-      { value: 'categories', label: 'Categories' },
-      { value: 'inventory', label: 'Inventory' },
-      { value: 'coupons', label: 'Coupons' },
-      { value: 'campaigns', label: 'Campaigns' },
-      { value: 'email_campaigns', label: 'Mailer broadcasts' },
-      { value: 'suppliers', label: 'Suppliers' },
-      { value: 'purchase_orders', label: 'Purchase orders' },
-      { value: 'purchase_order_items', label: 'PO items' },
-      { value: 'grns', label: 'GRNs' },
-      { value: 'grn_items', label: 'GRN items' },
-      { value: 'expenses', label: 'Expenses' },
-      { value: 'expense_payments', label: 'Expense payments' },
-      { value: 'shelf_locations', label: 'Shelf locations' },
-      { value: 'shelf_stock', label: 'Shelf stock' },
-      { value: 'shipping_zones', label: 'Shipping zones' },
-      { value: 'site_settings', label: 'Site settings' },
-      { value: 'gallery_images', label: 'Gallery images' },
-      { value: 'warehouses', label: 'Warehouses' },
-      { value: 'price_inflation_log', label: 'Price inflation' },
-      { value: 'scenarios', label: 'Scenarios' },
-      { value: 'custom_scenarios', label: 'Custom scenarios' },
-      { value: 'review_forms', label: 'Review forms' },
-      { value: 'customer_tag_definitions', label: 'Tag definitions' },
-    ],
-    []
-  )
-
-  const actionOptions = useMemo(
-    () => [
-      { value: 'all', label: 'All actions' },
-      { value: 'create', label: 'Create' },
-      { value: 'update', label: 'Update' },
-      { value: 'delete', label: 'Delete' },
-      { value: 'inventory_adjust', label: 'Inventory adjust' },
-      { value: 'feature', label: 'Feature' },
-      { value: 'unfeature', label: 'Unfeature' },
-      { value: 'send', label: 'Send' },
-      { value: 'export', label: 'Export' },
-    ],
-    []
-  )
-
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
 
   function actorLabel(e: AuditEvent) {
@@ -681,47 +655,17 @@ export default function AdminAuditClient() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
-            <input
-              type="text"
-              aria-label="Search mail log"
-              placeholder="Search by recipient or subject..."
-              value={mailQuery}
-              onChange={e => setMailQuery(e.target.value)}
-              className="field-md text-sm border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
-            />
-            <AdminSelect
-              value={mailKind}
-              onChange={v => setMailKind(v)}
-              options={[
-                { value: 'all', label: 'All kinds' },
-                { value: 'otp', label: 'OTP' },
-                { value: 'welcome', label: 'Welcome' },
-                { value: 'order', label: 'Order' },
-                { value: 'invoice', label: 'Invoice' },
-                { value: 'quotation', label: 'Quotation' },
-                { value: 'rfq', label: 'RFQ' },
-                { value: 'purchase_order', label: 'Purchase Order' },
-                { value: 'business', label: 'Business' },
-                { value: 'automation', label: 'Automation' },
-                { value: 'campaign', label: 'Campaign' },
-                { value: 'admin_notification', label: 'Admin notification' },
-                { value: 'support', label: 'Support' },
-                { value: 'other', label: 'Other' },
-              ]}
-              sm
-            />
-            <AdminSelect
-              value={mailStatus}
-              onChange={v => setMailStatus(v)}
-              options={[
-                { value: 'all', label: 'All status' },
-                { value: 'sent', label: 'Sent' },
-                { value: 'failed', label: 'Failed' },
-              ]}
-              sm
+          <div className="mb-4">
+            <ListFilters
+              entity="logs.email"
+              fields={EMAIL_LOG_FIELDS}
+              aliases={EMAIL_LOG_ALIASES}
+              search={EMAIL_LOG_SEARCH}
+              noun="Emails"
+              exportable={canExport}
             />
           </div>
+          <LogWindowNote meta={mailMeta} noun="emails" />
 
           {mailLoading && mailRows.length === 0 ? (
             <div className="space-y-3">
@@ -730,7 +674,7 @@ export default function AdminAuditClient() {
               ))}
             </div>
           ) : mailRows.length === 0 ? (
-            <EmptyState title="No emails found." />
+            <EmptyState title={emptyText(mailFilters, mailMeta, 'emails', 'No emails found.')} />
           ) : (
             <div className="space-y-2">
               {mailRows.map(row => {
@@ -880,40 +824,17 @@ export default function AdminAuditClient() {
             <p className="text-sm text-foreground-muted">Every outbound SMS notification (OTP is not logged).</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
-            <input
-              type="text"
-              aria-label="Search SMS log"
-              placeholder="Search by number or message..."
-              value={smsQuery}
-              onChange={e => setSmsQuery(e.target.value)}
-              className="field-md text-sm border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
-            />
-            <AdminSelect
-              value={smsKind}
-              onChange={v => setSmsKind(v)}
-              options={[
-                { value: 'all', label: 'All kinds' },
-                { value: 'order_confirmed', label: 'Order confirmed' },
-                { value: 'order_shipped', label: 'Order shipped' },
-                { value: 'order_delivered', label: 'Order delivered' },
-                { value: 'order_cancelled', label: 'Order cancelled' },
-                { value: 'out_for_delivery', label: 'Out for delivery' },
-                { value: 'payment_failed', label: 'Payment failed' },
-              ]}
-              sm
-            />
-            <AdminSelect
-              value={smsStatus}
-              onChange={v => setSmsStatus(v)}
-              options={[
-                { value: 'all', label: 'All status' },
-                { value: 'sent', label: 'Sent' },
-                { value: 'failed', label: 'Failed' },
-              ]}
-              sm
+          <div className="mb-4">
+            <ListFilters
+              entity="logs.sms"
+              fields={MESSAGE_LOG_FIELDS}
+              aliases={MESSAGE_LOG_ALIASES}
+              search={MESSAGE_LOG_SEARCH}
+              noun="Messages"
+              exportable={canExport}
             />
           </div>
+          <LogWindowNote meta={smsMeta} noun="messages" />
 
           {smsLoading && smsRows.length === 0 ? (
             <div className="space-y-3">
@@ -922,7 +843,7 @@ export default function AdminAuditClient() {
               ))}
             </div>
           ) : smsRows.length === 0 ? (
-            <EmptyState title="No SMS messages found." />
+            <EmptyState title={emptyText(messageFilters, smsMeta, 'SMS messages', 'No SMS messages found.')} />
           ) : (
             <div className="space-y-2">
               {smsRows.map(row => {
@@ -1044,40 +965,17 @@ export default function AdminAuditClient() {
             <p className="text-sm text-foreground-muted">Every outbound WhatsApp notification (OTP is not logged).</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
-            <input
-              type="text"
-              aria-label="Search WhatsApp log"
-              placeholder="Search by number or message..."
-              value={waQuery}
-              onChange={e => setWaQuery(e.target.value)}
-              className="field-md text-sm border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
-            />
-            <AdminSelect
-              value={waKind}
-              onChange={v => setWaKind(v)}
-              options={[
-                { value: 'all', label: 'All kinds' },
-                { value: 'order_confirmed', label: 'Order confirmed' },
-                { value: 'order_shipped', label: 'Order shipped' },
-                { value: 'order_delivered', label: 'Order delivered' },
-                { value: 'order_cancelled', label: 'Order cancelled' },
-                { value: 'out_for_delivery', label: 'Out for delivery' },
-                { value: 'payment_failed', label: 'Payment failed' },
-              ]}
-              sm
-            />
-            <AdminSelect
-              value={waStatus}
-              onChange={v => setWaStatus(v)}
-              options={[
-                { value: 'all', label: 'All status' },
-                { value: 'sent', label: 'Sent' },
-                { value: 'failed', label: 'Failed' },
-              ]}
-              sm
+          <div className="mb-4">
+            <ListFilters
+              entity="logs.whatsapp"
+              fields={MESSAGE_LOG_FIELDS}
+              aliases={MESSAGE_LOG_ALIASES}
+              search={MESSAGE_LOG_SEARCH}
+              noun="Messages"
+              exportable={canExport}
             />
           </div>
+          <LogWindowNote meta={waMeta} noun="messages" />
 
           {waLoading && waRows.length === 0 ? (
             <div className="space-y-3">
@@ -1086,7 +984,7 @@ export default function AdminAuditClient() {
               ))}
             </div>
           ) : waRows.length === 0 ? (
-            <EmptyState title="No WhatsApp messages found." />
+            <EmptyState title={emptyText(messageFilters, waMeta, 'WhatsApp messages', 'No WhatsApp messages found.')} />
           ) : (
             <div className="space-y-2">
               {waRows.map(row => {
@@ -1339,24 +1237,16 @@ export default function AdminAuditClient() {
 
       {pageTab === 'audit' && (
         <>
-          <div className="flex flex-wrap gap-2 mb-4">
-            <div className="min-w-[180px]">
-              <AdminSelect sm value={entityFilter} onChange={setEntityFilter} options={entityOptions} />
-            </div>
-            <div className="min-w-[180px]">
-              <AdminSelect sm value={actionFilter} onChange={setActionFilter} options={actionOptions} />
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setEntityFilter('all')
-                setActionFilter('all')
-              }}
-              className="text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary flex items-center gap-1"
-            >
-              <Filter className="w-3.5 h-3.5" /> Reset
-            </button>
+          <div className="mb-4">
+            <ListFilters
+              entity="audit"
+              fields={AUDIT_FIELDS}
+              search={AUDIT_SEARCH}
+              noun="Events"
+              exportable={canExport}
+            />
           </div>
+          <LogWindowNote meta={auditMeta} noun="events" />
 
           {loading ? (
             <div className="space-y-3">
@@ -1371,7 +1261,9 @@ export default function AdminAuditClient() {
               ))}
             </div>
           ) : events.length === 0 ? (
-            <p className="text-sm text-foreground-muted italic">No audit events yet.</p>
+            <p className="text-sm text-foreground-muted italic">
+              {emptyText(auditFilters, auditMeta, 'audit events', 'No audit events yet.')}
+            </p>
           ) : (
             <div className="space-y-2">
               {rows.map(r => {

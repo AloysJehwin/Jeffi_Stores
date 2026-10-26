@@ -2,6 +2,7 @@ import 'server-only'
 import { queryMany } from '@/lib/shared/db'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import { tenantLogoBuffer } from '@/lib/documents/store-logo'
+import { asJpegOrPng } from '@/lib/shared/image-compat'
 import { unitConversion } from '@/lib/orders/unit-conversion'
 
 const PDFDocument = eval('require')('pdfkit')
@@ -144,11 +145,12 @@ function box(doc: any, x: number, y: number, w: number, h: number, fill: string)
   doc.rect(x, y, w, h).fillColor(fill).fill()
 }
 
+// PDFKit draws only JPEG and PNG; a WebP gallery photo is converted, sized for print.
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(4000) })
     if (!res.ok) return null
-    return Buffer.from(await res.arrayBuffer())
+    return await asJpegOrPng(Buffer.from(await res.arrayBuffer()), 800)
   } catch {
     return null
   }

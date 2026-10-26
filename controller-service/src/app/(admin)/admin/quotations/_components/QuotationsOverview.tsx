@@ -1,10 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { QUOTATION_ALIASES, QUOTATION_FIELDS, QUOTATION_SEARCH } from '@jeffi/list-filters/fields'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { AttentionList, OverviewSkeleton, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { Badge, Kpi, KpiGrid, Section, Table, count, money, pct } from '@/components/admin/channels/ui'
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
-import { delta } from '@/lib/overview/period'
+import { MAX_SPAN_DAYS, delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import type { QuotationOverview } from '@/lib/overviews/quotations'
 
@@ -19,9 +22,13 @@ const days = (v: number | null) =>
 
 export default function QuotationsOverview() {
   const [period, setPeriod] = usePeriod()
+  const sp = useSearchParams()
+  // KPIs and charts follow the list's filters; the PeriodBar owns from / to (the quote date).
+  const filters = useFilterQuery(QUOTATION_FIELDS, { aliases: QUOTATION_ALIASES, omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<QuotationOverview>(
-    `/api/admin/quotations/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/quotations/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
+  const clamped = !!sp.get('from') && sp.get('from') !== period.from
 
   return (
     <div className="space-y-5">
@@ -32,6 +39,20 @@ export default function QuotationsOverview() {
         </p>
       </div>
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="quotations"
+        fields={QUOTATION_FIELDS}
+        aliases={QUOTATION_ALIASES}
+        search={QUOTATION_SEARCH}
+        period
+        noun="Quotations"
+        tab="overview"
+      />
+      {clamped && (
+        <p className="text-xs text-foreground-muted">
+          The overview covers at most {MAX_SPAN_DAYS} days: showing {period.from} to {period.to}.
+        </p>
+      )}
       {error && <p className="text-sm text-red-500">{error}</p>}
       {!data ? loading && <OverviewSkeleton /> : <Body d={data} />}
     </div>

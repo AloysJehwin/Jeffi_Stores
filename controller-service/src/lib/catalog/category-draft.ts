@@ -29,7 +29,8 @@ export async function publishCategoryDraft(categoryId: string): Promise<void> {
          policy_override = COALESCE($9::boolean, policy_override),
          return_allowed = $10::boolean, return_window_days = $11::integer,
          replacement_allowed = $12::boolean, replacement_window_days = $13::integer,
-         google_product_category = $14, icon_name = $15, updated_at = NOW()
+         google_product_category = $14, icon_name = $15,
+         image_url = CASE WHEN $16::boolean THEN $17 ELSE image_url END, updated_at = NOW()
        WHERE id = $1`,
       [
         categoryId,
@@ -47,6 +48,9 @@ export async function publishCategoryDraft(categoryId: string): Promise<void> {
         f.replacement_window_days != null ? parseInt(f.replacement_window_days) : null,
         f.google_product_category || null,
         f.icon_name || null,
+        // Drafts saved before the image field keep the live image.
+        'image_url' in f,
+        f.image_url || null,
       ]
     )
 

@@ -1,5 +1,8 @@
 import Link from 'next/link'
-import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
+import SlideImage from '@/components/visitor/slides/SlideImage'
+import StoreMedia from '@/components/visitor/media/StoreMedia'
+
+const MEDIA = 'absolute inset-0 w-full h-full object-cover object-center'
 
 interface PromoBannerProps {
   title?: string | null
@@ -8,6 +11,8 @@ interface PromoBannerProps {
   imageUrl?: string | null
   imageUrlMobile?: string | null
   blurhash?: string | null
+  /** MP4/WebM over the image, its poster. */
+  video?: string | null
   ctaLabel?: string | null
   ctaUrl?: string | null
 }
@@ -19,6 +24,7 @@ export default function PromoBanner({
   imageUrl,
   imageUrlMobile,
   blurhash,
+  video,
   ctaLabel,
   ctaUrl,
 }: PromoBannerProps) {
@@ -34,11 +40,15 @@ export default function PromoBanner({
         <div className="relative rounded-2xl overflow-hidden shadow-xl min-h-[14rem] md:min-h-[20rem] bg-[#0d0d0d]">
           {mobileImg ? (
             <>
-              {blurhash && <BlurhashCanvas hash={blurhash} />}
-              <picture>
-                <source media="(min-width: 1024px)" srcSet={desktopImg ?? mobileImg} />
-                <img src={mobileImg} alt="" className="absolute inset-0 w-full h-full object-cover object-center" />
-              </picture>
+              <StoreMedia image={desktopImg} video={video} className={MEDIA}>
+                <SlideImage
+                  src={desktopImg}
+                  mobileSrc={mobileImg}
+                  blurhash={blurhash}
+                  breakpoint={1024}
+                  className={MEDIA}
+                />
+              </StoreMedia>
               <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] from-10% via-[#0d0d0d]/70 via-55% to-transparent" />
             </>
           ) : (

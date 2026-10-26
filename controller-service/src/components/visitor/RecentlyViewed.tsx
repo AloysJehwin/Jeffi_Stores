@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { applyDiscount, mrpDiscountPct } from '@/lib/catalog/pricing'
+import { onImgError, responsiveImg } from '@/lib/shared/image-url'
 
 interface RecentProduct {
   id: string
@@ -113,7 +114,8 @@ export default function RecentlyViewed({
                   <div className="relative aspect-square bg-surface overflow-hidden">
                     {product.image ? (
                       <img
-                        src={product.image}
+                        {...responsiveImg(product.image, '(min-width: 768px) 200px, 40vw')}
+                        onError={onImgError}
                         alt={product.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                       />
@@ -194,7 +196,12 @@ export default function RecentlyViewed({
             <div className="flex gap-4 mb-4">
               <div className="w-20 h-20 rounded-xl border border-border-default bg-surface-secondary flex-shrink-0 overflow-hidden">
                 {quickView.image ? (
-                  <img src={quickView.image} alt={quickView.name} className="w-full h-full object-contain p-1" />
+                  <img
+                    {...responsiveImg(quickView.image, '80px')}
+                    onError={onImgError}
+                    alt={quickView.name}
+                    className="w-full h-full object-contain p-1"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <svg

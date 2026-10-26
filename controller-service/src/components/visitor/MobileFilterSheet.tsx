@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useRef, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { humanizeLabel } from '@/lib/shared/format'
 
@@ -83,7 +84,7 @@ function CheckboxFilterSection({
         {items.length > 6 && (
           <button
             onClick={() => setShowAll(v => !v)}
-            className="text-sm text-accent-500 hover:text-accent-600 font-medium px-4"
+            className="min-h-[44px] text-sm text-accent-500 hover:text-accent-600 font-medium px-4"
           >
             {showAll ? 'Show less' : `+${items.length - 6} more`}
           </button>
@@ -129,6 +130,7 @@ export default function MobileFilterSheet({
 
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<'filters' | 'sort'>('filters')
+  const openTab = useRef<'filters' | 'sort'>('filters')
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
   const [isPending, startTransition] = useTransition()
 
@@ -174,7 +176,7 @@ export default function MobileFilterSheet({
 
   useEffect(() => {
     if (open) {
-      setTab('filters')
+      setTab(openTab.current)
       setPendingCategories(currentCategory ? currentCategory.split(',') : [])
       setPendingBrands(currentBrand ? currentBrand.split(',') : [])
       setPendingSort(currentSort)
@@ -203,6 +205,20 @@ export default function MobileFilterSheet({
       document.body.style.overflow = ''
     }
   }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open])
+
+  function openSheet(t: 'filters' | 'sort') {
+    openTab.current = t
+    setOpen(true)
+  }
 
   const activeFilterCount = [
     currentCategory,
@@ -317,8 +333,9 @@ export default function MobileFilterSheet({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="lg:hidden flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium border transition-colors border-border-default text-foreground-secondary hover:bg-surface-secondary"
+        onClick={() => openSheet('filters')}
+        aria-haspopup="dialog"
+        className="lg:hidden shrink-0 flex items-center gap-1.5 px-3 h-11 rounded-lg text-xs font-medium border transition-colors border-border-default text-foreground-secondary hover:bg-surface-secondary"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h18l-7 8v5l-4 2v-7L3 5z" />
@@ -330,514 +347,548 @@ export default function MobileFilterSheet({
           </span>
         )}
       </button>
+      <button
+        type="button"
+        onClick={() => openSheet('sort')}
+        aria-haspopup="dialog"
+        className={`lg:hidden shrink-0 flex items-center gap-1.5 px-3 h-11 rounded-lg text-xs font-medium border transition-colors ${currentSort ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h13M3 12h9m-9 5h5m9-9v12m0 0l-3-3m3 3l3-3" />
+        </svg>
+        Sort
+      </button>
 
-      {open && (
-        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setOpen(false)} />
-          <div className="relative bg-surface-elevated rounded-t-2xl shadow-2xl flex flex-col max-h-[90vh] animate-slide-up">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
-              <span className="font-semibold text-foreground text-base">{tab === 'sort' ? 'Sort By' : 'Filters'}</span>
-              <div className="flex items-center gap-3">
-                {hasAnyPending && (
-                  <button onClick={clearAll} className="text-sm text-accent-500 hover:text-accent-600 font-medium">
-                    Clear all
+      {/* Portalled: the trigger sits in a sticky bar whose stacking context would trap the sheet under the header. */}
+      {open &&
+        createPortal(
+          <div
+            className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end"
+            role="dialog"
+            aria-modal="true"
+            aria-label={tab === 'sort' ? 'Sort by' : 'Filters'}
+          >
+            <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setOpen(false)} />
+            <div className="relative bg-surface-elevated rounded-t-2xl shadow-2xl flex flex-col max-h-[90dvh] animate-slide-up motion-reduce:animate-none">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
+                <span className="font-semibold text-foreground text-base">
+                  {tab === 'sort' ? 'Sort By' : 'Filters'}
+                </span>
+                <div className="flex items-center gap-3">
+                  {hasAnyPending && (
+                    <button
+                      onClick={clearAll}
+                      className="min-h-[44px] px-1 text-sm text-accent-500 hover:text-accent-600 font-medium"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setOpen(false)}
+                    aria-label="Close"
+                    className="w-11 h-11 -mr-2 rounded-full flex items-center justify-center hover:bg-surface transition-colors text-foreground-muted"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
-                )}
+                </div>
+              </div>
+
+              <div className="flex items-center px-5 pt-2 border-b border-border-default shrink-0">
                 <button
-                  onClick={() => setOpen(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface transition-colors text-foreground-muted"
+                  type="button"
+                  onClick={() => setTab('filters')}
+                  className={`flex-1 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'filters' ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('sort')}
+                  className={`flex-1 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'sort' ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
+                >
+                  Sort
                 </button>
               </div>
-            </div>
 
-            <div className="flex items-center px-5 pt-2 border-b border-border-default shrink-0">
-              <button
-                type="button"
-                onClick={() => setTab('filters')}
-                className={`flex-1 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'filters' ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
-              >
-                Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('sort')}
-                className={`flex-1 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'sort' ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
-              >
-                Sort
-              </button>
-            </div>
-
-            <div className={`overflow-y-auto flex-1 px-5 py-4 space-y-6 ${tab === 'filters' ? '' : 'hidden'}`}>
-              {/* Price Range */}
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-3">Price Range</h3>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {[
-                    { label: 'Under ₹500', min: '', max: '500' },
-                    { label: '₹500–₹2k', min: '500', max: '2000' },
-                    { label: '₹2k–₹10k', min: '2000', max: '10000' },
-                    { label: '₹10k+', min: '10000', max: '' },
-                  ].map(p => {
-                    const isActive =
-                      pendingMinPrice === p.min && pendingMaxPrice === p.max && (p.min !== '' || p.max !== '')
-                    return (
-                      <button
-                        key={p.label}
-                        onClick={() => {
-                          setPendingMinPrice(isActive ? '' : p.min)
-                          setPendingMaxPrice(isActive ? '' : p.max)
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
-                      >
-                        {p.label}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    placeholder="Min ₹"
-                    value={pendingMinPrice}
-                    onChange={e => setPendingMinPrice(e.target.value)}
-                    className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-                  />
-                  <span className="text-foreground-muted text-sm shrink-0">–</span>
-                  <input
-                    type="number"
-                    placeholder="Max ₹"
-                    value={pendingMaxPrice}
-                    onChange={e => setPendingMaxPrice(e.target.value)}
-                    className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-                  />
-                </div>
-              </div>
-
-              {/* Availability + On Sale */}
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-3">Availability</h3>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setPendingInStock(v => !v)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingInStock ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${pendingInStock ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}
-                    >
-                      {pendingInStock && (
-                        <svg
-                          className="w-2.5 h-2.5 text-white"
-                          viewBox="0 0 10 10"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </div>
-                    In Stock only
-                    <span className="ml-auto text-xs text-foreground-muted">({facets.inStockCount})</span>
-                  </button>
-                  <button
-                    onClick={() => setPendingOnSale(v => !v)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingOnSale ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${pendingOnSale ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}
-                    >
-                      {pendingOnSale && (
-                        <svg
-                          className="w-2.5 h-2.5 text-white"
-                          viewBox="0 0 10 10"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </div>
-                    On Sale
-                    <span className="ml-auto text-xs text-foreground-muted">({facets.onSaleCount})</span>
-                  </button>
-                </div>
-              </div>
-
-              {offers.length > 0 && (
+              <div className={`overflow-y-auto flex-1 px-5 py-4 space-y-6 ${tab === 'filters' ? '' : 'hidden'}`}>
+                {/* Price Range */}
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Offers</h3>
-                  <div className="space-y-2">
-                    {offers.map(o => {
-                      const active = pendingOffer === o.slug
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Price Range</h3>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {[
+                      { label: 'Under ₹500', min: '', max: '500' },
+                      { label: '₹500–₹2k', min: '500', max: '2000' },
+                      { label: '₹2k–₹10k', min: '2000', max: '10000' },
+                      { label: '₹10k+', min: '10000', max: '' },
+                    ].map(p => {
+                      const isActive =
+                        pendingMinPrice === p.min && pendingMaxPrice === p.max && (p.min !== '' || p.max !== '')
                       return (
                         <button
-                          key={o.slug}
-                          onClick={() => setPendingOffer(active ? '' : o.slug)}
-                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${active ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
+                          key={p.label}
+                          onClick={() => {
+                            setPendingMinPrice(isActive ? '' : p.min)
+                            setPendingMaxPrice(isActive ? '' : p.max)
+                          }}
+                          className={`px-3 py-1.5 min-h-[44px] rounded-full text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
                         >
-                          <div
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${active ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}
-                          >
-                            {active && (
-                              <svg
-                                className="w-2.5 h-2.5 text-white"
-                                viewBox="0 0 10 10"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            )}
-                          </div>
-                          {o.title}
+                          {p.label}
                         </button>
                       )
                     })}
                   </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min ₹"
+                      value={pendingMinPrice}
+                      onChange={e => setPendingMinPrice(e.target.value)}
+                      className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-border-default bg-surface text-foreground text-base focus:outline-none focus:ring-2 focus:ring-accent-400"
+                    />
+                    <span className="text-foreground-muted text-sm shrink-0">–</span>
+                    <input
+                      type="number"
+                      placeholder="Max ₹"
+                      value={pendingMaxPrice}
+                      onChange={e => setPendingMaxPrice(e.target.value)}
+                      className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-border-default bg-surface text-foreground text-base focus:outline-none focus:ring-2 focus:ring-accent-400"
+                    />
+                  </div>
                 </div>
-              )}
 
-              {/* Rating */}
-              {facets.hasRatings && (
+                {/* Availability + On Sale */}
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Rating</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Availability</h3>
                   <div className="space-y-2">
-                    {(['4', '3'] as const).map(r => (
-                      <button
-                        key={r}
-                        onClick={() => setPendingMinRating(pendingMinRating === r ? '' : r)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingMinRating === r ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
+                    <button
+                      onClick={() => setPendingInStock(v => !v)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingInStock ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${pendingInStock ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}
                       >
-                        {'★'.repeat(Number(r))}
-                        {'☆'.repeat(5 - Number(r))} & above
-                        {pendingMinRating === r && (
-                          <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                              clipRule="evenodd"
-                            />
+                        {pendingInStock && (
+                          <svg
+                            className="w-2.5 h-2.5 text-white"
+                            viewBox="0 0 10 10"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         )}
-                      </button>
-                    ))}
+                      </div>
+                      In Stock only
+                      <span className="ml-auto text-xs text-foreground-muted">({facets.inStockCount})</span>
+                    </button>
+                    <button
+                      onClick={() => setPendingOnSale(v => !v)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingOnSale ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${pendingOnSale ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}
+                      >
+                        {pendingOnSale && (
+                          <svg
+                            className="w-2.5 h-2.5 text-white"
+                            viewBox="0 0 10 10"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                      On Sale
+                      <span className="ml-auto text-xs text-foreground-muted">({facets.onSaleCount})</span>
+                    </button>
                   </div>
                 </div>
-              )}
 
-              {/* Color */}
-              {(facets.colors?.length ?? 0) > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Color</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {facets.colors!.map(c => {
-                      const isSelected = pendingColors.includes(c.value)
-                      return (
-                        <button
-                          key={c.value}
-                          onClick={() => toggleList(c.value, pendingColors, setPendingColors)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
-                        >
-                          {c.hex && (
-                            <span
-                              className="w-3 h-3 rounded-full border border-white/20 shrink-0"
-                              style={{ background: c.hex }}
-                            />
-                          )}
-                          {c.value}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <CheckboxFilterSection
-                title="Grade"
-                items={facets.grades}
-                selected={pendingGrades}
-                onToggle={v => toggleList(v, pendingGrades, setPendingGrades)}
-              />
-              <CheckboxFilterSection
-                title="Material"
-                items={facets.materials}
-                selected={pendingMaterials}
-                onToggle={v => toggleList(v, pendingMaterials, setPendingMaterials)}
-              />
-              <CheckboxFilterSection
-                title="Finish"
-                items={facets.finishes}
-                selected={pendingFinishes}
-                onToggle={v => toggleList(v, pendingFinishes, setPendingFinishes)}
-              />
-              <CheckboxFilterSection
-                title="Compliance Standard"
-                items={facets.compliances}
-                selected={pendingCompliances}
-                onToggle={v => toggleList(v, pendingCompliances, setPendingCompliances)}
-              />
-              <CheckboxFilterSection
-                title="Country of Origin"
-                items={facets.origins}
-                selected={pendingOrigins}
-                onToggle={v => toggleList(v, pendingOrigins, setPendingOrigins)}
-              />
-
-              {/* Variant Dimensions */}
-              {facets.variantTypes.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Variant Type</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {facets.variantTypes.map(vt => {
-                      const isActive = pendingVariantType === vt.value
-                      return (
-                        <button
-                          key={vt.value}
-                          onClick={() => {
-                            setPendingVariantType(isActive ? '' : vt.value)
-                            if (isActive) setPendingVariantValue('')
-                          }}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
-                        >
-                          {humanizeLabel(vt.value)} <span className="text-foreground-muted">({vt.count})</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {pendingVariantType && facets.variantValues.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {facets.variantValues.map(vv => {
-                        const isActive = pendingVariantValue === vv.value
+                {offers.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground mb-3">Offers</h3>
+                    <div className="space-y-2">
+                      {offers.map(o => {
+                        const active = pendingOffer === o.slug
                         return (
                           <button
-                            key={vv.value}
-                            onClick={() => setPendingVariantValue(isActive ? '' : vv.value)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
+                            key={o.slug}
+                            onClick={() => setPendingOffer(active ? '' : o.slug)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${active ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
                           >
-                            {humanizeLabel(vv.value)}
+                            <div
+                              className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${active ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}
+                            >
+                              {active && (
+                                <svg
+                                  className="w-2.5 h-2.5 text-white"
+                                  viewBox="0 0 10 10"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </div>
+                            {o.title}
                           </button>
                         )
                       })}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
 
-              {/* Specifications */}
-              {facets.specFacets.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Specifications</h3>
-                  {facets.specFacets.slice(0, 4).map(spec => (
-                    <div key={spec.key} className="mb-4">
-                      <p className="text-xs text-foreground-muted mb-2 font-medium">{humanizeLabel(spec.key)}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {spec.values.slice(0, 8).map(sv => {
-                          const isActive = pendingSpecKey === spec.key && pendingSpecValue === sv.value
+                {/* Rating */}
+                {facets.hasRatings && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground mb-3">Rating</h3>
+                    <div className="space-y-2">
+                      {(['4', '3'] as const).map(r => (
+                        <button
+                          key={r}
+                          onClick={() => setPendingMinRating(pendingMinRating === r ? '' : r)}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingMinRating === r ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
+                        >
+                          {'★'.repeat(Number(r))}
+                          {'☆'.repeat(5 - Number(r))} & above
+                          {pendingMinRating === r && (
+                            <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Color */}
+                {(facets.colors?.length ?? 0) > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground mb-3">Color</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {facets.colors!.map(c => {
+                        const isSelected = pendingColors.includes(c.value)
+                        return (
+                          <button
+                            key={c.value}
+                            onClick={() => toggleList(c.value, pendingColors, setPendingColors)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[44px] rounded-full text-xs font-medium border transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
+                          >
+                            {c.hex && (
+                              <span
+                                className="w-3 h-3 rounded-full border border-white/20 shrink-0"
+                                style={{ background: c.hex }}
+                              />
+                            )}
+                            {c.value}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <CheckboxFilterSection
+                  title="Grade"
+                  items={facets.grades}
+                  selected={pendingGrades}
+                  onToggle={v => toggleList(v, pendingGrades, setPendingGrades)}
+                />
+                <CheckboxFilterSection
+                  title="Material"
+                  items={facets.materials}
+                  selected={pendingMaterials}
+                  onToggle={v => toggleList(v, pendingMaterials, setPendingMaterials)}
+                />
+                <CheckboxFilterSection
+                  title="Finish"
+                  items={facets.finishes}
+                  selected={pendingFinishes}
+                  onToggle={v => toggleList(v, pendingFinishes, setPendingFinishes)}
+                />
+                <CheckboxFilterSection
+                  title="Compliance Standard"
+                  items={facets.compliances}
+                  selected={pendingCompliances}
+                  onToggle={v => toggleList(v, pendingCompliances, setPendingCompliances)}
+                />
+                <CheckboxFilterSection
+                  title="Country of Origin"
+                  items={facets.origins}
+                  selected={pendingOrigins}
+                  onToggle={v => toggleList(v, pendingOrigins, setPendingOrigins)}
+                />
+
+                {/* Variant Dimensions */}
+                {facets.variantTypes.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground mb-3">Variant Type</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {facets.variantTypes.map(vt => {
+                        const isActive = pendingVariantType === vt.value
+                        return (
+                          <button
+                            key={vt.value}
+                            onClick={() => {
+                              setPendingVariantType(isActive ? '' : vt.value)
+                              if (isActive) setPendingVariantValue('')
+                            }}
+                            className={`px-3 py-1.5 min-h-[44px] rounded-full text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
+                          >
+                            {humanizeLabel(vt.value)} <span className="text-foreground-muted">({vt.count})</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {pendingVariantType && facets.variantValues.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {facets.variantValues.map(vv => {
+                          const isActive = pendingVariantValue === vv.value
                           return (
                             <button
-                              key={sv.value}
-                              onClick={() => {
-                                if (isActive) {
-                                  setPendingSpecKey('')
-                                  setPendingSpecValue('')
-                                } else {
-                                  setPendingSpecKey(spec.key)
-                                  setPendingSpecValue(sv.value)
-                                }
-                              }}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
+                              key={vv.value}
+                              onClick={() => setPendingVariantValue(isActive ? '' : vv.value)}
+                              className={`px-3 py-1.5 min-h-[44px] rounded-full text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
                             >
-                              {humanizeLabel(sv.value)} <span className="text-foreground-muted">({sv.count})</span>
+                              {humanizeLabel(vv.value)}
                             </button>
                           )
                         })}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Categories */}
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-3">Categories</h3>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setPendingCategories([])}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingCategories.length === 0 ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
-                  >
-                    All Categories
-                    {pendingCategories.length === 0 && (
-                      <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
                     )}
-                  </button>
-                  {mainCats.map(cat => {
-                    const subs = subCats.filter(s => s.parent_category_id === cat.id)
-                    const isSelected = pendingCategories.includes(cat.id)
-                    const hasSelectedChild = subs.some(s => pendingCategories.includes(s.id))
-                    const isExpanded = expandedCats[cat.id]
-                    return (
-                      <div key={cat.id}>
-                        <div
-                          className={`flex items-center rounded-xl border transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : hasSelectedChild ? 'border-accent-300 dark:border-accent-700 bg-accent-50/50 dark:bg-accent-900/10' : 'border-border-default bg-surface hover:bg-surface-secondary'}`}
-                        >
-                          <button
-                            onClick={() => toggleCategory(cat.id)}
-                            className={`flex-1 text-left px-4 py-3 text-sm font-medium ${isSelected ? 'text-accent-700 dark:text-accent-400' : 'text-foreground'}`}
-                          >
-                            {cat.name}
-                          </button>
-                          <div className="flex items-center gap-1 pr-3">
-                            {isSelected && (
-                              <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            )}
-                            {subs.length > 0 && (
-                              <button onClick={() => toggleExpandCat(cat.id)} className="p-1 text-foreground-muted">
-                                <svg
-                                  className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                                </svg>
+                  </div>
+                )}
+
+                {/* Specifications */}
+                {facets.specFacets.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground mb-3">Specifications</h3>
+                    {facets.specFacets.slice(0, 4).map(spec => (
+                      <div key={spec.key} className="mb-4">
+                        <p className="text-xs text-foreground-muted mb-2 font-medium">{humanizeLabel(spec.key)}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {spec.values.slice(0, 8).map(sv => {
+                            const isActive = pendingSpecKey === spec.key && pendingSpecValue === sv.value
+                            return (
+                              <button
+                                key={sv.value}
+                                onClick={() => {
+                                  if (isActive) {
+                                    setPendingSpecKey('')
+                                    setPendingSpecValue('')
+                                  } else {
+                                    setPendingSpecKey(spec.key)
+                                    setPendingSpecValue(sv.value)
+                                  }
+                                }}
+                                className={`px-2.5 py-1 min-h-[44px] rounded-lg text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
+                              >
+                                {humanizeLabel(sv.value)} <span className="text-foreground-muted">({sv.count})</span>
                               </button>
-                            )}
-                          </div>
+                            )
+                          })}
                         </div>
-                        {subs.length > 0 && isExpanded && (
-                          <div className="ml-4 mt-1 space-y-1">
-                            {subs.map(sub => {
-                              const isSubSelected = pendingCategories.includes(sub.id)
-                              return (
-                                <button
-                                  key={sub.id}
-                                  onClick={() => toggleCategory(sub.id)}
-                                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm transition-colors ${isSubSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
-                                >
-                                  {sub.name}
-                                  {isSubSelected && (
-                                    <svg
-                                      className="w-4 h-4 text-accent-500 shrink-0"
-                                      fill="currentColor"
-                                      viewBox="0 0 20 20"
-                                    >
-                                      <path
-                                        fillRule="evenodd"
-                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                        clipRule="evenodd"
-                                      />
-                                    </svg>
-                                  )}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        )}
                       </div>
-                    )
-                  })}
+                    ))}
+                  </div>
+                )}
+
+                {/* Categories */}
+                <div className={categories.length === 0 ? 'hidden' : undefined}>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Categories</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setPendingCategories([])}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingCategories.length === 0 ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
+                    >
+                      All Categories
+                      {pendingCategories.length === 0 && (
+                        <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                    {mainCats.map(cat => {
+                      const subs = subCats.filter(s => s.parent_category_id === cat.id)
+                      const isSelected = pendingCategories.includes(cat.id)
+                      const hasSelectedChild = subs.some(s => pendingCategories.includes(s.id))
+                      const isExpanded = expandedCats[cat.id]
+                      return (
+                        <div key={cat.id}>
+                          <div
+                            className={`flex items-center rounded-xl border transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : hasSelectedChild ? 'border-accent-300 dark:border-accent-700 bg-accent-50/50 dark:bg-accent-900/10' : 'border-border-default bg-surface hover:bg-surface-secondary'}`}
+                          >
+                            <button
+                              onClick={() => toggleCategory(cat.id)}
+                              className={`flex-1 text-left px-4 py-3 text-sm font-medium ${isSelected ? 'text-accent-700 dark:text-accent-400' : 'text-foreground'}`}
+                            >
+                              {cat.name}
+                            </button>
+                            <div className="flex items-center gap-1 pr-3">
+                              {isSelected && (
+                                <svg
+                                  className="w-4 h-4 text-accent-500 shrink-0"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              )}
+                              {subs.length > 0 && (
+                                <button
+                                  onClick={() => toggleExpandCat(cat.id)}
+                                  aria-label={isExpanded ? `Collapse ${cat.name}` : `Expand ${cat.name}`}
+                                  aria-expanded={!!isExpanded}
+                                  className="w-11 h-11 -my-2 -mr-2 flex items-center justify-center text-foreground-muted"
+                                >
+                                  <svg
+                                    className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {subs.length > 0 && isExpanded && (
+                            <div className="ml-4 mt-1 space-y-1">
+                              {subs.map(sub => {
+                                const isSubSelected = pendingCategories.includes(sub.id)
+                                return (
+                                  <button
+                                    key={sub.id}
+                                    onClick={() => toggleCategory(sub.id)}
+                                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm transition-colors ${isSubSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
+                                  >
+                                    {sub.name}
+                                    {isSubSelected && (
+                                      <svg
+                                        className="w-4 h-4 text-accent-500 shrink-0"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    )}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Brands */}
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Brands</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setPendingBrands([])}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingBrands.length === 0 ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
+                    >
+                      All Brands
+                      {pendingBrands.length === 0 && (
+                        <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                    {brands.map(brand => {
+                      const isSelected = pendingBrands.includes(brand.id)
+                      return (
+                        <button
+                          key={brand.id}
+                          onClick={() => toggleBrand(brand.id)}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
+                        >
+                          {brand.name}
+                          {isSelected && (
+                            <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {/* Brands */}
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-3">Brands</h3>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setPendingBrands([])}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${pendingBrands.length === 0 ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
-                  >
-                    All Brands
-                    {pendingBrands.length === 0 && (
-                      <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                  {brands.map(brand => {
-                    const isSelected = pendingBrands.includes(brand.id)
-                    return (
-                      <button
-                        key={brand.id}
-                        onClick={() => toggleBrand(brand.id)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
-                      >
-                        {brand.name}
-                        {isSelected && (
-                          <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
+              <div className={`overflow-y-auto flex-1 px-5 py-4 space-y-2 ${tab === 'sort' ? '' : 'hidden'}`}>
+                {SORT_OPTIONS.map(opt => {
+                  const isSelected = pendingSort === opt.sort && pendingOrder === opt.order
+                  return (
+                    <button
+                      key={opt.label}
+                      onClick={() => selectSort(opt.sort, opt.order)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
+                    >
+                      {opt.label}
+                      {isSelected && (
+                        <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border-default shrink-0">
+                <button
+                  onClick={applyFilters}
+                  disabled={isPending}
+                  className="w-full py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-60"
+                >
+                  {isPending ? 'Applying…' : 'Apply Filters'}
+                </button>
               </div>
             </div>
-
-            <div className={`overflow-y-auto flex-1 px-5 py-4 space-y-2 ${tab === 'sort' ? '' : 'hidden'}`}>
-              {SORT_OPTIONS.map(opt => {
-                const isSelected = pendingSort === opt.sort && pendingOrder === opt.order
-                return (
-                  <button
-                    key={opt.label}
-                    onClick={() => selectSort(opt.sort, opt.order)}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
-                  >
-                    {opt.label}
-                    {isSelected && (
-                      <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="px-5 py-4 border-t border-border-default shrink-0">
-              <button
-                onClick={applyFilters}
-                disabled={isPending}
-                className="w-full py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-60"
-              >
-                {isPending ? 'Applying…' : 'Apply Filters'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   )
 }

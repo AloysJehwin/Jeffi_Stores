@@ -11,6 +11,7 @@ import { resolveGoogleTag, gtagBootstrapScript } from '@/lib/analytics/google-ta
 import { adsenseClient, adsenseInitScript, adsenseScriptSrc } from '@/lib/analytics/adsense'
 import AdSense from '@/components/visitor/AdSense'
 import { storeIsAdFree } from '@/lib/billing/ad-free'
+import { schemes } from '@jeffi/design-tokens'
 
 export async function generateMetadata() {
   const identity = await getStoreIdentity()
@@ -35,6 +36,7 @@ export async function generateMetadata() {
       icon,
       apple: logo || '/apple-icon.png',
     },
+    appleWebApp: { capable: true, title: identity.name, statusBarStyle: 'default' as const },
   }
 }
 
@@ -42,6 +44,11 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  // The browser chrome matches the header surface in each scheme.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: schemes.light.surfaceElevated },
+    { media: '(prefers-color-scheme: dark)', color: schemes.dark.surfaceElevated },
+  ],
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

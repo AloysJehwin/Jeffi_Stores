@@ -4,28 +4,46 @@ import { motionHeroIntervalMs, motionHeroSlides, safeHref } from '@/lib/catalog/
 import { Grid, Note, NumberField, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
 
-const KEYS = ['bgImage', 'fgImage', 'eyebrow', 'headline', 'sub', 'ctaLabel', 'url']
+const KEYS = ['bgImage', 'bgVideo', 'fgImage', 'fgFrame', 'eyebrow', 'headline', 'sub', 'ctaLabel', 'url']
 const MAX_SECONDS = 20
 
 export default function MotionHeroEditor(props: EditorProps) {
   const { section, canWrite } = props
   const b = useSectionBinding(props)
   const slides = readTiles(b.cfg.slides, KEYS)
-  const badLinks = slides.filter(s => [s.url, s.bgImage, s.fgImage].some(v => v && !safeHref(v))).length
+  const badLinks = slides.filter(s => [s.url, s.bgImage, s.bgVideo, s.fgImage].some(v => v && !safeHref(v))).length
 
   return (
     <Grid>
       <TileListEditor
         label="Slides"
-        hint="Each slide needs a background image and a headline. The foreground image drifts over the background as the slide plays."
+        hint="Each slide needs a background image and a headline. A background video plays over its image. The foreground image drifts over the background as the slide plays."
         tiles={slides}
-        fields={[
-          { key: 'bgImage', label: 'Background image', kind: 'image', placeholder: 'https://… or upload' },
+        fields={tile => [
+          {
+            key: 'bgImage',
+            label: 'Background',
+            kind: 'image',
+            size: ['hero', 'wide'],
+            videoKey: 'bgVideo',
+            defaultPrompt: tile.headline,
+          },
           {
             key: 'fgImage',
-            label: 'Foreground image (optional, PNG with transparency works best)',
+            label: 'Foreground image (optional)',
             kind: 'image',
-            placeholder: 'https://… or upload',
+            size: ['square', 'portrait'],
+          },
+          {
+            key: 'fgFrame',
+            label: 'Foreground style',
+            kind: 'select',
+            placeholder: 'Rounded card',
+            options: [
+              { value: 'rounded', label: 'Rounded card' },
+              { value: 'fade', label: 'Faded edges' },
+              { value: 'none', label: 'No frame (transparent PNG cutout)' },
+            ],
           },
           { key: 'eyebrow', label: 'Eyebrow', placeholder: 'New season' },
           { key: 'headline', label: 'Headline', placeholder: 'Built to last' },
@@ -33,7 +51,7 @@ export default function MotionHeroEditor(props: EditorProps) {
           { key: 'ctaLabel', label: 'Button label', placeholder: 'Shop now' },
           { key: 'url', label: 'Button link', placeholder: 'https://… or /products' },
         ]}
-        blank={{ bgImage: '', fgImage: '', eyebrow: '', headline: '', sub: '', ctaLabel: '', url: '' }}
+        blank={{ bgImage: '', bgVideo: '', fgImage: '', fgFrame: '', eyebrow: '', headline: '', sub: '', ctaLabel: '', url: '' }}
         disabled={!canWrite}
         max={8}
         showIcon={false}

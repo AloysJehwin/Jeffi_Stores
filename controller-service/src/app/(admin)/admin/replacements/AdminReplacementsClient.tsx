@@ -1,13 +1,28 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 import { useActionToast } from '@/components/admin/kit/toast'
-import { Dialog, EmptyState, ErrorState, TextArea, TableSkeleton, badgeCls, type Tone } from '@/components/admin/kit'
+import {
+  Dialog,
+  EmptyState,
+  ErrorState,
+  InfiniteFooter,
+  ListFilters,
+  TextArea,
+  TableSkeleton,
+  badgeCls,
+  fetchJson,
+  useFilterQuery,
+  useInfiniteList,
+  type Tone,
+} from '@/components/admin/kit'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { fmtQty } from '@/lib/shared/number-display'
+import { REPLACEMENT_FIELDS, REQUEST_SEARCH } from '@/lib/filters/fields/returns'
 
 interface ReplacementRow {
   id: string
@@ -344,35 +359,41 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
   )
 }
 
+const OUTCOMES = ['all', 'approved', 'rejected']
+const PAGE_SIZE = 20
+
 export default function AdminReplacementsClient() {
-  const [activeTab, setActiveTab] = useState('all')
-  const [historyFilter, setHistoryFilter] = useState('all')
-  const [replacements, setReplacements] = useState<ReplacementRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const url =
-        activeTab === 'history'
-          ? `/api/admin/replacements?status=history&filter=${historyFilter}`
-          : `/api/admin/replacements?status=${activeTab}`
-      const res = await fetch(url, { credentials: 'include' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed')
-      setReplacements(data.replacements)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
+  const sp = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  // The bucket and history outcome live in the URL beside the list filters.
+  const activeTab = STATUS_TABS.some(t => t.key === sp.get('bucket')) ? (sp.get('bucket') as string) : 'all'
+  const historyFilter = OUTCOMES.includes(sp.get('outcome') || '') ? (sp.get('outcome') as string) : 'all'
+  const filters = useFilterQuery(REPLACEMENT_FIELDS)
+  const setView = (patch: Record<string, string | null>) => {
+    const q = new URLSearchParams(sp.toString())
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) q.set(k, v)
+      else q.delete(k)
     }
-  }, [activeTab, historyFilter])
+    router.replace(`${pathname}?${q}`, { scroll: false })
+  }
 
-  useEffect(() => {
-    load()
-  }, [load])
+  const list = useInfiniteList<ReplacementRow>({
+    key: `${activeTab}|${historyFilter}|${filters}`,
+    pageSize: PAGE_SIZE,
+    getKey: r => r.id,
+    fetchPage: async (page, signal) => {
+      const q = new URLSearchParams(filters)
+      q.set('bucket', activeTab)
+      if (activeTab === 'history') q.set('filter', historyFilter)
+      q.set('page', String(page))
+      q.set('limit', String(PAGE_SIZE))
+      const data = await fetchJson(`/api/admin/replacements?${q}`, signal)
+      return { rows: data.replacements || [], total: data.total ?? null, hasMore: data.hasMore }
+    },
+  })
+  const replacements = list.rows
 
   return (
     <div className="space-y-4">
@@ -383,7 +404,7 @@ export default function AdminReplacementsClient() {
             <button
               key={tab.key}
               type="button"
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => setView({ bucket: tab.key === 'all' ? null : tab.key, outcome: null })}
               className={`shrink-0 rounded-md px-3 text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? 'bg-surface-elevated text-foreground shadow-sm'
@@ -405,7 +426,7 @@ export default function AdminReplacementsClient() {
               <button
                 key={f.key}
                 type="button"
-                onClick={() => setHistoryFilter(f.key)}
+                onClick={() => setView({ outcome: f.key === 'all' ? null : f.key })}
                 className={`rounded-md px-3 text-sm font-medium transition-colors ${
                   historyFilter === f.key
                     ? 'bg-surface-elevated text-foreground shadow-sm'
@@ -419,28 +440,32 @@ export default function AdminReplacementsClient() {
         )}
       </div>
 
+      <ListFilters entity="replacements" fields={REPLACEMENT_FIELDS} search={REQUEST_SEARCH} noun="Replacements" tab="list" exportable />
 
-      {loading ? (
+      {list.loading ? (
         <TableSkeleton rows={3} cols={4} />
-      ) : error ? (
-        <ErrorState body={error} />
+      ) : list.error && !replacements.length ? (
+        <ErrorState body={list.error} />
       ) : replacements.length === 0 ? (
         <EmptyState
-          title={activeTab === 'history'
-            ? historyFilter === 'approved'
-              ? 'No approved replacements'
-              : historyFilter === 'rejected'
-                ? 'No rejected replacements'
-                : 'No completed or rejected replacements'
-            : 'No active replacement requests'}
+          title={filters
+            ? 'No replacements match these filters'
+            : activeTab === 'history'
+              ? historyFilter === 'approved'
+                ? 'No approved replacements'
+                : historyFilter === 'rejected'
+                  ? 'No rejected replacements'
+                  : 'No completed or rejected replacements'
+              : 'No active replacement requests'}
         />
       ) : (
         <div className="space-y-3">
           {replacements.map(row => (
-            <ReplacementCard key={row.id} row={row} onValuated={load} />
+            <ReplacementCard key={row.id} row={row} onValuated={list.reload} />
           ))}
         </div>
       )}
+      <InfiniteFooter shown={replacements.length} control={list} noun="requests" />
     </div>
   )
 }

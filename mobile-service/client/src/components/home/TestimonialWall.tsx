@@ -1,8 +1,8 @@
 import { View } from 'react-native'
-import { Card, Text } from '../../ui'
+import { Card, Rail, Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { Star } from 'lucide-react-native'
-import { Carousel, GUTTER, SectionHeading } from './layout'
+import { GUTTER, SectionHeading } from './layout'
 import { primary, useTokens } from '../../theme'
 import type { SectionProps, Testimonial } from '../../types/home'
 
@@ -64,11 +64,11 @@ export default function TestimonialWall({ section, data }: SectionProps) {
         eyebrowClassName="text-primary-500"
       />
       {section.layout === 'carousel' ? (
-        <Carousel>
+        <Rail>
           {items.map(t => (
             <TestimonialCard key={t.id} t={t} />
           ))}
-        </Carousel>
+        </Rail>
       ) : (
         <View className="gap-4">
           {items.map(t => (

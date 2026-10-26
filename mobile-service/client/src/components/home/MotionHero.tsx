@@ -1,204 +1,79 @@
-import { useEffect, useId, useRef } from 'react'
-import { Pressable, View, useWindowDimensions } from 'react-native'
-import { Overline, Text } from '../../ui'
+import { useId, useState } from 'react'
+import { View } from 'react-native'
+import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg'
+import { Gradient, Media, Overline, Pager, Text, usePageParallax, usePageReveal, type PageInfo } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { ArrowRight } from 'lucide-react-native'
-import Animated, {
-  Extrapolation,
-  interpolate,
-  runOnJS,
-  useAnimatedReaction,
-  useAnimatedRef,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  type SharedValue,
-} from 'react-native-reanimated'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
-import { GUTTER } from './layout'
-import { absUrl, openHref } from '../../lib/links'
-import { status } from '../../theme'
+import Animated from 'react-native-reanimated'
+import { SlideCta } from './layout'
+import { useOnScreen } from './scroll-context'
+import { absUrl, openHref, type RemoteImage } from '../../lib/links'
+import { useImageSource } from '../../hooks/useImageSource'
+import { radius, status } from '../../theme'
 import type { MotionHeroData, MotionHeroSlide, SectionProps } from '../../types/home'
 
 // Swiggy-style animated hero: paged cards whose foreground drifts slower than the card, autoplaying
 // unless a finger is down or the system asks for less motion.
 
-const GAP = 12
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const
 
 export default function MotionHero({ section, data }: SectionProps) {
   const hero = data.extras[section.id] as MotionHeroData | undefined
   if (!hero?.slides.length) return null
-  return <Pager slides={hero.slides} intervalMs={hero.intervalMs} />
+  return <Hero hero={hero} />
 }
 
-function Pager({ slides, intervalMs }: { slides: MotionHeroSlide[]; intervalMs: number }) {
+function Hero({ hero }: { hero: MotionHeroData }) {
   const router = useRouter()
-  const { width } = useWindowDimensions()
-  const reduceMotion = useReducedMotion()
-  const cardW = width - GUTTER * 2
-  const cardH = Math.min(420, Math.round(cardW * 0.9))
-  const page = cardW + GAP
-  const count = slides.length
-  const autoplay = count > 1 && !reduceMotion
-
-  const ref = useAnimatedRef<Animated.ScrollView>()
-  const x = useSharedValue(0)
-  const active = useRef(0)
-  const touching = useRef(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Restarted on every page change (swipe or auto), so a slide always gets its full interval.
-  const schedule = useRef<(delay: number) => void>(() => {})
-  schedule.current = delay => {
-    if (timer.current) clearTimeout(timer.current)
-    if (!autoplay) return
-    timer.current = setTimeout(() => {
-      if (touching.current) return schedule.current(600)
-      ref.current?.scrollTo({ x: ((active.current + 1) % count) * page, animated: true })
-    }, delay)
-  }
-  useEffect(() => {
-    schedule.current(intervalMs)
-    return () => {
-      if (timer.current) clearTimeout(timer.current)
-    }
-  }, [intervalMs, autoplay, count, page])
-
-  const landed = (i: number) => {
-    active.current = i
-    schedule.current(intervalMs)
-  }
-  const onScroll = useAnimatedScrollHandler(e => {
-    x.value = e.contentOffset.x
-  })
-  useAnimatedReaction(
-    () => Math.min(count - 1, Math.max(0, Math.round(x.value / page))),
-    (cur, prev) => {
-      if (cur !== prev) runOnJS(landed)(cur)
-    },
-    [page, count]
-  )
-
-  const release = () => {
-    touching.current = false
-    schedule.current(intervalMs)
-  }
-
+  const [current, setCurrent] = useState(0)
+  const { ref, onLayout, onScreen } = useOnScreen(hero.slides.some(s => s.bgVideo))
   return (
-    <View className="bg-surface pb-4 pt-3">
-      <Animated.ScrollView
-        ref={ref}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={count > 1}
-        snapToInterval={page}
-        disableIntervalMomentum
-        decelerationRate="fast"
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        onTouchStart={() => (touching.current = true)}
-        onTouchEnd={release}
-        onTouchCancel={release}
-        contentContainerStyle={{ paddingHorizontal: GUTTER, gap: GAP }}
-      >
-        {slides.map((slide, i) => (
-          <Card
-            key={`${i}-${slide.bgImage}`}
-            slide={slide}
-            i={i}
-            x={x}
-            page={page}
-            w={cardW}
-            h={cardH}
-            still={reduceMotion}
-            onPress={slide.url ? () => openHref(router, slide.url) : undefined}
-          />
-        ))}
-      </Animated.ScrollView>
-
-      {count > 1 && (
-        <View className="mt-3 flex-row items-center justify-center gap-1.5">
-          {slides.map((_, i) => (
-            <Pill key={i} i={i} x={x} page={page} onPress={() => ref.current?.scrollTo({ x: i * page, animated: !reduceMotion })} />
-          ))}
-        </View>
-      )}
-    </View>
+    <Animated.View ref={ref} onLayout={onLayout} collapsable={false} className="bg-surface pb-4 pt-3">
+      <Pager
+        data={hero.slides}
+        keyExtractor={(slide, i) => `${i}-${slide.bgImage}`}
+        height={w => Math.min(420, Math.round(w * 0.9))}
+        autoplay
+        intervalMs={hero.intervalMs}
+        dots={{ size: 6 }}
+        onPress={slide => openHref(router, slide.url)}
+        canPress={slide => !!slide.url}
+        itemLabel={slide => [slide.eyebrow, slide.headline, slide.sub, slide.ctaLabel].filter(Boolean).join(', ')}
+        onIndexChange={setCurrent}
+        renderItem={(slide, info) => <Card slide={slide} info={info} active={onScreen && info.index === current} />}
+      />
+    </Animated.View>
   )
 }
 
-function Card({
-  slide,
-  i,
-  x,
-  page,
-  w,
-  h,
-  still,
-  onPress,
-}: {
-  slide: MotionHeroSlide
-  i: number
-  x: SharedValue<number>
-  page: number
-  w: number
-  h: number
-  still: boolean
-  onPress?: () => void
-}) {
-  const gid = `mh${useId().replace(/[^a-zA-Z0-9]/g, '')}`
+function Card({ slide, info, active }: { slide: MotionHeroSlide; info: PageInfo; active: boolean }) {
+  const { width: w, height: h } = info
   const bg = absUrl(slide.bgImage)
   const fg = absUrl(slide.fgImage)
-  const range = [(i - 1) * page, i * page, (i + 1) * page]
+  const imgSource = useImageSource()
+  const frame = slide.fgFrame ?? 'none'
   const titleSize = Math.min(40, Math.max(26, Math.round(w * 0.085)))
 
   // Relative to the card: the background lags a little, the foreground more, so the layers separate while paging.
-  const bgStyle = useAnimatedStyle(() =>
-    still
-      ? {}
-      : { transform: [{ scale: 1.12 }, { translateX: interpolate(x.value, range, [-page * 0.08, 0, page * 0.08], Extrapolation.CLAMP) }] }
-  )
-  const fgStyle = useAnimatedStyle(() =>
-    still ? {} : { transform: [{ translateX: interpolate(x.value, range, [-page * 0.28, 0, page * 0.28], Extrapolation.CLAMP) }] }
-  )
-  const textStyle = useAnimatedStyle(() =>
-    still
-      ? {}
-      : {
-          opacity: interpolate(x.value, range, [0, 1, 0], Extrapolation.CLAMP),
-          transform: [{ translateY: interpolate(x.value, range, [14, 0, 14], Extrapolation.CLAMP) }],
-        }
-  )
+  const bgStyle = usePageParallax(info, 0.08, 1.12)
+  const fgStyle = usePageParallax(info, 0.28)
+  const textStyle = usePageReveal(info)
 
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      style={{ width: w, height: h }}
-      className="overflow-hidden rounded-sheet bg-black"
-      accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={[slide.eyebrow, slide.headline, slide.sub, slide.ctaLabel].filter(Boolean).join(', ')}
-    >
+    <View style={{ width: w, height: h }} className="overflow-hidden rounded-sheet bg-black">
       <Animated.View style={[FILL, bgStyle]}>
-        <Image source={bg ? { uri: bg } : undefined} style={FILL} contentFit="cover" transition={300} />
+        <Media image={bg} video={slide.bgVideo} style={FILL} width={w * 1.12} transition={300} active={active} />
       </Animated.View>
-      <Svg style={FILL} width="100%" height="100%" pointerEvents="none">
-        <Defs>
-          <LinearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={status.black} stopOpacity={0.35} />
-            <Stop offset="0.4" stopColor={status.black} stopOpacity={0} />
-            <Stop offset="1" stopColor={status.black} stopOpacity={0.9} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill={`url(#${gid})`} />
-      </Svg>
+      <Gradient dir="b" stops={[[0, status.black, 0.35], [0.4, status.black, 0], [1, status.black, 0.9]]} />
 
-      {fg ? (
+      {fg && frame === 'none' ? (
         <Animated.View pointerEvents="none" style={[{ position: 'absolute', right: 0, bottom: 0, width: w * 0.5, height: h * 0.72 }, fgStyle]}>
-          <Image source={{ uri: fg }} style={{ width: '100%', height: '100%' }} contentFit="contain" contentPosition="bottom right" transition={300} />
+          <Image source={imgSource(fg, w * 0.5)} style={{ width: '100%', height: '100%' }} contentFit="contain" contentPosition="bottom right" transition={300} />
+        </Animated.View>
+      ) : fg ? (
+        // A framed photo sits top right, clear of the copy at the bottom.
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 16, right: 16, width: w * 0.46, height: h * 0.44, alignItems: 'flex-end' }, fgStyle]}>
+          <Framed source={imgSource(fg, w * 0.46)} fade={frame === 'fade'} boxW={w * 0.46} boxH={h * 0.44} />
         </Animated.View>
       ) : null}
 
@@ -223,27 +98,57 @@ function Card({
             {slide.sub}
           </Text>
         ) : null}
-        {slide.ctaLabel ? (
-          <View className="mt-4 flex-row items-center gap-1.5 self-start rounded-full bg-white px-4 py-2.5">
-            <Text className="text-sm font-bold text-black">{slide.ctaLabel}</Text>
-            <ArrowRight size={16} color={status.black} strokeWidth={2.5} />
-          </View>
-        ) : null}
+        <SlideCta label={slide.ctaLabel} size="md" className="mt-4" />
       </Animated.View>
-    </Pressable>
+    </View>
   )
 }
 
-// Pager pill: wide and solid for the current page, driven from the scroll offset so it tracks the drag.
-function Pill({ i, x, page, onPress }: { i: number; x: SharedValue<number>; page: number; onPress: () => void }) {
-  const range = [(i - 1) * page, i * page, (i + 1) * page]
-  const style = useAnimatedStyle(() => ({
-    width: interpolate(x.value, range, [6, 20, 6], Extrapolation.CLAMP),
-    opacity: interpolate(x.value, range, [0.25, 1, 0.25], Extrapolation.CLAMP),
-  }))
+const FEATHER = [0, 0.14, 0.86, 1] as const
+
+// Hugs the photo's own aspect so the rounded corners or the feathered edges follow it, not the box.
+function Framed({ source, fade, boxW, boxH }: { source?: RemoteImage; fade: boolean; boxW: number; boxH: number }) {
+  const [ratio, setRatio] = useState<number | null>(null)
+  const id = `f${useId().replace(/[^a-zA-Z0-9]/g, '')}`
+  const fit = ratio == null ? null : ratio > boxW / boxH ? { width: boxW, height: boxW / ratio } : { width: boxH * ratio, height: boxH }
+
+  if (fade && fit) {
+    // Mask = horizontal feather × vertical feather: white fading in, then black fading out over it.
+    return (
+      <Svg width={fit.width} height={fit.height}>
+        <Defs>
+          <LinearGradient id={`${id}h`} x1="0" y1="0" x2="1" y2="0">
+            {FEATHER.map((o, i) => (
+              <Stop key={i} offset={o} stopColor={status.white} stopOpacity={i === 0 || i === 3 ? 0 : 1} />
+            ))}
+          </LinearGradient>
+          <LinearGradient id={`${id}v`} x1="0" y1="0" x2="0" y2="1">
+            {FEATHER.map((o, i) => (
+              <Stop key={i} offset={o} stopColor={status.black} stopOpacity={i === 0 || i === 3 ? 1 : 0} />
+            ))}
+          </LinearGradient>
+          <Mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width={fit.width} height={fit.height}>
+            <Rect width="100%" height="100%" fill={`url(#${id}h)`} />
+            <Rect width="100%" height="100%" fill={`url(#${id}v)`} />
+          </Mask>
+        </Defs>
+        <SvgImage href={source} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" mask={`url(#${id})`} />
+      </Svg>
+    )
+  }
+
   return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Go to slide ${i + 1}`}>
-      <Animated.View className="h-1.5 rounded-full bg-foreground" style={style} />
-    </Pressable>
+    <View
+      className="overflow-hidden border border-white/15"
+      style={{ width: fit?.width ?? boxW, height: fit?.height ?? boxH, borderRadius: radius.hero, opacity: fit ? 1 : 0 }}
+    >
+      <Image
+        source={source}
+        style={{ width: '100%', height: '100%' }}
+        contentFit="cover"
+        transition={300}
+        onLoad={e => e.source.width > 0 && e.source.height > 0 && setRatio(e.source.width / e.source.height)}
+      />
+    </View>
   )
 }

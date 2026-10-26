@@ -1,11 +1,10 @@
 import { Pressable, View } from 'react-native'
-import { Button, Card, Overline, Pill, Text } from '../../ui'
+import { Button, Card, Gradient, Overline, Pill, Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Package } from 'lucide-react-native'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { DealCountdown } from './DealOfTheDay'
-import { absUrl } from '../../lib/links'
+import { useImageSource } from '../../hooks/useImageSource'
 import { inr } from '../../lib/format'
 import { accent, primary, useTokens } from '../../theme'
 import type { CountdownDeal, SectionProps } from '../../types/home'
@@ -17,6 +16,7 @@ const COPY = { eyebrow: 'Limited time', title: 'Deal ends soon', ctaLabel: 'Grab
 export default function CountdownDealBanner({ section, data }: SectionProps) {
   const router = useRouter()
   const t = useTokens()
+  const imgSource = useImageSource()
   const deal = data.extras[section.id] as CountdownDeal | null | undefined
   if (!deal) return null
 
@@ -29,16 +29,7 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
     <View className="bg-surface px-4 py-10">
       <Card padded={false} className="overflow-hidden">
         {/* bg-gradient-to-br from-primary-500/10 via-surface-elevated to-accent-500/10 */}
-        <Svg style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="cdbg" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor={primary[500]} stopOpacity={0.1} />
-              <Stop offset="0.5" stopColor={t.surfaceElevated} />
-              <Stop offset="1" stopColor={accent[500]} stopOpacity={0.1} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#cdbg)" />
-        </Svg>
+        <Gradient stops={[[0, primary[500], 0.1], [0.5, t.surfaceElevated], [1, accent[500], 0.1]]} />
 
         <View className="items-center gap-6 p-5">
           <Pressable
@@ -50,7 +41,7 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
           >
             {image ? (
               <Image
-                source={{ uri: absUrl(image.image_url) ?? image.image_url }}
+                source={imgSource(image.image_url, 352)}
                 placeholder={image.blurhash ? { blurhash: image.blurhash } : undefined}
                 style={{ flex: 1, margin: 16 }}
                 contentFit="contain"

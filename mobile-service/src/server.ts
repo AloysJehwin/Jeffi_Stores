@@ -8,7 +8,7 @@ import { Readable } from 'node:stream'
 import rateLimit from '@fastify/rate-limit'
 import Redis from 'ioredis'
 import { request as undici } from 'undici'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, timingSafeEqual } from 'node:crypto'
 import type pg from 'pg'
 import { mainPool } from '@jeffi/tenancy'
 
@@ -38,6 +38,24 @@ app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body,
 
 const fail = (reply: FastifyReply, status: number, error: string, message: string) => reply.code(status).send({ error, message })
 
+// Behind CloudFront the peer is an edge, so the user is in CloudFront-Viewer-Address ("ip:port"). Trusted only when
+// the request carries the origin secret CloudFront adds; anything else (direct hits) keeps the socket address.
+const EDGE_SECRET = Buffer.from(process.env.EDGE_ORIGIN_SECRET || '')
+function fromEdge(req: FastifyRequest): boolean {
+  const got = req.headers['x-jeffi-edge']
+  if (!EDGE_SECRET.length || typeof got !== 'string') return false
+  const b = Buffer.from(got)
+  return b.length === EDGE_SECRET.length && timingSafeEqual(b, EDGE_SECRET)
+}
+function clientIp(req: FastifyRequest): string {
+  const viewer = req.headers['cloudfront-viewer-address']
+  if (typeof viewer === 'string' && fromEdge(req)) {
+    const i = viewer.lastIndexOf(':')
+    if (i > 0) return viewer.slice(0, i).replace(/^\[|\]$/g, '')
+  }
+  return req.ip
+}
+
 app.get('/healthz', async () => ({ ok: true, service: 'mobile' }))
 app.get('/api/health', async () => ({ ok: true, service: 'mobile' }))
 
@@ -46,12 +64,43 @@ await app.register(rateLimit, {
   redis: redis ?? undefined,
   max: 240,
   timeWindow: '1 minute',
+  keyGenerator: clientIp,
   addHeaders: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true, 'x-ratelimit-reset': true, 'retry-after': true },
 })
 
 // ── Native: what the app needs before it can do anything else ──
 // Bump MIN_APP_VERSION to force an update; the app compares against its own version on launch.
 const MIN_APP_VERSION = process.env.MIN_APP_VERSION || '1.0.0'
+// The web host's /_next/image serves the app's resized images; APP_IMAGE_RESIZE=false sends it the originals.
+const IMAGE_RESIZE = process.env.APP_IMAGE_RESIZE !== 'false'
+// On only once the web host resizes a real gallery image: a release can roll this service out before the controller
+// that allows the CDN host. Re-checked hourly when on, every 5 minutes while off.
+let resizeProbe: { at: number; ok: boolean } | null = null
+async function imageResizeReady(): Promise<boolean> {
+  if (!IMAGE_RESIZE) return false
+  if (resizeProbe && Date.now() - resizeProbe.at < (resizeProbe.ok ? 3_600_000 : 300_000)) return resizeProbe.ok
+  let ok = false
+  try {
+    const row = (
+      await db().query<{ url: string }>(
+        `SELECT thumbnail_url AS url FROM gallery_images WHERE thumbnail_url LIKE 'https://%' ORDER BY created_at DESC LIMIT 1`,
+      )
+    ).rows[0]
+    if (row) {
+      const res = await undici(`${CONTROLLER_URL}/_next/image?url=${encodeURIComponent(row.url)}&w=64&q=70`, {
+        headers: { host: SITE_HOST, accept: 'image/webp' },
+        headersTimeout: 5000,
+        bodyTimeout: 5000,
+      })
+      ok = res.statusCode === 200
+      await res.body.dump()
+    }
+  } catch {
+    ok = false
+  }
+  resizeProbe = { at: Date.now(), ok }
+  return ok
+}
 const SETTING_KEYS = ['business_name', 'business_logo_url', 'business_phone', 'business_email', 'feature_razorpay_enabled', 'feature_cod_enabled']
 let configCache: { at: number; value: unknown } | null = null
 app.get('/v1/app/config', async (_req, reply) => {
@@ -64,13 +113,33 @@ app.get('/v1/app/config', async (_req, reply) => {
     site_url: PUBLIC_SITE_URL,
     store: { name: m.get('business_name') || 'Jeffi Stores', logo_url: m.get('business_logo_url') || '', phone: m.get('business_phone') || '', email: m.get('business_email') || '' },
     features: { razorpay: bool('feature_razorpay_enabled', true), cod: bool('feature_cod_enabled', true) },
+    image_resize: await imageResizeReady(),
   }
   configCache = { at: Date.now(), value }
   return reply.header('cache-control', 'public, max-age=60').send(value)
 })
 
 // ── Forwarded: the storefront API, same paths the web uses ──
-const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'te', 'trailer', 'upgrade', 'proxy-authorization', 'proxy-authenticate', 'host', 'content-length'])
+// Binaries from before the app sized its own images get theirs pointed at the web host's /_next/image here:
+// whole-string CDN / bucket image URLs (mirroring image-optimizer.json's hosts) in JSON, at a fixed width.
+// Builds that size images themselves send X-Jeffi-Image-Sizing and get the originals.
+const SIZED_HOST = /^https:\/\/(?:dm9rri2wgl1e\.cloudfront\.net|jeffi-(?:stores-bucket|tenant-[a-z0-9-]+)\.s3(?:\.us-east-1)?\.amazonaws\.com)\/[^?#\s]+\.(?:png|jpe?g|webp)$/i
+const MAX_REWRITE_BYTES = 5_000_000
+function sizeImages(v: unknown, key = ''): unknown {
+  if (typeof v === 'string')
+    return SIZED_HOST.test(v)
+      ? `${PUBLIC_SITE_URL}/_next/image?url=${encodeURIComponent(v)}&w=${/thumb/i.test(key) ? 384 : 828}&q=70`
+      : v
+  if (Array.isArray(v)) return v.map(x => sizeImages(x, key))
+  if (v && typeof v === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, x] of Object.entries(v)) out[k] = sizeImages(x, k)
+    return out
+  }
+  return v
+}
+
+const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'te', 'trailer', 'upgrade', 'proxy-authorization', 'proxy-authenticate', 'host', 'content-length', 'x-jeffi-edge'])
 async function forward(req: FastifyRequest, reply: FastifyReply) {
   const headers: Record<string, string> = {}
   for (const [k, v] of Object.entries(req.headers)) if (v && !HOP.has(k)) headers[k] = Array.isArray(v) ? v.join(', ') : v
@@ -78,11 +147,12 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
   headers.host = SITE_HOST
   headers['x-forwarded-host'] = SITE_HOST
   headers['x-forwarded-proto'] = 'https'
-  headers['x-forwarded-for'] = req.ip
+  headers['x-forwarded-for'] = clientIp(req)
   headers['x-request-id'] = req.id
   headers['x-jeffi-client'] = 'mobile'
-  // Auth responses are rewritten below (token injection), so ask for them uncompressed.
-  if (req.url.startsWith('/api/auth/')) delete headers['accept-encoding']
+  const sizeForClient = req.method === 'GET' && !req.headers['x-jeffi-image-sizing'] && (await imageResizeReady())
+  // Auth responses (token injection) and image-sized ones are rewritten below, so ask for them uncompressed.
+  if (req.url.startsWith('/api/auth/') || sizeForClient) delete headers['accept-encoding']
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
   const res = await undici(CONTROLLER_URL + req.url, {
     method: req.method as any,
@@ -110,6 +180,18 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
     const body = await res.body.json().catch(() => null)
     if (body && typeof body === 'object' && !Array.isArray(body)) return reply.code(res.statusCode).send({ ...body, token: decodeURIComponent(sid) })
     return reply.code(res.statusCode).send(body)
+  }
+  if (req.method === 'GET') reply.header('vary', [res.headers.vary, 'x-jeffi-image-sizing'].filter(Boolean).join(', '))
+  const size = Number(res.headers['content-length'] ?? 0)
+  if (sizeForClient && json && res.statusCode === 200 && !res.headers['content-encoding'] && size <= MAX_REWRITE_BYTES) {
+    const text = await res.body.text()
+    let body: unknown
+    try {
+      body = JSON.parse(text)
+    } catch {
+      return reply.code(res.statusCode).send(text)
+    }
+    return reply.code(res.statusCode).removeHeader('etag').send(sizeImages(body))
   }
   return reply.code(res.statusCode).send(res.body)
 }

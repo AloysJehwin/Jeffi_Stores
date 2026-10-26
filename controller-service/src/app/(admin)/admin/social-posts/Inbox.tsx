@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ExternalLink, Star } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { Badge, Empty, Section, api, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
 
 interface Item {
@@ -131,13 +132,23 @@ export default function Inbox({ reloadKey }: { reloadKey: number }) {
                 </p>
               ) : canWrite && replying === it.id ? (
                 <div className="space-y-2">
-                  <textarea
-                    rows={2}
-                    className={inputCls}
+                  <AIEnrichButton
+                    fieldLabel="Reply"
                     value={text}
-                    onChange={e => setText(e.target.value)}
-                    placeholder="Write a reply"
-                  />
+                    onChange={setText}
+                    scope="social:write"
+                    multiline
+                    write
+                    context={`Public reply from the store to a ${NETWORK_LABEL[it.network] ?? it.network} ${it.kind} by ${it.author ?? 'a customer'}${it.rating != null ? ` (${it.rating} stars)` : ''}: "${(it.text ?? '').slice(0, 600)}"`}
+                  >
+                    <textarea
+                      rows={2}
+                      className={`${inputCls} pr-8`}
+                      value={text}
+                      onChange={e => setText(e.target.value)}
+                      placeholder="Write a reply"
+                    />
+                  </AIEnrichButton>
                   <div className="flex gap-2 justify-end">
                     <button type="button" className={btnGhost} onClick={() => setReplying(null)}>
                       Cancel

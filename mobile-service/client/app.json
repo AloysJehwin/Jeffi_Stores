@@ -95,7 +95,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#7CB900"
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true

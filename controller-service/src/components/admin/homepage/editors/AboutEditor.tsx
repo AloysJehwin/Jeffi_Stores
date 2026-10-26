@@ -27,6 +27,7 @@ export default function AboutEditor(props: EditorProps) {
   const d = sectionCopy(props)
   const body = typeof b.cfg.body === 'string' ? b.cfg.body : null
   const imageUrl = typeof b.cfg.imageUrl === 'string' ? b.cfg.imageUrl : null
+  const video = typeof b.cfg.video === 'string' ? b.cfg.video : ''
 
   return (
     <Grid>
@@ -48,10 +49,18 @@ export default function AboutEditor(props: EditorProps) {
       <Image
         label="Photo"
         value={imageUrl ?? d.imageUrl ?? ''}
+        video={video}
+        allowVideo
+        size={['wide', 'landscape']}
         disabled={!canWrite}
-        placeholder="/images/about.jpg, https://… or upload"
-        hint={copyHint(imageUrl == null && !!d.imageUrl, 'Image shown beside the story.')}
-        onCommit={v => b.saveConfig({ imageUrl: optional(v) })}
+        hint={copyHint(imageUrl == null && !!d.imageUrl, 'Image or video shown beside the story.')}
+        onCommit={(img, vid) =>
+          b.saveConfig({
+            // Adding a video over the default photo keeps the photo a default.
+            imageUrl: imageUrl == null && img === d.imageUrl ? null : optional(img),
+            video: optional(vid),
+          })
+        }
       />
       <div>
         <p className={LABEL_CLASS}>Photo preview</p>

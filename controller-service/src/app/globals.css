@@ -73,6 +73,8 @@
 
   html {
     @apply bg-surface;
+    /* No rubber-band past the page ends, which showed a pale strip under the dark footer. */
+    overscroll-behavior-y: none;
   }
 
   body {
@@ -333,10 +335,83 @@ html[data-no-ads] .google-auto-placed {
   display: none !important;
 }
 
-/* The storefront footer strip makes room for a fixed bottom bar only while one is on screen. */
+/* The storefront footer pads for the home indicator itself, so the body's inset would double it. */
+body:has([data-footer-strip]) {
+  padding-bottom: 0;
+}
+
+/* The storefront footer makes room for a fixed bottom bar only while one is on screen. */
 body:has([data-bottom-bar]) [data-footer-strip] {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 }
-body:has([data-bottom-bar='cart']):has([data-bottom-bar='compare']) [data-footer-strip] {
+body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-bottom-bar='compare']) [data-footer-strip] {
   padding-bottom: calc(10rem + env(safe-area-inset-bottom));
 }
+
+/* Toasts clear the home indicator and sit above any fixed bottom bar. */
+[data-toast] {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+body:has([data-bottom-bar]) [data-toast] {
+  margin-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-bottom-bar='compare']) [data-toast] {
+  margin-bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 639px) {
+  /* Full-width storefront toasts on phones. */
+  body:has([data-storefront]) [data-toast] {
+    left: 1rem;
+  }
+
+  /* 16px text fields on storefront phones (portalled sheets too) so iOS Safari doesn't zoom on focus.
+     Larger text (OTP boxes) is left alone. */
+  body:has([data-storefront])
+    :is(
+      input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='button'], [type='submit'], [type='reset'], [type='image']),
+      select,
+      textarea
+    ):not(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl) {
+    font-size: 16px;
+  }
+}
+
+/* KpiGrid: the container width sets how many cards fit (150px + 12px gap each); n cards then take the
+   fewest rows, spread evenly (--kpi-cK: columns when K fit), and a short last row stretches. Counted on
+   the rendered cards, so fragments and wrapper components don't matter. */
+.kpi-grid {
+  container-type: inline-size;
+  width: 100%;
+}
+.kpi-grid > div {
+  --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 5; --kpi-c6: 6;
+  --cols: var(--kpi-c2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.kpi-grid > div > * {
+  flex: 1 1 calc((100% - (var(--cols) - 1) * 0.75rem) / var(--cols) - 0.5px);
+  min-width: 0;
+}
+.kpi-grid > div:has(> :nth-child(1):last-child) { --kpi-c2: 1; --kpi-c3: 1; --kpi-c4: 1; --kpi-c5: 1; --kpi-c6: 1; }
+.kpi-grid > div:has(> :nth-child(2):last-child) { --kpi-c2: 2; --kpi-c3: 2; --kpi-c4: 2; --kpi-c5: 2; --kpi-c6: 2; }
+.kpi-grid > div:has(> :nth-child(3):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 3; --kpi-c5: 3; --kpi-c6: 3; }
+.kpi-grid > div:has(> :nth-child(4):last-child) { --kpi-c2: 2; --kpi-c3: 2; --kpi-c4: 4; --kpi-c5: 4; --kpi-c6: 4; }
+.kpi-grid > div:has(> :nth-child(5):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 3; --kpi-c5: 5; --kpi-c6: 5; }
+.kpi-grid > div:has(> :nth-child(6):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 3; --kpi-c5: 3; --kpi-c6: 6; }
+.kpi-grid > div:has(> :nth-child(7):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 4; --kpi-c6: 4; }
+.kpi-grid > div:has(> :nth-child(8):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 4; --kpi-c6: 4; }
+.kpi-grid > div:has(> :nth-child(9):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 3; --kpi-c5: 5; --kpi-c6: 5; }
+.kpi-grid > div:has(> :nth-child(10):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 5; --kpi-c6: 5; }
+.kpi-grid > div:has(> :nth-child(11):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 4; --kpi-c6: 6; }
+.kpi-grid > div:has(> :nth-child(12):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 4; --kpi-c6: 6; }
+.kpi-grid > div:has(> :nth-child(13):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 5; --kpi-c6: 5; }
+.kpi-grid > div:has(> :nth-child(14):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 5; --kpi-c6: 5; }
+.kpi-grid > div:has(> :nth-child(15):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 5; --kpi-c6: 5; }
+.kpi-grid > div:has(> :nth-child(16):last-child) { --kpi-c2: 2; --kpi-c3: 3; --kpi-c4: 4; --kpi-c5: 4; --kpi-c6: 6; }
+@container (min-width: 474px) { .kpi-grid > div { --cols: var(--kpi-c3); } }
+@container (min-width: 636px) { .kpi-grid > div { --cols: var(--kpi-c4); } }
+@container (min-width: 798px) { .kpi-grid > div { --cols: var(--kpi-c5); } }
+@container (min-width: 960px) { .kpi-grid > div { --cols: var(--kpi-c6); } }

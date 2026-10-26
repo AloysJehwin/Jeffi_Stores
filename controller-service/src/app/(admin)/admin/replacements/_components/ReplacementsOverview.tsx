@@ -3,19 +3,32 @@
 import { Kpi, Banner, Section, count, pct } from '@/components/admin/channels/ui'
 import { AttentionList, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { delta } from '@/lib/overview/period'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { REPLACEMENT_FIELDS, REQUEST_SEARCH } from '@/lib/filters/fields/returns'
 import { BreakdownBars, fmtDays, withAp } from '../../orders/_components/overview-shared'
 import type { ReturnsData } from '../../returns/_components/ReturnsOverview'
 
 export default function ReplacementsOverview() {
   const [period, setPeriod] = usePeriod()
+  // The strip follows the list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(REPLACEMENT_FIELDS, { omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<ReturnsData>(
-    `/api/admin/replacements/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/replacements/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
   const c = data?.kpis.current
   const p = data?.kpis.previous
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="replacements"
+        fields={REPLACEMENT_FIELDS}
+        search={REQUEST_SEARCH}
+        period
+        noun="Replacements"
+        tab="overview"
+        exportable
+      />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? (
         <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />

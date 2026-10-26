@@ -1,15 +1,16 @@
 import { Suspense } from 'react'
+import { canonicalQuery, filterScope, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { pageUrls } from '@/lib/admin/page-urls'
-import { getFilteredOrders, getRevenueTrendBySource } from '@/lib/queries'
-import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
+import { isListUrl, tabHref } from '@/lib/admin/filter-url'
+import { getOrdersSummary, getRevenueTrendBySource, queryOrders } from '@/lib/queries'
+import { ORDERS_ENTITY } from '@/lib/filters/entities/orders'
+import { ORDER_ALIASES, ORDER_FIELDS, ORDER_SEARCH } from '@/lib/filters/fields/orders'
 import { ap } from '@/lib/shared/admin-path'
-import { isFulfilledStatus } from '@/lib/orders/fulfilled-status'
 import { getHost } from '@/lib/tenancy/get-host'
 import RevenueTrendChart from '@/components/admin/RevenueTrendChart'
-import { Kpi, ListSkeleton, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, ListFilters, ListSkeleton, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
 import OrdersTable from './_components/OrdersTable'
-import OrdersFilters from './_components/OrdersFilters'
 import OrdersOverview from './_components/OrdersOverview'
 
 export const dynamic = 'force-dynamic'
@@ -17,59 +18,34 @@ export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-// Params that belong to the list; a URL carrying any of them (old links, filters) opens the list tab.
-const LIST_PARAMS = [
-  'status',
-  'payment_status',
-  'source',
-  'search',
-  'sort',
-  'dir',
-  'page',
-  'date_from',
-  'date_to',
-  'amount_min',
-  'amount_max',
-  'awb',
-  'shipment_status',
-  'payment_mode',
-  'coupon_code',
-  'cod_pending',
-  '_adv',
-]
-
 type SP = { [key: string]: string | string[] | undefined }
 function sp(resolvedSearchParams: SP, key: string) {
   const v = resolvedSearchParams[key]
   return Array.isArray(v) ? v[0] : v
 }
 
-async function OrdersStats() {
-  const [allStats, revenueTrend] = await Promise.all([getFilteredOrders({}), getRevenueTrendBySource()])
-
-  const totalOrders = allStats.total
-  const pendingOrders = allStats.orders?.filter((o: any) => o.status === 'pending').length || 0
-  const processingOrders = allStats.orders?.filter((o: any) => o.status === 'processing').length || 0
-  const completedOrders = allStats.orders?.filter((o: any) => isFulfilledStatus(o.status)).length || 0
-  const totalRevenue =
-    allStats.orders?.reduce((sum: number, order: any) => {
-      return order.payment_status === 'paid' ? sum + Number(order.total_amount) : sum
-    }, 0) || 0
+/** KPIs over every order the filters match; the trend keeps its own window. */
+async function OrdersStats({ q }: { q: FilterQuery }) {
+  const ctx = (await ORDERS_ENTITY.context?.(q)) ?? {}
+  const [summary, revenueTrend] = await Promise.all([
+    getOrdersSummary(q, ctx),
+    getRevenueTrendBySource('12m', filterScope(ORDERS_ENTITY, q, { omit: ['created'], ctx })),
+  ])
 
   const money = (v: number) => `Rs. ${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   return (
     <div className="animate-fade-in grid grid-cols-1 gap-4 xl:grid-cols-3">
       <div className="grid grid-cols-2 content-start gap-3">
         <div className="col-span-2">
-          <Kpi label="Total revenue" value={money(totalRevenue)} sub="Paid orders" highlight />
+          <Kpi label="Total revenue" value={money(summary.paidRevenue)} sub="Paid orders" highlight />
         </div>
-        <Kpi label="Total" value={totalOrders.toLocaleString('en-IN')} />
-        <Kpi label="Pending" value={pendingOrders.toLocaleString('en-IN')} />
-        <Kpi label="Processing" value={processingOrders.toLocaleString('en-IN')} />
-        <Kpi label="Completed" value={completedOrders.toLocaleString('en-IN')} />
+        <Kpi label="Total" value={summary.total.toLocaleString('en-IN')} />
+        <Kpi label="Pending" value={summary.pending.toLocaleString('en-IN')} />
+        <Kpi label="Processing" value={summary.processing.toLocaleString('en-IN')} />
+        <Kpi label="Completed" value={summary.completed.toLocaleString('en-IN')} />
       </div>
       <div className="xl:col-span-2">
-        <RevenueTrendChart data={revenueTrend} />
+        <RevenueTrendChart data={revenueTrend} query={canonicalQuery(q, ORDER_FIELDS, { omit: ['from', 'to'] })} />
       </div>
     </div>
   )
@@ -81,20 +57,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
   const sort = sp(resolvedSearchParams, 'sort')
   const dir = sp(resolvedSearchParams, 'dir') as 'asc' | 'desc' | undefined
 
-  const { orders, total } = await getFilteredOrders({
-    status: sp(resolvedSearchParams, 'status'),
-    payment_status: sp(resolvedSearchParams, 'payment_status'),
-    source: sp(resolvedSearchParams, 'source'),
-    search: sp(resolvedSearchParams, 'search'),
-    date_from: sp(resolvedSearchParams, 'date_from'),
-    date_to: sp(resolvedSearchParams, 'date_to'),
-    amount_min: sp(resolvedSearchParams, 'amount_min'),
-    amount_max: sp(resolvedSearchParams, 'amount_max'),
-    awb: sp(resolvedSearchParams, 'awb'),
-    shipment_status: sp(resolvedSearchParams, 'shipment_status'),
-    payment_mode: sp(resolvedSearchParams, 'payment_mode'),
-    coupon_code: sp(resolvedSearchParams, 'coupon_code'),
-    cod_pending: sp(resolvedSearchParams, 'cod_pending'),
+  const { orders, total } = await queryOrders(normalizeQuery(ORDERS_ENTITY, resolvedSearchParams), {
     page,
     limit: PAGE_SIZE,
     sort,
@@ -119,9 +82,8 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {
   const resolved = await searchParams
   const host = await getHost()
-  const tabParam = sp(resolved, 'tab')
-  const tab =
-    tabParam === 'list' || (tabParam !== 'overview' && LIST_PARAMS.some(k => sp(resolved, k))) ? 'list' : 'overview'
+  const tab = isListUrl(resolved, ORDER_FIELDS, { aliases: ORDER_ALIASES }) ? 'list' : 'overview'
+  const href = (t: string) => ap(tabHref('/admin/orders', t, resolved, ORDER_FIELDS, { aliases: ORDER_ALIASES }), host)
 
   return (
     <PageBody>
@@ -129,8 +91,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
       <TabLinks
         tabs={[
-          { id: 'overview', label: 'Overview', href: ap('/admin/orders?tab=overview', host) },
-          { id: 'list', label: 'All orders', href: ap('/admin/orders?tab=list', host) },
+          { id: 'overview', label: 'Overview', href: href('overview') },
+          { id: 'list', label: 'All orders', href: href('list') },
         ]}
         value={tab}
       />
@@ -140,131 +102,30 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <OrdersOverview />
         </Suspense>
       ) : (
-        <OrdersList searchParams={searchParams} />
+        <OrdersList resolved={resolved} />
       )}
     </PageBody>
   )
 }
 
-function OrdersList({ searchParams }: { searchParams: Promise<SP> }) {
+function OrdersList({ resolved }: { resolved: SP }) {
+  const q = normalizeQuery(ORDERS_ENTITY, resolved)
   return (
     <>
-      <Suspense fallback={<ListSkeleton header={false} kpis={3} rows={0} />}>
-        <OrdersStats />
+      <Suspense key={JSON.stringify(q)} fallback={<ListSkeleton header={false} kpis={3} rows={0} />}>
+        <OrdersStats q={q} />
       </Suspense>
 
-      <OrdersFilters
-        filters={[
-          {
-            name: 'source',
-            label: 'Source',
-            options: [
-              { value: 'online', label: 'Online' },
-              { value: 'business', label: 'Business' },
-              { value: 'offline', label: 'Offline' },
-              { value: 'cash_sale', label: 'Cash Sale' },
-            ],
-          },
-          {
-            name: 'status',
-            label: 'Order Status',
-            options: [
-              { value: 'pending', label: 'Pending' },
-              { value: 'confirmed', label: 'Confirmed' },
-              { value: 'processing', label: 'Processing' },
-              { value: 'shipped', label: 'Shipped' },
-              { value: 'out_for_delivery', label: 'Out for Delivery' },
-              { value: 'delivered', label: 'Delivered' },
-              { value: 'granted', label: 'Access granted' },
-              { value: 'cancel_requested', label: 'Cancel Requested' },
-              { value: 'cancelled', label: 'Cancelled' },
-              { value: 'return_requested', label: 'Return Requested' },
-              { value: 'return_approved', label: 'Return Approved' },
-              { value: 'return_received', label: 'Return Received' },
-              { value: 'return_rejected', label: 'Return Rejected' },
-              { value: 'returned', label: 'Returned' },
-            ],
-          },
-          {
-            name: 'payment_status',
-            label: 'Payment Status',
-            options: [
-              { value: 'pending', label: 'Pending' },
-              { value: 'paid', label: 'Paid' },
-              { value: 'failed', label: 'Failed' },
-              { value: 'refunded', label: 'Refunded' },
-              { value: 'unpaid', label: 'Unpaid' },
-              { value: 'cancelled', label: 'Cancelled' },
-            ],
-          },
-        ]}
-        advanced={
-          <AdvancedFilterPanel
-            fields={[
-              { name: ['date_from', 'date_to'], label: 'Order Date', type: 'date-range', section: 'Date & Amount' },
-              {
-                name: ['amount_min', 'amount_max'],
-                label: 'Order Amount',
-                type: 'range',
-                section: 'Date & Amount',
-                unit: '₹',
-              },
-              {
-                name: 'shipment_status',
-                label: 'Shipment Status',
-                type: 'multi-select',
-                section: 'Shipment',
-                options: [
-                  { value: 'created', label: 'Created' },
-                  { value: 'in_transit', label: 'In Transit' },
-                  { value: 'out_for_delivery', label: 'Out for Delivery' },
-                  { value: 'delivered', label: 'Delivered' },
-                  { value: 'rto_initiated', label: 'RTO Initiated' },
-                  { value: 'rto_delivered', label: 'RTO Delivered' },
-                ],
-              },
-              {
-                name: 'awb',
-                label: 'AWB / Tracking No.',
-                type: 'text',
-                section: 'Shipment',
-                placeholder: 'Search by AWB number',
-              },
-              {
-                name: 'payment_mode',
-                label: 'Payment Mode',
-                type: 'multi-select',
-                section: 'Payment',
-                options: [
-                  { value: 'cod', label: 'Cash on Delivery' },
-                  { value: 'prepaid', label: 'Prepaid' },
-                ],
-              },
-              {
-                name: 'coupon_code',
-                label: 'Coupon Code',
-                type: 'text',
-                section: 'Payment',
-                placeholder: 'Search by coupon code',
-              },
-              { name: 'cod_pending', label: 'COD pending remittance', type: 'boolean', section: 'Payment' },
-            ]}
-            mode="content"
-            forceExpanded
-          />
-        }
-      />
+      <ListFilters entity="orders" fields={ORDER_FIELDS} aliases={ORDER_ALIASES} search={ORDER_SEARCH} noun="Orders" tab="list" exportable />
 
-      <OrdersListSection searchParams={searchParams} />
+      <OrdersListSection resolvedSearchParams={resolved} />
     </>
   )
 }
 
-// Resolves searchParams (no DB — near-instant) then keys the table Suspense
-// on the query string so filter/pagination changes re-trigger the shimmer
+// Keys the table Suspense on the query string so filter/pagination changes re-trigger the shimmer
 // while the stats + filters above stay mounted.
-async function OrdersListSection({ searchParams }: { searchParams: Promise<SP> }) {
-  const resolvedSearchParams = await searchParams
+function OrdersListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>

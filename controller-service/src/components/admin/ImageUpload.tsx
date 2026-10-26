@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import GalleryPicker, { type GalleryImage } from '@/components/admin/GalleryPicker'
+import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 
@@ -36,12 +38,15 @@ interface ImageUploadProps {
     galleryImages: { id: string; isPrimary: boolean }[],
     orderedKeys: string[]
   ) => void
+  /** Offers an AI image (saved to the gallery, then added like a gallery pick). */
+  ai?: { defaultPrompt?: string }
 }
 
 export default function ImageUpload({
   maxImages = 5,
   existingImages = [],
   onImagesChange,
+  ai,
 }: Omit<ImageUploadProps, 'productId'> & { productId?: string }) {
   const [images, setImages] = useState<LocalImage[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -224,6 +229,20 @@ export default function ImageUpload({
         </div>
         {canUploadMore && (
           <div className="flex flex-wrap gap-2">
+            {ai && (
+              <AiMediaButton
+                feature="product_image"
+                sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
+                defaultPrompt={ai.defaultPrompt}
+                saveToGallery
+                onPick={img => {
+                  if (img.galleryId)
+                    handleUseGalleryImages([
+                      { id: img.galleryId, image_url: img.url, thumbnail_url: null, file_name: 'ai-image.png' },
+                    ])
+                }}
+              />
+            )}
             <button
               type="button"
               onClick={openGallery}

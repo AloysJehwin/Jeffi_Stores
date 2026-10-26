@@ -3,16 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { productLabel, variantLabel } from '@/lib/catalog/product-label'
 import { round2 } from '@/lib/catalog/gst'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { FileText, ExternalLink, Plus, X } from 'lucide-react'
-import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, PageHeader, TableSkeleton, badgeCls, fetchJson, useActionToast, useInfiniteList, type StatusMap } from '@/components/admin/kit'
+import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, ListFilters, PageHeader, TableSkeleton, badgeCls, fetchJson, useActionToast, useFilterQuery, useInfiniteList, type StatusMap } from '@/components/admin/kit'
 import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
-import AdminSelect from '@/components/admin/AdminSelect'
-import AdminTypeahead from '@/components/admin/AdminTypeahead'
-import DatePicker from '@/components/ui/DatePicker'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 import HoverCard from '@/components/ui/HoverCard'
@@ -25,6 +22,7 @@ import SerialEntryModal, {
   SerialPicker,
 } from '@/components/admin/SerialEntryModal'
 import CashSaleMobileList from './_components/CashSaleMobileList'
+import { CASH_SALE_ALIASES, CASH_SALE_FIELDS, CASH_SALE_SEARCH } from '@/lib/filters/fields/cash-sale'
 
 interface CashSale {
   id: string
@@ -110,27 +108,14 @@ export default function CashSaleClient() {
   const confirm = useConfirm()
   const canWrite = useCanWrite('invoices')
   const searchParams = useSearchParams()
-  const router = useRouter()
   const [view, setView] = useState<View>('list')
 
   const [selectedSale, setSelectedSale] = useState<CashSale | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
-  const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
-  const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
-  const [toDate, setToDate] = useState(searchParams.get('to') || '')
-  const [searchQ, setSearchQ] = useState(searchParams.get('search') || '')
-  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '')
+  // The list filters live in the URL (from / to are the bill date); sorting stays local.
+  const filters = useFilterQuery(CASH_SALE_FIELDS, { aliases: CASH_SALE_ALIASES })
   const [sortCol, setSortCol] = useState<string | undefined>(undefined)
   const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
-
-  function syncUrl(patch: Record<string, string>) {
-    const p = new URLSearchParams(window.location.search)
-    for (const [k, v] of Object.entries(patch)) {
-      if (v) p.set(k, v)
-      else p.delete(k)
-    }
-    router.replace(ap(`/admin/cash-sale?${p.toString()}`), { scroll: false })
-  }
 
   const [paymentMode, setPaymentMode] = useState('cash')
   const [notes, setNotes] = useState('')
@@ -185,15 +170,11 @@ export default function CashSaleClient() {
 
   // Ordered server-side across all sales via sort/dir params; 25 per page.
   const list = useInfiniteList<CashSale>({
-    key: `${paymentFilter}|${fromDate}|${toDate}|${searchQ}|${sortCol}|${sortDir}`,
+    key: `${filters}|${sortCol}|${sortDir}`,
     pageSize: 25,
     getKey: s => s.id,
     fetchPage: async (p, signal) => {
-      const params = new URLSearchParams()
-      if (paymentFilter) params.set('payment', paymentFilter)
-      if (fromDate) params.set('from', fromDate)
-      if (toDate) params.set('to', toDate)
-      if (searchQ) params.set('search', searchQ)
+      const params = new URLSearchParams(filters)
       if (sortCol && SORT_KEYS[sortCol]) {
         params.set('sort', SORT_KEYS[sortCol])
         params.set('dir', sortDir || 'desc')
@@ -814,93 +795,21 @@ export default function CashSaleClient() {
         )}
       </div>
 
-      <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
-        <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex-1 min-w-[200px]">
-            <AdminTypeahead
-              type="invoices"
-              value={searchInput}
-              onChange={setSearchInput}
-              onSelect={item => {
-                setSearchInput(item.label)
-                setSearchQ(item.label)
-                syncUrl({ search: item.label })
-              }}
-              onEnter={val => {
-                setSearchQ(val)
-                syncUrl({ search: val })
-              }}
-              placeholder="Search receipt no, order no…"
-              inputClassName={inputCls + ' pr-9'}
-            />
-          </div>
-          <button
-            onClick={() => {
-              setSearchQ(searchInput)
-              syncUrl({ search: searchInput })
-            }}
-            className="control-md bg-accent-500 font-medium text-white transition-colors hover:bg-accent-600"
-          >
-            Search
-          </button>
-          {(searchQ || paymentFilter || fromDate || toDate) && (
-            <button
-              onClick={() => {
-                setSearchQ('')
-                setSearchInput('')
-                setPaymentFilter('')
-                setFromDate('')
-                setToDate('')
-                syncUrl({ search: '', payment: '', from: '', to: '' })
-              }}
-              className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
-            >
-              <X className="h-4 w-4" />
-              Clear
-            </button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <AdminSelect
-            value={paymentFilter}
-            onChange={v => {
-              setPaymentFilter(v)
-              syncUrl({ payment: v })
-            }}
-            placeholder="All Payments"
-            options={[
-              { value: 'paid', label: 'Paid' },
-              { value: 'refunded', label: 'Refunded' },
-              { value: 'cancelled', label: 'Cancelled' },
-            ]}
-          />
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <DatePicker
-              className="flex-1 min-w-[9rem] sm:w-36 sm:flex-none"
-              value={fromDate}
-              onChange={v => {
-                setFromDate(v)
-                syncUrl({ from: v })
-              }}
-            />
-            <span className="text-foreground-secondary text-xs">to</span>
-            <DatePicker
-              className="flex-1 min-w-[9rem] sm:w-36 sm:flex-none"
-              value={toDate}
-              onChange={v => {
-                setToDate(v)
-                syncUrl({ to: v })
-              }}
-            />
-          </div>
-        </div>
-      </div>
+      <ListFilters
+        entity="cash_sale"
+        fields={CASH_SALE_FIELDS}
+        aliases={CASH_SALE_ALIASES}
+        search={CASH_SALE_SEARCH}
+        noun="Cash sales"
+        tab="list"
+        exportable
+      />
 
       <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
         {loading ? (
           <TableSkeleton rows={8} cols={6} />
         ) : sales.length === 0 ? (
-          <EmptyState bare title="No cash sales found." />
+          <EmptyState bare title={filters ? 'No cash sales match these filters.' : 'No cash sales found.'} />
         ) : (
           <>
             <div className="hidden md:block overflow-x-auto">

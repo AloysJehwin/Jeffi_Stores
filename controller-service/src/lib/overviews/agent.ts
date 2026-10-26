@@ -29,7 +29,7 @@ export function agentAttention(s: {
       key: 'failed',
       severity: 'warning',
       title: `${plural(s.failed, 'approved action')} failed in this period`,
-      href: '/admin/agent/logs',
+      href: '/admin/agent/logs?status=failed',
     })
   if (s.proposed_tools)
     out.push({
@@ -45,7 +45,7 @@ export function agentAttention(s: {
       severity: 'info',
       title: `${Math.round(rate * 100)}% of tool calls errored`,
       sub: `${s.tool_errors} of ${s.tool_calls}`,
-      href: '/admin/agent/logs',
+      href: '/admin/agent/logs?has_error=true',
     })
   return out
 }

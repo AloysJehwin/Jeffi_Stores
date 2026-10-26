@@ -8,6 +8,7 @@ import CompareBar from '../../src/components/catalog/CompareBar'
 import PagedProductGrid from '../../src/components/catalog/PagedProductGrid'
 import { EmptyCard, ListingPageSkeleton } from '../../src/components/catalog/Paged'
 import { absUrl } from '../../src/lib/links'
+import { useImageSource } from '../../src/hooks/useImageSource'
 
 // Mirror of controller-service app/(storefront)/brands/[slug]/page.tsx at the mobile breakpoint.
 
@@ -16,6 +17,7 @@ const PAGE_SIZE = 25
 export default function BrandScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
   const bottomInset = useBottomInset(0)
+  const imgSource = useImageSource()
   const { data, isLoading } = useQuery({ queryKey: ['brands'], queryFn: listBrands, staleTime: 5 * 60_000 })
   const brand = (data ?? []).find(b => b.slug === slug) as BrandDetail | undefined
   const header = <ScreenHeader title={brand?.name} />
@@ -40,7 +42,7 @@ export default function BrandScreen() {
           <View className="flex-row items-center gap-4">
             {logo ? (
               <View className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary">
-                <Image recyclingKey={logo} source={{ uri: logo }} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={brand.name} />
+                <Image recyclingKey={logo} source={imgSource(logo, 56)} contentFit="contain" style={{ flex: 1, margin: 4 }} accessibilityLabel={brand.name} />
               </View>
             ) : null}
             <View className="min-w-0 flex-1">

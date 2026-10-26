@@ -41,7 +41,7 @@ export default function WorkloadCard({
     primary: a.name,
     secondary: a.overdue > 0 ? `${numStr(a.overdue)} overdue` : undefined,
     value: numStr(a.open),
-    href: ap('/admin/tasks?scope=all&status=open'),
+    href: ap('/admin/tasks?status=open'),
   }))
 
   return (

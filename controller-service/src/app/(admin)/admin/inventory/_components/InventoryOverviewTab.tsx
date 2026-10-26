@@ -7,6 +7,8 @@ import { AlertTriangle, ArrowRight, CircleAlert, Info, RefreshCw } from 'lucide-
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
+import { PRODUCT_SEARCH, VALUATION_ALIASES, VALUATION_FIELDS } from '@/lib/filters/fields/inventory'
 import {
   Badge,
   Banner,
@@ -432,6 +434,8 @@ export default function InventoryOverviewTab() {
     () => rangeFromParams(searchParams.get('from'), searchParams.get('to'), today),
     [searchParams, today]
   )
+  // Stock, movement and expiry figures follow the valuation tab's product filters.
+  const filters = useFilterQuery(VALUATION_FIELDS, { aliases: VALUATION_ALIASES })
   const [data, setData] = useState<Overview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -442,7 +446,9 @@ export default function InventoryOverviewTab() {
     setLoading(true)
     setError(null)
     try {
-      const { ok, data: body } = await api<Overview>(`/api/admin/inventory/overview?from=${range.from}&to=${range.to}`)
+      const { ok, data: body } = await api<Overview>(
+        `/api/admin/inventory/overview?from=${range.from}&to=${range.to}${filters ? `&${filters}` : ''}`
+      )
       if (id !== reqId.current) return
       if (!ok) throw new Error(body?.error || 'Could not load the overview')
       setData(body)
@@ -451,7 +457,7 @@ export default function InventoryOverviewTab() {
     } finally {
       if (id === reqId.current) setLoading(false)
     }
-  }, [range.from, range.to])
+  }, [range.from, range.to, filters])
 
   useEffect(() => {
     load()
@@ -593,10 +599,23 @@ export default function InventoryOverviewTab() {
     { key: 'value', label: 'Value', num: true, render: r => money(r.value), sort: r => r.value },
   ]
 
+  const filterBar = (
+    <ListFilters
+      entity="inventory.valuation"
+      fields={VALUATION_FIELDS}
+      aliases={VALUATION_ALIASES}
+      search={PRODUCT_SEARCH}
+      noun="Products"
+      tab="overview"
+      exportable
+    />
+  )
+
   if (loading && !data) {
     return (
       <div className="space-y-5">
         <PeriodPicker value={range} today={today} onChange={setRange} />
+        {filterBar}
         <AdminStatsSkeleton cards={6} gridClass="grid-cols-2 md:grid-cols-3 xl:grid-cols-6" />
         <AdminStatsSkeleton cards={6} gridClass="grid-cols-2 md:grid-cols-3 xl:grid-cols-6" />
       </div>
@@ -607,6 +626,7 @@ export default function InventoryOverviewTab() {
     return (
       <div className="space-y-5">
         <PeriodPicker value={range} today={today} onChange={setRange} />
+        {filterBar}
         <Banner ok={false}>
           {error || 'Could not load the overview'}{' '}
           <button type="button" onClick={load} className="underline">
@@ -637,6 +657,7 @@ export default function InventoryOverviewTab() {
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
+      {filterBar}
       {error && <Banner ok={false}>{error}</Banner>}
 
       <Section title="Needs attention">

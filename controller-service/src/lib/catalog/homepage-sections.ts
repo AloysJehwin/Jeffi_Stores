@@ -1,3 +1,5 @@
+import type { CardProps } from '@/lib/catalog/product-card-props'
+
 export type SectionType =
   | 'hero'
   | 'offer_slider'
@@ -26,6 +28,7 @@ export type SectionType =
   | 'stories'
   | 'product_spotlight'
   | 'rewards_game'
+  | 'slides'
 
 export const SECTION_TYPES: SectionType[] = [
   'hero',
@@ -55,6 +58,7 @@ export const SECTION_TYPES: SectionType[] = [
   'stories',
   'product_spotlight',
   'rewards_game',
+  'slides',
 ]
 
 /**
@@ -67,6 +71,7 @@ export const LEGACY_APP_HIDDEN_TYPES: ReadonlySet<SectionType> = new Set<Section
   'stories',
   'product_spotlight',
   'rewards_game',
+  'slides',
 ])
 
 /** Which query backs a product_row. Collapses the separate featured/new/best-seller fetches. */
@@ -219,6 +224,10 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     description: 'A spin-the-wheel or scratch card that gives signed-in customers a coupon.',
     singleton: true,
   },
+  slides: {
+    label: 'Slides',
+    description: 'A slider of offers, categories, products or your own animated slides.',
+  },
 }
 
 export interface SectionCopy {
@@ -227,6 +236,8 @@ export interface SectionCopy {
   subtitle?: string
   body?: string
   imageUrl?: string
+  /** MP4/WebM for the section's banner image (promo, about); `imageUrl` is its poster. */
+  video?: string
   ctaLabel?: string
   ctaUrl?: string
 }
@@ -416,10 +427,17 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? 
 const objects = (raw: unknown): Record<string, unknown>[] =>
   Array.isArray(raw) ? raw.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object') : []
 
+// How an opaque foreground photo sits on the slide; 'none' is for transparent cutouts.
+export const FG_FRAMES = ['rounded', 'fade', 'none'] as const
+export type FgFrame = (typeof FG_FRAMES)[number]
+
 // Animated hero: `config.slides`, each with a background image and a headline at least.
 export interface MotionHeroSlide {
   bgImage: string
+  /** MP4/WebM behind the slide; `bgImage` is its poster. Absent when unset. */
+  bgVideo?: string
   fgImage: string | null
+  fgFrame: FgFrame
   eyebrow: string | null
   headline: string
   sub: string | null
@@ -433,9 +451,12 @@ export function motionHeroSlides(section: Pick<HomepageSection, 'config'>): Moti
     const bgImage = safeHref(str(r.bgImage))
     const headline = str(r.headline)
     if (!bgImage || !headline) continue
+    const bgVideo = safeHref(str(r.bgVideo))
     slides.push({
       bgImage,
+      ...(bgVideo ? { bgVideo } : {}),
       fgImage: safeHref(str(r.fgImage)),
+      fgFrame: FG_FRAMES.find(f => f === r.fgFrame) ?? 'rounded',
       eyebrow: str(r.eyebrow),
       headline,
       sub: str(r.sub),
@@ -456,6 +477,8 @@ export function motionHeroIntervalMs(section: Pick<HomepageSection, 'config'>): 
 export interface StorySlide {
   id: string
   image: string
+  /** MP4/WebM for the slide; `image` is its poster. Absent when unset. */
+  video?: string
   caption: string | null
   ctaLabel: string | null
   url: string | null
@@ -481,9 +504,11 @@ export function storyGroups(section: Pick<HomepageSection, 'config'>): StoryGrou
       const image = safeHref(str(s.image))
       if (!image) return
       const secs = typeof s.seconds === 'number' ? s.seconds : parseFloat(String(s.seconds ?? ''))
+      const video = safeHref(str(s.video))
       slides.push({
         id: str(s.id) ?? `${gi}-${si}`,
         image,
+        ...(video ? { video } : {}),
         caption: str(s.caption),
         ctaLabel: str(s.ctaLabel),
         url: safeHref(str(s.url)),
@@ -493,8 +518,143 @@ export function storyGroups(section: Pick<HomepageSection, 'config'>): StoryGrou
     if (slides.length === 0) return
     groups.push({ id: str(g.id) ?? `group-${gi}`, title, cover, slides: slides.slice(0, 12) })
   })
-  return groups.slice(0, 12)
+  return groups.slice(0, 24)
 }
+
+// Slides: `config.items`, each pointing at an offer, category or product, or a slide of its own.
+export type SlidesLayout = 'cards' | 'banner' | 'rail' | 'fade'
+export type SlidesAspect = '4:5' | '1:1' | '16:9'
+export type SlideKind = 'offer' | 'category' | 'product' | 'custom'
+export type SlideMotion = 'none' | 'kenburns' | 'parallax' | 'reveal'
+
+export const SLIDES_LAYOUTS: SlidesLayout[] = ['cards', 'banner', 'rail', 'fade']
+export const SLIDES_ASPECTS: SlidesAspect[] = ['4:5', '1:1', '16:9']
+export const SLIDE_KINDS: SlideKind[] = ['offer', 'category', 'product', 'custom']
+export const SLIDE_MOTIONS: SlideMotion[] = ['none', 'kenburns', 'parallax', 'reveal']
+export const MAX_SLIDES = 12
+
+export interface CustomSlide {
+  id: string
+  kind: 'custom'
+  image: string
+  imageCard: string | null
+  /** MP4/WebM for `image` / `imageCard`, which are their posters. Absent when unset. */
+  video?: string
+  videoCard?: string
+  eyebrow: string | null
+  title: string
+  sub: string | null
+  ctaLabel: string | null
+  url: string | null
+  motion: SlideMotion
+}
+
+export type SlideItem =
+  | { id: string; kind: 'offer'; offerId: string }
+  | { id: string; kind: 'category'; categoryId: string }
+  | { id: string; kind: 'product'; productId: string }
+  | CustomSlide
+
+export interface SlidesConfig {
+  layout: SlidesLayout
+  aspect: SlidesAspect
+  autoplay: boolean
+  /** 3–20 s; only used with autoplay. */
+  intervalSeconds: number
+  items: SlideItem[]
+}
+
+const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(v as T) ? (v as T) : fallback
+
+const guid = (v: unknown): string | null => (typeof v === 'string' && GUID.test(v) ? v : null)
+
+export function slidesConfig(section: Pick<HomepageSection, 'config'>): SlidesConfig {
+  const cfg = section.config ?? {}
+  const items: SlideItem[] = []
+  const seen = new Set<string>()
+  for (const [i, r] of objects(cfg.items).entries()) {
+    let id = str(r.id) ?? `slide-${i}`
+    if (seen.has(id)) id = `${id}-${i}`
+    let item: SlideItem | null = null
+    if (r.kind === 'offer') {
+      const offerId = guid(r.offerId)
+      if (offerId) item = { id, kind: 'offer', offerId }
+    } else if (r.kind === 'category') {
+      const categoryId = guid(r.categoryId)
+      if (categoryId) item = { id, kind: 'category', categoryId }
+    } else if (r.kind === 'product') {
+      const productId = guid(r.productId)
+      if (productId) item = { id, kind: 'product', productId }
+    } else if (r.kind === 'custom') {
+      const image = safeHref(str(r.image))
+      const title = str(r.title)
+      if (image && title) {
+        const video = safeHref(str(r.video))
+        const videoCard = safeHref(str(r.videoCard))
+        item = {
+          id,
+          kind: 'custom',
+          image,
+          imageCard: safeHref(str(r.imageCard)),
+          eyebrow: str(r.eyebrow),
+          title,
+          sub: str(r.sub),
+          ctaLabel: str(r.ctaLabel),
+          url: safeHref(str(r.url)),
+          motion: oneOf(r.motion, SLIDE_MOTIONS, 'none'),
+          ...(video ? { video } : {}),
+          ...(videoCard ? { videoCard } : {}),
+        }
+      }
+    }
+    if (!item) continue
+    seen.add(id)
+    items.push(item)
+    if (items.length === MAX_SLIDES) break
+  }
+  return {
+    layout: oneOf(cfg.layout, SLIDES_LAYOUTS, 'cards'),
+    aspect: oneOf(cfg.aspect, SLIDES_ASPECTS, '4:5'),
+    autoplay: cfg.autoplay === true,
+    intervalSeconds: Math.max(3, configNumber(section, 'intervalSeconds', 6, 20)),
+    items,
+  }
+}
+
+/** One resolved slide, whatever it points at; what the storefront and the app draw. */
+export interface SlideCard {
+  /** The item id from config, stable across edits. */
+  id: string
+  kind: SlideKind
+  href: string | null
+  title: string
+  eyebrow: string | null
+  sub: string | null
+  badge: string | null
+  /** A `bg-*` class for the badge pill, when the source sets one. */
+  badgeClass: string | null
+  ctaLabel: string | null
+  /** The wide picture (or the only one). */
+  image: string | null
+  /** The portrait 4:5 picture, when there is one. */
+  imageCard: string | null
+  /** MP4/WebM for the wide slot; `image` is its poster. */
+  video: string | null
+  /** MP4/WebM for the card; `imageCard` is its poster. */
+  videoCard: string | null
+  blurhash: string | null
+  blurhashCard: string | null
+  price?: number
+  mrp?: number | null
+  productId?: string
+  productSlug?: string
+  /** Product slides: the full card props, for the quick-add button. */
+  product?: CardProps
+  motion: SlideMotion
+}
+
+export type SlidesData = Omit<SlidesConfig, 'items'> & { slides: SlideCard[] }
 
 // Product spotlight: one picked product with short callouts.
 export interface SpotlightConfig {

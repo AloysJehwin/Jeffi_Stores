@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastContext'
 import Toggle from '@/components/ui/Toggle'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 // Shared auto-save form primitives for the Site Controls page. Each field saves
 // to PATCH /api/admin/settings on blur (text/number) or on change (toggle),
@@ -110,12 +111,15 @@ export function TextAreaControl({
   hint,
   initial,
   rows = 4,
+  ai,
 }: {
   settingKey: string
   label: string
   hint?: string
   initial: string
   rows?: number
+  /** Customer-facing copy: show the AI sparkle; an AI edit saves straight away. */
+  ai?: { context: string; maxLength?: number }
 }) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
@@ -123,14 +127,31 @@ export function TextAreaControl({
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
-  async function save() {
-    if (!dirty) return
+  async function persist(next: string) {
     setSaving(true)
-    const ok = await patchSetting(settingKey, value)
+    const ok = await patchSetting(settingKey, next)
     setSaving(false)
     setDirty(false)
     showToast(ok ? 'Saved' : 'Failed to save', ok ? 'success' : 'error')
   }
+
+  async function save() {
+    if (dirty) await persist(value)
+  }
+
+  const field = (
+    <textarea
+      value={value}
+      rows={rows}
+      onChange={e => {
+        setValue(e.target.value)
+        setDirty(true)
+      }}
+      onBlur={save}
+      disabled={saving || !canWrite}
+      className={`w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60 resize-y${ai ? ' pr-8' : ''}`}
+    />
+  )
 
   return (
     <div>
@@ -138,17 +159,25 @@ export function TextAreaControl({
         <span className="text-sm font-medium text-foreground shrink-0">{label}</span>
         {hint && <span className="text-xs text-foreground-muted truncate">{hint}</span>}
       </label>
-      <textarea
-        value={value}
-        rows={rows}
-        onChange={e => {
-          setValue(e.target.value)
-          setDirty(true)
-        }}
-        onBlur={save}
-        disabled={saving || !canWrite}
-        className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60 resize-y"
-      />
+      {ai ? (
+        <AIEnrichButton
+          fieldLabel={label}
+          value={value}
+          onChange={v => {
+            setValue(v)
+            void persist(v)
+          }}
+          scope="settings:write"
+          context={ai.context}
+          maxLength={ai.maxLength}
+          multiline
+          write
+        >
+          {field}
+        </AIEnrichButton>
+      ) : (
+        field
+      )}
     </div>
   )
 }

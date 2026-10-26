@@ -1,20 +1,11 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/shared/db'
-import {
-  VARIANT_MIN_PRICE_INCL_GST_SQL,
-  VARIANT_MIN_PRICE_EX_GST_SQL,
-  VARIANT_MIN_MRP_SQL,
-  VARIANT_STOCK_TOTAL_SQL,
-} from '@/lib/queries'
-import { getFeatureFlags } from '@/lib/catalog/site-controls'
-import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { buildListingModel } from '@/lib/catalog/listing-model'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
-import { ServerPagedItems } from '@/components/admin/kit/infinite'
-import ProductCard from '@/components/visitor/ProductCard'
-import { round2 } from '@/lib/catalog/gst'
-
-const PAGE_SIZE = 24
+import ProductGrid from '@/components/visitor/ProductGrid'
+import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
+import { renderProductItem } from '@/components/visitor/listing/listing-items'
 
 async function getCategoryBySlug(slug: string) {
   return queryOne('SELECT * FROM categories WHERE slug = $1 AND is_active = true LIMIT 1', [slug])
@@ -27,44 +18,8 @@ async function getSubcategories(parentId: string) {
   )
 }
 
-async function getCategoryProducts(categoryId: string, subcategoryIds: string[], page: number) {
-  const allCategoryIds = [categoryId, ...subcategoryIds]
-  const offset = (page - 1) * PAGE_SIZE
-
-  const { gstEnabled } = await getFeatureFlags()
-  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
-
-  const countRow = await queryOne<{ total: string }>(
-    `SELECT COUNT(*)::text AS total FROM products WHERE category_id = ANY($1) AND is_active = true`,
-    [allCategoryIds]
-  )
-  const total = Number(countRow?.total ?? 0)
-
-  const products = await queryMany(
-    `
-    SELECT p.*,
-      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
-      json_build_object('id', b.id, 'name', b.name) AS brands,
-      COALESCE(
-        (SELECT json_agg(pi ORDER BY pi.display_order)
-         FROM product_images pi WHERE pi.product_id = p.id),
-        '[]'::json
-      ) AS product_images,
-      ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${MIN_PRICE_SQL} AS variant_min_price,
-      ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.category_id = ANY($1) AND p.is_active = true
-    ORDER BY p.created_at DESC
-    LIMIT $2 OFFSET $3
-  `,
-    [allCategoryIds, PAGE_SIZE, offset]
-  )
-
-  return { products, total, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
-}
+// Grid matches the page's full-width layout (no filter sidebar).
+const GRID = 'grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6'
 
 export default async function CategoryDetailPage({
   params,
@@ -81,14 +36,28 @@ export default async function CategoryDetailPage({
     notFound()
   }
 
-  const pageParam = typeof resolvedSearchParams.page === 'string' ? resolvedSearchParams.page : '1'
-  const page = Math.max(1, parseInt(pageParam, 10) || 1)
-
   const subcategories = await getSubcategories(category.id)
-  const { products, total, totalPages, gstEnabled } = await getCategoryProducts(
-    category.id,
-    subcategories.map(sub => sub.id),
-    page
+
+  // The /products listing scoped to this category: its filters and sort, with the category
+  // filter narrowed only to this category's own subcategories. Default order stays newest first.
+  const sp: Record<string, string | undefined> = {}
+  for (const [k, v] of Object.entries(resolvedSearchParams)) sp[k] = Array.isArray(v) ? v[0] : v
+  const ownSubs = new Set(subcategories.flatMap(sub => [String(sub.id), sub.slug]))
+  const picked = (sp.category ?? '').split(',').filter(c => ownSubs.has(c))
+  const { products, total, page, start, end, gstEnabled, facets, filterOffers } = await buildListingModel(
+    { ...sp, category: picked.length ? picked.join(',') : String(category.id), sort: sp.sort || 'created_at' },
+    { categoryBanners: false }
+  )
+  const filtered = Object.entries(sp).some(([k, v]) => !!v && !['page', 'sort', 'order'].includes(k))
+  const filterSheet = (
+    <MobileFilterSheet
+      key="mobile-filters"
+      basePath={`/categories/${category.slug}`}
+      categories={subcategories.map(sub => ({ id: String(sub.id), name: sub.name, parent_category_id: null }))}
+      brands={(facets.brands ?? []).map(b => ({ id: b.id, name: b.name }))}
+      facets={facets}
+      offers={filterOffers}
+    />
   )
 
   return (
@@ -152,98 +121,54 @@ export default async function CategoryDetailPage({
           </div>
 
           {products.length > 0 ? (
-            <>
-              {(() => {
-                const items = products.map(product => {
-                  const primaryImage =
-                    product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-                  const hasVariants = product.has_variants
-                  const displayPrice =
-                    hasVariants && product.variant_min_price
-                      ? Number(product.variant_min_price)
-                      : pickUnitPrice(
-                          {
-                            inclusive: Number(product.base_price),
-                            exGst: product.price_ex_gst != null ? Number(product.price_ex_gst) : undefined,
-                          },
-                          gstEnabled
-                        )
-                  const effectiveStock = hasVariants
-                    ? Number(product.variant_stock_total)
-                    : product.stock_status !== 'Out of Stock'
-                      ? 1
-                      : 0
-                  const rawMrp = product.mrp
-                    ? Number(product.mrp)
-                    : product.variant_min_mrp
-                      ? Number(product.variant_min_mrp)
-                      : null
-                  const gstRate = Number(product.gst_percentage ?? 0)
-                  const mrp =
-                    !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
-                  const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
-
-                  return {
-                    key: String(product.id),
-                    node: (
-                      <ProductCard
-                        id={product.id}
-                        name={product.name}
-                        slug={product.slug}
-                        hasVariants={hasVariants}
-                        displayPrice={Number(displayPrice)}
-                        mrp={mrp}
-                        mrpDiscount={mrpDiscount}
-                        effectiveStock={effectiveStock}
-                        isDigital={!!product.is_digital}
-                        primaryImage={primaryImage || null}
-                        brandName={product.brands?.name || null}
-                        categoryName={product.categories?.name || null}
-                        discountPct={Number(product.discount_pct ?? 0)}
-                        extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
-                        handlingDays={Number(product.handling_days ?? 2)}
-                      />
-                    ),
-                  }
-                })
-                return (
-                  <ServerPagedItems
-                    items={items}
-                    page={page}
-                    total={total}
-                    noun="products"
-                    wrap="div"
-                    wrapClassName="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
-                  />
-                )
-              })()}
-            </>
+            <ProductGrid
+              products={products}
+              gstEnabled={gstEnabled}
+              total={total}
+              start={start}
+              end={end}
+              filterSlot={filterSheet}
+              pagedItems={products.map(product => ({
+                key: String(product.id),
+                node: renderProductItem(product, gstEnabled),
+              }))}
+              page={page}
+              basePath={`/categories/${category.slug}`}
+              gridClassName={GRID}
+            />
           ) : (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-              <svg
-                className="mx-auto h-24 w-24 text-foreground-muted mb-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                />
-              </svg>
-              <h3 className="text-xl font-semibold text-foreground mb-2">No Products Yet</h3>
-              <p className="text-foreground-secondary mb-6">
-                We&apos;re working on adding products to this category. Check back soon!
-              </p>
-              <Link
-                href="/products"
-                className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-              >
-                Browse All Products
-              </Link>
-            </div>
+            <>
+              {filtered && <div className="flex gap-2 mb-4 lg:hidden">{filterSheet}</div>}
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-12 text-center">
+                <svg
+                  className="mx-auto h-24 w-24 text-foreground-muted mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
+                </svg>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  {filtered ? 'No Products Found' : 'No Products Yet'}
+                </h3>
+                <p className="text-foreground-secondary mb-6">
+                  {filtered
+                    ? 'Nothing in this category matches these filters. Try adjusting them.'
+                    : "We're working on adding products to this category. Check back soon!"}
+                </p>
+                <Link
+                  href={filtered ? `/categories/${category.slug}` : '/products'}
+                  className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                >
+                  {filtered ? 'Clear filters' : 'Browse All Products'}
+                </Link>
+              </div>
+            </>
           )}
         </div>
       </div>

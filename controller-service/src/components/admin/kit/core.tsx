@@ -82,11 +82,11 @@ export function Kpi({
   )
 }
 
+// Columns follow the rendered card count and the width (globals.css .kpi-grid).
 export function KpiGrid({ children }: { children: React.ReactNode }) {
-  // On phones an odd last card spans both columns so the grid has no hole.
   return (
-    <div className="grid gap-3 grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] sm:[&>*:last-child:nth-child(odd)]:col-span-1">
-      {children}
+    <div className="kpi-grid">
+      <div>{children}</div>
     </div>
   )
 }

@@ -1,21 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { filterScope, normalizeQuery } from '@jeffi/list-filters'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, parsePeriod, previousPeriod } from '@/lib/overview/period'
 import { byPeriod, groupFailures, num, periodArgs, str } from '@/lib/overviews/marketing'
 import {
-  BROADCASTS_SQL,
-  BY_CHANNEL_SQL,
-  FAILURES_SQL,
-  KPI_SQL,
-  STATE_SQL,
-  TEMPLATES_SQL,
   channelMatrix,
   messagingAttention,
-  seriesSql,
+  messagingSql,
+  stateSql,
   toMessagingState,
   toMessagingTotals,
 } from '@/lib/overviews/marketing-messaging'
+import { MESSAGING_ENTITY } from '@/lib/filters/entities/messaging'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,21 +24,29 @@ export async function GET(request: NextRequest) {
   const period = parsePeriod(sp.get('from'), sp.get('to'))
   const previous = previousPeriod(period)
   const bucket = bucketFor(period)
-  const args = periodArgs(period, previous)
+  // The broadcast list's filters, except its date (the period owns from / to); with any on, only
+  // the matching broadcasts count.
+  const scope = filterScope(MESSAGING_ENTITY, normalizeQuery(MESSAGING_ENTITY, sp), { omit: ['sent'] })
+  const ids = (col: string) => scope.inIds(col, 4)
+  const SQL = scope.empty ? messagingSql() : messagingSql(col => ids(col).sql, ' AND FALSE')
+  const base = periodArgs(period, previous)
+  const args = [...base, ...ids('c.id').params]
+  const state = scope.and(1)
 
   try {
-    const [kpis, byChannel, failureRows, series, broadcasts, templates, state] = await Promise.all([
-      queryMany<Record<string, unknown>>(KPI_SQL, args),
-      queryMany<Record<string, unknown>>(BY_CHANNEL_SQL, args),
-      queryMany<Record<string, unknown>>(FAILURES_SQL, args),
-      queryMany<Record<string, unknown>>(seriesSql(bucket), args),
-      queryMany<Record<string, unknown>>(BROADCASTS_SQL, args),
-      queryMany<Record<string, unknown>>(TEMPLATES_SQL, args),
-      queryOne<Record<string, unknown>>(STATE_SQL),
+    const [kpis, byChannel, failureRows, series, broadcasts, templates, stateRow] = await Promise.all([
+      queryMany<Record<string, unknown>>(SQL.kpis, args),
+      queryMany<Record<string, unknown>>(SQL.byChannel, args),
+      queryMany<Record<string, unknown>>(SQL.failures, args),
+      queryMany<Record<string, unknown>>(SQL.series(bucket), args),
+      queryMany<Record<string, unknown>>(SQL.broadcasts, args),
+      // Automated sends only: no broadcast filter to bind.
+      queryMany<Record<string, unknown>>(SQL.templates, base),
+      scope.empty ? queryOne<Record<string, unknown>>(stateSql()) : queryOne<Record<string, unknown>>(stateSql(state.sql), state.params),
     ])
     const totals = byPeriod(kpis, toMessagingTotals)
     const failures = groupFailures(failureRows.map(r => ({ error: r.error, n: r.n, channel: r.channel })))
-    const st = toMessagingState(state ?? undefined)
+    const st = toMessagingState(stateRow ?? undefined)
     return NextResponse.json({
       period,
       previous,
@@ -83,6 +88,7 @@ export async function GET(request: NextRequest) {
       })),
       state: st,
       attention: messagingAttention(totals.current, st, failures),
+      filtered: !scope.empty,
     })
   } catch (err) {
     console.error('[marketing/messaging/overview]', err)

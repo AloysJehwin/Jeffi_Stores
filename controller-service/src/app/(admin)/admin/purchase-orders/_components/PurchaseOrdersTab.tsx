@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { productLabel as grainLabel } from '@/lib/catalog/product-label'
 import Link from 'next/link'
-import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { PO_ALIASES, PO_FIELDS, PO_SEARCH } from '@jeffi/list-filters/fields'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -22,11 +22,12 @@ import { documentUrlForLocation } from '@/lib/tenancy/forms-host'
 import { ChevronLeft } from 'lucide-react'
 import { Kpi, KpiGrid } from '@/components/admin/kit/core'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
 import { DetailHeader } from '@/components/admin/kit/actions'
 import { Card, Field, Fields } from '@/components/admin/kit/layout'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
-import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, STATUS_BADGE, type Supplier } from '@/components/admin/purchasing/shared'
+import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, STATUS_BADGE } from '@/components/admin/purchasing/shared'
 import { FormFooter } from '@/components/admin/kit/form'
 import { resnapshotPoReceiveSession } from './receive-actions'
 
@@ -167,10 +168,9 @@ function ExpectedDateEditor({
 export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [supplierFilter, setSupplierFilter] = useState('')
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  // Filters live in the URL (from / to is the order date, shared with the Overview period).
+  const filters = useFilterQuery(PO_FIELDS, { aliases: PO_ALIASES })
+  const [summary, setSummary] = useState<{ open: number; open_value: number } | null>(null)
   const [viewPO, setViewPO] = useState<{ po: any; items: POItem[]; grns: any[] } | null>(null)
   const [receiveMode, setReceiveMode] = useState<{ po: any } | null>(null)
   // Receive edit-session id — opened on modal open, closed on submit (save) or
@@ -356,15 +356,15 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   }
 
   const list = useInfiniteList<PO>({
-    key: `${search}|${statusFilter}|${supplierFilter}`,
+    key: filters,
     pageSize: PAGE_SIZE,
     getKey: p => p.id,
     fetchPage: async (pg, signal) => {
-      const params = new URLSearchParams({ page: String(pg), limit: String(PAGE_SIZE) })
-      if (search) params.set('search', search)
-      if (statusFilter) params.set('status', statusFilter)
-      if (supplierFilter) params.set('supplier_id', supplierFilter)
+      const params = new URLSearchParams(filters)
+      params.set('page', String(pg))
+      params.set('limit', String(PAGE_SIZE))
       const json = await fetchJson(`/api/admin/inventory/po?${params}`, signal)
+      if (pg === 1) setSummary(json?.summary ?? null)
       return { rows: json?.purchase_orders || [], total: json?.total || 0 }
     },
   })
@@ -406,11 +406,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   }, [initialPO])
 
   useEffect(() => {
-    if (suppliers.length === 0) {
-      fetch('/api/admin/inventory/suppliers?limit=1000')
-        .then(r => r.json())
-        .then(j => setSuppliers(j?.suppliers || []))
-    }
     if (poCategories.length === 0) {
       fetch('/api/categories')
         .then(r => r.json())
@@ -722,10 +717,9 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     if (viewPO?.po.id === id) setViewPO(null)
   }
 
-  const openCount = pos.filter(p => ['draft', 'sent', 'partial'].includes(p.status)).length
-  const pendingValue = pos
-    .filter(p => ['draft', 'sent', 'partial'].includes(p.status))
-    .reduce((s, p) => s + parseFloat(p.total_amount || '0'), 0)
+  // Over every PO the filters match (from the list's first page), not just the loaded rows.
+  const openCount = summary?.open ?? 0
+  const pendingValue = summary?.open_value ?? 0
 
   if (receiveMode) {
     return (
@@ -1418,68 +1412,15 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
         <Kpi label="Pending Value" value={formatINR(pendingValue)} highlight />
       </KpiGrid>
 
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex-1 min-w-[200px]">
-          <label className={labelCls}>Search</label>
-          <AdminTypeahead
-            type="purchase_orders"
-            value={search}
-            onChange={v => {
-              setSearch(v)
-            }}
-            placeholder="PO number, supplier..."
-            inputClassName="w-full h-9 px-3 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
-          />
-        </div>
-        <div className="w-44">
-          <label className={labelCls}>Status</label>
-          <AdminSelect
-            sm
-            className="[&_button]:h-9"
-            value={statusFilter}
-            onChange={v => {
-              setStatusFilter(v)
-            }}
-            placeholder="All statuses"
-            options={[
-              { value: '', label: 'All statuses' },
-              { value: 'draft', label: 'Draft' },
-              { value: 'sent', label: 'Sent' },
-              { value: 'partial', label: 'Partial' },
-              { value: 'received', label: 'Received' },
-              { value: 'cancelled', label: 'Cancelled' },
-            ]}
-          />
-        </div>
-        <div className="w-52">
-          <label className={labelCls}>Supplier</label>
-          <AdminSelect
-            sm
-            className="[&_button]:h-9"
-            value={supplierFilter}
-            onChange={v => {
-              setSupplierFilter(v)
-            }}
-            placeholder="All suppliers"
-            options={[{ value: '', label: 'All suppliers' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
-          />
-        </div>
-        {(search || statusFilter || supplierFilter) && (
-          <div className="flex flex-col">
-            <span className={labelCls}>&nbsp;</span>
-            <button
-              onClick={() => {
-                setSearch('')
-                setStatusFilter('')
-                setSupplierFilter('')
-              }}
-              className="px-3 h-9 rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
-            >
-              Clear filters
-            </button>
-          </div>
-        )}
-      </div>
+      <ListFilters
+        entity="purchase-orders"
+        fields={PO_FIELDS}
+        aliases={PO_ALIASES}
+        search={PO_SEARCH}
+        noun="Purchase orders"
+        tab="orders"
+        exportable
+      />
 
       {poDrafts.length > 0 && (
         <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
@@ -1515,7 +1456,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
           <div className="md:hidden p-4 space-y-3">
             {pos.length === 0 ? (
               <p className="py-8 text-center text-foreground-secondary text-sm">
-                {search || statusFilter || supplierFilter ? 'No purchase orders match your filters' : 'No purchase orders yet'}
+                {filters ? 'No purchase orders match your filters' : 'No purchase orders yet'}
               </p>
             ) : (
               <PurchaseOrdersMobileList
@@ -1604,7 +1545,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                 {pos.length === 0 && (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-foreground-secondary text-sm">
-                      {search || statusFilter || supplierFilter ? 'No purchase orders match your filters' : 'No purchase orders yet'}
+                      {filters ? 'No purchase orders match your filters' : 'No purchase orders yet'}
                     </td>
                   </tr>
                 )}

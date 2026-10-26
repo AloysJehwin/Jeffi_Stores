@@ -1,70 +1,13 @@
 import Link from 'next/link'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import FilterSidebar from '@/components/visitor/FilterSidebar'
-import ProductCard from '@/components/visitor/ProductCard'
-import { pickUnitPrice } from '@/lib/catalog/pricing'
-import { round2 } from '@/lib/catalog/gst'
+import { renderProductItem } from '@/components/visitor/listing/listing-items'
 import { buildListingModel } from '@/lib/catalog/listing-model'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
 import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import ListingPromoBanner from '@/components/visitor/listing/ListingPromoBanner'
-
-// Pre-render each product as a server-side ReactNode so pages 2..N appended via
-// ServerPagedItems carry the same GST / discount maths without re-shipping product data.
-function renderProductItem(product: any, gstEnabled: boolean) {
-  const primaryImage = product.product_images?.find((i: any) => i.is_primary) || product.product_images?.[0]
-  const hasVariants = product.has_variants
-  const displayPrice =
-    hasVariants && product.variant_min_price
-      ? Number(product.variant_min_price)
-      : pickUnitPrice(
-          {
-            inclusive: Number(product.base_price),
-            exGst: product.price_ex_gst != null ? Number(product.price_ex_gst) : undefined,
-          },
-          gstEnabled
-        )
-  const effectiveStock = hasVariants
-    ? Number(product.variant_stock_total)
-    : product.stock_status !== 'Out of Stock'
-      ? 1
-      : 0
-  const rawMrp = hasVariants
-    ? product.variant_min_mrp
-      ? Number(product.variant_min_mrp)
-      : null
-    : product.mrp
-      ? Number(product.mrp)
-      : null
-  const gstRate = Number(product.gst_percentage ?? 0)
-  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
-  const mrpDiscount = mrp && mrp > Number(displayPrice) ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100) : 0
-  return (
-    <ProductCard
-      id={product.id}
-      name={product.name}
-      slug={product.slug}
-      hasVariants={hasVariants}
-      displayPrice={Number(displayPrice)}
-      mrp={mrp}
-      mrpDiscount={mrpDiscount}
-      effectiveStock={effectiveStock}
-      isDigital={!!product.is_digital}
-      primaryImage={primaryImage || null}
-      brandName={product.brands?.name ?? null}
-      categoryName={product.categories?.name ?? null}
-      categoryId={product.categories?.id ?? null}
-      discountPct={Number(product.discount_pct ?? 0)}
-      extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
-      handlingDays={Number(product.handling_days ?? 2)}
-      fragile={product.fragile}
-      hazardous={product.hazardous}
-      flammable={product.flammable}
-    />
-  )
-}
 
 // Each group is counted without its own filter so sibling brands/categories stay selectable.
 function buildPageUrl(searchParams: Record<string, string | undefined>, page: number) {
@@ -101,8 +44,20 @@ export default async function ProductsPage({
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
   const resolvedSearchParams = await searchParams
-  const { products, total, page, start, end, gstEnabled, categories, brands, categoryBanners, facets, filterOffers, promoOffer } =
-    await buildListingModel(resolvedSearchParams)
+  const {
+    products,
+    total,
+    page,
+    start,
+    end,
+    gstEnabled,
+    categories,
+    brands,
+    categoryBanners,
+    facets,
+    filterOffers,
+    promoOffer,
+  } = await buildListingModel(resolvedSearchParams)
 
   const allCats = categories as any[]
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
@@ -192,31 +147,42 @@ export default async function ProductsPage({
                 })()}
               </>
             ) : (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-                <svg
-                  className="mx-auto h-24 w-24 text-foreground-muted mb-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1}
-                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+              <>
+                {/* Phones keep the filter sheet so a dead-end filter can be undone. */}
+                <div className="flex gap-2 mb-4 lg:hidden">
+                  <MobileFilterSheet
+                    categories={allCats}
+                    brands={brands as any[]}
+                    facets={facets}
+                    offers={filterOffers}
                   />
-                </svg>
-                <h3 className="text-xl font-semibold text-foreground mb-2">No Products Found</h3>
-                <p className="text-foreground-secondary mb-6">
-                  We couldn&apos;t find any products matching your filters. Try adjusting your search criteria.
-                </p>
-                <Link
-                  href="/products"
-                  className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                >
-                  View All Products
-                </Link>
-              </div>
+                </div>
+                <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-12 text-center">
+                  <svg
+                    className="mx-auto h-24 w-24 text-foreground-muted mb-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1}
+                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                    />
+                  </svg>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">No Products Found</h3>
+                  <p className="text-foreground-secondary mb-6">
+                    We couldn&apos;t find any products matching your filters. Try adjusting your search criteria.
+                  </p>
+                  <Link
+                    href="/products"
+                    className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                  >
+                    View All Products
+                  </Link>
+                </div>
+              </>
             )}
 
             <RecentlyViewed title="Recently viewed" minItems={2} limit={6} />

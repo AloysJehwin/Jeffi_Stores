@@ -21,19 +21,23 @@ vi.mock('@/lib/shared/admin-audit', () => ({
   logAdminAudit: vi.fn(),
 }))
 
+// The list count is capped (lib/filters/run).
+const { mockCappedCount } = vi.hoisted(() => ({ mockCappedCount: vi.fn() }))
+vi.mock('@/lib/filters/run', () => ({ cappedCount: mockCappedCount }))
+
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { GET, POST } from '@/app/api/(admin)/admin/audit/route'
 import { authenticateAdmin, authenticateServiceAccount } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryCount } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockAuthSA = vi.mocked(authenticateServiceAccount)
 const mockHasScope = vi.mocked(hasScope)
 const mockQueryMany = vi.mocked(queryMany)
-const mockQueryCount = vi.mocked(queryCount)
+const counted = (count: number) => mockCappedCount.mockResolvedValue({ count, capped: false })
 const mockLogAudit = vi.mocked(logAdminAudit)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -138,7 +142,7 @@ describe('GET /api/admin/audit', () => {
     vi.resetAllMocks()
     // GET never calls authenticateServiceAccount — default null for safety
     mockAuthSA.mockResolvedValue(null)
-    mockQueryCount.mockResolvedValue(1)
+    counted(1)
     mockQueryMany.mockResolvedValue(sampleEvents)
   })
 
@@ -185,16 +189,17 @@ describe('GET /api/admin/audit', () => {
     expect(body.events).toEqual(sampleEvents)
   })
 
-  it('returns 200 with no filters — no WHERE clause in query', async () => {
+  it('returns 200 with no filters — only the default 7-day window', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
     mockHasScope.mockReturnValue(true)
     const req = makeGetRequest()
     const res = await GET(req)
     expect(res.status).toBe(200)
-    // queryCount called with empty filterVals
-    const [countSql, countVals] = mockQueryCount.mock.calls[0]
-    expect(countVals).toHaveLength(0)
-    expect(countSql).not.toContain('WHERE')
+    // The window's start date, then LIMIT / OFFSET
+    const [sql, vals] = mockQueryMany.mock.calls[0]
+    expect(vals).toHaveLength(3)
+    expect(sql).toContain('WHERE l.created_at >=')
+    expect((await res.json()).window).toMatchObject({ days: 7 })
   })
 
   it('returns 200 with entity_type filter', async () => {
@@ -203,9 +208,9 @@ describe('GET /api/admin/audit', () => {
     const req = makeGetRequest({ entity_type: 'product' })
     const res = await GET(req)
     expect(res.status).toBe(200)
-    const [countSql, countVals] = mockQueryCount.mock.calls[0]
-    expect(countVals).toContain('product')
-    expect(countSql).toContain('entity_type')
+    const [sql, vals] = mockQueryMany.mock.calls[0]
+    expect(vals).toContain('product')
+    expect(sql).toContain('entity_type')
   })
 
   it('returns 200 with action filter', async () => {
@@ -214,34 +219,35 @@ describe('GET /api/admin/audit', () => {
     const req = makeGetRequest({ action: 'update' })
     const res = await GET(req)
     expect(res.status).toBe(200)
-    const [countSql, countVals] = mockQueryCount.mock.calls[0]
-    expect(countVals).toContain('update')
-    expect(countSql).toContain('l.action')
+    const [sql, vals] = mockQueryMany.mock.calls[0]
+    expect(vals).toContain('update')
+    expect(sql).toContain('l.action')
   })
 
-  it('returns 200 with admin_id filter', async () => {
+  it('returns 200 with admin (member name) filter', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
     mockHasScope.mockReturnValue(true)
-    const req = makeGetRequest({ admin_id: 'admin-1' })
+    const req = makeGetRequest({ admin: 'Super Admin' })
     const res = await GET(req)
     expect(res.status).toBe(200)
-    const [countSql, countVals] = mockQueryCount.mock.calls[0]
-    expect(countVals).toContain('admin-1')
-    expect(countSql).toContain('admin_id')
+    const [sql, vals] = mockQueryMany.mock.calls[0]
+    expect(vals).toContain('Super Admin')
+    expect(sql).toContain('admin_id')
   })
 
   it('returns 200 with all three filters applied', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
     mockHasScope.mockReturnValue(true)
-    const req = makeGetRequest({ entity_type: 'product', action: 'update', admin_id: 'admin-1' })
+    const req = makeGetRequest({ entity_type: 'product', action: 'update', admin: 'Super Admin' })
     const res = await GET(req)
     expect(res.status).toBe(200)
-    const [countSql, countVals] = mockQueryCount.mock.calls[0]
-    expect(countVals).toHaveLength(3)
-    expect(countVals).toContain('product')
-    expect(countVals).toContain('update')
-    expect(countVals).toContain('admin-1')
-    expect(countSql).toContain('WHERE')
+    const [sql, vals] = mockQueryMany.mock.calls[0]
+    // window, three filters, LIMIT / OFFSET
+    expect(vals).toHaveLength(6)
+    expect(vals).toContain('product')
+    expect(vals).toContain('update')
+    expect(vals).toContain('Super Admin')
+    expect(sql).toContain('WHERE')
   })
 
   it('applies pagination params — page=2, pageSize=100', async () => {
@@ -289,10 +295,10 @@ describe('GET /api/admin/audit', () => {
     expect(body.page).toBe(1)
   })
 
-  it('returns total from queryCount', async () => {
+  it('returns total from the capped count', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
     mockHasScope.mockReturnValue(true)
-    mockQueryCount.mockResolvedValue(42)
+    counted(42)
     const req = makeGetRequest()
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -349,7 +355,7 @@ describe('GET /api/admin/audit response contract', () => {
   it('allows super_admin (hasScope grants platform owner)', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockHasScope.mockReturnValue(true)
-    mockQueryCount.mockResolvedValue(1)
+    counted(1)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
@@ -358,7 +364,7 @@ describe('GET /api/admin/audit response contract', () => {
   it('allows regular admin with audit scope', async () => {
     mockAuth.mockResolvedValue(regularAdmin)
     mockHasScope.mockReturnValue(true)
-    mockQueryCount.mockResolvedValue(1)
+    counted(1)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
@@ -367,7 +373,7 @@ describe('GET /api/admin/audit response contract', () => {
   it('returns paginated events on success', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockHasScope.mockReturnValue(true)
-    mockQueryCount.mockResolvedValue(5)
+    counted(5)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     const res = await GET(makeRequest({ page: '1', pageSize: '10' }))
     expect(res.status).toBe(200)
@@ -381,37 +387,34 @@ describe('GET /api/admin/audit response contract', () => {
   it('applies entity_type filter', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockHasScope.mockReturnValue(true)
-    mockQueryCount.mockResolvedValue(2)
+    counted(2)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     await GET(makeRequest({ entity_type: 'product' }))
-    const countCall = mockQueryCount.mock.calls[0]
-    expect(countCall[1]).toContain('product')
+    expect(mockQueryMany.mock.calls[0][1]).toContain('product')
   })
 
   it('applies action filter', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockHasScope.mockReturnValue(true)
-    mockQueryCount.mockResolvedValue(2)
+    counted(2)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     await GET(makeRequest({ action: 'create' }))
-    const countCall = mockQueryCount.mock.calls[0]
-    expect(countCall[1]).toContain('create')
+    expect(mockQueryMany.mock.calls[0][1]).toContain('create')
   })
 
-  it('applies admin_id filter', async () => {
+  it('applies admin filter', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockHasScope.mockReturnValue(true)
-    mockQueryCount.mockResolvedValue(2)
+    counted(2)
     mockQueryMany.mockResolvedValue(sampleRows as any)
-    await GET(makeRequest({ admin_id: 'some-uuid' }))
-    const countCall = mockQueryCount.mock.calls[0]
-    expect(countCall[1]).toContain('some-uuid')
+    await GET(makeRequest({ admin: 'Super Admin' }))
+    expect(mockQueryMany.mock.calls[0][1]).toContain('Super Admin')
   })
 
   it('clamps page size to valid range', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockHasScope.mockReturnValue(true)
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     mockQueryMany.mockResolvedValue([])
     const res = await GET(makeRequest({ page: '0', pageSize: '9999' }))
     expect(res.status).toBe(200)
@@ -423,7 +426,7 @@ describe('GET /api/admin/audit response contract', () => {
   it('returns empty events when no records', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockHasScope.mockReturnValue(true)
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     mockQueryMany.mockResolvedValue([])
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)

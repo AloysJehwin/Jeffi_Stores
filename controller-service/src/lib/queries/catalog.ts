@@ -1,6 +1,8 @@
+import { buildWhere, type FilterQuery } from '@jeffi/list-filters'
 import { queryOne, queryMany, queryCount } from './shared'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
 import { buildAttributeFilterClauses, type FilterParams } from '@/lib/catalog/product-attribute-filters'
+import { PRODUCTS_ENTITY, productQuickClauses } from '@/lib/filters/entities/products'
 
 export async function getAllProducts() {
   const products = await queryMany(`
@@ -249,36 +251,10 @@ export async function getFilteredProducts(filters: {
   // even under the Inactive status filter (a create-draft is is_active=false AND is_draft=true).
   conditions.push(`p.is_draft = false`)
 
-  if (filters.category_id) {
-    conditions.push(`p.category_id IN (
-      WITH RECURSIVE cat_tree AS (
-        SELECT id FROM categories WHERE id = $${i}
-        UNION ALL
-        SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id
-      )
-      SELECT id FROM cat_tree
-    )`)
-    params.push(filters.category_id)
-    i++
-  }
-  if (filters.brand_id) {
-    conditions.push(`p.brand_id = $${i++}`)
-    params.push(filters.brand_id)
-  }
-  if (filters.is_active === 'true' || filters.is_active === 'false') {
-    conditions.push(`p.is_active = $${i++}`)
-    params.push(filters.is_active === 'true')
-  } else {
-    // By default exclude products that have a pending draft (they show in draft context only)
-    // A product has a draft when there's a row in product_drafts for it.
-    // All products are shown; we no longer shadow-copy inactive draft rows.
-    // (product_drafts is the new draft table — no draft_of_id column on products)
-  }
-  if (filters.stock === 'low') {
-    conditions.push(`p.stock_status = 'Low Stock'`)
-  } else if (filters.stock === 'out') {
-    conditions.push(`p.stock_status = 'Out of Stock'`)
-  }
+  const quick = productQuickClauses(filters, i)
+  conditions.push(...quick.conditions)
+  params.push(...quick.params)
+  i = quick.nextIdx
   const attr = buildAttributeFilterClauses({ ...filters, ...filters.attributes }, i)
   conditions.push(...attr.conditions)
   params.push(...attr.params)
@@ -431,4 +407,19 @@ export async function getFilteredCategories(filters: { is_active?: string; type?
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
   return queryMany(`SELECT * FROM categories ${where} ORDER BY display_order ASC`, params)
+}
+
+/** Total and active products the list's filters match (the KPI strip). */
+export async function getProductsSummary(q: FilterQuery): Promise<{ total: number; active: number }> {
+  const w = buildWhere(PRODUCTS_ENTITY, q, 1)
+  const r = await queryOne<{ total: number; active: number }>(
+    `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE p.is_active)::int AS active FROM products p ${w.where}`,
+    w.params
+  )
+  return { total: Number(r?.total) || 0, active: Number(r?.active) || 0 }
+}
+
+/** Featured products store-wide (the storefront home shows at most 6). */
+export async function getFeaturedProductCount(): Promise<number> {
+  return queryCount(`SELECT COUNT(*) FROM products WHERE is_featured AND is_draft = false`)
 }

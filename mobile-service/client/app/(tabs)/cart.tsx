@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, ShoppingCart } from 'lucide-react-native'
 import TopNav from '../../src/components/layout/TopNav'
@@ -11,6 +11,7 @@ import CartLineItem from '../../src/components/cart/CartLineItem'
 import SavedItemRow from '../../src/components/cart/SavedItemRow'
 import FreeShippingProgress from '../../src/components/cart/FreeShippingProgress'
 import CouponNudge from '../../src/components/cart/CouponNudge'
+import YourCoupons from '../../src/components/cart/YourCoupons'
 import AiInsight from '../../src/components/cart/AiInsight'
 import CartUpsellRow from '../../src/components/cart/CartUpsellRow'
 import FeaturedForYouCompact from '../../src/components/cart/FeaturedForYouCompact'
@@ -35,12 +36,21 @@ import { status } from '../../src/theme'
 
 type CartSection = { key: 'cart' | 'saved'; data: CartLine[] }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // Mirror of controller-service app/(storefront)/cart/page.tsx at the mobile breakpoint.
 export default function CartScreen() {
   const router = useRouter()
   const qc = useQueryClient()
   const user = useAuthStore(s => s.user)
+  const authLoading = useAuthStore(s => s.isLoading)
   const { gstEnabled } = useStoreConfig().flags
+  // ?coupon=CODE from a win card or a link (or a legacy ?couponId=).
+  const params = useLocalSearchParams<{ coupon?: string; couponId?: string }>()
+  const urlCode = typeof params.coupon === 'string' ? params.coupon.trim().toUpperCase() : ''
+  const urlId = typeof params.couponId === 'string' && UUID.test(params.couponId) ? params.couponId : ''
+  const urlKey = urlCode || urlId
+  const consumedUrlCoupon = useRef<string | null>(null)
 
   const cartQuery = useQuery({ queryKey: ['cart'], queryFn: getCart })
   const savedQuery = useQuery({ queryKey: ['saved-cart'], queryFn: getSavedCart })
@@ -128,13 +138,11 @@ export default function CartScreen() {
   const finalTotal = Math.max(0, total - discount)
   const hasInactiveItems = cartItems.some(i => i.products?.is_active === false)
 
-  const handleApplyCoupon = async (codeArg?: string) => {
-    const code = (codeArg ?? couponCode).trim()
-    if (!code) return
+  const runApply = async (lookup: { code: string } | { couponId: string }) => {
     setCouponLoading(true)
     setCouponError('')
     try {
-      const data = await applyCoupon({ code, subtotal: total })
+      const data = await applyCoupon({ ...lookup, subtotal: total })
       setAppliedCoupon(data)
       setCouponCode('')
       toast.success(`Coupon "${data.code}" applied — saving ${money(data.discountAmount)}`)
@@ -144,6 +152,43 @@ export default function CartScreen() {
       setCouponLoading(false)
     }
   }
+
+  const handleApplyCoupon = (codeArg?: string) => {
+    const code = (codeArg ?? couponCode).trim()
+    if (code) void runApply({ code })
+  }
+
+  // Apply the link's coupon once there is something to apply it to, then clear the param so it
+  // isn't applied again. Signed out or an empty cart keeps it, with a notice.
+  useEffect(() => {
+    if (!urlKey) {
+      consumedUrlCoupon.current = null
+      return
+    }
+    if (consumedUrlCoupon.current === urlKey) return
+    if (cartQuery.isLoading || authLoading || !user || cartItems.length === 0) return
+    consumedUrlCoupon.current = urlKey
+    if (urlCode) setCouponCode(urlCode)
+    void runApply(urlCode ? { code: urlCode } : { couponId: urlId })
+    router.setParams({ coupon: undefined, couponId: undefined })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlKey, cartQuery.isLoading, authLoading, user, cartItems.length])
+
+  const couponNotice =
+    !urlKey || authLoading || (user && cartItems.length > 0) ? null : (
+      <Notice tone="info" className="mb-4">
+        {user ? (
+          `${urlCode ? `Coupon ${urlCode}` : 'Your coupon'} is saved to your account. Add something to your cart and it applies here.`
+        ) : (
+          <View>
+            <Text className="text-sm leading-5 text-accent-800 dark:text-accent-200">
+              Sign in to use {urlCode ? `coupon ${urlCode}` : 'your coupon'}. It&apos;s saved to your account.
+            </Text>
+            <TextButton label="Sign in" onPress={() => router.push('/(auth)/login')} className="mt-1" />
+          </View>
+        )}
+      </Notice>
+    )
 
   const proceedToCheckout = async () => {
     setProceeding(true)
@@ -168,6 +213,7 @@ export default function CartScreen() {
   if (cartCount === 0 && savedItems.length === 0) {
     return (
       <Screen header={<TopNav />} refreshing={refreshing} onRefresh={onRefresh}>
+        {couponNotice}
         <EmptyState
           fill
           icon={ShoppingCart}
@@ -237,6 +283,7 @@ export default function CartScreen() {
         ListHeaderComponent={
           <>
             <Title className="mb-4">Shopping Cart</Title>
+            {couponNotice}
             <FreeShippingProgress subtotal={physicalTotal} />
             {cartItems.length === 0 ? (
               <Card padded={false}>
@@ -328,6 +375,7 @@ export default function CartScreen() {
                         />
                       </View>
                       <CouponNudge subtotal={total} signedIn={!!user} applying={couponLoading} onApply={handleApplyCoupon} />
+                      {user ? <YourCoupons userId={user.id} subtotal={total} applying={couponLoading} onApply={handleApplyCoupon} /> : null}
                     </View>
                   )}
                 </View>

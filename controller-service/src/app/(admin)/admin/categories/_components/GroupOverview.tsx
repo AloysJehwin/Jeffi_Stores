@@ -5,7 +5,15 @@ import { ap } from '@/lib/shared/admin-path'
 import { Kpi, Section, Table, count, money, pct } from '@/components/admin/channels/ui'
 import { delta } from '@/lib/overview/period'
 import type { AttentionItem } from '@/components/admin/overview/kit'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { BRAND_ALIASES, BRAND_FIELDS, BRAND_SEARCH } from '@/lib/filters/fields/brands'
+import { CATEGORY_ALIASES, CATEGORY_FIELDS, CATEGORY_SEARCH } from '@/lib/filters/fields/categories'
 import { OverviewTab } from '../../products/_components/catalog-overview'
+
+const LISTS = {
+  category: { entity: 'categories', fields: CATEGORY_FIELDS, aliases: CATEGORY_ALIASES, search: CATEGORY_SEARCH },
+  brand: { entity: 'brands', fields: BRAND_FIELDS, aliases: BRAND_ALIASES, search: BRAND_SEARCH },
+} as const
 
 interface GroupRow {
   id: string
@@ -39,9 +47,24 @@ interface GroupOverviewData {
 export default function GroupOverview({ dim }: { dim: 'category' | 'brand' }) {
   const base = dim === 'category' ? '/admin/categories' : '/admin/brands'
   const plural = dim === 'category' ? 'Categories' : 'Brands'
+  const list = LISTS[dim]
+  // KPIs and tables follow the list's filters; the PeriodBar owns from / to.
+  const query = useFilterQuery(list.fields, { aliases: list.aliases, omit: ['from', 'to'] })
   return (
     <OverviewTab<GroupOverviewData>
       endpoint={`/api${base}/overview`}
+      query={query}
+      filters={
+        <ListFilters
+          entity={list.entity}
+          fields={list.fields}
+          aliases={list.aliases}
+          search={list.search}
+          noun={plural}
+          tab="overview"
+          period
+        />
+      }
       kpis={d => (
         <>
           <Kpi

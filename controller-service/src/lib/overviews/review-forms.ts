@@ -5,12 +5,13 @@ import { BOUNDS, num, periodCase, str } from './marketing'
 // Review incentive forms. "Requests" are review-form-share broadcast messages (email_campaign_logs
 // for email_campaigns with template_key 'review_form_share') sent in the period.
 
-export const KPI_SQL = `
+// Each takes the list's filters as conditions on its form-id column; '' keeps the SQL unchanged.
+export const kpiSql = (forms = '') => `
 WITH ${BOUNDS},
 s AS (
   SELECT rs.*, ${periodCase('rs.submitted_at')} AS period
     FROM review_form_submissions rs, b
-   WHERE rs.submitted_at >= b.p0 AND rs.submitted_at < b.c1
+   WHERE rs.submitted_at >= b.p0 AND rs.submitted_at < b.c1${forms}
 ),
 r AS (
   SELECT ${periodCase('l.sent_at')} AS period, l.status
@@ -26,8 +27,9 @@ SELECT p.period,
        (SELECT COUNT(*) FROM r WHERE r.period = p.period AND r.status <> 'failed') AS requests
   FROM (VALUES ('cur'), ('prev')) p(period)
 `
+export const KPI_SQL = kpiSql()
 
-export const FORMS_SQL = `
+export const formsSql = (forms = '') => `
 WITH ${BOUNDS}
 SELECT f.id, f.title, f.slug, f.is_active, c.code AS coupon_code, f.submissions_count AS all_time,
        COUNT(rs.id) AS submissions,
@@ -37,18 +39,20 @@ SELECT f.id, f.title, f.slug, f.is_active, c.code AS coupon_code, f.submissions_
   LEFT JOIN coupons c ON c.id = f.coupon_id
   CROSS JOIN b
   LEFT JOIN review_form_submissions rs ON rs.form_id = f.id AND rs.submitted_at >= b.c0 AND rs.submitted_at < b.c1
- WHERE NOT f.is_draft
+ WHERE NOT f.is_draft${forms}
  GROUP BY f.id, c.code
  ORDER BY submissions DESC, f.created_at DESC LIMIT 20
 `
+export const FORMS_SQL = formsSql()
 
-export const STATE_SQL = `
-SELECT (SELECT COUNT(*) FROM review_forms WHERE NOT is_draft) AS forms,
-       (SELECT COUNT(*) FROM review_forms WHERE NOT is_draft AND is_active) AS active,
-       (SELECT COUNT(*) FROM review_forms WHERE NOT is_draft AND is_active AND coupon_id IS NULL) AS no_coupon,
-       (SELECT COUNT(*) FROM review_form_submissions WHERE status = 'pending') AS pending,
-       (SELECT MIN(submitted_at) FROM review_form_submissions WHERE status = 'pending') AS oldest_pending
+export const stateSql = (f = '', s = '') => `
+SELECT (SELECT COUNT(*) FROM review_forms WHERE NOT is_draft${f}) AS forms,
+       (SELECT COUNT(*) FROM review_forms WHERE NOT is_draft AND is_active${f}) AS active,
+       (SELECT COUNT(*) FROM review_forms WHERE NOT is_draft AND is_active AND coupon_id IS NULL${f}) AS no_coupon,
+       (SELECT COUNT(*) FROM review_form_submissions WHERE status = 'pending'${s}) AS pending,
+       (SELECT MIN(submitted_at) FROM review_form_submissions WHERE status = 'pending'${s}) AS oldest_pending
 `
+export const STATE_SQL = stateSql()
 
 export interface ReviewFormTotals {
   submissions: number

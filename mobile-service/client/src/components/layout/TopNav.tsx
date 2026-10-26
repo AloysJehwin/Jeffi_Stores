@@ -6,7 +6,7 @@ import { KeyboardEvents } from 'react-native-keyboard-controller'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, ChevronRight, Clock, ImageIcon, Layers, Menu, Search, ShoppingCart, User, X } from 'lucide-react-native'
+import { ChevronRight, Clock, ImageIcon, Layers, Menu, Search, Sparkles, X } from 'lucide-react-native'
 import { api } from '../../api/client'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { useUnreadCount } from '../../hooks/useNotifications'
@@ -180,29 +180,18 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
 
           <View className="flex-row items-center gap-1 shrink-0">
             <IconButton icon={Search} label="Search" color={iconColor} onPress={openSearch} />
+            {user ? (
+              <IconButton icon={Sparkles} label="Ask the assistant" color={iconColor} onPress={() => router.push('/info/support')} />
+            ) : null}
+            {/* Cart, notifications and account moved into the menu to keep the bar to three icons. */}
             <IconButton
-              icon={Bell}
-              label="Notifications"
-              badge={unread.count}
-              accessibilityLabel={unread.count > 0 ? `Notifications, ${unread.count} unread` : 'Notifications'}
+              icon={Menu}
+              label="Open menu"
+              badge={cartCount + unread.count}
+              accessibilityLabel={cartCount + unread.count > 0 ? `Open menu, ${cartCount} in cart, ${unread.count} unread` : 'Open menu'}
               color={iconColor}
-              onPress={() => router.push('/notifications')}
+              onPress={() => setMenuOpen(true)}
             />
-            <IconButton
-              icon={ShoppingCart}
-              label="Cart"
-              badge={cartCount}
-              accessibilityLabel={cartCount > 0 ? `Cart, ${cartCount} items` : 'Cart'}
-              color={iconColor}
-              onPress={() => router.navigate('/(tabs)/cart')}
-            />
-            <IconButton
-              icon={User}
-              label={user ? 'My account' : 'Sign in'}
-              color={iconColor}
-              onPress={() => (user ? router.navigate('/(tabs)/account') : router.push('/(auth)/login'))}
-            />
-            <IconButton icon={Menu} label="Open menu" color={iconColor} onPress={() => setMenuOpen(true)} />
           </View>
         </View>
       </View>

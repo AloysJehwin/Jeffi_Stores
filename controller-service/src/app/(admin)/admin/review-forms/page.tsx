@@ -1,16 +1,18 @@
 import { Suspense } from 'react'
+import { buildWhere, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
+import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import DraftRowActions from '@/components/admin/DraftRowActions'
 import ReviewFormsTable, { type FormRow } from './_components/ReviewFormsTable'
-import { DataToolbar, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { formsHostForHost } from '@/lib/tenant-registry'
-import { resolveListTab } from '@/lib/overviews/marketing'
-import OverviewTabs from '../coupons/_components/OverviewTabs'
+import { REVIEW_FORMS_ENTITY } from '@/lib/filters/entities/review-forms'
+import { REVIEW_FORM_FIELDS, REVIEW_FORM_SEARCH } from '@/lib/filters/fields/review-forms'
 import ReviewFormsOverview from './_components/ReviewFormsOverview'
 
 export const dynamic = 'force-dynamic'
@@ -18,63 +20,50 @@ export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-async function getForms(filters: { search?: string; page?: number }) {
-  const conditions: string[] = []
-  const params: unknown[] = []
-  let i = 1
+type SP = { [key: string]: string | undefined }
 
-  // Never-published drafts live only in the Drafts section, never the live list.
-  conditions.push(`rf.is_draft = false`)
-
-  if (filters.search) {
-    conditions.push(`(rf.title ILIKE $${i} OR rf.slug ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
-  }
-
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-  const limit = PAGE_SIZE
-  const offset = ((filters.page || 1) - 1) * limit
-
+async function getForms(q: FilterQuery, page = 1) {
+  const w = buildWhere(REVIEW_FORMS_ENTITY, q)
+  const offset = (page - 1) * PAGE_SIZE
   const [forms, total] = await Promise.all([
     queryMany(
-      `SELECT rf.*, c.code AS coupon_code FROM review_forms rf LEFT JOIN coupons c ON rf.coupon_id = c.id ${where} ORDER BY rf.created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-      [...params, limit, offset]
+      `SELECT rf.*, c.code AS coupon_code FROM review_forms rf LEFT JOIN coupons c ON rf.coupon_id = c.id ${w.where} ORDER BY rf.created_at DESC LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
+      [...w.params, PAGE_SIZE, offset]
     ),
-    queryCount(`SELECT COUNT(*) FROM review_forms rf ${where}`, params),
+    queryCount(`SELECT COUNT(*) FROM review_forms rf ${w.where}`, w.params),
   ])
 
   return { forms, total }
 }
 
-export default async function ReviewFormsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | undefined }>
-}) {
+export default async function ReviewFormsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const host = await getHost()
   const sp = await searchParams
-  const tab = resolveListTab(sp, ['search', 'page'])
+  const tab = isListUrl(sp, REVIEW_FORM_FIELDS) ? 'list' : 'overview'
+  const href = (t: string) => ap(tabHref('/admin/review-forms', t, sp, REVIEW_FORM_FIELDS), host)
 
   return (
     <PageBody>
       <PageHeader title="Review Forms" description="Shareable forms that reward customers for Google reviews" />
 
-      <OverviewTabs
-        basePath={ap('/admin/review-forms', host)}
-        active={tab}
-        sp={sp}
-        listLabel="Forms"
-        actions={
-          <span className="hidden md:inline-flex">
-            <TabAction
-              href={ap('/admin/review-forms/add', host)}
-              icon={<Plus className="w-4 h-4" />}
-              label="Create Form"
-            />
-          </span>
-        }
-      />
+      <div className="mb-5">
+        <TabLinks
+          tabs={[
+            { id: 'overview', label: 'Overview', href: href('overview') },
+            { id: 'list', label: 'Forms', href: href('list') },
+          ]}
+          value={tab}
+          actions={
+            <span className="hidden md:inline-flex">
+              <TabAction
+                href={ap('/admin/review-forms/add', host)}
+                icon={<Plus className="w-4 h-4" />}
+                label="Create Form"
+              />
+            </span>
+          }
+        />
+      </div>
 
       {tab === 'overview' ? (
         <Suspense fallback={null}>
@@ -82,15 +71,20 @@ export default async function ReviewFormsPage({
         </Suspense>
       ) : (
         <>
-          <DataToolbar
-            search={{ placeholder: 'Search by title or slug...', param: 'search', suggestType: 'review_forms' }}
+          <ListFilters
+            entity="review_forms"
+            fields={REVIEW_FORM_FIELDS}
+            search={REVIEW_FORM_SEARCH}
+            noun="Forms"
+            tab="list"
+            exportable
           />
 
           <Suspense fallback={null}>
             <ReviewFormsDraftsBanner host={host} />
           </Suspense>
 
-          <ReviewFormsListSection searchParams={searchParams} host={host} />
+          <ReviewFormsListSection resolvedSearchParams={sp} host={host} />
         </>
       )}
     </PageBody>
@@ -170,41 +164,21 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
   )
 }
 
-async function ReviewFormsListSection({
-  searchParams,
-  host,
-}: {
-  searchParams: Promise<{ [key: string]: string | undefined }>
-  host: string
-}) {
-  const resolvedSearchParams = await searchParams
-  const key = listKey(resolvedSearchParams)
-
+// Keys the table Suspense on the query string so filter changes re-trigger the shimmer.
+function ReviewFormsListSection({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
   return (
-    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>
+    <Suspense key={listKey(resolvedSearchParams)} fallback={<TableSkeleton rows={8} cols={6} />}>
       <ReviewFormsListContent resolvedSearchParams={resolvedSearchParams} host={host} />
     </Suspense>
   )
 }
 
-async function ReviewFormsListContent({
-  resolvedSearchParams,
-  host,
-}: {
-  resolvedSearchParams: { [key: string]: string | undefined }
-  host: string
-}) {
+async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
-  const { forms, total } = await getForms({ search: resolvedSearchParams.search, page })
+  const q = normalizeQuery(REVIEW_FORMS_ENTITY, resolvedSearchParams)
+  const { forms, total } = await getForms(q, page)
   const formsBase = `https://${formsHostForHost(host)}`
-
-  const currentListUrl = (() => {
-    const params = new URLSearchParams({ tab: 'list' })
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (page > 1) params.set('page', String(page))
-    const qs = params.toString()
-    return `/admin/review-forms${qs ? `?${qs}` : ''}`
-  })()
+  const listUrl = tabHref('/admin/review-forms', 'list', resolvedSearchParams, REVIEW_FORM_FIELDS)
 
   return (
     <ReviewFormsTable
@@ -212,8 +186,8 @@ async function ReviewFormsListContent({
       total={total}
       page={page}
       pageSize={PAGE_SIZE}
-      search={resolvedSearchParams.search}
-      backUrl={currentListUrl}
+      search={q.search}
+      backUrl={page > 1 ? `${listUrl}&page=${page}` : listUrl}
       formsBase={formsBase}
     />
   )

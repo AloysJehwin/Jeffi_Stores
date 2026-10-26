@@ -2,6 +2,7 @@ import 'server-only'
 import { queryMany } from '@/lib/shared/db'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import { tenantLogoBuffer } from '@/lib/documents/store-logo'
+import { asJpegOrPng } from '@/lib/shared/image-compat'
 import path from 'path'
 import fs from 'fs'
 import { appPath } from '@/lib/shared/paths'
@@ -144,11 +145,12 @@ function hRule(doc: any, x1: number, y: number, x2: number, color = RULE_COLOR, 
   doc.moveTo(x1, y).lineTo(x2, y).lineWidth(w).strokeColor(color).stroke()
 }
 
+// PDFKit draws only JPEG and PNG; a WebP gallery photo is converted, sized for print.
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(4000) })
     if (!res.ok) return null
-    return Buffer.from(await res.arrayBuffer())
+    return await asJpegOrPng(Buffer.from(await res.arrayBuffer()), 800)
   } catch {
     return null
   }

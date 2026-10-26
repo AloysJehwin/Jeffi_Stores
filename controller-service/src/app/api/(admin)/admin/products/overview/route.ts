@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { filterScope, normalizeQuery } from '@jeffi/list-filters'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, parsePeriod, previousPeriod } from '@/lib/overview/period'
 import { margin, num, numOrNull, periodArgs, priceChange } from '@/lib/overviews/catalog'
+import { bindScope } from '@/lib/overview/filter-scope'
+import { PRODUCTS_ENTITY } from '@/lib/filters/entities/products'
 import {
-  HEALTH_SAMPLES_SQL,
-  HEALTH_SQL,
   HEALTH_ISSUES,
-  MOST_VIEWED_SQL,
-  NEVER_SOLD_SQL,
-  PERIOD_SQL,
-  PRICE_CHANGES_SQL,
-  PRICE_CHANGE_STATS_SQL,
-  RECENT_SQL,
-  SELLERS_OUT_SQL,
-  SERIES_SQL,
-  TOP_SELLERS_SQL,
+  healthSamplesSql,
+  healthSql,
+  mostViewedSql,
+  neverSoldSql,
+  periodSql,
+  priceChangeStatsSql,
+  priceChangesSql,
+  recentSql,
+  sellersOutSql,
+  seriesSql,
+  topSellersSql,
   healthCounts,
   productAttention,
   type HealthIssue,
@@ -51,20 +54,26 @@ export async function GET(request: NextRequest) {
   const bucket = bucketFor(period)
   const args = periodArgs(period, previous)
 
+  // The list's filters (its own created_from/_to included: from/to here is the sales window),
+  // bound after each query's own args.
+  const scope = filterScope(PRODUCTS_ENTITY, normalizeQuery(PRODUCTS_ENTITY, sp))
+  const [f1, f3, f5, f6] = [1, 3, 5, 6].map(start => bindScope(scope, start))
+  const two = args.slice(0, 2)
+
   try {
     const [health, samples, sellersOut, periods, series, top, viewed, never, recent, changes, changeStats] =
       await Promise.all([
-        queryOne<Row>(HEALTH_SQL),
-        queryMany<Row>(HEALTH_SAMPLES_SQL, args.slice(0, 2)),
-        queryMany<Row>(SELLERS_OUT_SQL, args),
-        queryMany<Row>(PERIOD_SQL, args),
-        queryMany<Row>(SERIES_SQL, [...args, bucket]),
-        queryMany<Row>(TOP_SELLERS_SQL, args),
-        queryMany<Row>(MOST_VIEWED_SQL, args),
-        queryMany<Row>(NEVER_SOLD_SQL, args.slice(0, 2)),
-        queryMany<Row>(RECENT_SQL, args.slice(0, 2)),
-        queryMany<Row>(PRICE_CHANGES_SQL, args),
-        queryOne<Row>(PRICE_CHANGE_STATS_SQL, args),
+        queryOne<Row>(healthSql(f1), f1.params),
+        queryMany<Row>(healthSamplesSql(f3), [...two, ...f3.params]),
+        queryMany<Row>(sellersOutSql(f5), [...args, ...f5.params]),
+        queryMany<Row>(periodSql(f5), [...args, ...f5.params]),
+        queryMany<Row>(seriesSql(f6), [...args, bucket, ...f6.params]),
+        queryMany<Row>(topSellersSql(f5), [...args, ...f5.params]),
+        queryMany<Row>(mostViewedSql(f5), [...args, ...f5.params]),
+        queryMany<Row>(neverSoldSql(f3), [...two, ...f3.params]),
+        queryMany<Row>(recentSql(f3), [...two, ...f3.params]),
+        queryMany<Row>(priceChangesSql(f5), [...args, ...f5.params]),
+        queryOne<Row>(priceChangeStatsSql(f5), [...args, ...f5.params]),
       ])
 
     const h = healthCounts(health)
@@ -147,6 +156,7 @@ export async function GET(request: NextRequest) {
         })),
       },
       sellersOutOfStock: outList,
+      filtered: !scope.empty,
       attention: productAttention(h, outList, neverTotal),
     })
   } catch (err) {

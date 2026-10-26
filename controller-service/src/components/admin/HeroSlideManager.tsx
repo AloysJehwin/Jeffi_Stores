@@ -1,14 +1,13 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminImage from '@/components/admin/AdminImage'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import Toggle from '@/components/ui/Toggle'
 import { useCanWrite, RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
-import AiMediaButton from '@/components/admin/ai/AiMediaButton'
-import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
+import MediaField from '@/components/admin/media/MediaField'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { notifyHomepageDraftChanged } from '@/components/admin/homepage/draft-events'
 import type { HomepageSurface } from '@/lib/catalog/homepage-sections'
@@ -23,6 +22,7 @@ export interface HeroSlideRow {
   image_url_mobile: string | null
   blurhash?: string | null
   blurhash_mobile?: string | null
+  video_url?: string | null
   cta_label: string | null
   cta_url: string | null
   filter_category: string | null
@@ -101,15 +101,11 @@ function SlideCard({
 }) {
   const { showToast } = useToast()
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [uploadingMobile, setUploadingMobile] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [generating, setGenerating] = useState(false)
   const [generatingAll, setGeneratingAll] = useState(false)
   const storeName = useStoreConfig().identity.name || 'an online store'
-  const fileRef = useRef<HTMLInputElement>(null)
-  const fileMobileRef = useRef<HTMLInputElement>(null)
 
   // Debounced-ish save: persist a field to the server
   const save = useCallback(
@@ -136,40 +132,16 @@ function SlideCard({
     [slide.id, showToast]
   )
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>, field: 'image_url' | 'image_url_mobile' = 'image_url') {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const isMobile = field === 'image_url_mobile'
-    const setBusy = isMobile ? setUploadingMobile : setUploading
-    const inputRef = isMobile ? fileMobileRef : fileRef
-    setBusy(true)
-    try {
-      const form = new FormData()
-      form.append('file', file)
-      form.append('field', field)
-      const res = await fetch(`/api/admin/hero-slides/${slide.id}/image`, {
-        method: 'POST',
-        body: form,
-        credentials: 'include',
-      })
-      const data = await res.json().catch(() => ({}))
-      if (res.ok && data.url) {
-        const hashField = isMobile ? 'blurhash_mobile' : 'blurhash'
-        onChange({ [field]: data.url, [hashField]: data.blurhash ?? null } as Partial<HeroSlideRow>)
-        showToast(isMobile ? 'Mobile image saved to draft' : 'Image saved to draft', 'success')
-        notifyHomepageDraftChanged()
-      } else showToast(data.error || 'Upload failed', 'error')
-    } catch {
-      showToast('Upload failed', 'error')
-    } finally {
-      setBusy(false)
-      if (inputRef.current) inputRef.current.value = ''
-    }
-  }
-
-  // Clearing falls the slide back to the desktop image on phones.
-  function clearMobileImage() {
-    field({ image_url_mobile: null, blurhash_mobile: null }, { imageUrlMobile: null })
+  // The image route saves to the draft as it uploads (and keeps GIFs); gallery, AI and video picks save through PATCH.
+  const uploader = (target: 'image_url' | 'image_url_mobile') => async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('field', target)
+    const res = await fetch(`/api/admin/hero-slides/${slide.id}/image`, { method: 'POST', body: form, credentials: 'include' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.url) throw new Error(data.error || 'Upload failed')
+    notifyHomepageDraftChanged()
+    return { url: data.url as string, blurhash: (data.blurhash as string | null) ?? null }
   }
 
   async function generateImage(promptOverride?: string) {
@@ -318,101 +290,49 @@ function SlideCard({
 
       {expanded && (
         <div className="p-4 space-y-4">
-          {/* Image — upload or AI generate */}
-          <div>
-            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Banner image — desktop</label>
-            <div className="flex flex-wrap items-center gap-3 mb-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={e => onFile(e, 'image_url')}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading || generating || !canWrite}
-                className="px-3 h-control-sm rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
-              >
-                {uploading ? 'Uploading…' : slide.image_url ? 'Replace image' : 'Upload image'}
-              </button>
-              <AiMediaButton
-                feature="hero_image"
-                compact
-                sizes={[AI_SIZE_PRESETS.hero, AI_SIZE_PRESETS.wide]}
-                defaultPrompt={aiPrompt || slide.title || ''}
-                usageRef={slide.id}
-                onPick={img => {
-                  field({ image_url: img.url, blurhash: img.blurhash ?? null }, { imageUrl: img.url })
-                  notifyHomepageDraftChanged()
-                }}
-              />
-              {slide.image_url && !uploading && !generating && (
-                <span className="text-[11px] text-foreground-muted">Image set</span>
-              )}
-            </div>
-
-            {/* The storefront swaps to this below 1024px. Optional — it falls back to the
-                desktop image, which crops badly on a narrow screen. */}
-            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Banner image — mobile</label>
-            <div className="flex flex-wrap items-center gap-3 mb-2">
-              <input
-                ref={fileMobileRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={e => onFile(e, 'image_url_mobile')}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileMobileRef.current?.click()}
-                disabled={uploadingMobile || generating || !canWrite}
-                className="px-3 h-control-sm rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
-              >
-                {uploadingMobile
-                  ? 'Uploading…'
-                  : slide.image_url_mobile
-                    ? 'Replace mobile image'
-                    : 'Upload mobile image'}
-              </button>
-              <AiMediaButton
-                feature="hero_image"
-                compact
-                label="AI mobile image"
-                sizes={[AI_SIZE_PRESETS.portrait, AI_SIZE_PRESETS.story]}
-                defaultPrompt={aiPrompt || slide.title || ''}
-                usageRef={slide.id}
-                onPick={img => {
-                  field({ image_url_mobile: img.url, blurhash_mobile: img.blurhash ?? null }, { imageUrlMobile: img.url })
-                  notifyHomepageDraftChanged()
-                }}
-              />
-              {slide.image_url_mobile && !uploadingMobile ? (
-                <>
-                  <div className="w-10 h-10 rounded overflow-hidden border border-border-default shrink-0">
-                    <AdminImage
-                      src={slide.image_url_mobile}
-                      alt=""
-                      blurhash={slide.blurhash_mobile}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  {canWrite && (
-                    <button
-                      type="button"
-                      onClick={clearMobileImage}
-                      className="text-[11px] text-foreground-muted hover:text-red-500 underline"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </>
-              ) : (
-                <span className="text-[11px] text-foreground-muted">Falls back to the desktop image</span>
-              )}
-            </div>
-            {/* AI generation — one scenario fills every field */}
+          {/* Media: desktop banner (image or video) and the optional mobile image */}
+          <div className="space-y-4">
+            <MediaField
+              label="Banner — desktop"
+              hint="2.4:1, e.g. 1536×640. An MP4 or GIF works too; the image is the video's poster."
+              value={{ image: slide.image_url, blurhash: slide.blurhash ?? null, video: slide.video_url ?? null }}
+              onChange={next =>
+                field(
+                  { image_url: next.image, blurhash: next.blurhash ?? null, video_url: next.video ?? null },
+                  { imageUrl: next.image, blurhash: next.blurhash ?? null, videoUrl: next.video ?? null }
+                )
+              }
+              size={['hero', 'wide']}
+              aiFeature="hero_image"
+              videoFeature="homepage_video"
+              allowVideo
+              scope="settings:write"
+              uploadImage={uploader('image_url')}
+              defaultPrompt={aiPrompt || slide.title || ''}
+              usageRef={slide.id}
+              disabled={!canWrite}
+            />
+            {/* The storefront swaps to this below 1024px. Optional: it falls back to the desktop
+                image, which crops badly on a narrow screen. */}
+            <MediaField
+              label="Banner — mobile"
+              hint={slide.image_url_mobile ? '4:5 or 9:16.' : '4:5 or 9:16. Falls back to the desktop image.'}
+              value={{ image: slide.image_url_mobile, blurhash: slide.blurhash_mobile ?? null }}
+              onChange={next =>
+                field(
+                  { image_url_mobile: next.image, blurhash_mobile: next.blurhash ?? null },
+                  { imageUrlMobile: next.image, blurhashMobile: next.blurhash ?? null }
+                )
+              }
+              size={['portrait', 'story']}
+              aiFeature="hero_image"
+              scope="settings:write"
+              uploadImage={uploader('image_url_mobile')}
+              defaultPrompt={aiPrompt || slide.title || ''}
+              usageRef={slide.id}
+              disabled={!canWrite}
+            />
+            {/* AI generation: one scenario fills the copy and the desktop image */}
             <RequireAi scope="settings:write">
               <div className="rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/10 p-3">
                 <div className="flex items-center gap-1.5 mb-2">
@@ -441,32 +361,21 @@ function SlideCard({
                   placeholder="e.g. 'Fasteners range — bolts, nuts and screws, precision engineered, dramatic industrial lighting'"
                   className="w-full px-3 py-2 rounded-lg border border-violet-200 dark:border-violet-700 bg-surface text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
                 />
-                <div className="flex gap-2 mt-2">
-                  <button
-                    type="button"
-                    onClick={generateAll}
-                    disabled={generatingAll || generating || !aiPrompt.trim()}
-                    className="flex-1 h-control rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {generatingAll || generating ? (
-                      <>
-                        <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />{' '}
-                        {generatingAll ? 'Writing copy…' : 'Creating image…'}
-                      </>
-                    ) : (
-                      'Generate everything'
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => generateImage()}
-                    disabled={generating || generatingAll || !aiPrompt.trim()}
-                    title="Only regenerate the banner image"
-                    className="px-3 h-control rounded-lg border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 text-sm font-medium hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                  >
-                    Image only
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={generateAll}
+                  disabled={generatingAll || generating || !aiPrompt.trim() || !canWrite}
+                  className="mt-2 w-full h-control rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {generatingAll || generating ? (
+                    <>
+                      <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />{' '}
+                      {generatingAll ? 'Writing copy…' : 'Creating image…'}
+                    </>
+                  ) : (
+                    'Generate everything'
+                  )}
+                </button>
                 <p className="mt-1.5 text-[11px] text-violet-500/80 dark:text-violet-400/80">
                   Image generation can take up to a minute.
                 </p>
@@ -482,6 +391,8 @@ function SlideCard({
                 fieldLabel="Hero slide title"
                 value={slide.title}
                 scope="settings:write"
+                maxLength={255}
+                write
                 context={`Homepage hero banner for the ${slide.filter_category || 'store'} category. Keep it punchy, 1-3 words.`}
                 onChange={v => field({ title: v }, { title: v })}
               >
@@ -501,6 +412,8 @@ function SlideCard({
                 fieldLabel="Hero slide subtitle"
                 value={slide.subtitle ?? ''}
                 scope="settings:write"
+                maxLength={500}
+                write
                 context={`Short supporting line under the hero title "${slide.title}" for the ${slide.filter_category || 'store'} category. One concise sentence.`}
                 onChange={v => field({ subtitle: v }, { subtitle: v })}
               >
@@ -524,6 +437,8 @@ function SlideCard({
                 fieldLabel="Hero slide badge"
                 value={slide.badge_text ?? ''}
                 scope="settings:write"
+                maxLength={100}
+                write
                 context={`Tiny uppercase promo badge (1-2 words) for the ${slide.filter_category || 'store'} hero slide, e.g. "New Arrivals", "Top Picks".`}
                 onChange={v => field({ badge_text: v }, { badgeText: v })}
               >

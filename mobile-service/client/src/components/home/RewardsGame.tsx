@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Share, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -17,12 +17,14 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, LinearGradient, Path, Polygon, Rect, Stop, Text as SvgText } from 'react-native-svg'
+import Svg, { Circle, Path, Polygon, Text as SvgText } from 'react-native-svg'
 import { GUTTER } from './layout'
 import { postJson } from '../../api/account'
-import { Button, Card, Overline, Skeleton, Text, TextButton, haptic, toast } from '../../ui'
-import { inr } from '../../lib/format'
+import { Button, Card, Gradient, Overline, Skeleton, Text, TextButton, haptic, toast } from '../../ui'
+import { couponTerms } from '../../lib/coupons'
+import { openHref } from '../../lib/links'
 import { useAuthStore } from '../../stores/authStore'
+import { useCartStore } from '../../stores/cartStore'
 import { accent, primary, status, useTokens } from '../../theme'
 import type {
   HomeSection,
@@ -56,16 +58,6 @@ async function fetchGameState(key: string): Promise<RewardGameState | 'gone' | '
   return res.data
 }
 
-const rupees = (n: number) => `₹${inr(n).replace(/\.00$/, '')}`
-
-/** "10% off (up to ₹150) on orders of ₹500+ · valid till 12 Nov" */
-function terms(c: NonNullable<RewardGamePlay['coupon']>): string {
-  const off = c.discountType === 'percentage' ? `${c.value}% off${c.maxDiscount ? ` (up to ${rupees(c.maxDiscount)})` : ''}` : `${rupees(c.value)} off`
-  const min = c.minPurchase > 0 ? ` on orders of ${rupees(c.minPurchase)}+` : ''
-  const till = c.validUntil ? ` · valid till ${new Date(c.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''
-  return `${off}${min}${till}`
-}
-
 function comeBack(limit: RewardsGameData['playLimit'], nextPlayAt: string | null): string {
   if (limit === 'once') return "You've played this one"
   if (nextPlayAt) {
@@ -89,7 +81,6 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
   const reduceMotion = useReducedMotion()
   const { width } = useWindowDimensions()
   const user = useAuthStore(s => s.user)
-  const gid = `rg${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const innerW = width - GUTTER * 2 - 32
   const wheelSize = Math.min(innerW, 300)
 
@@ -174,16 +165,7 @@ function GameCard({ section, game }: { section: HomeSection; game: RewardsGameDa
   return (
     <View className="bg-surface-secondary px-4 py-10">
       <Card padded={false} className="overflow-hidden">
-        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
-          <Defs>
-            <LinearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor={accent[500]} stopOpacity={0.14} />
-              <Stop offset="0.55" stopColor={t.surfaceElevated} stopOpacity={0} />
-              <Stop offset="1" stopColor={primary[500]} stopOpacity={0.14} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill={`url(#${gid})`} />
-        </Svg>
+        <Gradient stops={[[0, accent[500], 0.14], [0.55, t.surfaceElevated, 0], [1, primary[500], 0.14]]} />
 
         <View className="p-4">
           <Overline className="text-center text-primary-500" style={{ letterSpacing: 2 }}>
@@ -252,8 +234,16 @@ function Cta({ label, onPress, busy }: { label: string; onPress: () => void; bus
 }
 
 function ResultCard({ play, limit, nextPlayAt }: { play: RewardGamePlay | null; limit: RewardsGameData['playLimit']; nextPlayAt: string | null }) {
+  const router = useRouter()
+  const inCart = useCartStore(s => s.count) > 0
   const c = play?.coupon ?? null
+  const status = c?.status ?? 'usable'
   const share = () => Share.share({ message: c?.code ?? '' }).catch(() => toast.error('Could not share the code'))
+  const use = () => {
+    if (!c) return
+    if (inCart) router.navigate({ pathname: '/(tabs)/cart', params: { coupon: c.code } })
+    else openHref(router, '/products')
+  }
   return (
     <View className="mt-5 rounded-field border border-dashed border-border-default bg-surface p-4">
       {play ? (
@@ -265,12 +255,27 @@ function ResultCard({ play, limit, nextPlayAt }: { play: RewardGamePlay | null; 
       {c ? (
         <>
           <View className="mt-3 flex-row items-center justify-between gap-3">
-            <Text className="flex-1 font-mono text-base font-semibold text-foreground" selectable numberOfLines={1}>
+            <Text
+              className={`flex-1 font-mono text-base font-semibold ${status === 'usable' ? 'text-foreground' : 'text-foreground-muted line-through'}`}
+              selectable
+              numberOfLines={1}
+            >
               {c.code}
             </Text>
-            <Button label="Share code" variant="outline" size="sm" block={false} onPress={share} />
+            {status === 'usable' ? <Button label="Share code" variant="outline" size="sm" block={false} onPress={share} /> : null}
           </View>
-          <Text className="mt-2 text-xs text-foreground-secondary">{terms(c)}</Text>
+          <Text className="mt-2 text-xs text-foreground-secondary">{couponTerms(c)}</Text>
+          {status !== 'usable' ? (
+            <Text className="mt-2 text-xs font-semibold text-foreground-secondary">
+              {status === 'used' ? 'You have used this coupon.' : 'This coupon has expired.'}
+            </Text>
+          ) : !inCart ? (
+            <Text className="mt-2 text-xs text-foreground-secondary">Saved to your account. Add something to your cart and apply it there.</Text>
+          ) : null}
+          {status === 'usable' ? <Button label={inCart ? 'Apply in cart' : 'Shop now'} size="md" haptics className="mt-3" onPress={use} /> : null}
+          <View className="mt-2 flex-row justify-center">
+            <TextButton label="Your coupons" onPress={() => router.push('/account/rewards')} />
+          </View>
         </>
       ) : null}
       <Text className={`text-xs text-foreground-muted ${play ? 'mt-3' : ''}`}>{comeBack(limit, nextPlayAt)}</Text>

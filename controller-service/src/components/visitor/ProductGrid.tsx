@@ -9,6 +9,7 @@ import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 import { round2 } from '@/lib/catalog/gst'
 import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { onImgError, responsiveImg } from '@/lib/shared/image-url'
 
 interface ProductItem {
   is_digital?: boolean
@@ -71,7 +72,14 @@ interface Props {
   // server-rendered node; the page itself has already applied GST / discount maths.
   pagedItems?: { key: string; node: ReactNode }[]
   page?: number
+  /** Where sort changes navigate (the listing's own path). */
+  basePath?: string
+  /** Overrides the product grid's column classes. */
+  gridClassName?: string
 }
+
+const DEFAULT_GRID = 'grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6'
+const CHIP_H = 'h-11 lg:h-9'
 
 type ViewMode = 'grid' | 'table'
 
@@ -198,7 +206,8 @@ function CategoryBannerRow({
                       <div className="aspect-square overflow-hidden rounded-md bg-surface flex items-center justify-center">
                         {img ? (
                           <img
-                            src={img.thumbnail_url || img.image_url}
+                            {...responsiveImg(img.thumbnail_url || img.image_url, '(min-width: 768px) 120px, 25vw')}
+                            onError={onImgError}
                             alt={p.name}
                             className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                           />
@@ -243,7 +252,8 @@ function TableRow({
       <div className="w-10 h-10 shrink-0 rounded-lg bg-surface-secondary border border-border-default overflow-hidden">
         {img ? (
           <img
-            src={img.thumbnail_url || img.image_url}
+            {...responsiveImg(img.thumbnail_url || img.image_url, '40px')}
+            onError={onImgError}
             alt={product.name}
             className="w-full h-full object-contain p-1"
           />
@@ -324,6 +334,8 @@ export default function ProductGrid({
   pagedItems,
   page,
   total,
+  basePath = '/products',
+  gridClassName = DEFAULT_GRID,
 }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const router = useRouter()
@@ -363,13 +375,14 @@ export default function ProductGrid({
 
   return (
     <div>
-      {/* Single control bar: group · view mode · sort */}
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
+      {/* Single control bar: filters · group · view mode · sort. Sticks under the header on phones and tablets. */}
+      <div className="sticky top-[calc(4rem+env(safe-area-inset-top,0px))] z-20 -mx-4 px-4 py-2 mb-4 bg-surface border-b border-border-default flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:static lg:mx-0 lg:px-0 lg:py-0 lg:mb-6 lg:bg-transparent lg:border-0 lg:overflow-visible lg:flex-wrap">
         {filterSlot}
         <button
           type="button"
           onClick={toggleGrouped}
-          className={`flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium border transition-colors ${grouped ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+          aria-pressed={grouped}
+          className={`shrink-0 flex items-center gap-1.5 px-3 ${CHIP_H} rounded-lg text-xs font-medium border transition-colors ${grouped ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
         >
           <svg
             viewBox="0 0 16 16"
@@ -384,14 +397,17 @@ export default function ProductGrid({
             <rect x="1" y="9" width="6" height="6" rx="1" />
             <rect x="9" y="9" width="6" height="6" rx="1" />
           </svg>
-          Group by Category
+          <span className="sm:hidden">Group</span>
+          <span className="hidden sm:inline">Group by Category</span>
         </button>
-        <div className="flex items-center h-9 border border-border-default rounded-lg overflow-hidden">
+        <div className={`shrink-0 flex items-center ${CHIP_H} border border-border-default rounded-lg overflow-hidden`}>
           <button
             type="button"
             onClick={() => setViewMode('grid')}
             title="Grid view"
-            className={`px-2.5 h-full transition-colors ${viewMode === 'grid' ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface-secondary'}`}
+            aria-label="Grid view"
+            aria-pressed={viewMode === 'grid'}
+            className={`px-3 lg:px-2.5 h-full transition-colors ${viewMode === 'grid' ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface-secondary'}`}
           >
             <svg
               viewBox="0 0 16 16"
@@ -408,7 +424,9 @@ export default function ProductGrid({
             type="button"
             onClick={() => setViewMode('table')}
             title="Table view"
-            className={`px-2.5 h-full border-l border-border-default transition-colors ${viewMode === 'table' ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface-secondary'}`}
+            aria-label="Table view"
+            aria-pressed={viewMode === 'table'}
+            className={`px-3 lg:px-2.5 h-full border-l border-border-default transition-colors ${viewMode === 'table' ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface-secondary'}`}
           >
             <svg
               viewBox="0 0 16 16"
@@ -422,7 +440,7 @@ export default function ProductGrid({
           </button>
         </div>
         <div className="hidden lg:flex ml-auto">
-          <SortDropdown />
+          <SortDropdown basePath={basePath} />
         </div>
       </div>
 
@@ -463,7 +481,7 @@ export default function ProductGrid({
           total={total}
           noun="products"
           wrap="div"
-          wrapClassName="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6"
+          wrapClassName={gridClassName}
         />
       ) : (
         <div className="space-y-8">
@@ -483,7 +501,7 @@ export default function ProductGrid({
                 </div>
               )}
               {/* Grid with category banner rows injected every BANNER_EVERY products */}
-              <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
+              <div className={gridClassName}>
                 {group.items.map((product, idx) => {
                   const { primaryImage, hasVariants, displayPrice, effectiveStock, mrp, mrpDiscount } = resolve(
                     product,

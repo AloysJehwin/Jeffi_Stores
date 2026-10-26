@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { FormButton, TextArea } from '@/components/admin/kit/form'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 export default function CancelReview({ orderId }: { orderId: string }) {
   const router = useRouter()
@@ -59,14 +60,23 @@ export default function CancelReview({ orderId }: { orderId: string }) {
             <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
               Reason for rejection <span className="text-red-500">*</span>
             </label>
-            <TextArea
+            <AIEnrichButton
+              fieldLabel="Reason for rejecting the cancellation"
               value={rejectNote}
-              onChange={e => setRejectNote(e.target.value)}
-              rows={3}
-              placeholder="e.g. Order is already shipped and cannot be cancelled at this stage."
-              className="resize-none"
-              disabled={isProcessing}
-            />
+              onChange={setRejectNote}
+              scope="reviews:write"
+              multiline
+              context="Sent to the customer explaining why their order cancellation request was declined. Polite, brief, factual."
+            >
+              <TextArea
+                value={rejectNote}
+                onChange={e => setRejectNote(e.target.value)}
+                rows={3}
+                placeholder="e.g. Order is already shipped and cannot be cancelled at this stage."
+                className="resize-none pr-8"
+                disabled={isProcessing}
+              />
+            </AIEnrichButton>
           </div>
           <div className="flex flex-wrap gap-2">
             <FormButton type="button" onClick={() => handleReview('reject')} disabled={!rejectNote.trim()} pending={isProcessing} pendingLabel="Sending...">

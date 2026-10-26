@@ -6,6 +6,7 @@ import AdminSelect from './AdminSelect'
 import * as Icons from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
+import ImageUrlInput from './ImageUrlInput'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 import { useEditSession } from '@/hooks/useEditSession'
 import { FormButton, FormFooter, FormSection, fieldInputCls, useActionToast } from '@/components/admin/kit'
@@ -245,6 +246,7 @@ export default function CategoryForm({
   const [overriding, setOverriding] = useState(!isCurrentlyInherited)
   const [categoryName, setCategoryName] = useState<string>(category?.name || '')
   const [description, setDescription] = useState<string>(category?.description || '')
+  const [imageUrl, setImageUrl] = useState<string>(category?.image_url || '')
   const [returnAllowed, setReturnAllowed] = useState<boolean>(
     category?.return_allowed ?? parentCat?.return_allowed ?? true
   )
@@ -412,6 +414,28 @@ export default function CategoryForm({
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Category image</label>
+            <ImageUrlInput
+              name="image_url"
+              value={imageUrl}
+              onChange={setImageUrl}
+              className={fieldInputCls}
+              placeholder="https://… or upload"
+              ai={{
+                feature: 'category_image',
+                size: ['square', 'portrait', 'landscape'],
+                defaultPrompt: categoryName
+                  ? `${categoryName} products arranged neatly, soft studio light, plain light backdrop, no text`
+                  : undefined,
+                usageRef: category?.id,
+              }}
+            />
+            <p className="text-xs text-foreground-muted mt-1">
+              Shown on category cards. Leave empty to use the category&apos;s top product photo.
+            </p>
           </div>
 
           <AdminSelect

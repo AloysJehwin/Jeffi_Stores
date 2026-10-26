@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { responsiveImg } from '@/lib/shared/image-url'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
@@ -93,7 +94,11 @@ export default async function BrandDetailPage({
           <div className="flex items-center gap-4">
             {brand.logo_url && (
               <div className="w-16 h-16 bg-surface-secondary rounded-lg border border-border-default overflow-hidden flex-shrink-0">
-                <img src={brand.logo_url} alt={brand.name} className="w-full h-full object-contain p-1" />
+                <img
+                  {...responsiveImg(brand.logo_url, '64px')}
+                  alt={brand.name}
+                  className="w-full h-full object-contain p-1"
+                />
               </div>
             )}
             <div>
@@ -181,7 +186,7 @@ export default async function BrandDetailPage({
                     total={total}
                     noun="products"
                     wrap="div"
-                    wrapClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+                    wrapClassName="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
                   />
                 )
               })()}
