@@ -42,6 +42,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
     ? Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
     : null
   const googleProductCategory = (formData.get('google_product_category') as string) || null
+  const imageUrl = ((formData.get('image_url') as string) || '').trim().slice(0, 500) || null
   const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -71,6 +72,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
     replacement_window_days: replacementWindowDays,
     google_product_category: googleProductCategory,
     icon_name: iconName,
+    image_url: imageUrl,
   }
 
   const host = await getHost()
@@ -86,7 +88,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
       `UPDATE categories SET name=$1, slug=$2, description=$3, parent_category_id=$4,
        display_order=$5, sku_prefix=$6, is_active=$7, is_draft=$8, google_product_category=$9,
        icon_name=$10, return_allowed=$11, return_window_days=$12, replacement_allowed=$13,
-       replacement_window_days=$14, updated_at=NOW() WHERE id=$15`,
+       replacement_window_days=$14, image_url=$16, updated_at=NOW() WHERE id=$15`,
       [
         name,
         slug,
@@ -103,6 +105,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
         replacementAllowed,
         replacementWindowDays,
         categoryId,
+        imageUrl,
       ]
     )
     revalidatePath('/admin/categories')

@@ -72,7 +72,7 @@ export default function SupplierDetailClient({
       .catch(() => setLoading(false))
   }, [id])
 
-  const listHref = ap('/admin/suppliers?tab=suppliers')
+  const listHref = ap('/admin/suppliers?tab=suppliers&active=true')
 
   if (!loading && !data?.supplier) {
     return (

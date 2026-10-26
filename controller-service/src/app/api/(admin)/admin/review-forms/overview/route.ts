@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { filterScope, normalizeQuery } from '@jeffi/list-filters'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { parsePeriod, previousPeriod } from '@/lib/overview/period'
 import { byPeriod, periodArgs } from '@/lib/overviews/marketing'
+import { REVIEW_FORMS_ENTITY } from '@/lib/filters/entities/review-forms'
 import {
-  FORMS_SQL,
-  KPI_SQL,
-  STATE_SQL,
+  formsSql,
+  kpiSql,
   reviewFormAttention,
+  stateSql,
   toFormRow,
   toReviewFormState,
   toReviewFormTotals,
@@ -23,12 +25,19 @@ export async function GET(request: NextRequest) {
   const period = parsePeriod(sp.get('from'), sp.get('to'))
   const previous = previousPeriod(period)
   const args = periodArgs(period, previous)
+  // The list's filters (not its created date: the period owns from / to), as form-id conditions.
+  const scope = filterScope(REVIEW_FORMS_ENTITY, normalizeQuery(REVIEW_FORMS_ENTITY, sp), { omit: ['created'] })
+  const subs = scope.inIds('rs.form_id', args.length + 1)
+  const formIds = scope.inIds('f.id', args.length + 1)
+  const own = [scope.inIds('id', 1), scope.inIds('form_id', 1)]
 
   try {
     const [kpis, formRows, state] = await Promise.all([
-      queryMany<Record<string, unknown>>(KPI_SQL, args),
-      queryMany<Record<string, unknown>>(FORMS_SQL, args),
-      queryOne<Record<string, unknown>>(STATE_SQL),
+      queryMany<Record<string, unknown>>(kpiSql(subs.sql), [...args, ...subs.params]),
+      queryMany<Record<string, unknown>>(formsSql(formIds.sql), [...args, ...formIds.params]),
+      scope.empty
+        ? queryOne<Record<string, unknown>>(stateSql())
+        : queryOne<Record<string, unknown>>(stateSql(own[0].sql, own[1].sql), own[0].params),
     ])
     const totals = byPeriod(kpis, toReviewFormTotals)
     const forms = formRows.map(toFormRow)

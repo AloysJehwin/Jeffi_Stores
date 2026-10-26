@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react'
-import { Pressable, View, type AccessibilityActionEvent } from 'react-native'
+import { Pressable, View, useWindowDimensions, type AccessibilityActionEvent } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
@@ -8,6 +8,7 @@ import QuickAddButton from './QuickAddButton'
 import { openQuickAdd } from '../../stores/quickAddStore'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { useWishlistToggle } from '../../hooks/useWishlist'
+import { useImageSource } from '../../hooks/useImageSource'
 import { useAuthStore } from '../../stores/authStore'
 import { resolveEdd } from '../../lib/edd'
 import { inr, shortDate } from '../../lib/format'
@@ -28,6 +29,10 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
   const { inWishlist, toggle, pending } = useWishlistToggle(product.id)
   const [edd, setEdd] = useState<string | null>(null)
   const img = product.primaryImage
+  const imgSource = useImageSource()
+  const { width: screen } = useWindowDimensions()
+  // Two cards a row on phones; rails show a little less.
+  const cardWidth = Math.min(screen / 2, 320)
   const shadow = useElevation('raised')
   const press = usePressScale(0.98)
   const stock = digital ? 'Digital, instant access' : inStock ? 'In stock' : 'Out of stock'
@@ -85,7 +90,7 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
             {img ? (
               <>
                 <Image
-                  source={{ uri: img.image_url }}
+                  source={imgSource(img.image_url, 64)}
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -102,7 +107,7 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
                   accessible={false}
                 />
                 <Image
-                  source={{ uri: img.image_url }}
+                  source={imgSource(img.image_url, cardWidth)}
                   placeholder={img.blurhash ? { blurhash: img.blurhash } : undefined}
                   style={{ width: '100%', height: '100%' }}
                   contentFit="contain"

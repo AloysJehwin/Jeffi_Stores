@@ -166,10 +166,9 @@ export function buildAttributeFilterClauses(
     if (v === 'true' || v === 'false') conditions.push(`p.${flag} = ${v}`)
   }
   for (const [param, { expr, numeric }] of Object.entries(MULTI)) {
-    const values = first(sp[param])
-      .split(',')
-      .map(v => v.trim())
-      .filter(v => v && (!numeric || isNumber(v)))
+    // Pipe-joined from the panel; commas still accepted from old links.
+    const values = splitFilterValues(first(sp[param]), { commas: true })
+      .filter(v => !numeric || isNumber(v))
       .slice(0, MAX_VALUES)
     if (values.length === 0) continue
     conditions.push(

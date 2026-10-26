@@ -148,7 +148,7 @@ function RoundStep({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="w-9 h-9 rounded-full border border-border-default bg-surface-secondary text-foreground flex items-center justify-center hover:border-accent-400 transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
+      className="w-11 h-11 sm:w-9 sm:h-9 rounded-full border border-border-default bg-surface-secondary text-foreground flex items-center justify-center hover:border-accent-400 transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
     >
       {children}
     </button>

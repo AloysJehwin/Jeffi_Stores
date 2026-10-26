@@ -1,10 +1,13 @@
 import { Children, type ReactNode } from 'react'
-import { ScrollView, View, useWindowDimensions } from 'react-native'
-import { Overline, Text } from '../../ui'
+import { View, useWindowDimensions } from 'react-native'
+import { ArrowRight } from 'lucide-react-native'
+import { GUTTER, Overline, Text } from '../../ui'
+import { badgeBg } from '../../lib/badge'
+import { status } from '../../theme'
 
-// Shared building blocks for the home sections (web: container px-4, SectionCarousel, grid-cols-N).
+// Shared building blocks for the home sections (web: container px-4, grid-cols-N). The snap row is ui's Rail.
 
-export const GUTTER = 16
+export { GUTTER }
 
 /** Width of one column in an N-column grid inside the px-4 container. */
 export function useColumnWidth(cols: number, gap: number, inset = 0): number {
@@ -23,28 +26,6 @@ export function Grid({ cols = 2, gap = 12, inset = 0, children }: { cols?: numbe
         </View>
       ))}
     </View>
-  )
-}
-
-/** SectionCarousel at the mobile breakpoint: snap-scrolling row, items w-[45%], gap-3. */
-export function Carousel({ itemWidth = 0.45, gap = 12, children }: { itemWidth?: number; gap?: number; children: ReactNode }) {
-  const { width } = useWindowDimensions()
-  const w = Math.floor((width - GUTTER * 2) * itemWidth)
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      snapToInterval={w + gap}
-      decelerationRate="fast"
-      style={{ marginHorizontal: -GUTTER }}
-      contentContainerStyle={{ paddingHorizontal: GUTTER, gap }}
-    >
-      {Children.toArray(children).map((child, i) => (
-        <View key={i} style={{ width: w }}>
-          {child}
-        </View>
-      ))}
-    </ScrollView>
   )
 }
 
@@ -94,6 +75,38 @@ export function SectionHeading({
       ) : (
         heading
       )}
+    </View>
+  )
+}
+
+/** Room a pager page leaves around its card for the shadow; the pager's ScrollView clips. */
+export const SHADOW_ROOM = { top: 8, bottom: 16 } as const
+
+/** The uppercase pill over a media card's title, in the admin's `bg-*` colour. */
+export function SlideBadge({ text, color, shape = 'rounded-full' }: { text?: string | null; color?: string | null; shape?: string }) {
+  if (!text) return null
+  return (
+    <View className={`mb-3 self-start px-3 py-1.5 ${shape} ${badgeBg(color, 'bg-primary-500')}`}>
+      <Text className="text-[11px] font-extrabold uppercase text-white" style={{ letterSpacing: 1.5 }}>
+        {text}
+      </Text>
+    </View>
+  )
+}
+
+const CTA = {
+  sm: { box: 'py-2', text: 'text-xs', icon: 14 },
+  md: { box: 'py-2.5', text: 'text-sm', icon: 16 },
+} as const
+
+/** The white "label →" pill on a media card. */
+export function SlideCta({ label, size = 'sm', className = 'mt-3' }: { label?: string | null; size?: keyof typeof CTA; className?: string }) {
+  if (!label) return null
+  const c = CTA[size]
+  return (
+    <View className={`${className} flex-row items-center gap-1.5 self-start rounded-full bg-white px-4 ${c.box}`}>
+      <Text className={`${c.text} font-bold text-black`}>{label}</Text>
+      <ArrowRight size={c.icon} color={status.black} strokeWidth={2.5} />
     </View>
   )
 }

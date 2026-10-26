@@ -6,6 +6,7 @@ import Toggle from '@/components/ui/Toggle'
 import CopySku from '@/components/ui/CopySku'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 type Mode = 'category' | 'brand'
 
@@ -154,6 +155,8 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
   const [error, setError] = useState('')
 
   const filterLabel = mode === 'category' ? 'Categories' : 'Brands'
+  const picked = (mode === 'category' ? categories : brands).filter(f => selectedFilters.has(f.id)).map(f => f.name)
+  const aiContext = `A printable product brochure${picked.length ? ` for ${filterLabel.toLowerCase()}: ${picked.slice(0, 12).join(', ')}` : ''}.`
   const reqSeq = useRef(0)
 
   // ── Load section-1 options ──
@@ -533,27 +536,47 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
                 Brochure title (optional)
               </p>
-              <input
-                type="text"
+              <AIEnrichButton
+                fieldLabel="Brochure title"
                 value={title}
-                onChange={e => setTitle(e.target.value)}
+                onChange={setTitle}
+                scope="products:write"
                 maxLength={120}
-                placeholder="e.g. Summer Fastener Catalogue"
-                className="w-full px-3 h-control rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
-              />
+                write
+                context={`${aiContext} Cover title; a few words.`}
+              >
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  maxLength={120}
+                  placeholder="e.g. Summer Fastener Catalogue"
+                  className="w-full px-3 pr-8 h-control rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
+                />
+              </AIEnrichButton>
             </div>
             <div className="flex-1">
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
                 Cover promo line (optional)
               </p>
-              <input
-                type="text"
+              <AIEnrichButton
+                fieldLabel="Brochure cover promo line"
                 value={promo}
-                onChange={e => setPromo(e.target.value)}
+                onChange={setPromo}
+                scope="products:write"
                 maxLength={140}
-                placeholder="e.g. Monsoon Sale — up to 20% off fasteners"
-                className="w-full px-3 h-control rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
-              />
+                write
+                context={`${aiContext} One promotional line under the cover title${title ? ` "${title}"` : ''}; do not invent discounts.`}
+              >
+                <input
+                  type="text"
+                  value={promo}
+                  onChange={e => setPromo(e.target.value)}
+                  maxLength={140}
+                  placeholder="e.g. Monsoon Sale — up to 20% off fasteners"
+                  className="w-full px-3 pr-8 h-control rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
+                />
+              </AIEnrichButton>
             </div>
             <div className="shrink-0">
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Prices</p>

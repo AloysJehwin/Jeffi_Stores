@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Check, Plus, X } from 'lucide-react'
-import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, TableSkeleton, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit'
+import { ArrowDown, ArrowUp, Check, Plus } from 'lucide-react'
+import { QUOTATION_ALIASES, QUOTATION_FIELDS, QUOTATION_SEARCH } from '@jeffi/list-filters/fields'
+import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, TableSkeleton, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, ListFilters, fetchJson, useFilterQuery, useInfiniteList } from '@/components/admin/kit'
 import { useToast } from '@/contexts/ToastContext'
 import RowActions from '@/components/admin/RowActions'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
-import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import LineItemsSection, {
   LineItem,
   newLineItem,
@@ -132,23 +132,12 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   const setError = (m: string) => {
     if (m) toast.error(m)
   }
-  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all')
-  const [searchQ, setSearchQ] = useState(searchParams.get('q') || '')
-  const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
-  const [toDate, setToDate] = useState(searchParams.get('to') || '')
+  // Filters live in the URL (from / to is the quote date, shared with the Overview period).
+  const filters = useFilterQuery(QUOTATION_FIELDS, { aliases: QUOTATION_ALIASES })
   const [sortCol, setSortCol] = useState<string | undefined>(undefined)
   const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
 
   const PAGE_SIZE = 25
-
-  function syncUrl(patch: Record<string, string>) {
-    const p = new URLSearchParams(window.location.search)
-    for (const [k, v] of Object.entries(patch)) {
-      if (v && v !== 'all') p.set(k, v)
-      else p.delete(k)
-    }
-    router.replace(ap(`/admin/quotations?${p.toString()}`), { scroll: false })
-  }
 
   function handleSort(col: string, dir: SortDir) {
     setSortCol(col || undefined)
@@ -259,15 +248,11 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
 
   // Ordered server-side across all quotations via sort/dir params.
   const list = useInfiniteList<Quotation>({
-    key: view === 'list' ? `${statusFilter}|${searchQ}|${fromDate}|${toDate}|${sortCol}|${sortDir}` : null,
+    key: view === 'list' ? `${filters}|${sortCol}|${sortDir}` : null,
     pageSize: PAGE_SIZE,
     getKey: q => q.id,
     fetchPage: async (p, signal) => {
-      const params = new URLSearchParams()
-      if (statusFilter !== 'all') params.set('status', statusFilter)
-      if (searchQ) params.set('q', searchQ)
-      if (fromDate) params.set('from', fromDate)
-      if (toDate) params.set('to', toDate)
+      const params = new URLSearchParams(filters)
       if (sortCol && QUOTE_SORT_KEYS[sortCol]) {
         params.set('sort', QUOTE_SORT_KEYS[sortCol])
         params.set('dir', sortDir || 'desc')
@@ -839,74 +824,15 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
           </TabActionsPortal>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-[200px] flex-1">
-            <AdminTypeahead
-              type="quotations"
-              value={searchQ}
-              onChange={v => {
-                setSearchQ(v)
-                syncUrl({ q: v })
-              }}
-              onEnter={() => loadList()}
-              placeholder="Search quote # or consignee..."
-              inputClassName={inputCls + ' pr-9'}
-            />
-          </div>
-          <button type="button" onClick={() => loadList()} className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600">
-            Search
-          </button>
-          <div className="inline-flex h-control items-center rounded-lg border border-border-default bg-surface-elevated p-0.5">
-            {['all', 'draft', 'final'].map(s => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setStatusFilter(s)
-                  syncUrl({ status: s })
-                }}
-                className={`h-full rounded-md px-3 text-xs font-medium capitalize transition-colors ${statusFilter === s ? 'bg-accent-500 text-white' : 'text-foreground-secondary hover:bg-surface-secondary'}`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-          <div className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap">
-            <DatePicker
-              className="w-36"
-              value={fromDate}
-              onChange={v => {
-                setFromDate(v)
-                syncUrl({ from: v })
-              }}
-            />
-            <span className="text-xs text-foreground-muted">to</span>
-            <DatePicker
-              className="w-36"
-              value={toDate}
-              onChange={v => {
-                setToDate(v)
-                syncUrl({ to: v })
-              }}
-            />
-          </div>
-          {(searchQ || statusFilter !== 'all' || fromDate || toDate) && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQ('')
-                setStatusFilter('all')
-                setFromDate('')
-                setToDate('')
-                syncUrl({ q: '', status: '', from: '', to: '' })
-              }}
-              className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary"
-            >
-              <X className="h-4 w-4" />
-              Clear
-            </button>
-          )}
-        </div>
+        <ListFilters
+          entity="quotations"
+          fields={QUOTATION_FIELDS}
+          aliases={QUOTATION_ALIASES}
+          search={QUOTATION_SEARCH}
+          noun="Quotations"
+          tab="list"
+          exportable
+        />
 
         {loading ? (
           <TableSkeleton rows={8} cols={6} />

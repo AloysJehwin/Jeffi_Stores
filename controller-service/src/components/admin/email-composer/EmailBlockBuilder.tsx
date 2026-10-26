@@ -3,9 +3,7 @@
 import { createContext, useCallback, useContext, useState } from 'react'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
-import AiMediaButton from '@/components/admin/ai/AiMediaButton'
 import ScenarioFillDialog from '@/components/admin/messaging-templates/ScenarioFillDialog'
-import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import {
   DndContext,
   closestCenter,
@@ -148,27 +146,32 @@ function BlockRow({
       )}
 
       {block.type === 'text' && (
-        <EmailComposer
-          value={block.html}
-          onChange={html => onPatch({ ...block, html })}
-          extraVariables={vars}
-          minHeight={120}
-          allowSource={false}
-        />
+        <div className="relative">
+          <EmailComposer
+            value={block.html}
+            onChange={html => onPatch({ ...block, html })}
+            extraVariables={vars}
+            minHeight={120}
+            allowSource={false}
+          />
+          <AIEnrichButton placement="in-field" anchorClassName="absolute right-3 bottom-3 z-10" fieldLabel="Email text block (HTML)" value={block.html} onChange={html => onPatch({ ...block, html })} scope="mailer:write" format="html" variables={varNames} write context="A paragraph block inside a marketing email; no buttons or images." />
+        </div>
       )}
 
       {(block.type === 'hero_image' || block.type === 'image') && (
         <div className="space-y-2">
-          <div className="flex items-center justify-end">
-            <AiMediaButton
-              feature="email_hero"
-              compact
-              sizes={[AI_SIZE_PRESETS.landscape, AI_SIZE_PRESETS.square]}
-              defaultPrompt={block.alt || 'Marketing hero image for an email campaign'}
-              onPick={img => onPatch({ ...block, url: img.url })}
-            />
-          </div>
-          <ImageUrlInput className={inputCls} value={block.url} onChange={url => onPatch({ ...block, url })} placeholder="Image URL (https://…) or upload" preview={false} />
+          <ImageUrlInput
+            className={inputCls}
+            value={block.url}
+            onChange={url => onPatch({ ...block, url })}
+            placeholder="Image URL (https://…) or upload"
+            preview={false}
+            ai={{
+              feature: 'email_hero',
+              size: ['landscape', 'square'],
+              defaultPrompt: block.alt || 'Marketing hero image for an email campaign',
+            }}
+          />
           <input
             className={inputCls}
             value={block.alt ?? ''}

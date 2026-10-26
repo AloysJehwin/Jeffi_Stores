@@ -68,6 +68,7 @@ const SLIDE_COLUMNS = [
   'image_url_mobile',
   'blurhash',
   'blurhash_mobile',
+  'video_url',
   'cta_label',
   'cta_url',
   'filter_category',

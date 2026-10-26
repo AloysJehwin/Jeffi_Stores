@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
+import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
-import { buildVectorSearchClause } from '@/lib/catalog/search'
+import { CASH_SALE_ENTITY, CASH_SALE_SORTS } from '@/lib/filters/entities/cash-sale'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,54 +15,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
-    const from = searchParams.get('from') || ''
-    const to = searchParams.get('to') || ''
-    const payment = searchParams.get('payment') || ''
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
     const limit = 25
     const offset = (page - 1) * limit
 
-    const conditions: string[] = []
-    const params: any[] = []
-    let i = 1
+    // The list filters (old ?payment= included); from / to are the bill date.
+    const w = buildWhere(CASH_SALE_ENTITY, normalizeQuery(CASH_SALE_ENTITY, searchParams))
+    const where = w.where
+    const params = w.params
+    const i = w.nextIdx
 
-    if (payment) {
-      conditions.push(`cs.payment_status = $${i++}`)
-      params.push(payment)
-    }
-    if (from) {
-      conditions.push(`cs.invoice_date >= $${i++}`)
-      params.push(from)
-    }
-    if (to) {
-      conditions.push(`cs.invoice_date < ($${i++}::date + interval '1 day')`)
-      params.push(to)
-    }
-    if (search) {
-      const sc = buildVectorSearchClause(
-        search,
-        'cs.search_vector',
-        ['cs.customer_name'],
-        ['cs.invoice_number', 'cs.sale_number'],
-        i,
-        'simple'
-      )
-      conditions.push(sc.clause)
-      params.push(...sc.params)
-      i = sc.nextIdx
-    }
-
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-
-    // Whitelisted server-side sort (real cash_sales columns).
-    const SORT_COLS: Record<string, string> = {
-      invoice_number: 'cs.invoice_number',
-      invoice_date: 'cs.invoice_date',
-      total_amount: 'cs.total_amount',
-      payment_status: 'cs.payment_status',
-    }
-    const sortCol = SORT_COLS[searchParams.get('sort') || ''] || null
+    const sortCol = CASH_SALE_SORTS[searchParams.get('sort') || ''] || null
     const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
     const orderBy = sortCol
       ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, cs.created_at DESC`

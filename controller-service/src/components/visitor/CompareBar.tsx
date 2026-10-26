@@ -15,7 +15,10 @@ export default function CompareBar() {
   }
 
   return (
-    <div data-bottom-bar="compare" className="fixed bottom-0 left-0 right-0 z-30 bg-surface-elevated border-t border-border-default shadow-2xl">
+    <div
+      data-bottom-bar="compare"
+      className="fixed bottom-0 left-0 right-0 z-30 bg-surface-elevated border-t border-border-default shadow-2xl pb-[env(safe-area-inset-bottom,0px)]"
+    >
       <div className="container mx-auto px-4 py-3 flex items-center gap-3">
         {/* Product thumbnails */}
         <div className="flex-1 flex items-center gap-2 overflow-x-auto min-w-0">
@@ -44,7 +47,7 @@ export default function CompareBar() {
               </div>
               <button
                 onClick={() => removeFromCompare(p.id)}
-                className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shadow before:absolute before:-inset-2.5 before:content-['']"
                 aria-label={`Remove ${p.name}`}
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -67,13 +70,13 @@ export default function CompareBar() {
           <span className="hidden sm:block text-xs text-foreground-muted">{compareList.length} selected</span>
           <button
             onClick={clearCompare}
-            className="text-xs text-foreground-muted hover:text-foreground transition-colors px-2 py-1.5"
+            className="text-xs text-foreground-muted hover:text-foreground transition-colors px-2 py-1.5 min-h-[44px] lg:min-h-0"
           >
             Clear
           </button>
           <button
             onClick={handleCompare}
-            className="bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+            className="bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold px-4 py-2 min-h-[44px] lg:min-h-0 rounded-lg transition-colors whitespace-nowrap"
           >
             Compare Now
           </button>

@@ -10,6 +10,7 @@ import { fmtQty } from '@/lib/shared/number-display'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { NumberInput, TextArea, TextInput } from '@/components/admin/kit/form'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { Field, Fields } from '@/components/admin/kit/layout'
 
 interface ReturnRequest {
@@ -348,7 +349,16 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
             <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
               Admin notes (required for rejection, optional for approval)
             </label>
-            <TextArea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} rows={3} placeholder="Notes visible to customer..." className="resize-none" />
+            <AIEnrichButton
+              fieldLabel="Note to the customer on their return"
+              value={adminNotes}
+              onChange={setAdminNotes}
+              scope="returns:write"
+              multiline
+              context={`Shown to the customer on their ${returnRequest.type} request (reason: ${REASON_LABELS[returnRequest.reason] ?? returnRequest.reason}). Polite, brief, factual.`}
+            >
+              <TextArea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} rows={3} placeholder="Notes visible to customer..." className="resize-none pr-8" />
+            </AIEnrichButton>
           </div>
           <div className="flex gap-3">
             <button

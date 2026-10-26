@@ -5,6 +5,7 @@ import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { Card, DetailHeader, DetailSkeleton, Dialog, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, TextArea, badgeCls, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { RFQ_STATUS, fmtDay } from '../../_status'
 import { round2 } from '@/lib/catalog/gst'
@@ -332,6 +333,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
       ))}
     </div>
   )
+  const lastCustomerMessage = [...messages].reverse().find(m => m.sender === 'customer')?.message ?? ''
   const presetChips = (presets: string[]) => (
     <div className="grid grid-cols-1 gap-2">
       {presets.map(preset => (
@@ -444,7 +446,16 @@ export default function RFQDetailClient({ id }: { id: string }) {
             <RequireWrite scope="business_rfqs:write">
               <div className="space-y-3 rounded-xl border border-red-500/40 bg-red-500/5 p-4">
                 <p className="text-sm font-semibold text-red-600 dark:text-red-400">Reject this RFQ</p>
-                <TextArea value={adminNote} onChange={e => setAdminNote(e.target.value)} placeholder="Reason for rejection (shown to business customer)…" rows={3} className="resize-none" />
+                <AIEnrichButton
+                  fieldLabel="Reason for rejecting the RFQ"
+                  value={adminNote}
+                  onChange={setAdminNote}
+                  scope="business_rfqs:write"
+                  multiline
+                  context={`Shown to the business customer ${rfq.company_name || ''} explaining why their request for quotation was declined. Polite, brief, factual.`}
+                >
+                  <TextArea value={adminNote} onChange={e => setAdminNote(e.target.value)} placeholder="Reason for rejection (shown to business customer)…" rows={3} className="resize-none pr-8" />
+                </AIEnrichButton>
                 <div className="flex gap-2">
                   <button onClick={() => handleStatusChange('rejected')} disabled={actionLoading} className="control-md bg-red-600 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
                     Confirm Reject
@@ -1021,19 +1032,29 @@ export default function RFQDetailClient({ id }: { id: string }) {
                         'Could you increase the quantity? It will help us offer a better price.',
                         'We can match this price. Shall we proceed to a final quotation?',
                       ])}
-                      <TextArea
+                      <AIEnrichButton
+                        fieldLabel="Negotiation reply"
                         value={replyText}
-                        onChange={e => setReplyText(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            handleSendReply()
-                          }
-                        }}
-                        placeholder="Type a reply… (Enter to send, Shift+Enter for new line)"
-                        rows={3}
-                        className="resize-none"
-                      />
+                        onChange={setReplyText}
+                        scope="business_rfqs:write"
+                        multiline
+                        write
+                        context={`Reply from the store to the business customer ${rfq.company_name || ''} in an RFQ price negotiation. Do not invent prices or quantities.${lastCustomerMessage ? ` Their last message: "${lastCustomerMessage.slice(0, 600)}"` : ''}`}
+                      >
+                        <TextArea
+                          value={replyText}
+                          onChange={e => setReplyText(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              handleSendReply()
+                            }
+                          }}
+                          placeholder="Type a reply… (Enter to send, Shift+Enter for new line)"
+                          rows={3}
+                          className="resize-none pr-8"
+                        />
+                      </AIEnrichButton>
                       {counterToggle('Attach counter prices (optional)')}
                       {showCounterForm && counterPrices}
                       {sendButton('Send Reply')}

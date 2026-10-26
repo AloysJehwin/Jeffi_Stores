@@ -1,5 +1,7 @@
 import { query, queryOne, queryMany, getClient } from '@/lib/shared/db'
 import { PoolClient } from 'pg'
+import type { FilterScope } from '@jeffi/list-filters'
+import { LEDGER_COUNT_CAP } from '@/lib/filters/fields/inventory'
 import { buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
 import { round2 } from '@/lib/catalog/gst'
 
@@ -218,10 +220,13 @@ export async function updateWeightedAvgCost(
 export async function getStockLedger(filters: {
   productId?: string
   search?: string
+  /** IST days (YYYY-MM-DD), inclusive. */
   from?: string
   to?: string
   limit?: number
   offset?: number
+  /** The ledger list's other filters (on it), from the filter registry. */
+  scope?: FilterScope
 }) {
   const conditions: string[] = ['1=1']
   const params: any[] = []
@@ -232,12 +237,12 @@ export async function getStockLedger(filters: {
     params.push(filters.productId)
   }
   if (filters.from) {
-    conditions.push(`it.created_at >= $${i++}`)
+    conditions.push(`it.created_at >= ($${i++}::date)::timestamp AT TIME ZONE 'Asia/Kolkata'`)
     params.push(filters.from)
   }
   if (filters.to) {
-    conditions.push(`it.created_at <= $${i++}`)
-    params.push(filters.to + ' 23:59:59')
+    conditions.push(`it.created_at < ($${i++}::date + 1)::timestamp AT TIME ZONE 'Asia/Kolkata'`)
+    params.push(filters.to)
   }
   if (filters.search) {
     const sc = buildProductSearchClause(filters.search, 'p.name', 'p.sku', 'p.search_vector', i)
@@ -245,8 +250,13 @@ export async function getStockLedger(filters: {
     params.push(...sc.params)
     i = sc.nextIdx
   }
+  const scoped = filters.scope?.and(i)
+  if (scoped?.sql) {
+    params.push(...scoped.params)
+    i += scoped.params.length
+  }
 
-  const where = conditions.join(' AND ')
+  const where = conditions.join(' AND ') + (scoped?.sql ?? '')
 
   // Ledger rows are grouped in the UI by (reference_id, transaction_type) — a
   // GRN/sale that touched 50 serials is ONE event. Paginate by that group so the
@@ -255,15 +265,19 @@ export async function getStockLedger(filters: {
   // transaction_type, falling back to the row id for legacy rows with no reference.
   const GROUP_KEY = `COALESCE(it.reference_id::text || '::' || it.transaction_type, it.id::text)`
 
+  // Capped: the busiest table, and the footer only needs "N of M".
   const countRow = await queryOne<{ total: number }>(
-    `SELECT COUNT(DISTINCT ${GROUP_KEY})::int AS total
-     FROM inventory_transactions it
-     JOIN products p ON p.id = it.product_id
-     LEFT JOIN product_variants pv ON pv.id = it.variant_id
-     WHERE ${where}`,
+    `SELECT COUNT(*)::int AS total FROM (
+       SELECT DISTINCT ${GROUP_KEY}
+       FROM inventory_transactions it
+       JOIN products p ON p.id = it.product_id
+       WHERE ${where}
+       LIMIT ${LEDGER_COUNT_CAP + 1}) t`,
     params
   )
-  const total = countRow?.total || 0
+  const counted = countRow?.total || 0
+  const total = Math.min(counted, LEDGER_COUNT_CAP)
+  const capped = counted > LEDGER_COUNT_CAP
 
   const limit = filters.limit || 50
   const offset = filters.offset || 0
@@ -282,7 +296,7 @@ export async function getStockLedger(filters: {
     pageParams
   )
 
-  if (!groupRows || groupRows.length === 0) return { rows: [], total }
+  if (!groupRows || groupRows.length === 0) return { rows: [], total, capped }
 
   // Step 2: all child rows for exactly those groups, kept contiguous and in the
   // same group order (by the group's newest timestamp) so the UI groups cleanly.
@@ -336,7 +350,7 @@ export async function getStockLedger(filters: {
     rowParams
   )
 
-  return { rows: rows || [], total }
+  return { rows: rows || [], total, capped }
 }
 
 export async function getStockValuation(
@@ -349,9 +363,11 @@ export async function getStockValuation(
     stockStatus?: string
     sort?: string
     dir?: string
+    /** The valuation list's filters (on products p), from the filter registry. */
+    scope?: FilterScope
   } = {}
 ) {
-  const { limit = 50, offset = 0, search, categoryName, brandName, stockStatus, sort, dir } = filters
+  const { limit = 50, offset = 0, search, categoryName, brandName, stockStatus, sort, dir, scope } = filters
 
   // Build WHERE conditions applied to each UNION leg via a wrapping CTE
   const havingClauses: string[] = []
@@ -541,6 +557,12 @@ export async function getStockValuation(
   }
   if (stockStatus === 'low_stock') {
     havingClauses.push(`rows.inventory_quantity > 0 AND rows.inventory_quantity <= 5`)
+  }
+  if (scope && !scope.empty) {
+    const s = scope.inIds('rows.id', i)
+    havingClauses.push(s.sql.replace(/^ AND /, ''))
+    params.push(...s.params)
+    i += s.params.length
   }
 
   const whereClause = havingClauses.length > 0 ? `WHERE ${havingClauses.join(' AND ')}` : ''

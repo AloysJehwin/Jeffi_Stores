@@ -125,9 +125,13 @@ export default function HomepageFormFooter({ adminId, initialSummary, cancelHref
         setBusy(null)
         return
       }
+      // Stay on the editor: close this session and start a new one so Cancel reverts to the published state.
       if (edit.sessionId) await edit.save()
+      await edit.reopen()
+      await refresh()
+      autosaveBlockedRef.current = false
+      setBusy(null)
       showToast('Published - the homepage is live', 'success')
-      router.push(cancelHref)
       router.refresh()
     } catch {
       autosaveBlockedRef.current = false

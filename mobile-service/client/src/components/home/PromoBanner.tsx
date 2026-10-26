@@ -1,9 +1,8 @@
 import { View, useWindowDimensions } from 'react-native'
-import { Button, Overline, Text, elevationClass, useElevation } from '../../ui'
-import { Image } from 'expo-image'
+import { Button, Gradient, Overline, Text, elevationClass, useElevation } from '../../ui'
 import { useRouter } from 'expo-router'
 import { ChevronRight } from 'lucide-react-native'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
+import FeedMedia from './FeedMedia'
 import { absUrl, openHref } from '../../lib/links'
 import { primary, status } from '../../theme'
 import type { SectionProps } from '../../types/home'
@@ -22,10 +21,11 @@ export default function PromoBanner({ section }: SectionProps) {
   const imageUrlMobile = str(cfg.imageUrlMobile)
   const blurhash = str(cfg.blurhash)
   const mobileImg = imageUrlMobile ?? imageUrl ?? null
+  const video = section.copy.video ?? str(cfg.video)
   const showCta = !!(ctaUrl && ctaLabel)
   const shadow = useElevation('overlay')
 
-  if (!title && !subtitle && !eyebrow && !mobileImg && !showCta) return null
+  if (!title && !subtitle && !eyebrow && !mobileImg && !video && !showCta) return null
   const src = absUrl(mobileImg)
   const titleSize = Math.min(48, Math.max(24, width * 0.04)) // text-[clamp(1.5rem,4vw,3rem)]
 
@@ -33,37 +33,14 @@ export default function PromoBanner({ section }: SectionProps) {
     <View className="bg-surface px-4 py-8">
       <View style={shadow} className={`rounded-panel ${elevationClass('overlay')}`}>
         <View className="min-h-[14rem] overflow-hidden rounded-panel bg-black">
-          {mobileImg ? (
+          {mobileImg || video ? (
             <>
-              <Image
-                source={src ? { uri: src } : undefined}
-                placeholder={blurhash ? { blurhash } : undefined}
-                style={FILL}
-                contentFit="cover"
-                transition={200}
-              />
+              <FeedMedia image={src} video={video} blurhash={blurhash} style={FILL} />
               {/* bg-gradient-to-r from-10% via-70% at 55% to-transparent */}
-              <Svg style={FILL} width="100%" height="100%">
-                <Defs>
-                  <LinearGradient id="promo" x1="0" y1="0" x2="1" y2="0">
-                    <Stop offset="0.1" stopColor={status.black} />
-                    <Stop offset="0.55" stopColor={status.black} stopOpacity={0.7} />
-                    <Stop offset="1" stopColor={status.black} stopOpacity={0} />
-                  </LinearGradient>
-                </Defs>
-                <Rect width="100%" height="100%" fill="url(#promo)" />
-              </Svg>
+              <Gradient dir="r" stops={[[0.1, status.black], [0.55, status.black, 0.7], [1, status.black, 0]]} />
             </>
           ) : (
-            <Svg style={FILL} width="100%" height="100%">
-              <Defs>
-                <LinearGradient id="promoFallback" x1="0" y1="0" x2="1" y2="1">
-                  <Stop offset="0" stopColor={primary[600]} />
-                  <Stop offset="1" stopColor={primary[800]} />
-                </LinearGradient>
-              </Defs>
-              <Rect width="100%" height="100%" fill="url(#promoFallback)" />
-            </Svg>
+            <Gradient stops={[[0, primary[600]], [1, primary[800]]]} />
           )}
 
           <View className="gap-3 px-6 py-10" style={{ maxWidth: '90%' }}>

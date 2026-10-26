@@ -24,6 +24,9 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/AdminAgentModal.tsx',
   // Self-service: marks the member's own notification bell read; no scoped record mutation.
   'controller-service/src/components/admin/NotificationBell.tsx',
+  // Self-service: the member's own saved filter views. Sharing one is offered only when the
+  // server reports the list's :write scope (canShare), which the routes enforce again.
+  'controller-service/src/components/admin/kit/saved-views.tsx',
   // Platform control plane: gated by host + isPlatformAdmin, not a tenant scope.
   'controller-service/src/components/admin/ecom/tabs/KycActionButtons.tsx',
   'controller-service/src/components/admin/ecom/TenantActions.tsx',

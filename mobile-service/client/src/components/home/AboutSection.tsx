@@ -1,9 +1,8 @@
 import { View } from 'react-native'
-import { Button, Overline, Text, elevationClass, useElevation } from '../../ui'
-import { Image } from 'expo-image'
+import { Button, Gradient, Overline, Text, elevationClass, useElevation } from '../../ui'
 import { useRouter } from 'expo-router'
 import { ChevronRight } from 'lucide-react-native'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
+import FeedMedia from './FeedMedia'
 import { absUrl, openHref } from '../../lib/links'
 import { secondary, status } from '../../theme'
 import type { SectionProps } from '../../types/home'
@@ -30,23 +29,15 @@ export default function AboutSection({ section, data }: SectionProps) {
     <View className="bg-surface px-4 py-12">
       <View style={shadow} className={`rounded-panel bg-surface ${elevationClass('overlay')}`}>
         <View className="relative overflow-hidden rounded-panel">
-          <Image
-            source={{ uri: absUrl(copy.imageUrl || COPY.imageUrl) ?? undefined }}
+          <FeedMedia
+            image={absUrl(copy.imageUrl || COPY.imageUrl)}
+            video={copy.video}
             accessibilityLabel={`${data.storeName} team`}
             style={{ width: '100%', height: 224 }}
-            contentFit="cover"
+            transition={0}
           />
           {/* bg-gradient-to-t from-secondary-900/60 via-transparent to-transparent */}
-          <Svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0 }} pointerEvents="none">
-            <Defs>
-              <LinearGradient id="about-fade" x1="0" y1="1" x2="0" y2="0">
-                <Stop offset="0" stopColor={secondary[900]} stopOpacity={0.6} />
-                <Stop offset="0.5" stopColor={secondary[900]} stopOpacity={0} />
-                <Stop offset="1" stopColor={secondary[900]} stopOpacity={0} />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#about-fade)" />
-          </Svg>
+          <Gradient dir="t" stops={[[0, secondary[900], 0.6], [0.5, secondary[900], 0], [1, secondary[900], 0]]} />
           <View className="absolute bottom-4 left-4 right-4 flex-row gap-3">
             {stats.map((s, i) => (
               <View key={i} className="flex-1 rounded-xl border border-white/15 bg-white/10 px-4 py-3">

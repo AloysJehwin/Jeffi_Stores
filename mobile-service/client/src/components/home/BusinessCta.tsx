@@ -1,9 +1,8 @@
 import { StyleSheet, View } from 'react-native'
-import { Button, Text, elevationClass, useElevation } from '../../ui'
+import { Button, Gradient, Text, elevationClass, useElevation } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Building2, ChevronRight, FileText, MessageCircleMore, Tag } from 'lucide-react-native'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { absUrl, openHref } from '../../lib/links'
 import { accent, secondary, status } from '../../theme'
 import type { SectionProps } from '../../types/home'
@@ -43,23 +42,8 @@ export default function BusinessCta({ section, data }: SectionProps) {
               contentFit="cover"
               contentPosition="center"
             />
-            <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-              <Defs>
-                <LinearGradient id="biz-x" x1="0" y1="0" x2="1" y2="0">
-                  <Stop offset="0" stopColor={INK} stopOpacity={1} />
-                  <Stop offset="0.35" stopColor={INK} stopOpacity={1} />
-                  <Stop offset="0.6" stopColor={INK} stopOpacity={0.8} />
-                  <Stop offset="1" stopColor={INK} stopOpacity={0} />
-                </LinearGradient>
-                <LinearGradient id="biz-y" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0" stopColor={status.black} stopOpacity={0.2} />
-                  <Stop offset="0.5" stopColor={status.black} stopOpacity={0} />
-                  <Stop offset="1" stopColor={status.black} stopOpacity={0.3} />
-                </LinearGradient>
-              </Defs>
-              <Rect width="100%" height="100%" fill="url(#biz-x)" />
-              <Rect width="100%" height="100%" fill="url(#biz-y)" />
-            </Svg>
+            <Gradient dir="r" stops={[[0, INK], [0.35, INK], [0.6, INK, 0.8], [1, INK, 0]]} />
+            <Gradient dir="b" stops={[[0, status.black, 0.2], [0.5, status.black, 0], [1, status.black, 0.3]]} />
           </View>
 
           <View className="z-10 gap-4 px-6 pb-16 pt-10" style={{ maxWidth: '58%' }}>

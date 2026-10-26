@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PanResponder, Pressable, View, useWindowDimensions, type TextLayoutEventData, type NativeSyntheticEvent } from 'react-native'
-import { Text, elevationClass, useElevation, useMotion } from '../../ui'
-import { Image } from 'expo-image'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Pressable, View, useWindowDimensions, type TextLayoutEventData, type NativeSyntheticEvent } from 'react-native'
+import { Gradient, Media, PagerDots, Text, elevationClass, useAutoplay, useElevation, useMotion, useSwipe } from '../../ui'
 import { useRouter } from 'expo-router'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
+import { useOnScreen } from './scroll-context'
 import { badgeBg } from '../../lib/badge'
 import { absUrl, openHref } from '../../lib/links'
 import { status } from '../../theme'
@@ -27,7 +26,6 @@ const LEGACY_COPY: Record<string, { badge: string; badgeColor: string; subtitle:
 }
 
 const AUTO_ADVANCE_MS = 5000
-const SWIPE_THRESHOLD = 50
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const
 
 interface Resolved {
@@ -38,6 +36,7 @@ interface Resolved {
   badgeColor: string
   img: string | null
   blurhash: string | null
+  video: string | null
 }
 
 function resolveSlide(s: HeroSlide, i: number): Resolved {
@@ -50,6 +49,7 @@ function resolveSlide(s: HeroSlide, i: number): Resolved {
     badgeColor: s.badge_color ?? legacy?.badgeColor ?? 'bg-primary-500',
     img: absUrl(s.image_url_mobile ?? s.image_url ?? s.hero_image_mobile),
     blurhash: s.blurhash_mobile || s.blurhash || null,
+    video: s.video_url || null,
   }
 }
 
@@ -63,34 +63,17 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
   const router = useRouter()
   const { width, height } = useWindowDimensions()
   const [active, setActive] = useState(0)
-  const paused = useRef(false)
   const count = slides.length
   const index = active < count ? active : 0
   const resolved = useMemo(() => slides.map(resolveSlide), [slides])
-  const { animate } = useMotion()
 
   const go = useCallback((next: number) => setActive(((next % count) + count) % count), [count])
   const step = useCallback((d: number) => setActive(a => (((a + d) % count) + count) % count), [count])
 
-  useEffect(() => {
-    if (count <= 1 || !animate) return
-    const t = setTimeout(() => {
-      if (!paused.current) step(1)
-    }, AUTO_ADVANCE_MS)
-    return () => clearTimeout(t)
-  }, [active, step, count, animate])
-
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderRelease: (_, g) => {
-          if (Math.abs(g.dx) > SWIPE_THRESHOLD) step(g.dx < 0 ? 1 : -1) // swipe left → next
-        },
-      }),
-    [step]
-  )
+  const auto = useAutoplay(() => step(1), { enabled: count > 1, intervalMs: AUTO_ADVANCE_MS })
+  useEffect(() => auto.restart(), [auto, index])
+  const swipe = useSwipe(step)
+  const { ref, onLayout, onScreen } = useOnScreen(slides.some(s => s.video_url))
 
   const open = () => {
     const s = slides[index]
@@ -106,17 +89,17 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
   const shadow = useElevation('floating')
 
   return (
-    <View className="bg-surface" style={{ height: boxHeight, paddingHorizontal: 12, paddingTop: 12 }}>
+    <Animated.View ref={ref} onLayout={onLayout} collapsable={false} className="bg-surface" style={{ height: boxHeight, paddingHorizontal: 12, paddingTop: 12 }}>
       <View style={shadow} className={`flex-1 rounded-sheet ${elevationClass('floating')}`}>
         <View
           className="flex-1 overflow-hidden rounded-sheet bg-black"
-          {...pan.panHandlers}
-          onTouchStart={() => (paused.current = true)}
-          onTouchEnd={() => (paused.current = false)}
-          onTouchCancel={() => (paused.current = false)}
+          {...swipe}
+          onTouchStart={() => auto.hold(true)}
+          onTouchEnd={() => auto.hold(false)}
+          onTouchCancel={() => auto.hold(false)}
         >
           {resolved.map((s, i) => (
-            <Slide key={s.key} slide={s} active={i === index} cardWidth={cardWidth} titleSize={titleSize} />
+            <Slide key={s.key} slide={s} active={i === index} play={onScreen && i === index} cardWidth={cardWidth} titleSize={titleSize} />
           ))}
 
           <Pressable
@@ -128,20 +111,14 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
             onAccessibilityAction={e => step(e.nativeEvent.actionName === 'previous' ? -1 : 1)}
           />
 
-          {count > 1 && (
-            <View className="absolute bottom-5 left-0 right-0 flex-row items-center justify-center gap-2" style={{ zIndex: 30 }}>
-              {resolved.map((s, i) => (
-                <Dot key={s.key} on={i === index} animate={animate} onPress={() => go(i)} label={`Go to slide ${i + 1}`} />
-              ))}
-            </View>
-          )}
+          <PagerDots count={count} index={index} onSelect={go} tone="white" className="absolute bottom-5 left-0 right-0" style={{ zIndex: 30 }} />
         </View>
       </View>
-    </View>
+    </Animated.View>
   )
 }
 
-function Slide({ slide: s, active, cardWidth, titleSize }: { slide: Resolved; active: boolean; cardWidth: number; titleSize: number }) {
+function Slide({ slide: s, active, play, cardWidth, titleSize }: { slide: Resolved; active: boolean; play: boolean; cardWidth: number; titleSize: number }) {
   const opacity = useSharedValue(active ? 1 : 0)
   const { animate } = useMotion()
   useEffect(() => {
@@ -155,40 +132,12 @@ function Slide({ slide: s, active, cardWidth, titleSize }: { slide: Resolved; ac
       <View className="bg-black" style={FILL}>
         {/* The image covers the right 62%; its left edge fades into the base. */}
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: imageWidth }}>
-          <Image
-            source={s.img ? { uri: s.img } : undefined}
-            placeholder={s.blurhash ? { blurhash: s.blurhash } : undefined}
-            style={FILL}
-            contentFit="cover"
-            transition={300}
-          />
-          <Svg style={FILL} width="100%" height="100%">
-            <Defs>
-              <LinearGradient id="heroMask" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor={status.black} />
-                <Stop offset="0.35" stopColor={status.black} stopOpacity={0} />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#heroMask)" />
-          </Svg>
+          <Media image={s.img} video={s.video} blurhash={s.blurhash} style={FILL} width={imageWidth} transition={300} active={play} />
+          <Gradient dir="r" stops={[[0, status.black], [0.35, status.black, 0]]} />
         </View>
         {/* bg-gradient-to-r from-35% via-80% at 60% to-transparent, then to-b from-black/20 via-transparent to-black/30 */}
-        <Svg style={FILL} width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="heroX" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0.35" stopColor={status.black} />
-              <Stop offset="0.6" stopColor={status.black} stopOpacity={0.8} />
-              <Stop offset="1" stopColor={status.black} stopOpacity={0} />
-            </LinearGradient>
-            <LinearGradient id="heroY" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={status.black} stopOpacity={0.2} />
-              <Stop offset="0.5" stopColor={status.black} stopOpacity={0} />
-              <Stop offset="1" stopColor={status.black} stopOpacity={0.3} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#heroX)" />
-          <Rect width="100%" height="100%" fill="url(#heroY)" />
-        </Svg>
+        <Gradient dir="r" stops={[[0.35, status.black], [0.6, status.black, 0.8], [1, status.black, 0]]} />
+        <Gradient dir="b" stops={[[0, status.black, 0.2], [0.5, status.black, 0], [1, status.black, 0.3]]} />
       </View>
 
       <View style={{ height: '100%', maxWidth: '55%', paddingHorizontal: 24, paddingTop: 40, paddingBottom: 64 }}>
@@ -263,22 +212,5 @@ function HeroTitle({ text, maxWidth, fullWidth, fontSize }: { text: string; maxW
         {wrapped.join('\n')}
       </Text>
     </View>
-  )
-}
-
-// Pager pill: bg-white w-5 when active, bg-white/35 w-2 otherwise (transition-all duration-300).
-function Dot({ on, animate, onPress, label }: { on: boolean; animate: boolean; onPress: () => void; label: string }) {
-  const w = useSharedValue(on ? 20 : 8)
-  const o = useSharedValue(on ? 1 : 0.35)
-  useEffect(() => {
-    const duration = animate ? 300 : 0
-    w.value = withTiming(on ? 20 : 8, { duration })
-    o.value = withTiming(on ? 1 : 0.35, { duration })
-  }, [on, w, o, animate])
-  const style = useAnimatedStyle(() => ({ width: w.value, opacity: o.value }))
-  return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: on }}>
-      <Animated.View style={[{ height: 8, borderRadius: 999, backgroundColor: status.white }, style]} />
-    </Pressable>
   )
 }

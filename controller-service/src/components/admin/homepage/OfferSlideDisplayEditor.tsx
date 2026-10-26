@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
-import AdminImage from '@/components/admin/AdminImage'
+import { useCallback, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
-import { useCanWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import MediaField, { type MediaSize, type MediaValue } from '@/components/admin/media/MediaField'
+import AiCopyButton from '@/components/admin/ai/AiCopyButton'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 export interface OfferSlide {
   id: string
@@ -15,9 +17,60 @@ export interface OfferSlide {
   cta_label: string | null
   image_url: string | null
   blurhash: string | null
+  image_url_card?: string | null
+  blurhash_card?: string | null
+  video_url?: string | null
+  video_url_card?: string | null
   is_active: boolean
   product_count: number
 }
+
+interface Slot {
+  key: 'card' | 'wide'
+  label: string
+  hint: string
+  size: MediaSize[]
+  image: 'image_url' | 'image_url_card'
+  hash: 'blurhash' | 'blurhash_card'
+  video: 'video_url' | 'video_url_card'
+  /** PATCH body keys. */
+  api: { image: string; hash: string; video: string }
+  style: string
+}
+
+const SLOTS: Slot[] = [
+  {
+    key: 'card',
+    label: 'Card',
+    hint: '4:5, e.g. 1080×1350. The offer cards. An MP4 or GIF works too.',
+    size: ['portrait', 'square'],
+    image: 'image_url_card',
+    hash: 'blurhash_card',
+    video: 'video_url_card',
+    api: { image: 'imageUrlCard', hash: 'blurhashCard', video: 'videoUrlCard' },
+    style: 'promotional offer card, cinematic studio lighting, dark near-black background, subject in the upper two thirds leaving calm space at the bottom for text, photorealistic',
+  },
+  {
+    key: 'wide',
+    label: 'Wide',
+    hint: '2.4:1, e.g. 1536×640. Listing banners and a lone offer.',
+    size: ['hero', 'wide'],
+    image: 'image_url',
+    hash: 'blurhash',
+    video: 'video_url',
+    api: { image: 'imageUrl', hash: 'blurhash', video: 'videoUrl' },
+    style: 'promotional offer banner, cinematic studio lighting, dark near-black background, subject toward the right leaving space on the left for text, photorealistic',
+  },
+]
+
+const COPY_FIELDS = [
+  { name: 'subtitle', label: 'Short line under the offer title, one concise sentence', type: 'text' as const },
+  { name: 'badge_text', label: 'Tiny uppercase badge, 1-2 words e.g. Diwali', type: 'text' as const },
+  { name: 'cta_label', label: 'Button label, 1-3 words e.g. Shop the offer', type: 'text' as const },
+]
+
+const INPUT_CLASS =
+  'w-full pl-3 pr-9 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60'
 
 const BADGE_COLORS = [
   { value: 'bg-primary-500', label: 'Primary', swatch: '#7c3aed' },
@@ -39,13 +92,9 @@ export default function OfferSlideDisplayEditor({
 }) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('coupons:write')
-  const canUseAi = useCanUseAi('coupons:write')
   const storeName = useStoreConfig().identity.name || 'an online store'
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const [aiPrompt, setAiPrompt] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
+  const aiContext = `Homepage offer card for "${offer.title}" at ${storeName}.`
 
   const save = useCallback(
     async (patch: Partial<Record<string, unknown>>) => {
@@ -67,53 +116,30 @@ export default function OfferSlideDisplayEditor({
     [offer.id, showToast]
   )
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const form = new FormData()
-      form.append('file', file)
-      form.append('field', 'image_url')
-      const res = await fetch(`/api/admin/product-offers/${offer.id}/image`, {
-        method: 'POST',
-        body: form,
-        credentials: 'include',
-      })
-      const data = await res.json().catch(() => ({}))
-      if (res.ok && data.url) {
-        onChange({ image_url: data.url, blurhash: data.blurhash ?? null })
-        showToast('Image updated', 'success')
-      } else showToast(data.error || 'Upload failed', 'error')
-    } catch {
-      showToast('Upload failed', 'error')
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
+  // The image route saves as it uploads (and keeps GIFs); gallery, AI and video picks save through PATCH.
+  const uploader = (field: Slot['image']) => async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('field', field)
+    const res = await fetch(`/api/admin/product-offers/${offer.id}/image`, { method: 'POST', body: form, credentials: 'include' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.url) throw new Error(data.error || 'Upload failed')
+    return { url: data.url as string, blurhash: (data.blurhash as string | null) ?? null }
   }
 
-  async function generateImage() {
-    const prompt = aiPrompt.trim()
-    if (!prompt || generating) return
-    setGenerating(true)
-    try {
-      const res = await fetch(`/api/admin/product-offers/${offer.id}/generate-image`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ prompt, field: 'image_url' }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (res.ok && data.url) {
-        onChange({ image_url: data.url, blurhash: data.blurhash ?? null })
-        showToast('Image generated', 'success')
-      } else showToast(data.error || 'Image generation failed', 'error')
-    } catch {
-      showToast('Image generation failed', 'error')
-    } finally {
-      setGenerating(false)
-    }
+  function fillCopy(v: Record<string, string>) {
+    const patch: Partial<OfferSlide> = {}
+    if (v.subtitle) patch.subtitle = v.subtitle
+    if (v.badge_text) patch.badge_text = v.badge_text
+    if (v.cta_label) patch.cta_label = v.cta_label
+    onChange(patch)
+    save({ subtitle: patch.subtitle, badgeText: patch.badge_text, ctaLabel: patch.cta_label })
+  }
+
+  function setMedia(slot: Slot, next: MediaValue) {
+    const video = next.video ?? null
+    onChange({ [slot.image]: next.image, [slot.hash]: next.blurhash ?? null, [slot.video]: video })
+    save({ [slot.api.image]: next.image, [slot.api.hash]: next.blurhash ?? null, [slot.api.video]: video })
   }
 
   return (
@@ -123,113 +149,88 @@ export default function OfferSlideDisplayEditor({
         {saving && <span className="text-[10px] text-foreground-muted">Saving…</span>}
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Slide image</label>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-16 h-10 rounded-lg bg-surface-secondary border border-border-default overflow-hidden shrink-0">
-            {offer.image_url ? (
-              <AdminImage
-                src={offer.image_url}
-                alt=""
-                blurhash={offer.blurhash}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-foreground-muted/40 text-[10px]">
-                No image
-              </div>
-            )}
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={onFile}
-            className="hidden"
+      <div className="space-y-4">
+        {SLOTS.map(slot => (
+          <MediaField
+            key={slot.key}
+            label={`${slot.label} media`}
+            hint={slot.hint}
+            value={{ image: offer[slot.image] ?? null, blurhash: offer[slot.hash] ?? null, video: offer[slot.video] ?? null }}
+            onChange={next => setMedia(slot, next)}
+            size={slot.size}
+            aiFeature="offer_image"
+            videoFeature="offer_video"
+            allowVideo
+            scope="coupons:write"
+            uploadImage={uploader(slot.image)}
+            defaultPrompt={`${offer.title} offer at ${storeName}, ${slot.style}`}
+            usageRef={offer.id}
           />
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading || generating || !canWrite}
-            className="px-3 h-control-sm rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
-          >
-            {uploading ? 'Uploading…' : offer.image_url ? 'Replace image' : 'Upload image'}
-          </button>
-        </div>
-
-        {canUseAi && (
-          <div className="rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/10 p-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-4 h-4 text-violet-500"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
-                />
-              </svg>
-              <span className="text-xs font-semibold text-violet-700 dark:text-violet-300">Generate with AI</span>
-              <span className="text-[11px] text-violet-500 dark:text-violet-400">Describe the slide image</span>
-            </div>
-            <textarea
-              value={aiPrompt}
-              onChange={e => setAiPrompt(e.target.value)}
-              rows={2}
-              placeholder={`e.g. 'Diwali festive sale banner for ${storeName}, warm lights, celebratory'`}
-              className="w-full px-3 py-2 rounded-lg border border-violet-200 dark:border-violet-700 bg-surface text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
-            />
-            <button
-              type="button"
-              onClick={generateImage}
-              disabled={generating || !aiPrompt.trim()}
-              className="mt-2 w-full h-control rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {generating ? (
-                <>
-                  <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />{' '}
-                  Creating image…
-                </>
-              ) : (
-                'Generate image'
-              )}
-            </button>
-            <p className="mt-1.5 text-[11px] text-violet-500/80 dark:text-violet-400/80">
-              Image generation can take up to a minute.
-            </p>
-          </div>
+        ))}
+        {!offer.image_url_card && offer.image_url && (
+          <p className="text-[11px] text-foreground-muted">Without a card image, the cards show a centre crop of the wide one.</p>
         )}
       </div>
 
+      <AiCopyButton
+        scope="coupons:write"
+        context={aiContext}
+        defaultBrief={offer.title}
+        fields={COPY_FIELDS}
+        onFill={fillCopy}
+      />
+
       <div>
         <label className="block text-xs font-medium text-foreground-secondary mb-1">Card copy</label>
-        <input
-          type="text"
+        <AIEnrichButton
+          fieldLabel="Offer card subtitle"
           value={offer.subtitle ?? ''}
-          onChange={e => onChange({ subtitle: e.target.value })}
-          onBlur={e => save({ subtitle: e.target.value || null })}
-          placeholder="Short line shown under the title"
-          disabled={!canWrite}
-          className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
-        />
+          onChange={v => {
+            onChange({ subtitle: v })
+            save({ subtitle: v || null })
+          }}
+          scope="coupons:write"
+          maxLength={500}
+          write
+          context={`${aiContext} A short line under the offer title, one concise sentence.`}
+        >
+          <input
+            type="text"
+            value={offer.subtitle ?? ''}
+            onChange={e => onChange({ subtitle: e.target.value })}
+            onBlur={e => save({ subtitle: e.target.value || null })}
+            placeholder="Short line shown under the title"
+            disabled={!canWrite}
+            className={INPUT_CLASS}
+          />
+        </AIEnrichButton>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-foreground-secondary mb-1">Badge text</label>
-          <input
-            type="text"
+          <AIEnrichButton
+            fieldLabel="Offer card badge"
             value={offer.badge_text ?? ''}
-            onChange={e => onChange({ badge_text: e.target.value })}
-            onBlur={e => save({ badgeText: e.target.value || null })}
-            placeholder="Diwali"
-            disabled={!canWrite}
-            className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
-          />
+            onChange={v => {
+              onChange({ badge_text: v })
+              save({ badgeText: v || null })
+            }}
+            scope="coupons:write"
+            maxLength={100}
+            write
+            context={`${aiContext} A tiny uppercase badge, 1-2 words, e.g. Diwali.`}
+          >
+            <input
+              type="text"
+              value={offer.badge_text ?? ''}
+              onChange={e => onChange({ badge_text: e.target.value })}
+              onBlur={e => save({ badgeText: e.target.value || null })}
+              placeholder="Diwali"
+              disabled={!canWrite}
+              className={INPUT_CLASS}
+            />
+          </AIEnrichButton>
         </div>
         <div>
           <label className="block text-xs font-medium text-foreground-secondary mb-1">Badge color</label>
@@ -254,15 +255,29 @@ export default function OfferSlideDisplayEditor({
 
       <div>
         <label className="block text-xs font-medium text-foreground-secondary mb-1">CTA label</label>
-        <input
-          type="text"
+        <AIEnrichButton
+          fieldLabel="Offer card button label"
           value={offer.cta_label ?? ''}
-          onChange={e => onChange({ cta_label: e.target.value })}
-          onBlur={e => save({ ctaLabel: e.target.value || null })}
-          placeholder="Shop the offer"
-          disabled={!canWrite}
-          className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
-        />
+          onChange={v => {
+            onChange({ cta_label: v })
+            save({ ctaLabel: v || null })
+          }}
+          scope="coupons:write"
+          format="label"
+          maxLength={100}
+          write
+          context={aiContext}
+        >
+          <input
+            type="text"
+            value={offer.cta_label ?? ''}
+            onChange={e => onChange({ cta_label: e.target.value })}
+            onBlur={e => save({ ctaLabel: e.target.value || null })}
+            placeholder="Shop the offer"
+            disabled={!canWrite}
+            className={INPUT_CLASS}
+          />
+        </AIEnrichButton>
       </div>
     </div>
   )

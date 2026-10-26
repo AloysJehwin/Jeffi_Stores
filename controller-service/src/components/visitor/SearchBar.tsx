@@ -90,10 +90,9 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
 
   useEffect(() => {
     if (isOpen) {
-      const id = window.setTimeout(() => inputRef.current?.focus(), 280)
+      inputRef.current?.focus({ preventScroll: true })
       document.body.style.overflow = 'hidden'
       return () => {
-        window.clearTimeout(id)
         document.body.style.overflow = ''
       }
     }
@@ -221,7 +220,11 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
       {/* Trigger icon — hidden when search is open */}
       <button
         type="button"
-        onClick={() => onOpen()}
+        onClick={() => {
+          // Focus inside the tap itself: iOS only raises the keyboard for a focus made in the user gesture.
+          inputRef.current?.focus({ preventScroll: true })
+          onOpen()
+        }}
         className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors ${isOpen ? 'invisible pointer-events-none' : ''}`}
         aria-label="Search"
       >
@@ -273,16 +276,18 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
             </svg>
             <input
               ref={inputRef}
-              type="text"
+              type="search"
+              enterKeyHint="search"
+              aria-label="Search products"
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Search products, categories..."
               autoComplete="off"
               tabIndex={isOpen ? 0 : -1}
-              className="w-full pl-11 pr-24 py-3 rounded-full border border-border-secondary bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 text-sm shadow-lg"
+              className="w-full pl-11 pr-28 sm:pr-24 py-3 rounded-full border border-border-secondary bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 text-base sm:text-sm shadow-lg [&::-webkit-search-cancel-button]:appearance-none"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <div className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 flex items-center gap-0 sm:gap-1">
               {query && (
                 <button
                   type="button"
@@ -292,7 +297,7 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
                     setCategories([])
                     inputRef.current?.focus()
                   }}
-                  className="p-1.5 rounded-full text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
+                  className="p-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
                   aria-label="Clear text"
                   title="Clear"
                 >
@@ -308,7 +313,7 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
               <button
                 type="button"
                 onClick={close}
-                className="p-1.5 rounded-full text-foreground-secondary hover:text-foreground hover:bg-surface-secondary transition-colors"
+                className="p-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-full text-foreground-secondary hover:text-foreground hover:bg-surface-secondary transition-colors"
                 aria-label="Close search"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

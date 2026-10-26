@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { responsiveImg } from '@/lib/shared/image-url'
 import { listBrandsWithCounts } from '@/lib/catalog/storefront-counts'
 
 export const dynamic = 'force-dynamic'
@@ -28,7 +29,11 @@ export default async function BrandsPage() {
                   <div className="flex items-start gap-4 mb-4">
                     <div className="w-16 h-16 bg-surface-secondary rounded-lg flex items-center justify-center flex-shrink-0 border border-border-default overflow-hidden">
                       {brand.logo_url ? (
-                        <img src={brand.logo_url} alt={brand.name} className="w-full h-full object-contain p-1" />
+                        <img
+                          {...responsiveImg(brand.logo_url, '64px')}
+                          alt={brand.name}
+                          className="w-full h-full object-contain p-1"
+                        />
                       ) : (
                         <svg
                           className="w-8 h-8 text-foreground-muted"

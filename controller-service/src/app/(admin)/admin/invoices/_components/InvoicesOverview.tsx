@@ -1,10 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { INVOICE_ALIASES, INVOICE_FIELDS, INVOICE_SEARCH } from '@jeffi/list-filters/fields'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { AttentionList, OverviewSkeleton, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { Badge, Kpi, KpiGrid, Section, Table, count, money, pct } from '@/components/admin/channels/ui'
 import { DonutSplit, RankedBars, TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
-import { delta } from '@/lib/overview/period'
+import { MAX_SPAN_DAYS, delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import type { InvoiceOverview } from '@/lib/overviews/invoices'
 
@@ -24,9 +27,13 @@ const AGING_TONE = ['bg-green-500', 'bg-amber-500', 'bg-orange-500', 'bg-red-500
 
 export default function InvoicesOverview() {
   const [period, setPeriod] = usePeriod()
+  const sp = useSearchParams()
+  // KPIs and charts follow the list's filters; the PeriodBar owns from / to (the invoice date).
+  const filters = useFilterQuery(INVOICE_FIELDS, { aliases: INVOICE_ALIASES, omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<InvoiceOverview>(
-    `/api/admin/invoices/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/invoices/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
+  const clamped = !!sp.get('from') && sp.get('from') !== period.from
 
   return (
     <div className="space-y-5">
@@ -37,6 +44,20 @@ export default function InvoicesOverview() {
         </p>
       </div>
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="invoices"
+        fields={INVOICE_FIELDS}
+        aliases={INVOICE_ALIASES}
+        search={INVOICE_SEARCH}
+        period
+        noun="Invoices"
+        tab="overview"
+      />
+      {clamped && (
+        <p className="text-xs text-foreground-muted">
+          The overview covers at most {MAX_SPAN_DAYS} days: showing {period.from} to {period.to}.
+        </p>
+      )}
       {error && <p className="text-sm text-red-500">{error}</p>}
       {!data ? loading && <OverviewSkeleton /> : <Body d={data} />}
     </div>

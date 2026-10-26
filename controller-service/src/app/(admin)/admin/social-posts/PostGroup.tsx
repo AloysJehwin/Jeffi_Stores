@@ -5,6 +5,8 @@ import { CalendarClock, ExternalLink, Pencil, RotateCcw, Send, X } from 'lucide-
 import IconButton from '@/components/ui/IconButton'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import VideoUrlInput from '@/components/admin/media/VideoUrlInput'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, api, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
@@ -145,7 +147,16 @@ function EditPost({ post, onDone }: { post: Post; onDone: (saved: boolean) => vo
     <div className="mt-2 rounded-lg bg-surface-secondary p-3 space-y-2">
       <div>
         <label className={lbl}>Caption</label>
-        <textarea rows={3} className={inputCls} value={caption} onChange={e => setCaption(e.target.value)} />
+        <AIEnrichButton
+          fieldLabel="Social media caption"
+          value={caption}
+          onChange={setCaption}
+          scope="social:write"
+          multiline
+          context={`A ${label(post.platform)} post.`}
+        >
+          <textarea rows={3} className={`${inputCls} pr-8`} value={caption} onChange={e => setCaption(e.target.value)} />
+        </AIEnrichButton>
       </div>
       <div>
         <label className={lbl}>Hashtags</label>
@@ -155,7 +166,17 @@ function EditPost({ post, onDone }: { post: Post; onDone: (saved: boolean) => vo
         {TITLE_PLATFORMS.includes(post.platform) && (
           <div>
             <label className={lbl}>Title</label>
-            <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} />
+            <AIEnrichButton
+              fieldLabel="Video / pin title"
+              value={title}
+              onChange={setTitle}
+              scope="social:write"
+              maxLength={100}
+              write
+              context={`Title of a ${label(post.platform)} post.${caption ? ` Caption: ${caption.slice(0, 300)}` : ''}`}
+            >
+              <input className={`${inputCls} pr-8`} value={title} onChange={e => setTitle(e.target.value)} />
+            </AIEnrichButton>
           </div>
         )}
         <div>
@@ -164,11 +185,34 @@ function EditPost({ post, onDone }: { post: Post; onDone: (saved: boolean) => vo
         </div>
         <div>
           <label className={lbl}>Image URL</label>
-          <ImageUrlInput value={imageUrl} onChange={setImageUrl} className={inputCls} />
+          <ImageUrlInput
+            value={imageUrl}
+            onChange={setImageUrl}
+            className={inputCls}
+            ai={{
+              feature: 'social_image',
+              size: post.platform === 'ig_reel' ? ['story', 'portrait', 'square'] : ['square', 'portrait', 'landscape', 'story'],
+              defaultPrompt: caption.slice(0, 160) || undefined,
+              usageRef: post.id,
+            }}
+          />
         </div>
         <div>
           <label className={lbl}>Video URL</label>
-          <input className={inputCls} value={videoUrl} onChange={e => setVideoUrl(e.target.value)} />
+          <VideoUrlInput
+            value={videoUrl}
+            onChange={setVideoUrl}
+            className={inputCls}
+            ai={
+              (post.platform === 'ig_reel' || post.platform === 'youtube') && {
+                feature: 'social_video',
+                defaultPrompt: caption.slice(0, 160) || undefined,
+                imageUrl: /^https?:\/\//i.test(imageUrl) ? imageUrl : undefined,
+                aspect: post.platform === 'youtube' ? '16:9' : '9:16',
+                usageRef: post.id,
+              }
+            }
+          />
         </div>
         <div>
           <label className={lbl}>Scheduled for</label>

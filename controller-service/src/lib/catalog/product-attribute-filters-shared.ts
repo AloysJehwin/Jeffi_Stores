@@ -1,27 +1,9 @@
-export type AdvancedFilterFieldType =
-  'select' | 'range' | 'date-range' | 'toggle' | 'boolean' | 'text' | 'multi-select' | 'value-help'
+import type { FilterField as AdvancedFilterField } from '@jeffi/list-filters/client'
 
-export interface AdvancedFilterField {
-  name: string | [string, string]
-  label: string
-  type: AdvancedFilterFieldType
-  options?: { value: string; label: string }[]
-  section?: string
-  placeholder?: string
-  unit?: string
-}
-
-// Value-help picks are joined with a pipe: standards and specs often contain commas.
-const VALUE_SEPARATOR = '|'
-
-export function splitFilterValues(raw: string | string[] | null | undefined): string[] {
-  const parts = (Array.isArray(raw) ? raw : [raw ?? '']).flatMap(r => r.split(VALUE_SEPARATOR))
-  return [...new Set(parts.map(v => v.trim()).filter(Boolean))]
-}
-
-export function joinFilterValues(values: string[]): string {
-  return values.join(VALUE_SEPARATOR)
-}
+// The field type and value helpers live in @jeffi/list-filters; re-exported under the old names.
+export type { AdvancedFilterField }
+export type { FilterFieldType as AdvancedFilterFieldType } from '@jeffi/list-filters/client'
+export { splitFilterValues, joinFilterValues } from '@jeffi/list-filters/client'
 
 export const SPEC_PARAM_PREFIX = 'spec.'
 export const SPEC_SECTION = 'Technical Specifications'

@@ -1,3 +1,4 @@
+import type { FilterScope } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import type { Period } from '@/lib/overview/period'
 import type { AttentionItem } from '@/lib/overview/attention'
@@ -48,20 +49,23 @@ export function auditAttention(t: {
       severity: 'info',
       title: `${plural(t.deletes, 'delete')} in this period`,
       sub: 'Review that they were intended',
-      href: '/admin/audit?view=list',
+      href: '/admin/audit?view=list&action=delete',
     })
   else if (t.risky)
     out.push({
       key: 'risky',
       severity: 'info',
       title: `${plural(t.risky, 'risky action')} in this period`,
-      href: '/admin/audit?view=list',
+      href: '/admin/audit?view=list&risky=true',
     })
   return out
 }
 
-export async function getAuditOverview(period: Period) {
+/** `scope`: the audit list's filters (except its date) on l; failed sign-ins are not audit rows. */
+export async function getAuditOverview(period: Period, scope?: FilterScope) {
   const ps = periodSql(period)
+  const s5 = scope?.and(5) ?? { sql: '', params: [] }
+  const s3 = scope?.and(3) ?? { sql: '', params: [] }
   const [totals, failed, byAdmin, byType] = await Promise.all([
     queryOne<Record<string, unknown>>(
       `SELECT COUNT(*) FILTER (WHERE ${ps.cur('l.created_at')}) AS actions,
@@ -71,8 +75,8 @@ export async function getAuditOverview(period: Period) {
               COUNT(*) FILTER (WHERE ${ps.cur('l.created_at')} AND ${RISKY}) AS risky,
               COUNT(*) FILTER (WHERE ${ps.prev('l.created_at')} AND ${RISKY}) AS prev_risky,
               COUNT(*) FILTER (WHERE ${ps.cur('l.created_at')} AND l.action = 'delete') AS deletes
-       FROM admin_audit_log l WHERE ${ps.span('l.created_at')}`,
-      ps.params
+       FROM admin_audit_log l WHERE ${ps.span('l.created_at')}${s5.sql}`,
+      [...ps.params, ...s5.params]
     ),
     queryOne<Record<string, unknown>>(
       `SELECT COUNT(*) FILTER (WHERE ${ps.cur('f.created_at')}) AS failed,
@@ -86,14 +90,14 @@ export async function getAuditOverview(period: Period) {
       `SELECT l.admin_id, COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email, 'System') AS name,
               COUNT(*) AS actions, COUNT(*) FILTER (WHERE ${RISKY}) AS risky
        FROM admin_audit_log l LEFT JOIN admins a ON a.id = l.admin_id LEFT JOIN users u ON u.id = a.user_id
-       WHERE ${ps.cur('l.created_at')}
+       WHERE ${ps.cur('l.created_at')}${s3.sql}
        GROUP BY l.admin_id, u.first_name, u.last_name, u.email ORDER BY actions DESC LIMIT 6`,
-      ps.params.slice(0, 2)
+      [...ps.params.slice(0, 2), ...s3.params]
     ),
     queryMany<Record<string, unknown>>(
-      `SELECT l.action, COUNT(*) AS actions FROM admin_audit_log l WHERE ${ps.cur('l.created_at')}
+      `SELECT l.action, COUNT(*) AS actions FROM admin_audit_log l WHERE ${ps.cur('l.created_at')}${s3.sql}
        GROUP BY 1 ORDER BY 2 DESC LIMIT 8`,
-      ps.params.slice(0, 2)
+      [...ps.params.slice(0, 2), ...s3.params]
     ),
   ])
   const t = {
@@ -122,6 +126,7 @@ export async function getAuditOverview(period: Period) {
       risky: n(r.risky),
     })),
     by_action: byType.map(r => ({ action: String(r.action), actions: n(r.actions) })),
+    filtered: !!s3.sql,
     attention: auditAttention(t),
   }
 }

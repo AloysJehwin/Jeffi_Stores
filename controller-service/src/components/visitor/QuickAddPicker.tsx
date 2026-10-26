@@ -94,7 +94,7 @@ interface QuickAddPickerProps {
 const GENERIC_UNITS = new Set(['unit', 'units', 'pc', 'pcs', 'piece', 'pieces', 'nos', 'no', 'each'])
 
 const ICON_BTN =
-  'flex-shrink-0 w-8 h-8 rounded-full border border-border-default bg-surface-secondary flex items-center justify-center text-foreground-muted transition-colors disabled:opacity-60'
+  'flex-shrink-0 w-11 h-11 sm:w-8 sm:h-8 rounded-full border border-border-default bg-surface-secondary flex items-center justify-center text-foreground-muted transition-colors disabled:opacity-60'
 
 /** Like (storefront only) + Share + Close for the quick-add popup header. */
 export function QuickAddHeaderActions({
@@ -121,7 +121,7 @@ export function QuickAddHeaderActions({
     href,
   })
   return (
-    <div className="flex-shrink-0 flex items-center gap-1.5">
+    <div className="flex-shrink-0 flex items-center gap-1 sm:gap-1.5">
       {showWishlist && (
         <button
           type="button"
@@ -167,7 +167,7 @@ export function QuickAddHeaderActions({
           onClose()
         }}
         aria-label="Close"
-        className="flex-shrink-0 w-7 h-7 rounded-full text-foreground-muted hover:text-foreground flex items-center justify-center"
+        className="flex-shrink-0 w-11 h-11 -mr-2 sm:mr-0 sm:w-7 sm:h-7 rounded-full text-xl sm:text-base text-foreground-muted hover:text-foreground flex items-center justify-center"
       >
         &#215;
       </button>
@@ -440,10 +440,10 @@ export default function QuickAddPicker({
           <img
             src={imageUrl}
             alt={productName}
-            className="flex-shrink-0 w-16 h-16 rounded-xl border border-border-default object-contain bg-surface-secondary"
+            className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl border border-border-default object-contain bg-surface-secondary"
           />
         ) : (
-          <div className="flex-shrink-0 w-16 h-16 rounded-xl border border-border-default bg-surface-secondary" />
+          <div className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl border border-border-default bg-surface-secondary" />
         )}
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-bold text-foreground leading-snug line-clamp-2">{productName}</h3>
@@ -528,7 +528,7 @@ export default function QuickAddPicker({
                     onStop(e)
                     setSelectedVariantId(v.id)
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  className={`px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded-lg text-xs font-medium border transition-colors ${
                     selectedVariantId === v.id
                       ? 'bg-accent-500 text-white border-accent-500'
                       : v.stock_status !== 'Out of Stock'
@@ -557,7 +557,7 @@ export default function QuickAddPicker({
                       onStop(e)
                       setSelectedSubVariantId(sv.id)
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    className={`px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded-lg text-xs font-medium border transition-colors ${
                       selectedSubVariantId === sv.id
                         ? 'bg-accent-500 text-white border-accent-500'
                         : sv.stock_status !== 'Out of Stock'
@@ -615,7 +615,7 @@ export default function QuickAddPicker({
               onConfirm()
             }}
             disabled={adding || (!isDigital && cap.full)}
-            className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
+            className="w-full min-h-[44px] sm:min-h-0 bg-accent-500 hover:bg-accent-600 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
           >
             {isDigital
               ? adding
@@ -648,7 +648,7 @@ export default function QuickAddPicker({
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
         onClick={onStop}
-        className="relative w-full sm:w-[26rem] sm:max-w-[calc(100vw-2rem)] bg-surface-elevated rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 pb-8 sm:pb-5"
+        className="relative w-full sm:w-[26rem] sm:max-w-[calc(100vw-2rem)] max-sm:max-h-[92dvh] max-sm:overflow-y-auto max-sm:overscroll-contain bg-surface-elevated rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 pb-[calc(1.25rem+max(0.75rem,env(safe-area-inset-bottom)))] sm:pb-5"
       >
         <div className="w-10 h-1 bg-border-default rounded-full mx-auto mb-4 sm:hidden" />
         {body}

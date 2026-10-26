@@ -1,6 +1,7 @@
 import { View } from 'react-native'
+import { Rail } from '../../ui'
 import ProductCard from '../product/ProductCard'
-import { Carousel, Grid, SectionHeading } from './layout'
+import { Grid, SectionHeading } from './layout'
 import type { CardProduct } from '../../types/home'
 
 // The web's ROW_STYLES: index 0/1/2 give the Featured / New Arrivals / Best Sellers looks.
@@ -28,7 +29,7 @@ export default function ProductRowSection({
   return (
     <View className={`px-4 py-12 ${style.section}`}>
       <SectionHeading eyebrow={eyebrow} title={title} eyebrowClassName={style.eyebrow} barClassName={style.bar} />
-      {carousel ? <Carousel>{cards}</Carousel> : <Grid gap={style.gap}>{cards}</Grid>}
+      {carousel ? <Rail>{cards}</Rail> : <Grid gap={style.gap}>{cards}</Grid>}
     </View>
   )
 }

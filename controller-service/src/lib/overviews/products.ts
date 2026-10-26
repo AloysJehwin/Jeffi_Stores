@@ -1,9 +1,11 @@
 import type { AttentionItem } from '@/lib/overview/attention'
 import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
-import { SOLD_LINES, inIst, istDay, num } from './catalog'
+import { NO_SCOPE, type BoundScope } from '@/lib/overview/filter-scope'
+import { inIst, istDay, num, soldLines } from './catalog'
 
 // Products overview: catalogue health (now), sales/views/price changes (period vs previous).
-// Params everywhere: $1/$2 current IST days, $3/$4 previous.
+// Params everywhere: $1/$2 current IST days, $3/$4 previous. `f` carries the products list's
+// filters: `f.and` on the alias p, `f.ids(col)` on a product id column.
 
 export const HEALTH_ISSUES = [
   'no_price',
@@ -27,7 +29,7 @@ export const ISSUE_LABEL: Record<HealthIssue, string> = {
 }
 
 // One row per non-draft product with its health flags and a period score (sales + views) to rank samples.
-const FLAGS = `
+const flags = (f: BoundScope) => `
   flags AS (
     SELECT p.id, p.name, p.is_active, p.created_at,
       (NOT EXISTS (SELECT 1 FROM product_images i WHERE i.product_id = p.id) AND NULLIF(btrim(COALESCE(p.image_url, '')), '') IS NULL) AS no_image,
@@ -48,11 +50,12 @@ const FLAGS = `
         ELSE COALESCE(p.base_price, 0) <= 0 END) AS no_price,
       (NOT ${PRODUCT_IN_STOCK_SQL}) AS out_of_stock
     FROM products p
-    WHERE NOT p.is_draft
+    WHERE NOT p.is_draft${f.and}
   )`
+const sold = (f: BoundScope) => soldLines(f.ids('oi.product_id'))
 
-export const HEALTH_SQL = `
-  WITH ${FLAGS}
+export const healthSql = (f = NO_SCOPE) => `
+  WITH ${flags(f)}
   SELECT COUNT(*) AS total,
          COUNT(*) FILTER (WHERE is_active) AS active,
          COUNT(*) FILTER (WHERE NOT is_active) AS inactive,
@@ -66,10 +69,11 @@ export const HEALTH_SQL = `
          COUNT(*) FILTER (WHERE is_active AND out_of_stock) AS out_of_stock,
          COUNT(*) FILTER (WHERE is_active AND NOT (no_price OR no_image OR no_hsn OR no_gst OR no_cost OR no_description)) AS complete
   FROM flags`
+export const HEALTH_SQL = healthSql()
 
 // Up to 5 active products per issue, the ones that matter most (period sales, then views) first.
-export const HEALTH_SAMPLES_SQL = `
-  WITH ${FLAGS},
+export const healthSamplesSql = (f = NO_SCOPE) => `
+  WITH ${flags(f)},
   score AS (
     SELECT f.*,
       COALESCE((SELECT SUM(oi.total_price) FROM order_items oi JOIN orders o ON o.id = oi.order_id
@@ -89,16 +93,19 @@ export const HEALTH_SAMPLES_SQL = `
     WHERE x.hit
   ) r WHERE rn <= 5
   ORDER BY issue, rn`
+export const HEALTH_SAMPLES_SQL = healthSamplesSql()
 
 // Active products that sold in either period but are out of stock now.
-export const SELLERS_OUT_SQL = `
-  WITH ${SOLD_LINES}
+export const sellersOutSql = (f = NO_SCOPE) => `
+  WITH ${sold(f)}
   SELECT p.id, p.name, SUM(s.quantity) FILTER (WHERE s.cur) AS units_cur, SUM(s.value) AS value
   FROM sold s JOIN products p ON p.id = s.product_id
   WHERE p.is_active AND NOT p.is_draft AND NOT ${PRODUCT_IN_STOCK_SQL}
   GROUP BY p.id ORDER BY value DESC LIMIT 10`
+export const SELLERS_OUT_SQL = sellersOutSql()
 
-const PRICE_CHANGES = `
+const PC_PRODUCT = `CASE WHEN a.entity_type = 'products' THEN a.entity_id ELSE a.metadata->>'product_id' END`
+const priceChanges = (f: BoundScope) => `
   pc AS (
     SELECT a.id, a.created_at, a.entity_type, a.entity_id,
            CASE WHEN a.entity_type = 'products' THEN a.entity_id ELSE a.metadata->>'product_id' END AS product_id,
@@ -111,11 +118,15 @@ const PRICE_CHANGES = `
         OR (a.entity_type IN ('product_variants', 'product_sub_variants') AND a.diff ? 'price'))
       -- base_price on a product with variants is not what shoppers pay
       AND (a.entity_type <> 'products' OR NOT EXISTS (SELECT 1 FROM products px WHERE px.id = (CASE WHEN a.entity_type = 'products' THEN a.entity_id END)::uuid AND px.has_variants))
-      AND (${inIst('a.created_at', 1, 2)} OR ${inIst('a.created_at', 3, 4)})
+      AND (${inIst('a.created_at', 1, 2)} OR ${inIst('a.created_at', 3, 4)})${
+        f.ids('px2.id')
+          ? `\n      AND EXISTS (SELECT 1 FROM products px2 WHERE px2.id::text = (${PC_PRODUCT})${f.ids('px2.id')})`
+          : ''
+      }
   )`
 
-export const PERIOD_SQL = `
-  WITH ${SOLD_LINES}, ${PRICE_CHANGES},
+export const periodSql = (f = NO_SCOPE) => `
+  WITH ${sold(f)}, ${priceChanges(f)},
   per AS (SELECT unnest(ARRAY[true, false]) AS cur)
   SELECT per.cur,
     (SELECT COALESCE(SUM(quantity), 0) FROM sold WHERE sold.cur = per.cur) AS units,
@@ -124,25 +135,27 @@ export const PERIOD_SQL = `
     (SELECT COUNT(DISTINCT product_id) FROM sold WHERE sold.cur = per.cur) AS products_sold,
     (SELECT COALESCE(SUM(net), 0) FROM sold WHERE sold.cur = per.cur AND cost IS NOT NULL) AS costed_net,
     (SELECT COALESCE(SUM(cost), 0) FROM sold WHERE sold.cur = per.cur) AS cost,
-    (SELECT COUNT(*) FROM product_views v WHERE CASE WHEN per.cur THEN ${inIst('v.created_at', 1, 2)} ELSE ${inIst('v.created_at', 3, 4)} END) AS views,
-    (SELECT COUNT(*) FROM products p WHERE NOT p.is_draft AND CASE WHEN per.cur THEN ${inIst('p.created_at', 1, 2)} ELSE ${inIst('p.created_at', 3, 4)} END) AS added,
+    (SELECT COUNT(*) FROM product_views v WHERE CASE WHEN per.cur THEN ${inIst('v.created_at', 1, 2)} ELSE ${inIst('v.created_at', 3, 4)} END${f.ids('v.product_id')}) AS views,
+    (SELECT COUNT(*) FROM products p WHERE NOT p.is_draft AND CASE WHEN per.cur THEN ${inIst('p.created_at', 1, 2)} ELSE ${inIst('p.created_at', 3, 4)} END${f.and}) AS added,
     (SELECT COUNT(*) FROM pc WHERE pc.cur = per.cur) AS price_changes,
     (SELECT COUNT(DISTINCT product_id) FROM pc WHERE pc.cur = per.cur) AS products_repriced
   FROM per`
+export const PERIOD_SQL = periodSql()
 
 /** $5 = bucket ('day' | 'week' | 'month'). */
-export const SERIES_SQL = `
-  WITH ${SOLD_LINES},
+export const seriesSql = (f = NO_SCOPE) => `
+  WITH ${sold(f)},
   b AS (SELECT generate_series(date_trunc($5, $1::date), date_trunc($5, $2::date), ('1 ' || $5)::interval)::date AS bucket),
   s AS (SELECT date_trunc($5, d)::date AS bucket, SUM(value) AS sales, SUM(quantity) AS units FROM sold WHERE cur GROUP BY 1),
   v AS (SELECT date_trunc($5, ${istDay('created_at')})::date AS bucket, COUNT(*) AS views
-        FROM product_views WHERE ${inIst('created_at', 1, 2)} GROUP BY 1)
+        FROM product_views WHERE ${inIst('created_at', 1, 2)}${f.ids('product_id')} GROUP BY 1)
   SELECT b.bucket::text AS bucket, COALESCE(s.sales, 0) AS sales, COALESCE(s.units, 0) AS units, COALESCE(v.views, 0) AS views
   FROM b LEFT JOIN s USING (bucket) LEFT JOIN v USING (bucket)
   ORDER BY b.bucket`
+export const SERIES_SQL = seriesSql()
 
-export const TOP_SELLERS_SQL = `
-  WITH ${SOLD_LINES},
+export const topSellersSql = (f = NO_SCOPE) => `
+  WITH ${sold(f)},
   agg AS (
     SELECT product_id,
            SUM(quantity) FILTER (WHERE cur) AS units, SUM(value) FILTER (WHERE cur) AS sales,
@@ -155,19 +168,21 @@ export const TOP_SELLERS_SQL = `
   FROM agg a JOIN products p ON p.id = a.product_id
   WHERE a.sales > 0
   ORDER BY a.sales DESC LIMIT 10`
+export const TOP_SELLERS_SQL = topSellersSql()
 
-export const MOST_VIEWED_SQL = `
-  WITH ${SOLD_LINES},
+export const mostViewedSql = (f = NO_SCOPE) => `
+  WITH ${sold(f)},
   v AS (SELECT product_id, COUNT(*) AS views, COUNT(DISTINCT session_id) AS sessions
-        FROM product_views WHERE product_id IS NOT NULL AND ${inIst('created_at', 1, 2)} GROUP BY product_id)
+        FROM product_views WHERE product_id IS NOT NULL AND ${inIst('created_at', 1, 2)}${f.ids('product_id')} GROUP BY product_id)
   SELECT p.id, p.name, v.views, v.sessions,
          COALESCE((SELECT COUNT(DISTINCT order_id) FROM sold WHERE sold.cur AND sold.product_id = p.id), 0) AS orders,
          COALESCE((SELECT SUM(quantity) FROM sold WHERE sold.cur AND sold.product_id = p.id), 0) AS units
   FROM v JOIN products p ON p.id = v.product_id
   ORDER BY v.views DESC LIMIT 10`
+export const MOST_VIEWED_SQL = mostViewedSql()
 
 // Active products older than 30 days that have never been on a paid, live order.
-const NEVER_SOLD = `
+const neverSold = (f: BoundScope) => `
   ns AS (
     SELECT p.id, p.name, p.created_at,
            (SELECT COUNT(*) FROM product_views v WHERE v.product_id = p.id AND ${inIst('v.created_at', 1, 2)}) AS views
@@ -175,22 +190,24 @@ const NEVER_SOLD = `
     WHERE p.is_active AND NOT p.is_draft AND p.created_at < (($2::date - 30)::timestamp AT TIME ZONE 'Asia/Kolkata')
       AND NOT EXISTS (SELECT 1 FROM order_items oi JOIN orders o ON o.id = oi.order_id
                       WHERE oi.product_id = p.id AND o.payment_status = 'paid'
-                        AND o.status NOT IN ('cancelled', 'returned', 'draft', 'cancel_rejected'))
+                        AND o.status NOT IN ('cancelled', 'returned', 'draft', 'cancel_rejected'))${f.and}
   )`
 
-export const NEVER_SOLD_SQL = `
-  WITH ${NEVER_SOLD}
+export const neverSoldSql = (f = NO_SCOPE) => `
+  WITH ${neverSold(f)}
   SELECT (SELECT COUNT(*) FROM ns) AS total, id, name, created_at, views
   FROM ns ORDER BY views DESC, created_at ASC LIMIT 10`
+export const NEVER_SOLD_SQL = neverSoldSql()
 
-export const RECENT_SQL = `
-  WITH ${FLAGS}
+export const recentSql = (f = NO_SCOPE) => `
+  WITH ${flags(f)}
   SELECT id, name, is_active, created_at, no_price, no_image, no_hsn, no_gst, no_cost, no_description, out_of_stock
   FROM flags WHERE ${inIst('created_at', 1, 2)}
   ORDER BY created_at DESC LIMIT 10`
+export const RECENT_SQL = recentSql()
 
-export const PRICE_CHANGES_SQL = `
-  WITH ${PRICE_CHANGES}
+export const priceChangesSql = (f = NO_SCOPE) => `
+  WITH ${priceChanges(f)}
   SELECT pc.id, pc.created_at, pc.entity_type, pc.product_id, p.name, pc.ch->>'from' AS from_price, pc.ch->>'to' AS to_price, pc.bulk,
          COALESCE(pv.variant_name, sv.sub_variant_name) AS variant_name
   FROM pc
@@ -199,9 +216,10 @@ export const PRICE_CHANGES_SQL = `
   LEFT JOIN product_sub_variants sv ON pc.entity_type = 'product_sub_variants' AND sv.id::text = pc.entity_id
   WHERE pc.cur
   ORDER BY pc.created_at DESC LIMIT 10`
+export const PRICE_CHANGES_SQL = priceChangesSql()
 
-export const PRICE_CHANGE_STATS_SQL = `
-  WITH ${PRICE_CHANGES},
+export const priceChangeStatsSql = (f = NO_SCOPE) => `
+  WITH ${priceChanges(f)},
   c AS (SELECT bulk, (ch->>'from')::numeric AS f, (ch->>'to')::numeric AS t FROM pc WHERE cur)
   SELECT COUNT(*) FILTER (WHERE bulk) AS bulk,
          COUNT(*) FILTER (WHERE NOT bulk) AS manual,
@@ -210,6 +228,7 @@ export const PRICE_CHANGE_STATS_SQL = `
          COUNT(*) FILTER (WHERE COALESCE(t, 0) <= 0 AND COALESCE(f, 0) > 0) AS cleared,
          AVG((t - f) / f) FILTER (WHERE f > 0 AND t > 0) AS avg_change
   FROM c`
+export const PRICE_CHANGE_STATS_SQL = priceChangeStatsSql()
 
 export type HealthCounts = Record<'total' | 'active' | 'inactive' | 'drafts' | 'complete' | HealthIssue, number>
 

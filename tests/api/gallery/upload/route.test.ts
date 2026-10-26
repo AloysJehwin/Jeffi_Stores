@@ -16,7 +16,7 @@ vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(() => true),
 }))
 vi.mock('@/lib/shared/s3', () => ({
-  uploadGalleryImage: vi.fn(),
+  uploadGalleryMedia: vi.fn(),
   deleteGalleryImage: vi.fn(),
   fetchRemoteImage: vi.fn(),
 }))
@@ -24,12 +24,12 @@ vi.mock('@/lib/shared/s3', () => ({
 import { POST, OPTIONS } from '@/app/api/(public)/gallery/upload/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { uploadGalleryImage, fetchRemoteImage } from '@/lib/shared/s3'
+import { uploadGalleryMedia, fetchRemoteImage } from '@/lib/shared/s3'
 import { queryOne } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
-const mockUpload = vi.mocked(uploadGalleryImage)
+const mockUpload = vi.mocked(uploadGalleryMedia)
 const mockFetchRemoteImage = vi.mocked(fetchRemoteImage)
 const mockQueryOne = vi.mocked(queryOne)
 
@@ -42,6 +42,7 @@ const uploadResult = {
   fileSize: 1024,
   width: 800,
   height: 600,
+  mimeType: 'image/png',
 }
 
 const insertedRecord = {
@@ -75,9 +76,9 @@ describe('POST /api/gallery/upload', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 403 when the admin/token lacks products:write', async () => {
+  it('returns 403 when the admin/token holds none of the gallery write scopes', async () => {
     mockAuth.mockResolvedValueOnce({ adminId: 'a1', role: 'admin', scopes: [] } as any)
-    mockHasScope.mockReturnValueOnce(false)
+    mockHasScope.mockReturnValue(false)
     const req = new Request('http://localhost/api/gallery/upload', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -132,7 +133,7 @@ describe('POST /api/gallery/upload', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.id).toBe('new-id')
-    expect(mockUpload).toHaveBeenCalledWith(expect.any(Buffer), 'photo.png')
+    expect(mockUpload).toHaveBeenCalledWith(expect.any(Buffer), 'photo.png', 'image/png')
   })
 
   it('returns 500 when upload throws', async () => {

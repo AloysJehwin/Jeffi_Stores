@@ -3,6 +3,7 @@ import { Card, Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Grid, SectionHeading, useColumnWidth } from './layout'
+import { useImageSource } from '../../hooks/useImageSource'
 import type { SectionProps } from '../../types/home'
 
 // Mirror of controller-service components/visitor/home/CategoryShowcase.tsx.
@@ -11,6 +12,7 @@ export default function CategoryShowcase({ section, data }: SectionProps) {
   const cardWidth = useColumnWidth(2, 16)
   // Card minus its 1px border and p-2, split into two columns with gap-1.
   const tileWidth = Math.floor((cardWidth - 2 - 16 - 4) / 2)
+  const imgSource = useImageSource()
   const items = data.categoryShowcase
   if (items.length === 0) return null
 
@@ -50,7 +52,7 @@ export default function CategoryShowcase({ section, data }: SectionProps) {
                   >
                     <View className="aspect-square items-center justify-center overflow-hidden rounded-lg bg-surface-secondary">
                       {src ? (
-                        <Image recyclingKey={src} source={{ uri: src }} contentFit="contain" style={{ width: '100%', height: '100%' }} accessibilityLabel={p.name} />
+                        <Image recyclingKey={src} source={imgSource(src, tileWidth - 16)} contentFit="contain" style={{ width: '100%', height: '100%' }} accessibilityLabel={p.name} />
                       ) : (
                         <View className="h-full w-full rounded-lg bg-surface-secondary" />
                       )}

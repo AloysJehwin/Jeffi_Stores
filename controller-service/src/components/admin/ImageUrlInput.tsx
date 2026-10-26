@@ -1,9 +1,13 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Loader2, Upload } from 'lucide-react'
+import { Images, Loader2, Upload } from 'lucide-react'
+import GalleryPicker, { type GalleryImage } from '@/components/admin/GalleryPicker'
+import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import { AI_SIZE_PRESETS, PNG_IMAGE_FEATURES, type AiImageFeature } from '@/lib/ai/media-features'
 
 // An image-URL field with an Upload button: paste a link or upload a file (→ CDN URL in the field).
+// Optional Gallery pick and AI image generation sit beside it.
 
 // Raw bytes rather than multipart: the server checks it received every byte (lib/shared/form-file).
 export async function uploadImage(file: File, endpoint = '/api/admin/uploads/image'): Promise<string> {
@@ -17,7 +21,47 @@ export async function uploadImage(file: File, endpoint = '/api/admin/uploads/ima
   return d.url as string
 }
 
-export default function ImageUrlInput({ value, onChange, placeholder, className = '', endpoint, name, preview = true }: {
+/** A gallery image re-stored as PNG; WebP is the gallery default. */
+async function copyAsPng(imageUrl: string): Promise<string> {
+  const r = await fetch('/api/admin/uploads/image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageUrl }),
+  })
+  const d = await r.json().catch(() => ({}))
+  if (!r.ok || !d.url) throw new Error(d.error || 'Could not copy the image')
+  return d.url as string
+}
+
+const isWebp = (g: GalleryImage) => g.mime_type === 'image/webp' || /\.webp(?:[?#]|$)/i.test(g.image_url)
+
+/** AI image generation for the field: feature (billing + scope) and the AI_SIZE_PRESETS keys to offer. */
+export interface ImageUrlAi {
+  feature: AiImageFeature
+  /** First is pre-selected; defaults to square. */
+  size?: string | string[]
+  /** Area whose :write scope gates the button; defaults from the feature. */
+  scope?: string
+  defaultPrompt?: string
+  referenceImageUrl?: string
+  usageRef?: string
+}
+
+const sideBtn =
+  'inline-flex shrink-0 items-center gap-1.5 self-stretch rounded-lg border border-border-default px-3 text-xs font-semibold text-foreground hover:bg-surface-secondary disabled:opacity-50'
+
+export default function ImageUrlInput({
+  value,
+  onChange,
+  placeholder,
+  className = '',
+  endpoint,
+  name,
+  preview = true,
+  ai,
+  gallery,
+  png,
+}: {
   value: string
   onChange: (url: string) => void
   placeholder?: string
@@ -26,32 +70,102 @@ export default function ImageUrlInput({ value, onChange, placeholder, className 
   /** For uncontrolled server-action forms: also submit the value under this name. */
   name?: string
   preview?: boolean
+  /** Adds an "AI image" button; hidden without the scope or the AI plan. */
+  ai?: ImageUrlAi | false
+  /** Adds a Gallery pick; on by default when `ai` is set. */
+  gallery?: boolean
+  /** The field's clients can't show WebP, so a WebP gallery pick is copied as PNG; defaults from the AI feature. */
+  png?: boolean
 }) {
   const file = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [picker, setPicker] = useState(false)
+  const showGallery = gallery ?? !!ai
+  const pngOnly = png ?? (!!ai && PNG_IMAGE_FEATURES.includes(ai.feature))
+  const extras = !!ai || showGallery
   async function pick(f: File | undefined) {
     if (!f) return
-    setBusy(true); setErr(null)
-    try { onChange(await uploadImage(f, endpoint)) } catch (e: any) { setErr(e.message) } finally {
+    setBusy(true)
+    setErr(null)
+    try {
+      onChange(await uploadImage(f, endpoint))
+    } catch (e: any) {
+      setErr(e.message)
+    } finally {
       setBusy(false)
       if (file.current) file.current.value = ''
     }
   }
+  async function pickGallery(g: GalleryImage) {
+    if (!pngOnly || !isWebp(g)) return onChange(g.image_url)
+    setBusy(true)
+    setErr(null)
+    try {
+      onChange(await copyAsPng(g.image_url))
+    } catch (e: any) {
+      setErr(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const sizes = ai
+    ? (Array.isArray(ai.size) ? ai.size : [ai.size ?? 'square']).map(k => AI_SIZE_PRESETS[k]).filter(Boolean)
+    : []
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder ?? 'https://… or upload'} className={`${className} flex-1 min-w-0`} />
+      <div className={`flex items-center gap-2${extras ? ' flex-wrap' : ''}`}>
+        <input
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder ?? 'https://… or upload'}
+          className={`${className} flex-1 ${extras ? 'min-w-[10rem]' : 'min-w-0'}`}
+        />
         {name && <input type="hidden" name={name} value={value} />}
-        <input ref={file} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden onChange={e => pick(e.target.files?.[0])} />
-        <button type="button" onClick={() => file.current?.click()} disabled={busy}
-          className="inline-flex shrink-0 items-center gap-1.5 self-stretch rounded-lg border border-border-default px-3 text-xs font-semibold text-foreground hover:bg-surface-secondary disabled:opacity-50">
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} {busy ? 'Uploading…' : 'Upload'}
+        <input
+          ref={file}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+          hidden
+          onChange={e => pick(e.target.files?.[0])}
+        />
+        <button type="button" onClick={() => file.current?.click()} disabled={busy} className={sideBtn}>
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}{' '}
+          {busy ? 'Uploading…' : 'Upload'}
         </button>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {preview && value && /^(https?:)?\/\/|^\//.test(value) && <img src={value} alt="" className="h-9 w-9 shrink-0 rounded object-cover border border-border-default" />}
+        {showGallery && (
+          <button type="button" onClick={() => setPicker(true)} disabled={busy} className={sideBtn}>
+            <Images className="w-3.5 h-3.5" /> Gallery
+          </button>
+        )}
+        {ai && (
+          <AiMediaButton
+            feature={ai.feature}
+            scope={ai.scope}
+            sizes={sizes.length ? sizes : [AI_SIZE_PRESETS.square]}
+            defaultPrompt={ai.defaultPrompt}
+            referenceImageUrl={ai.referenceImageUrl}
+            usageRef={ai.usageRef}
+            triggerClassName={sideBtn}
+            onPick={img => onChange(img.url)}
+          />
+        )}
+        {preview && value && /^(https?:)?\/\/|^\//.test(value) && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={value} alt="" className="h-9 w-9 shrink-0 rounded object-cover border border-border-default" />
+        )}
       </div>
       {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+      {picker && (
+        <GalleryPicker
+          mode="single"
+          onClose={() => setPicker(false)}
+          onConfirm={imgs => {
+            setPicker(false)
+            if (imgs[0]) void pickGallery(imgs[0])
+          }}
+        />
+      )}
     </div>
   )
 }

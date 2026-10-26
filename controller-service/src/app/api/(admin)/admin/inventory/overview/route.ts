@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { filterScope, normalizeQuery } from '@jeffi/list-filters'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryOne } from '@/lib/shared/db'
 import { istDate } from '@/lib/channels/report-store'
 import { buildReorder, num, resolvePeriod, turnoverStats } from './compute'
 import { LEAVES } from '@/lib/purchasing/leaves-sql'
+import { VALUATION_ENTITY } from '@/lib/filters/entities/inventory'
 
 export const dynamic = 'force-dynamic'
 
-// $1..$4 = cur from/to, prev from/to (IST days); $5 = days in period.
-const STOCK_SQL = `${LEAVES}
+// $1..$4 = cur from/to, prev from/to (IST days); $5 = days in period. `f`: the valuation filters, from $6.
+const stockSql = (f = '') => `${LEAVES}
 , bounds AS (
   SELECT ($1::date)::timestamp AT TIME ZONE 'Asia/Kolkata' AS cur_start,
          (($2::date) + 1)::timestamp AT TIME ZONE 'Asia/Kolkata' AS cur_end,
@@ -31,7 +33,7 @@ j AS (
   FROM priced p
   LEFT JOIN sales s ON s.product_id = p.product_id
     AND s.variant_id IS NOT DISTINCT FROM p.variant_id
-    AND s.sub_variant_id IS NOT DISTINCT FROM p.sub_variant_id
+    AND s.sub_variant_id IS NOT DISTINCT FROM p.sub_variant_id${f ? `\n  WHERE TRUE${f}` : ''}
 )
 SELECT
   (SELECT json_build_object(
@@ -89,8 +91,8 @@ SELECT
      ORDER BY value_cost DESC LIMIT 20) t) AS dead
 `
 
-// $1..$4 = cur from/to, prev from/to.
-const MOVEMENT_SQL = `
+// $1..$4 = cur from/to, prev from/to. `f`: the valuation filters, from $5.
+const movementSql = (f = '') => `
 WITH b AS (
   SELECT ($1::date)::timestamp AT TIME ZONE 'Asia/Kolkata' AS cur_start,
          (($2::date) + 1)::timestamp AT TIME ZONE 'Asia/Kolkata' AS cur_end,
@@ -103,7 +105,7 @@ m AS (
          it.created_at >= b.cur_start AS cur
   FROM inventory_transactions it CROSS JOIN b
   WHERE it.created_at >= b.prev_start AND it.created_at < b.cur_end
-    AND (it.created_at >= b.cur_start OR it.created_at < b.prev_end)
+    AND (it.created_at >= b.cur_start OR it.created_at < b.prev_end)${f}
 )
 SELECT
   (SELECT json_build_object(
@@ -154,8 +156,8 @@ SELECT
   (SELECT COUNT(*) FROM suppliers WHERE is_active = TRUE) AS active_suppliers
 `
 
-// $1 = today (IST).
-const MISC_SQL = `
+// $1 = today (IST). `fb` / `fi`: the valuation filters on batches / movements, from $2.
+const miscSql = (fb = '', fi = '') => `
 SELECT
   (SELECT COALESCE(json_agg(t), '[]') FROM (
      SELECT pb.id, pb.product_id, pb.variant_id, pb.sub_variant_id, p.name, pv.variant_name AS leaf_name,
@@ -166,7 +168,7 @@ SELECT
      FROM product_batches pb
      JOIN products p ON p.id = pb.product_id
      LEFT JOIN product_variants pv ON pv.id = pb.variant_id
-     WHERE pb.quantity_remaining > 0 AND pb.expiry_date IS NOT NULL AND pb.expiry_date <= $1::date + 30
+     WHERE pb.quantity_remaining > 0 AND pb.expiry_date IS NOT NULL AND pb.expiry_date <= $1::date + 30${fb}
      ORDER BY pb.expiry_date ASC LIMIT 20) t) AS expiring,
   (SELECT COALESCE(json_agg(t ORDER BY t.created_at DESC), '[]') FROM (
      SELECT MAX(it.created_at) AS created_at, it.transaction_type, SUM(it.quantity_change) AS quantity_change,
@@ -183,7 +185,7 @@ SELECT
      LEFT JOIN orders o ON it.reference_type = 'order' AND o.id = it.reference_id
      LEFT JOIN cash_sales cs ON it.reference_type = 'cash_sale' AND cs.id = it.reference_id
      LEFT JOIN grns g ON it.reference_type = 'grn' AND g.id = it.reference_id
-     WHERE it.created_at > (SELECT MAX(created_at) FROM inventory_transactions) - INTERVAL '120 days'
+     WHERE it.created_at > (SELECT MAX(created_at) FROM inventory_transactions) - INTERVAL '120 days'${fi}
      GROUP BY it.reference_id, it.reference_type, it.transaction_type, it.product_id, it.variant_id, it.sub_variant_id, p.name,
               CASE WHEN it.reference_id IS NULL THEN it.id END
      ORDER BY MAX(it.created_at) DESC LIMIT 10) t) AS recent
@@ -201,11 +203,18 @@ export async function GET(request: NextRequest) {
     const period = resolvePeriod(sp.get('from'), sp.get('to'), today)
     const range = [period.from, period.to, period.prevFrom, period.prevTo]
 
+    // The valuation tab's filters narrow every product-level figure (not the purchase orders).
+    const scope = filterScope(VALUATION_ENTITY, normalizeQuery(VALUATION_ENTITY, sp))
+    const f6 = scope.inIds('p.product_id', 6)
+    const f5 = scope.inIds('it.product_id', 5)
+    const fb = scope.inIds('pb.product_id', 2)
+    const fi = scope.inIds('it.product_id', 2)
+
     const [stock, mov, po, misc] = await Promise.all([
-      queryOne<Json>(STOCK_SQL, [...range, period.days]),
-      queryOne<Json>(MOVEMENT_SQL, range),
+      queryOne<Json>(stockSql(f6.sql), [...range, period.days, ...f6.params]),
+      queryOne<Json>(movementSql(f5.sql), [...range, ...f5.params]),
       queryOne<Json>(PO_SQL, [...range, today]),
-      queryOne<Json>(MISC_SQL, [today]),
+      queryOne<Json>(miscSql(fb.sql, fi.sql), [today, ...fb.params]),
     ])
 
     const t = stock?.totals ?? {}
@@ -217,6 +226,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       period: { ...period, today },
+      filtered: !scope.empty,
       stock: {
         skus: num(t.skus),
         inStock: num(t.in_stock),

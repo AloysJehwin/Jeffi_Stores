@@ -12,6 +12,7 @@ import { useToast } from '@/contexts/ToastContext'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
@@ -52,6 +53,8 @@ function renderTemplate(template: string, vars: Record<string, string | number>)
   const filled = renderVars(renderVars(renderConditionals(template || '', { ...samples, ...vars }), vars), samples)
   return stripDoubleBraceTokens(filled).replace(/\{(\w+)\}/g, (_m, k) => (vars[k] != null ? String(vars[k]) : ''))
 }
+
+const campaignVarKeys = CAMPAIGN_VARIABLES.map(v => v.key)
 
 const EMPTY = {
   name: '',
@@ -344,25 +347,50 @@ export default function NewCampaignClient() {
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
               Subject line
             </label>
-            <input
-              type="text"
+            <AIEnrichButton
+              fieldLabel="Subject line"
               value={form.subject_template}
-              onChange={e => setForm(f => ({ ...f, subject_template: e.target.value }))}
-              className="w-full px-3 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-            />
+              onChange={v => setForm(f => ({ ...f, subject_template: v }))}
+              scope="campaigns:write"
+              format="subject"
+              variables={campaignVarKeys}
+              write
+              context={`Campaign: ${form.name || 'new campaign'}${form.description ? ` (${form.description})` : ''}.`}
+            >
+              <input
+                type="text"
+                value={form.subject_template}
+                onChange={e => setForm(f => ({ ...f, subject_template: e.target.value }))}
+                className="w-full px-3 pr-8 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              />
+            </AIEnrichButton>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
               Email body
             </label>
-            <EmailComposer
-              value={form.body_template}
-              onChange={v => setForm(f => ({ ...f, body_template: v }))}
-              extraVariables={CAMPAIGN_VARIABLES}
-              ctaHref="{ctaUrl}"
-              minHeight={260}
-            />
+            <div className="relative">
+              <EmailComposer
+                value={form.body_template}
+                onChange={v => setForm(f => ({ ...f, body_template: v }))}
+                extraVariables={CAMPAIGN_VARIABLES}
+                ctaHref="{ctaUrl}"
+                minHeight={260}
+              />
+              <AIEnrichButton
+                placement="in-field"
+                anchorClassName="absolute right-3 bottom-3 z-10"
+                fieldLabel="Email body (HTML)"
+                value={form.body_template}
+                onChange={v => setForm(f => ({ ...f, body_template: v }))}
+                scope="campaigns:write"
+                format="html"
+                variables={campaignVarKeys}
+                write
+                context={`Campaign: ${form.name || 'new campaign'}. Subject: "${form.subject_template}". One call-to-action button linking to {ctaUrl}.`}
+              />
+            </div>
             <p className="text-[10px] text-foreground-muted mt-1">
               Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code>{' '}
               <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code>{' '}

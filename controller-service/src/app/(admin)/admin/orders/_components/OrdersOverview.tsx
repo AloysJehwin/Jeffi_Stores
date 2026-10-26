@@ -1,6 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { ORDER_ALIASES, ORDER_FIELDS, ORDER_SEARCH } from '@/lib/filters/fields/orders'
 import { Kpi, KpiGrid, Section, Banner, Table, count, money, pct } from '@/components/admin/channels/ui'
 import {
   AttentionList,
@@ -11,7 +14,7 @@ import {
   type AttentionItem,
 } from '@/components/admin/overview/kit'
 import { DonutSplit, TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
-import { delta, type Bucket, type Period } from '@/lib/overview/period'
+import { MAX_SPAN_DAYS, delta, type Bucket, type Period } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import { BreakdownBars, fmtDays, fmtHours, withAp } from './overview-shared'
 
@@ -59,23 +62,45 @@ const SERIES: SeriesDef[] = [
 
 export default function OrdersOverview() {
   const [period, setPeriod] = usePeriod()
+  const sp = useSearchParams()
+  // KPIs and charts follow the list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(ORDER_FIELDS, { aliases: ORDER_ALIASES, omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/orders/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/orders/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
+  const clamped = !!sp.get('from') && sp.get('from') !== period.from
 
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="orders"
+        fields={ORDER_FIELDS}
+        aliases={ORDER_ALIASES}
+        search={ORDER_SEARCH}
+        period
+        noun="Orders"
+        tab="overview"
+      />
+      {clamped && (
+        <p className="text-xs text-foreground-muted">
+          The overview covers at most {MAX_SPAN_DAYS} days: showing {period.from} to {period.to}.
+        </p>
+      )}
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data ? <Body d={data} /> : null}
+      {loading && !data ? <OverviewSkeleton /> : data ? <Body d={data} filters={filters} /> : null}
     </div>
   )
 }
 
-function Body({ d }: { d: Data }) {
+function Body({ d, filters }: { d: Data; filters: string }) {
   const c = d.kpis.current
   const p = d.kpis.previous
-  const listHref = (status: string) => ap(`/admin/orders?tab=list&status=${status}`)
+  const listHref = (patch: Record<string, string>) => {
+    const q = new URLSearchParams(filters)
+    for (const [k, v] of Object.entries(patch)) q.set(k, v)
+    return ap(`/admin/orders?tab=list&${q}`)
+  }
 
   return (
     <>
@@ -132,7 +157,7 @@ function Body({ d }: { d: Data }) {
         <AttentionList items={withAp(d.attention)} />
         <Section title="Open orders now">
           <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-            <Link href={listHref('pending')} className="rounded-lg bg-surface-secondary p-2 hover:bg-surface">
+            <Link href={listHref({ status: 'pending' })} className="rounded-lg bg-surface-secondary p-2 hover:bg-surface">
               <p className="text-lg font-bold tabular-nums text-foreground">{count(d.snapshot.toConfirm)}</p>
               <p className="text-xs text-foreground-muted">To confirm</p>
             </Link>
@@ -140,7 +165,7 @@ function Body({ d }: { d: Data }) {
               <p className="text-lg font-bold tabular-nums text-foreground">{count(d.snapshot.toShip)}</p>
               <p className="text-xs text-foreground-muted">To ship</p>
             </Link>
-            <Link href={ap('/admin/packing-slips')} className="rounded-lg bg-surface-secondary p-2 hover:bg-surface">
+            <Link href={listHref({ late_to_ship: 'true' })} className="rounded-lg bg-surface-secondary p-2 hover:bg-surface">
               <p
                 className={`text-lg font-bold tabular-nums ${d.snapshot.lateToShip ? 'text-red-500' : 'text-foreground'}`}
               >
@@ -155,7 +180,7 @@ function Body({ d }: { d: Data }) {
               .map(s => (
                 <li key={s.status}>
                   <Link
-                    href={listHref(s.status)}
+                    href={listHref({ status: s.status })}
                     className="flex items-center justify-between gap-3 py-2 hover:text-accent-500"
                   >
                     <span className="text-foreground">{s.label}</span>

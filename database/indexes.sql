@@ -35,6 +35,14 @@ CREATE INDEX idx_addresses_user_id ON public.addresses USING btree (user_id);
 
 
 --
+-- Name: idx_amazon_orders_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_amazon_orders_order_id ON public.amazon_orders USING btree (order_id) WHERE (order_id IS NOT NULL);
+
+
+
+--
 -- Name: idx_admin_agent_actions_admin; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -107,6 +115,14 @@ CREATE INDEX idx_admin_audit_admin_created ON public.admin_audit_log USING btree
 
 
 --
+-- Name: idx_admin_audit_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON public.admin_audit_log USING btree (created_at DESC);
+
+
+
+--
 -- Name: idx_admin_audit_entity; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -143,6 +159,22 @@ CREATE INDEX idx_admin_certs_serial ON public.admin_certificates USING btree (se
 --
 
 CREATE INDEX idx_admin_mfa_recovery_codes_admin_id ON public.admin_mfa_recovery_codes USING btree (admin_id) WHERE (used_at IS NULL);
+
+
+
+--
+-- Name: idx_admin_saved_views_admin_page_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_admin_saved_views_admin_page_name ON public.admin_saved_views USING btree (admin_id, page_key, lower((name)::text));
+
+
+
+--
+-- Name: idx_admin_saved_views_shared; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_saved_views_shared ON public.admin_saved_views USING btree (page_key) WHERE is_shared;
 
 
 
@@ -381,6 +413,14 @@ CREATE INDEX idx_categories_slug ON public.categories USING btree (slug);
 --
 
 CREATE INDEX idx_ceu_user_id ON public.coupon_eligible_users USING btree (user_id);
+
+
+
+--
+-- Name: idx_coupon_usage_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_coupon_usage_order_id ON public.coupon_usage USING btree (order_id);
 
 
 
@@ -1135,6 +1175,14 @@ CREATE INDEX idx_orders_customer_name_trgm ON public.orders USING gin (customer_
 
 
 --
+-- Name: idx_orders_invoice_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_invoice_date ON public.orders USING btree (invoice_date) WHERE (invoice_number IS NOT NULL);
+
+
+
+--
 -- Name: idx_orders_invoice_number_trgm; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1171,6 +1219,62 @@ CREATE INDEX idx_orders_order_number_trgm ON public.orders USING gin (order_numb
 --
 
 CREATE INDEX idx_orders_original_order_id ON public.orders USING btree (original_order_id);
+
+
+
+--
+-- Name: idx_orders_awb_number_prefix; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_awb_number_prefix ON public.orders USING btree (awb_number text_pattern_ops) WHERE (awb_number IS NOT NULL);
+
+
+
+--
+-- Name: idx_orders_delivered_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_delivered_at ON public.orders USING btree (delivered_at) WHERE (delivered_at IS NOT NULL);
+
+
+
+--
+-- Name: idx_orders_payment_mode; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_payment_mode ON public.orders USING btree (payment_mode);
+
+
+
+--
+-- Name: idx_orders_payment_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_payment_status ON public.orders USING btree (payment_status);
+
+
+
+--
+-- Name: idx_orders_shipment_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_shipment_status ON public.orders USING btree (shipment_status) WHERE (shipment_status IS NOT NULL);
+
+
+
+--
+-- Name: idx_orders_shipped_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_shipped_at ON public.orders USING btree (shipped_at) WHERE (shipped_at IS NOT NULL);
+
+
+
+--
+-- Name: idx_orders_total_amount; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_total_amount ON public.orders USING btree (total_amount);
 
 
 
@@ -1581,6 +1685,14 @@ CREATE INDEX idx_return_requests_order_id ON public.return_requests USING btree 
 --
 
 CREATE INDEX idx_return_requests_status ON public.return_requests USING btree (status);
+
+
+
+--
+-- Name: idx_return_requests_type_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_return_requests_type_created ON public.return_requests USING btree (type, created_at DESC);
 
 
 

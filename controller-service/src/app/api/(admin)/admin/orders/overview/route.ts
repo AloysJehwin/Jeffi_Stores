@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { canonicalQuery, filterScope, normalizeQuery } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
@@ -25,6 +26,8 @@ import {
   type CancelReason,
   type Row,
 } from '@/lib/overviews/orders'
+import { ORDERS_ENTITY } from '@/lib/filters/entities/orders'
+import { ORDER_FIELDS } from '@/lib/filters/fields/orders'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +43,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const handlingDays = eddSettingsFromValues(await getBusinessValues().catch(() => null)).handlingDays
+    // The list's filters (not its date: the period owns from/to), appended after each query's own args.
+    const q = normalizeQuery(ORDERS_ENTITY, sp)
+    const scope = filterScope(ORDERS_ENTITY, q, { omit: ['created'], ctx: { handlingDays } })
+    const s4 = scope.and(args.length + 1)
+    const s2 = scope.and(2)
 
     const [placed, shipped, delivered, snapshot, pipeline, series, bySource, byState, cancels] = await Promise.all([
       queryMany<Row>(
@@ -53,9 +61,9 @@ export async function GET(request: NextRequest) {
                 COUNT(*) FILTER (WHERE o.status <> 'cancelled' AND o.payment_mode = 'cod') AS cod,
                 COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'cancelled' AND o.payment_mode = 'cod'), 0) AS cod_value
          FROM orders o, b
-         WHERE ${inBoth('o.created_at')} AND o.status <> 'draft'
+         WHERE ${inBoth('o.created_at')} AND o.status <> 'draft'${s4.sql}
          GROUP BY 1`,
-        args
+        [...args, ...s4.params]
       ),
       queryMany<Row>(
         `WITH ${BOUNDS}
@@ -65,9 +73,9 @@ export async function GET(request: NextRequest) {
                   FILTER (WHERE o.shipped_at >= COALESCE(o.confirmed_at, o.created_at)) AS dispatch_hours,
                 COUNT(*) FILTER (WHERE o.shipment_status LIKE 'rto%') AS rto
          FROM orders o, b
-         WHERE ${inBoth('o.shipped_at')} AND o.status <> 'draft'
+         WHERE ${inBoth('o.shipped_at')} AND o.status <> 'draft'${s4.sql}
          GROUP BY 1`,
-        args
+        [...args, ...s4.params]
       ),
       queryMany<Row>(
         `WITH ${BOUNDS}
@@ -79,9 +87,9 @@ export async function GET(request: NextRequest) {
                 COUNT(*) FILTER (WHERE o.estimated_delivery_date IS NOT NULL) AS with_promise,
                 COUNT(*) FILTER (WHERE (o.delivered_at AT TIME ZONE 'Asia/Kolkata')::date <= o.estimated_delivery_date) AS on_time
          FROM orders o, b
-         WHERE ${inBoth('o.delivered_at')} AND o.status = 'delivered' AND o.shipped_at IS NOT NULL
+         WHERE ${inBoth('o.delivered_at')} AND o.status = 'delivered' AND o.shipped_at IS NOT NULL${s4.sql}
          GROUP BY 1`,
-        args
+        [...args, ...s4.params]
       ),
       queryOne<Row>(
         `SELECT COUNT(*) FILTER (WHERE o.status = 'pending') AS to_confirm,
@@ -96,13 +104,13 @@ export async function GET(request: NextRequest) {
                                    AND o.estimated_delivery_date < (NOW() AT TIME ZONE 'Asia/Kolkata')::date) AS overdue_delivery,
                 COUNT(*) FILTER (WHERE o.payment_status = 'unpaid' AND o.payment_mode NOT IN ('cod', 'credit')
                                    AND o.status NOT IN ('cancelled', 'draft') AND o.created_at < NOW() - interval '1 day') AS unpaid_prepaid
-         FROM orders o`,
-        [handlingDays]
+         FROM orders o${s2.sql ? ` WHERE TRUE${s2.sql}` : ''}`,
+        [handlingDays, ...s2.params]
       ),
       queryMany<Row>(
         `SELECT o.status, COUNT(*) AS count, COALESCE(SUM(o.total_amount), 0) AS value
-         FROM orders o WHERE o.status = ANY($1::text[]) GROUP BY 1`,
-        [PIPELINE.map(p => p.status)]
+         FROM orders o WHERE o.status = ANY($1::text[])${s2.sql} GROUP BY 1`,
+        [PIPELINE.map(p => p.status), ...s2.params]
       ),
       queryMany<Row>(
         `WITH ${BOUNDS},
@@ -110,23 +118,23 @@ export async function GET(request: NextRequest) {
          placed AS (
            SELECT ${bucketSql('o.created_at', bucket)} AS bucket, COUNT(*) AS orders,
                   COALESCE(SUM(o.total_amount), 0) AS value
-           FROM orders o, b WHERE ${inCur('o.created_at')} AND o.status NOT IN ('draft', 'cancelled') GROUP BY 1),
+           FROM orders o, b WHERE ${inCur('o.created_at')} AND o.status NOT IN ('draft', 'cancelled')${s4.sql} GROUP BY 1),
          shipped AS (
            SELECT ${bucketSql('o.shipped_at', bucket)} AS bucket, COUNT(*) AS shipped
-           FROM orders o, b WHERE ${inCur('o.shipped_at')} AND o.status <> 'draft' GROUP BY 1)
+           FROM orders o, b WHERE ${inCur('o.shipped_at')} AND o.status <> 'draft'${s4.sql} GROUP BY 1)
          SELECT s.bucket::text AS bucket, COALESCE(p.orders, 0) AS orders, COALESCE(p.value, 0) AS value,
                 COALESCE(sh.shipped, 0) AS shipped
          FROM s LEFT JOIN placed p ON p.bucket = s.bucket LEFT JOIN shipped sh ON sh.bucket = s.bucket
          ORDER BY s.bucket`,
-        args
+        [...args, ...s4.params]
       ),
       queryMany<Row>(
         `WITH ${BOUNDS}
          SELECT o.source, COUNT(*) AS orders, COALESCE(SUM(o.total_amount), 0) AS value
          FROM orders o, b
-         WHERE ${inCur('o.created_at')} AND o.status NOT IN ('draft', 'cancelled')
+         WHERE ${inCur('o.created_at')} AND o.status NOT IN ('draft', 'cancelled')${s4.sql}
          GROUP BY 1 ORDER BY value DESC`,
-        args
+        [...args, ...s4.params]
       ),
       queryMany<Row>(
         `WITH ${BOUNDS}
@@ -134,17 +142,17 @@ export async function GET(request: NextRequest) {
                 COUNT(*) AS orders, COALESCE(SUM(o.total_amount), 0) AS value
          FROM orders o CROSS JOIN b
          LEFT JOIN addresses a ON a.id = o.shipping_address_id
-         WHERE ${inCur('o.created_at')} AND o.status NOT IN ('draft', 'cancelled')
+         WHERE ${inCur('o.created_at')} AND o.status NOT IN ('draft', 'cancelled')${s4.sql}
          GROUP BY 1 ORDER BY value DESC LIMIT 10`,
-        args
+        [...args, ...s4.params]
       ),
       queryMany<Row>(
         `WITH ${BOUNDS}
          SELECT ${CANCEL_REASON_SQL} AS reason, COUNT(*) AS count, COALESCE(SUM(o.total_amount), 0) AS value
          FROM orders o, b
-         WHERE ${inCur('o.created_at')} AND o.status = 'cancelled'
+         WHERE ${inCur('o.created_at')} AND o.status = 'cancelled'${s4.sql}
          GROUP BY 1 ORDER BY count DESC`,
-        args
+        [...args, ...s4.params]
       ),
     ])
 
@@ -217,7 +225,8 @@ export async function GET(request: NextRequest) {
         count: n(r.count),
         value: n(r.value),
       })),
-      attention: ordersAttention(snap, handlingDays),
+      filtered: !scope.empty,
+      attention: ordersAttention(snap, handlingDays, canonicalQuery(q, ORDER_FIELDS, { omit: ['from', 'to'] })),
     })
   } catch (err) {
     console.error('[orders/overview]', err)

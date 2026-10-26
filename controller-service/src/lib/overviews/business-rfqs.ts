@@ -1,3 +1,4 @@
+import type { FilterScope } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, ratio, type Period } from '@/lib/overview/period'
 import type { AttentionItem } from '@/lib/overview/attention'
@@ -22,13 +23,14 @@ const OPEN = `('pending', 'reviewed', 'negotiating', 'offer_accepted')`
 const INACTIVE_ORDER = `('cancelled', 'returned', 'draft', 'cancel_rejected')`
 export const STALE_QUOTE_DAYS = 14
 
-const RFQ = `
+/** `f`: list filters on r. */
+const rfqSql = (f = '') => `
   SELECT r.id, r.user_id, r.status, r.created_at, r.reviewed_at,
     (SELECT MIN(m.created_at) FROM rfq_messages m WHERE m.rfq_id = r.id AND m.sender = 'admin') AS first_reply,
     q.total_amount AS quoted, q.converted_order_id, o.total_amount AS won
   FROM business_rfqs r
   LEFT JOIN quotations q ON q.id = r.converted_quotation_id
-  LEFT JOIN orders o ON o.id = q.converted_order_id AND o.status NOT IN ${INACTIVE_ORDER}`
+  LEFT JOIN orders o ON o.id = q.converted_order_id AND o.status NOT IN ${INACTIVE_ORDER}${f ? ` WHERE TRUE${f}` : ''}`
 
 const totals = (a = '') => `
   COUNT(*) AS received,
@@ -118,37 +120,48 @@ export function rfqAttention(
   return out
 }
 
-export async function getRfqOverview(period: Period, now = new Date()) {
+/** `scope`: the RFQ list's filters, except its date. Unfiltered, every query is unchanged. */
+export async function getRfqOverview(period: Period, now = new Date(), scope?: FilterScope) {
   const ps = periodSql(period)
   const bucket = bucketFor(period)
+  const on = !!scope && !scope.empty
+  const at = (start: number) => (on ? scope!.and(start) : { sql: '', params: [] as unknown[] })
+  const sp = at(ps.params.length + 1)
+  const s2 = at(3)
+  const s0 = at(1)
+  // Unaliased snapshot queries take the alias only when filtered.
+  const rfqs = on ? `business_rfqs r WHERE TRUE${s0.sql}` : 'business_rfqs'
+  const a0 = (on ? [s0.params] : []) as [] | [unknown[]]
   const [rows, open, byStatus, series, top, awaiting, stale] = await Promise.all([
     queryMany<Record<string, unknown>>(
       `SELECT CASE WHEN ${ps.cur('created_at')} THEN 'cur' ELSE 'prev' END AS p, ${totals()}
-       FROM (${RFQ}) r WHERE ${ps.span('created_at')} GROUP BY 1`,
-      ps.params
+       FROM (${rfqSql(sp.sql)}) r WHERE ${ps.span('created_at')} GROUP BY 1`,
+      [...ps.params, ...sp.params]
     ),
     queryOne<Record<string, unknown>>(
       `SELECT COUNT(*) FILTER (WHERE status IN ${OPEN}) AS open,
               COUNT(*) FILTER (WHERE status = 'offer_accepted') AS offer_accepted
-       FROM business_rfqs`
+       FROM ${rfqs}`,
+      ...a0
     ),
     queryMany<{ status: string; count: string }>(
-      `SELECT status, COUNT(*) AS count FROM business_rfqs GROUP BY 1 ORDER BY 2 DESC`
+      `SELECT status, COUNT(*) AS count FROM ${rfqs} GROUP BY 1 ORDER BY 2 DESC`,
+      ...a0
     ),
     queryMany<Record<string, unknown>>(
       `WITH s AS (${bucketSeriesSql(bucket)})
        SELECT s.b::text AS label, COUNT(r.id) AS received, COUNT(r.id) FILTER (WHERE r.status = 'converted') AS converted
-       FROM s LEFT JOIN business_rfqs r ON ${bucketOf('r.created_at', bucket)} = s.b AND ${ps.cur('r.created_at')}
+       FROM s LEFT JOIN business_rfqs r ON ${bucketOf('r.created_at', bucket)} = s.b AND ${ps.cur('r.created_at')}${s2.sql}
        GROUP BY s.b ORDER BY s.b`,
-      ps.params.slice(0, 2)
+      [...ps.params.slice(0, 2), ...s2.params]
     ),
     queryMany<Record<string, unknown>>(
       `SELECT r.user_id, COALESCE(bp.company_name, u.email) AS name, ${totals('r.')}
-       FROM (${RFQ}) r JOIN users u ON u.id = r.user_id LEFT JOIN business_profiles bp ON bp.user_id = r.user_id
+       FROM (${rfqSql(s2.sql)}) r JOIN users u ON u.id = r.user_id LEFT JOIN business_profiles bp ON bp.user_id = r.user_id
        WHERE ${ps.cur('r.created_at')}
        GROUP BY r.user_id, bp.company_name, u.email
        ORDER BY won_value DESC, quoted_value DESC, received DESC LIMIT 8`,
-      ps.params.slice(0, 2)
+      [...ps.params.slice(0, 2), ...s2.params]
     ),
     // Open RFQs whose last word is the customer's (or that nobody has answered yet).
     queryMany<AwaitingRfq>(
@@ -158,13 +171,15 @@ export async function getRfqOverview(period: Period, now = new Date()) {
        LEFT JOIN business_profiles bp ON bp.user_id = r.user_id
        LEFT JOIN LATERAL (SELECT m.sender, m.created_at FROM rfq_messages m WHERE m.rfq_id = r.id ORDER BY m.created_at DESC LIMIT 1) lm ON true
        WHERE r.status IN ${OPEN}
-         AND (lm.sender = 'customer' OR (lm.sender IS NULL AND r.status = 'pending'))
-       ORDER BY waiting_since ASC LIMIT 20`
+         AND (lm.sender = 'customer' OR (lm.sender IS NULL AND r.status = 'pending'))${s0.sql}
+       ORDER BY waiting_since ASC LIMIT 20`,
+      ...a0
     ),
     queryOne<{ n: string }>(
       `SELECT COUNT(*) AS n FROM business_rfqs r JOIN quotations q ON q.id = r.converted_quotation_id
        WHERE r.status = 'converted' AND q.converted_order_id IS NULL
-         AND q.created_at < now() - interval '${STALE_QUOTE_DAYS} days'`
+         AND q.created_at < now() - interval '${STALE_QUOTE_DAYS} days'${s0.sql}`,
+      ...a0
     ),
   ])
 
@@ -197,5 +212,6 @@ export async function getRfqOverview(period: Period, now = new Date()) {
     top_customers: top.map(t => ({ user_id: String(t.user_id), name: String(t.name ?? ''), ...rfqTotals(t) })),
     awaiting: awaiting.slice(0, 8).map(a => ({ ...a, waiting_hours: hoursBetween(a.waiting_since, now) })),
     attention: rfqAttention(awaiting, offerAccepted, n(stale?.n), now),
+    filtered: on,
   }
 }

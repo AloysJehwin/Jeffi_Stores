@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
+import { AGENT_LOG_ENTITY } from '@/lib/filters/entities/agent'
+import { LOG_COUNT_CAP } from '@/lib/filters/fields/audit'
+import { cappedCount } from '@/lib/filters/run'
+import { listWindow } from '@/lib/filters/window'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,28 +22,29 @@ export async function GET(request: NextRequest) {
     const pageSize = Math.min(100, Math.max(10, parseInt(searchParams.get('pageSize') || '50', 10)))
     const offset = (page - 1) * pageSize
 
-    const result = await query<any>(
-      `SELECT
-        m.id, m.conversation_id, m.created_at, m.tool_calls,
-        COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) as admin_username,
-        u.first_name as admin_first_name, u.last_name as admin_last_name
-       FROM admin_agent_messages m
-       LEFT JOIN admins a ON a.id = m.admin_id
-       LEFT JOIN users u ON u.id = a.user_id
-       WHERE m.role = 'assistant' AND jsonb_array_length(m.tool_calls) > 0
-       ORDER BY m.created_at DESC
-       LIMIT $1 OFFSET $2`,
-      [pageSize, offset]
-    )
+    // The list filters; without dates, the last 30 days. The count stops at LOG_COUNT_CAP.
+    const { q, window } = listWindow(AGENT_LOG_ENTITY, normalizeQuery(AGENT_LOG_ENTITY, searchParams))
+    const w = buildWhere(AGENT_LOG_ENTITY, q)
+    const n = w.params.length
 
-    const countResult = await query<{ total: string }>(
-      `SELECT COUNT(*) as total FROM admin_agent_messages WHERE role = 'assistant' AND jsonb_array_length(tool_calls) > 0`
-    )
+    const [result, counted] = await Promise.all([
+      query<any>(
+        `SELECT
+          am.id, am.conversation_id, am.created_at, am.tool_calls,
+          COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) as admin_username,
+          u.first_name as admin_first_name, u.last_name as admin_last_name
+         FROM admin_agent_messages am
+         LEFT JOIN admins a ON a.id = am.admin_id
+         LEFT JOIN users u ON u.id = a.user_id
+         ${w.where}
+         ORDER BY am.created_at DESC
+         LIMIT $${n + 1} OFFSET $${n + 2}`,
+        [...w.params, pageSize, offset]
+      ),
+      cappedCount(AGENT_LOG_ENTITY, q, LOG_COUNT_CAP),
+    ])
 
-    return NextResponse.json({
-      messages: result.rows,
-      total: parseInt(countResult.rows[0]?.total || '0', 10),
-    })
+    return NextResponse.json({ messages: result.rows, total: counted.count, capped: counted.capped, window })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

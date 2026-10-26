@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { Fragment } from 'react'
 import Link from 'next/link'
-import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
+import Slides, { useSlide } from '@/components/visitor/slides/Slides'
+import SlideImage from '@/components/visitor/slides/SlideImage'
+import StoreMedia from '@/components/visitor/media/StoreMedia'
 
 export interface HeroSlide {
   // New DB-backed shape
@@ -15,6 +17,8 @@ export interface HeroSlide {
   image_url_mobile?: string | null
   blurhash?: string | null
   blurhash_mobile?: string | null
+  /** MP4/WebM over the desktop image, its poster. */
+  video_url?: string | null
   href?: string
   // Legacy category-derived fields (fallback path)
   name?: string
@@ -80,7 +84,8 @@ const LEGACY_COPY: Record<string, { badge: string; badgeColor: string; subtitle:
 const PLACEHOLDER =
   'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1440" height="640"%3E%3Crect width="100%25" height="100%25" fill="%230d0d0d"/%3E%3C/svg%3E'
 const AUTO_ADVANCE_MS = 5000
-const SWIPE_THRESHOLD = 50 // px
+const EDGE_MASK =
+  '[-webkit-mask-image:linear-gradient(to_right,transparent_0%,#000_35%)] [mask-image:linear-gradient(to_right,transparent_0%,#000_35%)]'
 
 interface Props {
   slides: HeroSlide[]
@@ -96,6 +101,7 @@ interface Resolved {
   mobileImg: string
   desktopImg: string
   blurhash: string | null
+  video: string | null
 }
 
 function resolveSlide(s: HeroSlide, i: number): Resolved {
@@ -110,99 +116,63 @@ function resolveSlide(s: HeroSlide, i: number): Resolved {
   // Mirrors the desktop image's fallback chain: the canvas sits under the <picture>, whose
   // default <img> is the mobile source, so prefer whichever hash matches what renders first.
   const blurhash = s.blurhash_mobile || s.blurhash || null
-  return { key: s.id ?? s.slug ?? String(i), href, title, subtitle, badge, badgeColor, mobileImg, desktopImg, blurhash }
+  const video = s.video_url ?? null
+  return {
+    key: s.id ?? s.slug ?? String(i),
+    href,
+    title,
+    subtitle,
+    badge,
+    badgeColor,
+    mobileImg,
+    desktopImg,
+    blurhash,
+    video,
+  }
+}
+
+const MEDIA = `absolute right-0 top-0 h-full w-[62%] sm:w-[60%] ${EDGE_MASK}`
+
+// Fade a slide's left edge into the base instead of cutting it off; only the current slide's clip plays.
+function Backdrop({ s }: { s: Resolved }) {
+  const { current } = useSlide()
+  return (
+    <StoreMedia image={s.desktopImg} video={s.video} active={current} className={`${MEDIA} object-cover object-center`}>
+      <SlideImage
+        src={s.desktopImg}
+        mobileSrc={s.mobileImg}
+        blurhash={s.blurhash}
+        breakpoint={1024}
+        blurClassName={MEDIA}
+        className={`${MEDIA} object-cover object-center`}
+      />
+    </StoreMedia>
+  )
 }
 
 export default function HeroCarousel({ slides }: Props) {
-  const [active, setActive] = useState(0)
-  const touchStartX = useRef<number | null>(null)
-  const touchDeltaX = useRef(0)
-  const [dragging, setDragging] = useState(false)
-  const paused = useRef(false)
-
-  const count = slides.length
-  const go = useCallback((next: number) => setActive(((next % count) + count) % count), [count])
-
-  useEffect(() => {
-    if (count <= 1) return
-    const t = setTimeout(() => {
-      if (!paused.current) go(active + 1)
-    }, AUTO_ADVANCE_MS)
-    return () => clearTimeout(t)
-  }, [active, go, count])
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX
-    touchDeltaX.current = 0
-    paused.current = true
-    setDragging(true)
-  }
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (touchStartX.current == null) return
-    touchDeltaX.current = e.touches[0].clientX - touchStartX.current
-  }
-  const onTouchEnd = () => {
-    const dx = touchDeltaX.current
-    if (Math.abs(dx) > SWIPE_THRESHOLD) {
-      go(active + (dx < 0 ? 1 : -1)) // swipe left → next
-    }
-    touchStartX.current = null
-    touchDeltaX.current = 0
-    paused.current = false
-    setDragging(false)
-  }
-
-  if (!count) return null
+  if (!slides.length) return null
 
   return (
     <div className="bg-surface px-3 sm:px-6 md:px-8 pt-3 pb-0 md:pt-6 h-[clamp(20rem,60svh,32rem)] sm:h-[clamp(22rem,58svh,34rem)] lg:h-[clamp(24rem,56svh,38rem)]">
-      <div
+      <Slides
+        layout="fade"
+        ariaLabel="Featured"
+        autoplay={AUTO_ADVANCE_MS}
         className="relative w-full rounded-2xl overflow-hidden shadow-2xl h-full select-none"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
       >
         {slides.map((raw, i) => {
           const s = resolveSlide(raw, i)
           return (
-            <div
-              key={s.key}
-              className={`absolute inset-0 transition-opacity duration-700 ${i === active ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-            >
-              <Link
-                href={s.href}
-                className="absolute inset-0 z-10"
-                aria-label={`Shop ${s.title}`}
-                onClick={e => {
-                  if (dragging && Math.abs(touchDeltaX.current) > SWIPE_THRESHOLD) e.preventDefault()
-                }}
-              />
+            <Fragment key={s.key}>
+              <Link href={s.href} className="absolute inset-0 z-10" aria-label={`Shop ${s.title}`} />
 
               {/* The image covers only the right ~60%, and the gradient below it is not fully
                   opaque everywhere. Without a solid base the near-white page background
                   (--color-surface #F9FAFB) bled through on the left as a grey haze, and the
                   boundary where that met the image read as a faint vertical line. */}
               <div className="absolute inset-0 bg-[#0d0d0d]">
-                {s.blurhash && (
-                  <div
-                    className="absolute right-0 top-0 h-full w-[62%] sm:w-[60%]
-                               [-webkit-mask-image:linear-gradient(to_right,transparent_0%,#000_35%)]
-                               [mask-image:linear-gradient(to_right,transparent_0%,#000_35%)]"
-                  >
-                    <BlurhashCanvas hash={s.blurhash} />
-                  </div>
-                )}
-                <picture>
-                  <source media="(min-width: 1024px)" srcSet={s.desktopImg} />
-                  {/* Fade the image's left edge into the base instead of cutting it off. */}
-                  <img
-                    src={s.mobileImg}
-                    alt=""
-                    className="absolute right-0 top-0 h-full w-[62%] sm:w-[60%] object-cover object-center
-                               [-webkit-mask-image:linear-gradient(to_right,transparent_0%,#000_35%)]
-                               [mask-image:linear-gradient(to_right,transparent_0%,#000_35%)]"
-                  />
-                </picture>
+                <Backdrop s={s} />
                 <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] from-35% via-[#0d0d0d]/80 via-60% to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/30" />
               </div>
@@ -224,24 +194,10 @@ export default function HeroCarousel({ slides }: Props) {
                   </p>
                 )}
               </div>
-            </div>
+            </Fragment>
           )
         })}
-
-        {/* Dot indicators */}
-        {count > 1 && (
-          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => go(i)}
-                className={`rounded-full transition-all duration-300 ${i === active ? 'bg-white w-5 h-2' : 'bg-white/35 hover:bg-white/60 w-2 h-2'}`}
-                aria-label={`Go to slide ${i + 1}`}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      </Slides>
     </div>
   )
 }

@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import StoreMedia from '@/components/visitor/media/StoreMedia'
+import { responsiveImg } from '@/lib/shared/image-url'
 import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.about
@@ -11,6 +13,8 @@ interface AboutSectionProps {
   eyebrow?: string | null
   body?: string | null
   imageUrl?: string | null
+  /** MP4/WebM over the image, its poster. */
+  video?: string | null
   ctaLabel?: string | null
   ctaUrl?: string | null
 }
@@ -23,19 +27,23 @@ export default function AboutSection({
   eyebrow,
   body,
   imageUrl,
+  video,
   ctaLabel,
   ctaUrl,
 }: AboutSectionProps) {
+  const image = imageUrl || COPY.imageUrl
   return (
     <section className="py-12 md:py-20 bg-surface">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-20 items-center">
           <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-            <img
-              src={imageUrl || COPY.imageUrl}
-              alt={`${storeName} team`}
-              className="w-full h-56 sm:h-80 md:h-[440px] object-cover"
-            />
+            <StoreMedia image={image} video={video} className="absolute inset-0 h-full w-full object-cover">
+              <img
+                {...responsiveImg(image, '(min-width: 768px) 50vw, 100vw')}
+                alt={`${storeName} team`}
+                className="w-full h-56 sm:h-80 md:h-[440px] object-cover"
+              />
+            </StoreMedia>
             <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 via-transparent to-transparent" />
             <div className="absolute bottom-4 left-4 right-4 flex gap-3">
               {stats.map((s, i) => (

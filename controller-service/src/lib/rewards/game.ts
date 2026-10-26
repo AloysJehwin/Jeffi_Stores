@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { insertUserCoupon } from '@/lib/loyalty/coupons'
+import { couponStatusSql, type CouponStatus } from './account-coupons'
 import {
   isWithinWindow,
   rewardsGameConfig,
@@ -30,6 +31,7 @@ export interface GamePlay {
     minPurchase: number
     maxDiscount: number | null
     validUntil: string | null
+    status: CouponStatus
   } | null
 }
 
@@ -108,6 +110,7 @@ function toPlay(row: PlayRow): GamePlay {
           minPurchase: Number(row.min_purchase_amount ?? 0),
           maxDiscount: row.max_discount_amount == null ? null : Number(row.max_discount_amount),
           validUntil: row.valid_until ? new Date(row.valid_until).toISOString() : null,
+          status: row.coupon_status ?? 'usable',
         }
       : null,
   }
@@ -124,10 +127,12 @@ interface PlayRow {
   min_purchase_amount: string | null
   max_discount_amount: string | null
   valid_until: string | null
+  coupon_status: CouponStatus | null
 }
 
 const PLAY_SELECT = `SELECT p.prize_id, p.prize_label, p.played_at, c.id AS coupon_id, c.code, c.discount_type, c.discount_value,
-    c.min_purchase_amount, c.max_discount_amount, c.valid_until
+    c.min_purchase_amount, c.max_discount_amount, c.valid_until,
+    CASE WHEN c.id IS NULL THEN NULL ELSE ${couponStatusSql('p.user_id')} END AS coupon_status
   FROM reward_game_plays p LEFT JOIN coupons c ON c.id = p.coupon_id`
 
 export async function getGameState(game: RewardsGameConfig, userId: string): Promise<GameState> {

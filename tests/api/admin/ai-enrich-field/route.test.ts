@@ -62,7 +62,7 @@ describe('POST /api/admin/ai-enrich-field', () => {
   // ── Scope and plan gating ────────────────────────────────────────────────
 
   it('returns 400 for a scope outside the AI allowlist', async () => {
-    const res = await POST(makeReq({ value: 'some product', scope: 'orders:write' }))
+    const res = await POST(makeReq({ value: 'some product', scope: 'financial:write' }))
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/invalid ai scope/i)
     expect(mockAiChat).not.toHaveBeenCalled()

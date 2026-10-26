@@ -1,8 +1,8 @@
-export interface SearchClause {
-  clause: string
-  params: unknown[]
-  nextIdx: number
-}
+import { prefixTsQuery as tsQuery, type SearchClause } from '@jeffi/list-filters'
+
+export type { SearchClause }
+// Shared with the controller; the substring part escapes LIKE wildcards.
+export { buildSearchClause, buildVectorSearchClause } from '@jeffi/list-filters'
 
 // Minimum pg_trgm word_similarity for a query word to be considered a fuzzy
 // match against the best-matching run of words in a column. Calibrated against
@@ -18,16 +18,6 @@ function searchWords(raw: string): string[] {
     .split(/\s+/)
     .map(w => w.replace(/^[^\w]+|[^\w]+$/g, ''))
     .filter(Boolean)
-}
-
-function tsQuery(raw: string): string {
-  return raw
-    .trim()
-    .split(/\s+/)
-    .map(w => w.replace(/[^\w]/g, ''))
-    .filter(Boolean)
-    .map(w => `${w}:*`)
-    .join(' & ')
 }
 
 export function buildProductSearchClause(
@@ -125,77 +115,6 @@ export function buildProductSearchRank(
     - word_similarity($${simIdx}::text, ${nameCol})
   )`
   return { rank, params, nextIdx: i }
-}
-
-export function buildVectorSearchClause(
-  raw: string,
-  vectorCol: string,
-  trgmCols: string[],
-  exactCols: string[],
-  startIdx: number,
-  ftsConfig: 'english' | 'simple' = 'simple'
-): SearchClause {
-  const q = raw.trim()
-  if (!q) return { clause: 'TRUE', params: [], nextIdx: startIdx }
-
-  const params: unknown[] = []
-  let i = startIdx
-  const parts: string[] = []
-
-  const tsq = tsQuery(q)
-  if (tsq) {
-    parts.push(`${vectorCol} @@ to_tsquery('${ftsConfig}', $${i})`)
-    params.push(tsq)
-    i++
-  }
-
-  for (const col of trgmCols) {
-    parts.push(`similarity(${col}, $${i}::text) > 0.12`)
-    params.push(q)
-    i++
-  }
-
-  for (const col of exactCols) {
-    parts.push(`${col} ILIKE $${i}`)
-    params.push(`%${q}%`)
-    i++
-  }
-
-  const clause = parts.length ? `(${parts.join(' OR ')})` : 'TRUE'
-  return { clause, params, nextIdx: i }
-}
-
-export function buildSearchClause(raw: string, columns: string[], startIdx: number = 1): SearchClause {
-  const words = searchWords(raw)
-  if (words.length === 0) {
-    return { clause: 'TRUE', params: [], nextIdx: startIdx }
-  }
-
-  const params: unknown[] = []
-  let idx = startIdx
-
-  // Exact: every word must appear (as a substring) somewhere across the columns.
-  const colClauses = columns.map(col => {
-    const wordClauses = words.map(word => {
-      params.push(`%${word}%`)
-      return `${col} ILIKE $${idx++}`
-    })
-    return `(${wordClauses.join(' AND ')})`
-  })
-
-  // Fuzzy: per-word trigram word_similarity against each column, so a typo in any
-  // single word still matches (e.g. "grindr" → "Wet Grinder").
-  const trgmClauses: string[] = []
-  for (const word of words) {
-    params.push(word)
-    const wi = idx++
-    for (const col of columns) {
-      trgmClauses.push(`word_similarity($${wi}::text, COALESCE(${col},'')) > ${WORD_SIM_THRESHOLD}`)
-    }
-  }
-
-  const clause = `(${colClauses.join(' OR ')} OR ${trgmClauses.join(' OR ')})`
-  return { clause, params, nextIdx: idx }
 }
 
 export function buildSearchRank(raw: string, primaryColumn: string): string {

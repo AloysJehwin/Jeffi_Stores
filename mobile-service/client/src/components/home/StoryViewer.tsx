@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BackHandler, StyleSheet, View, useWindowDimensions } from 'react-native'
-import { Button, IconButton, Text, haptic, useEntering, useMotion } from '../../ui'
+import { Button, Gradient, IconButton, Media, Text, haptic, useEntering, useMotion, useVideoAllowed } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -22,7 +22,6 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { absUrl, openHref } from '../../lib/links'
 import { useStoryStore } from '../../stores/storyStore'
 import { status } from '../../theme'
@@ -35,6 +34,9 @@ const CLOSE_DRAG = 120
 const CLOSE_VELOCITY = 1200
 const PREV_ZONE = 0.3
 const SEG_GAP = 4
+// A clip's length sets its slide's; if none arrives by then, the slide's own seconds do.
+const DURATION_WAIT_MS = 4000
+const MAX_CLIP_MS = 60_000
 
 export function StoryViewerHost() {
   const groups = useStoryStore(s => s.groups)
@@ -62,12 +64,34 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
   posRef.current = pos
   const group = groups[pos.g]
   const slide = group.slides[Math.min(pos.s, group.slides.length - 1)]
-  const image = absUrl(slide.image)
+  const slideKey = `${group.id}:${slide.id}`
+  const clip = useVideoAllowed() ? absUrl(slide.video) : null
 
   const progress = useSharedValue(0)
   const dragY = useSharedValue(0)
   const enter = useSharedValue(reduceMotion ? 1 : 0.96)
   const held = useRef(false)
+  const [holding, setHolding] = useState(false)
+
+  // How long the slide runs: its seconds, or a clip's length (null while that loads). The first answer
+  // for a slide sticks, so a late one doesn't restart its bar; lengths are kept for revisits.
+  const lengths = useRef(new Map<string, number>())
+  const [timed, setTimed] = useState<{ key: string; ms: number } | null>(null)
+  const time = (ms: number) => setTimed(t => (t?.key === slideKey ? t : { key: slideKey, ms }))
+  const slideMs = slide.seconds * 1000
+  const known = clip ? lengths.current.get(clip) : undefined
+  const durationMs = !clip ? slideMs : timed?.key === slideKey ? timed.ms : (known ?? null)
+  const onClipDuration = (secs: number) => {
+    if (!clip || lengths.current.has(clip)) return
+    const ms = Math.min(MAX_CLIP_MS, secs * 1000)
+    lengths.current.set(clip, ms)
+    time(ms)
+  }
+  useEffect(() => {
+    if (!clip || lengths.current.has(clip)) return
+    const t = setTimeout(() => time(slideMs), DURATION_WAIT_MS)
+    return () => clearTimeout(t)
+  }, [slideKey, clip, slideMs])
 
   useEffect(() => {
     enter.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) })
@@ -124,26 +148,31 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
       return
     }
     progress.value = from
+    if (durationMs == null) return // the clip's length is still loading
     progress.value = withTiming(
       1,
-      { duration: Math.max(0, (1 - from) * slide.seconds * 1000), easing: Easing.linear, reduceMotion: ReduceMotion.Never },
+      { duration: Math.max(0, (1 - from) * durationMs), easing: Easing.linear, reduceMotion: ReduceMotion.Never },
       finished => {
         if (finished) runOnJS(advance)()
       }
     )
   }
+  // Starts when the slide does, or once its clip's length is known; a finger already down waits for release.
   useEffect(() => {
-    run.current(0)
+    if (held.current) progress.value = 0
+    else run.current(0)
     return () => cancelAnimation(progress)
-  }, [pos.g, pos.s, progress])
+  }, [pos.g, pos.s, durationMs, progress])
 
   const pause = useCallback(() => {
     held.current = true
+    setHolding(true)
     cancelAnimation(progress)
   }, [progress])
   const resume = useCallback(() => {
     if (!held.current) return
     held.current = false
+    setHolding(false)
     run.current(progress.value)
   }, [progress])
 
@@ -200,12 +229,15 @@ function Viewer({ groups, start }: { groups: StoryGroup[]; start: number }) {
             ]}
             onAccessibilityAction={e => go(e.nativeEvent.actionName === 'decrement' ? -1 : 1)}
           >
-            <Image
-              source={image ? { uri: image } : undefined}
+            <Media
+              image={slide.image}
+              video={slide.video}
               style={StyleSheet.absoluteFill}
-              contentFit="cover"
               transition={reduceMotion ? 0 : 150}
-              accessible={false}
+              loop={false}
+              paused={holding}
+              onDuration={onClipDuration}
+              onError={() => known == null && time(slideMs)}
             />
             <Scrim top />
             {slide.caption || slide.url ? <Scrim /> : null}
@@ -271,16 +303,11 @@ function Segment({ width, state, progress }: { width: number; state: 'done' | 'a
 
 /** Dark fade behind the chrome so the title and caption stay readable on bright images. */
 function Scrim({ top }: { top?: boolean }) {
-  const id = top ? 'storyScrimTop' : 'storyScrimBottom'
   return (
-    <Svg pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, [top ? 'top' : 'bottom']: 0, height: top ? 160 : 220 }} width="100%" height="100%">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1={top ? '0' : '1'} x2="0" y2={top ? '1' : '0'}>
-          <Stop offset="0" stopColor={status.black} stopOpacity={top ? 0.6 : 0.75} />
-          <Stop offset="1" stopColor={status.black} stopOpacity={0} />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
+    <Gradient
+      dir={top ? 'b' : 't'}
+      stops={[[0, status.black, top ? 0.6 : 0.75], [1, status.black, 0]]}
+      style={{ left: 0, right: 0, [top ? 'top' : 'bottom']: 0, height: top ? 160 : 220 }}
+    />
   )
 }

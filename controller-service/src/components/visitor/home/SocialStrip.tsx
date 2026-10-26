@@ -1,11 +1,13 @@
 import Link from 'next/link'
-import StoreImage from '@/components/visitor/StoreImage'
+import StoreMedia from '@/components/visitor/media/StoreMedia'
 import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.social_strip
 
 export interface SocialStripItem {
   imageUrl: string
+  /** MP4/WebM over the image, its poster. */
+  video?: string
   url: string
   caption: string
 }
@@ -51,10 +53,13 @@ export default function SocialStrip({ items, eyebrow, title, ctaLabel, ctaUrl }:
               aria-label={item.caption || 'Open post'}
               className="group relative shrink-0 w-40 sm:w-auto aspect-square rounded-xl overflow-hidden bg-surface snap-start"
             >
-              <StoreImage
-                src={item.imageUrl}
+              <StoreMedia
+                image={item.imageUrl}
+                video={item.video}
                 alt={item.caption}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 160px"
+                wrapperClassName="absolute inset-0"
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
               {item.caption && (
                 <span className="absolute inset-x-0 bottom-0 p-2 text-xs text-white bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity line-clamp-2">

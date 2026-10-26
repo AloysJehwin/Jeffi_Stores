@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { renderTextWithLinks } from '@/components/ui/Linkify'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 interface Message {
   id: string
@@ -115,6 +116,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
   const [activeCategory, setActiveCategory] = useState(QUICK_REPLIES[0].category)
   const storeName = useStoreConfig().identity.name
   const withStore = (t: string) => t.replaceAll('{store}', storeName)
+  const lastCustomerMessage = [...messages].reverse().find(m => m.sender === 'user')?.message ?? ''
   const [isClosingReply, setIsClosingReply] = useState(false)
   const [adminUsername, setAdminUsername] = useState<string>('')
   const [sessionClosed, setSessionClosed] = useState(false)
@@ -462,14 +464,26 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                       />
                     </svg>
                   </button>
-                  <textarea
-                    rows={1}
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Reply to customer..."
-                    className="flex-1 min-w-0 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent-400"
-                  />
+                  <div className="relative flex-1 min-w-0">
+                    <textarea
+                      rows={1}
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Reply to customer..."
+                      className="block h-full w-full px-3.5 py-2 pr-10 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent-400"
+                    />
+                    <AIEnrichButton
+                      placement="in-field"
+                      anchorClassName="absolute right-2 top-1/2 -translate-y-1/2"
+                      fieldLabel="Support chat reply"
+                      value={input}
+                      onChange={setInput}
+                      scope="customers:write"
+                      write={!!lastCustomerMessage}
+                      context={`Live support chat reply from ${storeName} to a customer; short and friendly.${lastCustomerMessage ? ` The customer wrote: "${lastCustomerMessage.slice(0, 600)}"` : ''}`}
+                    />
+                  </div>
                   <button
                     onClick={() => sendMessage(undefined, isClosingReply)}
                     disabled={isSending || !input.trim()}

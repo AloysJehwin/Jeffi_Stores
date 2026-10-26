@@ -7,19 +7,22 @@ export default function OverviewTabs({
   sp,
   listLabel = 'List',
   actions,
+  hrefs,
 }: {
   basePath: string
   active: 'overview' | 'list'
   sp: Record<string, string | string[] | undefined>
   listLabel?: string
   actions?: React.ReactNode
+  /** Filterable lists pass tabHref links, which carry their filters across tabs. */
+  hrefs?: { overview: string; list: string }
 }) {
   const q = new URLSearchParams()
   if (typeof sp.from === 'string') q.set('from', sp.from)
   if (typeof sp.to === 'string') q.set('to', sp.to)
   const tabs = [
-    { id: 'overview' as const, label: 'Overview', href: q.size ? `${basePath}?${q}` : basePath },
-    { id: 'list' as const, label: listLabel, href: `${basePath}?tab=list` },
+    { id: 'overview' as const, label: 'Overview', href: hrefs?.overview ?? (q.size ? `${basePath}?${q}` : basePath) },
+    { id: 'list' as const, label: listLabel, href: hrefs?.list ?? `${basePath}?tab=list` },
   ]
   return (
     <div className="mb-5">

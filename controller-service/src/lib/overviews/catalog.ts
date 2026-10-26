@@ -16,8 +16,9 @@ export const istDay = (expr: string) => `(${expr} AT TIME ZONE ${IST})::date`
 
 export const ORDER_DATE = `COALESCE(o.invoice_date, o.created_at)`
 
-/** Sold order lines, with `cur` true for the current period. Params: $1/$2 current, $3/$4 previous. */
-export const SOLD_LINES = `
+/** Sold order lines, with `cur` true for the current period. Params: $1/$2 current, $3/$4 previous.
+ * `extra` narrows the lines (e.g. to the products list's filters). */
+export const soldLines = (extra = '') => `
   sold AS (
     SELECT oi.product_id, oi.variant_id, oi.sub_variant_id, oi.order_id, oi.quantity,
            oi.total_price AS value,
@@ -32,8 +33,9 @@ export const SOLD_LINES = `
     LEFT JOIN products p ON p.id = oi.product_id
     LEFT JOIN product_variants pv ON pv.id = oi.variant_id
     WHERE o.payment_status = 'paid' AND o.status NOT IN ${INACTIVE_ORDER}
-      AND (${inIst(ORDER_DATE, 1, 2)} OR ${inIst(ORDER_DATE, 3, 4)})
+      AND (${inIst(ORDER_DATE, 1, 2)} OR ${inIst(ORDER_DATE, 3, 4)})${extra}
   )`
+export const SOLD_LINES = soldLines()
 
 /** Sellable leaves of active, non-draft, physical products with stock at cost; same grains and
  * cost fallback (ex-GST price when no cost) as the Inventory overview. */

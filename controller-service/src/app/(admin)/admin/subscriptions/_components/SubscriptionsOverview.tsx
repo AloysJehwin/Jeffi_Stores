@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { SUBSCRIPTION_FIELDS, SUBSCRIPTION_SEARCH } from '@/lib/filters/fields/subscriptions'
 import { AttentionList, OverviewSkeleton, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { Badge, Kpi, KpiGrid, Section, Table, count, money, pct, when } from '@/components/admin/channels/ui'
 import { RankedBars, TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
@@ -16,13 +18,23 @@ const SERIES: SeriesDef[] = [
 
 export default function SubscriptionsOverview() {
   const [period, setPeriod] = usePeriod()
+  // KPIs and charts follow the list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(SUBSCRIPTION_FIELDS, { omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<SubscriptionOverview>(
-    `/api/admin/subscriptions/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/subscriptions/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
 
   return (
     <div className="space-y-5">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="subscriptions"
+        fields={SUBSCRIPTION_FIELDS}
+        search={SUBSCRIPTION_SEARCH}
+        period
+        noun="Subscriptions"
+        tab="overview"
+      />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {!data ? loading && <OverviewSkeleton /> : <Body d={data} />}
     </div>

@@ -13,6 +13,8 @@ import {
 import { DonutSplit, TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { delta, type Bucket, type Period } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { REQUEST_SEARCH, RETURN_FIELDS } from '@/lib/filters/fields/returns'
 import { BreakdownBars, fmtDays, withAp } from '../../orders/_components/overview-shared'
 
 export interface ReturnsKpis {
@@ -76,12 +78,15 @@ export const statusLabel = (s: string) => s.replace(/_/g, ' ')
 
 export default function ReturnsOverview() {
   const [period, setPeriod] = usePeriod()
+  // KPIs and charts follow the list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(RETURN_FIELDS, { omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<ReturnsData>(
-    `/api/admin/returns/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/returns/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters entity="returns" fields={RETURN_FIELDS} search={REQUEST_SEARCH} period noun="Returns" tab="overview" exportable />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <OverviewSkeleton /> : data ? <Body d={data} /> : null}
     </div>

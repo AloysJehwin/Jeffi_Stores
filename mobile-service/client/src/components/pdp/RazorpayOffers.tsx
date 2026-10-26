@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { CreditCard, Tag } from 'lucide-react-native'
-import { Overline, Text, useEntering, useMotion } from '../../ui'
+import { Gradient, Overline, Text, useEntering, useMotion } from '../../ui'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { getRazorpayOffers } from '../../api/pdp'
 import { openHref } from '../../lib/links'
 import { status, useTokens } from '../../theme'
@@ -57,15 +56,7 @@ export default function RazorpayOffers() {
           exiting={fadeOut}
           className={`absolute inset-0 flex-row items-center gap-3 px-3 ${GRADIENTS[i % GRADIENTS.length]}`}
         >
-          <Svg style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} width="100%" height="100%">
-            <Defs>
-              <LinearGradient id={`rzpOffer${i}`} x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor={status.black} stopOpacity={0} />
-                <Stop offset="1" stopColor={status.black} stopOpacity={0.35} />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill={`url(#rzpOffer${i})`} />
-          </Svg>
+          <Gradient dir="r" stops={[[0, status.black, 0], [1, status.black, 0.35]]} />
           <Tag size={14} color={status.white} opacity={0.7} />
           <Text numberOfLines={1} className="flex-1 text-xs text-white/90">
             {offer.title}

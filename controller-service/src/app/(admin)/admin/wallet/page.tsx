@@ -27,7 +27,8 @@ export default async function WalletPage() {
   const tenantId = await resolveTenantId().catch(() => null)
   if (!tenantId) redirect('/admin/dashboard')
   const [wallet, ai] = await Promise.all([
-    tenantId ? getTenantWallet(tenantId, 500).catch(() => null) : null,
+    // Balance only; the ledger pages in from the server with the list's filters.
+    tenantId ? getTenantWallet(tenantId, 0).catch(() => null) : null,
     tenantId ? aiSpend() : [],
   ])
 

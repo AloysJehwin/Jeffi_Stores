@@ -1,5 +1,7 @@
+import { buildWhere, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { queryOne, queryMany, queryCount } from './shared'
-import { buildSearchClause } from '@/lib/catalog/search'
+import type { CustomerStats } from './analytics'
+import { CUSTOMERS_ENTITY } from '@/lib/filters/entities/customers'
 
 const CUSTOMER_SORT_COLS: Record<string, string> = {
   name: "u.first_name || ' ' || u.last_name",
@@ -8,98 +10,21 @@ const CUSTOMER_SORT_COLS: Record<string, string> = {
   joined: 'u.created_at',
   orders: 'o.order_count',
   lifetime_value: 'o.lifetime_value',
+  status: 'u.is_active',
+  health: 'COALESCE(ch.score, -1)',
 }
 
-export async function getCustomers(filters: {
-  search?: string
-  status?: string
-  segment?: string
-  tag?: string
-  health?: string
-  page?: number
-  limit?: number
-  sort?: string
-  dir?: string
-}) {
-  const CUSTOMER_SORT_COLS: Record<string, string> = {
-    name: "u.first_name || ' ' || u.last_name",
-    email: 'u.email',
-    phone: 'u.phone',
-    joined: 'u.created_at',
-    orders: 'o.order_count',
-    lifetime_value: 'o.lifetime_value',
-    status: 'u.is_active',
-    health: 'COALESCE(ch.score, -1)',
-  }
-
-  const conditions: string[] = ['u.is_guest = false']
-  const params: any[] = []
-  let i = 1
-
-  if (filters.status === 'active') {
-    conditions.push(`u.is_active = true AND u.is_flagged = false`)
-  } else if (filters.status === 'inactive') {
-    conditions.push(`u.is_active = false AND u.is_flagged = false`)
-  } else if (filters.status === 'flagged') {
-    conditions.push(`u.is_flagged = true`)
-  }
-
-  if (filters.search) {
-    const sc = buildSearchClause(filters.search, ['u.email', 'u.first_name', 'u.last_name', 'u.phone'], i)
-    conditions.push(sc.clause)
-    params.push(...sc.params)
-    i = sc.nextIdx
-  }
-
-  if (filters.tag) {
-    conditions.push(`EXISTS (SELECT 1 FROM customer_tags ct WHERE ct.user_id = u.id AND ct.tag = $${i})`)
-    params.push(filters.tag.toLowerCase())
-    i++
-  }
-
-  if (filters.segment) {
-    const seg = filters.segment
-    if (seg === 'b2b') {
-      conditions.push(`(cp.gst_number IS NOT NULL OR cp.company_name IS NOT NULL)`)
-    } else if (seg === 'vip') {
-      conditions.push(`COALESCE(o.lifetime_value, 0) >= 50000`)
-    } else if (seg === 'loyal') {
-      conditions.push(`COALESCE(o.paid_orders, 0) >= 5 AND COALESCE(o.lifetime_value, 0) >= 25000`)
-    } else if (seg === 'repeat') {
-      conditions.push(`COALESCE(o.order_count, 0) >= 3`)
-    } else if (seg === 'one_time') {
-      conditions.push(`COALESCE(o.order_count, 0) = 1`)
-    } else if (seg === 'new') {
-      conditions.push(`u.created_at >= NOW() - INTERVAL '30 days'`)
-    } else if (seg === 'at_risk') {
-      conditions.push(
-        `o.last_order_at IS NOT NULL AND o.last_order_at < NOW() - INTERVAL '90 days' AND o.last_order_at >= NOW() - INTERVAL '180 days'`
-      )
-    } else if (seg === 'dormant') {
-      conditions.push(`o.last_order_at IS NOT NULL AND o.last_order_at < NOW() - INTERVAL '180 days'`)
-    } else if (seg === 'lead') {
-      conditions.push(`COALESCE(o.order_count, 0) = 0`)
-    }
-  }
-
-  if (filters.health === 'healthy') {
-    conditions.push(`ch.score >= 70`)
-  } else if (filters.health === 'at_risk') {
-    conditions.push(`ch.score >= 40 AND ch.score < 70`)
-  } else if (filters.health === 'critical') {
-    conditions.push(`ch.score IS NOT NULL AND ch.score < 40`)
-  } else if (filters.health === 'unknown') {
-    conditions.push(`ch.score IS NULL`)
-  }
-
-  const where = `WHERE ${conditions.join(' AND ')}`
-  const limit = filters.limit || 50
-  const offset = ((filters.page || 1) - 1) * limit
-  const sortCol = CUSTOMER_SORT_COLS[filters.sort || ''] || 'u.created_at'
-  const sortDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
-
-  const safeCol = filters.sort && CUSTOMER_SORT_COLS[filters.sort] ? CUSTOMER_SORT_COLS[filters.sort] : 'u.created_at'
-  const safeDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
+/** One page of customers for a normalised filter query, plus the matching total. */
+export async function queryCustomers(
+  q: FilterQuery,
+  opts: { page?: number; limit?: number; sort?: string; dir?: string } = {}
+) {
+  const w = buildWhere(CUSTOMERS_ENTITY, q, 1)
+  const i = w.nextIdx
+  const limit = opts.limit || 50
+  const offset = ((opts.page || 1) - 1) * limit
+  const safeCol = (opts.sort && CUSTOMER_SORT_COLS[opts.sort]) || 'u.created_at'
+  const safeDir = opts.dir === 'asc' ? 'ASC' : 'DESC'
 
   const [customers, total] = await Promise.all([
     queryMany(
@@ -135,32 +60,53 @@ export async function getCustomers(filters: {
                SUM(total_amount) AS lifetime_value
         FROM orders GROUP BY user_id
       ) o ON u.id = o.user_id
-      ${where}
+      ${w.where}
       ORDER BY ${safeCol} ${safeDir}
       LIMIT $${i} OFFSET $${i + 1}
     `,
-      [...params, limit, offset]
+      [...w.params, limit, offset]
     ),
-    queryCount(
-      `
-      SELECT COUNT(*) FROM users u
-      LEFT JOIN customer_profiles cp ON u.id = cp.user_id
-      LEFT JOIN customer_health ch ON ch.user_id = u.id
-      LEFT JOIN (
-        SELECT user_id,
-               COUNT(*) AS order_count,
-               COUNT(*) FILTER (WHERE payment_status = 'paid') AS paid_orders,
-               MAX(created_at) AS last_order_at,
-               SUM(total_amount) AS lifetime_value
-        FROM orders GROUP BY user_id
-      ) o ON u.id = o.user_id
-      ${where}
-    `,
-      params
-    ),
+    queryCount(`SELECT COUNT(*) FROM users u ${w.where}`, w.params),
   ])
 
   return { customers, total }
+}
+
+/** Raw URL-style filters → queryCustomers (tags are stored lower-case). */
+export async function getCustomers(filters: {
+  search?: string
+  status?: string
+  segment?: string
+  tag?: string
+  health?: string
+  page?: number
+  limit?: number
+  sort?: string
+  dir?: string
+  [param: string]: string | number | undefined
+}) {
+  const { page, limit, sort, dir, ...rest } = filters
+  if (typeof rest.tag === 'string') rest.tag = rest.tag.toLowerCase()
+  return queryCustomers(normalizeQuery(CUSTOMERS_ENTITY, rest), {
+    page: typeof page === 'number' ? page : undefined,
+    limit: typeof limit === 'number' ? limit : undefined,
+    sort: typeof sort === 'string' ? sort : undefined,
+    dir: typeof dir === 'string' ? dir : undefined,
+  })
+}
+
+/** The list's KPI strip over every matching customer. */
+export async function getCustomersSummary(q: FilterQuery): Promise<CustomerStats> {
+  const w = buildWhere(CUSTOMERS_ENTITY, q, 1)
+  const r = await queryOne<CustomerStats>(
+    `SELECT COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE u.is_active AND NOT u.is_flagged)::int AS active,
+            COUNT(*) FILTER (WHERE NOT u.is_active AND NOT u.is_flagged)::int AS inactive,
+            COUNT(*) FILTER (WHERE u.is_flagged)::int AS flagged
+     FROM users u ${w.where}`,
+    w.params
+  )
+  return r ?? { total: 0, active: 0, inactive: 0, flagged: 0 }
 }
 
 export async function getCustomerById(id: string) {

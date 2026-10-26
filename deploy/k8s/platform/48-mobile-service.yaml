@@ -67,6 +67,6 @@ spec:
     - match: Host(`mobile.jeffistores.in`)
       priority: 100
       kind: Rule
-      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }, { name: compress, namespace: jeffi-edge }]
       services: [{ name: jeffi-stores-mobile-service, port: 3103 }]
   tls: {}

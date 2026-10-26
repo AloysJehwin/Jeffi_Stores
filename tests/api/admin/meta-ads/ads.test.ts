@@ -45,7 +45,8 @@ const graphCalls = () =>
 
 function route(graph: (path: string, body: Record<string, string>) => Response) {
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-    if (url === IMG) return new Response(Buffer.from('jpegbytes'), { headers: { 'content-type': 'image/jpeg' } })
+    // JPEG magic bytes: ad uploads pass JPEG/PNG through untouched (asJpegOrPng).
+    if (url === IMG) return new Response(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from('jpegbytes')]), { headers: { 'content-type': 'image/jpeg' } })
     const path = url.replace(/^.*\/v[\d.]+\//, '').split('?')[0]
     return graph(path, Object.fromEntries(new URLSearchParams(String(init?.body ?? ''))))
   })

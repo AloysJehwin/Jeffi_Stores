@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { COUPON_ALIASES, COUPON_FIELDS, COUPON_SEARCH } from '@/lib/filters/fields/coupons'
 import {
   AttentionList,
   OverviewSkeleton,
@@ -46,8 +48,10 @@ const view = (id: string) => ap(`/admin/coupons/${id}/view`)
 
 export default function CouponsOverview() {
   const [period, setPeriod] = usePeriod()
+  // KPIs and charts follow the list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(COUPON_FIELDS, { aliases: COUPON_ALIASES, omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/coupons/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/coupons/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
   const c = data?.current
   const p = data?.previous_totals
@@ -55,6 +59,15 @@ export default function CouponsOverview() {
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="coupons"
+        fields={COUPON_FIELDS}
+        aliases={COUPON_ALIASES}
+        search={COUPON_SEARCH}
+        period
+        noun="Coupons"
+        tab="overview"
+      />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
         !error && <OverviewSkeleton />

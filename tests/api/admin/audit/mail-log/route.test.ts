@@ -8,17 +8,22 @@ vi.mock('@/lib/shared/db', () => ({
   queryCount: vi.fn(),
 }))
 
-const { mockRequireAdminScope } = vi.hoisted(() => ({ mockRequireAdminScope: vi.fn() }))
+const { mockRequireAdminScope, mockCappedCount } = vi.hoisted(() => ({
+  mockRequireAdminScope: vi.fn(),
+  mockCappedCount: vi.fn(),
+}))
 vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: mockRequireAdminScope }))
+// The list count is capped (lib/filters/run).
+vi.mock('@/lib/filters/run', () => ({ cappedCount: mockCappedCount }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
 import { GET } from '@/app/api/(admin)/admin/audit/mail-log/route'
-import { queryMany, queryCount } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)
-const mockQueryCount = vi.mocked(queryCount)
+const counted = (count: number) => mockCappedCount.mockResolvedValue({ count, capped: false })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +61,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('returns paginated rows and total', async () => {
     mockQueryMany.mockResolvedValue(sampleRows as any)
-    mockQueryCount.mockResolvedValue(1)
+    counted(1)
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -68,7 +73,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('applies kind filter', async () => {
     mockQueryMany.mockResolvedValue([])
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     await GET(makeRequest({ kind: 'marketing' }))
     const queryCall = mockQueryMany.mock.calls[0]
     expect(queryCall[1]).toContain('marketing')
@@ -76,7 +81,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('does not apply kind filter when kind=all', async () => {
     mockQueryMany.mockResolvedValue([])
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     await GET(makeRequest({ kind: 'all' }))
     const queryCall = mockQueryMany.mock.calls[0]
     expect(queryCall[0]).not.toContain('kind =')
@@ -84,7 +89,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('applies status filter', async () => {
     mockQueryMany.mockResolvedValue([])
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     await GET(makeRequest({ status: 'failed' }))
     const queryCall = mockQueryMany.mock.calls[0]
     expect(queryCall[1]).toContain('failed')
@@ -92,7 +97,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('does not apply status filter when status=all', async () => {
     mockQueryMany.mockResolvedValue([])
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     await GET(makeRequest({ status: 'all' }))
     const queryCall = mockQueryMany.mock.calls[0]
     expect(queryCall[0]).not.toContain('status =')
@@ -100,7 +105,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('applies search query filter', async () => {
     mockQueryMany.mockResolvedValue([])
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     await GET(makeRequest({ q: 'invoice' }))
     const queryCall = mockQueryMany.mock.calls[0]
     expect(queryCall[1]).toContain('%invoice%')
@@ -108,7 +113,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('returns page and pageSize from query params', async () => {
     mockQueryMany.mockResolvedValue([])
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     const res = await GET(makeRequest({ page: '3', pageSize: '10' }))
     const body = await res.json()
     expect(body.page).toBe(3)
@@ -117,7 +122,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('clamps pageSize to max 100 and min 1', async () => {
     mockQueryMany.mockResolvedValue([])
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     const res = await GET(makeRequest({ pageSize: '9999' }))
     const body = await res.json()
     expect(body.pageSize).toBe(100)
@@ -125,7 +130,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('defaults to page 1 when page is invalid', async () => {
     mockQueryMany.mockResolvedValue([])
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     const res = await GET(makeRequest({ page: '0' }))
     const body = await res.json()
     expect(body.page).toBe(1)
@@ -133,7 +138,7 @@ describe('GET /api/admin/audit/mail-log', () => {
 
   it('returns empty rows when no records match', async () => {
     mockQueryMany.mockResolvedValue([])
-    mockQueryCount.mockResolvedValue(0)
+    counted(0)
     const res = await GET(makeRequest({ kind: 'transactional', status: 'failed', q: 'noresult' }))
     expect(res.status).toBe(200)
     const body = await res.json()

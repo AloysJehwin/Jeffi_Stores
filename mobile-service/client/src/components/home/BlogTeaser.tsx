@@ -1,8 +1,8 @@
 import { View } from 'react-native'
 import { Card, Text, TextButton } from '../../ui'
-import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { BookOpen } from 'lucide-react-native'
+import FeedMedia from './FeedMedia'
 import { SectionHeading } from './layout'
 import { absUrl, openHref } from '../../lib/links'
 import { useTokens } from '../../theme'
@@ -15,6 +15,8 @@ interface BlogTeaserItem {
   excerpt: string
   url: string
   imageUrl: string
+  /** Optional MP4/WebM; `imageUrl` is its poster. */
+  video?: string
 }
 
 // homepage-sections safeHref: http(s) or a site-relative path only.
@@ -46,9 +48,9 @@ export default function BlogTeaser({ section }: SectionProps) {
               className="overflow-hidden"
             >
               <View className="relative overflow-hidden bg-surface-secondary" style={{ aspectRatio: 16 / 9 }}>
-                {img ? (
+                {img || item.video ? (
                   <View className="h-full w-full bg-gray-200 dark:bg-gray-700">
-                    <Image recyclingKey={img} source={{ uri: img }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={300} />
+                    <FeedMedia image={img} video={item.video} style={{ width: '100%', height: '100%' }} transition={300} />
                   </View>
                 ) : (
                   <View className="h-full w-full items-center justify-center">

@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
+import type { SelectOption } from '@/components/admin/AdminSelect'
+import type { MediaSize } from '@/components/admin/media/MediaField'
 import IconByName from '@/components/visitor/home/IconByName'
 import { ICON_OPTIONS } from './icon-options'
 import { LABEL_CLASS, Image, Select, Text, TextArea } from './fields'
@@ -10,9 +12,18 @@ export type Tile = Record<string, string>
 export interface TileField {
   key: string
   label: string
-  kind?: 'text' | 'textarea' | 'select' | 'image'
-  options?: { value: string; label: string }[]
+  kind?: 'text' | 'textarea' | 'select' | 'image' | 'custom'
+  options?: SelectOption[]
   placeholder?: string
+  hint?: string
+  /** For `image`: the size preset(s) for the preview and AI. */
+  size?: MediaSize | MediaSize[]
+  /** For `image`: a sibling key holding the slot's MP4/WebM; the slot then accepts video. */
+  videoKey?: string
+  /** For `image`: the AI prompt to start from. */
+  defaultPrompt?: string
+  /** For `custom`: draws the control for this key (e.g. a product picker); `patch` sets several keys at once. */
+  render?: (value: string, onCommit: (v: string) => void, patch: (p: Tile) => void) => React.ReactNode
 }
 
 interface TileListEditorProps {
@@ -21,15 +32,21 @@ interface TileListEditorProps {
   tiles: Tile[]
   /** Built-in tiles the storefront shows while none are saved; shown and editable in their place. */
   defaults?: Tile[]
-  fields: TileField[]
+  /** The same fields for every tile, or per tile (fields that depend on a tile's kind). */
+  fields: TileField[] | ((tile: Tile) => TileField[])
   blank: Tile
   disabled: boolean
   max?: number
+  /** Prepended to what the AI sparkle on each tile's copy is told, e.g. the story the slides belong to. */
+  aiContext?: string
   /** False for tiles without an icon, such as About stats. */
   showIcon?: boolean
   itemLabel?: string
   onCommit: (tiles: Tile[]) => void
 }
+
+// Links, ids and numbers are not copy, so they get no AI sparkle.
+const NOT_COPY_KEY = /(url|href|link|id|slug|code|email|phone|seconds|days|weight|value|purchase|discount)$/i
 
 const BTN_CLASS =
   'px-2 py-1 text-xs font-medium rounded-md border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed'
@@ -43,6 +60,7 @@ export default function TileListEditor({
   blank,
   disabled,
   max = 8,
+  aiContext,
   showIcon = true,
   itemLabel = 'Tile',
   onCommit,
@@ -62,6 +80,12 @@ export default function TileListEditor({
     const [row] = next.splice(index, 1)
     next.splice(target, 0, row)
     onCommit(next)
+  }
+
+  function tileContext(index: number, tile: Tile) {
+    const lead = tile.headline || tile.title || tile.label || tile.text
+    const where = `${label}${hint ? ` (${hint})` : ''}: ${itemLabel.toLowerCase()} ${index + 1} of ${shown.length}`
+    return `${aiContext ? `${aiContext} ` : ''}${where}${lead ? `, "${lead}"` : ''}.`
   }
 
   return (
@@ -173,14 +197,25 @@ export default function TileListEditor({
                   onChange={v => replace(i, { icon: v })}
                 />
               )}
-              {fields.map(f =>
-                f.kind === 'textarea' ? (
+              {(typeof fields === 'function' ? fields(tile) : fields).map(f =>
+                f.kind === 'custom' ? (
+                  <Fragment key={`${i}-${f.key}`}>
+                    {f.render?.(
+                      tile[f.key] ?? '',
+                      v => replace(i, { [f.key]: v }),
+                      p => replace(i, p)
+                    )}
+                  </Fragment>
+                ) : f.kind === 'textarea' ? (
                   <TextArea
                     key={`${i}-${f.key}`}
                     label={f.label}
                     value={tile[f.key] ?? ''}
                     disabled={disabled}
+                    hint={f.hint}
                     rows={2}
+                    ai={!NOT_COPY_KEY.test(f.key)}
+                    aiContext={tileContext(i, tile)}
                     onCommit={v => replace(i, { [f.key]: v })}
                   />
                 ) : f.kind === 'image' ? (
@@ -188,9 +223,16 @@ export default function TileListEditor({
                     key={`${i}-${f.key}`}
                     label={f.label}
                     value={tile[f.key] ?? ''}
+                    video={f.videoKey ? (tile[f.videoKey] ?? '') : ''}
+                    allowVideo={!!f.videoKey}
+                    size={f.size}
+                    defaultPrompt={f.defaultPrompt}
                     disabled={disabled}
+                    hint={f.hint}
                     placeholder={f.placeholder}
-                    onCommit={v => replace(i, { [f.key]: v })}
+                    onCommit={(img, vid) =>
+                      replace(i, f.videoKey ? { [f.key]: img, [f.videoKey]: vid } : { [f.key]: img })
+                    }
                   />
                 ) : f.kind === 'select' ? (
                   <Select
@@ -199,6 +241,8 @@ export default function TileListEditor({
                     value={tile[f.key] ?? ''}
                     options={f.options ?? []}
                     disabled={disabled}
+                    hint={f.hint}
+                    placeholder={f.placeholder}
                     onChange={v => replace(i, { [f.key]: v })}
                   />
                 ) : (
@@ -207,7 +251,10 @@ export default function TileListEditor({
                     label={f.label}
                     value={tile[f.key] ?? ''}
                     disabled={disabled}
+                    hint={f.hint}
                     placeholder={f.placeholder}
+                    ai={!NOT_COPY_KEY.test(f.key)}
+                    aiContext={tileContext(i, tile)}
                     onCommit={v => replace(i, { [f.key]: v })}
                   />
                 )

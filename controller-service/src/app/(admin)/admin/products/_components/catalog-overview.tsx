@@ -21,21 +21,29 @@ import { resolveListTab, type ListTab } from '@/lib/overviews/catalog'
 export const withAp = (items: AttentionItem[] | undefined) =>
   (items ?? []).map(i => (i.href ? { ...i, href: ap(i.href) } : i))
 
-/** Period bar + loader for `endpoint`; renders `children(data)` only for the current period. */
+/** Period bar + loader for `endpoint`; renders `children(data)` only for the current period.
+ * `query` (a list's filters) is sent along; `filters` renders under the period bar. */
 export function OverviewFrame<T extends { attention?: AttentionItem[] }>({
   endpoint,
   children,
   skeleton,
+  query,
+  filters,
 }: {
   endpoint: string
   children: (data: T, period: Period) => React.ReactNode
   skeleton?: React.ReactNode
+  query?: string
+  filters?: React.ReactNode
 }) {
   const [period, setPeriod] = usePeriod()
-  const { data, error, loading, reload } = useOverviewData<T>(`${endpoint}?from=${period.from}&to=${period.to}`)
+  const { data, error, loading, reload } = useOverviewData<T>(
+    `${endpoint}?from=${period.from}&to=${period.to}${query ? `&${query}` : ''}`
+  )
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      {filters}
       {error ? (
         <Banner ok={false}>{error}</Banner>
       ) : !data ? (
@@ -52,14 +60,18 @@ export function OverviewTab<T extends { attention?: AttentionItem[] }>({
   endpoint,
   kpis,
   extra,
+  query,
+  filters,
 }: {
   endpoint: string
   kpis: (data: T) => React.ReactNode
   extra?: (data: T) => React.ReactNode
+  query?: string
+  filters?: React.ReactNode
 }) {
   return (
     <Suspense fallback={<OverviewSkeleton />}>
-      <OverviewFrame<T> endpoint={endpoint}>
+      <OverviewFrame<T> endpoint={endpoint} query={query} filters={filters}>
         {data => (
           <div className="space-y-4">
             <KpiGrid>{kpis(data)}</KpiGrid>
@@ -86,15 +98,23 @@ export function TabLinks({
   active,
   tabs,
   actions,
+  query,
 }: {
   base: string
   active: string
   tabs: { id: string; label: string }[]
   actions?: React.ReactNode
+  /** A list's filters, carried to every tab. */
+  query?: string
 }) {
   return (
     <div className="mb-6">
-      <SharedTabLinks tabs={tabs.map(t => ({ ...t, href: ap(`${base}?tab=${t.id}`) }))} value={active} actions={actions} scroll={false} />
+      <SharedTabLinks
+        tabs={tabs.map(t => ({ ...t, href: ap(`${base}?tab=${t.id}${query ? `&${query}` : ''}`) }))}
+        value={active}
+        actions={actions}
+        scroll={false}
+      />
     </div>
   )
 }

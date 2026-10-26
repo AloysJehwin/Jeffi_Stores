@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { Loader2, Upload } from 'lucide-react'
-import { uploadImage } from '@/components/admin/ImageUrlInput'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import AdminSelect from '@/components/admin/AdminSelect'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import MediaField, { type MediaSize } from '@/components/admin/media/MediaField'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import Toggle from '@/components/ui/Toggle'
+import { useCanUseAi } from '@/contexts/AdminScopesContext'
+import type { AiActionScope } from '@/lib/auth/ai-scope'
 import {
   sectionLayout,
   sectionLimit,
@@ -65,9 +67,156 @@ function useExternalValue(value: string) {
   return { draft, setDraft, focused }
 }
 
+const LIVE_DEFAULT_NOTE = 'Live default. Edit to change it; clear it to restore the default.'
+
+interface AiCopy {
+  scope: AiActionScope
+  context: string
+}
+
+const AiCopyContext = createContext<AiCopy>({ scope: 'settings:write', context: 'Storefront homepage copy.' })
+
+/** What the AI sparkle on the Text and TextArea fields inside is told; nesting appends detail. */
+export function AiCopyScope({
+  context,
+  scope,
+  children,
+}: {
+  context: string
+  scope?: AiActionScope
+  children: React.ReactNode
+}) {
+  const parent = useContext(AiCopyContext)
+  const value = useMemo(
+    () => ({ scope: scope ?? parent.scope, context: `${parent.context} ${context}` }),
+    [parent, scope, context]
+  )
+  return <AiCopyContext.Provider value={value}>{children}</AiCopyContext.Provider>
+}
+
+interface CopyFieldProps {
+  label: string
+  value: string
+  disabled: boolean
+  hint?: string
+  /** False for fields that are not copy (links, ids, numbers): no AI sparkle. */
+  ai?: boolean
+  maxLength?: number
+  /** Added to the section's AI context for this field, e.g. which tile it belongs to. */
+  aiContext?: string
+  onCommit: (v: string) => void
+}
+
+function useSparkle(ai: boolean, disabled: boolean) {
+  const copy = useContext(AiCopyContext)
+  return { ...copy, on: useCanUseAi(copy.scope) && ai && !disabled }
+}
+
+/** Wraps a copy input with the AI sparkle; the result is committed straight away. */
+function Sparkle({
+  sparkle,
+  label,
+  hint,
+  placeholder,
+  maxLength,
+  aiContext,
+  value,
+  multiline,
+  onChange,
+  children,
+}: Omit<CopyFieldProps, 'disabled' | 'ai' | 'onCommit'> & {
+  sparkle: ReturnType<typeof useSparkle>
+  placeholder?: string
+  multiline?: boolean
+  onChange: (v: string) => void
+  children: React.ReactNode
+}) {
+  if (!sparkle.on) return <>{children}</>
+  const note = hint?.replace(LIVE_DEFAULT_NOTE, '').trim()
+  const context = [sparkle.context, aiContext, note, placeholder && `Example: ${placeholder}.`]
+    .filter(Boolean)
+    .join(' ')
+  // Tokens the hint or example names, e.g. {amount} in the trust strip, are filled in by the storefront.
+  const variables = [...new Set([...context.matchAll(/\{(\w+)\}/g)].map(m => m[1]))]
+  return (
+    <AIEnrichButton
+      fieldLabel={/^eyebrow$/i.test(label) ? 'Eyebrow: a tiny label above the heading, 1-3 words' : label}
+      value={value}
+      onChange={onChange}
+      scope={sparkle.scope}
+      format={/button/i.test(label) ? 'label' : 'plain'}
+      maxLength={maxLength}
+      multiline={multiline}
+      write
+      context={context}
+      variables={variables}
+    >
+      {children}
+    </AIEnrichButton>
+  )
+}
+
 export function Text({
   label,
   value,
+  disabled,
+  hint,
+  placeholder,
+  ai = true,
+  maxLength,
+  aiContext,
+  onCommit,
+}: CopyFieldProps & { placeholder?: string }) {
+  const { draft, setDraft, focused } = useExternalValue(value)
+  const sparkle = useSparkle(ai, disabled)
+  return (
+    <div>
+      <label className={LABEL_CLASS}>{label}</label>
+      <Sparkle
+        sparkle={sparkle}
+        label={label}
+        hint={hint}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        aiContext={aiContext}
+        value={draft}
+        onChange={v => {
+          setDraft(v)
+          if (v !== value) onCommit(v)
+        }}
+      >
+        <input
+          type="text"
+          value={draft}
+          disabled={disabled}
+          placeholder={placeholder}
+          onFocus={() => {
+            focused.current = true
+          }}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={() => {
+            focused.current = false
+            if (draft !== value) onCommit(draft)
+          }}
+          className={sparkle.on ? `${INPUT_CLASS} pr-9` : INPUT_CLASS}
+        />
+      </Sparkle>
+      {hint && <p className="text-[11px] text-foreground-muted mt-1">{hint}</p>}
+    </div>
+  )
+}
+
+/**
+ * A config media slot: upload, gallery or AI, plus a pasted link. With `allowVideo` it also binds the
+ * sibling video key and commits both together, so neither write overwrites the other.
+ */
+export function Image({
+  label,
+  value,
+  video = '',
+  allowVideo = false,
+  size = 'wide',
+  defaultPrompt,
   disabled,
   hint,
   placeholder,
@@ -75,65 +224,46 @@ export function Text({
 }: {
   label: string
   value: string
+  /** The sibling video key's value. */
+  video?: string
+  allowVideo?: boolean
+  size?: MediaSize | MediaSize[]
+  defaultPrompt?: string
   disabled: boolean
   hint?: string
   placeholder?: string
-  onCommit: (v: string) => void
+  /** The image URL, then the video URL ('' when cleared; passed through when the slot takes no video). */
+  onCommit: (image: string, video: string) => void
 }) {
   const { draft, setDraft, focused } = useExternalValue(value)
   return (
-    <div>
-      <label className={LABEL_CLASS}>{label}</label>
+    <div className="sm:col-span-2 space-y-1.5">
+      <MediaField
+        label={label}
+        hint={hint}
+        value={{ image: value || null, video: allowVideo ? video || null : null }}
+        onChange={next => onCommit(next.image ?? '', allowVideo ? (next.video ?? '') : video)}
+        size={size}
+        allowVideo={allowVideo}
+        defaultPrompt={defaultPrompt}
+        disabled={disabled}
+      />
       <input
         type="text"
         value={draft}
         disabled={disabled}
-        placeholder={placeholder}
+        aria-label={`${label} link`}
+        placeholder={placeholder ?? 'Or paste an image link: https://… or /images/…'}
         onFocus={() => {
           focused.current = true
         }}
         onChange={e => setDraft(e.target.value)}
         onBlur={() => {
           focused.current = false
-          if (draft !== value) onCommit(draft)
+          if (draft !== value) onCommit(draft.trim(), video)
         }}
-        className={INPUT_CLASS}
+        className={`${INPUT_CLASS} text-xs`}
       />
-      {hint && <p className="text-[11px] text-foreground-muted mt-1">{hint}</p>}
-    </div>
-  )
-}
-
-/** Image URL field: paste a link, or Upload (the uploaded CDN URL is saved immediately). */
-export function Image({ label, value, disabled, hint, placeholder, onCommit }: {
-  label: string; value: string; disabled: boolean; hint?: string; placeholder?: string; onCommit: (v: string) => void
-}) {
-  const { draft, setDraft, focused } = useExternalValue(value)
-  const file = useRef<HTMLInputElement>(null)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  async function pick(f: File | undefined) {
-    if (!f) return
-    setBusy(true); setErr(null)
-    try { const url = await uploadImage(f); setDraft(url); onCommit(url) } catch (e: any) { setErr(e.message) } finally {
-      setBusy(false)
-      if (file.current) file.current.value = ''
-    }
-  }
-  return (
-    <div>
-      <label className={LABEL_CLASS}>{label}</label>
-      <div className="flex items-center gap-2">
-        <input type="text" value={draft} disabled={disabled} placeholder={placeholder ?? 'https://… or upload'}
-          onFocus={() => { focused.current = true }} onChange={e => setDraft(e.target.value)}
-          onBlur={() => { focused.current = false; if (draft !== value) onCommit(draft) }} className={`${INPUT_CLASS} flex-1 min-w-0`} />
-        <input ref={file} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden onChange={e => pick(e.target.files?.[0])} />
-        <button type="button" disabled={disabled || busy} onClick={() => file.current?.click()}
-          className="inline-flex shrink-0 items-center gap-1.5 self-stretch rounded-lg border border-border-default px-3 text-xs font-semibold hover:bg-surface-secondary disabled:opacity-50">
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} {busy ? 'Uploading…' : 'Upload'}
-        </button>
-      </div>
-      {err ? <p className="text-[11px] text-red-600 mt-1">{err}</p> : hint && <p className="text-[11px] text-foreground-muted mt-1">{hint}</p>}
     </div>
   )
 }
@@ -144,33 +274,44 @@ export function TextArea({
   disabled,
   hint,
   rows = 3,
+  ai = true,
+  maxLength,
+  aiContext,
   onCommit,
-}: {
-  label: string
-  value: string
-  disabled: boolean
-  hint?: string
-  rows?: number
-  onCommit: (v: string) => void
-}) {
+}: CopyFieldProps & { rows?: number }) {
   const { draft, setDraft, focused } = useExternalValue(value)
+  const sparkle = useSparkle(ai, disabled)
   return (
     <div>
       <label className={LABEL_CLASS}>{label}</label>
-      <textarea
+      <Sparkle
+        sparkle={sparkle}
+        label={label}
+        hint={hint}
+        maxLength={maxLength}
+        aiContext={aiContext}
         value={draft}
-        rows={rows}
-        disabled={disabled}
-        onFocus={() => {
-          focused.current = true
+        multiline
+        onChange={v => {
+          setDraft(v)
+          if (v !== value) onCommit(v)
         }}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={() => {
-          focused.current = false
-          if (draft !== value) onCommit(draft)
-        }}
-        className={`${INPUT_CLASS} resize-none`}
-      />
+      >
+        <textarea
+          value={draft}
+          rows={rows}
+          disabled={disabled}
+          onFocus={() => {
+            focused.current = true
+          }}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={() => {
+            focused.current = false
+            if (draft !== value) onCommit(draft)
+          }}
+          className={`${INPUT_CLASS} resize-none${sparkle.on ? ' pr-9' : ''}`}
+        />
+      </Sparkle>
       {hint && <p className="text-[11px] text-foreground-muted mt-1">{hint}</p>}
     </div>
   )
@@ -375,8 +516,7 @@ export function sectionCopy({ section, options }: EditorProps): SectionCopy {
 /** Hint for a field that is showing the storefront default rather than a saved value. */
 export function copyHint(showingDefault: boolean, hint?: string): string | undefined {
   if (!showingDefault) return hint
-  const note = 'Live default. Edit to change it; clear it to restore the default.'
-  return hint ? `${hint} ${note}` : note
+  return hint ? `${hint} ${LIVE_DEFAULT_NOTE}` : LIVE_DEFAULT_NOTE
 }
 
 export function HeadingFields({ props, eyebrowHint }: { props: EditorProps; eyebrowHint?: string }) {
@@ -390,6 +530,7 @@ export function HeadingFields({ props, eyebrowHint }: { props: EditorProps; eyeb
         value={section.eyebrow ?? d.eyebrow ?? ''}
         disabled={!canWrite}
         hint={copyHint(section.eyebrow == null && !!d.eyebrow, eyebrowHint)}
+        maxLength={100}
         onCommit={b.eyebrow}
       />
       <Text
@@ -397,6 +538,7 @@ export function HeadingFields({ props, eyebrowHint }: { props: EditorProps; eyeb
         value={section.title ?? d.title ?? ''}
         disabled={!canWrite}
         hint={copyHint(section.title == null && !!d.title)}
+        maxLength={255}
         onCommit={b.title}
       />
     </>
@@ -423,6 +565,7 @@ export function CtaFields({
         disabled={!canWrite}
         placeholder="Shop all"
         hint={copyHint(section.cta_label == null && !!d.ctaLabel)}
+        maxLength={100}
         onCommit={b.ctaLabel}
       />
       <Text
@@ -431,6 +574,7 @@ export function CtaFields({
         disabled={!canWrite}
         placeholder={urlPlaceholder}
         hint={copyHint(section.cta_url == null && !!d.ctaUrl, hint)}
+        ai={false}
         onCommit={b.ctaUrl}
       />
     </>

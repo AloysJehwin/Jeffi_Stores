@@ -14,7 +14,8 @@ import CompareBar from '@/components/visitor/CompareBar'
 import PageTracker from './visitor/PageTracker'
 import PolicyConsentGate from './PolicyConsentGate'
 import NumberInputWheelGuard from './NumberInputWheelGuard'
-import CookieConsentBanner, { StorefrontFooterBar } from './visitor/CookieConsentBanner'
+import CookieConsentBanner from './visitor/CookieConsentBanner'
+import Footer from './visitor/Footer'
 
 export default function ConditionalLayout({
   children,
@@ -82,11 +83,13 @@ export default function ConditionalLayout({
                 <ConfirmProvider>
                   <CompareProvider>
                     <NumberInputWheelGuard />
-                    <div className="flex flex-col min-h-[100dvh] bg-surface">
+                    <div data-storefront className="flex flex-col min-h-[100dvh] bg-surface">
                       <PageTracker />
                       <Header />
-                      <main className="flex-1 bg-surface pt-16 lg:pt-20">{children}</main>
-                      {cookieConsent && <StorefrontFooterBar />}
+                      <main className="flex-1 bg-surface pt-[calc(4rem+env(safe-area-inset-top,0px))] lg:pt-[calc(5rem+env(safe-area-inset-top,0px))]">
+                        {children}
+                      </main>
+                      <Footer cookieConsent={cookieConsent} />
                     </div>
                     <CompareBar />
                     <PolicyConsentGate />

@@ -29,9 +29,10 @@ export default function UserMenu() {
     return (
       <Link
         href="/login"
-        className="flex items-center gap-2 px-4 py-2 text-foreground-secondary hover:text-accent-500 transition-colors"
+        aria-label="Login"
+        className="flex items-center justify-center gap-2 min-w-[44px] min-h-[44px] px-2.5 sm:min-h-0 sm:px-4 sm:py-2 text-foreground-secondary hover:text-accent-500 transition-colors"
       >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-6 h-6 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -50,9 +51,12 @@ export default function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 p-2 hover:bg-surface-secondary rounded-lg transition-colors"
+        aria-label="Account menu"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        className="flex items-center justify-center gap-2 min-w-[44px] min-h-[44px] p-1.5 sm:p-2 hover:bg-surface-secondary rounded-lg transition-colors"
       >
-        <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden flex-shrink-0">
           {user.avatarUrl ? (
             <img src={user.avatarUrl} alt={user.firstName} className="w-full h-full object-cover" />
           ) : (
@@ -65,7 +69,7 @@ export default function UserMenu() {
           <div className="text-sm font-medium text-foreground">{user.firstName}</div>
         </div>
         <svg
-          className={`w-4 h-4 text-foreground-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`hidden sm:block w-4 h-4 text-foreground-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -97,7 +101,7 @@ export default function UserMenu() {
           <Link
             href="/account"
             onClick={() => setIsOpen(false)}
-            className="flex items-center gap-3 px-4 py-2 text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
+            className="flex items-center gap-3 px-4 py-3 sm:py-2 text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -113,7 +117,7 @@ export default function UserMenu() {
           <Link
             href="/account/orders"
             onClick={() => setIsOpen(false)}
-            className="flex items-center gap-3 px-4 py-2 text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
+            className="flex items-center gap-3 px-4 py-3 sm:py-2 text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -129,7 +133,7 @@ export default function UserMenu() {
           <Link
             href="/wishlist"
             onClick={() => setIsOpen(false)}
-            className="flex items-center gap-3 px-4 py-2 text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
+            className="flex items-center gap-3 px-4 py-3 sm:py-2 text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -149,7 +153,7 @@ export default function UserMenu() {
               setIsOpen(false)
               logout()
             }}
-            className="flex items-center gap-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors w-full"
+            className="flex items-center gap-3 px-4 py-3 sm:py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors w-full"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path

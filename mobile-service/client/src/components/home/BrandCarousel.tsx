@@ -1,7 +1,7 @@
 import { View } from 'react-native'
-import { Card, Text } from '../../ui'
+import { Card, Rail, Text } from '../../ui'
 import { useRouter } from 'expo-router'
-import { Carousel, Grid, SectionHeading } from './layout'
+import { Grid, SectionHeading } from './layout'
 import { openHref } from '../../lib/links'
 import type { SectionProps } from '../../types/home'
 
@@ -41,7 +41,7 @@ export default function BrandCarousel({ section, data }: SectionProps) {
         className="mb-5"
       />
       {section.layout === 'carousel' ? (
-        <Carousel itemWidth={0.22}>{items}</Carousel>
+        <Rail itemWidth={0.22}>{items}</Rail>
       ) : (
         <Grid cols={4} gap={12}>{items}</Grid>
       )}

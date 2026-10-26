@@ -5,6 +5,7 @@ import { ExternalLink, Plus, Trash2 } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import Select from '@/components/ui/Select'
 import { Badge, Empty, Section, Table, btnGhost, btnPrimary, inputCls, money, when } from '@/components/admin/channels/ui'
 
@@ -148,7 +149,17 @@ function PromotionForm({ onSubmit }: { onSubmit: (p: Record<string, unknown>) =>
     <div className="rounded-lg border border-border-default p-3 mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
       <label className="text-xs text-foreground-muted md:col-span-3">
         Title shown on Google (max 60)
-        <input className={inputCls} maxLength={60} value={f.title} onChange={set('title')} placeholder="10% off all power tools" />
+        <AIEnrichButton
+          fieldLabel="Google promotion title"
+          value={f.title}
+          onChange={v => setF(s => ({ ...s, title: v }))}
+          scope="merchant_sync:write"
+          maxLength={60}
+          write
+          context={`Promotion title shown on Google Shopping: ${f.kind === 'PERCENT_OFF' ? `${f.value}% off` : `₹${f.value} off`}${f.minimumPurchase ? ` on orders over ₹${f.minimumPurchase}` : ''}${f.code ? `, code ${f.code}` : ''}. State the offer exactly; no exaggeration.`}
+        >
+          <input className={`${inputCls} pr-8`} maxLength={60} value={f.title} onChange={set('title')} placeholder="10% off all power tools" />
+        </AIEnrichButton>
       </label>
       <label className="text-xs text-foreground-muted">
         Discount

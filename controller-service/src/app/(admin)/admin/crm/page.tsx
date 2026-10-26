@@ -74,7 +74,7 @@ export default async function CrmDashboardPage({
           <p className="text-2xl font-bold text-foreground mt-1">{data.tasks.mine}</p>
         </Link>
         <Link
-          href={ap('/admin/tasks?scope=all&status=overdue', host)}
+          href={ap('/admin/tasks?status=overdue', host)}
           className={`rounded-xl border p-4 hover:border-accent-500/50 transition-colors ${
             data.tasks.overdue > 0 ? 'bg-red-500/5 border-red-500/40' : 'bg-surface-elevated border-border-default'
           }`}
@@ -95,7 +95,7 @@ export default async function CrmDashboardPage({
           </p>
         </Link>
         <Link
-          href={ap('/admin/tasks?scope=all&status=open', host)}
+          href={ap('/admin/tasks?status=open', host)}
           className="bg-surface-elevated rounded-xl border border-border-default p-4 hover:border-accent-500/50 transition-colors"
         >
           <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Open (all)</p>

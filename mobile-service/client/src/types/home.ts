@@ -5,7 +5,7 @@ export type SectionType =
   | 'category_showcase' | 'deal_of_the_day' | 'promo_banner' | 'featured_for_you' | 'benefits'
   | 'why_us' | 'about' | 'business_cta' | 'countdown_deal' | 'testimonials' | 'recently_viewed'
   | 'category_tabs' | 'bundle_spotlight' | 'back_in_stock' | 'blog_teaser' | 'social_strip' | 'value_stats'
-  | 'motion_hero' | 'stories' | 'product_spotlight' | 'rewards_game'
+  | 'motion_hero' | 'stories' | 'product_spotlight' | 'rewards_game' | 'slides'
 
 export interface SectionCopy {
   eyebrow?: string
@@ -13,6 +13,8 @@ export interface SectionCopy {
   subtitle?: string
   body?: string
   imageUrl?: string
+  /** MP4/WebM for the banner image (promo, about); `imageUrl` is its poster. */
+  video?: string
   ctaLabel?: string
   ctaUrl?: string
 }
@@ -29,6 +31,7 @@ export interface HomeSection {
   display_order: number
   layout: 'grid' | 'carousel'
   copy: SectionCopy
+  /** Blog and social items may carry an optional `video` beside `imageUrl`. */
   items: Record<string, string>[] | null
 }
 
@@ -65,6 +68,8 @@ export interface HeroSlide {
   hero_image_desktop?: string | null
   blurhash?: string | null
   blurhash_mobile?: string | null
+  /** MP4/WebM banner; `image_url` is its poster. */
+  video_url?: string | null
   href?: string
 }
 
@@ -79,6 +84,11 @@ export interface ProductOffer {
   image_url_mobile: string | null
   blurhash: string | null
   blurhash_mobile: string | null
+  image_url_card?: string | null
+  blurhash_card?: string | null
+  /** MP4/WebM for the card and wide slots; image_url_card / image_url are the posters. */
+  video_url_card?: string | null
+  video_url?: string | null
   cta_label: string | null
   ends_at: string | null
 }
@@ -124,7 +134,11 @@ export interface CountdownDeal {
 
 export interface MotionHeroSlide {
   bgImage: string
+  /** MP4/WebM behind the slide; `bgImage` is its poster. */
+  bgVideo?: string
   fgImage: string | null
+  /** Absent from older servers: treat as 'none'. */
+  fgFrame?: 'rounded' | 'fade' | 'none'
   eyebrow: string | null
   headline: string
   sub: string | null
@@ -140,6 +154,8 @@ export interface MotionHeroData {
 export interface StorySlide {
   id: string
   image: string
+  /** MP4/WebM for the slide; `image` is its poster. */
+  video?: string
   caption: string | null
   ctaLabel: string | null
   url: string | null
@@ -162,6 +178,44 @@ export interface SpotlightData {
   product: CardProduct
   headline: string | null
   callouts: string[]
+}
+
+// extras[section.id] of a slides section (homepage-extras.ts getSlides): every reference resolved, dead ones dropped.
+export interface SlideCard {
+  id: string
+  kind: 'offer' | 'category' | 'product' | 'custom'
+  href: string | null
+  title: string
+  eyebrow: string | null
+  sub: string | null
+  badge: string | null
+  /** A `bg-*` class for the badge pill, when the source sets one. */
+  badgeClass: string | null
+  ctaLabel: string | null
+  image: string | null
+  /** Portrait 4:5 picture, when there is one. */
+  imageCard: string | null
+  /** MP4/WebM for the wide slot and the card; `image` / `imageCard` are the posters. */
+  video?: string | null
+  videoCard?: string | null
+  blurhash: string | null
+  blurhashCard: string | null
+  price?: number
+  mrp?: number | null
+  productId?: string
+  productSlug?: string
+  /** Product slides: the card, for the quick-add sheet. */
+  product?: CardProduct
+  motion: 'none' | 'kenburns' | 'parallax' | 'reveal'
+}
+
+export interface SlidesData {
+  layout: 'cards' | 'banner' | 'rail' | 'fade'
+  aspect: '4:5' | '1:1' | '16:9'
+  autoplay: boolean
+  /** 3–20 s; only used with autoplay. */
+  intervalSeconds: number
+  slides: SlideCard[]
 }
 
 // extras[section.id] of a rewards_game section (homepage-sections.ts rewardsGamePublic): no weights, null when unplayable.
@@ -191,6 +245,8 @@ export interface RewardGamePlay {
     minPurchase: number
     maxDiscount: number | null
     validUntil: string | null
+    /** Absent from servers older than the status. */
+    status?: 'usable' | 'used' | 'expired'
   } | null
 }
 

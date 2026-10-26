@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
 import { authenticateAdmin, authenticateServiceAccount } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryCount } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
+import { AUDIT_ENTITY } from '@/lib/filters/entities/audit'
+import { LOG_COUNT_CAP } from '@/lib/filters/fields/audit'
+import { cappedCount } from '@/lib/filters/run'
+import { listWindow } from '@/lib/filters/window'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,45 +23,30 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
   const pageSize = Math.min(200, Math.max(10, parseInt(url.searchParams.get('pageSize') || '50', 10)))
   const offset = (page - 1) * pageSize
-  const entityType = url.searchParams.get('entity_type')
-  const action = url.searchParams.get('action')
-  const adminId = url.searchParams.get('admin_id')
+  // The list filters; without dates, the last 7 days. The count stops at LOG_COUNT_CAP.
+  const { q, window } = listWindow(AUDIT_ENTITY, normalizeQuery(AUDIT_ENTITY, url.searchParams))
+  const w = buildWhere(AUDIT_ENTITY, q)
+  const n = w.params.length
 
-  const wheres: string[] = []
-  const filterVals: any[] = []
-  if (entityType) {
-    filterVals.push(entityType)
-    wheres.push(`l.entity_type = $${filterVals.length}`)
-  }
-  if (action) {
-    filterVals.push(action)
-    wheres.push(`l.action = $${filterVals.length}`)
-  }
-  if (adminId) {
-    filterVals.push(adminId)
-    wheres.push(`l.admin_id = $${filterVals.length}::uuid`)
-  }
-  const whereSql = wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''
+  const [rows, counted] = await Promise.all([
+    queryMany(
+      `SELECT l.id::text, l.admin_id::text, l.action, l.entity_type, l.entity_id,
+              l.summary, l.diff, l.metadata, l.ip_address::text, l.created_at,
+              u.first_name AS admin_first_name, u.last_name AS admin_last_name,
+              COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS admin_username
+         FROM admin_audit_log l
+         LEFT JOIN admins a ON a.id = l.admin_id
+         LEFT JOIN users u ON u.id = a.user_id
+        ${w.where}
+        ORDER BY l.created_at DESC
+        LIMIT $${n + 1}
+        OFFSET $${n + 2}`,
+      [...w.params, pageSize, offset]
+    ),
+    cappedCount(AUDIT_ENTITY, q, LOG_COUNT_CAP),
+  ])
 
-  const total = await queryCount(`SELECT COUNT(*) FROM admin_audit_log l ${whereSql}`, filterVals)
-
-  const rowVals = [...filterVals, pageSize, offset]
-  const rows = await queryMany(
-    `SELECT l.id::text, l.admin_id::text, l.action, l.entity_type, l.entity_id,
-            l.summary, l.diff, l.metadata, l.ip_address::text, l.created_at,
-            u.first_name AS admin_first_name, u.last_name AS admin_last_name,
-            COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS admin_username
-       FROM admin_audit_log l
-       LEFT JOIN admins a ON a.id = l.admin_id
-       LEFT JOIN users u ON u.id = a.user_id
-      ${whereSql}
-      ORDER BY l.created_at DESC
-      LIMIT $${filterVals.length + 1}
-      OFFSET $${filterVals.length + 2}`,
-    rowVals
-  )
-
-  return NextResponse.json({ events: rows, total, page, pageSize })
+  return NextResponse.json({ events: rows, total: counted.count, capped: counted.capped, window, page, pageSize })
 }
 
 // POST — called by service accounts or the CRON_SECRET bearer to write audit entries.

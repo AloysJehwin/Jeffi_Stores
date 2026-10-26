@@ -4214,6 +4214,14 @@ export default function ProductForm({
                   <ImageUpload
                     productId={tempProductId}
                     maxImages={5}
+                    ai={{
+                      defaultPrompt: buildProductImagePrompt({
+                        name: productName,
+                        brand: brands.find(b => b.id === brandId)?.name,
+                        category: categories.find(c => c.id === categoryId)?.name,
+                        specs: specifications,
+                      }),
+                    }}
                     existingImages={product?.product_images || []}
                     onImagesChange={(files, existingToKeep, galleryImgs, orderedKeys) => {
                       setImageFiles(files)
@@ -5279,14 +5287,24 @@ export default function ProductForm({
                       {metaTitle.length}/160
                     </span>
                   </label>
-                  <input
-                    type="text"
-                    maxLength={160}
+                  <AIEnrichButton
+                    fieldLabel="SEO meta title"
                     value={metaTitle}
-                    onChange={e => setMetaTitle(e.target.value)}
-                    placeholder="SEO page title"
-                    className={inputCls}
-                  />
+                    onChange={setMetaTitle}
+                    scope="products:write"
+                    maxLength={160}
+                    write
+                    context={`SEO page title for the product "${productName}", ideally under 60 characters. ${description.replace(/<[^>]+>/g, ' ').slice(0, 300)}`}
+                  >
+                    <input
+                      type="text"
+                      maxLength={160}
+                      value={metaTitle}
+                      onChange={e => setMetaTitle(e.target.value)}
+                      placeholder="SEO page title"
+                      className={`${inputCls} pr-8`}
+                    />
+                  </AIEnrichButton>
                 </div>
                 <div>
                   <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
@@ -5295,14 +5313,25 @@ export default function ProductForm({
                       {metaDescription.length}/320
                     </span>
                   </label>
-                  <textarea
-                    maxLength={320}
-                    rows={3}
+                  <AIEnrichButton
+                    fieldLabel="SEO meta description"
                     value={metaDescription}
-                    onChange={e => setMetaDescription(e.target.value)}
-                    placeholder="SEO page description"
-                    className={`${inputCls} resize-none`}
-                  />
+                    onChange={setMetaDescription}
+                    scope="products:write"
+                    maxLength={320}
+                    multiline
+                    write
+                    context={`Search-result description for the product "${productName}", ideally about 155 characters. ${description.replace(/<[^>]+>/g, ' ').slice(0, 600)}`}
+                  >
+                    <textarea
+                      maxLength={320}
+                      rows={3}
+                      value={metaDescription}
+                      onChange={e => setMetaDescription(e.target.value)}
+                      placeholder="SEO page description"
+                      className={`${inputCls} resize-none pr-8`}
+                    />
+                  </AIEnrichButton>
                 </div>
                 <Toggle
                   id="is_searchable"

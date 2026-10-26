@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { canonicalQuery, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { pageUrls } from '@/lib/admin/page-urls'
 import { Plus } from 'lucide-react'
@@ -8,17 +9,24 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
-import { getFilteredProducts, getAllCategories, getAllBrands, getProductBreakdowns } from '@/lib/queries'
+import {
+  getFilteredProducts,
+  getAllCategories,
+  getAllBrands,
+  getProductBreakdowns,
+  getProductsSummary,
+  getFeaturedProductCount,
+} from '@/lib/queries'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import CopySku from '@/components/ui/CopySku'
 import ProductsTableClient from './ProductsTableClient'
-import ProductsAdvancedFilters from './_components/ProductsAdvancedFilters'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import { Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
-import { ADMIN_PRODUCT_FILTER_FIELDS } from '@/lib/catalog/product-attribute-filters-shared'
 import { getSpecFilterFields } from '@/lib/catalog/product-attribute-filters'
+import { PRODUCTS_ENTITY } from '@/lib/filters/entities/products'
+import { PRODUCT_SEARCH, productFields } from '@/lib/filters/fields/products'
 import { resolveListTab } from '@/lib/overviews/catalog'
 import ProductsOverview from './_components/ProductsOverview'
 import { TabLinks, TabMemory } from './_components/catalog-overview'
@@ -44,7 +52,7 @@ async function ProductsListContent({
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
 
-  const [{ products, total }, allProductsForStats] = await Promise.all([
+  const [{ products, total }, featuredCount] = await Promise.all([
     getFilteredProducts({
       category_id: resolvedSearchParams.category_id,
       brand_id: resolvedSearchParams.brand_id,
@@ -57,12 +65,9 @@ async function ProductsListContent({
       sort,
       dir,
     }),
-    getFilteredProducts({}),
+    // Store-wide, not the page shown: it enforces the 6-featured limit in FeaturedToggleButton.
+    getFeaturedProductCount(),
   ])
-
-  // Featured count is the global count of featured products (used to enforce the
-  // 6-featured limit in FeaturedToggleButton / ProductsTableClient).
-  const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
 
   const listParams = (p: number) => {
     const params = new URLSearchParams()
@@ -90,15 +95,16 @@ async function ProductsListContent({
   )
 }
 
-// Runs ONLY the aggregate stats query (all products) and renders the stat cards.
-async function ProductsStats() {
+// Stat cards: counts follow the filters; stock value, featured and categories are store-wide.
+async function ProductsStats({ q }: { q: FilterQuery }) {
   const host = await getHost()
   const h = await headers()
   const role = h.get('x-user-role') || ''
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'products:write')
-  const [stats, pendingDrafts, createDrafts] = await Promise.all([
+  const [stats, summary, pendingDrafts, createDrafts] = await Promise.all([
     getProductBreakdowns(),
+    getProductsSummary(q),
     // Edit-drafts: unpublished CHANGES staged against a live product (product_drafts).
     queryMany<{ product_id: string; name: string; sku: string; updated_at: string }>(
       `SELECT pd.product_id, p.name, p.sku, pd.updated_at
@@ -115,8 +121,8 @@ async function ProductsStats() {
   ])
 
   const featuredCount = stats.featured
-  const activeCount = stats.activeProducts
-  const totalCount = stats.totalProducts
+  const activeCount = summary.active
+  const totalCount = summary.total
   const categoryCount = stats.categories
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
 
@@ -241,9 +247,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'products:write')
 
-  // The overview tab renders no filters.
-  const [categories, brands, specFields] =
-    tab === 'list' ? await Promise.all([getAllCategories(), getAllBrands(), getSpecFilterFields()]) : [[], [], []]
+  const [categories, brands, specFields] = await Promise.all([
+    getAllCategories(),
+    getAllBrands(),
+    getSpecFilterFields(),
+  ])
 
   const allCats: any[] = categories || []
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
@@ -251,6 +259,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     const subs = allCats.filter((c: any) => c.parent_category_id === cat.id)
     return [{ value: cat.id, label: cat.name }, ...subs.map((sub: any) => ({ value: sub.id, label: `— ${sub.name}` }))]
   })
+  const fields = productFields(
+    categoryOptions,
+    (brands || []).map((b: any) => ({ value: b.id, label: b.name })),
+    specFields
+  )
+  const q = normalizeQuery(PRODUCTS_ENTITY, sp)
 
   return (
     <PageBody>
@@ -259,6 +273,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       <TabLinks
         base="/admin/products"
         active={tab}
+        query={canonicalQuery(sp, fields)}
         tabs={[
           { id: 'overview', label: 'Overview' },
           { id: 'list', label: 'Products' },
@@ -279,43 +294,21 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
       {tab === 'overview' ? (
         <Suspense fallback={null}>
-          <ProductsOverview />
+          <ProductsOverview fields={fields} />
         </Suspense>
       ) : (
         <>
-          <Suspense fallback={<KpiRowSkeleton />}>
-            <ProductsStats />
+          <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
+            <ProductsStats q={q} />
           </Suspense>
 
-          <ProductsAdvancedFilters
-            fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]}
-            toolbar={{
-              search: { placeholder: 'Search by name or SKU...', param: 'search', suggestType: 'products' },
-              filters: [
-                { name: 'category_id', label: 'Category', options: categoryOptions },
-                {
-                  name: 'brand_id',
-                  label: 'Brand',
-                  options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })),
-                },
-                {
-                  name: 'is_active',
-                  label: 'Status',
-                  options: [
-                    { value: 'true', label: 'Active' },
-                    { value: 'false', label: 'Inactive' },
-                  ],
-                },
-                {
-                  name: 'stock',
-                  label: 'Stock',
-                  options: [
-                    { value: 'low', label: 'Low Stock' },
-                    { value: 'out', label: 'Out of Stock' },
-                  ],
-                },
-              ],
-            }}
+          <ListFilters
+            entity="products"
+            fields={fields}
+            search={PRODUCT_SEARCH}
+            noun="Products"
+            tab="list"
+            exportable
           />
 
           <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />

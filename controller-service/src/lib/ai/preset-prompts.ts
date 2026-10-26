@@ -43,6 +43,11 @@ export const DEFAULT_PRESETS: Preset[] = [
     prompt: 'Bold discount visual for {productName} with a ribbon in {brandAccent}, confetti accents, high contrast tuned for mobile.' },
   { kind: 'image', feature: 'offer_image', scenario: 'festive',
     prompt: 'Festive seasonal composition around {productName}, warm lights, garland or floral motifs, brand accent {brandAccent}.' },
+  // ----- image: homepage_image -----
+  { kind: 'image', feature: 'homepage_image', scenario: 'section_banner',
+    prompt: 'Homepage section banner for {productName}; clean composition, brand accent {brandAccent}, calm space for a headline.' },
+  { kind: 'image', feature: 'homepage_image', scenario: 'story_cover',
+    prompt: 'Vertical story cover of {productName}, bold and close-up, soft gradient in {brandAccent}, space at the top for a caption.' },
   // ----- image: email_hero -----
   { kind: 'image', feature: 'email_hero', scenario: 'newsletter_banner',
     prompt: 'Clean email header banner for {productName}; wide 2:1 aspect, subtle brand gradient {brandAccent}, large copy-safe area on the right.' },
@@ -52,6 +57,18 @@ export const DEFAULT_PRESETS: Preset[] = [
   // ----- image: meta_ads_image -----
   { kind: 'image', feature: 'meta_ads_image', scenario: 'carousel_slide',
     prompt: 'Carousel-ready square of {productName} on a bright pastel wash with soft shadow and a visible brand accent {brandAccent}.' },
+  // ----- image: brand_image, category_image, logo_image -----
+  { kind: 'image', feature: 'brand_image', scenario: 'logo_mark',
+    prompt: 'Clean, flat logo mark for the brand {productName}: simple geometric symbol, two colours, plain white background, no extra text.' },
+  { kind: 'image', feature: 'category_image', scenario: 'category_tile',
+    prompt: 'Square category tile showing {productName} products arranged neatly, soft studio light, plain light backdrop, no text.' },
+  { kind: 'image', feature: 'logo_image', scenario: 'store_logo',
+    prompt: 'Minimal wordmark logo for the store {productName}, bold modern lettering in {brandAccent}, plain white background, centred.' },
+  // ----- image: campaign_image, template_image -----
+  { kind: 'image', feature: 'campaign_image', scenario: 'push_banner',
+    prompt: 'Wide promo banner for {productName}, bright and simple, brand accent {brandAccent}, subject centred, no small text.' },
+  { kind: 'image', feature: 'template_image', scenario: 'whatsapp_header',
+    prompt: 'WhatsApp message header image for {productName}: clean 1.91:1 composition, brand accent {brandAccent}, no text.' },
   // ----- image: globals (no feature) -----
   { kind: 'image', scenario: 'brand_mood',
     prompt: 'Brand mood board for {productName}: three complementary swatches of {brandAccent}, textures, soft natural light.' },
@@ -75,6 +92,18 @@ export const DEFAULT_PRESETS: Preset[] = [
     prompt: 'Looping subtle background with {productName} softly out of focus, slow pan, brand accent {brandAccent} haze for a testimonial overlay.' },
   { kind: 'video', feature: 'social_video', scenario: 'seasonal_highlight',
     prompt: 'Seasonal highlight reel of {productName} with falling confetti or petals in {brandAccent}, warm cinematic grade.' },
+  // ----- video: homepage_video, offer_video -----
+  { kind: 'video', feature: 'homepage_video', scenario: 'ambient_loop',
+    prompt: 'Calm, seamlessly looping banner of {productName}: slow drift of light across the subject, no cuts, brand accent {brandAccent}.' },
+  { kind: 'video', feature: 'homepage_video', scenario: 'hero_push_in',
+    prompt: 'Slow cinematic push-in on {productName} with soft particles, dark backdrop, space for a headline, loopable.' },
+  { kind: 'video', feature: 'offer_video', scenario: 'offer_sparkle',
+    prompt: 'Festive offer loop around {productName}: sparkles and warm bokeh in {brandAccent}, the product steady and centred.' },
+  { kind: 'video', feature: 'offer_video', scenario: 'offer_reveal',
+    prompt: 'Quick reveal of {productName} as a light sweep crosses it, dark studio, subject in the upper two thirds, loopable.' },
+  // ----- video: template_video -----
+  { kind: 'video', feature: 'template_video', scenario: 'whatsapp_header_loop',
+    prompt: 'Short, bright loop of {productName} turning slowly on a clean backdrop in {brandAccent}, centred, no text.' },
   // ----- video: globals (no feature) -----
   { kind: 'video', scenario: 'logo_flourish',
     prompt: 'Elegant logo flourish motion with {brandAccent} ribbons sweeping in, finishing on {productName}.' },

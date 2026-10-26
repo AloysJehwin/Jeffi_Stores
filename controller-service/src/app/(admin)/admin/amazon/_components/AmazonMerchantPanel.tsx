@@ -6,7 +6,8 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
 import { groupAmazonSyncErrors } from '@/lib/amazon/sync-errors'
-import { DataTable, fetchJson, useInfiniteList, Kpi, StatusBadge, btnGhost, btnPrimary, count, fieldInputCls, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { DataTable, ListFilters, fetchJson, useFilterQuery, useInfiniteList, Kpi, StatusBadge, btnGhost, btnPrimary, count, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { AMAZON_LISTING_FIELDS, AMAZON_LISTING_SEARCH } from '@/lib/filters/fields/amazon-listings'
 
 interface Summary {
   last_refreshed_at: string | null
@@ -83,9 +84,8 @@ const LISTING_COLS: DataCol<Row>[] = [
 
 export default function AmazonMerchantPanel() {
   const [summary, setSummary] = useState<Summary | null>(null)
-  const [search, setSearch] = useState('')
-  const [applied, setApplied] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  // The filters live in the URL (next to ?tab=listings); the cards follow them.
+  const filters = useFilterQuery(AMAZON_LISTING_FIELDS)
   const [refreshing, setRefreshing] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
@@ -93,13 +93,13 @@ export default function AmazonMerchantPanel() {
   const { showToast } = useToast()
 
   const list = useInfiniteList<Row>({
-    key: `${applied}|${statusFilter}`,
+    key: filters,
     pageSize: PAGE_SIZE,
     getKey: r => r.sku,
     fetchPage: async (p, signal) => {
-      const params = new URLSearchParams({ page: String(p), pageSize: String(PAGE_SIZE) })
-      if (applied) params.set('search', applied)
-      if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
+      const params = new URLSearchParams(filters)
+      params.set('page', String(p))
+      params.set('pageSize', String(PAGE_SIZE))
       const data = await fetchJson(`/api/admin/merchant/amazon/listing-status?${params.toString()}`, signal)
       if (p === 1) setSummary(data.summary)
       return { rows: data.rows, total: data.total }
@@ -140,7 +140,6 @@ export default function AmazonMerchantPanel() {
         showToast(data.error || 'Refresh failed', 'error')
         return
       }
-      setSummary(data.summary)
       list.reload()
       showToast('Refreshed from Amazon.', 'success')
     } catch {
@@ -187,11 +186,6 @@ export default function AmazonMerchantPanel() {
     }
   }
 
-  const doSearch = () => setApplied(search.trim())
-  const changeStatus = (st: string) => setStatusFilter(st)
-  const btn =
-    'control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
-
   return (
     <section className="rounded-xl border border-border-default bg-surface-elevated">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-default px-4 py-3">
@@ -237,34 +231,14 @@ export default function AmazonMerchantPanel() {
           <Kpi label="Blocked" value={count(summary?.disapproved ?? 0)} />
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') doSearch()
-              }}
-              placeholder="Search SKU or title…"
-              className={`${fieldInputCls} w-64 max-w-full`}
-            />
-            <button onClick={doSearch} className={btn}>
-              Search
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-1">
-            {['all', 'approved', 'pending', 'disapproved'].map(st => (
-              <button
-                key={st}
-                onClick={() => changeStatus(st)}
-                className={`control-sm text-xs border transition-colors ${statusFilter === st ? 'bg-accent-500 text-white border-accent-500' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
-        </div>
+        <ListFilters
+          entity="amazon.listings"
+          fields={AMAZON_LISTING_FIELDS}
+          search={AMAZON_LISTING_SEARCH}
+          noun="Listings"
+          tab="listings"
+          exportable
+        />
 
         <DataTable
           rows={list.rows}

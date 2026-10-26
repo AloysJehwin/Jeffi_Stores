@@ -508,12 +508,14 @@ const PincodeChecker = ({
         }}
         onKeyDown={e => e.key === 'Enter' && checkPincode()}
         placeholder="Enter pincode"
-        className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        autoComplete="postal-code"
+        enterKeyHint="go"
+        className="flex-1 min-w-0 text-base sm:text-sm px-3 py-2.5 sm:py-2 rounded-lg border border-border-default bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
       />
       <button
         onClick={checkPincode}
         disabled={pincodeChecking}
-        className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-60"
+        className="shrink-0 min-h-[44px] sm:min-h-0 text-sm font-semibold px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-60"
       >
         {pincodeChecking ? 'Checking…' : 'Check'}
       </button>

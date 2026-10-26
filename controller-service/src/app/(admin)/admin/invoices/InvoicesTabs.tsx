@@ -1,14 +1,25 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import { listParamNames } from '@jeffi/list-filters/client'
+import { INVOICE_ALIASES, INVOICE_FIELDS } from '@jeffi/list-filters/fields'
 import { TabActionsHost, Tabs } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
 import { resolveOverviewTab, type OverviewTab } from '@/lib/overviews/sales-documents'
 import InvoicesClient from './InvoicesClient'
 import InvoicesOverview from './_components/InvoicesOverview'
 
-// Params the invoice list reads; a link carrying any of them (without ?tab) opens the list.
-const LIST_KEYS = ['view', 'edit', 'product', 'variant', 'search', 'source', 'payment', 'page', 'sort'] as const
+// Params the list reads; a link carrying any of them (without ?tab) opens the list. from / to is
+// also the Overview period, so it never flips the tab.
+const LIST_KEYS = [
+  'view',
+  'edit',
+  'product',
+  'variant',
+  'page',
+  'sort',
+  ...listParamNames(INVOICE_FIELDS, { aliases: INVOICE_ALIASES }),
+].filter(k => k !== 'from' && k !== 'to')
 
 export default function InvoicesTabs({ canWrite }: { canWrite: boolean }) {
   const sp = useSearchParams()

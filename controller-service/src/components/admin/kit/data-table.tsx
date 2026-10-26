@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDown, ArrowUp, Bookmark, Search, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Search, X } from 'lucide-react'
 import Select from '@/components/ui/Select'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import RowActions, { type RowAction } from '@/components/admin/RowActions'
-import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { EmptyState, ErrorState, TableSkeleton, type EmptyStateProps } from './states'
 import { InfiniteFooter, useReveal, useServerPages, type InfiniteControl } from './infinite'
@@ -68,8 +68,6 @@ export interface DataTableProps<T> {
   /** Search box. Server mode writes ?param; client mode filters rows by `match`. */
   search?: { placeholder: string; param?: string; suggestType?: string; match?: (r: T) => string }
   filters?: FilterDef[]
-  /** Server mode: named saved views of the current query string, kept in localStorage. */
-  savedViews?: { storageKey: string }
   /** Extra controls at the right end of the toolbar. */
   toolbar?: ReactNode
   selectable?: boolean
@@ -109,13 +107,28 @@ function useQuery() {
   return { sp, set, pathname, router }
 }
 
+export interface DataToolbarProps {
+  search?: DataTableProps<unknown>['search']
+  filters?: FilterDef[]
+  /** Active filters the toolbar doesn't render (an advanced panel), so Clear still shows. */
+  activeExtra?: number
+  /** More params Clear removes; `tab`, `view` and `edit` always survive. */
+  clear?: string[]
+  /** Hide the filter selects on small screens (a filter sheet covers them). */
+  hideFiltersBelow?: 'sm' | 'md' | 'lg'
+  children?: ReactNode
+}
+
+const HIDE_BELOW = { sm: 'hidden sm:block', md: 'hidden md:block', lg: 'hidden lg:block' }
+
 /** Search + filter selects + clear, bound to the URL with the same semantics as AdminFilters. */
-export function DataToolbar({ search, filters = [], savedViews, children }: { search?: DataTableProps<unknown>['search']; filters?: FilterDef[]; savedViews?: { storageKey: string }; children?: ReactNode }) {
-  const { sp, set, pathname, router } = useQuery()
+export function DataToolbar({ search, filters = [], activeExtra = 0, clear = [], hideFiltersBelow, children }: DataToolbarProps) {
+  const { sp, set, router } = useQuery()
   const param = search?.param ?? 'search'
   const [q, setQ] = useState(sp.get(param) || '')
   useEffect(() => setQ(sp.get(param) || ''), [sp, param])
-  const active = filters.some(f => sp.get(f.name)) || !!sp.get(param)
+  const active = filters.some(f => sp.get(f.name)) || !!sp.get(param) || activeExtra > 0
+  const clearAll = () => set(Object.fromEntries([param, ...filters.map(f => f.name), ...clear].map(k => [k, null])))
   return (
     <div className="flex items-center gap-2 overflow-x-auto -mx-4 px-4 pb-1">
       {search &&
@@ -150,7 +163,7 @@ export function DataToolbar({ search, filters = [], savedViews, children }: { se
           </form>
         ))}
       {filters.map(f => (
-        <div key={f.name} className="w-[160px] shrink-0">
+        <div key={f.name} className={`w-[160px] shrink-0 ${hideFiltersBelow ? HIDE_BELOW[hideFiltersBelow] : ''}`}>
           <Select<string>
             className="w-full"
             value={sp.get(f.name) || ''}
@@ -160,54 +173,13 @@ export function DataToolbar({ search, filters = [], savedViews, children }: { se
           />
         </div>
       ))}
-      {savedViews && <SavedViews storageKey={savedViews.storageKey} />}
       {active && (
-        <button type="button" onClick={() => router.push(pathname)} className="control-md shrink-0 border border-border-default text-foreground-secondary hover:bg-surface-secondary">
+        <button type="button" onClick={clearAll} className="control-md shrink-0 border border-border-default text-foreground-secondary hover:bg-surface-secondary">
           <X className="h-4 w-4" />
           Clear
         </button>
       )}
       {children && <div className="ml-auto flex items-center gap-2 shrink-0">{children}</div>}
-    </div>
-  )
-}
-
-function SavedViews({ storageKey }: { storageKey: string }) {
-  const { sp, pathname, router } = useQuery()
-  const prompt = usePrompt()
-  const key = `admin-views:${storageKey}`
-  const [views, setViews] = useState<Record<string, string>>({})
-  useEffect(() => {
-    try {
-      setViews(JSON.parse(localStorage.getItem(key) || '{}'))
-    } catch {
-      setViews({})
-    }
-  }, [key])
-  const save = async () => {
-    const name = await prompt({ title: 'Save view', message: 'Name this view (filters and search).', placeholder: 'e.g. Inactive brands' })
-    if (!name) return
-    const q = new URLSearchParams(sp.toString())
-    q.delete('page')
-    const next = { ...views, [name]: q.toString() }
-    setViews(next)
-    try {
-      localStorage.setItem(key, JSON.stringify(next))
-    } catch {
-      /* storage blocked: the view lives for this visit only */
-    }
-  }
-  const names = Object.keys(views)
-  return (
-    <div className="flex items-center gap-1">
-      {names.length > 0 && (
-        <div className="w-[160px]">
-          <Select<string> value="" placeholder="Saved views" options={names.map(n => ({ value: n, label: n }))} onChange={n => router.push(`${pathname}${views[n] ? `?${views[n]}` : ''}`)} />
-        </div>
-      )}
-      <button type="button" onClick={save} aria-label="Save this view" title="Save this view" className="control-md control-icon border border-border-default text-foreground-muted hover:bg-surface-secondary hover:text-foreground">
-        <Bookmark className="h-4 w-4" />
-      </button>
     </div>
   )
 }
@@ -239,7 +211,7 @@ function BulkButton<T>({ a, rows, done }: { a: BulkAction<T>; rows: T[]; done: (
 }
 
 export function DataTable<T>(props: DataTableProps<T>) {
-  const { rows, cols, rowKey, mode = 'client', pageSize = 25, search, filters, savedViews, toolbar, selectable, bulkActions, rowActions, onRowClick, mobileCard, mobile, empty, bare, infinite, noun, hide } = props
+  const { rows, cols, rowKey, mode = 'client', pageSize = 25, search, filters, toolbar, selectable, bulkActions, rowActions, onRowClick, mobileCard, mobile, empty, bare, infinite, noun, hide } = props
   const server = mode === 'server'
   const { sp, set } = useQuery()
 
@@ -304,10 +276,10 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const selectedRows = loadedRows.filter(r => selected.has(rowKey(r)))
   const emptyProps: EmptyStateProps = typeof empty === 'string' ? { title: empty } : (empty ?? { title: 'Nothing here yet.' })
 
-  const hasToolbar = !!(search || filters?.length || savedViews || toolbar)
+  const hasToolbar = !!(search || filters?.length || toolbar)
   const toolbarNode = hasToolbar ? (
     server ? (
-      <DataToolbar search={search as DataTableProps<unknown>['search']} filters={filters} savedViews={savedViews}>
+      <DataToolbar search={search as DataTableProps<unknown>['search']} filters={filters}>
         {toolbar}
       </DataToolbar>
     ) : (

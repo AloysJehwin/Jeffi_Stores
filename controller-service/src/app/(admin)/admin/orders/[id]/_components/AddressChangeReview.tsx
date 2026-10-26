@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { TextArea } from '@/components/admin/kit/form'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { Card } from '@/components/admin/kit/layout'
 import { badgeCls, type Tone } from '@/components/admin/kit/tones'
 
@@ -186,15 +187,25 @@ export default function AddressChangeReview({
                   <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                     Reason for rejection <span className="text-red-500">*</span>
                   </label>
-                  <TextArea
+                  <AIEnrichButton
+                    fieldLabel="Reason for rejecting the address change"
                     value={rejectNote}
-                    onChange={e => setRejectNote(e.target.value)}
-                    rows={3}
+                    onChange={setRejectNote}
+                    scope="orders:write"
                     maxLength={1000}
-                    placeholder="e.g. We cannot deliver to this location for this order."
-                    className="resize-none"
-                    disabled={isProcessing}
+                    multiline
+                    context="Sent to the customer explaining why their delivery address change request was declined. Polite, brief, factual."
+                  >
+                    <TextArea
+                      value={rejectNote}
+                      onChange={e => setRejectNote(e.target.value)}
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="e.g. We cannot deliver to this location for this order."
+                      className="resize-none pr-8"
+                      disabled={isProcessing}
                     />
+                  </AIEnrichButton>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
