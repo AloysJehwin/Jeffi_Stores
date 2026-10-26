@@ -20,6 +20,13 @@ export function useSwipe(onSwipe: (dir: 1 | -1) => void, threshold = 50): Gestur
   )
 }
 
+// True while a vertical feed is dragged or flung: an autoplaying pager waits for it to settle, so its
+// page change and crossfade don't land mid-scroll.
+let feedScrolling = false
+export function setFeedScrolling(on: boolean) {
+  feedScrolling = on
+}
+
 export interface Autoplay {
   /** Give the current slide its full interval again; call on every page change (swipe or auto). */
   restart: () => void
@@ -28,8 +35,8 @@ export interface Autoplay {
 }
 
 /**
- * Calls `advance` every `intervalMs`. Off under reduced motion or a screen reader; while held it retries
- * shortly instead of advancing under the finger.
+ * Calls `advance` every `intervalMs`. Off under reduced motion or a screen reader; while held (or while the
+ * feed scrolls) it retries shortly instead of advancing under the finger.
  */
 export function useAutoplay(advance: () => void, { enabled = true, intervalMs = 5000 }: { enabled?: boolean; intervalMs?: number } = {}): Autoplay {
   const { animate } = useMotion()
@@ -45,7 +52,7 @@ export function useAutoplay(advance: () => void, { enabled = true, intervalMs = 
       if (timer.current) clearTimeout(timer.current)
       if (!latest.current.on) return
       timer.current = setTimeout(() => {
-        if (held.current) return schedule(600)
+        if (held.current || feedScrolling) return schedule(600)
         latest.current.advance()
       }, delay)
     }

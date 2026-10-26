@@ -26,14 +26,21 @@ function useListProps({ refreshing = false, onRefresh, padded = true, keyboard, 
   // Stable identities, so FlatList doesn't remount separators or the scroller on every render.
   const separator = useMemo(() => (gap ? () => <View style={{ height: gap }} /> : undefined), [gap])
   const scroller = useMemo(() => (keyboard ? (props: ScrollViewProps) => <KeyboardScroll {...props} /> : undefined), [keyboard])
+  const bottom = (footerBar ? 16 : insets.bottom) + 24
+  const refreshControl = useMemo(
+    () =>
+      onRefresh ? (
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent500} colors={[t.accent500]} progressBackgroundColor={t.surfaceElevated} />
+      ) : undefined,
+    [onRefresh, refreshing, t]
+  )
+  const contentContainerStyle = useMemo(() => ({ paddingTop: 16, paddingHorizontal: padded ? 16 : 0, paddingBottom: bottom }), [padded, bottom])
   return {
-    refreshControl: onRefresh ? (
-      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent500} colors={[t.accent500]} progressBackgroundColor={t.surfaceElevated} />
-    ) : undefined,
+    refreshControl,
     renderScrollComponent: scroller,
     ItemSeparatorComponent: separator,
     keyboardShouldPersistTaps: 'handled' as const,
-    contentContainerStyle: { paddingTop: 16, paddingHorizontal: padded ? 16 : 0, paddingBottom: (footerBar ? 16 : insets.bottom) + 24 },
+    contentContainerStyle,
   }
 }
 

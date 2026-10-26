@@ -10,7 +10,7 @@ import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { useWishlistToggle } from '../../hooks/useWishlist'
 import { useImageSource } from '../../hooks/useImageSource'
 import { useAuthStore } from '../../stores/authStore'
-import { resolveEdd } from '../../lib/edd'
+import { peekEdd, resolveEdd } from '../../lib/edd'
 import { inr, shortDate } from '../../lib/format'
 import { productLabel } from '../../lib/a11y'
 import { status, useTokens } from '../../theme'
@@ -18,6 +18,10 @@ import { IconButton, Pill, Text, elevationClass, haptic, useElevation, usePressS
 import type { CardProduct } from '../../types/home'
 
 // Mirror of controller-service components/visitor/ProductCard.tsx at the mobile breakpoint.
+
+const BACKDROP = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6, transform: [{ scale: 1.1 }] } as const
+const FILL = { width: '100%', height: '100%' } as const
+const PRESS_DELAY = 80
 
 function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; handlingDays?: number }) {
   const router = useRouter()
@@ -27,7 +31,7 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
   const digital = digitalProductsEnabled && product.isDigital
   const inStock = digital || product.effectiveStock > 0
   const { inWishlist, toggle, pending } = useWishlistToggle(product.id)
-  const [edd, setEdd] = useState<string | null>(null)
+  const [edd, setEdd] = useState<string | null>(() => (digital ? null : (peekEdd(!!user, handlingDays, product.extraDeliveryDays) ?? null)))
   const img = product.primaryImage
   const imgSource = useImageSource()
   const { width: screen } = useWindowDimensions()
@@ -57,6 +61,8 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
 
   useEffect(() => {
     if (digital) return
+    const known = peekEdd(!!user, handlingDays, product.extraDeliveryDays)
+    if (known !== undefined) return setEdd(known)
     let live = true
     resolveEdd(!!user, handlingDays, product.extraDeliveryDays).then(v => {
       if (live && v) setEdd(v)
@@ -74,6 +80,8 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
         accessibilityActions={actions}
         onAccessibilityAction={onAction}
         onPress={() => router.push(`/product/${product.slug}`)}
+        // A scroll that starts on the card doesn't squeeze it.
+        unstable_pressDelay={PRESS_DELAY}
         onLongPress={() => {
           if (!inStock) return
           haptic.tap()
@@ -89,19 +97,12 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
           >
             {img ? (
               <>
+                {/* Blurred backdrop: the blurhash when there is one (no second download or blur pass). */}
                 <Image
-                  source={imgSource(img.image_url, 64)}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    opacity: 0.6,
-                    transform: [{ scale: 1.1 }],
-                  }}
+                  source={img.blurhash ? { blurhash: img.blurhash } : imgSource(img.image_url, 64)}
+                  style={BACKDROP}
                   contentFit="cover"
-                  blurRadius={24}
+                  blurRadius={img.blurhash ? undefined : 24}
                   cachePolicy="memory-disk"
                   recyclingKey={img.image_url}
                   accessible={false}
@@ -109,7 +110,7 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
                 <Image
                   source={imgSource(img.image_url, cardWidth)}
                   placeholder={img.blurhash ? { blurhash: img.blurhash } : undefined}
-                  style={{ width: '100%', height: '100%' }}
+                  style={FILL}
                   contentFit="contain"
                   transition={200}
                   cachePolicy="memory-disk"

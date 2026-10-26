@@ -82,7 +82,11 @@ function Slides({ cfg, eyebrow, title }: { cfg: SlidesData; eyebrow?: string; ti
   const ratio = RATIO[aspect]
   // A lone card would float mid-screen; like the offer slider, it becomes a banner.
   const layout = cfg.layout === 'cards' && slides.length === 1 ? 'banner' : cfg.layout
-  const { ref, onLayout, onScreen } = useOnScreen(layout !== 'rail' && slides.some(s => s.video || s.videoCard))
+  const { animate } = useMotion()
+  const zooms = animate && slides.some(s => s.kind === 'custom' && s.motion === 'kenburns')
+  const pages = layout !== 'rail' && (slides.some(s => s.video || s.videoCard) || (cfg.autoplay && slides.length > 1))
+  // Clips, autoplay and the Ken Burns zoom run only while the section is on screen with its tab focused.
+  const { ref, onLayout, onScreen } = useOnScreen(zooms || pages)
 
   const inStock = (p: CardProduct) => (digitalProductsEnabled && p.isDigital) || p.effectiveStock > 0
   const open = (s: SlideCard) => openHref(router, s.href)
@@ -98,6 +102,7 @@ function Slides({ cfg, eyebrow, title }: { cfg: SlidesData; eyebrow?: string; ti
       height={h}
       shape={aspect}
       current={on}
+      live={onScreen}
       play={play}
       info={info}
       room={room}
@@ -111,7 +116,7 @@ function Slides({ cfg, eyebrow, title }: { cfg: SlidesData; eyebrow?: string; ti
     canPress: (s: SlideCard) => !!s.href,
     itemLabel: slideLabel,
     itemActions: actions,
-    autoplay: cfg.autoplay,
+    autoplay: cfg.autoplay && onScreen,
     intervalMs: cfg.intervalSeconds * 1000,
     onIndexChange: setCurrent,
   }
@@ -187,6 +192,7 @@ function SlideCardView({
   height,
   shape,
   current,
+  live,
   play,
   info,
   room,
@@ -198,6 +204,8 @@ function SlideCardView({
   shape: Shape
   /** The slide on show (Ken Burns runs only then). */
   current: boolean
+  /** The section is on screen. */
+  live: boolean
   /** Its clip may play. */
   play: boolean
   /** The scroll pager's offset, for parallax and reveal. */
@@ -215,7 +223,7 @@ function SlideCardView({
   return (
     <View style={[shadow, room && { marginTop: SHADOW_ROOM.top, marginBottom: SHADOW_ROOM.bottom }]} className={`rounded-panel ${elevationClass('overlay')}`}>
       <View className="w-full overflow-hidden rounded-panel bg-black" style={{ height }}>
-        <Backdrop slide={slide} shape={shape} motion={motion} current={current} play={play} info={info} width={width} />
+        <Backdrop slide={slide} shape={shape} motion={motion} current={current && live} play={play} info={info} width={width} />
         <Gradient dir="t" stops={SCRIM} />
         <Caption motion={motion} current={current} info={info}>
           <SlideBadge text={slide.badge} color={slide.badgeClass} />
