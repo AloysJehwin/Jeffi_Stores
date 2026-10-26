@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Search } from 'lucide-react'
-import { joinFilterValues, splitFilterValues } from '@/lib/catalog/product-attribute-filters-shared'
+import { joinFilterValues, splitFilterValues } from '@jeffi/list-filters/client'
 
 interface ValueRow {
   value: string
@@ -17,7 +18,13 @@ interface Props {
   placeholder?: string
   multi?: boolean
   endpoint?: string
+  /** Column heading for the counts. */
+  noun?: string
+  /** The list's other filters (a query string); the counts are narrowed to them. */
+  context?: string
 }
+
+const PAGE_SIZE = 50
 
 export default function FilterValueHelp({
   field,
@@ -27,28 +34,40 @@ export default function FilterValueHelp({
   placeholder,
   multi = true,
   endpoint = '/api/admin/products/attribute-values',
+  noun = 'Products',
+  context = '',
 }: Props) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<ValueRow[]>([])
   const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const selected = splitFilterValues(value)
   const searchRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const ctxRef = useRef(context)
+  ctxRef.current = context
 
   const fetchValues = useCallback(
-    async (q: string) => {
-      setLoading(true)
+    async (q: string, p = 1) => {
+      if (p === 1) setLoading(true)
+      else setLoadingMore(true)
       try {
-        const res = await fetch(`${endpoint}?field=${encodeURIComponent(field)}&search=${encodeURIComponent(q)}`, {
-          credentials: 'include',
-        })
+        const qs = new URLSearchParams({ field, search: q, page: String(p) })
+        if (ctxRef.current) qs.set('context', ctxRef.current)
+        const res = await fetch(`${endpoint}?${qs}`, { credentials: 'include' })
         if (res.ok) {
           const data = await res.json()
-          setRows(data.values || [])
+          const got: ValueRow[] = data.values || []
+          setRows(prev => (p === 1 ? got : [...prev, ...got]))
+          setHasMore(typeof data.hasMore === 'boolean' ? data.hasMore : got.length >= PAGE_SIZE)
+          setPage(p)
         }
       } finally {
         setLoading(false)
+        setLoadingMore(false)
       }
     },
     [field, endpoint]
@@ -128,10 +147,10 @@ export default function FilterValueHelp({
         </button>
       </div>
 
-      {/* Value Help Popup */}
-      {open && (
+      {/* Value Help Popup (portalled: it can open from inside a sheet) */}
+      {open && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/50"
+          className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/50"
           onClick={() => setOpen(false)}
         >
           <div
@@ -211,7 +230,7 @@ export default function FilterValueHelp({
                         Value
                       </th>
                       <th className="px-4 py-2.5 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-                        Products
+                        {noun}
                       </th>
                     </tr>
                   </thead>
@@ -256,6 +275,18 @@ export default function FilterValueHelp({
                   </tbody>
                 </table>
               )}
+              {!loading && hasMore && (
+                <div className="flex justify-center py-3">
+                  <button
+                    type="button"
+                    disabled={loadingMore}
+                    onClick={() => fetchValues(search, page + 1)}
+                    className="px-4 h-control-sm text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface-secondary disabled:opacity-50"
+                  >
+                    {loadingMore ? 'Loading…' : 'Load more'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
@@ -276,7 +307,8 @@ export default function FilterValueHelp({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

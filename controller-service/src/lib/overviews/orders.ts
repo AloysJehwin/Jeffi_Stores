@@ -108,37 +108,39 @@ export interface OrdersSnapshot {
   unpaidPrepaid: number
 }
 
-export function ordersAttention(s: OrdersSnapshot, handlingDays: number): AttentionItem[] {
+/** `filters` (a canonical query) rides along on the orders-list links, matching the scoped counts. */
+export function ordersAttention(s: OrdersSnapshot, handlingDays: number, filters = ''): AttentionItem[] {
   const out: AttentionItem[] = []
   const plural = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`
+  const list = (flag: string) => `/admin/orders?tab=list&${flag}${filters ? `&${filters}` : ''}`
   if (s.lateToShip)
     out.push({
       key: 'late_to_ship',
       severity: 'critical',
       title: `${plural(s.lateToShip, 'order')} past the ${handlingDays}-day dispatch window`,
       sub: 'Confirmed or processing and not shipped yet',
-      href: '/admin/packing-slips',
+      href: list('late_to_ship=true'),
     })
   if (s.cancelRequests)
     out.push({
       key: 'cancel_requests',
       severity: 'warning',
       title: `${plural(s.cancelRequests, 'cancellation request')} to review`,
-      href: '/admin/orders?tab=list&status=cancel_requested',
+      href: list('status=cancel_requested'),
     })
   if (s.toConfirmStale)
     out.push({
       key: 'to_confirm',
       severity: 'warning',
       title: `${plural(s.toConfirmStale, 'order')} waiting over a day to be confirmed`,
-      href: '/admin/orders?tab=list&status=pending',
+      href: list('status=pending'),
     })
   if (s.overdueDelivery)
     out.push({
       key: 'overdue_delivery',
       severity: 'warning',
       title: `${plural(s.overdueDelivery, 'shipment')} past the promised delivery date`,
-      href: '/admin/delhivery',
+      href: list('overdue=true'),
     })
   if (s.returnRequests)
     out.push({
@@ -152,7 +154,7 @@ export function ordersAttention(s: OrdersSnapshot, handlingDays: number): Attent
       key: 'unpaid',
       severity: 'info',
       title: `${plural(s.unpaidPrepaid, 'prepaid order')} unpaid for over a day`,
-      href: '/admin/orders?tab=list&payment_status=unpaid',
+      href: list('unpaid_stale=true'),
     })
   return out
 }

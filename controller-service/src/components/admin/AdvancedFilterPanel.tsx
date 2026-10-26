@@ -5,23 +5,38 @@ import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
+import { Sheet } from './kit/dialog'
 import FilterValueHelp from './FilterValueHelp'
 import AdminSelect from './AdminSelect'
-import { splitFilterValues, type AdvancedFilterField } from '@/lib/catalog/product-attribute-filters-shared'
+import { RESERVED_PARAMS, joinFilterValues, splitFilterValues } from '@jeffi/list-filters/client'
+import type { AdvancedFilterField } from '@/lib/catalog/product-attribute-filters-shared'
 
 interface Props {
   fields: AdvancedFilterField[]
   paramNames?: string[]
-  mode?: 'trigger' | 'content' | 'both'
+  /** 'sheet': the sections in a bottom sheet with a sticky Reset / Apply footer (phones). */
+  mode?: 'trigger' | 'content' | 'both' | 'sheet'
   forceExpanded?: boolean
   valuesEndpoint?: string
+  /** Show the active-filter chips row (ListFilters renders its own). */
+  chips?: boolean
+  /** What the value help counts ("Orders"); a field's own noun wins. */
+  noun?: string
+  open?: boolean
+  onClose?: () => void
+  title?: string
 }
 
 function fieldParamNames(f: AdvancedFilterField): string[] {
   return Array.isArray(f.name) ? f.name : [f.name]
 }
 
-function chipLabel(f: AdvancedFilterField, params: URLSearchParams): string {
+const optionLabels = (f: AdvancedFilterField, raw: string) =>
+  splitFilterValues(raw, { commas: true })
+    .map(v => f.options?.find(o => o.value === v)?.label || v)
+    .join(', ')
+
+export function chipLabel(f: AdvancedFilterField, params: URLSearchParams): string {
   const name = Array.isArray(f.name) ? f.name[0] : f.name
   if (f.type === 'range') {
     const [min, max] = Array.isArray(f.name) ? f.name : [`${f.name}_min`, `${f.name}_max`]
@@ -42,9 +57,7 @@ function chipLabel(f: AdvancedFilterField, params: URLSearchParams): string {
   }
   if (f.type === 'boolean') return `${f.label}: Yes`
   if (f.type === 'toggle' || f.type === 'select' || f.type === 'multi-select') {
-    const val = params.get(name) || ''
-    const opt = f.options?.find(o => o.value === val)
-    return `${f.label}: ${opt?.label || val}`
+    return `${f.label}: ${optionLabels(f, params.get(name) || '')}`
   }
   if (f.type === 'value-help') {
     const vals = splitFilterValues(params.get(name))
@@ -53,7 +66,7 @@ function chipLabel(f: AdvancedFilterField, params: URLSearchParams): string {
   return `${f.label}: ${params.get(name)}`
 }
 
-function fieldIsActive(f: AdvancedFilterField, params: URLSearchParams): boolean {
+export function fieldIsActive(f: AdvancedFilterField, params: URLSearchParams): boolean {
   return fieldParamNames(f).some(n => !!params.get(n))
 }
 
@@ -107,7 +120,7 @@ function MultiSelectField({
   value: string
   onChange: (v: string) => void
 }) {
-  const selected = value ? value.split(',').filter(Boolean) : []
+  const selected = splitFilterValues(value, { commas: true })
   const [isOpen, setIsOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
@@ -134,7 +147,7 @@ function MultiSelectField({
 
   function toggle(val: string) {
     const next = selected.includes(val) ? selected.filter(s => s !== val) : [...selected, val]
-    onChange(next.join(','))
+    onChange(joinFilterValues(next))
   }
 
   const label = selected.length > 0 ? selected.map(v => options.find(o => o.value === v)?.label || v).join(', ') : 'Any'
@@ -256,37 +269,46 @@ export default function AdvancedFilterPanel({
   mode = 'both',
   forceExpanded,
   valuesEndpoint,
+  chips = true,
+  noun,
+  open,
+  onClose,
+  title,
 }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const expanded = forceExpanded ?? searchParams.get('_adv') === '1'
+  const [expandedLocal, setExpandedLocal] = useState(false)
+  const expanded = forceExpanded ?? expandedLocal
   const [local, setLocal] = useState<Record<string, string>>({})
+  const allParams = paramNames || fields.flatMap(fieldParamNames)
+  const fieldNames = fields.flatMap(fieldParamNames).join(',')
 
   function toggleExpanded() {
-    const params = new URLSearchParams(searchParams.toString())
-    if (expanded) {
-      params.delete('_adv')
-    } else {
-      params.set('_adv', '1')
-    }
-    router.push(`?${params.toString()}`, { scroll: false })
+    setExpandedLocal(e => !e)
   }
 
   useEffect(() => {
     const state: Record<string, string> = {}
-    fields.forEach(f =>
-      fieldParamNames(f).forEach(n => {
-        const v = searchParams.get(n)
-        if (v) state[n] = v
-      })
-    )
+    for (const n of fieldNames.split(',')) {
+      const v = n && searchParams.get(n)
+      if (v) state[n] = v
+    }
     setLocal(state)
-  }, [searchParams])
+  }, [searchParams, fieldNames])
 
   const activeFields = fields.filter(f => fieldIsActive(f, searchParams))
   const activeCount = activeFields.length
-  const allParams = paramNames || fields.flatMap(fieldParamNames)
   const sections = Array.from(new Set(fields.map(f => f.section || 'General')))
+
+  // The value help counts rows matching everything else picked so far (applied or not).
+  function contextFor(f: AdvancedFilterField): string {
+    const p = new URLSearchParams(searchParams.toString())
+    allParams.forEach(n => p.delete(n))
+    Object.entries(local).forEach(([k, v]) => v && p.set(k, v))
+    fieldParamNames(f).forEach(n => p.delete(n))
+    RESERVED_PARAMS.forEach(n => p.delete(n))
+    return p.toString()
+  }
 
   function setLocalVal(name: string, value: string) {
     setLocal(prev =>
@@ -301,17 +323,17 @@ export default function AdvancedFilterPanel({
       if (v) params.set(k, v)
     })
     params.delete('page')
-    params.delete('_adv')
     router.push(`?${params.toString()}`)
+    onClose?.()
   }
 
   function reset() {
     const params = new URLSearchParams(searchParams.toString())
     allParams.forEach(n => params.delete(n))
     params.delete('page')
-    params.delete('_adv')
     setLocal({})
     router.push(`?${params.toString()}`)
+    onClose?.()
   }
 
   function removeChip(f: AdvancedFilterField) {
@@ -325,8 +347,8 @@ export default function AdvancedFilterPanel({
     'w-full px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 transition-colors placeholder:text-foreground-muted'
 
   // Scrolls on its own: the filter card is sticky, and the spec sections can outgrow the screen.
-  const sectionList = () => (
-    <div className="max-h-[50vh] overflow-y-auto overscroll-contain space-y-1.5 pr-1">
+  const sectionList = (inSheet = false) => (
+    <div className={inSheet ? 'space-y-1.5' : 'max-h-[50vh] overflow-y-auto overscroll-contain space-y-1.5 pr-1'}>
       {sections.map(section => {
         const sectionFields = fields.filter(f => (f.section || 'General') === section)
         const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
@@ -485,6 +507,8 @@ export default function AdvancedFilterPanel({
           placeholder={f.placeholder}
           multi
           endpoint={valuesEndpoint}
+          noun={f.noun ?? noun}
+          context={contextFor(f)}
         />
       )
     return null
@@ -498,11 +522,41 @@ export default function AdvancedFilterPanel({
     return <AdvancedFilterTrigger activeCount={activeCount} expanded={expanded} onToggle={toggleExpanded} />
   }
 
-  if (mode === 'content') {
-    if (!expanded && activeCount === 0) return null
+  if (mode === 'sheet') {
     return (
-      <div className="mt-2 pt-2 border-t border-border-default space-y-1.5">
-        {activeCount > 0 && (
+      <Sheet
+        open={!!open}
+        onClose={() => onClose?.()}
+        title={title ?? 'Filters'}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={reset}
+              className="px-3 h-control text-sm font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={apply}
+              className="px-5 h-control text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
+            >
+              Apply
+            </button>
+          </>
+        }
+      >
+        {sectionList(true)}
+      </Sheet>
+    )
+  }
+
+  if (mode === 'content') {
+    if (!expanded && (activeCount === 0 || !chips)) return null
+    return (
+      <div className={`space-y-1.5 ${chips ? 'mt-2 pt-2 border-t border-border-default' : ''}`}>
+        {chips && activeCount > 0 && (
           <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border-default">
             {activeFields.map((f, i) => (
               <span

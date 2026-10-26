@@ -18,6 +18,7 @@
     "@jeffi/api-contracts": "*",
     "@jeffi/bulk": "*",
     "@jeffi/gst": "*",
+    "@jeffi/list-filters": "*",
     "@jeffi/pricing": "*",
     "@jeffi/service-auth": "*",
     "@jeffi/tenancy": "*",

@@ -35,6 +35,14 @@ CREATE INDEX idx_addresses_user_id ON public.addresses USING btree (user_id);
 
 
 --
+-- Name: idx_amazon_orders_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_amazon_orders_order_id ON public.amazon_orders USING btree (order_id) WHERE (order_id IS NOT NULL);
+
+
+
+--
 -- Name: idx_admin_agent_actions_admin; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -381,6 +389,14 @@ CREATE INDEX idx_categories_slug ON public.categories USING btree (slug);
 --
 
 CREATE INDEX idx_ceu_user_id ON public.coupon_eligible_users USING btree (user_id);
+
+
+
+--
+-- Name: idx_coupon_usage_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_coupon_usage_order_id ON public.coupon_usage USING btree (order_id);
 
 
 
@@ -1171,6 +1187,62 @@ CREATE INDEX idx_orders_order_number_trgm ON public.orders USING gin (order_numb
 --
 
 CREATE INDEX idx_orders_original_order_id ON public.orders USING btree (original_order_id);
+
+
+
+--
+-- Name: idx_orders_awb_number_prefix; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_awb_number_prefix ON public.orders USING btree (awb_number text_pattern_ops) WHERE (awb_number IS NOT NULL);
+
+
+
+--
+-- Name: idx_orders_delivered_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_delivered_at ON public.orders USING btree (delivered_at) WHERE (delivered_at IS NOT NULL);
+
+
+
+--
+-- Name: idx_orders_payment_mode; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_payment_mode ON public.orders USING btree (payment_mode);
+
+
+
+--
+-- Name: idx_orders_payment_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_payment_status ON public.orders USING btree (payment_status);
+
+
+
+--
+-- Name: idx_orders_shipment_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_shipment_status ON public.orders USING btree (shipment_status) WHERE (shipment_status IS NOT NULL);
+
+
+
+--
+-- Name: idx_orders_shipped_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_shipped_at ON public.orders USING btree (shipped_at) WHERE (shipped_at IS NOT NULL);
+
+
+
+--
+-- Name: idx_orders_total_amount; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_total_amount ON public.orders USING btree (total_amount);
 
 
 

@@ -1,3 +1,4 @@
+import type { FilterScope } from '@jeffi/list-filters'
 import { queryOne, queryMany, type RevenuePeriod } from './shared'
 import { getStockValuation } from '@/lib/orders/inventory'
 
@@ -15,8 +16,8 @@ const REVENUE_SOURCES: Array<{ source: string; label: string; color: string }> =
 
 // Monthly paid-revenue trend split by order source, for the requested period. Pivoted
 // server-side into one continuous (zero-filled) points array per source, aligned to a shared
-// months axis.
-export async function getRevenueTrendBySource(period: RevenuePeriod = '12m'): Promise<RevenueTrend> {
+// months axis. `scope` narrows it to the orders list's filters.
+export async function getRevenueTrendBySource(period: RevenuePeriod = '12m', scope?: FilterScope): Promise<RevenueTrend> {
   // Resolve the window's start month (inclusive) as a Date at day 1.
   const now = new Date()
   const startOfMonth = (y: number, m: number) => new Date(y, m, 1)
@@ -43,18 +44,19 @@ export async function getRevenueTrendBySource(period: RevenuePeriod = '12m'): Pr
   }
 
   const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`
+  const sc = scope?.and(2) ?? { sql: '', params: [] }
   const rows = await queryMany<{ month: string; source: string; revenue: number }>(
     `
-    SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
-           source,
-           SUM(total_amount)::float AS revenue
-      FROM orders
-     WHERE payment_status = 'paid'
-       AND created_at >= $1::date
+    SELECT to_char(date_trunc('month', o.created_at), 'YYYY-MM') AS month,
+           o.source,
+           SUM(o.total_amount)::float AS revenue
+      FROM orders o
+     WHERE o.payment_status = 'paid'
+       AND o.created_at >= $1::date${sc.sql}
      GROUP BY 1, 2
      ORDER BY 1
   `,
-    [startStr]
+    [startStr, ...sc.params]
   ).catch(() => [])
 
   // Continuous month axis from `start` through the current month.
