@@ -7,7 +7,7 @@ import { ImageIcon } from 'lucide-react-native'
 import { Badge, Button, Card, ModalSheet, Pill, Text, usePressScale } from '../../ui'
 import { Grid, SectionHeading, useColumnWidth } from './layout'
 import { useImageSource } from '../../hooks/useImageSource'
-import { inr } from '../../lib/format'
+import { inr, num } from '../../lib/format'
 import { useTokens } from '../../theme'
 import { useRecentlyViewedStore, type RecentProduct } from '../../stores/recentlyViewedStore'
 import type { HomeSection, SectionProps } from '../../types/home'
@@ -27,7 +27,6 @@ function configNumber(section: HomeSection, key: string, fallback: number, max =
   return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), max) : fallback
 }
 
-const noDecimals = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 0 })
 
 function PhotoIcon({ color }: { color: string }) {
   return <ImageIcon size={32} color={color} strokeWidth={1} />
@@ -95,6 +94,7 @@ function Tile({ product, onPress, onLongPress }: { product: RecentProduct; onPre
         onPress={onPress}
         onLongPress={onLongPress}
         delayLongPress={450}
+        unstable_pressDelay={80}
         accessibilityRole="button"
         accessibilityLabel={product.name}
         accessibilityHint="Long press for a quick view"
@@ -128,7 +128,7 @@ function Tile({ product, onPress, onLongPress }: { product: RecentProduct; onPre
               <Text className="text-xs font-bold text-primary-600 dark:text-primary-400">₹{inr(product.price)}</Text>
               {product.mrp && product.mrp > product.price ? (
                 <Text className="text-xs text-foreground-muted line-through" style={{ lineHeight: 12 }}>
-                  ₹{noDecimals(product.mrp)}
+                  ₹{num(product.mrp)}
                 </Text>
               ) : null}
             </View>

@@ -6,7 +6,8 @@ import { applyRouteRefund } from '@/lib/payments/route-settlement'
 import { sendPaymentStatusUpdate } from '@/lib/email'
 import { logActivity } from '@/lib/shared/activity'
 import { getReturnRequest } from '@/lib/queries'
-import { computeRefundableAmount, refundCapacity } from '@/lib/payments/refund'
+import { computeRefundableAmount, externalRefundCeiling, recordExternalRefund, refundCapacity } from '@/lib/payments/refund'
+import { RAZORPAY_ONLY_METHODS, externalRefundLabel, parseExternalRefund } from '@/lib/payments/external-refund'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
@@ -33,6 +34,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
+
+    const body = await request.json().catch(() => ({}))
+    if (body?.external) return await refundExternally(order, body, admin.adminId)
 
     if (order.status !== 'cancelled' && order.status !== 'returned') {
       return NextResponse.json(
@@ -127,39 +131,114 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ])
     }
 
-    // A cancelled order is refunded in full, so every digital line loses vault access. A returned
-    // order only refunds its returned lines, and digital lines are never returnable.
-    await withTransaction(async client => {
-      await client.query(`UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [orderId])
-      if (order.status === 'cancelled') await revokeOrderEntitlements(client, { orderId, reason: 'refund' })
+    await markOrderRefunded(order, {
+      amount: totalRefunded,
+      revoke: order.status === 'cancelled',
+      notify: true,
+      actorId: admin.adminId,
+      summary: `Refund issued for #${order.order_number} (₹${totalRefunded.toFixed(0)}${refundIds.length > 1 ? `, ${refundIds.length} payments` : ''})`,
+      metadata: { refundIds },
     })
-    await queueAdsConversion(orderId, order)
-
-    const user = order.users
-    const userEmail = user?.email || order.customer_email
-    const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : order.customer_name
-
-    if (userEmail && userName) {
-      sendPaymentStatusUpdate(userEmail, userName, order.order_number, orderId, 'refunded', totalRefunded).catch(
-        () => {}
-      )
-    }
-
-    if (order.user_id) {
-      logActivity({
-        userId: order.user_id,
-        actorId: admin.adminId,
-        kind: 'payment_status',
-        referenceId: orderId,
-        referenceType: 'orders',
-        summary: `Refund issued for #${order.order_number} (₹${totalRefunded.toFixed(0)}${refundIds.length > 1 ? `, ${refundIds.length} payments` : ''})`,
-        metadata: { payment_status: 'refunded', amount: totalRefunded, refundIds },
-      }).catch(() => {})
-    }
 
     return NextResponse.json({ success: true, refundIds, totalRefunded })
   } catch (err: any) {
     const message = err?.error?.description || err?.message || 'Failed to initiate refund'
     return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+// The refund already reached the customer another way (a Razorpay dispute or dashboard refund, bank
+// transfer, cash…): record it and settle the order without calling Razorpay. Any paid order qualifies,
+// so a chargeback on a delivered order can be recorded too.
+async function refundExternally(order: any, body: any, adminId: string) {
+  const refund = parseExternalRefund(body.external)
+  if (typeof refund === 'string') return NextResponse.json({ error: refund }, { status: 400 })
+  if (order.payment_status !== 'paid' && order.payment_status !== 'cod_collected') {
+    return NextResponse.json({ error: 'Only a paid order can be marked refunded.' }, { status: 400 })
+  }
+
+  const paymentOrderId = order.original_order_id || order.id
+  const paid = await externalRefundCeiling(paymentOrderId)
+  if (paid === null && RAZORPAY_ONLY_METHODS.includes(refund.method)) {
+    return NextResponse.json({ error: 'This order has no Razorpay payment to refund.' }, { status: 400 })
+  }
+  const ceiling = paid ?? Number(order.total_amount)
+  const isReturnOrCancel = order.status === 'returned' || order.status === 'cancelled'
+  const returnRequest = order.status === 'returned' ? await getReturnRequest(order.id).catch(() => null) : null
+  const suggested = isReturnOrCancel ? await computeRefundableAmount(order, returnRequest) : Number(order.total_amount)
+  const amount = Math.round(Number(body.amount ?? Math.min(ceiling, suggested)) * 100) / 100
+  if (!(amount > 0)) return NextResponse.json({ error: 'Enter the amount that was refunded.' }, { status: 400 })
+  if (amount > ceiling + 0.01) {
+    return NextResponse.json({ error: `At most ₹${ceiling.toFixed(2)} was paid on this order.` }, { status: 400 })
+  }
+
+  // Claim first so a double click can't record it twice; a failed write releases the claim.
+  const claimed = await queryOne(
+    `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1 AND payment_status = $2 RETURNING id`,
+    [order.id, order.payment_status]
+  )
+  if (!claimed) return NextResponse.json({ error: 'This order was already marked refunded.' }, { status: 409 })
+  const tenant = await resolveRequestTenant()
+  try {
+    await recordExternalRefund({
+      orderId: paymentOrderId,
+      amount,
+      full: true,
+      refund,
+      purpose: 'order_refund',
+      orderRef: order.order_number,
+      actorId: adminId,
+      tenantId: tenant?.tenantId,
+    })
+  } catch (e) {
+    await query(`UPDATE orders SET payment_status = $2 WHERE id = $1`, [order.id, order.payment_status])
+    throw e
+  }
+
+  const how = externalRefundLabel(refund.method)
+  await markOrderRefunded(order, {
+    amount,
+    // A returned order only refunds its returned lines; anything else refunded in full loses vault access.
+    revoke: order.status === 'cancelled' || (order.status !== 'returned' && amount >= Number(order.total_amount) - 0.01),
+    notify: body.notify !== false,
+    actorId: adminId,
+    summary: `Refund of ₹${amount.toFixed(0)} recorded for #${order.order_number} (${how}${refund.reference ? ` · ${refund.reference}` : ''})`,
+    metadata: { external: refund },
+  })
+
+  return NextResponse.json({ success: true, totalRefunded: amount, external: refund })
+}
+
+async function markOrderRefunded(
+  order: any,
+  opts: { amount: number; revoke: boolean; notify: boolean; actorId: string; summary: string; metadata: Record<string, unknown> }
+) {
+  const orderId = order.id
+  // A cancelled order is refunded in full, so every digital line loses vault access. A returned
+  // order only refunds its returned lines, and digital lines are never returnable.
+  await withTransaction(async client => {
+    await client.query(`UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [orderId])
+    if (opts.revoke) await revokeOrderEntitlements(client, { orderId, reason: 'refund' })
+  })
+  await queueAdsConversion(orderId, order)
+
+  const user = order.users
+  const userEmail = user?.email || order.customer_email
+  const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : order.customer_name
+
+  if (opts.notify && userEmail && userName) {
+    sendPaymentStatusUpdate(userEmail, userName, order.order_number, orderId, 'refunded', opts.amount).catch(() => {})
+  }
+
+  if (order.user_id) {
+    logActivity({
+      userId: order.user_id,
+      actorId: opts.actorId,
+      kind: 'payment_status',
+      referenceId: orderId,
+      referenceType: 'orders',
+      summary: opts.summary,
+      metadata: { payment_status: 'refunded', amount: opts.amount, ...opts.metadata },
+    }).catch(() => {})
   }
 }

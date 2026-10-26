@@ -19,6 +19,8 @@ import CancelReview from '@/app/(admin)/admin/orders/[id]/_components/CancelRevi
 import ReturnReview from '@/app/(admin)/admin/orders/[id]/_components/ReturnReview'
 import GenerateInvoiceButton from '@/app/(admin)/admin/orders/[id]/_components/GenerateInvoiceButton'
 import InitiateRefundButton from '@/app/(admin)/admin/orders/[id]/_components/InitiateRefundButton'
+import { RecordRefundLink } from '@/app/(admin)/admin/orders/[id]/_components/ExternalRefundForm'
+import { externalRefundLabel } from '@/lib/payments/external-refund'
 import RetryPaymentEmailButton from '@/app/(admin)/admin/orders/[id]/_components/RetryPaymentEmailButton'
 import CreateShipmentButton from '@/app/(admin)/admin/orders/[id]/_components/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
@@ -138,6 +140,12 @@ export default async function OrderDetailsPage({
     (order.order_items?.length ?? 0) > 0 &&
     order.order_items.every((i: any) => digitalItemIds.has(i.id))
   const refundableAmount = await computeRefundableAmount(order, returnRequest).catch(() => Number(order.total_amount))
+  const moneyIn = order.payment_status === 'paid' || order.payment_status === 'cod_collected'
+  // Razorpay can only refund a captured Razorpay payment; COD, cash and hand-marked payments are recorded.
+  // A replacement order's payments sit on the original, which the refund route resolves.
+  const razorpayPaid =
+    !!order.original_order_id ||
+    (order.payments ?? []).some((p: any) => p.payment_gateway === 'razorpay' && p.status === 'completed' && p.transaction_id)
   const showRetryEmailButton =
     (order.payment_status === 'failed' || order.payment_status === 'unpaid') &&
     (Date.now() - new Date(order.created_at).getTime()) / 3600000 < 24
@@ -632,8 +640,8 @@ export default async function OrderDetailsPage({
               </Card>
           )}
 
-          {(order.status === 'cancelled' || order.status === 'returned' || order.status === 'cancel_requested') &&
-            order.payment_status === 'paid' &&
+          {(order.status === 'cancelled' || order.status === 'returned') &&
+            moneyIn &&
             returnRequest?.type !== 'replacement' &&
             refundableAmount > 0 &&
             canWrite && (
@@ -642,6 +650,7 @@ export default async function OrderDetailsPage({
                 orderNumber={order.order_number || order.id.slice(0, 8)}
                 amount={refundableAmount}
                 isReturn={order.status === 'returned'}
+                gateway={order.payment_status === 'paid' && razorpayPaid}
               />
             )}
 
@@ -655,6 +664,7 @@ export default async function OrderDetailsPage({
                 endpoint={`/api/admin/orders/${order.id}/adjustments/${r.id}/refund${r.legacy ? '?legacy=1' : ''}`}
                 heading="Refund for approved changes"
                 description="The customer approved the product changes on this order. Refund the difference to their original payment:"
+                gateway={razorpayPaid}
               />
             ))}
 
@@ -841,21 +851,23 @@ export default async function OrderDetailsPage({
                         : p.gateway_response || {}
                     const isVariantChange = resp?.purpose === 'variant_change'
                     const isAdjustment = resp?.purpose === 'order_adjustment'
-                    const partial: Array<{ id: string; amount: number; purpose?: string; at?: string }> = Array.isArray(resp?.partial_refunds) ? resp.partial_refunds : []
+                    const isRecordedRefund = resp?.purpose === 'external_refund'
+                    const partial: Array<{ id: string; amount: number; purpose?: string; at?: string; method?: string; reference?: string | null; note?: string | null }> = Array.isArray(resp?.partial_refunds) ? resp.partial_refunds : []
                     const partialTotal = partial.reduce((s2, r) => s2 + (Number(r.amount) || 0), 0)
                     const refunded = resp?.refund || resp?.variantChangeRefund
+                    const external = resp?.external_refund
                     const returnCharge = resp?.returnCharge
                     return (
                       <div key={p.id || idx} className="rounded-lg border border-border-default p-3 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-semibold text-foreground">
-                            {isVariantChange ? 'Variant-change top-up' : isAdjustment ? 'Order-changes top-up' : idx === 0 ? 'Order payment' : 'Payment'}
+                            {isRecordedRefund ? 'Refund (recorded)' : isVariantChange ? 'Variant-change top-up' : isAdjustment ? 'Order-changes top-up' : idx === 0 ? 'Order payment' : 'Payment'}
                           </span>
                           <Badge tone={p.status === 'completed' ? 'green' : p.status === 'refunded' ? 'red' : 'amber'}>{p.status}</Badge>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-foreground-secondary">Method</span>
-                          <span className="text-foreground capitalize">{p.payment_method}</span>
+                          <span className="text-foreground capitalize">{isRecordedRefund ? externalRefundLabel(p.payment_method) : p.payment_method}</span>
                         </div>
                         {p.transaction_id && (
                           <div className="flex justify-between gap-3 text-sm">
@@ -888,12 +900,15 @@ export default async function OrderDetailsPage({
                         {partial.map(r => (
                           <div key={r.id} className="flex justify-between gap-3 text-sm">
                             <span className="text-foreground-secondary">
-                              Partial refund{r.purpose === 'order_adjustment' ? ' · order changes' : r.purpose === 'variant_change' ? ' · variant change' : ''}
+                              Partial refund{r.purpose === 'order_adjustment' ? ' · order changes' : r.purpose === 'variant_change' ? ' · variant change' : r.purpose === 'dispute' ? ' · dispute' : ''}
+                              {r.method ? <span className="block text-[11px] text-foreground-muted">via {externalRefundLabel(r.method)}{r.note ? ` — ${r.note}` : ''}</span> : null}
                               {r.at ? <span className="block text-[11px] text-foreground-muted">{new Date(r.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span> : null}
                             </span>
                             <span className="min-w-0 text-right">
                               <span className="block font-semibold tabular-nums text-red-600 dark:text-red-400">− Rs. {Number(r.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              <span className="block text-foreground-muted font-mono text-[11px] [overflow-wrap:anywhere]">{r.id}</span>
+                              {!r.method || r.reference ? (
+                                <span className="block text-foreground-muted font-mono text-[11px] [overflow-wrap:anywhere]">{r.method ? r.reference : r.id}</span>
+                              ) : null}
                             </span>
                           </div>
                         ))}
@@ -902,6 +917,19 @@ export default async function OrderDetailsPage({
                             <span className="text-foreground-secondary">Net received</span>
                             <span className="text-foreground font-semibold">
                               Rs. {(Number(p.amount) - partialTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        )}
+                        {external && (
+                          <div className="flex justify-between gap-3 text-sm">
+                            <span className="text-foreground-secondary">
+                              Refunded via {externalRefundLabel(external.method)}
+                              {external.note ? <span className="block text-[11px] text-foreground-muted">{external.note}</span> : null}
+                              {external.at ? <span className="block text-[11px] text-foreground-muted">{new Date(external.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span> : null}
+                            </span>
+                            <span className="min-w-0 text-right">
+                              <span className="block font-semibold tabular-nums text-red-600 dark:text-red-400">− Rs. {Number(external.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              {external.reference ? <span className="block text-foreground-muted font-mono text-[11px] [overflow-wrap:anywhere]">{external.reference}</span> : null}
                             </span>
                           </div>
                         )}
@@ -927,6 +955,9 @@ export default async function OrderDetailsPage({
                     )
                   })}
                 </div>
+              )}
+              {canWrite && moneyIn && order.status !== 'cancelled' && order.status !== 'returned' && Number(order.total_amount) > 0 && (
+                <RecordRefundLink orderId={order.id} amount={Number(order.total_amount)} razorpayPaid={razorpayPaid} />
               )}
             </Card>
     </>
