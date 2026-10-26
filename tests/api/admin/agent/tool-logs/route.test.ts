@@ -4,6 +4,9 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
+// The list count is capped (lib/filters/run).
+const { mockCappedCount } = vi.hoisted(() => ({ mockCappedCount: vi.fn() }))
+vi.mock('@/lib/filters/run', () => ({ cappedCount: mockCappedCount }))
 
 import { GET } from '@/app/api/(admin)/admin/agent/tool-logs/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -57,9 +60,8 @@ describe('GET /api/admin/agent/tool-logs', () => {
   it('returns messages and total on success', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQuery
-      .mockResolvedValueOnce({ rows: sampleMessages, rowCount: 1 } as any)
-      .mockResolvedValueOnce({ rows: [{ total: '1' }], rowCount: 1 } as any)
+    mockQuery.mockResolvedValueOnce({ rows: sampleMessages, rowCount: 1 } as any)
+    mockCappedCount.mockResolvedValueOnce({ count: 1, capped: false })
 
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
@@ -71,9 +73,8 @@ describe('GET /api/admin/agent/tool-logs', () => {
   it('returns empty list with total 0 when no messages', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQuery
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
-      .mockResolvedValueOnce({ rows: [{ total: '0' }], rowCount: 1 } as any)
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
+    mockCappedCount.mockResolvedValueOnce({ count: 0, capped: false })
 
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
@@ -85,9 +86,8 @@ describe('GET /api/admin/agent/tool-logs', () => {
   it('handles pagination params', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQuery
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
-      .mockResolvedValueOnce({ rows: [{ total: '50' }], rowCount: 1 } as any)
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
+    mockCappedCount.mockResolvedValueOnce({ count: 50, capped: false })
 
     const res = await GET(makeRequest({ page: '2', pageSize: '20' }))
     expect(res.status).toBe(200)
@@ -95,12 +95,11 @@ describe('GET /api/admin/agent/tool-logs', () => {
     expect(body.total).toBe(50)
   })
 
-  it('handles missing total row gracefully', async () => {
+  it('handles an empty log', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQuery
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
+    mockCappedCount.mockResolvedValueOnce({ count: 0, capped: false })
 
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)

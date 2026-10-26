@@ -14,6 +14,9 @@ export function isValuesField<K extends string>(entity: FilterEntity<K>, field: 
   return Object.hasOwn(entity.sql, field) && entity.sql[field as K].kind === 'values'
 }
 
+/** Without facets, a windowed list (defaultWindowDays) still counts only its date range. */
+const windowOnly = <K extends string>(e: FilterEntity<K>): K[] => (e.defaultWindowDays && e.period ? [e.period] : [])
+
 /**
  * Distinct values of one field with their row counts, busiest first. With `facets`, the other active
  * filters narrow the counts. Fetches one extra row so the caller can tell whether there is more.
@@ -29,7 +32,9 @@ export function valuesQuery<K extends string>(
   if (s.kind !== 'values') return null
   const pageSize = opts.pageSize ?? VALUES_PAGE_SIZE
   if (entity.branches?.length) return unionValuesQuery(entity, field, q, { ...opts, pageSize, fold: s.fold ?? 'lower' })
-  const w = entity.facets ? buildWhere(entity, q, 1, { omit: [field], ctx: opts.ctx }) : buildWhere(entity, {}, 1)
+  const w = entity.facets
+    ? buildWhere(entity, q, 1, { omit: [field], ctx: opts.ctx })
+    : buildWhere(entity, q, 1, { only: windowOnly(entity), ctx: opts.ctx })
   const params = [...w.params]
   const bind = (v: unknown) => {
     params.push(v)
@@ -66,7 +71,7 @@ function unionValuesQuery<K extends string>(
     if (s.kind !== 'values') return []
     const w = entity.facets
       ? buildWhere(b, q, params.length + 1, { omit: [field], ctx: opts.ctx })
-      : buildWhere(b, {}, params.length + 1)
+      : buildWhere(b, q, params.length + 1, { only: windowOnly(entity), ctx: opts.ctx })
     params.push(...w.params)
     const a = b.alias
     return [
