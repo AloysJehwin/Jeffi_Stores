@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg'
+import type { QueryResult, QueryResultRow } from 'pg'
 import { NextResponse } from 'next/server'
 import { redirect } from 'next/navigation'
 import * as dl from '@jeffi/draft-locks'
@@ -77,29 +77,119 @@ async function announce(actor: NonNullable<DraftActor>, type: DraftResourceType,
   }
 }
 
+/** A transaction client or the pool: both answer query(text, params). */
+export type DraftDb = { query: <R extends QueryResultRow = any>(text: string, params?: any[]) => Promise<QueryResult<R>> }
+const poolDb: DraftDb = { query: (text, params) => query(text, params) }
+
+export const actorOf = (a: { adminId?: string; role?: string; scopes?: string[] } | null | undefined): DraftActor =>
+  a?.adminId ? { adminId: a.adminId, role: a.role, scopes: a.scopes } : null
+
 /**
  * Run a draft write inside a transaction that first asserts the caller holds the lock. The lock
  * row stays locked until commit, so a takeover waits for this save. Throws DraftLockError (→ 423
- * via draftLockResponse). No actor = pass-through.
+ * via draftLockResponse). No actor = pass-through: `fn` runs on the pool as before.
+ * `ensure`: when the draft did not exist yet (so nothing was asserted), take the lock after the
+ * write, still inside the transaction. `assertAfter`: assert after the write instead (a draft the
+ * write just created is claimed then).
  */
 export async function withDraftWrite<T>(
   actor: DraftActor,
   type: DraftResourceType,
   id: string,
-  fn: (client: PoolClient) => Promise<T>,
-  opts: { epoch?: number | null } = {}
+  fn: (db: DraftDb) => Promise<T>,
+  opts: { epoch?: number | null; ensure?: boolean; assertAfter?: boolean } = {}
 ): Promise<T> {
-  if (!actor?.adminId) return withTransaction(fn)
+  if (!actor?.adminId) return fn(poolDb)
   let res: LockResult | null = null
+  const assert = (c: dl.SqlClient) => dl.assertHolder(c, actor, type, id, { ...OPTS, epoch: opts.epoch })
   const out = await withTransaction(async client => {
-    res = await dl.assertHolder(client, actor, type, id, { ...OPTS, epoch: opts.epoch })
-    return fn(client)
+    // assertAfter: same guarantee (a refusal rolls the write back), the write just runs first.
+    if (!opts.assertAfter) res = await assert(client)
+    const value = await fn(client as unknown as DraftDb)
+    if (opts.assertAfter) res = await assert(client)
+    else if (opts.ensure && res && !res.lock && !res.change) res = await dl.acquire(client, actor, type, id, OPTS)
+    return value
   })
   if (res) await announce(actor, type, id, res)
   return out
 }
 
-/** Assert inside a transaction the caller already runs (no-op without an actor). */
+/** Create a draft and take its lock in one transaction (no actor = plain write on the pool). */
+export async function withDraftCreate<T>(actor: DraftActor, type: DraftResourceType, id: string, fn: (db: DraftDb) => Promise<T>): Promise<T> {
+  if (!actor?.adminId) return fn(poolDb)
+  let res: LockResult | null = null
+  const out = await withTransaction(async client => {
+    const value = await fn(client as unknown as DraftDb)
+    res = await dl.acquire(client, actor, type, id, OPTS)
+    return value
+  })
+  if (res) await announce(actor, type, id, res)
+  return out
+}
+
+/** 423 when the caller may not discard / delete this draft (see canDiscard), else null. */
+export async function discardGuard(actor: DraftActor, type: DraftResourceType, id: string): Promise<NextResponse | null> {
+  const r = await canDiscard(actor, type, id)
+  return r.ok ? null : NextResponse.json(r.error.body(), { status: 423 })
+}
+
+/** Lock a draft the caller just created (best effort: an unlocked draft is claimed by its first writer). */
+export async function lockNewDraft(actor: DraftActor, type: DraftResourceType, id: string): Promise<void> {
+  if (!actor?.adminId) return
+  try {
+    await acquireDraftLock(actor, type, id)
+  } catch (err) {
+    console.error('[draft-locks] lock of new draft failed for', type, id, err)
+  }
+}
+
+/** Close the lock after a discard / delete that already happened (never fails the caller). */
+export async function closeAfter(actor: DraftActor, type: DraftResourceType, id: string, reason: dl.ClosedReason): Promise<void> {
+  if (!actor?.adminId) return
+  try {
+    await closeDraftLock(actor, type, id, reason)
+  } catch (err) {
+    console.error('[draft-locks] close failed for', type, id, err)
+  }
+}
+
+/** A campaign's lock id is its campaign_drafts.campaign_id; `create` seeds the empty row first. */
+export async function campaignLockId(kind: string, create = false): Promise<string | null> {
+  if (create) {
+    await query(`INSERT INTO campaign_drafts (kind) VALUES ($1) ON CONFLICT (kind) DO NOTHING`, [kind])
+  }
+  const r = await query(`SELECT campaign_id FROM campaign_drafts WHERE kind = $1`, [kind])
+  return (r?.rows?.[0]?.campaign_id as string | undefined) ?? null
+}
+
+/** A live write on an entity whose draft someone else holds: 423, else null. */
+export async function lockedByOther(actor: DraftActor, type: DraftResourceType, id: string): Promise<NextResponse | null> {
+  if (!actor?.adminId) return null
+  try {
+    const lock = await dl.getLock(pool, type, id, OPTS)
+    if (lock && !lock.closedAt && lock.ownerId && lock.ownerId !== actor.adminId && lock.ownerCanEdit) {
+      return NextResponse.json(new dl.DraftLockError('DRAFT_LOCKED', lock).body(), { status: 423 })
+    }
+  } catch {
+    /* lock store unavailable: do not block live writes */
+  }
+  return null
+}
+
+/** The entity itself was deleted: close an open lock so viewers see it, else nothing. */
+export async function closeIfLocked(actor: DraftActor, type: DraftResourceType, id: string, reason: dl.ClosedReason = 'deleted') {
+  try {
+    const lock = await dl.getLock(pool, type, id, OPTS)
+    if (lock && !lock.closedAt) await closeDraftLock(actor, type, id, reason)
+  } catch (err) {
+    console.error('[draft-locks] close failed for', type, id, err)
+  }
+}
+
+/**
+ * Assert inside a transaction the caller already runs (no-op without an actor). Calling it after
+ * the draft write, before commit, is just as safe: a refusal rolls the write back.
+ */
 export async function assertDraftHolder(
   client: dl.SqlClient,
   actor: DraftActor,
@@ -144,6 +234,32 @@ export async function closeDraftLock(
   const res = client ? await run(client) : await withTransaction(run)
   if (!client) await publishLockEvent({ type: 'closed', resourceType: type, resourceId: id, lock: res.lock, by: actor?.adminId ?? null, reason })
   return res
+}
+
+/** Close inside the caller's transaction; skipped without an actor (system writers, tests). */
+export async function closeDraftLockTx(db: DraftDb | dl.SqlClient, actor: DraftActor, type: DraftResourceType, id: string, reason: dl.ClosedReason) {
+  if (!actor?.adminId) return null
+  return dl.close(db as dl.SqlClient, actor, type, id, reason, OPTS)
+}
+
+/** Publish / finalize / send: assert the lock, run the write, close the lock, one transaction. */
+export async function withDraftPublish<T>(
+  actor: DraftActor,
+  type: DraftResourceType,
+  id: string,
+  fn: (db: DraftDb) => Promise<T>,
+  opts: { epoch?: number | null; reason?: dl.ClosedReason } = {}
+): Promise<T> {
+  if (!actor?.adminId) return fn(poolDb)
+  let closed: LockResult | null = null
+  const out = await withTransaction(async client => {
+    await dl.assertHolder(client, actor, type, id, { ...OPTS, epoch: opts.epoch })
+    const value = await fn(client as unknown as DraftDb)
+    closed = await dl.close(client, actor, type, id, opts.reason ?? 'published', OPTS)
+    return value
+  })
+  await announceDraftClosed(actor, type, id, closed, opts.reason ?? 'published')
+  return out
 }
 
 /** Event for a close that ran on the caller's client, sent once its transaction committed. */
@@ -243,6 +359,46 @@ export async function tryAcquireForAction(type: DraftResourceType, id: string): 
     if (dl.isDraftLockError(err)) return false
     throw err
   }
+}
+
+/**
+ * Guard for an edit-page server action: discard needs canDiscard, every other intent the lock.
+ * Redirects to the edit page in read-only mode when refused; returns the actor otherwise.
+ */
+export async function guardDraftAction(type: DraftResourceType, id: string, editPath: string, intent?: string | null): Promise<DraftActor> {
+  const actor = await actionActor()
+  if (!actor?.adminId) return actor
+  if (intent !== 'discard') {
+    await lockOrRedirect(type, id, editPath)
+    return actor
+  }
+  const r = await canDiscard(actor, type, id)
+  if (!r.ok) redirect(ap(`${editPath}${editPath.includes('?') ? '&' : '?'}locked=1`, await getHost()))
+  return actor
+}
+
+/** Like guardDraftAction for actions that report instead of redirecting: the refusal message, or null. */
+export async function draftActionError(type: DraftResourceType, id: string, intent?: string | null): Promise<string | null> {
+  const actor = await actionActor()
+  if (!actor?.adminId) return null
+  if (intent === 'discard') {
+    const r = await canDiscard(actor, type, id)
+    return r.ok ? null : r.error.message
+  }
+  try {
+    const res = await withTransaction(c => dl.assertHolder(c, actor, type, id, OPTS))
+    await announce(actor, type, id, res)
+    return null
+  } catch (err) {
+    if (dl.isDraftLockError(err)) return `${err.message}. Your changes were not saved.`
+    throw err
+  }
+}
+
+/** Edit-page URL for start*Draft: `locked=1` when someone else holds the draft. */
+export function draftEditUrl(path: string, back: string | null | undefined, mine: boolean): string {
+  const qs = [back ? `back=${encodeURIComponent(back)}` : '', mine ? '' : 'locked=1'].filter(Boolean).join('&')
+  return qs ? `${path}?${qs}` : path
 }
 
 /** The signed-in admin for server actions (null outside a request). */

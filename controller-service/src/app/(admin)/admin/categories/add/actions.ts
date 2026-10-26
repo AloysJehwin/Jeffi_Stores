@@ -6,6 +6,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/shared/db'
 import { suggestIcon } from '@/lib/shared/icon-suggest'
+import { actionActor, lockNewDraft } from '@/lib/admin/draft-locks'
 
 export async function createCategory(formData: FormData) {
   const name = formData.get('name') as string
@@ -34,7 +35,7 @@ export async function createCategory(formData: FormData) {
 
   // Create-as-draft: is_draft = true (and is_active = false) so the category lives ONLY in the
   // Drafts section, never the live list or storefront nav. "Publish" flips is_draft = false.
-  await query<{ id: string }>(
+  const created = await query<{ id: string }>(
     `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, is_draft, google_product_category, icon_name, return_allowed, return_window_days, replacement_allowed, replacement_window_days, image_url)
      VALUES ($1, $2, $3, $4, $5, $6, false, true, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
     [
@@ -54,6 +55,7 @@ export async function createCategory(formData: FormData) {
     ]
   )
 
+  if (created.rows[0]) await lockNewDraft(await actionActor(), 'category', created.rows[0].id)
   revalidatePath('/admin/categories')
 
   const host = await getHost()

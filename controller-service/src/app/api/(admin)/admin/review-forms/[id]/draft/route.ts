@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
+import {
+  actorOf,
+  closeAfter,
+  discardGuard,
+  draftLockResponse,
+  epochFrom,
+  withDraftPublish,
+  withDraftWrite,
+} from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 interface Params {
@@ -32,12 +41,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const body = await req.json()
-  await query(
-    `INSERT INTO review_form_drafts (form_id, fields, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
-     ON CONFLICT (form_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
-    [id, JSON.stringify(body)]
-  )
+  try {
+    await withDraftWrite(
+      actorOf(admin),
+      'review_form',
+      id,
+      async db => {
+        await db.query(
+          `INSERT INTO review_form_drafts (form_id, fields, updated_at)
+           VALUES ($1, $2::jsonb, NOW())
+           ON CONFLICT (form_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
+          [id, JSON.stringify(body)]
+        )
+      },
+      { epoch: epochFrom(req), ensure: true }
+    )
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ success: true })
 }
 
@@ -56,30 +79,44 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 
   const f = draft.fields as any
-  await query(
-    `UPDATE review_forms SET
-       title = COALESCE($2, title),
-       slug = COALESCE($3, slug),
-       template_type = COALESCE($4, template_type),
-       google_review_url = COALESCE($5, google_review_url),
-       coupon_id = $6::uuid,
-       description = $7,
-       is_active = COALESCE($8::boolean, is_active),
-       custom_fields = COALESCE($9::jsonb, custom_fields)
-     WHERE id = $1`,
-    [
+  try {
+    await withDraftPublish(
+      actorOf(admin),
+      'review_form',
       id,
-      f.title || null,
-      f.slug || null,
-      f.template_type || null,
-      f.google_review_url || null,
-      f.coupon_id || null,
-      f.description ?? null,
-      f.is_active != null ? f.is_active : null,
-      f.custom_fields ? JSON.stringify(f.custom_fields) : null,
-    ]
-  )
-  await query(`DELETE FROM review_form_drafts WHERE form_id = $1`, [id])
+      async db => {
+        await db.query(
+          `UPDATE review_forms SET
+             title = COALESCE($2, title),
+             slug = COALESCE($3, slug),
+             template_type = COALESCE($4, template_type),
+             google_review_url = COALESCE($5, google_review_url),
+             coupon_id = $6::uuid,
+             description = $7,
+             is_active = COALESCE($8::boolean, is_active),
+             custom_fields = COALESCE($9::jsonb, custom_fields)
+           WHERE id = $1`,
+          [
+            id,
+            f.title || null,
+            f.slug || null,
+            f.template_type || null,
+            f.google_review_url || null,
+            f.coupon_id || null,
+            f.description ?? null,
+            f.is_active != null ? f.is_active : null,
+            f.custom_fields ? JSON.stringify(f.custom_fields) : null,
+          ]
+        )
+        await db.query(`DELETE FROM review_form_drafts WHERE form_id = $1`, [id])
+      },
+      { epoch: epochFrom(req) }
+    )
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ success: true })
 }
 
@@ -91,6 +128,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'review_forms:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const actor = actorOf(admin)
+  const denied = await discardGuard(actor, 'review_form', id)
+  if (denied) return denied
   await query(`DELETE FROM review_form_drafts WHERE form_id = $1`, [id])
+  await closeAfter(actor, 'review_form', id, 'discarded')
   return NextResponse.json({ success: true })
 }

@@ -4,6 +4,34 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query, queryMany } from '@/lib/shared/db'
 import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/catalog/selling-unit'
 import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
+import { actorOf, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
+
+// Write the units column under the draft lock: a 423 response when someone else holds the draft.
+async function saveUnits(
+  req: NextRequest,
+  admin: { adminId?: string; role?: string; scopes?: string[] },
+  id: string,
+  units: unknown[]
+): Promise<NextResponse | null> {
+  try {
+    await withDraftWrite(
+      actorOf(admin),
+      'product',
+      id,
+      db =>
+        db.query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+          id,
+          JSON.stringify(units),
+        ]),
+      { epoch: epochFrom(req), assertAfter: true }
+    )
+    return null
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -160,10 +188,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     updated = [...all, newUnit]
   }
 
-  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-    id,
-    JSON.stringify(updated),
-  ])
+  const locked = await saveUnits(req, admin, id, updated)
+  if (locked) return locked
   return NextResponse.json({ success: true, unit: newUnit })
 }
 
@@ -182,9 +208,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const all = await getAllDraftUnits(id)
   const updated = all.filter((u: any) => u.id !== unitId)
 
-  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-    id,
-    JSON.stringify(updated),
-  ])
+  const locked = await saveUnits(req, admin, id, updated)
+  if (locked) return locked
   return NextResponse.json({ success: true })
 }

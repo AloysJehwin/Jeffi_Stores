@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
+import {
+  actorOf,
+  closeAfter,
+  discardGuard,
+  draftLockResponse,
+  epochFrom,
+  withDraftPublish,
+  withDraftWrite,
+} from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 interface Params {
@@ -28,12 +37,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   const body = await req.json()
-  await query(
-    `INSERT INTO supplier_drafts (supplier_id, fields, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
-     ON CONFLICT (supplier_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
-    [id, JSON.stringify(body)]
-  )
+  try {
+    await withDraftWrite(
+      actorOf(admin),
+      'supplier',
+      id,
+      async db => {
+        await db.query(
+          `INSERT INTO supplier_drafts (supplier_id, fields, updated_at)
+           VALUES ($1, $2::jsonb, NOW())
+           ON CONFLICT (supplier_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
+          [id, JSON.stringify(body)]
+        )
+      },
+      { epoch: epochFrom(req), ensure: true }
+    )
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ success: true })
 }
 
@@ -50,29 +73,43 @@ export async function POST(req: NextRequest, { params }: Params) {
   )
   if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
   const f = draft.fields as any
-  await query(
-    `UPDATE suppliers SET
-       name=$1, gstin=$2, contact_name=$3, phone=$4, email=$5, address=$6,
-       payment_terms=$7, notes=$8, bank_name=$9, account_number=$10, ifsc=$11, upi_id=$12,
-       updated_at=NOW()
-     WHERE id=$13`,
-    [
-      f.name,
-      f.gstin || null,
-      f.contact_name || null,
-      f.phone || null,
-      f.email || null,
-      f.address || null,
-      f.payment_terms ? parseInt(f.payment_terms) : null,
-      f.notes || null,
-      f.bank_name || null,
-      f.account_number || null,
-      f.ifsc || null,
-      f.upi_id || null,
+  try {
+    await withDraftPublish(
+      actorOf(admin),
+      'supplier',
       id,
-    ]
-  )
-  await query(`DELETE FROM supplier_drafts WHERE supplier_id = $1`, [id])
+      async db => {
+        await db.query(
+          `UPDATE suppliers SET
+             name=$1, gstin=$2, contact_name=$3, phone=$4, email=$5, address=$6,
+             payment_terms=$7, notes=$8, bank_name=$9, account_number=$10, ifsc=$11, upi_id=$12,
+             updated_at=NOW()
+           WHERE id=$13`,
+          [
+            f.name,
+            f.gstin || null,
+            f.contact_name || null,
+            f.phone || null,
+            f.email || null,
+            f.address || null,
+            f.payment_terms ? parseInt(f.payment_terms) : null,
+            f.notes || null,
+            f.bank_name || null,
+            f.account_number || null,
+            f.ifsc || null,
+            f.upi_id || null,
+            id,
+          ]
+        )
+        await db.query(`DELETE FROM supplier_drafts WHERE supplier_id = $1`, [id])
+      },
+      { epoch: epochFrom(req) }
+    )
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ success: true })
 }
 
@@ -83,6 +120,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const actor = actorOf(admin)
+  const denied = await discardGuard(actor, 'supplier', id)
+  if (denied) return denied
   await query(`DELETE FROM supplier_drafts WHERE supplier_id = $1`, [id])
+  await closeAfter(actor, 'supplier', id, 'discarded')
   return NextResponse.json({ success: true })
 }

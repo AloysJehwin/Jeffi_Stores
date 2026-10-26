@@ -1,7 +1,9 @@
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import type { PoolClient } from 'pg'
+import { announceDraftClosed, assertDraftHolder, closeDraftLockTx, type DraftActor } from '@/lib/admin/draft-locks'
 
-export async function publishCategoryDraft(categoryId: string): Promise<void> {
+/** With an `actor` the draft lock is asserted and closed inside the publish transaction. */
+export async function publishCategoryDraft(categoryId: string, opts: { actor?: DraftActor } = {}): Promise<void> {
   const draft = await queryOne<{ category_id: string; fields: Record<string, unknown> }>(
     `SELECT category_id, fields FROM category_drafts WHERE category_id = $1`,
     [categoryId]
@@ -19,7 +21,9 @@ export async function publishCategoryDraft(categoryId: string): Promise<void> {
         .replace(/^-|-$/g, '')
     : null
 
+  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
   await withTransaction(async (client: PoolClient) => {
+    await assertDraftHolder(client, opts.actor, 'category', categoryId)
     await client.query(
       `UPDATE categories SET
          name = COALESCE($2, name), slug = COALESCE($3, slug),
@@ -70,5 +74,7 @@ export async function publishCategoryDraft(categoryId: string): Promise<void> {
     }
 
     await client.query(`DELETE FROM category_drafts WHERE category_id = $1`, [categoryId])
+    closed = await closeDraftLockTx(client, opts.actor, 'category', categoryId, 'published')
   })
+  await announceDraftClosed(opts.actor, 'category', categoryId, closed, 'published')
 }

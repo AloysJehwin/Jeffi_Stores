@@ -9,6 +9,7 @@ import { publishCategoryDraft } from '@/lib/catalog/category-draft'
 import { suggestIcon } from '@/lib/shared/icon-suggest'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
+import { closeAfter, guardDraftAction } from '@/lib/admin/draft-locks'
 
 // Keep the admin's open editor session's snapshot in step with the draft just saved.
 // After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
@@ -76,6 +77,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
   }
 
   const host = await getHost()
+  const actor = await guardDraftAction('category', categoryId, `/admin/categories/${categoryId}/edit`, intent)
 
   // Create-draft category (is_draft = true, no category_drafts row): edit the row in place.
   // Save keeps it a draft; Publish flips is_draft = false + is_active.
@@ -108,6 +110,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
         imageUrl,
       ]
     )
+    if (publish) await closeAfter(actor, 'category', categoryId, 'published')
     revalidatePath('/admin/categories')
     redirect(ap('/admin/categories', host))
   }
@@ -115,6 +118,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
   if (hasDraft || intent === 'draft') {
     if (intent === 'discard') {
       await query(`DELETE FROM category_drafts WHERE category_id = $1`, [categoryId])
+      await closeAfter(actor, 'category', categoryId, 'discarded')
       revalidatePath(`/admin/categories/${categoryId}/edit`)
       redirect(ap(`/admin/categories/${categoryId}/edit`, host))
     }
@@ -128,7 +132,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
     )
 
     if (intent === 'publish') {
-      await publishCategoryDraft(categoryId)
+      await publishCategoryDraft(categoryId, { actor })
       revalidatePath('/admin/categories')
       revalidatePath(`/admin/categories/${categoryId}/edit`)
       redirect(ap(`/admin/categories`, host))

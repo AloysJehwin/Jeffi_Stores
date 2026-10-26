@@ -6,6 +6,16 @@ import { deleteProductImage } from '@/lib/shared/s3'
 import { productErrorMessage, roundMoneyFields } from '@/lib/catalog/product-validation'
 import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
 import { applyDraftSubVariantPrices, parseSubVariantPriceEntries } from '@/lib/subscriptions/sub-variant-prices'
+import {
+  acquireDraftLock,
+  actorOf,
+  closeAfter,
+  discardGuard,
+  draftLockResponse,
+  epochFrom,
+  withDraftCreate,
+  withDraftWrite,
+} from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,15 +57,19 @@ export async function POST(req: NextRequest, { params }: Params) {
       `SELECT product_id FROM product_drafts WHERE product_id = $1`,
       [id]
     )
+    const actor = actorOf(admin)
     if (existingDraft) {
+      // 409 = the draft is (now) yours, go edit; 423 = someone else holds it.
+      await acquireDraftLock(actor, 'product', id)
       return NextResponse.json(
         { error: 'A draft already exists for this product', productId: existingDraft.product_id },
         { status: 409 }
       )
     }
 
-    await query(
-      `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, variant_images)
+    await withDraftCreate(actor, 'product', id, db =>
+      db.query(
+        `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, variant_images)
        SELECT
          p.id,
          to_jsonb(p) - 'id' - 'created_at' - 'updated_at' - 'search_vector' - 'views_count' - 'sales_count' - 'inventory_quantity',
@@ -73,12 +87,15 @@ export async function POST(req: NextRequest, { params }: Params) {
                    JOIN product_variants v ON v.id = vi.variant_id
                    WHERE v.product_id = p.id), '[]')
        FROM products p WHERE p.id = $1`,
-      [id]
+        [id]
+      )
     )
     await closeProductSessions(id)
 
     return NextResponse.json({ success: true, productId: id })
   } catch (err: unknown) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     console.error('[product-draft] create failed for', id, err)
     return NextResponse.json({ error: productErrorMessage(err, 'Failed to create draft') }, { status: 500 })
   }
@@ -163,17 +180,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         )
       : null
 
-    await query(
-      `UPDATE product_drafts SET fields = $2::jsonb,
-       images = COALESCE($3::jsonb, images),
-       variants = COALESCE($4::jsonb, variants),
-       updated_at = NOW() WHERE product_id = $1`,
-      [id, JSON.stringify(roundMoneyFields(fields)), imagesJson, variantsJson]
+    await withDraftWrite(
+      actorOf(admin),
+      'product',
+      id,
+      db =>
+        db.query(
+          `UPDATE product_drafts SET fields = $2::jsonb,
+           images = COALESCE($3::jsonb, images),
+           variants = COALESCE($4::jsonb, variants),
+           updated_at = NOW() WHERE product_id = $1`,
+          [id, JSON.stringify(roundMoneyFields(fields)), imagesJson, variantsJson]
+        ),
+      { epoch: epochFrom(req) }
     )
     await applyDraftSubVariantPrices(id, parseSubVariantPriceEntries(body?.subVariantSubscriptionPrices))
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     console.error('[product-draft] autosave failed for', id, err)
     return NextResponse.json({ error: productErrorMessage(err, 'Autosave failed') }, { status: 500 })
   }
@@ -187,6 +213,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const actor = actorOf(admin)
+  const denied = await discardGuard(actor, 'product', id)
+  if (denied) return denied
   try {
     // Clean up S3 files for variant images that were uploaded fresh into this draft
     // (staged, never applied to live). Live-image rows (real uuid ids) are left alone —
@@ -204,6 +233,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       ])
       if (createDraft) {
         await query(`DELETE FROM products WHERE id = $1 AND is_draft = true`, [id])
+        await closeAfter(actor, 'product', id, 'discarded')
         return NextResponse.json({ success: true })
       }
     }
@@ -226,6 +256,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
     await query(`DELETE FROM product_drafts WHERE product_id = $1`, [id])
     await closeProductSessions(id)
+    await closeAfter(actor, 'product', id, 'discarded')
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
     console.error('[product-draft] discard failed for', id, err)

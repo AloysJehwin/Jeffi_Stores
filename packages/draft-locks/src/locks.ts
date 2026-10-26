@@ -5,6 +5,12 @@ export interface SqlClient {
   query(text: string, params?: unknown[]): Promise<{ rows: any[]; rowCount?: number | null }>
 }
 
+/** Query with a normalised result, so a stubbed client that returns nothing reads as no rows. */
+export async function q(c: SqlClient, text: string, params?: unknown[]): Promise<{ rows: any[]; rowCount: number }> {
+  const r = await c.query(text, params)
+  return { rows: Array.isArray(r?.rows) ? r.rows : [], rowCount: r?.rowCount ?? 0 }
+}
+
 export type HasScopeFn = (role: string, scopes: string[], scope: string) => boolean
 /** Fallback when the caller does not pass its own hasScope (legacy parents etc. live there). */
 export const defaultHasScope: HasScopeFn = (role, scopes, scope) => role === 'administrator' || scopes.includes(scope)
@@ -146,11 +152,12 @@ export function toLock(row: Row, hasScope: HasScopeFn = defaultHasScope): DraftL
 }
 
 async function readRow(c: SqlClient, type: DraftResourceType, id: string, forUpdate = false): Promise<Row | null> {
-  const r = await c.query(`${LOCK_SELECT} WHERE l.resource_type = $1 AND l.resource_id = $2${forUpdate ? ' FOR UPDATE OF l' : ''}`, [
+  const r = await q(c, `${LOCK_SELECT} WHERE l.resource_type = $1 AND l.resource_id = $2${forUpdate ? ' FOR UPDATE OF l' : ''}`, [
     type,
     id,
   ])
-  return r.rows[0] ?? null
+  const row = r.rows[0]
+  return row?.resource_type ? row : null
 }
 
 export async function getLock(c: SqlClient, type: DraftResourceType, id: string, opts: LockOpts = {}): Promise<DraftLock | null> {
@@ -160,7 +167,7 @@ export async function getLock(c: SqlClient, type: DraftResourceType, id: string,
 
 export async function draftExists(c: SqlClient, type: DraftResourceType, id: string): Promise<boolean> {
   const sql = DRAFT_RESOURCES[type].existsSql
-  const r = await c.query(sql, sql.includes('$1') ? [id] : [])
+  const r = await q(c, sql, sql.includes('$1') ? [id] : [])
   return (r.rows?.length ?? 0) > 0
 }
 
@@ -171,7 +178,7 @@ function ownerHolds(row: Row, hasScope: HasScopeFn): boolean {
 
 async function supersedeSessions(c: SqlClient, type: DraftResourceType, id: string, adminId: string | null) {
   if (!adminId) return
-  await c.query(
+  await q(c, 
     `UPDATE editor_sessions SET closed_at = now(), closed_reason = 'superseded'
       WHERE resource_type = $1 AND resource_id = $2 AND admin_id = $3 AND closed_at IS NULL`,
     [type, id, adminId]
@@ -199,7 +206,7 @@ export async function acquire(
 ): Promise<LockResult> {
   const hasScope = opts.hasScope ?? defaultHasScope
   const via = opts.via ?? 'start'
-  const ins = await c.query(
+  const ins = await q(c, 
     `INSERT INTO draft_locks (resource_type, resource_id, owner_admin_id, started_by_admin_id, acquired_via)
      VALUES ($1, $2, $3, $3, $4) ON CONFLICT (resource_type, resource_id) DO NOTHING RETURNING epoch`,
     [type, id, actor.adminId, via]
@@ -212,7 +219,7 @@ export async function acquire(
     return acquire(c, actor, type, id, opts, attempt + 1)
   }
   if (cur.closed_at) {
-    const r = await c.query(
+    const r = await q(c, 
       `UPDATE draft_locks SET owner_admin_id = $3, started_by_admin_id = $3, previous_owner_admin_id = NULL,
               acquired_via = $4, takeover_reason = NULL, epoch = epoch + 1, started_at = now(), acquired_at = now(),
               last_active_at = now(), updated_at = now(), closed_at = NULL, closed_reason = NULL, closed_by_admin_id = NULL
@@ -223,11 +230,11 @@ export async function acquire(
     return { lock: await getLock(c, type, id, opts), change: 'acquired', created: true }
   }
   if (cur.owner_admin_id === actor.adminId) {
-    await c.query(`UPDATE draft_locks SET last_active_at = now() WHERE resource_type = $1 AND resource_id = $2`, [type, id])
+    await q(c, `UPDATE draft_locks SET last_active_at = now() WHERE resource_type = $1 AND resource_id = $2`, [type, id])
     return { lock: toLock(cur, hasScope), change: null, created: false }
   }
   if (ownerHolds(cur, hasScope)) throw new DraftLockError('DRAFT_LOCKED', toLock(cur, hasScope))
-  const r = await c.query(
+  const r = await q(c, 
     `UPDATE draft_locks SET owner_admin_id = $3, previous_owner_admin_id = owner_admin_id, acquired_via = 'claim',
             takeover_reason = NULL, epoch = epoch + 1, acquired_at = now(), last_active_at = now(), updated_at = now()
       WHERE resource_type = $1 AND resource_id = $2 AND epoch = $4`,
@@ -253,7 +260,7 @@ export async function assertHolder(
 ): Promise<LockResult> {
   const hasScope = opts.hasScope ?? defaultHasScope
   const epoch = opts.epoch ?? null
-  const hit = await c.query(
+  const hit = await q(c, 
     `UPDATE draft_locks SET last_active_at = now()
       WHERE resource_type = $1 AND resource_id = $2 AND owner_admin_id = $3 AND closed_at IS NULL
         AND ($4::int IS NULL OR epoch = $4) RETURNING epoch`,
@@ -287,14 +294,14 @@ export async function close(
   opts: LockOpts = {}
 ): Promise<LockResult> {
   const by = actor?.adminId ?? null
-  const upd = await c.query(
+  const upd = await q(c, 
     `UPDATE draft_locks SET closed_at = now(), closed_reason = $3, closed_by_admin_id = $4, epoch = epoch + 1,
             last_active_at = now(), updated_at = now()
       WHERE resource_type = $1 AND resource_id = $2 AND closed_at IS NULL RETURNING epoch`,
     [type, id, reason, by]
   )
   if (!upd.rowCount && by) {
-    await c.query(
+    await q(c, 
       `INSERT INTO draft_locks (resource_type, resource_id, owner_admin_id, started_by_admin_id, acquired_via,
                                 closed_at, closed_reason, closed_by_admin_id)
        VALUES ($1, $2, $3, $3, 'start', now(), $4, $3)
@@ -304,7 +311,7 @@ export async function close(
       [type, id, by, reason]
     )
   }
-  await c.query(
+  await q(c, 
     `UPDATE editor_sessions SET closed_at = now(), closed_reason = 'save'
       WHERE resource_type = $1 AND resource_id = $2 AND closed_at IS NULL`,
     [type, id]
@@ -322,7 +329,7 @@ async function holderRow(c: SqlClient, actor: LockActor, type: DraftResourceType
 
 export async function release(c: SqlClient, actor: LockActor, type: DraftResourceType, id: string, opts: LockOpts = {}): Promise<LockResult> {
   const cur = await holderRow(c, actor, type, id, opts)
-  await c.query(
+  await q(c, 
     `UPDATE draft_locks SET owner_admin_id = NULL, previous_owner_admin_id = $3, epoch = epoch + 1, updated_at = now()
       WHERE resource_type = $1 AND resource_id = $2 AND epoch = $4`,
     [type, id, actor.adminId, cur.epoch]
@@ -341,7 +348,7 @@ export async function handover(
   opts: LockOpts = {}
 ): Promise<LockResult> {
   const cur = await holderRow(c, actor, type, id, opts)
-  await c.query(
+  await q(c, 
     `UPDATE draft_locks SET owner_admin_id = $3, previous_owner_admin_id = $4, acquired_via = 'handover',
             takeover_reason = NULL, epoch = epoch + 1, acquired_at = now(), last_active_at = now(), updated_at = now()
       WHERE resource_type = $1 AND resource_id = $2 AND epoch = $5`,
@@ -364,7 +371,7 @@ export async function takeover(
   const cur = await readRow(c, type, id, true)
   if (!cur || cur.closed_at || !cur.owner_admin_id) return acquire(c, actor, type, id, { ...opts, via: 'claim' })
   if (cur.owner_admin_id === actor.adminId) return { lock: toLock(cur, opts.hasScope), change: null }
-  await c.query(
+  await q(c, 
     `UPDATE draft_locks SET owner_admin_id = $3, previous_owner_admin_id = owner_admin_id, acquired_via = 'takeover',
             takeover_reason = $4, epoch = epoch + 1, acquired_at = now(), last_active_at = now(), updated_at = now()
       WHERE resource_type = $1 AND resource_id = $2 AND epoch = $5`,
@@ -392,13 +399,13 @@ export async function status(c: SqlClient, type: DraftResourceType, id: string, 
   let hint: string | null = null
   const def = DRAFT_RESOURCES[type]
   if (def.hintSql && exists && (!row || row.closed_at)) {
-    const h = await c.query(def.hintSql, def.hintSql.includes('$1') ? [id] : [])
+    const h = await q(c, def.hintSql, def.hintSql.includes('$1') ? [id] : [])
     hint = h.rows[0]?.admin_id ?? null
     if (hint && !row) {
-      const a = await c.query(`SELECT role, scopes, is_active FROM admins WHERE id = $1`, [hint])
+      const a = await q(c, `SELECT role, scopes, is_active FROM admins WHERE id = $1`, [hint])
       const adm = a.rows[0]
       if (adm?.is_active && hasScope(String(adm.role ?? ''), scopesOf(adm.scopes), def.writeScope)) {
-        await c.query(
+        await q(c, 
           `INSERT INTO draft_locks (resource_type, resource_id, owner_admin_id, started_by_admin_id, acquired_via)
            VALUES ($1, $2, $3, $3, 'backfill') ON CONFLICT (resource_type, resource_id) DO NOTHING`,
           [type, id, hint]
@@ -413,7 +420,7 @@ export async function status(c: SqlClient, type: DraftResourceType, id: string, 
 /** Open locks for a list page's rows, keyed by resource id. */
 export async function lockMap(c: SqlClient, type: DraftResourceType, ids: string[], opts: LockOpts = {}): Promise<Record<string, DraftLock>> {
   if (!ids.length) return {}
-  const r = await c.query(`${LOCK_SELECT} WHERE l.resource_type = $1 AND l.resource_id = ANY($2::uuid[]) AND l.closed_at IS NULL`, [type, ids])
+  const r = await q(c, `${LOCK_SELECT} WHERE l.resource_type = $1 AND l.resource_id = ANY($2::uuid[]) AND l.closed_at IS NULL`, [type, ids])
   const out: Record<string, DraftLock> = {}
   for (const row of r.rows) out[row.resource_id] = toLock(row, opts.hasScope)
   return out
@@ -429,11 +436,11 @@ export async function changedSince(
   opts: LockOpts & { limit?: number } = {}
 ): Promise<{ locks: DraftLock[]; cursor: string }> {
   if (!cursor) {
-    const r = await c.query(`SELECT now()::text AS now`)
+    const r = await q(c, `SELECT now()::text AS now`)
     return { locks: [], cursor: String(r.rows[0]?.now ?? new Date().toISOString()) }
   }
   // Text cursor keeps microseconds; a millisecond ISO cursor would re-send the last row forever.
-  const r = await c.query(
+  const r = await q(c, 
     `SELECT * FROM (${LOCK_SELECT}) x, LATERAL (SELECT x.updated_at::text AS cursor_text) ct
       WHERE x.updated_at > $1::timestamptz ORDER BY x.updated_at LIMIT $2`,
     [cursor, opts.limit ?? 100]
@@ -444,7 +451,7 @@ export async function changedSince(
 
 /** Release every lock an admin holds (deactivated, deleted, or scopes changed). */
 export async function releaseLocksOfAdmin(c: SqlClient, adminId: string): Promise<{ resourceType: DraftResourceType; resourceId: string }[]> {
-  const r = await c.query(
+  const r = await q(c, 
     `UPDATE draft_locks SET previous_owner_admin_id = owner_admin_id, owner_admin_id = NULL, epoch = epoch + 1, updated_at = now()
       WHERE owner_admin_id = $1 AND closed_at IS NULL RETURNING resource_type, resource_id`,
     [adminId]
@@ -455,6 +462,6 @@ export async function releaseLocksOfAdmin(c: SqlClient, adminId: string): Promis
 
 /** The entity itself is gone: drop its lock and presence rows. */
 export async function dropLocksFor(c: SqlClient, type: DraftResourceType, id: string): Promise<void> {
-  await c.query(`DELETE FROM draft_locks WHERE resource_type = $1 AND resource_id = $2`, [type, id])
-  await c.query(`DELETE FROM draft_presence WHERE resource_type = $1 AND resource_id = $2`, [type, id])
+  await q(c, `DELETE FROM draft_locks WHERE resource_type = $1 AND resource_id = $2`, [type, id])
+  await q(c, `DELETE FROM draft_presence WHERE resource_type = $1 AND resource_id = $2`, [type, id])
 }

@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'
+import {
+  acquireDraftLock,
+  actorOf,
+  closeAfter,
+  discardGuard,
+  draftLockResponse,
+  withDraftCreate,
+} from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 interface Params {
@@ -20,18 +28,29 @@ export async function POST(req: NextRequest, { params }: Params) {
   const brand = await queryOne<{ id: string }>(`SELECT id FROM brands WHERE id = $1`, [id])
   if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 })
 
-  const existing = await queryOne<{ brand_id: string }>(`SELECT brand_id FROM brand_drafts WHERE brand_id = $1`, [id])
-  if (existing) {
-    return NextResponse.json({ error: 'A draft already exists for this brand', brandId: id }, { status: 409 })
-  }
+  const actor = actorOf(admin)
+  try {
+    const existing = await queryOne<{ brand_id: string }>(`SELECT brand_id FROM brand_drafts WHERE brand_id = $1`, [id])
+    if (existing) {
+      // 409 = the draft is (now) yours, go edit; 423 = someone else holds it.
+      await acquireDraftLock(actor, 'brand', id)
+      return NextResponse.json({ error: 'A draft already exists for this brand', brandId: id }, { status: 409 })
+    }
 
-  await query(
-    `INSERT INTO brand_drafts (brand_id, fields)
-     SELECT id, to_jsonb(b) - 'id' - 'created_at' - 'updated_at'
-     FROM brands b WHERE b.id = $1
-     ON CONFLICT (brand_id) DO NOTHING`,
-    [id]
-  )
+    await withDraftCreate(actor, 'brand', id, db =>
+      db.query(
+        `INSERT INTO brand_drafts (brand_id, fields)
+         SELECT id, to_jsonb(b) - 'id' - 'created_at' - 'updated_at'
+         FROM brands b WHERE b.id = $1
+         ON CONFLICT (brand_id) DO NOTHING`,
+        [id]
+      )
+    )
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ success: true, brandId: id })
 }
 
@@ -43,6 +62,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'brands:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const actor = actorOf(admin)
+  const denied = await discardGuard(actor, 'brand', id)
+  if (denied) return denied
   await query(`DELETE FROM brand_drafts WHERE brand_id = $1`, [id])
+  await closeAfter(actor, 'brand', id, 'discarded')
   return NextResponse.json({ success: true })
 }

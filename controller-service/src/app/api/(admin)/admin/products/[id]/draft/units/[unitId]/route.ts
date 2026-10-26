@@ -3,6 +3,34 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query, queryMany } from '@/lib/shared/db'
 import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/catalog/selling-unit'
+import { actorOf, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
+
+// Write the units column under the draft lock: a 423 response when someone else holds the draft.
+async function saveUnits(
+  req: NextRequest,
+  admin: { adminId?: string; role?: string; scopes?: string[] },
+  id: string,
+  units: unknown[]
+): Promise<NextResponse | null> {
+  try {
+    await withDraftWrite(
+      actorOf(admin),
+      'product',
+      id,
+      db =>
+        db.query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+          id,
+          JSON.stringify(units),
+        ]),
+      { epoch: epochFrom(req), assertAfter: true }
+    )
+    return null
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -64,7 +92,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (body.is_base === true) {
     const vId = (existing?.variant_id ?? req.nextUrl.searchParams.get('variant_id')) || null
     const svId = (existing?.sub_variant_id ?? req.nextUrl.searchParams.get('sub_variant_id')) || null
-    const inScope = (u: any) => (svId ? u.sub_variant_id === svId : vId ? u.variant_id === vId && !u.sub_variant_id : !u.variant_id && !u.sub_variant_id)
+    const inScope = (u: any) =>
+      svId
+        ? u.sub_variant_id === svId
+        : vId
+          ? u.variant_id === vId && !u.sub_variant_id
+          : !u.variant_id && !u.sub_variant_id
     let all = units
     if (!all.some((u: any) => !u._cleared && inScope(u))) {
       const live = await queryMany<any>(
@@ -74,18 +107,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       )
       all = [...all.filter((u: any) => !inScope(u)), ...live]
     }
-    updated = all.map((u: any) => (u.id === unitId ? { ...u, ...patch, is_base: true } : inScope(u) ? { ...u, is_base: false } : u))
-    if (!updated.some((u: any) => u.id === unitId)) updated.push({ ...patch, id: unitId, variant_id: vId, sub_variant_id: svId })
+    updated = all.map((u: any) =>
+      u.id === unitId ? { ...u, ...patch, is_base: true } : inScope(u) ? { ...u, is_base: false } : u
+    )
+    if (!updated.some((u: any) => u.id === unitId))
+      updated.push({ ...patch, id: unitId, variant_id: vId, sub_variant_id: svId })
   } else if (idx >= 0) {
     updated = units.map((u: any) => (u.id === unitId ? { ...u, ...patch } : u))
   } else {
     // Unit not in draft yet — add it with this id
     updated = [...units, { ...patch, id: unitId }]
   }
-  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-    id,
-    JSON.stringify(updated),
-  ])
+  const locked = await saveUnits(req, admin, id, updated)
+  if (locked) return locked
   return NextResponse.json({ success: true, unit: updated.find((u: any) => u.id === unitId) })
 }
 
@@ -138,9 +172,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     sub_variant_id: clearedSubVariantId,
   })
 
-  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-    id,
-    JSON.stringify(filtered),
-  ])
+  const locked = await saveUnits(req, admin, id, filtered)
+  if (locked) return locked
   return NextResponse.json({ success: true })
 }

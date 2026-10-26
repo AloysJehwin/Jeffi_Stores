@@ -7,10 +7,11 @@ vi.mock('@/lib/auth/jwt', () => ({
 vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
-vi.mock('@/lib/shared/db', () => ({
-  queryOne: vi.fn(),
-  query: vi.fn(),
-}))
+vi.mock('@/lib/shared/db', () => {
+  const query = vi.fn()
+  // The stage write runs in a transaction with the draft-lock check; both go to query.
+  return { queryOne: vi.fn(), query, withTransaction: vi.fn(async (fn: any) => fn({ query })) }
+})
 vi.mock('@/lib/shared/s3', () => ({
   uploadVariantImage: vi.fn(),
   getS3Url: vi.fn((key: string) => `https://cdn.example.com/${key}`),
