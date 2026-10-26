@@ -13,6 +13,8 @@ import { Kpi, KpiGrid, Section, Table, money, count, when } from '@/components/a
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { B2B_ALIASES, B2B_FIELDS, B2B_SEARCH } from '@/lib/filters/fields/business-customers'
 
 interface Data {
   kpis: OverviewKpi[]
@@ -38,13 +40,25 @@ const SERIES: SeriesDef[] = [
 
 export default function B2bCustomersOverview() {
   const [period, setPeriod] = usePeriod()
+  // KPIs and charts follow the account list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(B2B_FIELDS, { aliases: B2B_ALIASES, omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/business/customers/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/business/customers/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
 
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="business_customers"
+        fields={B2B_FIELDS}
+        aliases={B2B_ALIASES}
+        search={B2B_SEARCH}
+        period
+        noun="Accounts"
+        tab="overview"
+        exportable
+      />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (
         !error && <OverviewSkeleton />

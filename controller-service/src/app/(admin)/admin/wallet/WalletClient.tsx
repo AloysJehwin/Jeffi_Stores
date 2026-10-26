@@ -1,14 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { topupAmounts } from '@/lib/billing/topup-amounts'
 import { aiFeatureLabel, aiLedgerNote } from '@/lib/ai/feature-labels'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import AdminSelect from '@/components/admin/AdminSelect'
-import DatePicker from '@/components/ui/DatePicker'
-import { Banner, Card, DataTable, EmptyState, FormButton, FormField, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton, badgeCls, fieldInputCls, useActionToast, type DataCol } from '@/components/admin/kit'
+import { Banner, Card, DataTable, FormButton, FormField, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, badgeCls, fetchJson, fieldInputCls, useActionToast, useFilterQuery, useInfiniteList, type DataCol } from '@/components/admin/kit'
+import { WALLET_FIELDS, WALLET_SEARCH } from '@/lib/filters/fields/wallet'
 
 type LedgerEntry = {
+  id: string
   entry_type: 'recharge' | 'debit' | 'adjustment'
   category: string | null
   amount: string
@@ -17,7 +17,7 @@ type LedgerEntry = {
   note: string | null
   occurred_at: string
 }
-type Wallet = { balance: number; minBalance: number; currency: string; ledger: LedgerEntry[] }
+type Wallet = { balance: number; minBalance: number; currency: string }
 export type AiSpendRow = { feature: string; calls: number; spent: number; unpaid: number }
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -41,11 +41,7 @@ const catOf = (e: LedgerEntry) => e.category || e.entry_type
 const catLabel = (c: string) => CATEGORY_LABEL[c] || c
 const noteOf = (e: LedgerEntry) => (e.category === 'ai' ? aiLedgerNote(e.note) : e.note)
 
-const DIRECTION_OPTIONS = [
-  { value: 'all', label: 'All directions' },
-  { value: 'in', label: 'In (credits)' },
-  { value: 'out', label: 'Out (debits)' },
-]
+const PAGE_SIZE = 50
 
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise(resolve => {
@@ -75,50 +71,28 @@ export default function WalletClient({
   // Top-up responses are toasts; same call sites, no banner.
   const setToast = (t: { ok: boolean; text: string } | null) => t && toast.result(t)
 
-  // filters
-  const [dir, setDir] = useState('all')
-  const [cat, setCat] = useState('all')
-  const [q, setQ] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-
-  const ledger = useMemo(() => wallet?.ledger ?? [], [wallet])
-  const categoryOptions = useMemo(
-    () => [{ value: 'all', label: 'All categories' }, ...[...new Set(ledger.map(catOf))].sort().map(c => ({ value: c, label: catLabel(c) }))],
-    [ledger]
-  )
-
-  const rows = useMemo(() => {
-    return ledger.filter(e => {
-      const amt = Number(e.amount)
-      if (dir === 'in' && amt < 0) return false
-      if (dir === 'out' && amt > 0) return false
-      if (cat !== 'all' && catOf(e) !== cat) return false
-      if (from && e.occurred_at.slice(0, 10) < from) return false
-      if (to && e.occurred_at.slice(0, 10) > to) return false
-      if (q) {
-        const hay = `${e.order_ref ?? ''} ${e.awb ?? ''} ${noteOf(e) ?? ''}`.toLowerCase()
-        if (!hay.includes(q.toLowerCase())) return false
-      }
-      return true
-    })
-  }, [ledger, dir, cat, q, from, to])
-
-  const totals = useMemo(() => {
-    let credit = 0
-    let debit = 0
-    for (const e of rows) {
-      const a = Number(e.amount)
-      if (a >= 0) credit += a
-      else debit += -a
-    }
-    return { credit, debit }
-  }, [rows])
+  // The ledger's filters live in the URL and are applied on the server, 50 entries a page; the
+  // credit / debit cards total every matching entry.
+  const filters = useFilterQuery(WALLET_FIELDS)
+  const [totals, setTotals] = useState({ credit: 0, debit: 0 })
+  const list = useInfiniteList<LedgerEntry>({
+    key: filters,
+    pageSize: PAGE_SIZE,
+    getKey: e => e.id,
+    fetchPage: async (p, signal) => {
+      const params = new URLSearchParams(filters)
+      params.set('page', String(p))
+      const data = await fetchJson(`/api/admin/financial/wallet/topup/ledger?${params}`, signal)
+      if (p === 1) setTotals({ credit: Number(data.credit) || 0, debit: Number(data.debit) || 0 })
+      return { rows: data.rows || [], total: data.total ?? 0 }
+    },
+  })
 
   async function refresh() {
     try {
       const r = await fetch('/api/admin/financial/wallet/topup', { cache: 'no-store' })
       if (r.ok) setWallet(await r.json())
+      list.reload()
       window.dispatchEvent(new Event('wallet:changed'))
     } catch {
       /* keep current */
@@ -174,36 +148,12 @@ export default function WalletClient({
     }
   }
 
-  function exportCsv() {
-    const head = ['Date', 'Category', 'Direction', 'Amount (INR)', 'Order', 'AWB', 'Note']
-    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
-    const lines = rows.map(e =>
-      [
-        new Date(e.occurred_at).toISOString(),
-        catLabel(catOf(e)),
-        Number(e.amount) >= 0 ? 'in' : 'out',
-        Number(e.amount).toFixed(2),
-        e.order_ref ?? '',
-        e.awb ?? '',
-        (noteOf(e) ?? '').replace(/\s+/g, ' '),
-      ]
-        .map(x => esc(String(x)))
-        .join(',')
-    )
-    const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `wallet-ledger-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(a.href)
-  }
-
   const balance = wallet?.balance ?? 0
   const low = balance < (wallet?.minBalance ?? 0)
 
   const when = (iso: string) =>
     new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
-  const cols: DataCol<LedgerEntry & { i: number }>[] = [
+  const cols: DataCol<LedgerEntry>[] = [
     { key: 'date', label: 'Date', render: e => <span className="whitespace-nowrap text-foreground-secondary">{when(e.occurred_at)}</span> },
     { key: 'cat', label: 'Category', render: e => <span className={badgeCls('muted')}>{catLabel(catOf(e))}</span> },
     {
@@ -242,8 +192,8 @@ export default function WalletClient({
 
       <KpiGrid>
         <Kpi label="Balance" value={inr(balance)} sub={low ? `below minimum ${inr(wallet?.minBalance ?? 0)}` : `minimum ${inr(wallet?.minBalance ?? 0)}`} highlight />
-        <Kpi label="Credits (filtered)" value={inr(totals.credit)} sub="recharges + credits" />
-        <Kpi label="Debits (filtered)" value={inr(totals.debit)} sub="shipping + charges" />
+        <Kpi label={filters ? 'Credits (filtered)' : 'Credits'} value={inr(totals.credit)} sub="recharges + credits" />
+        <Kpi label={filters ? 'Debits (filtered)' : 'Debits'} value={inr(totals.debit)} sub="shipping + charges" />
       </KpiGrid>
 
       {low && <Banner ok={false}>Balance is below the minimum. Shipments may be blocked.</Banner>}
@@ -270,40 +220,11 @@ export default function WalletClient({
 
       {aiSpend.length > 0 && <AiSpendSection rows={aiSpend} days={aiSpendDays} />}
 
-      <Card title="Ledger" hint={`Showing the most recent ${ledger.length} entries.`} flush>
-        <div className="flex flex-wrap items-end gap-3 px-5 pb-4">
-          <div className="w-40">
-            <AdminSelect label="Direction" value={dir} onChange={setDir} options={DIRECTION_OPTIONS} sm />
-          </div>
-          <div className="w-52">
-            <AdminSelect label="Category" value={cat} onChange={setCat} options={categoryOptions} sm />
-          </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <FormField label="From">
-              <DatePicker className="w-36" value={from} onChange={setFrom} />
-            </FormField>
-            <FormField label="To">
-              <DatePicker className="w-36" value={to} onChange={setTo} />
-            </FormField>
-          </div>
-          <div className="min-w-[180px] flex-1">
-            <FormField label="Search order / AWB / note" htmlFor="wallet-q">
-              <input id="wallet-q" className={fieldInputCls} value={q} onChange={e => setQ(e.target.value)} placeholder="JS-123, AWB…" />
-            </FormField>
-          </div>
-          <FormButton type="button" variant="secondary" onClick={exportCsv} disabled={rows.length === 0} className="w-full md:w-auto">
-            Export CSV
-          </FormButton>
+      <Card title="Ledger" flush>
+        <div className="px-5 pb-4">
+          <ListFilters entity="wallet" fields={WALLET_FIELDS} search={WALLET_SEARCH} noun="Entries" exportable />
         </div>
-        {!wallet ? (
-          <div className="px-5 pb-5">
-            <TableSkeleton rows={6} cols={4} />
-          </div>
-        ) : rows.length === 0 ? (
-          <EmptyState bare title="No matching entries." />
-        ) : (
-          <DataTable<LedgerEntry & { i: number }> bare rows={rows.map((e, i) => ({ ...e, i }))} cols={cols} rowKey={e => String(e.i)} />
-        )}
+        <DataTable<LedgerEntry> bare rows={list.rows} infinite={list} cols={cols} rowKey={e => e.id} empty="No matching entries." />
       </Card>
     </PageBody>
   )

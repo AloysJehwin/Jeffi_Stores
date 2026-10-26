@@ -1,4 +1,6 @@
+import { buildWhere, hasFilters, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { query, queryMany, queryOne } from '@/lib/shared/db'
+import { AMAZON_LISTINGS_ENTITY } from '@/lib/filters/entities/amazon-listings'
 import { searchListingsItems } from './client'
 import { recordAmazonQuantities } from './stock'
 
@@ -116,12 +118,30 @@ export async function refreshAmazonStatusSnapshot(): Promise<AmazonSummary | { l
   }
 }
 
-export async function getAmazonSummary(): Promise<AmazonSummary> {
+/** The last refresh's counts; with list filters, live counts of the matching listings instead. */
+export async function getAmazonSummary(filters?: FilterQuery): Promise<AmazonSummary> {
   const m = await queryOne<AmazonSummary>(
     `SELECT last_refreshed_at, total, approved, pending, disapproved
        FROM amazon_refresh_meta WHERE id = 1`
   )
-  return m ?? { last_refreshed_at: null, total: 0, approved: 0, pending: 0, disapproved: 0 }
+  const meta = m ?? { last_refreshed_at: null, total: 0, approved: 0, pending: 0, disapproved: 0 }
+  if (!filters || !hasFilters(AMAZON_LISTINGS_ENTITY, filters)) return meta
+  const w = buildWhere(AMAZON_LISTINGS_ENTITY, filters)
+  const c = await queryOne<Record<string, number>>(
+    `SELECT COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE al.status = 'approved')::int AS approved,
+            COUNT(*) FILTER (WHERE al.status = 'pending')::int AS pending,
+            COUNT(*) FILTER (WHERE al.status = 'disapproved')::int AS disapproved
+       FROM amazon_listing_status al ${w.where}`,
+    w.params
+  )
+  return {
+    last_refreshed_at: meta.last_refreshed_at,
+    total: c?.total ?? 0,
+    approved: c?.approved ?? 0,
+    pending: c?.pending ?? 0,
+    disapproved: c?.disapproved ?? 0,
+  }
 }
 
 export interface AmazonPageParams {
@@ -129,6 +149,8 @@ export interface AmazonPageParams {
   pageSize: number
   search?: string
   status?: string
+  /** The listings tab's filters (normalised); `search` / `status` are the old params. */
+  filters?: FilterQuery
 }
 
 export async function getAmazonStatusPage(
@@ -136,32 +158,21 @@ export async function getAmazonStatusPage(
 ): Promise<{ rows: AmazonStatusRow[]; total: number }> {
   const page = Math.max(1, params.page || 1)
   const pageSize = Math.min(200, Math.max(1, params.pageSize || 50))
-  const where: string[] = []
-  const args: any[] = []
-  if (params.search) {
-    args.push(`%${params.search}%`)
-    where.push(`(sku ILIKE $${args.length} OR title ILIKE $${args.length})`)
-  }
-  if (params.status && params.status !== 'all') {
-    args.push(params.status)
-    where.push(`status = $${args.length}`)
-  }
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const q = params.filters ?? normalizeQuery(AMAZON_LISTINGS_ENTITY, { search: params.search, status: params.status })
+  const w = buildWhere(AMAZON_LISTINGS_ENTITY, q)
 
   const totalRow = await queryOne<{ n: number }>(
-    `SELECT COUNT(*)::int AS n FROM amazon_listing_status ${whereSql}`,
-    args
+    `SELECT COUNT(*)::int AS n FROM amazon_listing_status al ${w.where}`,
+    w.params
   )
   const total = totalRow?.n ?? 0
 
-  const limitArg = args.length + 1
-  const offsetArg = args.length + 2
   const rows = await queryMany<AmazonStatusRow>(
-    `SELECT sku, title, status, parent_sku, asin, price, issues, synced_at
-       FROM amazon_listing_status ${whereSql}
-      ORDER BY (status = 'disapproved') DESC, (status = 'pending') DESC, sku
-      LIMIT $${limitArg} OFFSET $${offsetArg}`,
-    [...args, pageSize, (page - 1) * pageSize]
+    `SELECT al.sku, al.title, al.status, al.parent_sku, al.asin, al.price, al.issues, al.synced_at
+       FROM amazon_listing_status al ${w.where}
+      ORDER BY (al.status = 'disapproved') DESC, (al.status = 'pending') DESC, al.sku
+      LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
+    [...w.params, pageSize, (page - 1) * pageSize]
   )
   return { rows, total }
 }
