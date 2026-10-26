@@ -1,44 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
+import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
+import { TASKS_ENTITY } from '@/lib/filters/entities/tasks'
 
 export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 25
-
-const KIND_SEGMENTS: Record<string, string[]> = {
-  orders: [
-    'process_confirmed',
-    'stuck_processing',
-    'stuck_shipment',
-    'ndr_check',
-    'address_rto',
-    'chase_refund',
-    'review_return',
-    'schedule_pickup',
-    'inspect_refund',
-    'process_refund',
-    'confirm_cod_payment',
-    'review_high_value_order',
-    'review_flagged',
-    'contact_failed_payment',
-    'abandoned_checkout',
-  ],
-  support: ['support_pickup', 'support_urgent'],
-  customers: [
-    'b2b_welcome',
-    'collect_gst',
-    'vip_check_in',
-    'winback',
-    'lead_followup',
-    'save_customer',
-    'respond_review',
-    'followup_quote',
-    'chase_quote_payment',
-  ],
-  security: ['login_anomaly'],
-}
 
 export async function GET(req: NextRequest) {
   const admin = await authenticateAdmin(req)
@@ -46,62 +15,18 @@ export async function GET(req: NextRequest) {
   if (!hasScope(admin.role, admin.scopes, 'customers:read'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const sp = req.nextUrl.searchParams
-  const scope = sp.get('scope') || 'mine'
-  const status = sp.get('status') || 'open'
-  const priority = sp.get('priority') || 'all'
-  const segment = sp.get('segment') || 'all'
-  const search = sp.get('search') || ''
+  // The list's filters. Without ?scope / ?status the API keeps its old default, my open tasks;
+  // "all" (not a filter value) turns either off.
+  const sp = new URLSearchParams(req.nextUrl.searchParams)
+  if (!sp.has('scope')) sp.set('scope', 'mine')
+  if (!sp.has('status')) sp.set('status', 'open')
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10))
-
-  const wheres: string[] = []
-  const vals: any[] = []
-
-  if (scope === 'mine') {
-    wheres.push(`ct.assigned_to = $${vals.length + 1}`)
-    vals.push(admin.adminId)
-  } else if (scope === 'unassigned') {
-    wheres.push(`ct.assigned_to IS NULL`)
-  }
-
-  if (status === 'open') {
-    wheres.push(`ct.status IN ('pending', 'in_progress')`)
-  } else if (status === 'completed') {
-    wheres.push(`ct.status = 'completed' AND ct.completed_at > NOW() - INTERVAL '30 days'`)
-  } else if (status === 'overdue') {
-    wheres.push(`ct.status IN ('pending', 'in_progress')`)
-    wheres.push(`ct.due_date < CURRENT_DATE`)
-  }
-
-  if (priority !== 'all') {
-    wheres.push(`ct.priority = $${vals.length + 1}`)
-    vals.push(priority)
-  }
-
-  if (segment !== 'all' && KIND_SEGMENTS[segment]) {
-    const kinds = KIND_SEGMENTS[segment]
-    wheres.push(`ct.source_kind = ANY($${vals.length + 1}::text[])`)
-    vals.push(kinds)
-  } else if (segment === 'manual') {
-    wheres.push(`ct.auto_created = false`)
-  }
-
-  if (search.trim()) {
-    wheres.push(
-      `(ct.title ILIKE $${vals.length + 1} OR cu.first_name ILIKE $${vals.length + 1} OR cu.last_name ILIKE $${vals.length + 1} OR cu.email ILIKE $${vals.length + 1})`
-    )
-    vals.push(`%${search.trim()}%`)
-  }
-
-  const whereClause = wheres.length ? `WHERE ${wheres.join(' AND ')}` : ''
+  const { where: whereClause, params: vals } = buildWhere(TASKS_ENTITY, normalizeQuery(TASKS_ENTITY, sp), 1, {
+    ctx: { adminId: admin.adminId },
+  })
 
   const countRow = await queryOne<{ total: string }>(
-    `
-    SELECT COUNT(*) AS total
-    FROM customer_tasks ct
-    LEFT JOIN users cu ON ct.user_id = cu.id
-    ${whereClause}
-  `,
+    `SELECT COUNT(*) AS total FROM customer_tasks ct ${whereClause}`,
     vals
   )
 

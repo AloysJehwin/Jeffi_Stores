@@ -8,6 +8,8 @@ import { Kpi, KpiGrid, Section, Badge, Banner, Empty, api, count, pct, change } 
 import { TrendChart, type ChartPoint, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { ap } from '@/lib/shared/admin-path'
 import { PeriodBar } from '@/components/admin/kit/period'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
+import { REVIEW_ALIASES, REVIEW_FIELDS, REVIEW_SEARCH } from '@/lib/filters/fields/reviews'
 import { istToday, parsePeriod, runningAverage, type Period } from '@/lib/reviews/overview-period'
 
 interface Stats {
@@ -90,7 +92,10 @@ const rating = (v: number | null | undefined) => (v == null ? '-' : v.toFixed(2)
 const ratingDelta = (cur: number | null, prev: number | null) => (cur != null && prev ? (cur - prev) / prev : null)
 const ageDays = (iso: string | null) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000) : 0)
 const listHref = (filter: string, q?: string) =>
-  ap(`/admin/reviews?view=reviews&filter=${filter}${q ? `&q=${encodeURIComponent(q)}` : ''}`)
+  ap(`/admin/reviews?tab=list&filter=${filter}${q ? `&q=${encodeURIComponent(q)}` : ''}`)
+
+// The overview follows the list's filters except its Pending / Approved switch (its KPIs split by it).
+const OVERVIEW_FIELDS = REVIEW_FIELDS.filter(f => f.key !== 'approval')
 
 const TREND_SERIES: SeriesDef[] = [
   { key: 'reviews', label: 'Reviews', color: 'rgb(224 123 63)', kind: 'bar', axis: 'count', on: true },
@@ -238,6 +243,7 @@ export default function ReviewsOverview() {
   const [data, setData] = useState<ReviewsOverviewData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const filters = useFilterQuery(OVERVIEW_FIELDS, { aliases: REVIEW_ALIASES, search: REVIEW_SEARCH.param, omit: ['from', 'to'] })
 
   const setPeriod = useCallback(
     (p: Period) => {
@@ -253,7 +259,9 @@ export default function ReviewsOverview() {
     let live = true
     setLoading(true)
     setError(null)
-    api<ReviewsOverviewData>(`/api/admin/reviews/overview?from=${period.from}&to=${period.to}`).then(r => {
+    api<ReviewsOverviewData>(
+      `/api/admin/reviews/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
+    ).then(r => {
       if (!live) return
       if (r.ok) setData(r.data)
       else setError(r.data.error || 'Could not load the overview')
@@ -262,7 +270,7 @@ export default function ReviewsOverview() {
     return () => {
       live = false
     }
-  }, [period.from, period.to])
+  }, [period.from, period.to, filters])
 
   const trendPoints = useMemo<ChartPoint[]>(
     () => (data?.trend ?? []).map(t => ({ label: t.day, reviews: t.reviews, negative: t.negative })),
@@ -274,7 +282,20 @@ export default function ReviewsOverview() {
     return t.map((d, i) => ({ label: d.day, avg: run[i] ?? 0, daily: d.avgRating ?? 0 }))
   }, [data])
 
-  const header = <PeriodBar value={period} onChange={setPeriod} />
+  const header = (
+    <>
+      <PeriodBar value={period} onChange={setPeriod} />
+      <ListFilters
+        entity="reviews"
+        fields={OVERVIEW_FIELDS}
+        aliases={REVIEW_ALIASES}
+        search={REVIEW_SEARCH}
+        noun="Reviews"
+        tab="overview"
+        period
+      />
+    </>
+  )
 
   if (error)
     return (

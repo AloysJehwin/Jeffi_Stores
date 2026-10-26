@@ -9,6 +9,12 @@ import { CUSTOMERS_ENTITY } from './entities/customers'
 import { PRODUCTS_ENTITY } from './entities/products'
 import { COUPONS_ENTITY } from './entities/coupons'
 import { SUBSCRIPTIONS_ENTITY } from './entities/subscriptions'
+import { BRANDS_ENTITY } from './entities/brands'
+import { CATEGORIES_ENTITY } from './entities/categories'
+import { REVIEWS_ENTITY } from './entities/reviews'
+import { REVIEW_FORMS_ENTITY } from './entities/review-forms'
+import { SUPPLIERS_ENTITY } from './entities/suppliers'
+import { TASKS_ENTITY } from './entities/tasks'
 
 // Every filterable admin list, by key. Field definitions (client-safe) live in ./fields.
 export const FILTER_ENTITIES: Record<string, FilterEntity> = {
@@ -27,6 +33,12 @@ export const FILTER_ENTITIES: Record<string, FilterEntity> = {
   invoices: INVOICES_ENTITY as unknown as FilterEntity,
   quotations: QUOTATIONS_ENTITY as unknown as FilterEntity,
   'purchase-orders': PURCHASE_ORDERS_ENTITY as unknown as FilterEntity,
+  brands: BRANDS_ENTITY as unknown as FilterEntity,
+  categories: CATEGORIES_ENTITY as unknown as FilterEntity,
+  reviews: REVIEWS_ENTITY as unknown as FilterEntity,
+  review_forms: REVIEW_FORMS_ENTITY as unknown as FilterEntity,
+  suppliers: SUPPLIERS_ENTITY as unknown as FilterEntity,
+  tasks: TASKS_ENTITY as unknown as FilterEntity,
 }
 
 export function getEntity(key: string): FilterEntity | null {

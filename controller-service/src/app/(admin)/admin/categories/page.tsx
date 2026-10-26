@@ -1,5 +1,7 @@
 import { Suspense } from 'react'
+import { hasFilters, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
+import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { headers } from 'next/headers'
@@ -7,24 +9,27 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { hasScope } from '@/lib/auth/scopes'
 import { getFilteredCategories } from '@/lib/queries'
+import { getCategoriesSummary, queryCategoryTree } from '@/lib/queries/category-list'
+import { CATEGORIES_ENTITY } from '@/lib/filters/entities/categories'
+import { CATEGORY_ALIASES, CATEGORY_FIELDS, CATEGORY_SEARCH } from '@/lib/filters/fields/categories'
 import { queryMany } from '@/lib/shared/db'
 import CategoriesClient from './CategoriesClient'
 import BrochureButton from '@/components/admin/BrochureButton'
 import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
 import GroupOverview from './_components/GroupOverview'
-import { TabLinks, TabMemory } from '../products/_components/catalog-overview'
-import { resolveListTab } from '@/lib/overviews/catalog'
+import { TabMemory } from '../products/_components/catalog-overview'
 
 type SP = { [key: string]: string | undefined }
 
-async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
-  const [host, categories, misassignedRows, pendingDrafts, createDrafts] = await Promise.all([
+/** KPIs over every category the filters match. */
+async function CategoriesStats({ q }: { q: FilterQuery }) {
+  const [host, summary, categories, misassignedRows, pendingDrafts, createDrafts] = await Promise.all([
     getHost(),
-    getFilteredCategories({
-      is_active: resolvedSearchParams.is_active,
-    }),
+    getCategoriesSummary(q),
+    // Every live category: the misassigned banner moves products into any of them.
+    getFilteredCategories({}),
     queryMany<{ id: string; name: string; category_id: string; category_name: string }>(
       `SELECT p.id, p.name, p.category_id, c.name AS category_name
        FROM products p
@@ -51,8 +56,8 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
   const canWrite = hasScope(role, scopes, 'categories:write')
 
   const allCategories = categories || []
-  const mainCategoriesCount = allCategories.filter(c => !c.parent_category_id).length
-  const totalCategories = allCategories.length
+  const mainCategoriesCount = summary.main
+  const totalCategories = summary.total
   const subCategoriesCount = totalCategories - mainCategoriesCount
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
 
@@ -138,10 +143,9 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
 }
 
 async function CategoriesListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
+  const q = normalizeQuery(CATEGORIES_ENTITY, resolvedSearchParams)
   const [categories, productCountRows] = await Promise.all([
-    getFilteredCategories({
-      is_active: resolvedSearchParams.is_active,
-    }),
+    queryCategoryTree(q),
     queryMany<{ category_id: string; count: string }>(
       'SELECT category_id, COUNT(*) as count FROM products WHERE is_active = true GROUP BY category_id'
     ),
@@ -152,86 +156,71 @@ async function CategoriesListContent({ resolvedSearchParams }: { resolvedSearchP
     productCounts[r.category_id] = parseInt(r.count, 10)
   })
 
-  const allCategories = categories || []
-
-  const currentListUrl = (() => {
-    const params = new URLSearchParams()
-    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (resolvedSearchParams.type) params.set('type', resolvedSearchParams.type)
-    const qs = params.toString()
-    return `/admin/categories${qs ? `?${qs}` : ''}`
-  })()
-
   return (
     <CategoriesClient
-      initialCategories={allCategories}
+      initialCategories={categories || []}
       productCounts={productCounts}
-      initialSearch={resolvedSearchParams.search || ''}
-      initialType={resolvedSearchParams.type || ''}
-      backUrl={currentListUrl}
+      initialSearch={q.search || ''}
+      initialType={q.level || ''}
+      filtered={hasFilters(CATEGORIES_ENTITY, q)}
+      backUrl={tabHref('/admin/categories', 'list', resolvedSearchParams, CATEGORY_FIELDS, { aliases: CATEGORY_ALIASES })}
     />
   )
 }
 
 export default async function CategoriesPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams
-  const tab = resolveListTab(sp)
+  const host = await getHost()
+  const tab = isListUrl(sp, CATEGORY_FIELDS, { aliases: CATEGORY_ALIASES }) ? 'list' : 'overview'
+  const href = (t: string) => ap(tabHref('/admin/categories', t, sp, CATEGORY_FIELDS, { aliases: CATEGORY_ALIASES }), host)
+  const q = normalizeQuery(CATEGORIES_ENTITY, sp)
   return (
     <PageBody>
       <PageHeader title="Categories" description="Manage product categories and subcategories" />
 
-      <TabLinks
-        base="/admin/categories"
-        active={tab}
-        tabs={[
-          { id: 'overview', label: 'Overview' },
-          { id: 'list', label: 'Categories' },
-        ]}
-        actions={
-          <>
-            <BrochureButton mode="category" />
-            <Suspense fallback={null}>
-              <AddCategoryButton />
-            </Suspense>
-          </>
-        }
-      />
+      <div className="mb-6">
+        <TabLinks
+          tabs={[
+            { id: 'overview', label: 'Overview', href: href('overview') },
+            { id: 'list', label: 'Categories', href: href('list') },
+          ]}
+          value={tab}
+          scroll={false}
+          actions={
+            <>
+              <BrochureButton mode="category" />
+              <Suspense fallback={null}>
+                <AddCategoryButton />
+              </Suspense>
+            </>
+          }
+        />
+      </div>
       <Suspense fallback={null}>
         <TabMemory storageKey="category" tab={tab} explicit={typeof sp.tab === 'string'} />
       </Suspense>
 
       {tab === 'overview' ? (
-        <GroupOverview dim="category" />
+        <Suspense fallback={null}>
+          <GroupOverview dim="category" />
+        </Suspense>
       ) : (
         <>
-          <Suspense fallback={<KpiRowSkeleton />}>
-            <CategoriesStatsSection searchParams={searchParams} />
+          <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
+            <CategoriesStats q={q} />
           </Suspense>
 
-          <DataToolbar
-            search={{ placeholder: 'Search by name...', param: 'search', suggestType: 'categories' }}
-            filters={[
-              {
-                name: 'is_active',
-                label: 'Status',
-                options: [
-                  { value: 'true', label: 'Active' },
-                  { value: 'false', label: 'Inactive' },
-                ],
-              },
-              {
-                name: 'type',
-                label: 'Type',
-                options: [
-                  { value: 'main', label: 'Main Categories' },
-                  { value: 'sub', label: 'Subcategories' },
-                ],
-              },
-            ]}
+          <ListFilters
+            entity="categories"
+            fields={CATEGORY_FIELDS}
+            aliases={CATEGORY_ALIASES}
+            search={CATEGORY_SEARCH}
+            noun="Categories"
+            tab="list"
+            exportable
           />
 
-          <CategoriesListSection searchParams={searchParams} />
+          <CategoriesListSection resolvedSearchParams={sp} />
         </>
       )}
     </PageBody>
@@ -257,18 +246,9 @@ async function AddCategoryButton() {
   return <TabAction href={ap('/admin/categories/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Category" />
 }
 
-// Resolves searchParams (no DB — near-instant) then runs the stats/aggregate
-// query so the stat cards + misassigned banner stream in above the filters.
-async function CategoriesStatsSection({ searchParams }: { searchParams: Promise<SP> }) {
-  const resolvedSearchParams = await searchParams
-  return <CategoriesStats resolvedSearchParams={resolvedSearchParams} />
-}
-
-// Resolves searchParams (no DB — near-instant) then keys the table Suspense
-// on the query string so filter/pagination changes re-trigger the shimmer
-// while the stats + filters above stay mounted.
-async function CategoriesListSection({ searchParams }: { searchParams: Promise<SP> }) {
-  const resolvedSearchParams = await searchParams
+// Keys the table Suspense on the query string so filter changes re-trigger the shimmer while the
+// stats + filters above stay mounted.
+function CategoriesListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={4} />}>

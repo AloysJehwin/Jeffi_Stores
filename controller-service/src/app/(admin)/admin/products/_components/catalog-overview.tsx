@@ -60,14 +60,18 @@ export function OverviewTab<T extends { attention?: AttentionItem[] }>({
   endpoint,
   kpis,
   extra,
+  query,
+  filters,
 }: {
   endpoint: string
   kpis: (data: T) => React.ReactNode
   extra?: (data: T) => React.ReactNode
+  query?: string
+  filters?: React.ReactNode
 }) {
   return (
     <Suspense fallback={<OverviewSkeleton />}>
-      <OverviewFrame<T> endpoint={endpoint}>
+      <OverviewFrame<T> endpoint={endpoint} query={query} filters={filters}>
         {data => (
           <div className="space-y-4">
             <KpiGrid>{kpis(data)}</KpiGrid>

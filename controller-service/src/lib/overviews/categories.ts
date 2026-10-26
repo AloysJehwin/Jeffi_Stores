@@ -9,7 +9,8 @@ export type GroupDim = 'category' | 'brand'
 
 const COL: Record<GroupDim, string> = { category: 'category_id', brand: 'brand_id' }
 
-export function groupSql(dim: GroupDim) {
+/** `scope`: extra conditions on the group row `g` (the list's filters). */
+export function groupSql(dim: GroupDim, scope = '') {
   const col = COL[dim]
   const table = dim === 'category' ? 'categories' : 'brands'
   const extra =
@@ -49,7 +50,7 @@ export function groupSql(dim: GroupDim) {
   LEFT JOIN stock st ON st.gid = g.id
   LEFT JOIN sales sa ON sa.gid = g.id
   LEFT JOIN last_sale ls ON ls.gid = g.id
-  WHERE NOT g.is_draft
+  WHERE NOT g.is_draft${scope}
   ORDER BY COALESCE(sa.sales, 0) DESC, COALESCE(st.value, 0) DESC, g.name`
 }
 
@@ -155,7 +156,7 @@ export function groupAttention(
       severity: 'warning',
       title: `${c.inactiveWithProducts.length} inactive ${word(c.inactiveWithProducts.length)} still holding active products`,
       sub: names(c.inactiveWithProducts),
-      href: `${base}?is_active=false`,
+      href: `${base}?tab=list&active=false&products_min=1`,
     })
   if (unassigned)
     out.push({
@@ -170,7 +171,7 @@ export function groupAttention(
       severity: 'info',
       title: `${c.empty.length} active ${word(c.empty.length)} with no products`,
       sub: names(c.empty),
-      href: `${base}?is_active=true`,
+      href: `${base}?tab=list&active=true&products_max=0`,
     })
   if (c.unused.length)
     out.push({

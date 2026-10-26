@@ -83,7 +83,7 @@ export default function EditSupplierClient({ id }: { id: string }) {
   const toast = useActionToast()
   const setError = (text: string) => text && toast.error(text)
   const [loadError, setLoadError] = useState('')
-  const listHref = ap('/admin/suppliers?tab=suppliers')
+  const listHref = ap('/admin/suppliers?tab=suppliers&active=true')
   const viewHref = ap(`/admin/suppliers/${id}/view`)
   const [ifscLookup, setIfscLookup] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const edit = useEditSession({ resourceType: 'supplier', resourceId: id ?? null })

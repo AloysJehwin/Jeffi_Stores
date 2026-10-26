@@ -1,15 +1,18 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { canonicalQuery, normalizeParams } from '@jeffi/list-filters/client'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Tabs } from '@/components/admin/channels/ui'
-import { Dialog, EmptyState, InfiniteFooter, PageBody, PageHeader, badgeCls, fetchJson, fieldInputCls, useInfiniteList } from '@/components/admin/kit'
-import { Check, MessageSquare, Search, ExternalLink, Trash2, AlertTriangle } from 'lucide-react'
+import { Dialog, EmptyState, InfiniteFooter, ListFilters, PageBody, PageHeader, badgeCls, fetchJson, useInfiniteList } from '@/components/admin/kit'
+import { Check, MessageSquare, ExternalLink, Trash2, AlertTriangle } from 'lucide-react'
+import { tabHref } from '@/lib/admin/filter-url'
+import { REVIEW_ALIASES, REVIEW_FIELDS, REVIEW_LIST_PRESET, REVIEW_SEARCH } from '@/lib/filters/fields/reviews'
 import ReviewsOverview from './_components/ReviewsOverview'
 
 interface Review {
@@ -56,29 +59,39 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-type View = 'overview' | 'reviews'
+type View = 'overview' | 'list'
+
+const LIST_OPTS = { aliases: REVIEW_ALIASES, search: REVIEW_SEARCH.param }
+
+/** ?tab, else the old ?view, else any list param (old ?filter / ?q links) opens the list. */
+function viewOf(sp: URLSearchParams): View {
+  const t = sp.get('tab') ?? (sp.get('view') === 'reviews' ? 'list' : sp.get('view'))
+  if (t === 'list' || t === 'overview') return t
+  return canonicalQuery(sp, REVIEW_FIELDS, { ...LIST_OPTS, omit: ['from', 'to'] }) ? 'list' : 'overview'
+}
 
 export default function ReviewsClient({ canWrite = false }: { canWrite?: boolean }) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  // Old links (?filter / ?q without ?view) still open the list.
-  const initial: View =
-    searchParams.get('view') === 'reviews' ||
-    (!searchParams.get('view') && (searchParams.has('filter') || searchParams.has('q')))
-      ? 'reviews'
-      : 'overview'
-  const [view, setView] = useState<View>(initial)
+  const view = viewOf(new URLSearchParams(searchParams.toString()))
 
+  // Old links: ?view= becomes ?tab=, and ?filter=all (every review) is no filter at all.
   useEffect(() => {
-    const v = searchParams.get('view')
-    if (v === 'reviews' || v === 'overview') setView(v)
-  }, [searchParams])
+    const p = new URLSearchParams(searchParams.toString())
+    if (!p.has('view') && p.get('filter') !== 'all') return
+    p.delete('view')
+    if (p.get('filter') === 'all') p.delete('filter')
+    p.set('tab', view)
+    router.replace(ap(`/admin/reviews?${p}`), { scroll: false })
+  }, [searchParams, view, router])
 
   function switchView(v: View) {
-    setView(v)
-    const p = new URLSearchParams(window.location.search)
-    p.set('view', v)
-    router.replace(ap(`/admin/reviews?${p.toString()}`), { scroll: false })
+    const p = new URLSearchParams(searchParams.toString())
+    p.delete('view')
+    let href = tabHref('/admin/reviews', v, p, REVIEW_FIELDS, LIST_OPTS)
+    // The list opens on pending reviews unless filters came along.
+    if (v === 'list' && !canonicalQuery(p, REVIEW_FIELDS, { ...LIST_OPTS, omit: ['from', 'to'] })) href += `&${REVIEW_LIST_PRESET}`
+    router.replace(ap(href), { scroll: false })
   }
 
   return (
@@ -90,7 +103,7 @@ export default function ReviewsClient({ canWrite = false }: { canWrite?: boolean
       <Tabs
         tabs={[
           { id: 'overview', label: 'Overview' },
-          { id: 'reviews', label: 'Reviews' },
+          { id: 'list', label: 'Reviews' },
         ]}
         value={view}
         onChange={switchView}
@@ -102,29 +115,25 @@ export default function ReviewsClient({ canWrite = false }: { canWrite?: boolean
 
 function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean }) {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const hasWriteScope = useCanWrite('reviews:write')
   const canWrite = canWriteProp && hasWriteScope
 
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>(
-    (searchParams.get('filter') as 'all' | 'pending' | 'approved') || 'pending'
-  )
-  const [search, setSearch] = useState(searchParams.get('q') || '')
-  const [query, setQuery] = useState(search.trim())
+  // The list's filters from the URL; no approval choice means every review (the API defaults to pending).
+  const query = canonicalQuery(normalizeParams(searchParams, REVIEW_ALIASES).params, REVIEW_FIELDS, LIST_OPTS)
+  const approval = new URLSearchParams(query).get('filter') || 'all'
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const { showToast } = useToast()
   const confirm = useConfirm()
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const PAGE_SIZE = 25
   const list = useInfiniteList<Review>({
-    key: `${filter}|${query}`,
+    key: query,
     pageSize: PAGE_SIZE,
     getKey: r => r.id,
     fetchPage: async (p, signal) => {
-      const params = new URLSearchParams({ filter })
-      if (query) params.set('q', query)
+      const params = new URLSearchParams(query)
+      if (!params.has('filter')) params.set('filter', 'all')
       params.set('page', String(p))
       params.set('pageSize', String(PAGE_SIZE))
       const data = await fetchJson(`/api/admin/reviews?${params}`, signal)
@@ -143,22 +152,6 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
     return () => window.removeEventListener('keydown', onKey)
   }, [lightboxUrl])
 
-  function syncUrl(patch: Record<string, string>) {
-    const p = new URLSearchParams(window.location.search)
-    for (const [k, v] of Object.entries(patch)) {
-      if (v) p.set(k, v)
-      else p.delete(k)
-    }
-    router.replace(ap(`/admin/reviews?${p.toString()}`), { scroll: false })
-  }
-
-  function handleSearchChange(val: string) {
-    setSearch(val)
-    syncUrl({ q: val })
-    if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => setQuery(val.trim()), 300)
-  }
-
   const handleApprove = async (reviewId: string) => {
     try {
       const response = await fetch('/api/admin/reviews', {
@@ -167,7 +160,7 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
         body: JSON.stringify({ reviewId, action: 'approve' }),
       })
       if (response.ok) {
-        list.setRows(rows => (filter === 'pending' ? rows.filter(r => r.id !== reviewId) : rows.map(r => (r.id === reviewId ? { ...r, is_approved: true } : r))))
+        list.setRows(rows => (approval === 'pending' ? rows.filter(r => r.id !== reviewId) : rows.map(r => (r.id === reviewId ? { ...r, is_approved: true } : r))))
         showToast('Review approved', 'success')
       } else {
         showToast('Failed to approve review', 'error')
@@ -203,17 +196,11 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
     }
   }
 
-  const TABS = [
-    { key: 'pending', label: 'Pending' },
-    { key: 'approved', label: 'Approved' },
-    { key: 'all', label: 'All' },
-  ] as const
-
   const pendingCount = reviews.filter(r => !r.is_approved).length
 
   return (
     <div>
-      {filter === 'pending' && !isLoading && pendingCount > 0 && (
+      {approval === 'pending' && !isLoading && pendingCount > 0 && (
         <div className="mb-3 flex justify-end">
           <span className={`${badgeCls('amber')} inline-flex items-center gap-1.5 text-xs`}>
             <AlertTriangle className="h-3.5 w-3.5" />
@@ -222,33 +209,16 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex h-control rounded-lg border border-border-default bg-surface-elevated p-0.5">
-          {TABS.map(tab => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => {
-                setFilter(tab.key)
-                syncUrl({ filter: tab.key })
-              }}
-              className={`h-full rounded-md px-3 text-xs font-medium transition-colors ${filter === tab.key ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div className="relative min-w-[200px] max-w-sm flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => handleSearchChange(e.target.value)}
-            placeholder="Search by product or reviewer…"
-            aria-label="Search"
-            className={`${fieldInputCls} pl-9`}
-          />
-        </div>
+      <div className="mb-4">
+        <ListFilters
+          entity="reviews"
+          fields={REVIEW_FIELDS}
+          aliases={REVIEW_ALIASES}
+          search={REVIEW_SEARCH}
+          noun="Reviews"
+          tab="list"
+          exportable
+        />
       </div>
 
       {/* Content */}
@@ -273,7 +243,7 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
           icon={<MessageSquare className="h-5 w-5" />}
           title="No reviews found"
           body={
-            filter === 'pending' ? 'All caught up — no reviews awaiting approval.' : 'No reviews match your filters.'
+            approval === 'pending' ? 'All caught up — no reviews awaiting approval.' : 'No reviews match your filters.'
           }
         />
       ) : (

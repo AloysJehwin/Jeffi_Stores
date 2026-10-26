@@ -1,14 +1,17 @@
 'use client'
 
-import React, { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { canonicalQuery } from '@jeffi/list-filters/client'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import { EmptyState, ListSkeleton } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { ListFilters } from '@/components/admin/kit/list-filters'
+import { TASK_FIELDS, TASK_SEARCH } from '@/lib/filters/fields/tasks'
 
 interface AdminOption {
   id: string
@@ -45,15 +48,6 @@ const PRIORITY_BADGE: Record<string, string> = {
   medium: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
   low: 'bg-surface-secondary text-foreground-muted',
 }
-
-const SEGMENTS = [
-  { key: 'all', label: 'All' },
-  { key: 'orders', label: 'Orders' },
-  { key: 'support', label: 'Support' },
-  { key: 'customers', label: 'Customers' },
-  { key: 'security', label: 'Security' },
-  { key: 'manual', label: 'Manual' },
-]
 
 const SEGMENT_COLORS: Record<string, string> = {
   orders: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
@@ -93,14 +87,6 @@ const KIND_SEGMENT: Record<string, string> = {
   login_anomaly: 'security',
 }
 
-const PRIORITY_OPTIONS = [
-  { value: 'all', label: 'All priorities' },
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' },
-]
-
 function segmentOf(t: TaskRow): string {
   if (!t.auto_created || !t.source_kind) return 'manual'
   return KIND_SEGMENT[t.source_kind] || 'manual'
@@ -108,36 +94,6 @@ function segmentOf(t: TaskRow): string {
 
 function adminLabel(a: AdminOption) {
   return `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.username
-}
-
-interface Suggestion {
-  type: 'task' | 'customer'
-  label: string
-  sub?: string
-}
-
-function buildSuggestions(query: string, tasks: TaskRow[]): Suggestion[] {
-  if (!query.trim()) return []
-  const q = query.toLowerCase()
-  const seen = new Set<string>()
-  const out: Suggestion[] = []
-  for (const t of tasks) {
-    if (t.title.toLowerCase().includes(q) && !seen.has('t:' + t.title)) {
-      seen.add('t:' + t.title)
-      out.push({ type: 'task', label: t.title })
-    }
-    const cname = `${t.customer_first_name || ''} ${t.customer_last_name || ''}`.trim()
-    if (cname && cname.toLowerCase().includes(q) && !seen.has('c:' + cname)) {
-      seen.add('c:' + cname)
-      out.push({ type: 'customer', label: cname, sub: t.customer_email || undefined })
-    }
-    if (t.customer_email?.toLowerCase().includes(q) && !seen.has('e:' + t.customer_email)) {
-      seen.add('e:' + t.customer_email)
-      out.push({ type: 'customer', label: t.customer_email, sub: cname || undefined })
-    }
-    if (out.length >= 6) break
-  }
-  return out
 }
 
 function AssignSelect({
@@ -192,36 +148,20 @@ function AssignSelect({
   )
 }
 
-const SCOPES = ['mine', 'all', 'unassigned'] as const
-const STATUSES = ['open', 'overdue', 'completed'] as const
-
 export default function AdminTasksClient() {
   const router = useRouter()
   const canWrite = useCanWrite('tasks:write')
-  // ?scope= and ?status= (from the overview strip's links) preselect the list filters.
+  // The list's filters from the URL. No Tasks / Status choice means all of them (the API defaults
+  // to my open tasks, so say "all" explicitly).
   const sp = useSearchParams()
-  const qScope = SCOPES.find(s => s === sp.get('scope'))
-  const qStatus = STATUSES.find(s => s === sp.get('status'))
-  const [scope, setScope] = useState<'mine' | 'all' | 'unassigned'>(qScope ?? 'mine')
-  const [status, setStatus] = useState<'open' | 'overdue' | 'completed'>(qStatus ?? 'open')
-  useEffect(() => {
-    if (qScope) setScope(qScope)
-    if (qStatus) setStatus(qStatus)
-  }, [qScope, qStatus])
-  const [priority, setPriority] = useState<string>('all')
-  const [segment, setSegment] = useState<string>('all')
-  const [search, setSearch] = useState('')
-  const [query, setQuery] = useState('')
+  const query = canonicalQuery(sp, TASK_FIELDS, { search: TASK_SEARCH.param })
+  const q = new URLSearchParams(query)
+  const search = q.get('search') || ''
+  const status = q.get('status') || ''
   const [busy, setBusy] = useState(false)
   const toast = useActionToast()
 
   const [admins, setAdmins] = useState<AdminOption[]>([])
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const [suggestStyle, setSuggestStyle] = useState<React.CSSProperties>({})
-  const searchRef = useRef<HTMLInputElement>(null)
-  const suggestRef = useRef<HTMLDivElement>(null)
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/admins', { credentials: 'include' })
@@ -234,11 +174,14 @@ export default function AdminTasksClient() {
 
   // API pages at 25 (?page); next page appends on scroll, filters start over.
   const list = useInfiniteList<TaskRow>({
-    key: [scope, status, priority, segment, query].join('|'),
+    key: query,
     pageSize: 25,
     getKey: t => t.id,
     fetchPage: async (pg, signal) => {
-      const params = new URLSearchParams({ scope, status, priority, segment, page: String(pg), ...(query ? { search: query } : {}) })
+      const params = new URLSearchParams(query)
+      if (!params.has('scope')) params.set('scope', 'all')
+      if (!params.has('status')) params.set('status', 'all')
+      params.set('page', String(pg))
       const data = await fetchJson(`/api/admin/tasks?${params}`, signal)
       return { rows: data.tasks || [], total: data.total || 0, hasMore: pg < (data.totalPages || 1) }
     },
@@ -246,40 +189,6 @@ export default function AdminTasksClient() {
   const tasks = list.rows
   const loading = list.loading
   const total = list.total ?? 0
-
-  useEffect(() => {
-    if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => setQuery(search.trim()), 350)
-    return () => {
-      if (searchTimer.current) clearTimeout(searchTimer.current)
-    }
-  }, [search])
-
-  useEffect(() => {
-    setSuggestions(buildSuggestions(search, tasks))
-  }, [search, tasks])
-
-  useEffect(() => {
-    if (!showSuggestions || !searchRef.current) return
-    const r = searchRef.current.getBoundingClientRect()
-    const panelW = 288
-    const left = r.right - panelW < 8 ? Math.max(8, r.left) : r.right - panelW
-    setSuggestStyle({ position: 'fixed', top: r.bottom + 4, left, width: panelW, zIndex: 9999 })
-  }, [showSuggestions, suggestions])
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (
-        suggestRef.current &&
-        !suggestRef.current.contains(e.target as Node) &&
-        searchRef.current &&
-        !searchRef.current.contains(e.target as Node)
-      )
-        setShowSuggestions(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
 
   async function complete(t: TaskRow) {
     setBusy(true)
@@ -292,8 +201,11 @@ export default function AdminTasksClient() {
       })
       if (res.ok) {
         toast.success(t.status === 'completed' ? 'Task reopened' : 'Task completed')
-        // Toggling always moves the task out of the current status filter.
-        list.setRows(rows => rows.filter(r => r.id !== t.id))
+        // Toggling moves the task out of an Open / Overdue / Completed filter.
+        const next: TaskRow['status'] = t.status === 'completed' ? 'pending' : 'completed'
+        list.setRows(rows =>
+          status ? rows.filter(r => r.id !== t.id) : rows.map(r => (r.id === t.id ? { ...r, status: next } : r))
+        )
       } else toast.error('Could not update the task')
       router.refresh()
     } finally {
@@ -343,149 +255,7 @@ export default function AdminTasksClient() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex h-control items-center gap-0.5 bg-surface-elevated border border-border-default rounded-lg p-0.5">
-          {(['mine', 'unassigned', 'all'] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setScope(s)}
-              className={`h-full px-3 rounded-md text-xs font-semibold transition-all ${
-                scope === s
-                  ? 'bg-accent-500 text-white shadow-sm'
-                  : 'text-foreground-secondary hover:text-foreground hover:bg-surface-secondary'
-              }`}
-            >
-              {s === 'mine' ? 'My Tasks' : s === 'unassigned' ? 'Unassigned' : 'All'}
-            </button>
-          ))}
-        </div>
-        <div className="flex h-control items-center gap-0.5 bg-surface-elevated border border-border-default rounded-lg p-0.5">
-          {[
-            { key: 'open', label: 'Open', active: 'bg-accent-500 text-white' },
-            { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white' },
-            { key: 'completed', label: 'Completed (30d)', active: 'bg-green-600 text-white' },
-          ].map(s => (
-            <button
-              key={s.key}
-              onClick={() => setStatus(s.key as any)}
-              className={`h-full px-3 rounded-md text-xs font-semibold transition-all ${
-                status === s.key
-                  ? s.active + ' shadow-sm'
-                  : 'text-foreground-secondary hover:text-foreground hover:bg-surface-secondary'
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto -mx-4 px-4 whitespace-nowrap sm:flex-wrap sm:overflow-visible sm:mx-0 sm:px-0 [&>button]:shrink-0">
-          {SEGMENTS.map(seg => (
-            <button
-              key={seg.key}
-              onClick={() => setSegment(seg.key)}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all border ${
-                segment === seg.key
-                  ? 'border-accent-500 bg-accent-500/10 text-accent-500'
-                  : 'border-border-default text-foreground-muted hover:text-foreground hover:border-border-secondary'
-              }`}
-            >
-              {seg.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
-          <AdminSelect
-            value={priority}
-            options={PRIORITY_OPTIONS}
-            onChange={v => setPriority(v)}
-            sm
-          />
-
-          <div className="relative min-w-0 flex-1 sm:flex-none">
-            <svg
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-muted pointer-events-none"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"
-              />
-            </svg>
-            <input
-              ref={searchRef}
-              type="text"
-              placeholder="Search tasks or customers…"
-              value={search}
-              onChange={e => {
-                setSearch(e.target.value)
-                setShowSuggestions(true)
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              onKeyDown={e => {
-                if (e.key === 'Escape') {
-                  setShowSuggestions(false)
-                  setSearch('')
-                }
-              }}
-              className="field-md pl-7 pr-7 text-xs border border-border-default bg-surface-elevated text-foreground placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40 w-full sm:w-56"
-            />
-            {search && (
-              <button
-                onClick={() => {
-                  setSearch('')
-                  setShowSuggestions(false)
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-            {showSuggestions && suggestions.length > 0 && (
-              <div
-                ref={suggestRef}
-                style={suggestStyle}
-                className="bg-surface-elevated border border-border-default rounded-xl shadow-xl overflow-hidden"
-              >
-                {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    onMouseDown={e => {
-                      e.preventDefault()
-                      setSearch(s.label)
-                      setShowSuggestions(false)
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-secondary transition-colors"
-                  >
-                    <span
-                      className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                        s.type === 'task'
-                          ? 'bg-accent-500/15 text-accent-500'
-                          : 'bg-teal-500/10 text-teal-700 dark:text-teal-400'
-                      }`}
-                    >
-                      {s.type === 'task' ? 'T' : 'C'}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-foreground truncate">{s.label}</p>
-                      {s.sub && <p className="text-[10px] text-foreground-muted truncate">{s.sub}</p>}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <ListFilters entity="tasks" fields={TASK_FIELDS} search={TASK_SEARCH} noun="Tasks" tab="list" exportable />
 
       {!loading && total > 0 && (
         <p className="text-xs text-foreground-muted">
@@ -506,7 +276,14 @@ export default function AdminTasksClient() {
           }
           actionNode={
             search ? (
-              <button onClick={() => setSearch('')} className="text-xs text-accent-500 hover:text-accent-600">
+              <button
+                onClick={() => {
+                  const p = new URLSearchParams(sp.toString())
+                  p.delete('search')
+                  router.replace(`${window.location.pathname}?${p}`, { scroll: false })
+                }}
+                className="text-xs text-accent-500 hover:text-accent-600"
+              >
                 Clear search
               </button>
             ) : undefined

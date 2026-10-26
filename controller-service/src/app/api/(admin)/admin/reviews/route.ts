@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { REVIEWS_ENTITY } from '@/lib/filters/entities/reviews'
 import { queryMany, query, queryOne } from '@/lib/shared/db'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -11,39 +13,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
-    const filter = searchParams.get('filter') || 'pending'
-    const q = searchParams.get('q')?.trim() || ''
     const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '25', 10), 200)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
     const offset = (page - 1) * pageSize
 
-    const conditions: string[] = []
-    const params: unknown[] = []
-    let i = 1
-
-    if (filter === 'pending') {
-      conditions.push(`pr.is_approved = $${i++}`)
-      params.push(false)
-    } else if (filter === 'approved') {
-      conditions.push(`pr.is_approved = $${i++}`)
-      params.push(true)
-    }
-
-    if (q) {
-      conditions.push(
-        `(p.name ILIKE $${i} OR u.first_name ILIKE $${i} OR u.last_name ILIKE $${i} OR u.email ILIKE $${i})`
-      )
-      params.push(`%${q}%`)
-      i++
-    }
-
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+    // The list's filters; with no ?filter the API still returns pending reviews (filter=all for every one).
+    const sp = new URLSearchParams(searchParams)
+    if (!sp.has('filter')) sp.set('filter', 'pending')
+    const w = buildWhere(REVIEWS_ENTITY, normalizeQuery(REVIEWS_ENTITY, sp))
+    const { where, params } = w
 
     const countRow = await queryOne<{ total: string }>(
       `SELECT COUNT(*)::text AS total
        FROM product_reviews pr
-       LEFT JOIN users u ON pr.user_id = u.id
-       LEFT JOIN products p ON pr.product_id = p.id
        ${where}`,
       params
     )
@@ -59,7 +41,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN products p ON pr.product_id = p.id
       ${where}
       ORDER BY pr.created_at DESC
-      LIMIT $${i} OFFSET $${i + 1}
+      LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}
     `
 
     const reviews = await queryMany(sql, [...params, pageSize, offset])

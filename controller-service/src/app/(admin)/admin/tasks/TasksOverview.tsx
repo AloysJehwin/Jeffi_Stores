@@ -10,6 +10,11 @@ import {
 import { Kpi, KpiGrid, Section, Table, count } from '@/components/admin/channels/ui'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
+import { TASK_FIELDS, TASK_SEARCH } from '@/lib/filters/fields/tasks'
+
+// The list's filters bar, without its My tasks / Open presets (the overview covers the whole team).
+const OVERVIEW_FIELDS = TASK_FIELDS.filter(f => f.key !== 'scope' && f.key !== 'status')
 
 interface Data {
   kpis: OverviewKpi[]
@@ -27,12 +32,14 @@ interface Data {
 // Tasks overview: open, overdue, throughput and load by assignee.
 export default function TasksOverview() {
   const [period, setPeriod] = usePeriod()
+  const filters = useFilterQuery(OVERVIEW_FIELDS, { search: TASK_SEARCH.param, omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/tasks/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/tasks/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
   return (
     <div className="space-y-3">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters entity="tasks" fields={OVERVIEW_FIELDS} search={TASK_SEARCH} noun="Tasks" tab="overview" period />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading && <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />}
       {data && (

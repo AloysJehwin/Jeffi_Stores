@@ -32,7 +32,7 @@ export default function NewSupplierPage() {
   const [saving, setSaving] = useState(false)
   const toast = useActionToast()
   const setError = (text: string) => text && toast.error(text)
-  const listHref = ap('/admin/suppliers?tab=suppliers')
+  const listHref = ap('/admin/suppliers?tab=suppliers&active=true')
   const [ifscLookup, setIfscLookup] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
 
   async function lookupIfsc(code: string) {
@@ -70,7 +70,7 @@ export default function NewSupplierPage() {
         setSaving(false)
         return
       }
-      router.push(ap('/admin/suppliers?tab=suppliers'))
+      router.push(ap('/admin/suppliers?tab=suppliers&active=true'))
     } catch {
       setError('Failed to create supplier')
       setSaving(false)

@@ -1,3 +1,4 @@
+import type { FilterScope } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, previousPeriod, ratio, type Period } from '@/lib/overview/period'
 import type { AttentionItem } from '@/lib/overview/attention'
@@ -24,10 +25,13 @@ export const PAYABLES = `
   LEFT JOIN LATERAL (SELECT id FROM suppliers WHERE lower(name) = lower(e.supplier_name) ORDER BY is_active DESC LIMIT 1) s ON po.id IS NULL
   WHERE e.status != 'paid'`
 
-// Per PO in the window: last and first GRN date, for on-time and lead time.
-const DELIVERIES = (a: number, b: number) => `
+// The supplier a bill belongs to, as PAYABLES links it (through its PO, else by name).
+const BILL_SUPPLIER = `COALESCE(po.supplier_id, (SELECT sx.id FROM suppliers sx WHERE lower(sx.name) = lower(e.supplier_name) ORDER BY sx.is_active DESC LIMIT 1))`
+
+// Per PO in the window: last and first GRN date, for on-time and lead time. `scope` narrows the POs.
+const DELIVERIES = (a: number, b: number, scope = '') => `
   SELECT po.id, po.supplier_id, po.order_date, po.expected_date, MIN(g.received_date) AS first_grn, MAX(g.received_date) AS last_grn
-  FROM purchase_orders po JOIN grns g ON g.po_id = po.id
+  FROM purchase_orders po JOIN grns g ON g.po_id = po.id${scope ? `\n  WHERE TRUE${scope}` : ''}
   GROUP BY po.id
   HAVING MAX(g.received_date) BETWEEN $${a}::date AND $${b}::date`
 
@@ -61,25 +65,39 @@ export function supplierTotals(r: Record<string, unknown> | null | undefined): S
   }
 }
 
-async function totals(p: Period) {
+/** The list's filters as supplier-id conditions; every one is '' with no filters. */
+function supplierScope(scope: FilterScope | undefined, start: number) {
+  const on = (col: string) => scope?.inIds(col, start) ?? { sql: '', params: [] }
+  const bills = on(BILL_SUPPLIER)
+  return {
+    on: (col: string) => on(col).sql,
+    paid: bills.sql
+      ? ` AND ep.expense_id IN (SELECT e.id FROM expenses e LEFT JOIN purchase_orders po ON po.id = e.po_id WHERE TRUE${bills.sql})`
+      : '',
+    params: bills.params,
+  }
+}
+
+async function totals(p: Period, scope?: FilterScope) {
+  const sc = supplierScope(scope, 3)
   const row = await queryOne<Record<string, unknown>>(
     `SELECT
        (SELECT COALESCE(SUM(gi.quantity_received * gi.unit_cost), 0) FROM grn_items gi JOIN grns g ON g.id = gi.grn_id
-         WHERE g.received_date BETWEEN $1::date AND $2::date) AS received_value,
-       (SELECT COUNT(*) FROM grns g WHERE g.received_date BETWEEN $1::date AND $2::date) AS grns,
+         WHERE g.received_date BETWEEN $1::date AND $2::date${sc.on('g.supplier_id')}) AS received_value,
+       (SELECT COUNT(*) FROM grns g WHERE g.received_date BETWEEN $1::date AND $2::date${sc.on('g.supplier_id')}) AS grns,
        (SELECT COALESCE(SUM(total_amount), 0) FROM purchase_orders
-         WHERE order_date BETWEEN $1::date AND $2::date AND COALESCE(status, '') NOT IN ('draft', 'cancelled')) AS raised_value,
+         WHERE order_date BETWEEN $1::date AND $2::date AND COALESCE(status, '') NOT IN ('draft', 'cancelled')${sc.on('supplier_id')}) AS raised_value,
        (SELECT COUNT(*) FROM purchase_orders
-         WHERE order_date BETWEEN $1::date AND $2::date AND COALESCE(status, '') NOT IN ('draft', 'cancelled')) AS pos_raised,
+         WHERE order_date BETWEEN $1::date AND $2::date AND COALESCE(status, '') NOT IN ('draft', 'cancelled')${sc.on('supplier_id')}) AS pos_raised,
        (SELECT COALESCE(SUM(ep.amount), 0) FROM expense_payments ep
-         WHERE ep.payment_date BETWEEN $1::date AND $2::date AND ${LIVE_PAYOUT}) AS paid,
+         WHERE ep.payment_date BETWEEN $1::date AND $2::date AND ${LIVE_PAYOUT}${sc.paid}) AS paid,
        d.delivered, d.with_expected, d.on_time, d.lead_days
      FROM (SELECT COUNT(*) AS delivered,
                   COUNT(*) FILTER (WHERE expected_date IS NOT NULL) AS with_expected,
                   COUNT(*) FILTER (WHERE expected_date IS NOT NULL AND last_grn <= expected_date) AS on_time,
                   AVG(first_grn - order_date) AS lead_days
-           FROM (${DELIVERIES(1, 2)}) x) d`,
-    [p.from, p.to]
+           FROM (${DELIVERIES(1, 2, sc.on('po.supplier_id'))}) x) d`,
+    [p.from, p.to, ...sc.params]
   )
   return supplierTotals(row)
 }
@@ -135,35 +153,40 @@ export function supplierAttention(
   return out
 }
 
-export async function getSupplierOverview(period: Period) {
+/** `scope`: the Suppliers list's filters; without it every query is unchanged. */
+export async function getSupplierOverview(period: Period, scope?: FilterScope) {
   const previous = previousPeriod(period)
   const bucket = bucketFor(period)
+  const own = supplierScope(scope, 1)
+  const ranged = supplierScope(scope, 3)
+  const one = (sql: string) =>
+    own.params.length ? queryOne<Record<string, unknown>>(sql, own.params) : queryOne<Record<string, unknown>>(sql)
   const [current, prev, open, payables, series, top, overdue, drafts] = await Promise.all([
-    totals(period),
-    totals(previous),
-    queryOne<Record<string, unknown>>(
+    totals(period, scope),
+    totals(previous, scope),
+    one(
       `SELECT COUNT(*) AS open, COALESCE(SUM(total_amount), 0) AS open_value,
               COUNT(*) FILTER (WHERE status = 'draft') AS drafts,
-              (SELECT COUNT(*) FROM suppliers WHERE is_active) AS active_suppliers
-       FROM purchase_orders WHERE COALESCE(status, '') NOT IN ${CLOSED}`
+              (SELECT COUNT(*) FROM suppliers WHERE is_active${own.on('id')}) AS active_suppliers
+       FROM purchase_orders WHERE COALESCE(status, '') NOT IN ${CLOSED}${own.on('supplier_id')}`
     ),
-    queryOne<Record<string, unknown>>(
+    one(
       `SELECT COALESCE(SUM(amount), 0) AS amount, COUNT(*) AS count,
               COALESCE(SUM(amount) FILTER (WHERE days > 0), 0) AS overdue_amount, COUNT(*) FILTER (WHERE days > 0) AS overdue_count,
               COALESCE(SUM(amount) FILTER (WHERE days BETWEEN -${DUE_SOON_DAYS} AND 0 AND due_date IS NOT NULL), 0) AS due_soon_amount,
               COUNT(*) FILTER (WHERE days BETWEEN -${DUE_SOON_DAYS} AND 0 AND due_date IS NOT NULL) AS due_soon_count
-       FROM (${PAYABLES}) x WHERE amount > 0`
+       FROM (${PAYABLES}) x WHERE amount > 0${own.on('x.supplier_id')}`
     ),
     queryMany<Record<string, unknown>>(
       `WITH s AS (SELECT g::date AS b FROM generate_series(date_trunc('${bucket}', $1::date::timestamp), $2::date::timestamp, interval '1 ${bucket}') g)
        SELECT s.b::text AS label,
               COALESCE((SELECT SUM(gi.quantity_received * gi.unit_cost) FROM grn_items gi JOIN grns g ON g.id = gi.grn_id
-                WHERE g.received_date BETWEEN $1::date AND $2::date AND date_trunc('${bucket}', g.received_date::timestamp)::date = s.b), 0) AS received,
+                WHERE g.received_date BETWEEN $1::date AND $2::date AND date_trunc('${bucket}', g.received_date::timestamp)::date = s.b${ranged.on('g.supplier_id')}), 0) AS received,
               COALESCE((SELECT SUM(total_amount) FROM purchase_orders po
                 WHERE po.order_date BETWEEN $1::date AND $2::date AND COALESCE(po.status, '') NOT IN ('draft', 'cancelled')
-                  AND date_trunc('${bucket}', po.order_date::timestamp)::date = s.b), 0) AS raised
+                  AND date_trunc('${bucket}', po.order_date::timestamp)::date = s.b${ranged.on('po.supplier_id')}), 0) AS raised
        FROM s ORDER BY s.b`,
-      [period.from, period.to]
+      [period.from, period.to, ...ranged.params]
     ),
     queryMany<Record<string, unknown>>(
       `WITH recv AS (
@@ -184,19 +207,21 @@ export async function getSupplierOverview(period: Period) {
        LEFT JOIN del ON del.supplier_id = s.id
        LEFT JOIN pay ON pay.supplier_id = s.id
        LEFT JOIN openpo ON openpo.supplier_id = s.id
-       WHERE recv.received > 0 OR pay.payable > 0 OR openpo.open_pos > 0
+       WHERE ${ranged.params.length ? `(recv.received > 0 OR pay.payable > 0 OR openpo.open_pos > 0)${ranged.on('s.id')}` : 'recv.received > 0 OR pay.payable > 0 OR openpo.open_pos > 0'}
        ORDER BY COALESCE(recv.received, 0) DESC, COALESCE(pay.payable, 0) DESC LIMIT 10`,
-      [period.from, period.to]
+      [period.from, period.to, ...ranged.params]
     ),
     queryMany<Record<string, unknown>>(
       `SELECT po.id, po.po_number, s.name AS supplier_name, po.expected_date::text AS expected_date,
               (${TODAY} - po.expected_date)::int AS days_late, po.total_amount
        FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
-       WHERE COALESCE(po.status, '') NOT IN ${CLOSED} AND po.status != 'draft' AND po.expected_date < ${TODAY}
-       ORDER BY po.expected_date ASC LIMIT 20`
+       WHERE COALESCE(po.status, '') NOT IN ${CLOSED} AND po.status != 'draft' AND po.expected_date < ${TODAY}${own.on('po.supplier_id')}
+       ORDER BY po.expected_date ASC LIMIT 20`,
+      ...(own.params.length ? [own.params] : [])
     ),
     queryOne<{ n: string }>(
-      `SELECT COUNT(*) AS n FROM purchase_orders WHERE status = 'draft' AND created_at < now() - interval '${STALE_DRAFT_DAYS} days'`
+      `SELECT COUNT(*) AS n FROM purchase_orders WHERE status = 'draft' AND created_at < now() - interval '${STALE_DRAFT_DAYS} days'${own.on('supplier_id')}`,
+      ...(own.params.length ? [own.params] : [])
     ),
   ])
 
