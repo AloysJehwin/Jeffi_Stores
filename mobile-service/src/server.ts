@@ -120,6 +120,25 @@ app.get('/v1/app/config', async (_req, reply) => {
 })
 
 // ── Forwarded: the storefront API, same paths the web uses ──
+// Binaries from before the app sized its own images get theirs pointed at the web host's /_next/image here:
+// whole-string CDN / bucket image URLs (mirroring image-optimizer.json's hosts) in JSON, at a fixed width.
+// Builds that size images themselves send X-Jeffi-Image-Sizing and get the originals.
+const SIZED_HOST = /^https:\/\/(?:dm9rri2wgl1e\.cloudfront\.net|jeffi-(?:stores-bucket|tenant-[a-z0-9-]+)\.s3(?:\.us-east-1)?\.amazonaws\.com)\/[^?#\s]+\.(?:png|jpe?g|webp)$/i
+const MAX_REWRITE_BYTES = 5_000_000
+function sizeImages(v: unknown, key = ''): unknown {
+  if (typeof v === 'string')
+    return SIZED_HOST.test(v)
+      ? `${PUBLIC_SITE_URL}/_next/image?url=${encodeURIComponent(v)}&w=${/thumb/i.test(key) ? 384 : 828}&q=70`
+      : v
+  if (Array.isArray(v)) return v.map(x => sizeImages(x, key))
+  if (v && typeof v === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, x] of Object.entries(v)) out[k] = sizeImages(x, k)
+    return out
+  }
+  return v
+}
+
 const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'te', 'trailer', 'upgrade', 'proxy-authorization', 'proxy-authenticate', 'host', 'content-length', 'x-jeffi-edge'])
 async function forward(req: FastifyRequest, reply: FastifyReply) {
   const headers: Record<string, string> = {}
@@ -131,8 +150,9 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
   headers['x-forwarded-for'] = clientIp(req)
   headers['x-request-id'] = req.id
   headers['x-jeffi-client'] = 'mobile'
-  // Auth responses are rewritten below (token injection), so ask for them uncompressed.
-  if (req.url.startsWith('/api/auth/')) delete headers['accept-encoding']
+  const sizeForClient = req.method === 'GET' && !req.headers['x-jeffi-image-sizing'] && (await imageResizeReady())
+  // Auth responses (token injection) and image-sized ones are rewritten below, so ask for them uncompressed.
+  if (req.url.startsWith('/api/auth/') || sizeForClient) delete headers['accept-encoding']
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
   const res = await undici(CONTROLLER_URL + req.url, {
     method: req.method as any,
@@ -160,6 +180,18 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
     const body = await res.body.json().catch(() => null)
     if (body && typeof body === 'object' && !Array.isArray(body)) return reply.code(res.statusCode).send({ ...body, token: decodeURIComponent(sid) })
     return reply.code(res.statusCode).send(body)
+  }
+  if (req.method === 'GET') reply.header('vary', [res.headers.vary, 'x-jeffi-image-sizing'].filter(Boolean).join(', '))
+  const size = Number(res.headers['content-length'] ?? 0)
+  if (sizeForClient && json && res.statusCode === 200 && !res.headers['content-encoding'] && size <= MAX_REWRITE_BYTES) {
+    const text = await res.body.text()
+    let body: unknown
+    try {
+      body = JSON.parse(text)
+    } catch {
+      return reply.code(res.statusCode).send(text)
+    }
+    return reply.code(res.statusCode).removeHeader('etag').send(sizeImages(body))
   }
   return reply.code(res.statusCode).send(res.body)
 }
