@@ -5,6 +5,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
+import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
 
 const patchSchema = z
   .object({
@@ -26,10 +27,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Publish a create-draft: flip is_draft = false (+ is_active) without requiring the full body.
   if (body.is_draft === false && body.name === undefined) {
-    await query(`UPDATE brands SET is_draft = false, is_active = COALESCE($2::boolean, is_active) WHERE id = $1`, [
-      id,
-      typeof body.is_active === 'boolean' ? body.is_active : null,
-    ])
+    try {
+      await withDraftPublish(
+        actorOf(admin),
+        'brand',
+        id,
+        db =>
+          db.query(`UPDATE brands SET is_draft = false, is_active = COALESCE($2::boolean, is_active) WHERE id = $1`, [
+            id,
+            typeof body.is_active === 'boolean' ? body.is_active : null,
+          ]),
+        { epoch: epochFrom(req) }
+      )
+    } catch (err) {
+      const locked = draftLockResponse(err)
+      if (locked) return locked
+      throw err
+    }
     revalidatePath('/admin/brands')
     const updated = await queryOne<any>('SELECT * FROM brands WHERE id = $1', [id])
     return NextResponse.json(updated)

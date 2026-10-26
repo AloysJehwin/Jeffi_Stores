@@ -24,6 +24,7 @@ import {
   uniqueProductSlug,
   variantSkuCollisionError,
 } from '@/lib/catalog/product-validation'
+import { actionActor, lockNewDraft } from '@/lib/admin/draft-locks'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -391,6 +392,7 @@ export async function createProduct(formData: FormData): Promise<ProductActionRe
     await cleanupS3()
     return { error: productErrorMessage(err, 'Failed to create product. Please try again.') }
   }
+  await lockNewDraft(await actionActor(), 'product', productId)
 
   const { syncProductToSheet } = await import('@/lib/shared/google-sheets')
   syncProductToSheet(productId).catch(e => console.error('[product-create] sheet sync failed for', productId, e))

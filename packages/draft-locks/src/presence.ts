@@ -1,5 +1,5 @@
 import { DRAFT_RESOURCES, type DraftResourceType } from './registry'
-import { defaultHasScope, toLock, type DraftLock, type HasScopeFn, type SqlClient } from './locks'
+import { defaultHasScope, q, toLock, type DraftLock, type HasScopeFn, type SqlClient } from './locks'
 
 /** A viewer drops out after this long without a heartbeat. */
 export const PRESENCE_TTL_SECONDS = 45
@@ -18,7 +18,7 @@ export async function heartbeat(
   p: { type: DraftResourceType; id: string; adminId: string; tabId: string; mode: 'view' | 'edit'; leaving?: boolean }
 ): Promise<{ changed: boolean }> {
   if (p.leaving) {
-    const r = await c.query(`DELETE FROM draft_presence WHERE resource_type = $1 AND resource_id = $2 AND admin_id = $3 AND tab_id = $4`, [
+    const r = await q(c, `DELETE FROM draft_presence WHERE resource_type = $1 AND resource_id = $2 AND admin_id = $3 AND tab_id = $4`, [
       p.type,
       p.id,
       p.adminId,
@@ -27,7 +27,7 @@ export async function heartbeat(
     return { changed: (r.rowCount ?? 0) > 0 }
   }
   // changed = a tab joined (first heartbeat); refreshes are silent.
-  const r = await c.query(
+  const r = await q(c, 
     `INSERT INTO draft_presence (resource_type, resource_id, admin_id, tab_id, mode, seen_at)
      VALUES ($1, $2, $3, $4, $5, now())
      ON CONFLICT (resource_type, resource_id, admin_id, tab_id) DO UPDATE SET mode = EXCLUDED.mode, seen_at = now()
@@ -38,7 +38,7 @@ export async function heartbeat(
 }
 
 export async function viewers(c: SqlClient, type: DraftResourceType, id: string): Promise<DraftViewer[]> {
-  const r = await c.query(
+  const r = await q(c, 
     `SELECT p.admin_id, ${NAME} AS name, bool_or(p.mode = 'edit') AS editing, max(p.seen_at) AS seen_at
        FROM draft_presence p
        LEFT JOIN admins a ON a.id = p.admin_id LEFT JOIN users u ON u.id = a.user_id
@@ -56,7 +56,7 @@ export async function viewers(c: SqlClient, type: DraftResourceType, id: string)
 
 export async function viewerCounts(c: SqlClient, keys: { type: DraftResourceType; id: string }[]): Promise<Record<string, number>> {
   if (!keys.length) return {}
-  const r = await c.query(
+  const r = await q(c, 
     `SELECT resource_type || ':' || resource_id AS k, count(DISTINCT admin_id)::int AS n FROM draft_presence
       WHERE (resource_type, resource_id) IN (SELECT * FROM unnest($1::text[], $2::uuid[]))
         AND seen_at > now() - make_interval(secs => $3)
@@ -85,7 +85,7 @@ async function labels(c: SqlClient, rows: { resourceType: DraftResourceType; res
   for (const r of rows) byType.set(r.resourceType, [...(byType.get(r.resourceType) ?? []), r.resourceId])
   const out = new Map<string, { label: string; ref: string | null }>()
   for (const [type, ids] of byType) {
-    const res = await c.query(DRAFT_RESOURCES[type].labelSql, DRAFT_RESOURCES[type].labelSql.includes('$1') ? [ids] : [])
+    const res = await q(c, DRAFT_RESOURCES[type].labelSql, DRAFT_RESOURCES[type].labelSql.includes('$1') ? [ids] : [])
     for (const r of res.rows) out.set(`${type}:${r.id}`, { label: r.label ?? DRAFT_RESOURCES[type].label, ref: r.ref ?? null })
   }
   return out
@@ -104,13 +104,13 @@ export async function listDrafts(
   let base: { resourceType: DraftResourceType; resourceId: string; lock: DraftLock | null; updatedAt: string | null }[] = []
   if (opts.scope === 'unclaimed') {
     for (const type of opts.types) {
-      const r = await c.query(
+      const r = await q(c, 
         `SELECT d.id, d.updated_at FROM (${DRAFT_RESOURCES[type].listSql}) d
           WHERE NOT EXISTS (SELECT 1 FROM draft_locks l WHERE l.resource_type = $1 AND l.resource_id = d.id
                               AND l.closed_at IS NULL AND l.owner_admin_id IS NOT NULL)`,
         [type]
       )
-      const open = await c.query(`${LIST_SELECT} WHERE l.resource_type = $1 AND l.closed_at IS NULL AND l.owner_admin_id IS NULL`, [type])
+      const open = await q(c, `${LIST_SELECT} WHERE l.resource_type = $1 AND l.closed_at IS NULL AND l.owner_admin_id IS NULL`, [type])
       const released = new Map(open.rows.map(row => [row.resource_id, toLock(row, hasScope)]))
       for (const row of r.rows) {
         base.push({
@@ -123,7 +123,7 @@ export async function listDrafts(
     }
     base.sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))
   } else {
-    const r = await c.query(
+    const r = await q(c, 
       `${LIST_SELECT} WHERE l.closed_at IS NULL AND l.resource_type = ANY($1::text[])
           AND ${opts.scope === 'mine' ? 'l.owner_admin_id = $2' : 'l.owner_admin_id IS NOT NULL AND $2::uuid IS NOT NULL'}
         ORDER BY l.last_active_at DESC`,
@@ -154,37 +154,37 @@ export async function listDrafts(
  * draft is gone, and tombstones older than a week.
  */
 export async function sweep(c: SqlClient): Promise<{ presence: number; released: number; orphaned: number; purged: number }> {
-  const presence = await c.query(`DELETE FROM draft_presence WHERE seen_at < now() - interval '5 minutes'`)
-  const released = await c.query(
+  const presence = await q(c, `DELETE FROM draft_presence WHERE seen_at < now() - interval '5 minutes'`)
+  const released = await q(c, 
     `UPDATE draft_locks l SET previous_owner_admin_id = l.owner_admin_id, owner_admin_id = NULL, epoch = l.epoch + 1, updated_at = now()
       WHERE l.closed_at IS NULL AND l.owner_admin_id IS NOT NULL
         AND NOT EXISTS (SELECT 1 FROM admins a WHERE a.id = l.owner_admin_id AND a.is_active IS TRUE)
       RETURNING l.resource_type, l.resource_id, l.previous_owner_admin_id`
   )
   for (const row of released.rows) {
-    await c.query(
+    await q(c, 
       `UPDATE editor_sessions SET closed_at = now(), closed_reason = 'superseded'
         WHERE resource_type = $1 AND resource_id = $2 AND admin_id = $3 AND closed_at IS NULL`,
       [row.resource_type, row.resource_id, row.previous_owner_admin_id]
     )
   }
   // A lock younger than a few minutes may belong to a draft whose create is still committing.
-  const open = await c.query(
+  const open = await q(c, 
     `SELECT resource_type, resource_id FROM draft_locks WHERE closed_at IS NULL AND started_at < now() - interval '10 minutes'`
   )
   let orphaned = 0
   for (const row of open.rows) {
     const def = DRAFT_RESOURCES[row.resource_type as DraftResourceType]
     if (!def) continue
-    const ex = await c.query(def.existsSql, def.existsSql.includes('$1') ? [row.resource_id] : [])
+    const ex = await q(c, def.existsSql, def.existsSql.includes('$1') ? [row.resource_id] : [])
     if (ex.rows.length) continue
-    const r = await c.query(
+    const r = await q(c, 
       `UPDATE draft_locks SET closed_at = now(), closed_reason = 'orphaned', epoch = epoch + 1, updated_at = now()
         WHERE resource_type = $1 AND resource_id = $2 AND closed_at IS NULL`,
       [row.resource_type, row.resource_id]
     )
     orphaned += r.rowCount ?? 0
   }
-  const purged = await c.query(`DELETE FROM draft_locks WHERE closed_at < now() - interval '7 days'`)
+  const purged = await q(c, `DELETE FROM draft_locks WHERE closed_at < now() - interval '7 days'`)
   return { presence: presence.rowCount ?? 0, released: released.rowCount ?? 0, orphaned, purged: purged.rowCount ?? 0 }
 }

@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'
 import { uploadGalleryMedia } from '@/lib/shared/s3'
+import { actorOf, lockedByOther } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const offer = await queryOne<{ id: string }>(`SELECT id FROM product_offers WHERE id = $1`, [id])
     if (!offer) return NextResponse.json({ error: 'Offer not found' }, { status: 404 })
+    const locked = await lockedByOther(actorOf(admin), 'offer', id)
+    if (locked) return locked
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null

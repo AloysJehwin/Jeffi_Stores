@@ -5,6 +5,7 @@ import { queryOne } from '@/lib/shared/db'
 import { z } from 'zod'
 import { friendlyProductDbError } from '@/lib/catalog/product-validation'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
+import { actorOf, lockNewDraft } from '@/lib/admin/draft-locks'
 
 const createDraftSchema = z.object({
   name: zNonEmpty,
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
     )
 
     if (!product) throw new Error('Insert failed')
+    await lockNewDraft(actorOf(admin), 'product', product.id)
 
     return NextResponse.json({ id: product.id, name: trimmed, sku })
   } catch (e: any) {

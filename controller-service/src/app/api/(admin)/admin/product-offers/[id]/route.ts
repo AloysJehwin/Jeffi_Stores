@@ -5,12 +5,25 @@ import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
 import { findOpenSession } from '@/lib/admin/editor-sessions'
-import { ensureOfferDraft } from '@/lib/admin/offer-drafts'
+import { ensureOfferDraftTx } from '@/lib/admin/offer-drafts'
+import {
+  actorOf,
+  closeIfLocked,
+  discardGuard,
+  draftLockResponse,
+  epochFrom,
+  lockedByOther,
+  withDraftWrite,
+} from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
 // Absolute (S3/CDN) or a site path such as /images/...
-const mediaUrl = z.string().max(2000).regex(/^(https?:\/\/|\/(?!\/))/, 'Expected a URL').nullish()
+const mediaUrl = z
+  .string()
+  .max(2000)
+  .regex(/^(https?:\/\/|\/(?!\/))/, 'Expected a URL')
+  .nullish()
 const blurhash = z.string().max(64).nullish()
 
 const patchSchema = z.object({
@@ -72,6 +85,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (touched.length === 0 && media.length === 0)
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
+  const actor = actorOf(admin)
+  // Media and legacy writes hit the live row: not while someone else holds the draft.
+  const denied = await lockedByOther(actor, 'offer', id)
+  if (denied) return denied
+
   if (media.length > 0) {
     const sets = media.map(([, col], i) => `${col} = $${i + 1}`)
     const res = await query(
@@ -87,16 +105,30 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if (session) {
     // Draft path — merge the patch into offer_drafts.fields.
-    await ensureOfferDraft(id)
     const patchJson: Record<string, unknown> = {}
     for (const [key, col] of touched) patchJson[col] = d[key] ?? null
-    await query(
-      `UPDATE offer_drafts SET fields = fields || $1::jsonb, updated_at = now()
-       WHERE offer_id = $2`,
-      [JSON.stringify(patchJson), id]
-    )
-    const row = await queryOne(`SELECT * FROM offer_drafts WHERE offer_id = $1`, [id])
-    return NextResponse.json({ draft: row })
+    try {
+      const row = await withDraftWrite(
+        actor,
+        'offer',
+        id,
+        async db => {
+          await ensureOfferDraftTx(db, id)
+          await db.query(
+            `UPDATE offer_drafts SET fields = fields || $1::jsonb, updated_at = now()
+             WHERE offer_id = $2`,
+            [JSON.stringify(patchJson), id]
+          )
+          return (await db.query(`SELECT * FROM offer_drafts WHERE offer_id = $1`, [id])).rows[0] ?? null
+        },
+        { epoch: epochFrom(request), ensure: true }
+      )
+      return NextResponse.json({ draft: row })
+    } catch (err) {
+      const locked = draftLockResponse(err)
+      if (locked) return locked
+      throw err
+    }
   }
 
   // Legacy path — commit directly to live row (non-editor callers like homepage picker).
@@ -121,9 +153,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasScope(admin.role, admin.scopes, 'coupons:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const actor = actorOf(admin)
+  const denied = await discardGuard(actor, 'offer', id)
+  if (denied) return denied
   await withTransaction(async client => {
     await client.query(`DELETE FROM product_offer_items WHERE offer_id = $1`, [id])
     await client.query(`DELETE FROM product_offers WHERE id = $1`, [id])
   })
+  await closeIfLocked(actor, 'offer', id)
   return NextResponse.json({ success: true })
 }

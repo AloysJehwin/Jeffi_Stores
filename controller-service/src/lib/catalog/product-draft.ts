@@ -13,6 +13,7 @@ import {
   skuConflictError,
   uniqueProductSlug,
 } from '@/lib/catalog/product-validation'
+import { announceDraftClosed, assertDraftHolder, closeDraftLockTx, isDraftLockError, type DraftActor } from '@/lib/admin/draft-locks'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -267,10 +268,12 @@ interface ProductDraft {
  * replaces all related data (variants, images, sub_variants, units),
  * then deletes the draft. Called from both the API route and the
  * server action so the publish logic is never duplicated or bypassed.
+ * With an `actor` the draft lock is asserted and closed inside the same transaction
+ * (system callers such as the importer pass none).
  */
 export async function publishProductDraft(
   productId: string,
-  opts: { activate?: boolean } = {}
+  opts: { activate?: boolean; actor?: DraftActor; epoch?: number | null } = {}
 ): Promise<{ keptForHistory: PurgeResult['deactivated'] }> {
   const draft = await queryOne<ProductDraft>(`SELECT * FROM product_drafts WHERE product_id = $1`, [productId])
   if (!draft) throw new Error('Draft not found')
@@ -385,7 +388,9 @@ export async function publishProductDraft(
   const slug = fields.slug ? await uniqueProductSlug({ query }, String(fields.slug), productId) : ''
 
   const purged: PurgeResult[] = []
+  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
   await withTransaction(async client => {
+    await assertDraftHolder(client, opts.actor, 'product', productId, { epoch: opts.epoch })
     await client.query(
       `UPDATE products SET
          category_id              = NULLIF(($2::jsonb)->>'category_id', '')::uuid,
@@ -1652,7 +1657,9 @@ export async function publishProductDraft(
     await recomputeStockStatusForProduct(client, productId)
 
     await client.query(`DELETE FROM product_drafts WHERE product_id = $1`, [productId])
+    closed = await closeDraftLockTx(client, opts.actor, 'product', productId, 'published')
   }).catch(err => {
+    if (isDraftLockError(err)) throw err
     const friendly = friendlyProductDbError(err)
     if (friendly) throw new ProductValidationError(friendly, { cause: err })
     throw err
@@ -1667,6 +1674,7 @@ export async function publishProductDraft(
   } catch (e) {
     console.error('[product-draft] closing edit sessions failed for', productId, e)
   }
+  await announceDraftClosed(opts.actor, 'product', productId, closed, 'published')
   const keptForHistory = purged.flatMap(p => p.deactivated)
   if (keptForHistory.length > 0)
     console.warn('[product-draft] toggled-off rows kept (deactivated) for history on', productId, keptForHistory)

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, query } from '@/lib/shared/db'
+import { queryOne } from '@/lib/shared/db'
+import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 interface Params {
@@ -25,36 +26,50 @@ export async function POST(req: NextRequest, { params }: Params) {
   const f = draft.fields as any
   // Edit-draft publish: apply the drafted changes to the existing live coupon (COALESCE keeps
   // unset fields). A create-draft (never published) goes live and active.
-  await query(
-    `UPDATE coupons SET
-       code = COALESCE($2, code),
-       description = $3,
-       discount_type = COALESCE($4, discount_type),
-       discount_value = COALESCE($5::numeric, discount_value),
-       min_purchase_amount = $6::numeric,
-       max_discount_amount = $7::numeric,
-       usage_limit = $8::integer,
-       usage_limit_per_user = $9::integer,
-       valid_from = $10::timestamptz,
-       valid_until = $11::timestamptz,
-       is_active = CASE WHEN is_draft THEN true ELSE COALESCE($12::boolean, is_active) END,
-       is_draft = false
-     WHERE id = $1`,
-    [
+  try {
+    await withDraftPublish(
+      actorOf(admin),
+      'coupon',
       id,
-      f.code || null,
-      f.description ?? null,
-      f.discount_type || null,
-      f.discount_value != null ? f.discount_value : null,
-      f.min_purchase_amount ?? null,
-      f.max_discount_amount ?? null,
-      f.usage_limit ?? null,
-      f.usage_limit_per_user ?? null,
-      f.valid_from || null,
-      f.valid_until || null,
-      f.is_active != null ? f.is_active : null,
-    ]
-  )
-  await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
+      async db => {
+        await db.query(
+          `UPDATE coupons SET
+           code = COALESCE($2, code),
+           description = $3,
+           discount_type = COALESCE($4, discount_type),
+           discount_value = COALESCE($5::numeric, discount_value),
+           min_purchase_amount = $6::numeric,
+           max_discount_amount = $7::numeric,
+           usage_limit = $8::integer,
+           usage_limit_per_user = $9::integer,
+           valid_from = $10::timestamptz,
+           valid_until = $11::timestamptz,
+           is_active = CASE WHEN is_draft THEN true ELSE COALESCE($12::boolean, is_active) END,
+           is_draft = false
+         WHERE id = $1`,
+          [
+            id,
+            f.code || null,
+            f.description ?? null,
+            f.discount_type || null,
+            f.discount_value != null ? f.discount_value : null,
+            f.min_purchase_amount ?? null,
+            f.max_discount_amount ?? null,
+            f.usage_limit ?? null,
+            f.usage_limit_per_user ?? null,
+            f.valid_from || null,
+            f.valid_until || null,
+            f.is_active != null ? f.is_active : null,
+          ]
+        )
+        await db.query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
+      },
+      { epoch: epochFrom(req) }
+    )
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ success: true })
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, queryCount } from '@/lib/shared/db'
 import { authenticateAdmin, requireAdminScope } from '@/lib/auth/jwt'
+import { actorOf, closeIfLocked, discardGuard } from '@/lib/admin/draft-locks'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -70,7 +71,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       )
     }
 
+    const actor = actorOf(admin)
+    const denied = await discardGuard(actor, 'brand', brandId)
+    if (denied) return denied
     await query('DELETE FROM brands WHERE id = $1', [brandId])
+    await closeIfLocked(actor, 'brand', brandId)
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

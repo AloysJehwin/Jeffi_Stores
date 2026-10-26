@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query, withTransaction } from '@/lib/shared/db'
 import type { PoolClient } from 'pg'
+import { actorOf, announceDraftClosed, assertDraftHolder, closeDraftLockTx, draftLockResponse, epochFrom } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 interface Params {
@@ -26,8 +27,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   const f = draft.fields as any
   const prevIsActive = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM categories WHERE id = $1`, [id])
 
+  const actor = actorOf(admin)
+  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
   try {
     await withTransaction(async (client: PoolClient) => {
+      await assertDraftHolder(client, actor, 'category', id, { epoch: epochFrom(req) })
       const slug = f.name
         ? f.name
             .toLowerCase()
@@ -89,10 +93,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
 
       await client.query(`DELETE FROM category_drafts WHERE category_id = $1`, [id])
+      closed = await closeDraftLockTx(client, actor, 'category', id, 'published')
     })
+    await announceDraftClosed(actor, 'category', id, closed, 'published')
 
     return NextResponse.json({ success: true, categoryId: id })
   } catch (err: unknown) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     const msg = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: msg || 'Failed to publish' }, { status: 500 })
   }
