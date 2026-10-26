@@ -1117,6 +1117,8 @@ CREATE INDEX idx_admin_notifications_unread ON public.admin_notifications USING 
 
 CREATE INDEX idx_admin_notifications_entity ON public.admin_notifications USING btree (entity_type, entity_id);
 
+CREATE INDEX idx_admin_notifications_recipient ON public.admin_notifications USING btree (recipient_admin_id, created_at DESC) WHERE recipient_admin_id IS NOT NULL;
+
 
 
 --
@@ -2389,6 +2391,11 @@ CREATE UNIQUE INDEX idx_editor_sessions_open
 
 CREATE INDEX idx_editor_sessions_resource
   ON public.editor_sessions (resource_type, resource_id, started_at DESC);
+
+-- Drafts dashboard ("mine"), deactivation release, and the SSE poll cursor.
+CREATE INDEX idx_draft_locks_owner ON public.draft_locks (owner_admin_id) WHERE closed_at IS NULL;
+CREATE INDEX idx_draft_locks_updated ON public.draft_locks (updated_at);
+CREATE INDEX idx_draft_presence_seen ON public.draft_presence (seen_at);
 
 -- One open po_drafts row per admin — once promoted_po_id is set, the draft is
 -- "spent" and a new draft can be opened.

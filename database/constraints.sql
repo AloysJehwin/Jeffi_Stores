@@ -3756,7 +3756,36 @@ ALTER TABLE ONLY public.editor_sessions
 
 ALTER TABLE public.editor_sessions
     ADD CONSTRAINT editor_sessions_closed_reason_check
-    CHECK (closed_reason IN ('save','cancel','expired') OR closed_reason IS NULL);
+    CHECK (closed_reason IN ('save','cancel','expired','superseded') OR closed_reason IS NULL);
+
+--
+-- draft_locks / draft_presence
+--
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_pkey PRIMARY KEY (resource_type, resource_id);
+ALTER TABLE public.draft_locks
+    ADD CONSTRAINT draft_locks_acquired_via_check
+    CHECK (acquired_via IN ('start','claim','handover','takeover','backfill'));
+ALTER TABLE public.draft_locks
+    ADD CONSTRAINT draft_locks_closed_reason_check
+    CHECK (closed_reason IN ('published','discarded','finalized','sent','converted','deleted','orphaned') OR closed_reason IS NULL);
+ALTER TABLE public.draft_locks
+    ADD CONSTRAINT draft_locks_takeover_reason_check
+    CHECK (acquired_via <> 'takeover' OR takeover_reason IS NOT NULL);
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_owner_admin_id_fkey FOREIGN KEY (owner_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_started_by_admin_id_fkey FOREIGN KEY (started_by_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_previous_owner_admin_id_fkey FOREIGN KEY (previous_owner_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_closed_by_admin_id_fkey FOREIGN KEY (closed_by_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.draft_presence
+    ADD CONSTRAINT draft_presence_pkey PRIMARY KEY (resource_type, resource_id, admin_id, tab_id);
+ALTER TABLE public.draft_presence
+    ADD CONSTRAINT draft_presence_mode_check CHECK (mode IN ('view','edit'));
+ALTER TABLE ONLY public.admin_notifications
+    ADD CONSTRAINT admin_notifications_recipient_admin_id_fkey FOREIGN KEY (recipient_admin_id) REFERENCES public.admins(id) ON DELETE CASCADE;
 
 --
 -- campaign_drafts
