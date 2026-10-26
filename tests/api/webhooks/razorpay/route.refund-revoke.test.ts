@@ -53,6 +53,9 @@ describe('Razorpay refund webhook — vault revocation', () => {
     vi.clearAllMocks()
     process.env.RAZORPAY_WEBHOOK_SECRET = SECRET
     vi.mocked(db.query).mockResolvedValue({ rows: [{ order_id: 'ord-1' }], rowCount: 1 } as any)
+    vi.mocked(db.queryOne).mockImplementation(async (sql: string) =>
+      (/FROM payments/.test(sql) ? { order_id: 'ord-1', amount: '500.00' } : { order_number: 'JS-1' }) as any
+    )
     txQuery.mockResolvedValue({ rows: [{ order_number: 'JS-1', total_amount: '500.00' }] })
   })
 
@@ -69,14 +72,16 @@ describe('Razorpay refund webhook — vault revocation', () => {
     expect(queueAdsConversion).toHaveBeenCalledWith('ord-1')
   })
 
-  it('does not revoke on a partial refund', async () => {
+  it('books a partial refund on the payment without marking the order refunded', async () => {
     await POST(refundEvent({ payment_id: 'pay_1', amount: 10000, notes: { tenant_id: 't-1' } }))
     expect(revokeOrderEntitlements).not.toHaveBeenCalled()
+    expect(txQuery).not.toHaveBeenCalled()
+    expect(vi.mocked(db.query).mock.calls.some(([sql]) => /partial_refunds/.test(String(sql)))).toBe(true)
     expect(applyRouteRefund).toHaveBeenCalled()
   })
 
   it('is a no-op when the app already recorded the refund', async () => {
-    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    vi.mocked(db.queryOne).mockResolvedValue(null)
     await POST(refundEvent({ payment_id: 'pay_1', amount: 50000, notes: { tenant_id: 't-1' } }))
     expect(revokeOrderEntitlements).not.toHaveBeenCalled()
     expect(applyRouteRefund).not.toHaveBeenCalled()
@@ -84,7 +89,6 @@ describe('Razorpay refund webhook — vault revocation', () => {
 
   it('still returns 200 when the revoke throws', async () => {
     vi.mocked(revokeOrderEntitlements).mockRejectedValueOnce(new Error('db down'))
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ order_number: 'JS-1' } as any)
     const res = await POST(refundEvent({ payment_id: 'pay_1', amount: 50000, notes: { tenant_id: 't-1' } }))
     expect(res.status).toBe(200)
     expect(applyRouteRefund).toHaveBeenCalled()

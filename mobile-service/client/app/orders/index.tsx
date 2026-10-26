@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useCallback, useRef, useState } from 'react'
 import { FlatList, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
@@ -9,19 +9,19 @@ import { useInfiniteList, useRequireAuth } from '../../src/components/account/ho
 import { InfiniteFooter, orderStatusLabel } from '../../src/components/account/ui'
 import { Badge, Card, confirm, Divider, EmptyState, Screen, Skeleton, statusTone, Text, TextButton, useBottomInset } from '../../src/ui'
 import { useTokens } from '../../src/theme'
+import { dateFormat, inr } from '../../src/lib/format'
 
 // Mirror of controller-service app/(storefront)/account/orders/page.tsx (the sm:hidden mobile card).
 
-const fmt = (n: number | string | null | undefined) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const fmt = inr
+// One formatter each rather than a toLocale* per row (each builds a new Intl formatter).
+const eddDate = dateFormat({ timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' })
+const placedDate = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' })
+const Gap = () => <View style={{ height: 12 }} />
 
 function resolveOrderEdd(order: ListOrder): string | null {
   if (!order.estimated_delivery_date) return null
-  return new Date(order.estimated_delivery_date + 'T00:00:00Z').toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return eddDate(new Date(order.estimated_delivery_date + 'T00:00:00Z'))
 }
 
 function getEddDisplay(order: ListOrder, edd: string): { label: string; color: string } {
@@ -72,13 +72,13 @@ function OrdersLoading() {
   )
 }
 
-function OrderCard({ order, cancelling, onCancel }: { order: ListOrder; cancelling: boolean; onCancel: () => void }) {
+const OrderCard = memo(function OrderCard({ order, cancelling, onCancel }: { order: ListOrder; cancelling: boolean; onCancel: (id: string) => void }) {
   const router = useRouter()
   const t = useTokens()
   const first = order.order_items[0]
   const img = first?.products?.product_images?.find(i => i.is_primary) || first?.products?.product_images?.[0]
   const extra = order.order_items.length - 1
-  const date = new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  const date = placedDate(new Date(order.created_at))
   const edd = resolveOrderEdd(order)
   const eddShow = edd && !['cancelled', 'returned'].includes(order.status) ? getEddDisplay(order, edd) : null
   const open = () => router.push(`/orders/${order.id}`)
@@ -126,12 +126,12 @@ function OrderCard({ order, cancelling, onCancel }: { order: ListOrder; cancelli
       <View className="flex-row items-center justify-between gap-2">
         <TextButton label="View Details" onPress={open} />
         {(order.status === 'pending' || order.status === 'confirmed') && (
-          <TextButton label={cancelling ? 'Submitting…' : 'Request Cancellation'} tone="danger" onPress={() => !cancelling && onCancel()} />
+          <TextButton label={cancelling ? 'Submitting…' : 'Request Cancellation'} tone="danger" onPress={() => !cancelling && onCancel(order.id)} />
         )}
       </View>
     </Card>
   )
-}
+})
 
 export default function OrdersScreen() {
   const bottom = useBottomInset()
@@ -150,7 +150,10 @@ export default function OrdersScreen() {
   })
   const orders = list.rows
 
-  const handleCancel = async (orderId: string) => {
+  // Stable for the memoized cards; list.reload is a new function every render.
+  const reload = useRef(list.reload)
+  reload.current = list.reload
+  const handleCancel = useCallback(async (orderId: string) => {
     const ok = await confirm({
       title: 'Request cancellation?',
       message: 'Request cancellation for this order? This action cannot be undone.',
@@ -162,12 +165,12 @@ export default function OrdersScreen() {
     setCancellingId(orderId)
     try {
       await cancelOrder(orderId)
-      list.reload()
+      reload.current()
     } catch {
     } finally {
       setCancellingId(null)
     }
-  }
+  }, [])
 
   return (
     <Screen title="My Orders" mode="none">
@@ -176,10 +179,10 @@ export default function OrdersScreen() {
         keyExtractor={o => o.id}
         contentContainerStyle={{ paddingBottom: bottom }}
         ListHeaderComponent={<View style={{ height: 16 }} />}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+        ItemSeparatorComponent={Gap}
         onEndReached={list.loadMore}
         onEndReachedThreshold={0.5}
-        renderItem={({ item }) => <OrderCard order={item} cancelling={cancellingId === item.id} onCancel={() => handleCancel(item.id)} />}
+        renderItem={({ item }) => <OrderCard order={item} cancelling={cancellingId === item.id} onCancel={handleCancel} />}
         ListEmptyComponent={
           !user || list.loading ? (
             <OrdersLoading />

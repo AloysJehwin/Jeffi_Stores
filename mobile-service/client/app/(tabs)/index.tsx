@@ -2,13 +2,16 @@ import { useCallback, useMemo } from 'react'
 import { RefreshControl, View, type ListRenderItem } from 'react-native'
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 import { useQuery } from '@tanstack/react-query'
+import { useFocusEffect } from 'expo-router'
 import TopNav from '../../src/components/layout/TopNav'
-import SectionRenderer from '../../src/components/home/SectionRenderer'
+import { FeedItemView, feedItems, type FeedItem } from '../../src/components/home/SectionRenderer'
 import { HomeScrollContext } from '../../src/components/home/scroll-context'
-import { HomeSkeleton, Screen, useBottomInset } from '../../src/ui'
+import { HomeSkeleton, Screen, setFeedScrolling, useBottomInset } from '../../src/ui'
 import { getHome } from '../../src/api/home'
-import type { HomeSection } from '../../src/types/home'
 import { useTokens } from '../../src/theme'
+
+const scrolling = () => setFeedScrolling(true)
+const settled = () => setFeedScrolling(false)
 
 // The storefront home: the admin-configured sections from GET /api/home, rendered like the web's page.
 export default function HomeScreen() {
@@ -25,15 +28,11 @@ export default function HomeScreen() {
     scrollY.value = e.contentOffset.y
   })
 
-  // Each product_row's position among the rows, for its alternating style.
-  const rowIndex = useMemo(() => {
-    let n = 0
-    return (data?.sections ?? []).map(s => (s.type === 'product_row' ? n++ : n))
-  }, [data?.sections])
-  const renderSection = useCallback<ListRenderItem<HomeSection>>(
-    ({ item, index }) => (data ? <SectionRenderer section={item} data={data.data} rowIndex={rowIndex[index]} /> : null),
-    [data, rowIndex]
-  )
+  // A fling cut short by leaving the tab may never report its end.
+  useFocusEffect(useCallback(() => settled, []))
+
+  const items = useMemo(() => (data ? feedItems(data.sections, data.data) : []), [data])
+  const renderItem = useCallback<ListRenderItem<FeedItem>>(({ item }) => (data ? <FeedItemView item={item} data={data.data} /> : null), [data])
 
   // A failed load gets a retry and pull to refresh (Screen's scroll mode), with the generic connection message.
   if (!isLoading && (isError || !data)) {
@@ -44,16 +43,20 @@ export default function HomeScreen() {
     <Screen header={<TopNav />} mode="none" loading={isLoading} skeleton={<View className="flex-1 overflow-hidden"><HomeSkeleton /></View>}>
       {data ? (
         <HomeScrollContext.Provider value={scrollY}>
-          {/* Windowed: sections (and their images) mount as they near the screen, not all at once. */}
+          {/* Windowed: sections, and the card grids a row of two at a time, mount as they near the screen. */}
           <Animated.FlatList
-            data={data.sections}
-            keyExtractor={s => s.id}
-            renderItem={renderSection}
+            data={items}
+            keyExtractor={it => it.key}
+            renderItem={renderItem}
             initialNumToRender={3}
             maxToRenderPerBatch={2}
             windowSize={9}
             onScroll={onScroll}
             scrollEventThrottle={16}
+            onScrollBeginDrag={scrolling}
+            onScrollEndDrag={settled}
+            onMomentumScrollBegin={scrolling}
+            onMomentumScrollEnd={settled}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: bottomInset }}
             refreshControl={

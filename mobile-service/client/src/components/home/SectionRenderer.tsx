@@ -1,14 +1,14 @@
 import type { HomeSection, HomeData, CardProduct } from '../../types/home'
-import ProductRowSection, { ROW_STYLES } from './ProductRowSection'
+import ProductRowSection, { ProductPair, ProductRowHead, ROW_STYLES, type RowStyle } from './ProductRowSection'
 import HeroCarousel from './HeroCarousel'
 import OfferSlider from './OfferSlider'
 import TrustStrip from './TrustStrip'
 import PromoBanner from './PromoBanner'
 import CountdownDealBanner from './CountdownDealBanner'
-import DealOfTheDay from './DealOfTheDay'
+import DealOfTheDay, { DealHead } from './DealOfTheDay'
 import CategoryGrid from './CategoryGrid'
 import BrandCarousel from './BrandCarousel'
-import CategoryShowcase from './CategoryShowcase'
+import CategoryShowcase, { ShowcaseHead, ShowcaseRow } from './CategoryShowcase'
 import CategoryTabs from './CategoryTabs'
 import FeaturedForYou from './FeaturedForYou'
 import RecentlyViewed from './RecentlyViewed'
@@ -90,4 +90,89 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
       return Component ? <Component section={section} data={data} /> : null
     }
   }
+}
+
+// The home feed's items. A grid of cards becomes its heading plus one item per row of two, so the feed
+// mounts (and unmounts) it a row at a time instead of a whole section of cards in one frame mid-scroll.
+
+type Rows =
+  | { kind: 'products'; products: CardProduct[]; title: string; eyebrow: string; style: RowStyle }
+  | { kind: 'deal'; products: CardProduct[] }
+  | { kind: 'showcase'; cats: HomeData['categoryShowcase'] }
+
+export type FeedItem =
+  | { key: string; type: 'section'; section: HomeSection; rowIndex: number }
+  | { key: string; type: 'head'; section: HomeSection; rows: Rows }
+  | { key: string; type: 'row'; rows: Rows; products: CardProduct[]; cats: HomeData['categoryShowcase']; last: boolean }
+
+function gridRows(section: HomeSection, data: HomeData, rowIndex: number): Rows | null {
+  if (section.layout === 'carousel' && section.type !== 'deal_of_the_day' && section.type !== 'category_showcase') return null
+  switch (section.type) {
+    case 'product_row':
+      return {
+        kind: 'products',
+        products: data.productRows[section.id] ?? [],
+        title: section.copy.title ?? 'Products',
+        eyebrow: section.copy.eyebrow ?? '',
+        style: ROW_STYLES[rowIndex % ROW_STYLES.length],
+      }
+    case 'bundle_spotlight':
+    case 'back_in_stock':
+      return {
+        kind: 'products',
+        products: (data.extras[section.id] as CardProduct[] | undefined) ?? [],
+        title: section.copy.title ?? '',
+        eyebrow: section.copy.eyebrow ?? '',
+        style: ROW_STYLES[section.type === 'bundle_spotlight' ? 1 : 2],
+      }
+    case 'deal_of_the_day':
+      return { kind: 'deal', products: data.dealOfTheDay }
+    case 'category_showcase':
+      return { kind: 'showcase', cats: data.categoryShowcase }
+    default:
+      return null
+  }
+}
+
+const rowCount = (rows: Rows) => (rows.kind === 'showcase' ? rows.cats.length : rows.products.length)
+
+export function feedItems(sections: HomeSection[], data: HomeData): FeedItem[] {
+  const out: FeedItem[] = []
+  let n = 0
+  for (const section of sections) {
+    // Each product_row's position among the rows, for its alternating style.
+    const rowIndex = section.type === 'product_row' ? n++ : n
+    const rows = gridRows(section, data, rowIndex)
+    if (!rows) {
+      out.push({ key: section.id, type: 'section', section, rowIndex })
+      continue
+    }
+    const count = rowCount(rows)
+    if (count === 0) continue
+    out.push({ key: `${section.id}:head`, type: 'head', section, rows })
+    for (let i = 0; i < count; i += 2) {
+      out.push({
+        key: `${section.id}:${i}`,
+        type: 'row',
+        rows,
+        products: rows.kind === 'showcase' ? [] : rows.products.slice(i, i + 2),
+        cats: rows.kind === 'showcase' ? rows.cats.slice(i, i + 2) : [],
+        last: i + 2 >= count,
+      })
+    }
+  }
+  return out
+}
+
+export function FeedItemView({ item, data }: { item: FeedItem; data: HomeData }) {
+  if (item.type === 'section') return <SectionRenderer section={item.section} data={data} rowIndex={item.rowIndex} />
+  const { rows } = item
+  if (item.type === 'head') {
+    if (rows.kind === 'products') return <ProductRowHead title={rows.title} eyebrow={rows.eyebrow} style={rows.style} />
+    return rows.kind === 'deal' ? <DealHead section={item.section} /> : <ShowcaseHead section={item.section} />
+  }
+  if (rows.kind === 'showcase') return <ShowcaseRow cats={item.cats} last={item.last} />
+  const bg = rows.kind === 'deal' ? 'bg-surface-secondary' : rows.style.section
+  const gap = rows.kind === 'deal' ? 12 : rows.style.gap
+  return <ProductPair products={item.products} bg={bg} gap={gap} last={item.last} />
 }

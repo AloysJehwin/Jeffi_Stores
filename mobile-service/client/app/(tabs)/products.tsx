@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Pressable, View } from 'react-native'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { FlatList, Pressable, View, type ListRenderItem } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { LayoutGrid, Rows3, Shapes } from 'lucide-react-native'
@@ -64,6 +64,21 @@ const RECENT: HomeSection = {
 
 const pairs = (rows: ListingCard[], prefix: string): Item[] =>
   Array.from({ length: Math.ceil(rows.length / 2) }, (_, i) => ({ type: 'pair' as const, key: `${prefix}${rows[i * 2].id}`, rows: rows.slice(i * 2, i * 2 + 2) }))
+
+// Memoized so the screen re-rendering (paging state, the compare bar) doesn't re-render mounted cards.
+const Pair = memo(function Pair({ rows, width }: { rows: ListingCard[]; width: number }) {
+  return (
+    <View className="mb-3 flex-row gap-3 px-4">
+      {rows.map(r => (
+        <View key={r.id} style={{ width }}>
+          <ProductCard product={r} handlingDays={r.handlingDays} />
+        </View>
+      ))}
+    </View>
+  )
+}, (a, b) => a.width === b.width && a.rows.length === b.rows.length && a.rows.every((r, i) => r === b.rows[i]))
+
+const keyOf = (it: Item) => it.key
 
 export default function ProductsScreen() {
   const router = useRouter()
@@ -137,8 +152,41 @@ export default function ProductsScreen() {
     return out
   }, [loading, rows, view, grouped, promo])
 
-  const apply = (next: ListingParams) => router.setParams(toRouteParams(next))
+  const apply = useCallback((next: ListingParams) => router.setParams(toRouteParams(next)), [router])
   const toggleGrouped = () => apply({ ...params, sort: grouped ? undefined : 'category', order: undefined })
+
+  // Stable, so a screen re-render doesn't re-render every mounted row.
+  const renderItem = useCallback<ListRenderItem<Item>>(
+    ({ item }) => {
+      if (item.type === 'promo') {
+        return promo ? (
+          <View className="mb-3 px-4">
+            <ListingPromoBanner offer={promo} />
+          </View>
+        ) : null
+      }
+      if (item.type === 'table') {
+        return (
+          <View className="px-4">
+            <ProductTable products={rows} />
+          </View>
+        )
+      }
+      if (item.type === 'group') {
+        return (
+          <View className={`mb-4 flex-row items-center gap-3 px-4 ${item.gap ? 'mt-5' : ''}`}>
+            <Pressable accessibilityRole="link" onPress={() => (item.slug ? router.push(`/category/${item.slug}`) : apply({}))} hitSlop={8}>
+              <Text className="font-display text-base font-extrabold text-foreground">{item.name}</Text>
+            </Pressable>
+            <View className="h-px flex-1 bg-border-default" />
+            <Text className="text-xs text-foreground-muted">{item.count} products</Text>
+          </View>
+        )
+      }
+      return <Pair rows={item.rows} width={cardW} />
+    },
+    [promo, rows, router, apply, cardW]
+  )
 
   const header = (
     <View className="px-4 pt-6">
@@ -214,43 +262,8 @@ export default function ProductsScreen() {
       <FlatList
         ref={listRef}
         data={items}
-        keyExtractor={it => it.key}
-        renderItem={({ item }) => {
-          if (item.type === 'promo') {
-            return (
-              <View className="mb-3 px-4">
-                <ListingPromoBanner offer={promo!} />
-              </View>
-            )
-          }
-          if (item.type === 'table') {
-            return (
-              <View className="px-4">
-                <ProductTable products={rows} />
-              </View>
-            )
-          }
-          if (item.type === 'group') {
-            return (
-              <View className={`mb-4 flex-row items-center gap-3 px-4 ${item.gap ? 'mt-5' : ''}`}>
-                <Pressable accessibilityRole="link" onPress={() => (item.slug ? router.push(`/category/${item.slug}`) : apply({}))} hitSlop={8}>
-                  <Text className="font-display text-base font-extrabold text-foreground">{item.name}</Text>
-                </Pressable>
-                <View className="h-px flex-1 bg-border-default" />
-                <Text className="text-xs text-foreground-muted">{item.count} products</Text>
-              </View>
-            )
-          }
-          return (
-            <View className="mb-3 flex-row gap-3 px-4">
-              {item.rows.map(r => (
-                <View key={r.id} style={{ width: cardW }}>
-                  <ProductCard product={r} handlingDays={r.handlingDays} />
-                </View>
-              ))}
-            </View>
-          )
-        }}
+        keyExtractor={keyOf}
+        renderItem={renderItem}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         ListFooterComponent={footer}
@@ -258,9 +271,10 @@ export default function ProductsScreen() {
           if (!grouped && control.hasMore && !control.loadingMore && !control.error) control.loadMore()
         }}
         onEndReachedThreshold={0.6}
-        initialNumToRender={4}
-        maxToRenderPerBatch={4}
-        windowSize={11}
+        // Rows of two cards: small batches keep each mount commit short while scrolling.
+        initialNumToRender={3}
+        maxToRenderPerBatch={2}
+        windowSize={9}
         showsVerticalScrollIndicator={false}
       />
       <FilterSheet

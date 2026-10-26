@@ -27,6 +27,7 @@ import { resolveSubscriptionTenant, runInTenant, type WebhookTenant } from '@/li
 import { processSubscriptionEvent } from '@/lib/subscriptions/cycle'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
+import { recordExternalRefund } from '@/lib/payments/refund'
 
 // Customer-subscription events we route to handleSubscriptionEvent. Kept as a Set so the POST
 // dispatch stays a single membership test and new states only touch this list.
@@ -101,7 +102,9 @@ export async function POST(request: NextRequest) {
       // Account-level settlement cleared: advance every Route transfer it paid out to 'settled'.
       await applySettlementProcessed(event.payload.settlement.entity).catch(() => {})
     } else if (eventType === 'refund.created' || eventType === 'refund.processed') {
-      await handleRefund(event.payload.refund.entity)
+      await handleRefund(event.payload.refund.entity, event.payload.payment?.entity)
+    } else if (eventType === 'payment.dispute.lost') {
+      await handleDisputeLost(event.payload.dispute?.entity, event.payload.payment?.entity)
     } else if (SUBSCRIPTION_EVENTS.has(eventType)) {
       // Customer subscriptions are the ONLY branch allowed to break the 200-on-catch contract, and
       // only on a transient failure. We run the dispatch in its own try so a TransientWebhookError
@@ -558,30 +561,38 @@ async function handleTransferReversed(transfer: any) {
  * Refunds issued BY the app already recorded themselves; the status guard makes this a no-op
  * for those rather than double-counting.
  */
-async function handleRefund(refund: any) {
+async function handleRefund(refund: any, payment?: any) {
   const paymentId = (refund?.payment_id ?? '').toString().trim()
   if (!paymentId) return
-
-  // Razorpay hits a fixed URL with no tenant host, so ALS is empty here. Resolve the tenant first
-  // (refund notes, else the captured payment's notes) and do every per-tenant write inside it.
-  let tenant = await resolveWebhookTenantId(refund, '').catch(() => null)
-  if (!tenant) {
-    const payment = await import('@/lib/payments/razorpay')
-      .then(m => m.getRazorpayInstanceFor())
-      .then(({ instance }) => instance.payments.fetch(paymentId))
-      .catch(() => null)
-    if (payment) tenant = await resolveWebhookTenantId(payment, '').catch(() => null)
-  }
-  const NIL = '00000000-0000-0000-0000-000000000000'
-  const ctx =
-    tenant?.tenantId && tenant.tenantId !== NIL
-      ? await import('@/lib/tenant-registry/host-resolution')
-          .then(m => m.lookupTenantContextById(tenant!.tenantId))
-          .catch(() => null)
-      : null
-  const scope: WebhookTenant = { tenantId: tenant?.tenantId ?? NIL, slug: tenant?.slug ?? '', ctx }
+  const { scope, tenant } = await webhookScopeFor(refund, paymentId, payment)
 
   const order = await runInTenant(scope, async () => {
+    const current = await queryOne<{ order_id: string; amount: string }>(
+      `SELECT order_id, amount FROM payments WHERE transaction_id = $1 AND status <> 'refunded'`,
+      [paymentId]
+    ).catch(() => null)
+    if (!current) return null // already recorded by the in-app refund path
+
+    // A partial refund (an order-change refund, or part of a payment refunded from the dashboard) leaves
+    // the payment and order paid; it is only booked against the payment, once per refund id.
+    const refundedPaise = Number(payment?.amount_refunded ?? refund?.amount) || 0
+    const full = payment?.refund_status
+      ? payment.refund_status === 'full'
+      : refundedPaise >= Math.round(Number(current.amount) * 100) - 1
+    if (!full) {
+      const refundId = (refund?.id ?? '').toString()
+      const entry = { id: refundId, amount: (Number(refund?.amount) || 0) / 100, purpose: refund?.notes?.purpose || 'razorpay_dashboard', at: new Date().toISOString() }
+      await query(
+        `UPDATE payments
+            SET gateway_response = jsonb_set(COALESCE(gateway_response, '{}'::jsonb), '{partial_refunds}',
+                  COALESCE(gateway_response->'partial_refunds', '[]'::jsonb) || $2::jsonb),
+                updated_at = NOW()
+          WHERE transaction_id = $1 AND NOT (COALESCE(gateway_response->'partial_refunds', '[]'::jsonb) @> $3::jsonb)`,
+        [paymentId, JSON.stringify([entry]), JSON.stringify([{ id: refundId }])]
+      ).catch(() => {})
+      return queryOne<{ order_number: string }>(`SELECT order_number FROM orders WHERE id = $1`, [current.order_id]).catch(() => null)
+    }
+
     const updated = await query(
       `UPDATE payments SET status = 'refunded', updated_at = NOW()
         WHERE transaction_id = $1 AND status <> 'refunded'
@@ -630,6 +641,72 @@ async function handleRefund(refund: any) {
     refundPaise: Number(refund?.amount) || 0,
     orderRef: order.order_number,
   }).catch(() => {})
+}
+
+/**
+ * A lost dispute (chargeback) returns the money through the customer's bank, not as a refund. Record it
+ * as one so the order, the payment and the tenant's Route share settle the same way. Keyed on the
+ * dispute id, so a redelivered event changes nothing.
+ */
+async function handleDisputeLost(dispute: any, payment?: any) {
+  const paymentId = (dispute?.payment_id ?? payment?.id ?? '').toString().trim()
+  const disputeId = (dispute?.id ?? '').toString().trim()
+  const paise = Number(dispute?.amount_deducted) || Number(dispute?.amount) || 0
+  if (!paymentId || !disputeId || !(paise > 0)) return
+  const { scope, tenant } = await webhookScopeFor(payment ?? dispute, paymentId)
+
+  await runInTenant(scope, async () => {
+    const row = await queryOne<{ order_id: string; amount: string; order_number: string; total_amount: string }>(
+      `SELECT p.order_id, p.amount, o.order_number, o.total_amount
+         FROM payments p JOIN orders o ON o.id = p.order_id
+        WHERE p.transaction_id = $1 AND p.status = 'completed' AND COALESCE(p.gateway_response::text, '') NOT LIKE '%' || $2 || '%'`,
+      [paymentId, disputeId]
+    )
+    if (!row) return
+    const full = paise >= Math.round(Number(row.amount) * 100) - 1
+    await recordExternalRefund({
+      orderId: row.order_id,
+      amount: paise / 100,
+      full,
+      refund: { method: 'razorpay_dispute', reference: disputeId, note: dispute?.reason_code ? `Dispute lost (${dispute.reason_code})` : 'Dispute lost' },
+      purpose: 'dispute',
+      orderRef: row.order_number,
+      tenantId: tenant?.tenantId,
+      transactionId: paymentId,
+    })
+    if (!full) return
+    await withTransaction(async client => {
+      await client.query(`UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [row.order_id])
+      if (paise >= Math.round(Number(row.total_amount) * 100) - 1) {
+        const { revokeOrderEntitlements } = await import('@/lib/orders/entitlements')
+        await revokeOrderEntitlements(client, { orderId: row.order_id, reason: 'refund' })
+      }
+    })
+    await queueAdsConversion(row.order_id)
+  }).catch(e => console.error('[webhook:razorpay] dispute.lost not recorded', paymentId, e))
+}
+
+// Razorpay hits a fixed URL with no tenant host, so ALS is empty here. Resolve the tenant from the
+// entity's notes, else the captured payment's, and do every per-tenant write inside the scope.
+async function webhookScopeFor(entity: any, paymentId: string, payment?: any) {
+  let tenant = await resolveWebhookTenantId(entity, '').catch(() => null)
+  if (!tenant && payment) tenant = await resolveWebhookTenantId(payment, '').catch(() => null)
+  if (!tenant) {
+    const fetched = await import('@/lib/payments/razorpay')
+      .then(m => m.getRazorpayInstanceFor())
+      .then(({ instance }) => instance.payments.fetch(paymentId))
+      .catch(() => null)
+    if (fetched) tenant = await resolveWebhookTenantId(fetched, '').catch(() => null)
+  }
+  const NIL = '00000000-0000-0000-0000-000000000000'
+  const ctx =
+    tenant?.tenantId && tenant.tenantId !== NIL
+      ? await import('@/lib/tenant-registry/host-resolution')
+          .then(m => m.lookupTenantContextById(tenant!.tenantId))
+          .catch(() => null)
+      : null
+  const scope: WebhookTenant = { tenantId: tenant?.tenantId ?? NIL, slug: tenant?.slug ?? '', ctx }
+  return { scope, tenant }
 }
 
 async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId: string, payment: any) {

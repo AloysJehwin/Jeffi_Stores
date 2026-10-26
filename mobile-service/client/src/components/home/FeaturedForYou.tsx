@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import ProductCard from '../product/ProductCard'
@@ -31,13 +32,16 @@ export default function FeaturedForYou({ section }: SectionProps) {
   })
 
   // Only genuine personalised results; signed-out visitors get a best-sellers `fallback`, which stays hidden.
-  const rows = data && !data.fallback && Array.isArray(data.products) ? data.products : []
-  if (rows.length === 0) return null
-  // The route already returns card props; raw rows go through toCard.
-  const products = rows.map(r => ({
-    card: (typeof r.displayPrice === 'number' ? r : toCard(r as any, gstEnabled)) as CardProduct,
-    handlingDays: typeof r.handlingDays === 'number' ? r.handlingDays : undefined,
-  }))
+  // The route already returns card props; raw rows go through toCard. Built once per response, so the
+  // memoized cards don't all re-render with the section.
+  const products = useMemo(() => {
+    const rows = data && !data.fallback && Array.isArray(data.products) ? data.products : []
+    return rows.map(r => ({
+      card: (typeof r.displayPrice === 'number' ? r : toCard(r as any, gstEnabled)) as CardProduct,
+      handlingDays: typeof r.handlingDays === 'number' ? r.handlingDays : undefined,
+    }))
+  }, [data, gstEnabled])
+  if (products.length === 0) return null
 
   // "Explore more" is hidden below sm on the web.
   return (

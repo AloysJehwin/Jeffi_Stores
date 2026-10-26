@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, View, useWindowDimensions, type TextLayoutEventData, type NativeSyntheticEvent } from 'react-native'
 import { Gradient, Media, PagerDots, Text, elevationClass, useAutoplay, useElevation, useMotion, useSwipe } from '../../ui'
 import { useRouter } from 'expo-router'
@@ -70,10 +70,11 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
   const go = useCallback((next: number) => setActive(((next % count) + count) % count), [count])
   const step = useCallback((d: number) => setActive(a => (((a + d) % count) + count) % count), [count])
 
-  const auto = useAutoplay(() => step(1), { enabled: count > 1, intervalMs: AUTO_ADVANCE_MS })
+  // Advances only while on screen with the tab focused; off screen a slide change is wasted work mid-scroll.
+  const { ref, onLayout, onScreen } = useOnScreen(count > 1 || slides.some(s => s.video_url))
+  const auto = useAutoplay(() => step(1), { enabled: count > 1 && onScreen, intervalMs: AUTO_ADVANCE_MS })
   useEffect(() => auto.restart(), [auto, index])
   const swipe = useSwipe(step)
-  const { ref, onLayout, onScreen } = useOnScreen(slides.some(s => s.video_url))
 
   const open = () => {
     const s = slides[index]
@@ -118,7 +119,7 @@ function Carousel({ slides }: { slides: HeroSlide[] }) {
   )
 }
 
-function Slide({ slide: s, active, play, cardWidth, titleSize }: { slide: Resolved; active: boolean; play: boolean; cardWidth: number; titleSize: number }) {
+const Slide = memo(function Slide({ slide: s, active, play, cardWidth, titleSize }: { slide: Resolved; active: boolean; play: boolean; cardWidth: number; titleSize: number }) {
   const opacity = useSharedValue(active ? 1 : 0)
   const { animate } = useMotion()
   useEffect(() => {
@@ -157,7 +158,7 @@ function Slide({ slide: s, active, play, cardWidth, titleSize }: { slide: Resolv
       </View>
     </Animated.View>
   )
-}
+})
 
 // whitespace-pre-line inside the 55% column: wraps at spaces, but a word wider than the column
 // overflows it (as on the web) instead of breaking mid-word. Word widths come from one hidden layout.
