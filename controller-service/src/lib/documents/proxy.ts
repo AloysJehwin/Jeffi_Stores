@@ -28,6 +28,8 @@ async function forward(request: NextRequest, path: string, claims: Record<string
     headers: {
       authorization: `Bearer ${token({ tenantId: tenant.tenantId, tenantSlug: tenant.slug, ...claims })}`,
       ...(body ? { 'content-type': request.headers.get('content-type') || 'application/json' } : {}),
+      // Draft-lock fence for stale tabs (document-service checks it on draft writes).
+      ...(request.headers.get('x-draft-lock-epoch') ? { 'x-draft-lock-epoch': request.headers.get('x-draft-lock-epoch')! } : {}),
     },
     body: body || undefined,
     cache: 'no-store',

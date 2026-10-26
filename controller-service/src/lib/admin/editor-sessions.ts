@@ -1,5 +1,7 @@
 import type { PoolClient } from 'pg'
+import { acquire, isDraftResourceType, type LockActor, type LockResult } from '@jeffi/draft-locks'
 import { query, queryMany, queryOne, withTransaction } from '@/lib/shared/db'
+import { hasScope } from '@/lib/auth/scopes'
 
 export type ResourceType =
   | 'mailer'
@@ -154,7 +156,7 @@ export async function snapshotResource(
       }
     }
     case 'homepage': {
-      // Singleton draft (homepage_drafts.id = true). resourceId is the admin's own uuid.
+      // Singleton draft (homepage_drafts.id = true); resourceId is HOMEPAGE_LOCK_ID.
       const row = await queryOne<{ sections: unknown; hero_slides: unknown; updated_at: string }>(
         `SELECT sections, hero_slides, updated_at FROM homepage_drafts WHERE id = true`
       )
@@ -189,7 +191,8 @@ export async function restoreSnapshot(
   client: PoolClient,
   resourceType: ResourceType,
   resourceId: string,
-  snapshot: Record<string, unknown>
+  snapshot: Record<string, unknown>,
+  adminId?: string
 ): Promise<void> {
   switch (resourceType) {
     case 'mailer': {
@@ -395,7 +398,7 @@ export async function restoreSnapshot(
                  hero_slides = EXCLUDED.hero_slides,
                  updated_by = EXCLUDED.updated_by,
                  updated_at = now()`,
-          [JSON.stringify(sections ?? []), JSON.stringify(heroSlides ?? []), resourceId]
+          [JSON.stringify(sections ?? []), JSON.stringify(heroSlides ?? []), adminId ?? resourceId]
         )
       } else {
         await client.query(`DELETE FROM homepage_drafts WHERE id = true`)
@@ -405,34 +408,62 @@ export async function restoreSnapshot(
   }
 }
 
-/** Open an edit session or return the existing open one for this admin+resource. */
+/**
+ * Open an edit session or return the existing open one for this admin+resource. With an actor,
+ * the draft lock is acquired in the same transaction (DraftLockError when someone else holds it),
+ * so viewers never get a session.
+ */
 export async function openSession(
   adminId: string,
   resourceType: ResourceType,
-  resourceId: string
-): Promise<{ id: string; resumed: boolean; startedAt: string; changeCount: number } | null> {
-  const existing = await queryOne<{ id: string; started_at: string; change_count: number }>(
-    `SELECT id, started_at, change_count FROM editor_sessions
-     WHERE admin_id = $1 AND resource_type = $2 AND resource_id = $3 AND closed_at IS NULL
-     LIMIT 1`,
-    [adminId, resourceType, resourceId]
-  )
-  if (existing) {
-    return {
-      id: existing.id,
-      resumed: true,
-      startedAt: existing.started_at,
-      changeCount: existing.change_count,
+  resourceId: string,
+  actor?: LockActor | null
+): Promise<{ id: string; resumed: boolean; startedAt: string; changeCount: number; lock?: LockResult } | null> {
+  const lockable = !!actor && isDraftResourceType(resourceType)
+  if (!lockable) {
+    const existing = await queryOne<{ id: string; started_at: string; change_count: number }>(
+      `SELECT id, started_at, change_count FROM editor_sessions
+       WHERE admin_id = $1 AND resource_type = $2 AND resource_id = $3 AND closed_at IS NULL
+       LIMIT 1`,
+      [adminId, resourceType, resourceId]
+    )
+    if (existing) {
+      return {
+        id: existing.id,
+        resumed: true,
+        startedAt: existing.started_at,
+        changeCount: existing.change_count,
+      }
     }
   }
   const snap = await snapshotResource(resourceType, resourceId)
   if (!snap) return null
-  const row = await queryOne<{ id: string; started_at: string }>(
-    `INSERT INTO editor_sessions (admin_id, resource_type, resource_id, snapshot)
-     VALUES ($1, $2, $3, $4::jsonb) RETURNING id, started_at`,
-    [adminId, resourceType, resourceId, JSON.stringify(snap.snapshot)]
-  )
-  return row ? { id: row.id, resumed: false, startedAt: row.started_at, changeCount: 0 } : null
+  if (!lockable) {
+    const row = await queryOne<{ id: string; started_at: string }>(
+      `INSERT INTO editor_sessions (admin_id, resource_type, resource_id, snapshot)
+       VALUES ($1, $2, $3, $4::jsonb) RETURNING id, started_at`,
+      [adminId, resourceType, resourceId, JSON.stringify(snap.snapshot)]
+    )
+    return row ? { id: row.id, resumed: false, startedAt: row.started_at, changeCount: 0 } : null
+  }
+  return withTransaction(async client => {
+    const lock = await acquire(client, actor!, resourceType as never, resourceId, { hasScope })
+    const existing = await client.query(
+      `SELECT id, started_at, change_count FROM editor_sessions
+       WHERE admin_id = $1 AND resource_type = $2 AND resource_id = $3 AND closed_at IS NULL
+       LIMIT 1`,
+      [adminId, resourceType, resourceId]
+    )
+    const e = existing.rows[0]
+    if (e) return { id: e.id, resumed: true, startedAt: e.started_at, changeCount: e.change_count, lock }
+    const ins = await client.query(
+      `INSERT INTO editor_sessions (admin_id, resource_type, resource_id, snapshot)
+       VALUES ($1, $2, $3, $4::jsonb) RETURNING id, started_at`,
+      [adminId, resourceType, resourceId, JSON.stringify(snap.snapshot)]
+    )
+    const row = ins.rows[0]
+    return row ? { id: row.id, resumed: false, startedAt: row.started_at, changeCount: 0, lock } : null
+  })
 }
 
 /**
@@ -467,7 +498,11 @@ export async function saveSession(sessionId: string, adminId: string): Promise<b
   return (r.rowCount ?? 0) > 0
 }
 
-/** Roll back the resource to the session's snapshot inside a transaction. */
+/**
+ * Roll back the resource to the session's snapshot inside a transaction. With a draft lock in
+ * play the snapshot is restored only if the caller still holds it and the session started under
+ * their current hold; otherwise (taken over, handed over) the session just closes as superseded.
+ */
 export async function cancelSession(sessionId: string, adminId: string): Promise<boolean> {
   const session = await queryOne<{
     resource_type: ResourceType
@@ -480,11 +515,19 @@ export async function cancelSession(sessionId: string, adminId: string): Promise
   )
   if (!session) return false
   await withTransaction(async (client: PoolClient) => {
-    await restoreSnapshot(client, session.resource_type, session.resource_id, session.snapshot)
-    await client.query(
-      `UPDATE editor_sessions SET closed_at = now(), closed_reason = 'cancel' WHERE id = $1`,
-      [sessionId]
+    const lock = await client.query(
+      `SELECT l.owner_admin_id, l.closed_at, l.acquired_at <= s.started_at AS held_since_start
+         FROM draft_locks l JOIN editor_sessions s ON s.id = $3
+        WHERE l.resource_type = $1 AND l.resource_id = $2 FOR UPDATE OF l`,
+      [session.resource_type, session.resource_id, sessionId]
     )
+    const l = lock.rows[0]
+    const mayRestore = !l || (!l.closed_at && l.owner_admin_id === adminId && l.held_since_start)
+    if (mayRestore) await restoreSnapshot(client, session.resource_type, session.resource_id, session.snapshot, adminId)
+    await client.query(`UPDATE editor_sessions SET closed_at = now(), closed_reason = $2 WHERE id = $1`, [
+      sessionId,
+      mayRestore ? 'cancel' : 'superseded',
+    ])
   })
   return true
 }
