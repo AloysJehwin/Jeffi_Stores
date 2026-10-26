@@ -79,6 +79,21 @@ const SQL: Record<OrderKey, FieldSql> = {
   shipping_method: { kind: 'values', expr: 'o.shipping_method' },
 
   customer: { kind: 'text', expr: ['o.customer_name', 'o.customer_email', 'o.customer_phone'] },
+  // Razorpay payment / order ids and refund ids, wherever a payment, an order edit or a variant change keeps them.
+  txn: {
+    kind: 'custom',
+    build: (q, bind) => {
+      const id = bind(String(q.txn).trim())
+      const inRefunds = (col: string) => `COALESCE(${col}, '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('id', ${id}::text))`
+      return `(EXISTS (SELECT 1 FROM payments pm WHERE pm.order_id = o.id AND (pm.transaction_id = ${id}
+          OR pm.gateway_response->>'razorpay_payment_id' = ${id} OR pm.gateway_response->>'razorpay_order_id' = ${id}
+          OR pm.gateway_response->'refund'->>'id' = ${id} OR ${inRefunds("pm.gateway_response->'partial_refunds'")}))
+        OR EXISTS (SELECT 1 FROM order_adjustments oa WHERE oa.order_id = o.id
+          AND (oa.razorpay_payment_id = ${id} OR ${inRefunds('oa.refunds')}))
+        OR EXISTS (SELECT 1 FROM variant_change_requests vc WHERE vc.order_id = o.id
+          AND (vc.razorpay_payment_id = ${id} OR vc.refund_id = ${id})))`
+    },
+  },
   customer_type: {
     kind: 'enum',
     virtual: {

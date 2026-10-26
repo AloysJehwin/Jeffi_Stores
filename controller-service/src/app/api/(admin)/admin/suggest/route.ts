@@ -251,6 +251,23 @@ async function suggestOrders(q: string): Promise<SuggestItem[]> {
   }))
 }
 
+// Whoever placed orders, guests included, most orders first; the id is the email the orders filter matches on.
+async function suggestOrderCustomers(q: string): Promise<SuggestItem[]> {
+  const sc = buildSearchClause(q, ['o.customer_name', 'o.customer_email', 'o.customer_phone'], 1)
+  const rows = await queryMany<{ email: string; name: string | null; phone: string | null; n: string }>(
+    `SELECT lower(o.customer_email) AS email, max(o.customer_name) AS name, max(o.customer_phone) AS phone, count(*) AS n
+       FROM orders o
+      WHERE o.status IS DISTINCT FROM 'draft' AND o.customer_email IS NOT NULL AND ${sc.clause}
+      GROUP BY lower(o.customer_email) ORDER BY count(*) DESC, max(o.created_at) DESC LIMIT 8`,
+    sc.params
+  )
+  return (rows || []).map(r => ({
+    id: r.email,
+    label: r.name || r.email,
+    sublabel: [r.email, r.phone, `${r.n} order${r.n === '1' ? '' : 's'}`].filter(Boolean).join(' · '),
+  }))
+}
+
 async function suggestCustomers(q: string): Promise<SuggestItem[]> {
   const sc = buildSearchClause(q, ['u.first_name', 'u.last_name', 'u.email', 'u.phone'], 1)
   const rows = await queryMany<{
@@ -633,6 +650,7 @@ const handlers: Record<string, (q: string) => Promise<SuggestItem[]>> = {
   products: suggestProducts,
   orders: suggestOrders,
   customers: suggestCustomers,
+  order_customers: suggestOrderCustomers,
   invoices: suggestInvoices,
   quotations: suggestQuotations,
   categories: suggestCategories,
