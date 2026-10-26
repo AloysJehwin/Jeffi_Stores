@@ -54,6 +54,7 @@ export async function getFilterValues(
   q: FilterQuery,
   opts: { search?: string; page?: number } = {}
 ): Promise<{ values: FilterValue[]; hasMore: boolean } | null> {
+  if (entity.custom) return entity.custom.values ? entity.custom.values(field, opts) : null
   const ctx = await filterContext(entity, q)
   const vq = valuesQuery(entity, field, q, { ...opts, ctx })
   if (!vq) return null

@@ -51,6 +51,7 @@ export function normalizeQuery<K extends string>(entity: FilterEntity<K>, sp: Pa
     const s = params.get(p)?.trim().slice(0, MAX_VALUE_LENGTH)
     if (s) q[p] = s
   }
+  if (entity.custom) return { ...q, ...entity.custom.normalize(params) }
   for (const f of entity.fields) {
     const s: FieldSql = entity.sql[f.key]
     const names = paramNamesOf(f)
@@ -201,6 +202,7 @@ export function buildClauses<K extends string>(
     params.push(value)
     return `$${startIdx + params.length - 1}`
   }
+  if (entity.custom) return opts.only ? { conditions, params, nextIdx: startIdx } : entity.custom.clauses(q, startIdx)
   for (const f of entity.fields) {
     if (opts.omit?.includes(f.key) || (opts.only && !opts.only.includes(f.key))) continue
     conditions.push(...fieldConditions(f, entity.sql[f.key], q, bind, opts.ctx ?? {}))
@@ -236,6 +238,7 @@ export function buildWhere<K extends string>(
 export function hasFilters<K extends string>(entity: FilterEntity<K>, q: FilterQuery, omit: string[] = []): boolean {
   const sp = searchParamOf(entity as FilterEntity)
   if (entity.search && q[sp] && !omit.includes(sp)) return true
+  if (entity.custom) return entity.custom.clauses(q, 1).conditions.length > 0
   return entity.fields.some(f => !omit.includes(f.key) && paramNamesOf(f).some(n => !!q[n]))
 }
 

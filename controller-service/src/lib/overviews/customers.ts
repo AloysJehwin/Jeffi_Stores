@@ -1,20 +1,22 @@
 import type { AttentionItem } from '@/lib/overview/attention'
 import { ratio } from '@/lib/overview/period'
+import { NO_SCOPE, filteredHref, type BoundScope } from '@/lib/overview/filter-scope'
 import { BOUNDS, num, periodCase, realized, str } from './marketing'
 
 // Strip for the customers list. Depth (cohorts, LTV, health) lives on /admin/crm.
+// `f` carries the list's filters: on the users alias u, or on user ids (orders by matching accounts).
 
-export const KPI_SQL = `
+export const kpiSql = (f: BoundScope = NO_SCOPE) => `
 WITH ${BOUNDS},
 nu AS (
   SELECT ${periodCase('u.created_at')} AS period, u.is_guest
     FROM users u, b
-   WHERE u.created_at >= b.p0 AND u.created_at < b.c1 AND u.merged_to_user_id IS NULL
+   WHERE u.created_at >= b.p0 AND u.created_at < b.c1 AND u.merged_to_user_id IS NULL${f.and}
 ),
 ro AS (
   SELECT ${periodCase('o.created_at')} AS period, o.user_id, o.total_amount, COALESCE(u.is_guest, true) AS guest
     FROM orders o LEFT JOIN users u ON u.id = o.user_id, b
-   WHERE ${realized('o')} AND o.created_at >= b.p0 AND o.created_at < b.c1
+   WHERE ${realized('o')} AND o.created_at >= b.p0 AND o.created_at < b.c1${f.ids('o.user_id')}
 ),
 life AS (
   SELECT o.user_id,
@@ -37,25 +39,28 @@ SELECT p.period,
        (SELECT COALESCE(SUM(total_amount), 0) FROM ro WHERE ro.period = p.period) AS revenue
   FROM (VALUES ('cur'), ('prev')) p(period)
 `
+export const KPI_SQL = kpiSql()
 
-export const STATES_SQL = `
+export const statesSql = (f: BoundScope = NO_SCOPE) => `
 WITH ${BOUNDS}
 SELECT COALESCE(NULLIF(TRIM(o.shipping_address_snapshot->>'state'), ''), 'Unknown') AS state,
        COUNT(*) AS orders,
        COUNT(DISTINCT COALESCE(o.user_id::text, o.customer_email)) AS customers,
        COALESCE(SUM(o.total_amount), 0) AS revenue
   FROM orders o, b
- WHERE ${realized('o')} AND o.created_at >= b.c0 AND o.created_at < b.c1
+ WHERE ${realized('o')} AND o.created_at >= b.c0 AND o.created_at < b.c1${f.ids('o.user_id')}
  GROUP BY 1 ORDER BY orders DESC LIMIT 6
 `
+export const STATES_SQL = statesSql()
 
-export const STATE_SQL = `
-SELECT (SELECT COUNT(*) FROM users WHERE is_flagged AND merged_to_user_id IS NULL) AS flagged,
+export const stateSql = (f: BoundScope = NO_SCOPE) => `
+SELECT (SELECT COUNT(*) FROM users WHERE is_flagged AND merged_to_user_id IS NULL${f.ids('id')}) AS flagged,
        (SELECT COUNT(*) FROM users u WHERE u.is_guest = false AND u.merged_to_user_id IS NULL
            AND u.created_at > NOW() - INTERVAL '30 days'
-           AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)) AS new_no_order,
-       (SELECT COUNT(*) FROM users WHERE is_guest = false AND merged_to_user_id IS NULL) AS total_accounts
+           AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)${f.and}) AS new_no_order,
+       (SELECT COUNT(*) FROM users WHERE is_guest = false AND merged_to_user_id IS NULL${f.ids('id')}) AS total_accounts
 `
+export const STATE_SQL = stateSql()
 
 export interface CustomerTotals {
   new_accounts: number
@@ -108,7 +113,13 @@ export const toCustomerState = (r: Record<string, unknown> | undefined): Custome
 /** Guest orders above this share get a nudge to push sign-up at checkout. */
 export const HIGH_GUEST_SHARE = 0.5
 
-export function customerAttention(state: CustomerState, cur: CustomerTotals, prev: CustomerTotals): AttentionItem[] {
+/** `query`: the list's canonical filters, carried into the links. */
+export function customerAttention(
+  state: CustomerState,
+  cur: CustomerTotals,
+  prev: CustomerTotals,
+  query = ''
+): AttentionItem[] {
   const out: AttentionItem[] = []
   if (state.flagged)
     out.push({
@@ -116,7 +127,7 @@ export function customerAttention(state: CustomerState, cur: CustomerTotals, pre
       severity: 'warning',
       title: `${state.flagged} flagged customer${state.flagged === 1 ? '' : 's'}`,
       sub: 'Review before their next order ships.',
-      href: '/admin/customers?status=flagged',
+      href: filteredHref('/admin/customers', { status: 'flagged' }, query),
     })
   if (state.new_no_order)
     out.push({
@@ -124,7 +135,7 @@ export function customerAttention(state: CustomerState, cur: CustomerTotals, pre
       severity: 'info',
       title: `${state.new_no_order} account${state.new_no_order === 1 ? '' : 's'} from the last 30 days without an order`,
       sub: 'A welcome coupon or follow-up can convert them.',
-      href: '/admin/customers?segment=lead',
+      href: filteredHref('/admin/customers', { segment: 'lead' }, query),
     })
   if (cur.guest_share != null && cur.guest_share > HIGH_GUEST_SHARE && cur.account_orders + cur.guest_orders >= 10)
     out.push({

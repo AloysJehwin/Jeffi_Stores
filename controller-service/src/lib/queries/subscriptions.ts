@@ -1,5 +1,7 @@
 import 'server-only'
+import { buildWhere, type FilterQuery, type ScopeSql } from '@jeffi/list-filters'
 import { queryOne, queryMany, queryCount } from './shared'
+import { CYCLE_PAISE_SQL, SUBSCRIPTIONS_ENTITY } from '@/lib/filters/entities/subscriptions'
 import {
   SUBSCRIPTION_INTERVAL_LABELS,
   SUBSCRIPTION_STATUS_LABELS,
@@ -8,8 +10,7 @@ import {
 
 export const ADMIN_SUBSCRIPTIONS_PAGE_SIZE = 25
 
-// Per-cycle amount in paise and its monthly normalisation (weekly*52/12, quarterly/3, yearly/12).
-const CYCLE_PAISE_SQL = `(COALESCE(s.unit_price_paise, 0) * s.quantity + s.shipping_paise)`
+// Monthly normalisation of the per-cycle amount (weekly*52/12, quarterly/3, yearly/12).
 const MONTHLY_FACTOR_SQL = `CASE s.interval WHEN 'weekly' THEN 52.0 / 12 WHEN 'quarterly' THEN 1.0 / 3 WHEN 'yearly' THEN 1.0 / 12 ELSE 1 END`
 
 export interface AdminSubscriptionStats {
@@ -97,7 +98,8 @@ function toItem(r: ListRow): AdminSubscriptionListItem {
   }
 }
 
-export async function getAdminSubscriptionStats(): Promise<AdminSubscriptionStats> {
+/** `scope`: the list's filters on alias s (from filterScope(...).and(1)). */
+export async function getAdminSubscriptionStats(scope?: ScopeSql): Promise<AdminSubscriptionStats> {
   const row = await queryOne<{ active: number; paused: number; halted: number; cancelled: number; mrr_paise: string }>(
     `SELECT COUNT(*) FILTER (WHERE s.status = 'active')::int AS active,
             COUNT(*) FILTER (WHERE s.status = 'paused')::int AS paused,
@@ -105,7 +107,8 @@ export async function getAdminSubscriptionStats(): Promise<AdminSubscriptionStat
             COUNT(*) FILTER (WHERE s.status = 'cancelled')::int AS cancelled,
             COALESCE(SUM(${CYCLE_PAISE_SQL} * ${MONTHLY_FACTOR_SQL}) FILTER (WHERE s.status = 'active'), 0)::text AS mrr_paise
        FROM subscriptions s
-      WHERE s.source <> 'legacy'`
+      WHERE s.source <> 'legacy'${scope?.sql ?? ''}`,
+    scope?.params
   )
   return {
     active: row?.active ?? 0,
@@ -132,7 +135,16 @@ export async function listAdminSubscriptions(filters: { status?: string; q?: str
       `(u.email ILIKE $${n} OR (COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) ILIKE $${n} OR p.name ILIKE $${n} OR s.razorpay_subscription_id ILIKE $${n})`
     )
   }
-  const where = `WHERE ${conditions.join(' AND ')}`
+  return selectSubscriptions(`WHERE ${conditions.join(' AND ')}`, params, page)
+}
+
+/** One page for a normalised filter query (the admin list). */
+export async function queryAdminSubscriptions(q: FilterQuery, page = 1) {
+  const w = buildWhere(SUBSCRIPTIONS_ENTITY, q, 1)
+  return selectSubscriptions(w.where, w.params, Math.max(1, Math.floor(page)))
+}
+
+async function selectSubscriptions(where: string, params: unknown[], page: number) {
   const from = `FROM subscriptions s JOIN users u ON u.id = s.user_id JOIN products p ON p.id = s.product_id`
   const offset = (page - 1) * ADMIN_SUBSCRIPTIONS_PAGE_SIZE
 

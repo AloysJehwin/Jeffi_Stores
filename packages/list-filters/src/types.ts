@@ -76,6 +76,20 @@ export interface FilterEntity<K extends string = string> {
   /** Loads what context-bound predicates need; called only by the runners. */
   context?: (q: FilterQuery) => Promise<FilterCtx>
   export?: { columns: ExportColumn[]; keyset: string[]; cap?: number }
+  /** Adapter for a list whose filter SQL lives elsewhere (products); replaces `fields` / `sql`. */
+  custom?: CustomFilters
+}
+
+export interface CustomFilters {
+  /** The list's own params from the URL, validated. */
+  normalize(params: URLSearchParams): FilterQuery
+  /** Conditions on the root alias, binding from `startIdx`. */
+  clauses(q: FilterQuery, startIdx: number): Clauses
+  /** One page of a value-help field; null for a field without value help. */
+  values?(
+    field: string,
+    opts: { search?: string; page?: number }
+  ): Promise<{ values: { value: string; count: number }[]; hasMore: boolean } | null>
 }
 
 export interface Clauses {

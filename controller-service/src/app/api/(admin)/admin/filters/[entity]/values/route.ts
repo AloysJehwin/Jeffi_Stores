@@ -16,11 +16,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const sp = request.nextUrl.searchParams
   const field = sp.get('field') || ''
-  if (!isValuesField(entity, field)) return NextResponse.json({ error: 'Invalid field' }, { status: 400 })
+  if (!entity.custom && !isValuesField(entity, field))
+    return NextResponse.json({ error: 'Invalid field' }, { status: 400 })
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10) || 1)
   const q = withDefaultWindow(entity, normalizeQuery(entity, new URLSearchParams(sp.get('context') || '')))
   try {
     const res = await getFilterValues(entity, field, q, { search: sp.get('search') || '', page })
+    if (!res) return NextResponse.json({ error: 'Invalid field' }, { status: 400 })
     return NextResponse.json({ field, page, ...res })
   } catch (err) {
     console.error(`[filters/${entity.key}/values]`, err)

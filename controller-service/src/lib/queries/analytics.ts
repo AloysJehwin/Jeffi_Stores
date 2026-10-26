@@ -208,8 +208,9 @@ export async function getCustomerStats(): Promise<CustomerStats> {
 }
 
 // Engagement segments (VIP / loyal / repeat / one-time / new / at-risk / dormant / lead)
-// derived from order history — mirrors the CRM segment SQL.
-export async function getCustomerSegments(): Promise<BreakdownSlice[]> {
+// derived from order history — mirrors the CRM segment SQL. `scope`: the customers list's filters.
+export async function getCustomerSegments(scope?: FilterScope): Promise<BreakdownSlice[]> {
+  const sc = scope?.inIds('u.id', 1) ?? { sql: '', params: [] }
   const row = await queryOne<{
     vip: number
     loyal: number
@@ -236,7 +237,7 @@ export async function getCustomerSegments(): Promise<BreakdownSlice[]> {
                MAX(created_at) AS last_order_at
         FROM orders GROUP BY user_id
       ) o ON o.user_id = u.id
-      WHERE u.is_guest = false
+      WHERE u.is_guest = false${sc.sql}
     )
     SELECT
       COUNT(*) FILTER (WHERE ltv >= 50000)::int AS vip,
@@ -248,7 +249,9 @@ export async function getCustomerSegments(): Promise<BreakdownSlice[]> {
       COUNT(*) FILTER (WHERE last_order_at IS NOT NULL AND last_order_at < NOW() - INTERVAL '180 days')::int AS dormant,
       COUNT(*) FILTER (WHERE order_count = 0)::int AS lead
     FROM agg
-  `)
+  `,
+    sc.params
+  )
   const s = row ?? { vip: 0, loyal: 0, repeat: 0, one_time: 0, new: 0, at_risk: 0, dormant: 0, lead: 0 }
   return [
     { label: 'VIP', value: s.vip, color: '#8b5cf6' },
@@ -263,13 +266,17 @@ export async function getCustomerSegments(): Promise<BreakdownSlice[]> {
 }
 
 // Notification-channel preference mix across non-guest customers.
-export async function getCustomerChannelMix(): Promise<BreakdownSlice[]> {
-  const rows = await queryMany<{ channel: string | null; count: string }>(`
+export async function getCustomerChannelMix(scope?: FilterScope): Promise<BreakdownSlice[]> {
+  const sc = scope?.inIds('id', 1) ?? { sql: '', params: [] }
+  const rows = await queryMany<{ channel: string | null; count: string }>(
+    `
     SELECT notification_channel AS channel, COUNT(*)::int AS count
     FROM users
-    WHERE is_guest = false
+    WHERE is_guest = false${sc.sql}
     GROUP BY notification_channel
-  `)
+  `,
+    sc.params
+  )
   const colors: Record<string, string> = { email: '#3b82f6', sms: '#10b981', whatsapp: '#22c55e' }
   const labels: Record<string, string> = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' }
   return rows

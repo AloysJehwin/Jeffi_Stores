@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { CUSTOMER_FIELDS, CUSTOMER_SEARCH } from '@/lib/filters/fields/customers'
 import {
   AttentionList,
   PeriodBar,
@@ -24,8 +26,10 @@ interface Data {
 // Customers overview tab; cohorts, LTV and health are on the CRM overview.
 export default function CustomersOverview() {
   const [period, setPeriod] = usePeriod()
+  // KPIs follow the list's filters; the PeriodBar owns from / to.
+  const filters = useFilterQuery(CUSTOMER_FIELDS, { omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/customers/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/customers/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
   const c = data?.current
   const p = data?.previous_totals
@@ -33,6 +37,14 @@ export default function CustomersOverview() {
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="customers"
+        fields={CUSTOMER_FIELDS}
+        search={CUSTOMER_SEARCH}
+        period
+        noun="Customers"
+        tab="overview"
+      />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
         !error && <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
