@@ -26,16 +26,23 @@ export function useScreenReader() {
   return on
 }
 
-/** Press-down scale for a Pressable: spread `handlers` on it and `style` on an Animated.View around it. */
+/**
+ * Press-down scale for a Pressable: spread `handlers` on it and `style` on an Animated.View around it.
+ * The style stays empty until the first press: a view Reanimated has styled gets its props re-sent on
+ * every commit (each scroll event), which adds up across a list of cards.
+ */
 export function usePressScale(to = 0.97) {
   const scale = useSharedValue(1)
+  const pressed = useSharedValue(false)
   const { animate } = useMotion()
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+  const style = useAnimatedStyle(() => (pressed.value ? { transform: [{ scale: scale.value }] } : {}))
   return {
     style,
     handlers: {
       onPressIn: () => {
-        if (animate) scale.value = withSpring(to, SPRING)
+        if (!animate) return
+        pressed.value = true
+        scale.value = withSpring(to, SPRING)
       },
       onPressOut: () => {
         scale.value = withSpring(1, SPRING)

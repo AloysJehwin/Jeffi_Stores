@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { PanResponder, type GestureResponderHandlers } from 'react-native'
 import { useMotion, useScreenReader } from './motion'
 
@@ -23,9 +23,20 @@ export function useSwipe(onSwipe: (dir: 1 | -1) => void, threshold = 50): Gestur
 // True while a vertical feed is dragged or flung: an autoplaying pager waits for it to settle, so its
 // page change and crossfade don't land mid-scroll.
 let feedScrolling = false
+const feedListeners = new Set<() => void>()
 export function setFeedScrolling(on: boolean) {
+  if (feedScrolling === on) return
   feedScrolling = on
+  feedListeners.forEach(l => l())
 }
+
+const subscribeFeed = (l: () => void) => {
+  feedListeners.add(l)
+  return () => feedListeners.delete(l)
+}
+
+/** False while the feed is dragged or flung. */
+export const useFeedSettled = () => !useSyncExternalStore(subscribeFeed, () => feedScrolling)
 
 export interface Autoplay {
   /** Give the current slide its full interval again; call on every page change (swipe or auto). */
