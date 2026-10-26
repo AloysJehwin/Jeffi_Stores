@@ -11,5 +11,5 @@ export async function GET(request: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const sessions = await listActiveSessions('business', auth.userId)
-  return NextResponse.json({ sessions })
+  return NextResponse.json({ sessions: sessions.map(s => ({ ...s, current: s.id === auth.sessionId })) })
 }

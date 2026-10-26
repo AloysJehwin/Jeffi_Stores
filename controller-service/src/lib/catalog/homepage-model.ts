@@ -214,7 +214,7 @@ async function getCategoryShowcase() {
       const products = await queryMany(
         `
       SELECT p.id, p.name, p.slug, p.has_variants,
-        p.base_price, p.price_ex_gst, p.discount_pct,
+        p.base_price, p.price_ex_gst, p.discount_pct, p.category_id,
         (SELECT json_agg(json_build_object('image_url', pi2.image_url, 'thumbnail_url', pi2.thumbnail_url))
           FROM product_images pi2 WHERE pi2.product_id = p.id LIMIT 1) AS product_images,
         MIN(pv.price) FILTER (WHERE pv.is_active) AS variant_min_price
