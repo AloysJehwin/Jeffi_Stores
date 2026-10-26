@@ -29,6 +29,8 @@ export async function api<T>(
     ...rest,
     headers: {
       'Content-Type': 'application/json',
+      // This build sizes its own images (useImageSource); older ones get them sized by mobile-service.
+      'X-Jeffi-Image-Sizing': 'client',
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...(rest.headers as Record<string, string> | undefined),
     },
