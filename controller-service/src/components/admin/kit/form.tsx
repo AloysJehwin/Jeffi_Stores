@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
+import { lockSummary, type UseDraftLockResult } from '@/hooks/useDraftLock'
 
 // Form layout. Markup only: field names, hidden inputs, server actions and submit buttons stay
 // with the caller, so wrapping an existing form in these never changes what it posts.
@@ -193,6 +194,8 @@ export interface FormFooterProps {
   children?: ReactNode
   /** Sticky to the bottom of the viewport (default). */
   sticky?: boolean
+  /** Draft lock: read-only hides Save / Publish / Cancel; Discard stays for owner roles (canDiscard). */
+  lock?: UseDraftLockResult | null
 }
 
 const ghostCls =
@@ -201,7 +204,7 @@ const ghostAccentCls =
   'control-md inline-flex items-center border border-accent-500/40 bg-accent-500/10 text-accent-500 hover:bg-accent-500/20 font-semibold transition-colors'
 
 function isAutosaveStatus(v: unknown): v is AutosaveStatus {
-  return v === 'idle' || v === 'saving' || v === 'saved' || v === 'error'
+  return v === 'idle' || v === 'saving' || v === 'saved' || v === 'error' || v === 'locked'
 }
 
 /** Cancel and submit row. Render it inside the <form> so its buttons submit that form. */
@@ -222,8 +225,10 @@ export function FormFooter({
   cancel,
   children,
   sticky = true,
+  lock,
 }: FormFooterProps) {
   const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const readOnly = !!lock?.readOnly
   const autosaveNode = isAutosaveStatus(autosave) ? <AutosaveStatusPill status={autosave} /> : autosave
 
   const handleCancel = async () => {
@@ -237,10 +242,33 @@ export function FormFooter({
     await cancel()
   }
 
+  const shell = `${sticky ? 'sticky bottom-0 z-10 !mt-3' : ''} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`
+
+  if (readOnly && lock) {
+    return (
+      <div className={shell}>
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-foreground-muted">
+          <AutosaveStatusPill status="locked" />
+          <span>{lockSummary(lock.lock) || 'Someone else is editing this draft'}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {discard && lock.canDiscard && (
+            <button type="button" onClick={() => void discard()} className={ghostCls}>
+              Discard draft
+            </button>
+          )}
+          {cancelHref && (
+            <Link href={cancelHref} className={ghostCls}>
+              Back
+            </Link>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div
-      className={`${sticky ? 'sticky bottom-0 z-10 !mt-3' : ''} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`}
-    >
+    <div className={shell}>
       <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-foreground-muted">
         {autosaveNode}
         {draftBadge}
