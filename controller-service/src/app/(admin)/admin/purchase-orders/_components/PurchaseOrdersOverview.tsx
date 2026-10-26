@@ -1,6 +1,10 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { PO_ALIASES, PO_FIELDS, PO_SEARCH } from '@jeffi/list-filters/fields'
+import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { MAX_SPAN_DAYS } from '@/lib/overview/period'
 import {
   usePeriod,
   PeriodBar,
@@ -52,13 +56,31 @@ function draftHref(g: ReorderGroup) {
 
 export default function PurchaseOrdersOverview() {
   const [period, setPeriod] = usePeriod()
+  const sp = useSearchParams()
+  // KPIs and charts follow the list's filters; the PeriodBar owns from / to (the order date).
+  const filters = useFilterQuery(PO_FIELDS, { aliases: PO_ALIASES, omit: ['from', 'to'] })
   const { data, error, loading, reload } = useOverviewData<Data>(
-    `/api/admin/purchase-orders/overview?from=${period.from}&to=${period.to}`
+    `/api/admin/purchase-orders/overview?from=${period.from}&to=${period.to}${filters ? `&${filters}` : ''}`
   )
+  const clamped = !!sp.get('from') && sp.get('from') !== period.from
 
   return (
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <ListFilters
+        entity="purchase-orders"
+        fields={PO_FIELDS}
+        aliases={PO_ALIASES}
+        search={PO_SEARCH}
+        period
+        noun="Purchase orders"
+        tab="overview"
+      />
+      {clamped && (
+        <p className="text-xs text-foreground-muted">
+          The overview covers at most {MAX_SPAN_DAYS} days: showing {period.from} to {period.to}.
+        </p>
+      )}
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (
         !error && <OverviewSkeleton />

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from '../../next'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne, withTransaction } from '@jeffi/tenancy'
-import { buildVectorSearchClause } from '../../lib/search'
+import { QUOTATIONS_ENTITY, QUOTE_SUBTOTAL_SQL, QUOTE_TOTAL_SQL, buildWhere, normalizeQuery } from '@jeffi/list-filters'
 import { z } from 'zod'
 import { parseBody, zNonEmpty, zEmail } from '../../lib/validate'
 import {
@@ -36,73 +36,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status') || ''
-    const q = searchParams.get('q') || ''
-    const from = searchParams.get('from') || ''
-    const to = searchParams.get('to') || ''
     const pageSize = Math.min(parseInt(searchParams.get('pageSize') || searchParams.get('limit') || '25'), 200)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const offset = (page - 1) * pageSize
 
-    const conditions: string[] = []
-    const params: any[] = []
-    let i = 1
-
     // Whitelisted server-side sort (columns/aliases available in the SELECT below).
-    const SORT_COLS: Record<string, string> = {
-      quote_number: 'quote_number',
-      quote_date: 'quote_date',
-      consignee_name: 'consignee_name',
-      total_amount: 'total_amount',
-      status: 'status',
-    }
-    const sortCol = SORT_COLS[searchParams.get('sort') || ''] || null
+    const sortCol = QUOTATIONS_ENTITY.sorts?.[searchParams.get('sort') || ''] || null
     const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
     const orderBy = sortCol ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, created_at DESC` : `ORDER BY created_at DESC`
 
-    if (status) {
-      conditions.push(`status = $${i++}`)
-      params.push(status)
-    }
-    if (q) {
-      const sc = buildVectorSearchClause(q, 'search_vector', ['consignee_name'], ['quote_number'], i, 'simple')
-      conditions.push(sc.clause)
-      params.push(...sc.params)
-      i = sc.nextIdx
-    }
-    if (from) {
-      conditions.push(`quote_date >= $${i++}`)
-      params.push(from)
-    }
-    if (to) {
-      conditions.push(`quote_date <= $${i++}`)
-      params.push(to)
-    }
-
-    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
+    const { where, params, nextIdx: i } = buildWhere(QUOTATIONS_ENTITY, normalizeQuery(QUOTATIONS_ENTITY, searchParams))
 
     const countRow = await queryOne<{ total: string }>(
-      `SELECT COUNT(*)::text AS total FROM quotations ${where}`,
+      `SELECT COUNT(*)::text AS total FROM quotations q ${where}`,
       params
     )
     const total = parseInt(countRow?.total || '0', 10)
 
     const dataParams = [...params, pageSize, offset]
     const rows = await queryMany(
-      `SELECT id, quote_number, quote_date, status, consignee_name, consignee_addr1, consignee_addr2,
-              consignee_city, consignee_state, consignee_gstin, consignee_phone, consignee_pincode,
-              consignee_email, buyer_same, buyer_name, buyer_addr1, buyer_addr2, buyer_city, buyer_state,
-              buyer_gstin,
-              CASE WHEN COALESCE(subtotal, 0) = 0
-                THEN COALESCE((SELECT SUM(amount) FROM quotation_items WHERE quotation_id = quotations.id), 0)
-                ELSE subtotal END AS subtotal,
-              CASE WHEN COALESCE(total_amount, 0) = 0
-                THEN COALESCE((SELECT SUM(amount * (1 + gst_rate / 100)) FROM quotation_items WHERE quotation_id = quotations.id), 0)
-                ELSE total_amount END AS total_amount,
-              cgst_amount, sgst_amount, converted_order_id,
-              view_token, created_at,
-              EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = quotations.id) AS from_rfq
-       FROM quotations ${where} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`,
+      `SELECT q.id, q.quote_number, q.quote_date, q.status, q.consignee_name, q.consignee_addr1, q.consignee_addr2,
+              q.consignee_city, q.consignee_state, q.consignee_gstin, q.consignee_phone, q.consignee_pincode,
+              q.consignee_email, q.buyer_same, q.buyer_name, q.buyer_addr1, q.buyer_addr2, q.buyer_city, q.buyer_state,
+              q.buyer_gstin,
+              ${QUOTE_SUBTOTAL_SQL} AS subtotal,
+              ${QUOTE_TOTAL_SQL} AS total_amount,
+              q.cgst_amount, q.sgst_amount, q.converted_order_id,
+              q.view_token, q.created_at,
+              EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = q.id) AS from_rfq
+       FROM quotations q ${where} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`,
       dataParams
     )
     return NextResponse.json({ quotations: rows || [], total, page, pageSize })

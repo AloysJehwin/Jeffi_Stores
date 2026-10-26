@@ -1,5 +1,5 @@
 import { MAX_VALUE_LENGTH, escapeLike } from './client'
-import { buildWhere, rowsSql } from './clauses'
+import { branchesOf, buildWhere, rowsSql } from './clauses'
 import type { FilterCtx, FilterEntity, FilterQuery } from './types'
 
 export const VALUES_PAGE_SIZE = 50
@@ -28,6 +28,7 @@ export function valuesQuery<K extends string>(
   const s = entity.sql[field]
   if (s.kind !== 'values') return null
   const pageSize = opts.pageSize ?? VALUES_PAGE_SIZE
+  if (entity.branches?.length) return unionValuesQuery(entity, field, q, { ...opts, pageSize, fold: s.fold ?? 'lower' })
   const w = entity.facets ? buildWhere(entity, q, 1, { omit: [field], ctx: opts.ctx }) : buildWhere(entity, {}, 1)
   const params = [...w.params]
   const bind = (v: unknown) => {
@@ -47,6 +48,42 @@ export function valuesQuery<K extends string>(
      ORDER BY count DESC, value
      LIMIT ${pageSize + 1} OFFSET ${offset}`
   return { sql, params, pageSize }
+}
+
+function unionValuesQuery<K extends string>(
+  entity: FilterEntity<K>,
+  field: K,
+  q: FilterQuery,
+  opts: { search?: string; page?: number; ctx?: FilterCtx; pageSize: number; fold: string }
+): { sql: string; params: unknown[]; pageSize: number } {
+  const params: unknown[] = []
+  const bind = (v: unknown) => {
+    params.push(v)
+    return `$${params.length}`
+  }
+  const rows = branchesOf(entity).flatMap((b, i) => {
+    const s = b.sql[field]
+    if (s.kind !== 'values') return []
+    const w = entity.facets
+      ? buildWhere(b, q, params.length + 1, { omit: [field], ctx: opts.ctx })
+      : buildWhere(b, {}, params.length + 1)
+    params.push(...w.params)
+    const a = b.alias
+    return [
+      `SELECT v.val, '${i}:' || ${a}.${b.pk ?? 'id'} AS rid FROM ${b.root} ${a} CROSS JOIN LATERAL (${rowsSql(s)}) v ${w.where}`,
+    ]
+  })
+  const conds = [`u.val IS NOT NULL`, `u.val <> ''`]
+  const needle = (opts.search ?? '').trim().slice(0, MAX_VALUE_LENGTH)
+  if (needle) conds.push(`u.val ILIKE ${bind(`%${escapeLike(needle)}%`)}`)
+  const offset = bind((Math.max(1, opts.page ?? 1) - 1) * opts.pageSize)
+  const sql = `SELECT mode() WITHIN GROUP (ORDER BY u.val) AS value, count(DISTINCT u.rid)::int AS count
+     FROM (${rows.join(' UNION ALL ')}) u
+     WHERE ${conds.join(' AND ')}
+     GROUP BY ${opts.fold}(u.val)
+     ORDER BY count DESC, value
+     LIMIT ${opts.pageSize + 1} OFFSET ${offset}`
+  return { sql, params, pageSize: opts.pageSize }
 }
 
 /** Trims the look-ahead row. */

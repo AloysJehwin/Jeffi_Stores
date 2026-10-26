@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from '../../next'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne } from '@jeffi/tenancy'
-import { buildVectorSearchClause } from '../../lib/search'
-
+import { INVOICES_ENTITY, buildWhere, normalizeQuery } from '@jeffi/list-filters'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,111 +12,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
-    const source = searchParams.get('source') || ''
-    const search = searchParams.get('search') || ''
-    const from = searchParams.get('from') || ''
-    const to = searchParams.get('to') || ''
-    const payment = searchParams.get('payment') || ''
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
     const limit = 25
     const offset = (page - 1) * limit
 
-    const orderConditions: string[] = ['o.invoice_number IS NOT NULL', "o.source != 'cash_sale'"]
-    const csConditions: string[] = ['cs.invoice_number IS NOT NULL']
-    const params: any[] = []
-    let i = 1
+    // One filter set, applied to each side of the union (cash sales drop out of order-only filters).
+    const q = normalizeQuery(INVOICES_ENTITY, searchParams)
+    const ow = buildWhere(INVOICES_ENTITY, q, 1, { branch: 'order' })
+    const cw = buildWhere(INVOICES_ENTITY, q, ow.nextIdx, { branch: 'cash_sale' })
+    const params: unknown[] = [...ow.params, ...cw.params]
+    const i = cw.nextIdx
 
-    const showOrders = !source || source !== 'cash_sale'
-    const showCashSales = !source || source === 'cash_sale'
-
-    if (source && source !== 'cash_sale') {
-      orderConditions.push(`o.source = $${i++}`)
-      params.push(source)
-    }
-    if (payment) {
-      if (showOrders) {
-        orderConditions.push(`o.payment_status = $${i}`)
-      }
-      if (showCashSales) {
-        csConditions.push(`cs.payment_status = $${i}`)
-      }
-      params.push(payment)
-      i++
-    }
-    if (from) {
-      if (showOrders) {
-        orderConditions.push(`o.invoice_date >= $${i}`)
-      }
-      if (showCashSales) {
-        csConditions.push(`cs.invoice_date >= $${i}`)
-      }
-      params.push(from)
-      i++
-    }
-    if (to) {
-      if (showOrders) {
-        orderConditions.push(`o.invoice_date < ($${i}::date + interval '1 day')`)
-      }
-      if (showCashSales) {
-        csConditions.push(`cs.invoice_date < ($${i}::date + interval '1 day')`)
-      }
-      params.push(to)
-      i++
-    }
-    if (search) {
-      if (showOrders && showCashSales) {
-        const sc = buildVectorSearchClause(
-          search,
-          'o.search_vector',
-          ['o.customer_name'],
-          ['o.invoice_number', 'o.order_number'],
-          i,
-          'simple'
-        )
-        orderConditions.push(sc.clause)
-        const csSc = buildVectorSearchClause(
-          search,
-          'cs.search_vector',
-          ['cs.customer_name'],
-          ['cs.invoice_number', 'cs.sale_number'],
-          i,
-          'simple'
-        )
-        csConditions.push(csSc.clause)
-        params.push(...sc.params)
-        i = sc.nextIdx
-      } else if (showOrders) {
-        const sc = buildVectorSearchClause(
-          search,
-          'o.search_vector',
-          ['o.customer_name'],
-          ['o.invoice_number', 'o.order_number'],
-          i,
-          'simple'
-        )
-        orderConditions.push(sc.clause)
-        params.push(...sc.params)
-        i = sc.nextIdx
-      } else if (showCashSales) {
-        const sc = buildVectorSearchClause(
-          search,
-          'cs.search_vector',
-          ['cs.customer_name'],
-          ['cs.invoice_number', 'cs.sale_number'],
-          i,
-          'simple'
-        )
-        csConditions.push(sc.clause)
-        params.push(...sc.params)
-        i = sc.nextIdx
-      }
-    }
-
-    const orderWhere = `WHERE ${orderConditions.join(' AND ')}`
-    const csWhere = `WHERE ${csConditions.join(' AND ')}`
-
-    const orderQuery = showOrders
-      ? `
+    const unionQuery = `
       SELECT
         o.id, o.order_number, o.invoice_number, o.invoice_date,
         o.customer_name, o.customer_phone, o.customer_email,
@@ -128,12 +34,8 @@ export async function GET(request: NextRequest) {
         o.created_at
       FROM orders o
       LEFT JOIN invoices inv ON inv.order_id = o.id
-      ${orderWhere}
-    `
-      : null
-
-    const csQuery = showCashSales
-      ? `
+      ${ow.where}
+      UNION ALL
       SELECT
         cs.id, cs.sale_number AS order_number, cs.invoice_number, cs.invoice_date,
         cs.customer_name, NULL::text AS customer_phone, NULL::text AS customer_email,
@@ -143,21 +45,10 @@ export async function GET(request: NextRequest) {
         NULL::text AS pdf_url,
         cs.created_at
       FROM cash_sales cs
-      ${csWhere}
+      ${cw.where}
     `
-      : null
-
-    const unionQuery = [orderQuery, csQuery].filter(Boolean).join('\nUNION ALL\n')
     // Whitelisted server-side sort over the full combined set (before LIMIT/OFFSET).
-    const SORT_COLS: Record<string, string> = {
-      invoice_number: 'invoice_number',
-      invoice_date: 'invoice_date',
-      customer_name: 'customer_name',
-      total_amount: 'total_amount',
-      payment_status: 'payment_status',
-      source: 'source',
-    }
-    const sortCol = SORT_COLS[searchParams.get('sort') || ''] || 'invoice_number'
+    const sortCol = INVOICES_ENTITY.sorts?.[searchParams.get('sort') || ''] || 'invoice_number'
     const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
     const fullQuery = `SELECT * FROM (${unionQuery}) combined ORDER BY ${sortCol} ${sortDir} NULLS LAST, invoice_number DESC NULLS LAST`
 

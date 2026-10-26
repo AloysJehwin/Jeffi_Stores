@@ -1,3 +1,4 @@
+import type { FilterScope } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, previousPeriod, ratio, spanDays, type Period } from '@/lib/overview/period'
 import { buildReorder } from '@/lib/purchasing/reorder'
@@ -22,19 +23,32 @@ const OPEN = `('draft', 'sent', 'partial')`
 const TODAY = `(now() AT TIME ZONE 'Asia/Kolkata')::date`
 export const STALLED_PARTIAL_DAYS = 14
 
-async function totals(p: Period) {
+/** The list's filters on `po` and, for GRN rows, as a PO id list; both bound from `start` with the same params. */
+interface PoScope {
+  po: string
+  grn: string
+  params: unknown[]
+}
+function scoped(scope: FilterScope | undefined, start: number): PoScope {
+  if (!scope || scope.empty) return { po: '', grn: '', params: [] }
+  // PO filters have no base conditions, so both fragments bind the same values in the same order.
+  const a = scope.and(start)
+  return { po: a.sql, grn: scope.inIds('g.po_id', start).sql, params: a.params }
+}
+
+async function totals(p: Period, f: PoScope) {
   const row = await queryOne<Record<string, unknown>>(
     `SELECT
-       (SELECT COALESCE(SUM(total_amount), 0) FROM purchase_orders
-         WHERE order_date BETWEEN $1::date AND $2::date AND COALESCE(status, '') NOT IN ('draft', 'cancelled')) AS raised_value,
-       (SELECT COUNT(*) FROM purchase_orders
-         WHERE order_date BETWEEN $1::date AND $2::date AND COALESCE(status, '') NOT IN ('draft', 'cancelled')) AS raised_count,
+       (SELECT COALESCE(SUM(po.total_amount), 0) FROM purchase_orders po
+         WHERE po.order_date BETWEEN $1::date AND $2::date AND COALESCE(po.status, '') NOT IN ('draft', 'cancelled')${f.po}) AS raised_value,
+       (SELECT COUNT(*) FROM purchase_orders po
+         WHERE po.order_date BETWEEN $1::date AND $2::date AND COALESCE(po.status, '') NOT IN ('draft', 'cancelled')${f.po}) AS raised_count,
        (SELECT COALESCE(SUM(gi.quantity_received * gi.unit_cost), 0) FROM grn_items gi JOIN grns g ON g.id = gi.grn_id
-         WHERE g.received_date BETWEEN $1::date AND $2::date) AS received_value,
-       (SELECT COUNT(*) FROM grns WHERE received_date BETWEEN $1::date AND $2::date) AS grns,
-       (SELECT COUNT(*) FROM purchase_orders
-         WHERE order_date BETWEEN $1::date AND $2::date AND status = 'cancelled') AS cancelled`,
-    [p.from, p.to]
+         WHERE g.received_date BETWEEN $1::date AND $2::date${f.grn}) AS received_value,
+       (SELECT COUNT(*) FROM grns g WHERE g.received_date BETWEEN $1::date AND $2::date${f.grn}) AS grns,
+       (SELECT COUNT(*) FROM purchase_orders po
+         WHERE po.order_date BETWEEN $1::date AND $2::date AND po.status = 'cancelled'${f.po}) AS cancelled`,
+    [p.from, p.to, ...f.params]
   )
   const raised = n(row?.raised_value)
   const count = n(row?.raised_count)
@@ -103,9 +117,15 @@ export function groupReorder(
 export function poAttention(
   open: OpenPo[],
   staleDrafts: number,
-  payablesOverdue: { amount: number; count: number }
+  payablesOverdue: { amount: number; count: number },
+  query = ''
 ): AttentionItem[] {
   const out: AttentionItem[] = []
+  const list = (patch: Record<string, string>) => {
+    const q = new URLSearchParams(query)
+    for (const [k, v] of Object.entries(patch)) q.set(k, v)
+    return `/admin/purchase-orders?tab=orders&${q}`
+  }
   const late = open.filter(p => p.days_late > 0).sort((a, b) => b.days_late - a.days_late)
   if (late.length) {
     const w = late[0]
@@ -114,7 +134,7 @@ export function poAttention(
       severity: late.some(p => p.days_late > 7) ? 'critical' : 'warning',
       title: `${plural(late.length, 'purchase order')} past the expected date`,
       sub: `Latest: ${w.po_number}${w.supplier_name ? ` (${w.supplier_name})` : ''}, ${w.days_late} d late`,
-      href: `/admin/purchase-orders?tab=orders&po=${w.id}`,
+      href: late.length > 1 ? list({ overdue: 'true' }) : `/admin/purchase-orders?tab=orders&po=${w.id}`,
     })
   }
   const stalled = open.filter(
@@ -152,7 +172,7 @@ export function poAttention(
       key: 'drafts',
       severity: 'info',
       title: `${plural(staleDrafts, 'draft PO')} not sent for over ${STALE_DRAFT_DAYS} days`,
-      href: '/admin/purchase-orders?tab=orders',
+      href: list({ status: 'draft' }),
     })
   return out
 }
@@ -196,14 +216,17 @@ WHERE s.sold > 0 AND (l.qty + COALESCE(i.due, 0)) * $3::numeric < s.sold * 90
 ORDER BY GREATEST(l.qty + COALESCE(i.due, 0), 0) / s.sold ASC
 LIMIT 200`
 
-export async function getPurchaseOrderOverview(period: Period) {
+/** `scope` is the list's filters (without the order date, which the period owns); payables and reorder stay store-wide. */
+export async function getPurchaseOrderOverview(period: Period, scope?: FilterScope, query?: string) {
   const previous = previousPeriod(period)
   const bucket = bucketFor(period)
   const days = spanDays(period)
+  const s1 = scoped(scope, 1)
+  const s3 = scoped(scope, 3)
   const [current, prev, openRows, byStatus, series, topSuppliers, payables, drafts, reorderRows, onTime] =
     await Promise.all([
-      totals(period),
-      totals(previous),
+      totals(period, s3),
+      totals(previous, s3),
       queryMany<Record<string, unknown>>(
         `SELECT po.id, po.po_number, s.name AS supplier_name, po.status, po.expected_date::text AS expected_date,
                 CASE WHEN po.status IN ('sent', 'partial') AND po.expected_date < ${TODAY}
@@ -214,31 +237,33 @@ export async function getPurchaseOrderOverview(period: Period) {
                    FROM purchase_order_items poi WHERE poi.po_id = po.id) AS received_share,
                 (SELECT MAX(g.received_date)::text FROM grns g WHERE g.po_id = po.id) AS last_grn
          FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
-         WHERE po.status IN ${OPEN}
+         WHERE po.status IN ${OPEN}${s1.po}
          ORDER BY po.expected_date ASC NULLS LAST, po.order_date ASC
-         LIMIT 500`
+         LIMIT 500`,
+        s1.params
       ),
       queryMany<Record<string, unknown>>(
-        `SELECT status, COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS value
-         FROM purchase_orders WHERE status IN ${OPEN} GROUP BY status`
+        `SELECT po.status, COUNT(*) AS count, COALESCE(SUM(po.total_amount), 0) AS value
+         FROM purchase_orders po WHERE po.status IN ${OPEN}${s1.po} GROUP BY po.status`,
+        s1.params
       ),
       queryMany<Record<string, unknown>>(
         `WITH s AS (SELECT g::date AS b FROM generate_series(date_trunc('${bucket}', $1::date::timestamp), $2::date::timestamp, interval '1 ${bucket}') g)
          SELECT s.b::text AS label,
                 COALESCE((SELECT SUM(total_amount) FROM purchase_orders po
                   WHERE po.order_date BETWEEN $1::date AND $2::date AND COALESCE(po.status, '') NOT IN ('draft', 'cancelled')
-                    AND date_trunc('${bucket}', po.order_date::timestamp)::date = s.b), 0) AS raised,
+                    AND date_trunc('${bucket}', po.order_date::timestamp)::date = s.b${s3.po}), 0) AS raised,
                 COALESCE((SELECT SUM(gi.quantity_received * gi.unit_cost) FROM grn_items gi JOIN grns g ON g.id = gi.grn_id
-                  WHERE g.received_date BETWEEN $1::date AND $2::date AND date_trunc('${bucket}', g.received_date::timestamp)::date = s.b), 0) AS received
+                  WHERE g.received_date BETWEEN $1::date AND $2::date AND date_trunc('${bucket}', g.received_date::timestamp)::date = s.b${s3.grn}), 0) AS received
          FROM s ORDER BY s.b`,
-        [period.from, period.to]
+        [period.from, period.to, ...s3.params]
       ),
       queryMany<Record<string, unknown>>(
         `SELECT s.id, s.name, SUM(po.total_amount) AS value, COUNT(*) AS pos
          FROM purchase_orders po JOIN suppliers s ON s.id = po.supplier_id
-         WHERE po.order_date BETWEEN $1::date AND $2::date AND COALESCE(po.status, '') NOT IN ('draft', 'cancelled')
+         WHERE po.order_date BETWEEN $1::date AND $2::date AND COALESCE(po.status, '') NOT IN ('draft', 'cancelled')${s3.po}
          GROUP BY s.id, s.name ORDER BY value DESC LIMIT 8`,
-        [period.from, period.to]
+        [period.from, period.to, ...s3.params]
       ),
       queryOne<Record<string, unknown>>(
         `SELECT COALESCE(SUM(amount), 0) AS amount, COUNT(*) AS count,
@@ -246,7 +271,9 @@ export async function getPurchaseOrderOverview(period: Period) {
          FROM (${PAYABLES}) x WHERE amount > 0`
       ),
       queryOne<{ n: string }>(
-        `SELECT COUNT(*) AS n FROM purchase_orders WHERE status = 'draft' AND created_at < now() - interval '${STALE_DRAFT_DAYS} days'`
+        `SELECT COUNT(*) AS n FROM purchase_orders po
+         WHERE po.status = 'draft' AND po.created_at < now() - interval '${STALE_DRAFT_DAYS} days'${s1.po}`,
+        s1.params
       ),
       queryMany<Record<string, unknown>>(REORDER_SQL, [period.from, period.to, days]),
       queryOne<Record<string, unknown>>(
@@ -254,9 +281,9 @@ export async function getPurchaseOrderOverview(period: Period) {
                 COUNT(*) FILTER (WHERE expected_date IS NOT NULL AND last_grn <= expected_date) AS on_time
          FROM (SELECT po.expected_date, MAX(g.received_date) AS last_grn
                FROM purchase_orders po JOIN grns g ON g.po_id = po.id
-               WHERE po.status = 'received'
+               WHERE po.status = 'received'${s3.po}
                GROUP BY po.id HAVING MAX(g.received_date) BETWEEN $1::date AND $2::date) x`,
-        [period.from, period.to]
+        [period.from, period.to, ...s3.params]
       ),
     ])
 
@@ -363,6 +390,7 @@ export async function getPurchaseOrderOverview(period: Period) {
       .map(p => ({ ...p, received_share: nn(p.received_share) ?? 0 })),
     reorder,
     payables: pay,
-    attention: poAttention(open, n(drafts?.n), { amount: pay.overdue_amount, count: pay.overdue_count }),
+    attention: poAttention(open, n(drafts?.n), { amount: pay.overdue_amount, count: pay.overdue_count }, query),
+    filtered: !!scope && !scope.empty,
   }
 }

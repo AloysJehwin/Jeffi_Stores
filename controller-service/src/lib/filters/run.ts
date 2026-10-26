@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg'
 import {
   CSV_BOM,
   EXPORT_BATCH,
-  buildWhere,
+  countQuery,
   csvRow,
   exportQuery,
   pageOfValues,
@@ -71,13 +71,8 @@ export async function cappedCount(
   cap: number,
   ctx?: FilterCtx
 ): Promise<{ count: number; capped: boolean }> {
-  const w = buildWhere(entity, q, 1, { ctx: ctx ?? (await filterContext(entity, q)) })
-  const r = await withTimeout(entity.db, '15s', c =>
-    c.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM (SELECT 1 FROM ${entity.root} ${entity.alias} ${w.where} LIMIT ${cap + 1}) t`,
-      w.params
-    )
-  )
+  const cq = countQuery(entity, q, cap, { ctx: ctx ?? (await filterContext(entity, q)) })
+  const r = await withTimeout(entity.db, '15s', c => c.query<{ n: number }>(cq.sql, cq.params))
   const n = r.rows[0]?.n ?? 0
   return { count: Math.min(n, cap), capped: n > cap }
 }

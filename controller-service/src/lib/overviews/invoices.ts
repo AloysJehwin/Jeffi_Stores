@@ -1,3 +1,4 @@
+import type { FilterScope } from '@jeffi/list-filters'
 import type { Bucket, Period } from '@/lib/overview/period'
 import type { AttentionItem } from '@/lib/overview/attention'
 import { queryMany, queryOne } from '@/lib/shared/db'
@@ -25,7 +26,14 @@ const UNPAID = `('unpaid', 'partial', 'cod_pending')`
 const RECEIVABLE = `payment_status IN ('unpaid', 'partial') AND status NOT IN ('cancelled', 'returned', 'draft', 'cancel_rejected')`
 export const OVERDUE_DAYS = 30
 
-const INV = `inv AS (
+/** The list's filters for each side of the union (empty adds nothing). */
+export interface InvoiceScope {
+  o: string
+  cs: string
+}
+const NONE: InvoiceScope = { o: '', cs: '' }
+
+const INV = (f: InvoiceScope) => `inv AS (
   SELECT 'order'::text AS kind, o.id, o.invoice_number, o.invoice_date AS at,
          COALESCE(NULLIF(o.customer_name, ''), 'Customer') AS customer,
          NULLIF(TRIM(o.buyer_gstin), '') AS gstin, o.total_amount AS amount,
@@ -34,17 +42,18 @@ const INV = `inv AS (
          o.payment_status, COALESCE(o.status, '') AS status, o.status = 'cancelled' AS voided,
          o.source, o.irn_status
     FROM orders o
-   WHERE o.invoice_number IS NOT NULL AND o.source <> 'cash_sale' AND o.invoice_date IS NOT NULL
+   WHERE o.invoice_number IS NOT NULL AND o.source <> 'cash_sale' AND o.invoice_date IS NOT NULL${f.o}
   UNION ALL
   SELECT 'cash_sale', cs.id, cs.invoice_number, cs.invoice_date, COALESCE(NULLIF(cs.customer_name, ''), 'Walk-in Customer'),
          NULL, cs.total_amount, cs.taxable_amount, cs.cgst_amount + cs.sgst_amount + cs.igst_amount,
          cs.payment_status, cs.status, cs.status = 'cancelled', 'cash_sale', NULL
     FROM cash_sales cs
-   WHERE cs.invoice_number IS NOT NULL AND cs.invoice_date IS NOT NULL
+   WHERE cs.invoice_number IS NOT NULL AND cs.invoice_date IS NOT NULL${f.cs}
 )`
 
-export const INVOICE_SQL = {
-  kpis: `WITH ${BOUNDS}, ${INV}
+/** `a` scopes the queries bound after the three period args, `z` the ones without args. */
+const invoiceSql = (a: InvoiceScope, z: InvoiceScope) => ({
+  kpis: `WITH ${BOUNDS}, ${INV(a)}
     SELECT CASE WHEN at >= b.c0 THEN 'cur' ELSE 'prev' END AS period,
            COUNT(*) FILTER (WHERE NOT voided) AS invoices,
            COUNT(*) FILTER (WHERE voided) AS voided,
@@ -62,12 +71,12 @@ export const INVOICE_SQL = {
       FROM inv, b
      WHERE at >= b.p0 AND at < b.c1
      GROUP BY 1`,
-  aging: `WITH ${INV}
+  aging: `WITH ${INV(z)}
     SELECT CASE WHEN d <= 30 THEN 'd0_30' WHEN d <= 60 THEN 'd31_60' WHEN d <= 90 THEN 'd61_90' ELSE 'd90_plus' END AS bucket,
            COUNT(*) AS n, SUM(amount) AS amount
       FROM (SELECT amount, (${TODAY_IST} - ${istDay('at')})::int AS d FROM inv WHERE ${RECEIVABLE}) x
      GROUP BY 1`,
-  oldestUnpaid: `WITH ${INV}
+  oldestUnpaid: `WITH ${INV(z)}
     SELECT kind, id, invoice_number, customer, amount, at, (${TODAY_IST} - ${istDay('at')})::int AS days
       FROM inv WHERE ${RECEIVABLE}
      ORDER BY at ASC LIMIT 8`,
@@ -77,37 +86,39 @@ export const INVOICE_SQL = {
              COALESCE(oi.cgst_amount, 0) + COALESCE(oi.sgst_amount, 0) + COALESCE(oi.igst_amount, 0) AS gst
         FROM order_items oi JOIN orders o ON o.id = oi.order_id, b
        WHERE o.invoice_number IS NOT NULL AND o.source <> 'cash_sale' AND o.status <> 'cancelled'
-         AND o.invoice_date >= b.c0 AND o.invoice_date < b.c1
+         AND o.invoice_date >= b.c0 AND o.invoice_date < b.c1${a.o}
       UNION ALL
       SELECT csi.gst_rate, csi.taxable_amount, csi.cgst_amount + csi.sgst_amount + csi.igst_amount
         FROM cash_sale_items csi JOIN cash_sales cs ON cs.id = csi.sale_id, b
        WHERE cs.invoice_number IS NOT NULL AND cs.status <> 'cancelled'
-         AND cs.invoice_date >= b.c0 AND cs.invoice_date < b.c1
+         AND cs.invoice_date >= b.c0 AND cs.invoice_date < b.c1${a.cs}
     )
     SELECT rate, COUNT(*) AS lines, SUM(taxable) AS taxable, SUM(gst) AS gst
       FROM lines GROUP BY rate ORDER BY rate NULLS LAST`,
-  bySource: `WITH ${BOUNDS}, ${INV}
+  bySource: `WITH ${BOUNDS}, ${INV(a)}
     SELECT source, COUNT(*) AS n, SUM(amount) AS amount
       FROM inv, b WHERE NOT voided AND at >= b.c0 AND at < b.c1
      GROUP BY source ORDER BY amount DESC`,
-  topCustomers: `WITH ${BOUNDS}, ${INV}
+  topCustomers: `WITH ${BOUNDS}, ${INV(a)}
     SELECT customer, COUNT(*) AS n, SUM(amount) AS amount,
            SUM(amount) FILTER (WHERE payment_status IN ${UNPAID}) AS unpaid
       FROM inv, b WHERE NOT voided AND at >= b.c0 AND at < b.c1
      GROUP BY customer ORDER BY amount DESC LIMIT 8`,
-  series: (bucket: Bucket) => `WITH ${BOUNDS}, ${INV}, ${bucketsCte(bucket)}
+  series: (bucket: Bucket) => `WITH ${BOUNDS}, ${INV(a)}, ${bucketsCte(bucket)}
     SELECT to_char(k.bucket, 'YYYY-MM-DD') AS label,
            COUNT(inv.id) AS invoices, COALESCE(SUM(inv.amount), 0) AS value, COALESCE(SUM(inv.gst), 0) AS gst
       FROM k CROSS JOIN b
       LEFT JOIN inv ON NOT inv.voided AND inv.at >= b.c0 AND inv.at < b.c1 AND ${inBucket('inv.at', bucket)}
      GROUP BY k.bucket ORDER BY k.bucket`,
   // Snapshot: draft invoices on live orders, B2B invoices without an IRN in the last 90 days.
-  pending: `WITH ${INV}
+  pending: `WITH ${INV(z)}
     SELECT (SELECT COUNT(*) FROM invoices i JOIN orders o ON o.id = i.order_id
-             WHERE i.status = 'draft' AND o.status <> 'cancelled') AS drafts,
+             WHERE i.status = 'draft' AND o.status <> 'cancelled'${z.o}) AS drafts,
            (SELECT COUNT(*) FROM inv WHERE NOT voided AND gstin IS NOT NULL AND COALESCE(irn_status, 'pending') <> 'generated'
                AND at >= now() - INTERVAL '90 days') AS b2b_no_irn`,
-}
+})
+
+export const INVOICE_SQL = invoiceSql(NONE, NONE)
 
 export const AGING_KEYS = [
   { key: 'd0_30', label: '0-30 days' },
@@ -161,11 +172,20 @@ export function invoiceStats(r: Row | undefined): InvoiceStats {
 const invoiceHref = (kind: string, id: string) =>
   kind === 'cash_sale' ? `/admin/cash-sale/${id}/view` : `/admin/invoices/${id}/view`
 
+/** A list link with the overview's other filters kept (`patch` wins). */
+const listHref = (patch: Record<string, string>, query = '') => {
+  const q = new URLSearchParams(query)
+  for (const [k, v] of Object.entries(patch)) q.set(k, v)
+  return `/admin/invoices?tab=list&${q}`
+}
+
 export function invoiceAttention(a: {
   aging: { key: string; count: number; amount: number }[]
   drafts: number
   b2bNoIrn: number
   voided: number
+  /** The list filters to carry into the links (no period: aging is all-time). */
+  query?: string
 }): AttentionItem[] {
   const out: AttentionItem[] = []
   const over = a.aging.filter(b => b.key !== 'd0_30')
@@ -178,7 +198,7 @@ export function invoiceAttention(a: {
       severity: old ? 'critical' : 'warning',
       title: `${overN} unpaid invoice${overN === 1 ? '' : 's'} older than ${OVERDUE_DAYS} days`,
       sub: `₹${Math.round(overAmt).toLocaleString('en-IN')} outstanding${old ? `, ${old} over 60 days` : ''}`,
-      href: '/admin/invoices?tab=list&payment=unpaid',
+      href: listHref({ overdue: 'true' }, a.query),
     })
   if (a.drafts)
     out.push({
@@ -194,7 +214,7 @@ export function invoiceAttention(a: {
       severity: 'info',
       title: `${a.b2bNoIrn} B2B invoice${a.b2bNoIrn === 1 ? '' : 's'} without an e-invoice IRN`,
       sub: 'Last 90 days, invoices with a buyer GSTIN',
-      href: '/admin/invoices?tab=list&source=business',
+      href: listHref({ b2b: 'true', irn_status: 'pending' }, a.query),
     })
   if (a.voided)
     out.push({
@@ -205,17 +225,30 @@ export function invoiceAttention(a: {
   return out
 }
 
-export async function loadInvoiceOverview(period: Period) {
+/** Both sides of the union scoped from `start` (the cash-sale binds follow the order ones). */
+function sides(scope: FilterScope | undefined, start: number): { f: InvoiceScope; params: unknown[] } {
+  if (!scope || scope.empty) return { f: NONE, params: [] }
+  const o = scope.and(start, 'order')
+  const cs = scope.and(start + o.params.length, 'cash_sale')
+  return { f: { o: o.sql, cs: cs.sql }, params: [...o.params, ...cs.params] }
+}
+
+/** `scope` is the list's filters (without the invoice date, which the period owns). */
+export async function loadInvoiceOverview(period: Period, scope?: FilterScope, query?: string) {
   const { previous, bucket, args } = periodArgs(period)
+  const a = sides(scope, args.length + 1)
+  const z = sides(scope, 1)
+  const sql = scope && !scope.empty ? invoiceSql(a.f, z.f) : INVOICE_SQL
+  const pa = [...args, ...a.params]
   const [kpiRows, agingRows, oldest, rates, sources, customers, series, pending] = await Promise.all([
-    queryMany<Row>(INVOICE_SQL.kpis, args),
-    queryMany<Row>(INVOICE_SQL.aging),
-    queryMany<Row>(INVOICE_SQL.oldestUnpaid),
-    queryMany<Row>(INVOICE_SQL.byRate, args),
-    queryMany<Row>(INVOICE_SQL.bySource, args),
-    queryMany<Row>(INVOICE_SQL.topCustomers, args),
-    queryMany<Row>(INVOICE_SQL.series(bucket), args),
-    queryOne<Row>(INVOICE_SQL.pending),
+    queryMany<Row>(sql.kpis, pa),
+    queryMany<Row>(sql.aging, z.params),
+    queryMany<Row>(sql.oldestUnpaid, z.params),
+    queryMany<Row>(sql.byRate, pa),
+    queryMany<Row>(sql.bySource, pa),
+    queryMany<Row>(sql.topCustomers, pa),
+    queryMany<Row>(sql.series(bucket), pa),
+    queryOne<Row>(sql.pending, z.params),
   ])
   const kpis = byPeriod(kpiRows, invoiceStats)
   const aging = fillKeyed(AGING_KEYS, agingRows)
@@ -258,7 +291,9 @@ export async function loadInvoiceOverview(period: Period) {
       drafts: num(pending?.drafts),
       b2bNoIrn: num(pending?.b2b_no_irn),
       voided: kpis.current.voided,
+      query,
     }),
+    filtered: !!scope && !scope.empty,
   }
 }
 

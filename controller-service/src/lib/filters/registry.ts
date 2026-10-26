@@ -1,5 +1,5 @@
 import 'server-only'
-import type { FilterEntity } from '@jeffi/list-filters'
+import { INVOICES_ENTITY, PURCHASE_ORDERS_ENTITY, QUOTATIONS_ENTITY, type FilterEntity } from '@jeffi/list-filters'
 import { ORDERS_ENTITY } from './entities/orders'
 import { REPLACEMENTS_ENTITY, RETURNS_ENTITY } from './entities/returns'
 import { PACKING_ENTITY } from './entities/packing-slips'
@@ -23,6 +23,10 @@ export const FILTER_ENTITIES: Record<string, FilterEntity> = {
   products: PRODUCTS_ENTITY,
   coupons: COUPONS_ENTITY as unknown as FilterEntity,
   subscriptions: SUBSCRIPTIONS_ENTITY as unknown as FilterEntity,
+  // Lists served by document-service; their registries live in the package so both services share them.
+  invoices: INVOICES_ENTITY as unknown as FilterEntity,
+  quotations: QUOTATIONS_ENTITY as unknown as FilterEntity,
+  'purchase-orders': PURCHASE_ORDERS_ENTITY as unknown as FilterEntity,
 }
 
 export function getEntity(key: string): FilterEntity | null {

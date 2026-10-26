@@ -5,5 +5,5 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "exports": { ".": "./src/index.ts", "./client": "./src/client.ts" }
+  "exports": { ".": "./src/index.ts", "./client": "./src/client.ts", "./fields": "./src/fields.ts" }
 }

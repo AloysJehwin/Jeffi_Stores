@@ -52,6 +52,22 @@ export interface ExportColumn {
   sql: string
 }
 
+/**
+ * One table of a UNION entity (invoices: orders + cash sales). Every field needs SQL in each branch;
+ * a constant expression (`'cash_sale'::text`, `NULL::text`, `false`) just leaves the branch's rows out.
+ */
+export interface FilterBranch<K extends string = string> {
+  key: string
+  root: string
+  alias: string
+  pk?: string
+  base?: string[]
+  sql: Record<K, FieldSql>
+  search?: (q: string, startIdx: number) => SearchClause
+  /** This branch's SQL per export column key (missing ones are NULL) and its keyset. */
+  export?: { columns: Record<string, string>; keyset: string[] }
+}
+
 export interface FilterEntity<K extends string = string> {
   key: string
   scope: string
@@ -78,6 +94,8 @@ export interface FilterEntity<K extends string = string> {
   export?: { columns: ExportColumn[]; keyset: string[]; cap?: number }
   /** Adapter for a list whose filter SQL lives elsewhere (products); replaces `fields` / `sql`. */
   custom?: CustomFilters
+  /** UNION entities: root / alias / sql above mirror the first branch (see `unionEntity`). */
+  branches?: FilterBranch<K>[]
 }
 
 export interface CustomFilters {
@@ -102,6 +120,8 @@ export interface ClauseOpts {
   omit?: string[]
   only?: string[]
   ctx?: FilterCtx
+  /** A UNION entity's branch key. */
+  branch?: string
 }
 
 export interface ScopeSql {
@@ -112,6 +132,6 @@ export interface ScopeSql {
 /** Filters an overview appends to its own queries: `and(start)` on the root alias, `inIds` on related tables. */
 export interface FilterScope {
   empty: boolean
-  and(start: number): ScopeSql
+  and(start: number, branch?: string): ScopeSql
   inIds(col: string, start: number): ScopeSql
 }
