@@ -30,7 +30,7 @@ import { repoPath } from '@/lib/shared/paths'
  * moment the schema tries to create a new object. Provisioning's own loadSchema connects
  * as the master user for exactly this reason (aws-provider.tenantPool) — mirror that here.
  */
-function tenantPool(infra: { rdsEndpoint: string; rdsPort: number; rdsDb: string }): Pool {
+export function tenantPool(infra: { rdsEndpoint: string; rdsPort: number; rdsDb: string }): Pool {
   const masterUser = process.env.TENANT_RDS_MASTER_USER || 'postgres'
   const masterPassword = process.env.RDS_MASTER_PASSWORD
   if (!masterPassword) {
@@ -51,7 +51,7 @@ function tenantPool(infra: { rdsEndpoint: string; rdsPort: number; rdsDb: string
   })
 }
 
-interface TenantTarget {
+export interface TenantTarget {
   id: string
   slug: string
   rds_endpoint: string
@@ -60,7 +60,7 @@ interface TenantTarget {
   region: string
 }
 
-async function listActiveTenantTargets(): Promise<TenantTarget[]> {
+export async function listActiveTenantTargets(): Promise<TenantTarget[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT t.id, t.slug, i.rds_endpoint, i.rds_port, i.rds_db, i.region
