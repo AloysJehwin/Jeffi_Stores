@@ -116,7 +116,7 @@ function OrdersList({ resolved }: { resolved: SP }) {
         <OrdersStats q={q} />
       </Suspense>
 
-      <ListFilters entity="orders" fields={ORDER_FIELDS} aliases={ORDER_ALIASES} search={ORDER_SEARCH} noun="Orders" tab="list" />
+      <ListFilters entity="orders" fields={ORDER_FIELDS} aliases={ORDER_ALIASES} search={ORDER_SEARCH} noun="Orders" tab="list" exportable />
 
       <OrdersListSection resolvedSearchParams={resolved} />
     </>

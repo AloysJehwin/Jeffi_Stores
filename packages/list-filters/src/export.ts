@@ -6,8 +6,9 @@ export const EXPORT_CAP = 50_000
 export const CSV_BOM = '\uFEFF'
 
 /**
- * One keyset batch of the export: the entity's columns plus the keyset values (`__k0`, `__k1`, …)
- * the next batch passes back as `after`. Null when the entity has no export.
+ * One keyset batch of the export: the entity's columns plus the keyset values (`__k0`, `__k1`, …,
+ * as text so timestamps keep their microseconds) the next batch passes back as `after`. Null when
+ * the entity has no export.
  */
 export function exportQuery<K extends string>(
   entity: FilterEntity<K>,
@@ -26,7 +27,7 @@ export function exportQuery<K extends string>(
     })
     conds.push(`(${ex.keyset.join(', ')}) > (${binds.join(', ')})`)
   }
-  const cols = [...ex.columns.map(c => `${c.sql} AS "${c.key}"`), ...ex.keyset.map((k, i) => `${k} AS "__k${i}"`)]
+  const cols = [...ex.columns.map(c => `${c.sql} AS "${c.key}"`), ...ex.keyset.map((k, i) => `(${k})::text AS "__k${i}"`)]
   const sql = `SELECT ${cols.join(', ')}
      FROM ${entity.root} ${entity.alias}
      ${conds.length ? `WHERE ${conds.join(' AND ')}` : ''}
@@ -35,11 +36,11 @@ export function exportQuery<K extends string>(
   return { sql, params }
 }
 
-/** A CSV cell: formula-leading values neutralised with `'`, quoted when needed. */
+/** A CSV cell: formula-leading values (not plain negative numbers) neutralised with `'`, quoted when needed. */
 export function csvCell(v: unknown): string {
   if (v == null) return ''
   let s = v instanceof Date ? v.toISOString() : String(v)
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
+  if (/^[=+\-@\t\r]/.test(s) && !/^-\d+(\.\d+)?$/.test(s)) s = `'${s}`
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 

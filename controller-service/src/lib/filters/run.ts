@@ -1,6 +1,10 @@
 import type { PoolClient } from 'pg'
 import {
+  CSV_BOM,
+  EXPORT_BATCH,
   buildWhere,
+  csvRow,
+  exportQuery,
   pageOfValues,
   valuesQuery,
   type FilterCtx,
@@ -9,10 +13,13 @@ import {
   type FilterValue,
 } from '@jeffi/list-filters'
 import { withTransaction } from '@/lib/shared/db'
+import { resolveTenant, runWithTenantContext } from '@/lib/tenancy/tenant-context'
 
-// Runs filter queries for the registry: value help under a short statement timeout, capped counts.
+// Runs filter queries for the registry: value help under a short statement timeout, capped counts,
+// CSV export.
 
 const VALUES_TIMEOUT = '4s'
+const EXPORT_TIMEOUT = '15s'
 
 /** One transaction on the entity's DB with a local statement timeout. */
 async function withTimeout<T>(db: FilterEntity['db'], timeout: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
@@ -72,4 +79,66 @@ export async function cappedCount(
   )
   const n = r.rows[0]?.n ?? 0
   return { count: Math.min(n, cap), capped: n > cap }
+}
+
+/**
+ * The filtered rows as CSV: BOM and header, then keyset batches of 1,000 up to `cap`, each its own
+ * pooled query under a statement timeout. The tenant is captured here because the stream is pulled
+ * after the handler returns. `onDone(rows, completed)` runs once, when it ends or is cancelled.
+ */
+export async function streamCsv(
+  entity: FilterEntity,
+  q: FilterQuery,
+  opts: { cap: number; ctx?: FilterCtx; onDone?: (rows: number, completed: boolean) => unknown }
+): Promise<ReadableStream<Uint8Array>> {
+  const ex = entity.export
+  if (!ex) throw new Error(`${entity.key} has no export`)
+  const ctx = opts.ctx ?? (await filterContext(entity, q))
+  const tenant = await resolveTenant()
+  const inTenant = <T>(fn: () => Promise<T>) => (tenant ? runWithTenantContext(tenant, fn) : fn())
+  const enc = new TextEncoder()
+  let after: unknown[] | undefined
+  let rows = 0
+  let ended = false
+  const end = async (completed: boolean) => {
+    if (ended) return
+    ended = true
+    await inTenant(async () => opts.onDone?.(rows, completed))
+  }
+
+  return new ReadableStream<Uint8Array>({
+    start(c) {
+      c.enqueue(enc.encode(CSV_BOM + csvRow(ex.columns.map(col => col.label))))
+    },
+    async pull(c) {
+      try {
+        const limit = Math.min(EXPORT_BATCH, opts.cap - rows)
+        const eq = limit > 0 ? exportQuery(entity, q, { after, limit, ctx }) : null
+        const batch = eq
+          ? await inTenant(() =>
+              withTimeout(entity.db, EXPORT_TIMEOUT, cl =>
+                cl.query<Record<string, unknown>>(eq.sql, eq.params).then(r => r.rows)
+              )
+            )
+          : []
+        if (batch.length) {
+          c.enqueue(enc.encode(batch.map(r => csvRow(ex.columns.map(col => r[col.key]))).join('')))
+          rows += batch.length
+          const last = batch[batch.length - 1]
+          after = ex.keyset.map((_, i) => last[`__k${i}`])
+        }
+        if (batch.length < limit || rows >= opts.cap) {
+          c.close()
+          await end(true)
+        }
+      } catch (err) {
+        console.error(`[filters/${entity.key}/export]`, err)
+        c.error(err)
+        await end(false)
+      }
+    },
+    async cancel() {
+      await end(false)
+    },
+  })
 }

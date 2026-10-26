@@ -55,6 +55,8 @@ export interface ExportColumn {
 export interface FilterEntity<K extends string = string> {
   key: string
   scope: string
+  /** Sharing views; defaults to `scope` with `:read` → `:write`. */
+  writeScope?: string
   exportScope?: string
   noun: string
   db?: 'tenant' | 'control'
