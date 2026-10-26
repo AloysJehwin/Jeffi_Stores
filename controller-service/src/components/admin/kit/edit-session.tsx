@@ -22,6 +22,8 @@ export interface EditSessionActionsProps {
   restore?: () => void
   /** Plain draft discard — rendered only when `restore` is not set. */
   discard?: () => void
+  /** Someone else holds the draft: hide Cancel / Restore; Discard only when passed (owner roles). */
+  readOnly?: boolean
 }
 
 export function EditSessionActions({
@@ -34,6 +36,7 @@ export function EditSessionActions({
   disabled = false,
   restore,
   discard,
+  readOnly = false,
 }: EditSessionActionsProps) {
   const router = useRouter()
   const [confirming, setConfirming] = useState(false)
@@ -48,6 +51,23 @@ export function EditSessionActions({
     const ok = await onCancel()
     setConfirming(false)
     if (ok && cancelHref) router.push(cancelHref)
+  }
+
+  if (readOnly) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <AutosaveStatusPill status="locked" />
+        {discard && (
+          <button
+            type="button"
+            onClick={discard}
+            className="h-control inline-flex items-center rounded-lg border border-border-secondary bg-surface px-3 text-sm text-foreground-secondary transition-colors hover:bg-surface-secondary"
+          >
+            Discard
+          </button>
+        )}
+      </div>
+    )
   }
 
   const localNewer = !!restore

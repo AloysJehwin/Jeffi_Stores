@@ -20,6 +20,8 @@ interface Props {
   /** Hide the Cancel button (rare, mostly for the "Save as Draft" + "Publish" dual-submit editors). */
   hideCancel?: boolean
   disabled?: boolean
+  /** Someone else holds the draft: no Save / Cancel, just the read-only pill. */
+  readOnly?: boolean
 }
 
 export default function EditorToolbar({
@@ -33,6 +35,7 @@ export default function EditorToolbar({
   hideSave = false,
   hideCancel = false,
   disabled = false,
+  readOnly = false,
 }: Props) {
   const router = useRouter()
   const [confirming, setConfirming] = useState(false)
@@ -49,6 +52,8 @@ export default function EditorToolbar({
     setConfirming(false)
     if (ok && cancelHref) router.push(cancelHref)
   }
+
+  if (readOnly) return <AutosaveStatusPill status="locked" />
 
   return (
     <div className="flex flex-wrap items-center gap-3">

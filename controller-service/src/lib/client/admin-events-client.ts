@@ -4,7 +4,18 @@ export type SessionFrame =
   | { kind: 'session'; type: 'hello' | 'deadline'; deadlineAt: number; expiresAt: number; serverNow: number }
   | { kind: 'session'; type: 'logout'; reason: string; serverNow: number }
 export type NotificationsFrame = { kind: 'notifications'; items: any[]; unreadCount: number }
-export type AdminEventFrame = SessionFrame | NotificationsFrame
+export type LockFrame = {
+  kind: 'lock'
+  type: 'acquired' | 'released' | 'handover' | 'takeover' | 'closed' | 'presence'
+  resourceType: string
+  resourceId: string
+  lock: any | null
+  viewers?: any[]
+  by: string | null
+  reason?: string | null
+  at: string
+}
+export type AdminEventFrame = SessionFrame | NotificationsFrame | LockFrame
 export type StreamStatus = 'open' | 'error' | 'closed'
 
 type Handler = (frame: AdminEventFrame) => void
@@ -102,4 +113,16 @@ export function reconnectAdminEvents() {
   }
   retryMs = 1000
   connect()
+}
+
+/** Lock frames for one draft (acquired / handover / takeover / closed / presence). */
+export function subscribeLockEvents(
+  resourceType: string,
+  resourceId: string,
+  fn: (frame: LockFrame) => void,
+  onStatus?: StatusHandler
+): () => void {
+  return subscribeAdminEvents(frame => {
+    if (frame.kind === 'lock' && frame.resourceType === resourceType && frame.resourceId === resourceId) fn(frame)
+  }, onStatus)
 }

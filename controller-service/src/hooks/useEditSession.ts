@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-export type EditSessionStatus = 'idle' | 'opening' | 'open' | 'closing' | 'closed' | 'error'
+export type EditSessionStatus = 'idle' | 'opening' | 'open' | 'closing' | 'closed' | 'error' | 'locked'
+
+/** The draft lock as seen by the editor (useDraftLock); sessions open only for the holder. */
+export interface EditSessionLock {
+  loaded: boolean
+  isMine: boolean
+  claimable: boolean
+  markLocked?: () => void
+  refresh?: () => Promise<void>
+}
 
 export interface UseEditSessionOptions {
   resourceType: string
@@ -11,6 +20,8 @@ export interface UseEditSessionOptions {
   autoOpen?: boolean
   /** Called after the session closes with action='cancel' so the editor can reload drafts/state. */
   onCancelled?: () => void
+  /** Draft lock: open only when the draft is ours or free (viewers never open sessions). */
+  lock?: EditSessionLock | null
 }
 
 export interface UseEditSessionResult {
@@ -36,15 +47,21 @@ export function useEditSession({
   resourceId,
   autoOpen = true,
   onCancelled,
+  lock,
 }: UseEditSessionOptions): UseEditSessionResult {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [resumed, setResumed] = useState(false)
   const [status, setStatus] = useState<EditSessionStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const openedRef = useRef(false)
+  const lockRef = useRef(lock)
+  lockRef.current = lock
+  const mayOpen = !lock || (lock.loaded && (lock.isMine || lock.claimable))
 
   const open = useCallback(async () => {
     if (!resourceId || openedRef.current) return
+    const l = lockRef.current
+    if (l && !(l.loaded && (l.isMine || l.claimable))) return
     openedRef.current = true
     setStatus('opening')
     setError(null)
@@ -54,6 +71,13 @@ export function useEditSession({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resource_type: resourceType, resource_id: resourceId }),
       })
+      if (r.status === 423) {
+        // Someone else holds the draft: read-only, no session.
+        openedRef.current = false
+        setStatus('locked')
+        lockRef.current?.markLocked?.()
+        return
+      }
       if (!r.ok) {
         const body = await r.json().catch(() => ({}))
         throw new Error(body.error || `HTTP ${r.status}`)
@@ -62,6 +86,8 @@ export function useEditSession({
       setSessionId(data.session_id)
       setResumed(!!data.resumed)
       setStatus('open')
+      // Opening a session claims an unclaimed draft; pick up the new holder.
+      if (lockRef.current && !lockRef.current.isMine) void lockRef.current.refresh?.()
     } catch (e) {
       openedRef.current = false
       setStatus('error')
@@ -105,8 +131,17 @@ export function useEditSession({
   const cancel = useCallback(() => close('cancel'), [close])
 
   useEffect(() => {
-    if (autoOpen && resourceId && !openedRef.current) void open()
-  }, [autoOpen, resourceId, open])
+    if (autoOpen && resourceId && mayOpen && !openedRef.current) void open()
+  }, [autoOpen, resourceId, mayOpen, open])
+
+  // Lost the lock (takeover / handover / release): the server superseded our session.
+  const lost = !!lock && lock.loaded && !lock.isMine && !lock.claimable
+  useEffect(() => {
+    if (!lost) return
+    openedRef.current = false
+    setSessionId(null)
+    setStatus('locked')
+  }, [lost])
 
   return { sessionId, resumed, status, open, reopen, save, cancel, error }
 }
