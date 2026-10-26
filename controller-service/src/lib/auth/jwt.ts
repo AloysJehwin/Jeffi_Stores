@@ -59,6 +59,7 @@ export async function authenticateBusiness(request: NextRequest): Promise<UserJW
     approvalStatus: s.approvalStatus || undefined,
     scopes: s.scopes,
     sid,
+    sessionId: s.sessionId,
   }
 }
 

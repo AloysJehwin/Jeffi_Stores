@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const user = await queryOne<any>(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.phone_verified, u.date_of_birth,
               u.created_at, u.avatar_url, u.policies_accepted_version,
-              bp.approval_status, bp.company_name
+              bp.approval_status, bp.company_name, bp.gst_number, bp.industry, bp.business_address, bp.rejection_note
        FROM users u
        LEFT JOIN business_profiles bp ON bp.user_id = u.id
        WHERE u.id = $1 AND u.user_type = 'business'`,
@@ -43,6 +43,10 @@ export async function GET(request: NextRequest) {
         isBusiness: true,
         approvalStatus: user.approval_status || 'pending',
         companyName: user.company_name,
+        gstNumber: user.gst_number || null,
+        industry: user.industry || null,
+        businessAddress: user.business_address || null,
+        rejectionNote: user.approval_status === 'rejected' ? user.rejection_note || null : null,
         businessDiscountMap: user.approval_status === 'approved' ? businessDiscountMap : undefined,
         policiesAcceptedVersion: user.policies_accepted_version,
         requiresPolicyAcceptance: user.policies_accepted_version !== POLICY_VERSION,

@@ -37,6 +37,8 @@ export function productCardProps(product: any, gstEnabled: boolean) {
     primaryImage: primaryImage || null,
     brandName: product.brands?.name || null,
     categoryName: product.categories?.name || null,
+    // Business prices are per category (business_discounts), worked out on the client.
+    categoryId: product.category_id ?? product.categories?.id ?? null,
     discountPct: Number(product.discount_pct ?? 0),
     extraDeliveryDays: Number(product.extra_delivery_days ?? 0),
     isDigital: !!product.is_digital,

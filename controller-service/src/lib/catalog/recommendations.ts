@@ -37,6 +37,7 @@ export interface RecCard {
   product_images: Array<{ image_url: string; thumbnail_url: string; is_primary: boolean; blurhash?: string | null }>
   brands: { name: string } | null
   categories: { name: string } | null
+  category_id?: string | null
 }
 
 export type RecSource = 'vector' | 'heuristic' | 'bestsellers'

@@ -152,7 +152,7 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
   headers['x-jeffi-client'] = 'mobile'
   const sizeForClient = req.method === 'GET' && !req.headers['x-jeffi-image-sizing'] && (await imageResizeReady())
   // Auth responses (token injection) and image-sized ones are rewritten below, so ask for them uncompressed.
-  if (req.url.startsWith('/api/auth/') || sizeForClient) delete headers['accept-encoding']
+  if (req.url.startsWith('/api/auth/') || req.url.startsWith('/api/business/') || sizeForClient) delete headers['accept-encoding']
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
   const res = await undici(CONTROLLER_URL + req.url, {
     method: req.method as any,
@@ -170,7 +170,8 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
   const cookies = ([] as string[]).concat((res.headers['set-cookie'] as string | string[] | undefined) ?? [])
   // Sign-in responses carry the session only as a cookie; the app keeps it as a bearer token instead
   // (the controller accepts `Authorization: Bearer <sid>`), so copy it into the JSON body as `token`.
-  const sid = cookies.map(c => /^user_sid=([^;]+)/.exec(c)?.[1]).find(v => v && v !== 'deleted')
+  // Business sign-ins set business_sid instead.
+  const sid = cookies.map(c => /^(?:user|business)_sid=([^;]+)/.exec(c)?.[1]).find(v => v && v !== 'deleted')
   const json = String(res.headers['content-type'] ?? '').includes('application/json')
   for (const [k, v] of Object.entries(res.headers)) {
     if (v && !HOP.has(k) && k !== 'set-cookie' && !(sid && json && k === 'content-encoding')) reply.header(k, v as string)
