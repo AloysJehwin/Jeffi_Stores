@@ -1237,7 +1237,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                                                 type="button"
                                                 onClick={() => setQty(batch.id, qty - 1, batch.quantity_remaining)}
                                                 disabled={qty <= 1}
-                                                className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                                                className="w-[26px] h-[26px] flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
                                               >
                                                 ‹
                                               </button>
@@ -1250,13 +1250,13 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                                                   const v = parseInt(e.target.value)
                                                   if (!isNaN(v)) setQty(batch.id, v, batch.quantity_remaining)
                                                 }}
-                                                className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                                                className="field-xs w-12 text-center font-medium text-foreground tabular-nums border border-border-default bg-surface focus:outline-none focus:ring-1 focus:ring-accent-500"
                                               />
                                               <button
                                                 type="button"
                                                 onClick={() => setQty(batch.id, qty + 1, batch.quantity_remaining)}
                                                 disabled={qty >= batch.quantity_remaining}
-                                                className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                                                className="w-[26px] h-[26px] flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
                                               >
                                                 ›
                                               </button>
@@ -2148,7 +2148,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                                               type="button"
                                               onClick={() => setQty2(batch.id, qty - 1, batch.quantity_remaining)}
                                               disabled={qty <= 1}
-                                              className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                                              className="w-[26px] h-[26px] flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
                                             >
                                               ‹
                                             </button>
@@ -2161,13 +2161,13 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                                                 const v = parseInt(e.target.value)
                                                 if (!isNaN(v)) setQty2(batch.id, v, batch.quantity_remaining)
                                               }}
-                                              className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                                              className="field-xs w-12 text-center font-medium text-foreground tabular-nums border border-border-default bg-surface focus:outline-none focus:ring-1 focus:ring-accent-500"
                                             />
                                             <button
                                               type="button"
                                               onClick={() => setQty2(batch.id, qty + 1, batch.quantity_remaining)}
                                               disabled={qty >= batch.quantity_remaining}
-                                              className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                                              className="w-[26px] h-[26px] flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
                                             >
                                               ›
                                             </button>

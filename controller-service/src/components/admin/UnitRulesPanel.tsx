@@ -24,7 +24,7 @@ interface Props {
 }
 
 const inputCls =
-  'px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]'
+  'px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-control-sm'
 
 // Rules live on the unit row. Product-level units (variant_id IS NULL) use the
 // product rules endpoint; variant-level units use the variant rules endpoint.
@@ -248,7 +248,7 @@ export default function UnitRulesPanel({ productId, unitId, unitVariantId, rules
                   type="button"
                   onClick={addTier}
                   disabled={busy}
-                  className="px-3 h-control-sm text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50 h-[34px]"
+                  className="px-3 h-control-sm text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50"
                 >
                   + Add Tier
                 </button>
