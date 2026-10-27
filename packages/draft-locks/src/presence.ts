@@ -154,7 +154,7 @@ export async function listDrafts(
  * draft is gone, and tombstones older than a week.
  */
 export async function sweep(c: SqlClient): Promise<{ presence: number; released: number; orphaned: number; purged: number }> {
-  const presence = await q(c, `DELETE FROM draft_presence WHERE seen_at < now() - interval '5 minutes'`)
+  const presence = await q(c, `DELETE FROM draft_presence WHERE seen_at < now() - make_interval(secs => $1)`, [PRESENCE_TTL_SECONDS])
   const released = await q(c, 
     `UPDATE draft_locks l SET previous_owner_admin_id = l.owner_admin_id, owner_admin_id = NULL, epoch = l.epoch + 1, updated_at = now()
       WHERE l.closed_at IS NULL AND l.owner_admin_id IS NOT NULL

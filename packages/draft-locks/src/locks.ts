@@ -449,12 +449,18 @@ export async function changedSince(
   return { locks, cursor: r.rows.length ? String(r.rows[r.rows.length - 1].cursor_text) : cursor }
 }
 
-/** Release every lock an admin holds (deactivated, deleted, or scopes changed). */
-export async function releaseLocksOfAdmin(c: SqlClient, adminId: string): Promise<{ resourceType: DraftResourceType; resourceId: string }[]> {
-  const r = await q(c, 
+/** Release the locks an admin holds (deactivated, deleted, or scopes changed); `types` limits it. */
+export async function releaseLocksOfAdmin(
+  c: SqlClient,
+  adminId: string,
+  types?: DraftResourceType[] | null
+): Promise<{ resourceType: DraftResourceType; resourceId: string }[]> {
+  if (types && !types.length) return []
+  const r = await q(c,
     `UPDATE draft_locks SET previous_owner_admin_id = owner_admin_id, owner_admin_id = NULL, epoch = epoch + 1, updated_at = now()
-      WHERE owner_admin_id = $1 AND closed_at IS NULL RETURNING resource_type, resource_id`,
-    [adminId]
+      WHERE owner_admin_id = $1 AND closed_at IS NULL AND ($2::text[] IS NULL OR resource_type = ANY($2::text[]))
+      RETURNING resource_type, resource_id`,
+    [adminId, types ?? null]
   )
   for (const row of r.rows) await supersedeSessions(c, row.resource_type, row.resource_id, adminId)
   return r.rows.map(row => ({ resourceType: row.resource_type, resourceId: row.resource_id }))
