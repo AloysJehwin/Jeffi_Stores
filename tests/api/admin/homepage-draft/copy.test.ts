@@ -13,6 +13,12 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: (fn: any) => fake.db.withTransaction(fn),
 }))
 
+// Draft-lock bookkeeping is out of scope here: with no actor the writes run unlocked.
+vi.mock('@/lib/admin/draft-locks', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/admin/draft-locks')>()),
+  actorOf: () => null,
+}))
+
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { POST } from '@/app/api/(admin)/admin/homepage-draft/copy/route'

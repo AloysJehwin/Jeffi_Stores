@@ -8,10 +8,12 @@ import { HOMEPAGE_SURFACES, rowSurface } from '@/lib/catalog/homepage-sections'
 import {
   applyDraftOrder,
   getEditableHomepage,
+  homepageLockFrom,
   nextDisplayOrder,
   withHomepageDraft,
   type DraftHeroSlide,
 } from '@/lib/catalog/homepage-draft'
+import { lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,7 +92,8 @@ export async function POST(request: NextRequest) {
     }
     draft.heroSlides.push(row)
     return row
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (slide instanceof NextResponse) return slide
 
   return NextResponse.json({ slide })
 }
@@ -106,8 +109,9 @@ export async function PATCH(request: NextRequest) {
   const order: string[] = Array.isArray(body?.order) ? body.order : []
   if (order.length === 0) return NextResponse.json({ error: 'order[] required' }, { status: 400 })
 
-  await withHomepageDraft(admin.adminId, draft => {
+  const saved = await withHomepageDraft(admin.adminId, draft => {
     draft.heroSlides = applyDraftOrder(draft.heroSlides, order)
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (saved instanceof NextResponse) return saved
   return NextResponse.json({ success: true })
 }

@@ -3,7 +3,8 @@ import { authenticateAdmin, type AdminJWTPayload } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
-import { applyDraftPatch, endsBeforeStart, withHomepageDraft, type DraftSection } from '@/lib/catalog/homepage-draft'
+import { applyDraftPatch, endsBeforeStart, homepageLockFrom, withHomepageDraft, type DraftSection } from '@/lib/catalog/homepage-draft'
+import { lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,7 +70,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     applyDraftPatch(section, updates)
     return { section }
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (outcome instanceof NextResponse) return outcome
   if ('error' in outcome) return NextResponse.json({ error: outcome.error }, { status: outcome.status })
 
   return NextResponse.json({ section: outcome.section })
@@ -80,8 +82,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (admin instanceof NextResponse) return admin
   const { id } = await params
 
-  await withHomepageDraft(admin.adminId, draft => {
+  const saved = await withHomepageDraft(admin.adminId, draft => {
     draft.sections = draft.sections.filter(s => s.id !== id)
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (saved instanceof NextResponse) return saved
   return NextResponse.json({ success: true })
 }

@@ -3,6 +3,31 @@ import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import { randomUUID } from 'crypto'
 import { rowSurface, withDefaults, type HomepageSection, type HomepageSurface } from '@/lib/catalog/homepage-sections'
 import type { HeroSlide } from '@/lib/catalog/hero-slides'
+import {
+  HOMEPAGE_LOCK_ID,
+  actorOf,
+  announceDraftClosed,
+  announceDraftLock,
+  assertDraftHolder,
+  canDiscard,
+  closeDraftLockTx,
+  epochFrom,
+  type DraftActor,
+} from '@/lib/admin/draft-locks'
+
+/** The editing admin for the draft lock. No actor (system writers, tests) = no lock. */
+export interface HomepageLockOpts {
+  actor?: DraftActor
+  epoch?: number | null
+}
+
+/** Lock options for a route: the signed-in admin and the tab's epoch header. */
+export function homepageLockFrom(
+  admin: { adminId?: string; role?: string; scopes?: string[] },
+  req: { headers: { get(name: string): string | null } }
+): HomepageLockOpts {
+  return { actor: actorOf(admin), epoch: epochFrom(req) }
+}
 
 export type DraftSection = HomepageSection & { created_at: string; updated_at: string }
 export type DraftHeroSlide = HeroSlide
@@ -311,21 +336,28 @@ async function lockDraft(client: PoolClient, updatedBy: string | null): Promise<
 /**
  * Runs `mutate` against the locked draft, creating it from the live tables on first edit, and writes
  * both arrays back. A mutate that changes nothing rolls back, so it never leaves a fresh draft behind.
+ * With `lock.actor` the caller must hold the draft lock (DraftLockError otherwise); an unclaimed
+ * draft is claimed, all inside the same transaction.
  */
 export async function withHomepageDraft<T>(
   adminId: string | null,
-  mutate: (draft: HomepageDraftState) => T | Promise<T>
+  mutate: (draft: HomepageDraftState) => T | Promise<T>,
+  lock: HomepageLockOpts = {}
 ): Promise<T> {
   const updatedBy = asUuid(adminId)
+  let held: Awaited<ReturnType<typeof assertDraftHolder>> = null
   try {
-    return await withTransaction(async client => {
+    const out = await withTransaction(async client => {
       const draft = await lockDraft(client, updatedBy)
+      held = await assertDraftHolder(client, lock.actor, 'homepage', HOMEPAGE_LOCK_ID, { epoch: lock.epoch })
       const before = JSON.stringify(draft)
       const result = await mutate(draft)
       if (JSON.stringify(draft) === before) throw new Unchanged(result)
       await client.query(WRITE_DRAFT_SQL, [JSON.stringify(draft.sections), JSON.stringify(draft.heroSlides), updatedBy])
       return result
     })
+    await announceDraftLock(lock.actor, 'homepage', HOMEPAGE_LOCK_ID, held)
+    return out
   } catch (err) {
     if (err instanceof Unchanged) return err.result as T
     throw err
@@ -341,21 +373,44 @@ async function publishRows(client: PoolClient, spec: TableSpec, rows: DraftRow[]
   return { inserted, updated: upserted.rows.length - inserted, deleted: deleted.rowCount ?? 0 }
 }
 
-/** Copies the draft onto the live tables in one transaction and deletes it. Null when there is no draft. */
-export async function publishHomepageDraft(): Promise<PublishResult | null> {
-  return withTransaction(async client => {
+/**
+ * Copies the draft onto the live tables in one transaction and deletes it. Null when there is no draft.
+ * With `lock.actor` the draft lock is asserted and closed in that transaction.
+ */
+export async function publishHomepageDraft(lock: HomepageLockOpts = {}): Promise<PublishResult | null> {
+  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
+  const out = await withTransaction(async client => {
     const { rows } = await client.query(LOCK_DRAFT_SQL)
     if (!rows[0]) return null
+    await assertDraftHolder(client, lock.actor, 'homepage', HOMEPAGE_LOCK_ID, { epoch: lock.epoch })
     const sections = await publishRows(client, SECTIONS, asArray(rows[0].sections))
     const heroSlides = await publishRows(client, SLIDES, asArray(rows[0].hero_slides))
     await client.query(DELETE_DRAFT_SQL)
+    closed = await closeDraftLockTx(client, lock.actor, 'homepage', HOMEPAGE_LOCK_ID, 'published')
     return { sections, heroSlides }
   })
+  await announceDraftClosed(lock.actor, 'homepage', HOMEPAGE_LOCK_ID, closed, 'published')
+  return out
 }
 
-export async function discardHomepageDraft(): Promise<boolean> {
-  const result = await query(DELETE_DRAFT_SQL)
-  return (result.rowCount ?? 0) > 0
+/** With `lock.actor`: the holder or an owner role (audited) discards, and the lock closes with the row. */
+export async function discardHomepageDraft(lock: HomepageLockOpts = {}): Promise<boolean> {
+  const actor = lock.actor
+  if (!actor?.adminId) {
+    const result = await query(DELETE_DRAFT_SQL)
+    return (result.rowCount ?? 0) > 0
+  }
+  const allowed = await canDiscard(actor, 'homepage', HOMEPAGE_LOCK_ID)
+  if (!allowed.ok) throw allowed.error
+  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
+  const discarded = await withTransaction(async client => {
+    const result = await client.query(DELETE_DRAFT_SQL)
+    if (!result.rowCount) return false
+    closed = await closeDraftLockTx(client, actor, 'homepage', HOMEPAGE_LOCK_ID, 'discarded')
+    return true
+  })
+  await announceDraftClosed(actor, 'homepage', HOMEPAGE_LOCK_ID, closed, 'discarded')
+  return discarded
 }
 
 function diffRows(draft: DraftRow[], live: DraftRow[], fields: readonly string[]): DraftDiff {
