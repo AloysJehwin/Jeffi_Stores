@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/auth-sessions', () => ({ sweepExpiredAdminSessions: vi.fn() }))
+vi.mock('@/lib/admin/draft-locks', () => ({ sweepDraftLocks: vi.fn(async () => ({ presence: 0, released: 0, orphaned: 0, purged: 0 })) }))
 
 import { GET } from '@/app/api/(internal)/cron/sweep-sessions/route'
 import { sweepExpiredAdminSessions } from '@/lib/auth/auth-sessions'
@@ -26,7 +27,7 @@ describe('GET /api/cron/sweep-sessions', () => {
     mockSweep.mockResolvedValue(['s1', 's2'])
     const res = await GET(req('Bearer secret'))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ ok: true, revoked: 2 })
+    expect(await res.json()).toEqual({ ok: true, revoked: 2, drafts: { presence: 0, released: 0, orphaned: 0, purged: 0 } })
   })
 
   it('500 when the sweep fails', async () => {

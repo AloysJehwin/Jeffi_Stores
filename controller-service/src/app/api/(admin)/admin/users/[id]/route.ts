@@ -8,6 +8,19 @@ import { resolveRequestTenantId } from '@/lib/tenancy/request-tenant'
 import { revokeAllForPrincipal } from '@/lib/auth/auth-sessions'
 import { revokePortalCerts } from '@/lib/tenancy/portal-certs'
 
+// Free the admin's drafts for others to claim: all of them, or (scoped) only the types they can
+// no longer write. Best effort; the sweep also frees locks held by inactive admins.
+async function releaseDrafts(id: string, actorId: string, scoped?: { role: string; scopes: string[] }) {
+  try {
+    const dl = await import('@/lib/admin/draft-locks')
+    const actor = { adminId: actorId }
+    if (scoped) await dl.releaseLocksOutOfScope(id, scoped.role, scoped.scopes, actor)
+    else await dl.releaseLocksOfAdmin(id, actor)
+  } catch {
+    /* lock store unavailable */
+  }
+}
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await authenticateAdmin(request)
@@ -100,6 +113,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
       // Mirror into the central portal registry so certificate.jeffistores.in refuses these serials.
       await revokePortalCerts((revoked.rows || []).map(r => r.serial_number))
+      await releaseDrafts(id, admin.adminId)
+    } else if (role !== undefined || scopes !== undefined) {
+      await releaseDrafts(id, admin.adminId, {
+        role: String(updated.role ?? ''),
+        scopes: Array.isArray(updated.scopes) ? updated.scopes : [],
+      })
     }
 
     return NextResponse.json({ success: true, admin: updated })
@@ -129,6 +148,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     )
     await query('DELETE FROM admin_certificates WHERE admin_id = $1', [id])
     await revokePortalCerts((certRows.rows || []).map(r => r.serial_number))
+    // Before the delete: the FK would only null the owner, without a lock event or session cleanup.
+    await releaseDrafts(id, admin.adminId)
 
     const deleted = await queryOne('DELETE FROM admins WHERE id = $1 RETURNING id, user_id', [id])
 

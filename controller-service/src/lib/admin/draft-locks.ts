@@ -426,10 +426,10 @@ export async function getDraftLockMap(type: DraftResourceType, ids: string[]): P
   }
 }
 
-/** Deactivated, deleted, or re-scoped admin: free their drafts for others to claim. */
-export async function releaseLocksOfAdmin(adminId: string, actor?: DraftActor): Promise<number> {
+/** Deactivated, deleted, or re-scoped admin: free their drafts (of `types`, else all) for others to claim. */
+export async function releaseLocksOfAdmin(adminId: string, actor?: DraftActor, types?: DraftResourceType[]): Promise<number> {
   try {
-    const freed = await withTransaction(c => dl.releaseLocksOfAdmin(c, adminId))
+    const freed = await withTransaction(c => dl.releaseLocksOfAdmin(c, adminId, types))
     for (const f of freed) {
       await publishLockEvent({ type: 'released', resourceType: f.resourceType, resourceId: f.resourceId, lock: null, by: actor?.adminId ?? null })
     }
@@ -438,6 +438,17 @@ export async function releaseLocksOfAdmin(adminId: string, actor?: DraftActor): 
     console.error('[draft-locks] releaseLocksOfAdmin failed for', adminId, err)
     return 0
   }
+}
+
+/** Scopes or role changed: free only the drafts whose write scope the admin no longer has. */
+export async function releaseLocksOutOfScope(adminId: string, role: string, scopes: string[], actor?: DraftActor): Promise<number> {
+  const lost = dl.DRAFT_RESOURCE_TYPES.filter(t => !hasScope(role, scopes, dl.DRAFT_RESOURCES[t].writeScope))
+  return lost.length ? releaseLocksOfAdmin(adminId, actor, lost) : 0
+}
+
+/** Cron housekeeping: stale presence, orphaned locks, locks of inactive admins, old tombstones. */
+export async function sweepDraftLocks() {
+  return dl.sweep(pool)
 }
 
 /** The entity was deleted outright. */
