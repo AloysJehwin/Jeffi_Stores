@@ -19,6 +19,7 @@ function buildPageUrl(searchParams: Record<string, string | undefined>, page: nu
   if (searchParams.offer) params.set('offer', searchParams.offer)
   if (searchParams.search) params.set('search', searchParams.search)
   if (searchParams.sort) params.set('sort', searchParams.sort)
+  if (searchParams.dir) params.set('dir', searchParams.dir)
   if (searchParams.order) params.set('order', searchParams.order)
   if (searchParams.minPrice) params.set('minPrice', searchParams.minPrice)
   if (searchParams.maxPrice) params.set('maxPrice', searchParams.maxPrice)

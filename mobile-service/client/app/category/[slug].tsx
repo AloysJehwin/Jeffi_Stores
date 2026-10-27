@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { View } from 'react-native'
 import { Card, Screen, ScreenHeader, Text, useBottomInset } from '../../src/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -8,6 +9,8 @@ import CategoryIcon from '../../src/components/catalog/CategoryIcon'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import PagedProductGrid from '../../src/components/catalog/PagedProductGrid'
 import { EmptyCard, InfiniteFooter, ListingPageSkeleton } from '../../src/components/catalog/Paged'
+import { SortButton, SortSheet } from '../../src/components/catalog/FilterSheet'
+import { productSortKey, type ProductSortId } from '../../src/components/catalog/listing'
 import { Grid } from '../../src/components/home/layout'
 import { accent } from '../../src/theme'
 
@@ -38,8 +41,10 @@ function SubcategoryTile({ category }: { category: CategoryDetail }) {
 }
 
 export default function CategoryScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>()
+  const { slug, sort, dir, order } = useLocalSearchParams<{ slug: string; sort?: string; dir?: string; order?: string }>()
   const bottomInset = useBottomInset(0)
+  const [sortId, setSortId] = useState<ProductSortId>(() => productSortKey(sort, dir ?? order))
+  const [sortOpen, setSortOpen] = useState(false)
   const { data: all, isLoading, error, refetch } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
   const { data: home } = useQuery({ queryKey: ['home', 'store'], queryFn: () => getHome(), staleTime: 120_000 })
   const categories = withDetails(all ?? [], home?.data.mainCategories as Record<string, any>[] | undefined)
@@ -99,6 +104,7 @@ export default function CategoryScreen() {
           <Text accessibilityRole="header" className="font-display text-xl font-extrabold text-foreground">
             Products ({total ?? 0})
           </Text>
+          {(total ?? 0) > 1 || sortId !== 'featured' ? <SortButton value={sortId} onPress={() => setSortOpen(true)} /> : null}
         </View>
       </View>
     </>
@@ -109,6 +115,7 @@ export default function CategoryScreen() {
       <PagedProductGrid
         page="category"
         base={{ category: category.slug }}
+        sort={sortId}
         pageSize={PAGE_SIZE}
         cols={2}
         gap={12}
@@ -119,6 +126,7 @@ export default function CategoryScreen() {
         }
       />
       <CompareBar />
+      <SortSheet open={sortOpen} onClose={() => setSortOpen(false)} value={sortId} onApply={setSortId} />
     </Screen>
   )
 }

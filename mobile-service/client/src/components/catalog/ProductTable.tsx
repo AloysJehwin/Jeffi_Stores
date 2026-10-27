@@ -1,12 +1,13 @@
 import { Pressable, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { Box, ChevronRight } from 'lucide-react-native'
+import { ArrowDown, ArrowUp, ArrowUpDown, Box, ChevronRight } from 'lucide-react-native'
 import { Badge, Card, Text } from '../../ui'
 import type { ListingCard } from '../../api/products'
 import { absUrl } from '../../lib/links'
 import { inr } from '../../lib/format'
 import { useTokens } from '../../theme'
+import { PRODUCT_TABLE_COLUMNS, nextTableSort, tableSortState, type ProductTableColumn } from './listing'
 
 // ProductGrid's table view (TableRow + StockBadge).
 
@@ -70,24 +71,45 @@ function TableRow({ product: c, stripe, last }: { product: ListingCard; stripe: 
   )
 }
 
-export default function ProductTable({ products }: { products: ListingCard[] }) {
-  const head = 'text-[11px] font-semibold uppercase text-foreground-muted'
+export type TableSort = { sort?: string; dir?: string }
+
+/** A sortable column title: natural direction → flipped → cleared (PRODUCT_TABLE_COLUMNS). */
+function ColumnHead({ col, value, onSort, className }: { col: ProductTableColumn; value: TableSort; onSort: (next: TableSort) => void; className: string }) {
+  const t = useTokens()
+  const state = tableSortState(col.key, value.sort, value.dir)
+  const Arrow = state === 'asc' ? ArrowUp : state === 'desc' ? ArrowDown : ArrowUpDown
+  return (
+    <Pressable
+      onPress={() => onSort(nextTableSort(col.key, value.sort, value.dir))}
+      accessibilityRole="button"
+      accessibilityLabel={`Sort by ${col.label}`}
+      accessibilityState={{ selected: !!state }}
+      hitSlop={6}
+      className={`flex-row items-center gap-1 ${className}`}
+    >
+      <Text className={`text-[11px] font-semibold uppercase ${state ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted'}`} style={{ letterSpacing: 0.5 }}>
+        {col.label}
+      </Text>
+      <Arrow size={11} color={t.foregroundMuted} style={{ opacity: state ? 1 : 0.4 }} />
+    </Pressable>
+  )
+}
+
+const COLUMN_BOX: Record<ProductTableColumn['key'], string> = {
+  name: 'flex-1',
+  price: 'min-w-[80px] shrink-0 justify-end',
+  discount: 'w-10 shrink-0 justify-center',
+  stock: 'shrink-0',
+}
+
+export default function ProductTable({ products, sort, onSort }: { products: ListingCard[]; sort: TableSort; onSort: (next: TableSort) => void }) {
   return (
     <Card padded={false} className="overflow-hidden">
       <View className="flex-row items-center gap-3 border-b border-border-default bg-surface-secondary px-4 py-2.5">
         <View className="w-10 shrink-0" />
-        <Text className={`flex-1 ${head}`} style={{ letterSpacing: 0.5 }}>
-          Product
-        </Text>
-        <Text className={`min-w-[80px] shrink-0 text-right ${head}`} style={{ letterSpacing: 0.5 }}>
-          Price
-        </Text>
-        <Text className={`w-10 shrink-0 text-center ${head}`} style={{ letterSpacing: 0.5 }}>
-          Off
-        </Text>
-        <Text className={`shrink-0 ${head}`} style={{ letterSpacing: 0.5 }}>
-          Stock
-        </Text>
+        {PRODUCT_TABLE_COLUMNS.map(col => (
+          <ColumnHead key={col.key} col={col} value={sort} onSort={onSort} className={COLUMN_BOX[col.key]} />
+        ))}
         <View className="w-3.5 shrink-0" />
       </View>
       {products.map((p, i) => (

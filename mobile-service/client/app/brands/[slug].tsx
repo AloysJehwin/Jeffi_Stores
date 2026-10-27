@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Linking, View } from 'react-native'
 import { Screen, ScreenHeader, Text, TextButton, useBottomInset } from '../../src/ui'
 import { Image } from 'expo-image'
@@ -7,6 +8,8 @@ import { listBrands, type BrandDetail } from '../../src/api/brands'
 import CompareBar from '../../src/components/catalog/CompareBar'
 import PagedProductGrid from '../../src/components/catalog/PagedProductGrid'
 import { EmptyCard, ListingPageSkeleton } from '../../src/components/catalog/Paged'
+import { SortButton, SortSheet } from '../../src/components/catalog/FilterSheet'
+import { productSortKey, type ProductSortId } from '../../src/components/catalog/listing'
 import { absUrl } from '../../src/lib/links'
 import { useImageSource } from '../../src/hooks/useImageSource'
 
@@ -15,8 +18,10 @@ import { useImageSource } from '../../src/hooks/useImageSource'
 const PAGE_SIZE = 25
 
 export default function BrandScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>()
+  const { slug, sort, dir, order } = useLocalSearchParams<{ slug: string; sort?: string; dir?: string; order?: string }>()
   const bottomInset = useBottomInset(0)
+  const [sortId, setSortId] = useState<ProductSortId>(() => productSortKey(sort, dir ?? order))
+  const [sortOpen, setSortOpen] = useState(false)
   const imgSource = useImageSource()
   const { data, isLoading } = useQuery({ queryKey: ['brands'], queryFn: listBrands, staleTime: 5 * 60_000 })
   const brand = (data ?? []).find(b => b.slug === slug) as BrandDetail | undefined
@@ -58,6 +63,7 @@ export default function BrandScreen() {
           <Text accessibilityRole="header" className="font-display text-xl font-extrabold text-foreground">
             Products ({total ?? 0})
           </Text>
+          {(total ?? 0) > 1 || sortId !== 'featured' ? <SortButton value={sortId} onPress={() => setSortOpen(true)} /> : null}
         </View>
       </View>
     </>
@@ -68,6 +74,7 @@ export default function BrandScreen() {
       <PagedProductGrid
         page="brand"
         base={{ brand: brand.id }}
+        sort={sortId}
         pageSize={PAGE_SIZE}
         cols={1}
         gap={16}
@@ -76,6 +83,7 @@ export default function BrandScreen() {
         empty={<EmptyCard title="No Products Yet" body="We're working on adding products for this brand. Check back soon!" />}
       />
       <CompareBar />
+      <SortSheet open={sortOpen} onClose={() => setSortOpen(false)} value={sortId} onApply={setSortId} />
     </Screen>
   )
 }

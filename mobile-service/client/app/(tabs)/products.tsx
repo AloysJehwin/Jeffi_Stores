@@ -162,7 +162,7 @@ export default function ProductsScreen() {
   }, [loading, rows, view, grouped, promo, layout, total])
 
   const apply = useCallback((next: ListingParams) => router.setParams(toRouteParams(next)), [router])
-  const toggleGrouped = () => apply({ ...params, sort: grouped ? undefined : 'category', order: undefined })
+  const toggleGrouped = () => apply({ ...params, sort: grouped ? undefined : 'category', dir: undefined, order: undefined })
 
   // Stable, so a screen re-render doesn't re-render every mounted row.
   const renderItem = useCallback<ListRenderItem<Item>>(
@@ -178,7 +178,11 @@ export default function ProductsScreen() {
       if (item.type === 'table') {
         return (
           <View className="px-4">
-            <ProductTable products={rows} />
+            <ProductTable
+              products={rows}
+              sort={{ sort: params.sort, dir: params.dir ?? params.order }}
+              onSort={next => apply({ ...params, sort: next.sort, dir: next.dir, order: undefined })}
+            />
           </View>
         )
       }
@@ -195,7 +199,7 @@ export default function ProductsScreen() {
       }
       return <Pair rows={item.rows} width={cardW} />
     },
-    [promo, rows, router, apply, cardW, layout]
+    [promo, rows, router, apply, cardW, layout, params]
   )
 
   const header = (
@@ -296,6 +300,7 @@ export default function ProductsScreen() {
         facets={first?.facets ?? EMPTY_FACETS}
         offers={first?.offers ?? []}
         onApply={apply}
+        sortable={view === 'grid'}
       />
       <CompareBar />
     </Screen>

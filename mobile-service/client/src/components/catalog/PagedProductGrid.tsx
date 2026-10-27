@@ -9,6 +9,7 @@ import { useColumnWidth } from '../home/layout'
 import { ListingFeedItem, listingFeed, useListingLayout, type ListingFeedEntry } from '../home/ListingFeed'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { toCard } from '../../lib/card'
+import { PRODUCT_SORTS, type ProductSortId } from './listing'
 import type { CardProduct } from '../../types/home'
 
 interface Row {
@@ -16,7 +17,7 @@ interface Row {
   handlingDays: number
 }
 
-// A ServerPagedItems product grid (category and brand pages): newest first, pages appended on scroll.
+// A ServerPagedItems product grid (category and brand pages): in the chosen PRODUCT_SORTS order, pages appended on scroll.
 // Rows are packed here rather than with numColumns, so the sections placed between the products
 // (GET /api/home?page=category|brand) can span the full width.
 
@@ -50,6 +51,7 @@ const ProductRow = memo(
 export default function PagedProductGrid({
   page,
   base,
+  sort = 'featured',
   pageSize,
   cols,
   gap,
@@ -61,6 +63,7 @@ export default function PagedProductGrid({
   /** Whose placed sections go between the products. */
   page: 'category' | 'brand'
   base: Pick<ProductQuery, 'category' | 'brand'>
+  sort?: ProductSortId
   pageSize: number
   cols: 1 | 2
   gap: number
@@ -72,9 +75,10 @@ export default function PagedProductGrid({
   const { gstEnabled } = useStoreConfig().flags
   const w = useColumnWidth(cols, gap)
   const layout = useListingLayout(page)
+  const opt = PRODUCT_SORTS.find(o => o.id === sort)
   const q = useInfiniteQuery({
-    queryKey: ['products', 'paged', base, pageSize],
-    queryFn: ({ pageParam }) => listProducts({ ...base, sort: 'created_at', order: 'desc', page: pageParam, limit: pageSize }),
+    queryKey: ['products', 'paged', base, sort, pageSize],
+    queryFn: ({ pageParam }) => listProducts({ ...base, sort: opt?.sort, dir: opt?.dir, page: pageParam, limit: pageSize }),
     initialPageParam: 1,
     getNextPageParam: (last, pages) => (pages.length * pageSize < last.total ? pages.length + 1 : undefined),
     enabled,

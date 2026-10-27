@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { View } from 'react-native'
-import { ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react-native'
+import { ArrowUpDown, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react-native'
 import { Button, Caption, Checkbox, Chip, ChipGroup, IconButton, ModalSheet, Radio, Subheading, Text, TextButton, TextField, cn, type IconComponent } from '../../ui'
-import { SORT_OPTIONS, activeFilterCount, humanizeLabel, splitList, type ListingParams } from './listing'
+import { PRODUCT_SORTS, activeFilterCount, humanizeLabel, productSortKey, splitList, type ListingParams, type ProductSortId } from './listing'
 import type { ListingFacetValue as FacetValue, ListingFacets as FilterFacets } from '../../api/products'
 
 type Category = { id: string; name: string; slug?: string; parent_category_id: string | null }
@@ -57,6 +57,12 @@ export function FiltersButton({ params, onPress }: { params: ListingParams; onPr
   return <Chip label="Filters" icon={SlidersHorizontal} selected={count > 0} meta={count > 0 ? count : undefined} onPress={onPress} />
 }
 
+/** A Sort chip showing the current choice; opens a SortSheet. */
+export function SortButton({ value, onPress }: { value: ProductSortId; onPress: () => void }) {
+  const label = PRODUCT_SORTS.find(o => o.id === value)?.label ?? 'Sort'
+  return <Chip label={value === 'featured' ? 'Sort' : label} icon={ArrowUpDown} selected={value !== 'featured'} onPress={onPress} />
+}
+
 const PRICE_PRESETS = [
   { label: 'Under ₹500', min: '', max: '500' },
   { label: '₹500–₹2k', min: '500', max: '2000' },
@@ -67,8 +73,9 @@ const PRICE_PRESETS = [
 type Pending = {
   categories: string[]
   brands: string[]
-  sort: string
-  order: string
+  sort: ProductSortId
+  /** Untouched, the URL's sort stays as is (group-by-category, a table column sort). */
+  sortTouched: boolean
   minPrice: string
   maxPrice: string
   inStock: boolean
@@ -91,8 +98,8 @@ function fromParams(p: ListingParams): Pending {
   return {
     categories: splitList(p.category),
     brands: splitList(p.brand),
-    sort: p.sort ?? '',
-    order: p.order ?? '',
+    sort: productSortKey(p.sort, p.dir ?? p.order),
+    sortTouched: false,
     minPrice: p.minPrice ?? '',
     maxPrice: p.maxPrice ?? '',
     inStock: p.inStock === '1',
@@ -112,13 +119,12 @@ function fromParams(p: ListingParams): Pending {
   }
 }
 
-function toParams(s: Pending, search?: string): ListingParams {
+function toParams(s: Pending, orig: ListingParams): ListingParams {
   const out: ListingParams = {}
   const join = (v: string[]) => (v.length ? v.join(',') : undefined)
   out.category = join(s.categories)
   out.brand = join(s.brands)
-  out.sort = s.sort || undefined
-  out.order = s.order || undefined
+  Object.assign(out, s.sortTouched ? sortParams(s.sort) : { sort: orig.sort, dir: orig.dir, order: orig.order })
   out.minPrice = s.minPrice || undefined
   out.maxPrice = s.maxPrice || undefined
   out.inStock = s.inStock ? '1' : undefined
@@ -137,11 +143,64 @@ function toParams(s: Pending, search?: string): ListingParams {
     out.specKey = s.specKey
     out.specValue = s.specValue
   }
-  if (search) out.search = search
+  if (orig.search) out.search = orig.search
   return out
 }
 
-const EMPTY: Pending = fromParams({})
+const EMPTY: Pending = { ...fromParams({}), sortTouched: true }
+
+/** ?sort / ?dir for a sort choice; `order` is always cleared (legacy alias). */
+export function sortParams(id: ProductSortId): Pick<ListingParams, 'sort' | 'dir' | 'order'> {
+  const opt = PRODUCT_SORTS.find(o => o.id === id)
+  return { sort: opt?.sort, dir: opt?.dir, order: undefined }
+}
+
+function SortOptions({ value, onSelect }: { value: string; onSelect: (id: ProductSortId) => void }) {
+  return (
+    <View>
+      {PRODUCT_SORTS.map(opt => (
+        <Radio key={opt.id} selected={value === opt.id} label={opt.label} onSelect={() => onSelect(opt.id)} />
+      ))}
+    </View>
+  )
+}
+
+/** Sort only, for listings without the facet filters (category and brand screens). */
+export function SortSheet({
+  open,
+  onClose,
+  value,
+  onApply,
+}: {
+  open: boolean
+  onClose: () => void
+  value: ProductSortId
+  onApply: (id: ProductSortId) => void
+}) {
+  const [pending, setPending] = useState<ProductSortId>(value)
+  useEffect(() => {
+    if (open) setPending(value)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+  return (
+    <ModalSheet
+      open={open}
+      onClose={onClose}
+      title="Sort By"
+      footer={
+        <Button
+          label="Apply"
+          onPress={() => {
+            onApply(pending)
+            onClose()
+          }}
+        />
+      }
+    >
+      <SortOptions value={pending} onSelect={setPending} />
+    </ModalSheet>
+  )
+}
 
 export default function FilterSheet({
   open,
@@ -152,10 +211,13 @@ export default function FilterSheet({
   facets,
   offers,
   onApply,
+  sortable = true,
 }: {
   open: boolean
   onClose: () => void
   params: ListingParams
+  /** False in table views, which sort by their column titles. */
+  sortable?: boolean
   categories: Category[]
   brands: Brand[]
   facets: FilterFacets
@@ -197,7 +259,7 @@ export default function FilterSheet({
   const hasAnyPending =
     s.categories.length > 0 ||
     s.brands.length > 0 ||
-    !!s.sort ||
+    s.sort !== 'featured' ||
     !!s.minPrice ||
     !!s.maxPrice ||
     s.inStock ||
@@ -212,7 +274,7 @@ export default function FilterSheet({
     !!s.specKey
 
   const apply = () => {
-    onApply(toParams(s, params.search))
+    onApply(toParams(s, params))
     onClose()
   }
 
@@ -232,10 +294,10 @@ export default function FilterSheet({
     >
       <ChipGroup className="mb-5">
         <Chip label={`Filters${count > 0 ? ` (${count})` : ''}`} selected={tab === 'filters'} onPress={() => setTab('filters')} />
-        <Chip label="Sort" selected={tab === 'sort'} onPress={() => setTab('sort')} />
+        {sortable ? <Chip label="Sort" selected={tab === 'sort'} onPress={() => setTab('sort')} /> : null}
       </ChipGroup>
 
-      {tab === 'filters' ? (
+      {tab === 'filters' || !sortable ? (
         <View className="gap-6">
           <Group title="Price Range">
             <ChipGroup className="mb-3">
@@ -419,14 +481,7 @@ export default function FilterSheet({
         </View>
       ) : (
         <View>
-          {SORT_OPTIONS.map(opt => (
-            <Radio
-              key={opt.label}
-              selected={s.sort === opt.sort && s.order === opt.order}
-              label={opt.label}
-              onSelect={() => setS(prev => ({ ...prev, sort: opt.sort, order: opt.order }))}
-            />
-          ))}
+          <SortOptions value={s.sort} onSelect={id => setS(prev => ({ ...prev, sort: id, sortTouched: true }))} />
         </View>
       )}
     </ModalSheet>
