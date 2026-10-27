@@ -21,12 +21,14 @@ interface Props {
   offers: ProductOffer[]
   title?: string | null
   eyebrow?: string | null
+  /** Width / height of the cards, or of a lone offer's banner; null keeps the defaults. */
+  aspect?: number | null
 }
 
 const shopLabel = (o: ProductOffer) => [`Shop ${o.title}`, o.badge_text, o.subtitle].filter(Boolean).join(', ')
 
 // Several offers are 4:5 cards whose neighbours fade and shrink; a lone offer stays one wide banner.
-export default function OfferSlider({ offers, title, eyebrow }: Props) {
+export default function OfferSlider({ offers, title, eyebrow, aspect }: Props) {
   if (!offers.length) return null
   const single = offers.length === 1
 
@@ -39,9 +41,12 @@ export default function OfferSlider({ offers, title, eyebrow }: Props) {
         ariaLabel={title ?? 'Offers'}
         itemLabel="offer"
         aspect="4:5"
+        aspectRatio={aspect}
         dots={{ label: i => `Go to offer ${i + 1}`, className: 'mt-3 justify-center' }}
       >
-        {offers.map(o => (single ? <OfferBanner key={o.id} offer={o} /> : <OfferCard key={o.id} offer={o} />))}
+        {offers.map(o =>
+          single ? <OfferBanner key={o.id} offer={o} aspect={aspect} /> : <OfferCard key={o.id} offer={o} />
+        )}
       </Slides>
     </section>
   )
@@ -90,9 +95,10 @@ function OfferCard({ offer }: { offer: ProductOffer }) {
 }
 
 // A lone offer spans the row like the hero and business cards.
-function OfferBanner({ offer }: { offer: ProductOffer }) {
+function OfferBanner({ offer, aspect }: { offer: ProductOffer; aspect?: number | null }) {
   return (
     <PromoBanner
+      aspectRatio={aspect}
       href={offerHref(offer.slug)}
       label={`Shop ${offer.title}`}
       backdrop={

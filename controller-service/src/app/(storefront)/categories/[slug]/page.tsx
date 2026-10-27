@@ -1,11 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/shared/db'
-import { buildListingModel } from '@/lib/catalog/listing-model'
+import { LISTING_PAGE_SIZE, buildListingModel } from '@/lib/catalog/listing-model'
+import { getWebSurface } from '@/lib/catalog/web-surface'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import { renderProductItem } from '@/components/visitor/listing/listing-items'
+import { withListingSections } from '@/components/visitor/listing/listing-sections'
 
 async function getCategoryBySlug(slug: string) {
   return queryOne('SELECT * FROM categories WHERE slug = $1 AND is_active = true LIMIT 1', [slug])
@@ -19,7 +21,7 @@ async function getSubcategories(parentId: string) {
 }
 
 // Grid matches the page's full-width layout (no filter sidebar).
-const GRID = 'grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6'
+const GRID = 'grid grid-flow-row-dense grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6'
 
 export default async function CategoryDetailPage({
   params,
@@ -48,7 +50,11 @@ export default async function CategoryDetailPage({
     { ...sp, category: picked.length ? picked.join(',') : String(category.id), sort: sp.sort || 'created_at' },
     { categoryBanners: false }
   )
-  const filtered = Object.entries(sp).some(([k, v]) => !!v && !['page', 'sort', 'order'].includes(k))
+  const filtered = Object.entries(sp).some(([k, v]) => !!v && !['page', 'sort', 'order', 'layout'].includes(k))
+  const pagedItems = await withListingSections(
+    products.map(product => ({ key: String(product.id), node: renderProductItem(product, gstEnabled) })),
+    { page: 'category', surface: await getWebSurface(sp.layout), pageNum: page, pageSize: LISTING_PAGE_SIZE, total }
+  )
   const filterSheet = (
     <MobileFilterSheet
       key="mobile-filters"
@@ -128,10 +134,7 @@ export default async function CategoryDetailPage({
               start={start}
               end={end}
               filterSlot={filterSheet}
-              pagedItems={products.map(product => ({
-                key: String(product.id),
-                node: renderProductItem(product, gstEnabled),
-              }))}
+              pagedItems={pagedItems}
               page={page}
               basePath={`/categories/${category.slug}`}
               gridClassName={GRID}

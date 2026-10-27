@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import StoreMedia from '@/components/visitor/media/StoreMedia'
@@ -8,6 +8,13 @@ export const CARD_IMAGE =
   'absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out motion-safe:group-hover:scale-[1.04]'
 export const BANNER_IMAGE =
   'absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out motion-safe:group-hover:scale-[1.03]'
+
+/** A full-width banner in the admin's shape: capped so a tall one never fills the screen, floored so its text fits. */
+export const bannerShape = (aspectRatio: number, minHeight?: string): CSSProperties => ({
+  aspectRatio,
+  maxHeight: 'min(80vh, 640px)',
+  minHeight,
+})
 
 export interface PromoMediaProps {
   /** A 4:5 / 1:1 card takes the card clip, a wide slot the wide one; each falls back to the other. */
@@ -138,11 +145,20 @@ export function PromoCard({ surface = 'bg-[#0d0d0d]', ...p }: PromoFaceProps) {
   )
 }
 
+const BANNER_H = 'h-[clamp(14rem,40vw,28rem)]'
+
 // One slide across the row, like the hero and business cards.
-export function PromoBanner({ surface = 'bg-[#0d0d0d]', ...p }: PromoFaceProps) {
+export function PromoBanner({
+  surface = 'bg-[#0d0d0d]',
+  aspectRatio,
+  ...p
+}: PromoFaceProps & { aspectRatio?: number | null }) {
   return (
     <Face href={p.href} label={p.label} tabIndex={p.tabIndex} action={p.action} className="group block rounded-2xl">
-      <div className={`relative w-full overflow-hidden rounded-2xl ${surface} h-[clamp(14rem,40vw,28rem)] shadow-2xl`}>
+      <div
+        className={`relative w-full overflow-hidden rounded-2xl ${surface} ${aspectRatio ? '' : BANNER_H} shadow-2xl`}
+        style={aspectRatio ? bannerShape(aspectRatio, '14rem') : undefined}
+      >
         {p.backdrop}
         {p.backdrop && (
           <>

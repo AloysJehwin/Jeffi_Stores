@@ -70,7 +70,7 @@ interface Props {
   // When provided, grid-view + non-grouped renders ServerPagedItems so pages 2..N
   // accumulate client-side instead of needing a page-number pager. Each item is a
   // server-rendered node; the page itself has already applied GST / discount maths.
-  pagedItems?: { key: string; node: ReactNode }[]
+  pagedItems?: { key: string; node: ReactNode; extra?: boolean }[]
   page?: number
   /** Where sort changes navigate (the listing's own path). */
   basePath?: string
@@ -78,7 +78,7 @@ interface Props {
   gridClassName?: string
 }
 
-const DEFAULT_GRID = 'grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6'
+const DEFAULT_GRID = 'grid grid-flow-row-dense grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6'
 const CHIP_H = 'h-11 lg:h-9'
 
 type ViewMode = 'grid' | 'table'

@@ -2,7 +2,9 @@ import Link from 'next/link'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import FilterSidebar from '@/components/visitor/FilterSidebar'
 import { renderProductItem } from '@/components/visitor/listing/listing-items'
-import { buildListingModel } from '@/lib/catalog/listing-model'
+import { LISTING_PAGE_SIZE, buildListingModel } from '@/lib/catalog/listing-model'
+import { getWebSurface } from '@/lib/catalog/web-surface'
+import { withListingSections, type PagedItem } from '@/components/visitor/listing/listing-sections'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
 import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
@@ -59,6 +61,32 @@ export default async function ProductsPage({
     promoOffer,
   } = await buildListingModel(resolvedSearchParams)
 
+  // Server-renders this page's product cards; useServerPages accumulates page 1..N under one
+  // ?page URL replace per advance (no router.push).
+  const items: PagedItem[] = (products as any[]).map(product => ({
+    key: String(product.id),
+    node: renderProductItem(product, gstEnabled),
+  }))
+  // Promo slot keeps its page-1 placement (idx 6) as a col-span-full node; later pages don't re-inject it.
+  if (page === 1 && promoOffer && items.length > 6) {
+    items.splice(6, 0, {
+      key: 'promo-slot',
+      extra: true,
+      node: (
+        <div className="col-span-full">
+          <ListingPromoBanner offer={promoOffer} />
+        </div>
+      ),
+    })
+  }
+  const pagedItems = await withListingSections(items, {
+    page: 'products',
+    surface: await getWebSurface(resolvedSearchParams.layout),
+    pageNum: page,
+    pageSize: LISTING_PAGE_SIZE,
+    total,
+  })
+
   const allCats = categories as any[]
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
   const subCats = allCats.filter((c: any) => c.parent_category_id)
@@ -102,50 +130,26 @@ export default async function ProductsPage({
 
             {/* Products Grid */}
             {products.length > 0 ? (
-              <>
-                {(() => {
-                  // Server-renders this page's product cards; useServerPages accumulates
-                  // page 1..N under one ?page URL replace per advance (no router.push).
-                  const items = (products as any[]).map(product => ({
-                    key: String(product.id),
-                    node: renderProductItem(product, gstEnabled),
-                  }))
-                  // Promo slot keeps its current page-1 placement (idx 6) by injecting a
-                  // col-span-full node; later pages don't re-inject it.
-                  if (page === 1 && promoOffer && items.length > 6) {
-                    items.splice(6, 0, {
-                      key: 'promo-slot',
-                      node: (
-                        <div className="col-span-full">
-                          <ListingPromoBanner offer={promoOffer} />
-                        </div>
-                      ),
-                    })
-                  }
-                  return (
-                    <ProductGrid
-                      products={products as any[]}
-                      gstEnabled={gstEnabled}
-                      categoryBanners={categoryBanners as any[]}
-                      total={total}
-                      start={start}
-                      end={end}
-                      filterSlot={
-                        <MobileFilterSheet
-                          key="mobile-filters"
-                          categories={allCats}
-                          brands={brands as any[]}
-                          facets={facets}
-                          offers={filterOffers}
-                        />
-                      }
-                      promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined}
-                      pagedItems={items}
-                      page={page}
-                    />
-                  )
-                })()}
-              </>
+              <ProductGrid
+                products={products as any[]}
+                gstEnabled={gstEnabled}
+                categoryBanners={categoryBanners as any[]}
+                total={total}
+                start={start}
+                end={end}
+                filterSlot={
+                  <MobileFilterSheet
+                    key="mobile-filters"
+                    categories={allCats}
+                    brands={brands as any[]}
+                    facets={facets}
+                    offers={filterOffers}
+                  />
+                }
+                promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined}
+                pagedItems={pagedItems}
+                page={page}
+              />
             ) : (
               <>
                 {/* Phones keep the filter sheet so a dead-end filter can be undone. */}

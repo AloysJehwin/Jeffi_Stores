@@ -10,6 +10,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
   type RefObject,
 } from 'react'
@@ -68,6 +69,8 @@ export interface SlidesProps {
   cardWidth?: string
   /** cards: the card's aspect ratio. */
   aspect?: SlidesAspect
+  /** cards: any width / height, in place of `aspect`. */
+  aspectRatio?: number | null
   className?: string
   /** rail/banner: the gap; cards: padding and gap overrides. */
   trackClassName?: string
@@ -79,6 +82,8 @@ export const CARD_WIDTH = '[--slide-w:72vw] sm:[--slide-w:42%] lg:[--slide-w:28%
 const RAIL_ITEM = 'w-[45%] sm:w-[30%] lg:w-[18%]'
 const ASPECT: Record<SlidesAspect, string> = { '4:5': 'aspect-[4/5]', '1:1': 'aspect-square', '16:9': 'aspect-video' }
 const DEFAULT_AUTOPLAY_MS = 5000
+// A custom card shape still leaves room for the card's text.
+const CARD_MIN_H = '16rem'
 const SETTLE_MS = 150
 const MIN_OPACITY = 0.35
 const MIN_SCALE = 0.9
@@ -265,11 +270,13 @@ function Track({
   itemClassName,
   cardWidth = CARD_WIDTH,
   aspect = '4:5',
+  aspectRatio,
   className = '',
   trackClassName,
   slideClassName = '',
 }: InnerProps) {
   const cards = layout === 'cards'
+  const cardShape = aspectRatio ? { aspectRatio, minHeight: CARD_MIN_H } : undefined
   const rail = layout === 'rail'
   const n = items.length
   const reduced = !!useReducedMotion()
@@ -512,7 +519,8 @@ function Track({
                 reduced={reduced}
                 current={current}
                 label={`${s.i + 1} of ${n}`}
-                className={`${ASPECT[aspect]} ${slideClassName}`}
+                className={cardShape ? slideClassName : `${ASPECT[aspect]} ${slideClassName}`}
+                style={cardShape}
               >
                 {content}
               </CardSlide>
@@ -586,12 +594,23 @@ interface CardSlideProps {
   current: boolean
   label: string
   className: string
+  style?: CSSProperties
   children: ReactNode
 }
 
 // Opacity and scale follow the card's distance from the middle of the track, reaching their
 // minimum at its edge. Until the track is measured both stay at 1, as the server renders them.
-function CardSlide({ trackRef, metrics, version, reduced, current, label, className, children }: CardSlideProps) {
+function CardSlide({
+  trackRef,
+  metrics,
+  version,
+  reduced,
+  current,
+  label,
+  className,
+  style,
+  children,
+}: CardSlideProps) {
   const ref = useRef<HTMLDivElement>(null)
   const { scrollXProgress } = useScroll({ container: trackRef, target: ref, axis: 'x', offset: ['start end', 'end start'] })
   const distance = useTransform([scrollXProgress, version], ([p]: number[]) => {
@@ -611,7 +630,7 @@ function CardSlide({ trackRef, metrics, version, reduced, current, label, classN
       aria-label={label}
       aria-hidden={!current}
       {...inert(!current)}
-      style={{ opacity, scale }}
+      style={{ ...style, opacity, scale }}
       className={`relative snap-center shrink-0 w-[var(--slide-w)] rounded-2xl ${current ? 'group-focus-visible/slides:ring-2 group-focus-visible/slides:ring-accent-500 group-focus-visible/slides:ring-offset-2' : ''} ${className}`}
     >
       {children}
