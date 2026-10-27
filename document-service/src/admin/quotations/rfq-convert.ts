@@ -4,6 +4,7 @@ import { requireAdminScope } from '../../auth'
 import { queryOne, queryMany, query } from '@jeffi/tenancy'
 import { stackDiscounts, applyDiscount, lineItemExGst } from '../../lib/pricing'
 import { sendRfqConvertedToQuotationEmail } from '../../lib/mail-business'
+import { lockNewDraft } from '../../lib/draft-locks'
 
 function buildQuoteNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -288,6 +289,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     qt!.id,
     id,
   ])
+  // The draft quotation belongs to the admin who converted the RFQ.
+  await lockNewDraft(admin, 'quotation', qt!.id)
 
   // Notify business user
   if (rfq.email && qt?.view_token) {

@@ -6,6 +6,7 @@ import { isInterState, round2 } from '../../lib/gst'
 import { getBusinessValues, getFeatureFlags } from '../../lib/site-controls'
 import { parseBody } from '../../lib/validate'
 import { draftInvoiceSchema, priceInvoiceLines } from '../../lib/invoice-line-items'
+import { canDiscard, closeLock, draftLockResponse, epochFrom, withDraftWrite } from '../../lib/draft-locks'
 
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -83,7 +84,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const processedItems = priced.lines
     const { subtotal, taxAmount, totalAmount, totalTaxable, totalCgst, totalSgst, totalIgst } = priced
 
-    await withTransaction(async client => {
+    await withDraftWrite(admin, 'invoice', id, async client => {
       await client.query(
         `UPDATE orders SET
           customer_name = $1, customer_phone = $2, customer_email = $3,
@@ -159,10 +160,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           ]
         )
       }
-    })
+    }, { epoch: epochFrom(request) })
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     console.error(`[admin/invoices/drafts/${(await params).id} PATCH] failed`, err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
@@ -191,10 +194,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
              AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.shipping_address_id = a.id OR o.billing_address_id = a.id)`,
           [ids]
         )
+      const denied = await canDiscard(admin, 'invoice', id, client)
+      if (denied) throw denied
+      await closeLock(client, admin, 'invoice', id, 'discarded')
     })
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

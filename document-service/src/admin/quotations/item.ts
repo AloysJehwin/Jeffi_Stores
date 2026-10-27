@@ -13,6 +13,7 @@ import {
   quotationTotals,
   insertQuotationItem,
 } from '../../lib/invoice-line-items'
+import { announceLock, assertHolder, canDiscard, closeAfter, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
 
 const zText = z.string().nullish()
 const patchQuotationSchema = z
@@ -192,7 +193,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updateParams.push(id)
 
     // Header + line replace in one transaction so a failed insert never leaves an empty quote.
-    const qt = await withTransaction(async client => {
+    const { qt, lock } = await withTransaction(async client => {
       if (rows) {
         await client.query(`DELETE FROM quotation_items WHERE quotation_id = $1`, [id])
         for (let idx = 0; idx < rows.length; idx++) await insertQuotationItem(client, id, idx, rows[idx])
@@ -201,8 +202,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         `UPDATE quotations SET ${setClauses.join(', ')} WHERE id = $${pi} RETURNING *`,
         updateParams
       )
-      return r.rows[0]
+      const qt = r.rows[0]
+      // A draft is edited only by its lock holder; finalising ends the lock.
+      let lock = null
+      if (existing.status === 'draft' || qt?.status === 'draft') lock = await assertHolder(client, admin, 'quotation', id, { epoch: epochFrom(request) })
+      if (existing.status === 'draft' && qt && qt.status !== 'draft') await closeLock(client, admin, 'quotation', id, 'finalized')
+      return { qt, lock }
     })
+    await announceLock(admin, 'quotation', id, lock)
 
     const savedItems = await queryMany(
       `
@@ -255,6 +262,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({ quotation: qt, items: savedItems })
   } catch (e: any) {
+    const locked = draftLockResponse(e)
+    if (locked) return locked
     console.error(`[admin/quotations/${(await params).id} PATCH] failed`, e)
     return NextResponse.json({ error: e?.message || 'Failed to update' }, { status: 500 })
   }
@@ -272,6 +281,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (existing.status !== 'draft')
       return NextResponse.json({ error: 'Only draft quotations can be deleted' }, { status: 400 })
+    const denied = await withTransaction(c => canDiscard(admin, 'quotation', id, c))
+    if (denied) return NextResponse.json(denied.body(), { status: 423 })
 
     // Detach any RFQ that points to this quotation before deleting
     await query(
@@ -280,6 +291,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     )
 
     await query(`DELETE FROM quotations WHERE id = $1`, [id])
+    await closeAfter(admin, 'quotation', id, 'discarded')
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     // FK violation fallback (shouldn't reach here after the detach above, but just in case)

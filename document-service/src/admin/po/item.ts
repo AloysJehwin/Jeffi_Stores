@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from '../../next'
 import { z } from 'zod'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
-import { queryOne, queryMany, query } from '@jeffi/tenancy'
+import { queryOne, queryMany, withTransaction } from '@jeffi/tenancy'
 import { sendPurchaseOrderEmail } from '../../lib/mail'
 import { parseBody } from '../../lib/validate'
+import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
 
 const PatchSchema = z
   .object({
@@ -119,7 +120,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updates.push(`updated_at = NOW()`)
     values.push(id)
 
-    await query(`UPDATE purchase_orders SET ${updates.join(', ')} WHERE id = $${i}`, values)
+    // A draft PO is changed only by its lock holder; sending (or cancelling) it ends the lock.
+    const lock = await withTransaction(async client => {
+      const prev = await client.query<{ status: string }>(`SELECT status FROM purchase_orders WHERE id = $1 FOR UPDATE`, [id])
+      await client.query(`UPDATE purchase_orders SET ${updates.join(', ')} WHERE id = $${i}`, values)
+      const was = prev.rows[0]?.status
+      const next = status !== undefined ? status : was
+      if (was !== 'draft' && next !== 'draft') return null
+      const res = await assertHolder(client, admin, 'purchase_order', id, { epoch: epochFrom(request) })
+      if (was === 'draft' && next !== 'draft')
+        await closeLock(client, admin, 'purchase_order', id, next === 'sent' ? 'sent' : next === 'cancelled' ? 'discarded' : 'published')
+      return res
+    })
+    await announceLock(admin, 'purchase_order', id, lock)
 
     if (status === 'sent') {
       try {
@@ -161,6 +174,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }
