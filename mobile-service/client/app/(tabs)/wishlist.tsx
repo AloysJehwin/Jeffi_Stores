@@ -77,7 +77,7 @@ function wishlistBadges(i: {
 /** A wishlist card while the list loads: image, remove button, title, price, stock and the cart button. */
 function WishlistCardSkeleton() {
   return (
-    <View className="overflow-hidden rounded-panel bg-surface-elevated dark:border dark:border-border-default">
+    <View className="overflow-hidden rounded-panel border border-transparent bg-surface-elevated dark:border-border-default">
       <View className="mx-3 mt-3">
         <Skeleton aspectRatio={5 / 3} rounded="rounded-xl" />
       </View>
