@@ -29,6 +29,9 @@ import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
 import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, STATUS_BADGE } from '@/components/admin/purchasing/shared'
 import { FormFooter } from '@/components/admin/kit/form'
+import { DraftLockBadge, DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { lockHeaders } from '@/lib/client/draft-lock-client'
 import { resnapshotPoReceiveSession } from './receive-actions'
 
 const PO_STATUS: StatusMap = {
@@ -52,6 +55,8 @@ type PO = {
   expected_date: string | null
   item_count: number
   total_amount: string
+  /** Who holds the draft PO or the PO's receipt (list endpoint). */
+  lock?: { ownerId: string; ownerName: string | null; lastActiveAt: string; mine: boolean } | null
 }
 
 type POItem = {
@@ -173,6 +178,8 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   const [summary, setSummary] = useState<{ open: number; open_value: number } | null>(null)
   const [viewPO, setViewPO] = useState<{ po: any; items: POItem[]; grns: any[] } | null>(null)
   const [receiveMode, setReceiveMode] = useState<{ po: any } | null>(null)
+  // One receipt per PO belongs to the admin receiving it; others watch read-only.
+  const receiveLock = useDraftLock({ resourceType: 'po_receive', resourceId: receiveMode?.po?.id ?? null })
   // Receive edit-session id — opened on modal open, closed on submit (save) or
   // cancel (rollback). Kept in a ref because closers run outside the setter.
   const receiveSessionIdRef = React.useRef<string | null>(null)
@@ -262,13 +269,13 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     [showToast]
   )
 
-  useBarcodeScanner({ onScan: fillNextSerial, enabled: !!receiveMode && scanSerials, captureInInputs: true })
+  useBarcodeScanner({ onScan: fillNextSerial, enabled: !!receiveMode && scanSerials && !receiveLock.readOnly, captureInInputs: true })
 
   // Autosave the in-progress receive form to localStorage (keyed by PO id) so a
   // long receive isn't lost on navigate-away/refresh. Restored in openReceive.
   // Also mirrors to po_receive_drafts on the server so Cancel rolls back cleanly.
   useEffect(() => {
-    if (!receiveMode?.po?.id || receiveItems.length === 0) return
+    if (!receiveMode?.po?.id || receiveItems.length === 0 || receiveLock.readOnly) return
     const poId = receiveMode.po.id
     const key = `po_receive_draft:${poId}`
     const t = setTimeout(() => {
@@ -292,16 +299,21 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
       // Mirror to server draft (fire-and-forget — localStorage still works offline).
       void fetch(`/api/admin/inventory/po/${poId}/receive/draft`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('po_receive', poId) },
         credentials: 'include',
         body: JSON.stringify({
           line_items: slim,
           serials: slim.flatMap(r => (Array.isArray(r.serial_numbers) ? r.serial_numbers : [])),
         }),
-      }).catch(() => {})
+      })
+        .then(r => {
+          if (r.status === 423) receiveLock.markLocked(slim)
+        })
+        .catch(() => {})
     }, 600)
     return () => clearTimeout(t)
-  }, [receiveMode, receiveItems, receiveNotes, receiveWarehouseId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiveMode, receiveItems, receiveNotes, receiveWarehouseId, receiveLock.readOnly])
 
   async function printReceivedSerialLabels() {
     if (!lastReceivedSerials.length) return
@@ -563,13 +575,18 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     try {
       const r = await fetch(`/api/admin/inventory/po/${poId}/receive/draft`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('po_receive', poId) },
         credentials: 'include',
         body: JSON.stringify({
           line_items: slim,
           serials: slim.flatMap(r => (Array.isArray(r.serial_numbers) ? r.serial_numbers : [])),
         }),
       })
+      if (r.status === 423) {
+        receiveLock.markLocked(slim)
+        showToast('Someone else is receiving this PO — your entries were not saved', 'error')
+        return
+      }
       if (!r.ok) flushed = false
     } catch {
       flushed = false
@@ -644,7 +661,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
       }))
     const res = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...lockHeaders('po_receive', receiveMode.po.id) },
       body: JSON.stringify({
         items,
         notes: receiveNotes,
@@ -653,6 +670,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     })
     const json = await res.json()
     setReceiveSaving(false)
+    if (res.status === 423) receiveLock.markLocked()
     if (json.success) {
       // Clear the autosaved draft for this PO now that it's received.
       try {
@@ -746,6 +764,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
           </button>
           }
         />
+        <DraftLockBanner lock={receiveLock} scope="inventory:write" />
         {draftRestored && (
           <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-amber-500/40 bg-amber-500/5">
             <svg
@@ -775,7 +794,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             </button>
           </div>
         )}
-        <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+        <LockedFieldset readOnly={receiveLock.readOnly} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
@@ -1080,9 +1099,9 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
               </tbody>
             </table>
           </div>
-        </div>
+        </LockedFieldset>
         {editWarehouses.length > 0 && (
-          <div>
+          <LockedFieldset readOnly={receiveLock.readOnly}>
             <label className={labelCls}>
               Warehouse <span className="text-foreground-muted font-normal">(stock destination)</span>
             </label>
@@ -1096,9 +1115,9 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                 Stock with no specific bin will land on the open shelf. Override per-item below.
               </p>
             )}
-          </div>
+          </LockedFieldset>
         )}
-        <div>
+        <LockedFieldset readOnly={receiveLock.readOnly}>
           <label className={labelCls}>Notes</label>
           <textarea
             className={inputCls}
@@ -1106,8 +1125,9 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             value={receiveNotes}
             onChange={e => setReceiveNotes(e.target.value)}
           />
-        </div>
+        </LockedFieldset>
         <FormFooter
+          lock={receiveLock}
           cancel={cancelReceive}
           cancelLabel="Cancel"
         >
@@ -1591,6 +1611,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                       >
                         {po.status}
                       </span>
+                      {po.lock && <span className="ml-1.5"><DraftLockBadge lock={po.lock} mine={po.lock.mine} /></span>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">

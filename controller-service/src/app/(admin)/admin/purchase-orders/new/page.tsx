@@ -22,6 +22,9 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { round3 } from '@/lib/shared/number-display'
 import { useEditSession } from '@/hooks/useEditSession'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
+import { assertDraftResponse, lockHeaders } from '@/lib/client/draft-lock-client'
 import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
 import { resnapshotPurchaseOrderSession } from './actions'
 
@@ -327,9 +330,12 @@ export default function NewPOPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftLoaded])
 
+  // The draft belongs to the admin editing it; others (or a handed-over creator) see it read-only.
+  const lock = useDraftLock({ resourceType: 'po_new', resourceId: draftId })
   const edit = useEditSession({
     resourceType: 'po_new',
     resourceId: draftId,
+    lock,
     onCancelled: () => {
       // Draft was rolled back by server (deleted on cancel). Go back to the list.
       router.push(ap('/admin/purchase-orders?tab=orders'))
@@ -344,7 +350,7 @@ export default function NewPOPage() {
       try {
         const res = await fetch(`/api/admin/inventory/po/draft/${id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('po_new', id) },
           credentials: 'include',
           signal,
           body: JSON.stringify({
@@ -356,12 +362,13 @@ export default function NewPOPage() {
             line_items: value.lineItems,
           }),
         })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        await assertDraftResponse(res, `HTTP ${res.status}`)
       } finally {
         inFlightRef.current = false
       }
     },
-    enabled: () => !!draftIdRef.current && draftLoaded && !autosaveBlockedRef.current,
+    enabled: () => !!draftIdRef.current && draftLoaded && !autosaveBlockedRef.current && !lock.readOnly,
+    onLocked: (_err, unsaved) => lock.markLocked(unsaved),
   })
 
   // Trigger autosave whenever form or lineItems change (after the initial hydrate).
@@ -501,7 +508,7 @@ export default function NewPOPage() {
     }
   }
 
-  useBarcodeScanner({ onScan: handlePoScan, enabled: scanEnabled, captureInInputs: true })
+  useBarcodeScanner({ onScan: handlePoScan, enabled: scanEnabled && !lock.readOnly, captureInInputs: true })
 
   // Per-line Scanner mode: resolve the scanned code and FILL this line (it.id),
   // then auto-append a fresh blank line (also in Scanner mode) so the operator can
@@ -751,10 +758,11 @@ export default function NewPOPage() {
       } catch {
         /* ignore autosave flush errors — the live POST is the source of truth here */
       }
+      // draft_id: the server publishes this draft (and closes its lock) with the new PO.
       const res = await fetch('/api/admin/inventory/po', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, items }),
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('po_new', draftIdRef.current) },
+        body: JSON.stringify({ ...form, items, draft_id: draftIdRef.current }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -804,46 +812,49 @@ export default function NewPOPage() {
           description="Create a new PO for a supplier"
           badges={hasDraftContent ? <Badge tone="amber">Draft pending</Badge> : undefined}
         />
+        <DraftLockBanner lock={lock} scope="inventory:write" />
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <FormSection title="Order Details">
-            <FormGrid cols={3}>
-              <FormField label="Supplier" required>
-                <AdminSelect
-                  sm
-                  value={form.supplier_id}
-                  onChange={v => setForm(p => ({ ...p, supplier_id: v }))}
-                  placeholder="Select supplier"
-                  options={[
-                    { value: '', label: 'Select supplier' },
-                    ...suppliers.map(s => ({ value: s.id, label: s.name })),
-                  ]}
-                />
-              </FormField>
-              <FormField label="Order Date">
-                <DatePicker value={form.order_date} onChange={v => setForm(p => ({ ...p, order_date: v }))} />
-              </FormField>
-              <FormField label="Expected Date">
-                <DatePicker value={form.expected_date} onChange={v => setForm(p => ({ ...p, expected_date: v }))} />
-              </FormField>
-              <FormField label="Status">
-                <AdminSelect
-                  sm
-                  value={form.status}
-                  onChange={v => setForm(p => ({ ...p, status: v }))}
-                  options={[
-                    { value: 'draft', label: 'Draft' },
-                    { value: 'sent', label: 'Sent to Supplier' },
-                  ]}
-                />
-              </FormField>
-              <FormField label="Notes" span={2}>
-                <TextInput value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes..." />
-              </FormField>
-            </FormGrid>
-          </FormSection>
+          <LockedFieldset readOnly={lock.readOnly}>
+            <FormSection title="Order Details">
+              <FormGrid cols={3}>
+                <FormField label="Supplier" required>
+                  <AdminSelect
+                    sm
+                    value={form.supplier_id}
+                    onChange={v => setForm(p => ({ ...p, supplier_id: v }))}
+                    placeholder="Select supplier"
+                    options={[
+                      { value: '', label: 'Select supplier' },
+                      ...suppliers.map(s => ({ value: s.id, label: s.name })),
+                    ]}
+                  />
+                </FormField>
+                <FormField label="Order Date">
+                  <DatePicker value={form.order_date} onChange={v => setForm(p => ({ ...p, order_date: v }))} />
+                </FormField>
+                <FormField label="Expected Date">
+                  <DatePicker value={form.expected_date} onChange={v => setForm(p => ({ ...p, expected_date: v }))} />
+                </FormField>
+                <FormField label="Status">
+                  <AdminSelect
+                    sm
+                    value={form.status}
+                    onChange={v => setForm(p => ({ ...p, status: v }))}
+                    options={[
+                      { value: 'draft', label: 'Draft' },
+                      { value: 'sent', label: 'Sent to Supplier' },
+                    ]}
+                  />
+                </FormField>
+                <FormField label="Notes" span={2}>
+                  <TextInput value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes..." />
+                </FormField>
+              </FormGrid>
+            </FormSection>
+          </LockedFieldset>
 
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
+          <LockedFieldset readOnly={lock.readOnly} className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Line Items</h2>
               <div className="flex items-center gap-3">
@@ -1310,9 +1321,10 @@ export default function NewPOPage() {
                 </div>
               </div>
             )}
-          </div>
+          </LockedFieldset>
 
           <FormFooter
+            lock={lock}
             autosave={<AutosaveStatusPill status={autosave.status} />}
             draftBadge={hasDraftContent ? <Badge tone="amber">Draft pending</Badge> : undefined}
             discard={hasDraftContent ? discardDraft : undefined}

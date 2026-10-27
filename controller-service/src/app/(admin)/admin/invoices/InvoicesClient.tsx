@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowDown, ArrowUp, Check, Download, Plus, X } from 'lucide-react'
 import { INVOICE_ALIASES, INVOICE_FIELDS, INVOICE_SEARCH } from '@jeffi/list-filters/fields'
-import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, Field, Fields, TableSkeleton, FormFooter, FormButton, fieldInputCls, InfiniteFooter, ListFilters, fetchJson, useFilterQuery, useInfiniteList, type StatusMap } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, Field, Fields, LockedFieldset, TableSkeleton, FormFooter, FormButton, fieldInputCls, InfiniteFooter, ListFilters, fetchJson, useFilterQuery, useInfiniteList, type StatusMap } from '@/components/admin/kit'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { lockHeaders } from '@/lib/client/draft-lock-client'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import RowActions from '@/components/admin/RowActions'
@@ -215,6 +217,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   const [finalizingId, setFinalizingId] = useState<string | null>(null)
   const [publishingId, setPublishingId] = useState<string | null>(null)
   const [editIsDraft, setEditIsDraft] = useState(false)
+  // A draft invoice belongs to the admin editing it; everyone else sees it read-only.
+  const lock = useDraftLock({ resourceType: 'invoice', resourceId: view === 'edit' && editIsDraft ? editId : null })
 
   // Batch picker for perishable line items
   const [batchPickerItem, setBatchPickerItem] = useState<BatchPickerItem | null>(null)
@@ -288,7 +292,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
 
   // Autosave draft every 30s when editing an existing draft
   useEffect(() => {
-    if (!editId || !editIsDraft) return
+    if (!editId || !editIsDraft || lock.readOnly) return
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(() => {
       void autoSaveDraft()
@@ -299,6 +303,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   }, [
     editId,
     editIsDraft,
+    lock.readOnly,
     customerName,
     customerPhone,
     customerEmail,
@@ -668,7 +673,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
 
   // Autosave existing draft — debounced
   async function autoSaveDraft() {
-    if (!editId || !editIsDraft || autoSaveInFlight.current) return
+    if (!editId || !editIsDraft || lock.readOnly || autoSaveInFlight.current) return
     // Wait for complete lines; the explicit Save/Finalize buttons report problems.
     if (validateLineItems(items)) return
     autoSaveInFlight.current = true
@@ -677,7 +682,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       const res = await fetch(`/api/admin/invoices/drafts/${editId}`, {
         method: 'PATCH',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
         body: JSON.stringify({
           customerName,
           customerPhone,
@@ -694,6 +699,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
         }),
       })
+      if (res.status === 423) {
+        setAutoSaveStatus('idle')
+        lock.markLocked({ customerName, customerPhone, notes, items: items.filter(it => !isBlankLine(it)).map(lineItemPayload) })
+        return
+      }
       setAutoSaveStatus(res.ok ? 'saved' : 'error')
       if (!res.ok) setFormError(apiErrorMessage(res, await res.json().catch(() => ({})), 'Draft autosave failed'))
       setTimeout(() => setAutoSaveStatus('idle'), 2000)
@@ -810,7 +820,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       const res = await fetch(`/api/admin/invoices/${editId}`, {
         method: 'PATCH',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
         body: JSON.stringify({
           customerName,
           customerPhone,
@@ -832,6 +842,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         const msg = apiErrorMessage(res, data, 'Failed to save invoice')
         setFormError(msg)
         showToast(msg, 'error')
+        if (res.status === 423) lock.markLocked()
         return
       }
       if (data.movedToDraft) {
@@ -972,7 +983,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       const saveRes = await fetch(`/api/admin/invoices/${editId}`, {
         method: 'PATCH',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
         body: JSON.stringify({
           customerName,
           customerPhone,
@@ -994,6 +1005,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         const msg = apiErrorMessage(saveRes, saveData, 'Failed to save')
         setFormError(msg)
         showToast(msg, 'error')
+        if (saveRes.status === 423) lock.markLocked()
         return
       }
       if (saveData.movedToDraft) {
@@ -1007,7 +1019,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
         body: JSON.stringify({
           batch_assignments:
             Object.keys(batchAssignments).length > 0
@@ -1043,6 +1055,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         const msg = apiErrorMessage(finalRes, finalData, 'Failed to finalize')
         setFormError(msg)
         showToast(msg, 'error')
+        if (finalRes.status === 423) lock.markLocked()
         return
       }
       showToast(`Invoice ${finalData.invoiceNumber || ''} finalized`, 'success')
@@ -1136,6 +1149,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
             title={isEdit ? 'Edit Offline Invoice' : 'New Offline Invoice'}
             description={isEdit ? 'Update customer details, items and payment mode' : 'Walk-in, credit sale, B2B or bulk order'}
           />
+          {isEdit && editIsDraft && <DraftLockBanner lock={lock} scope="invoices:write" />}
 
           {formError && (
             <div className="rounded-xl border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400">
@@ -1144,7 +1158,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           )}
 
           <form onSubmit={isEdit ? handleEdit : handleCreate} className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <LockedFieldset readOnly={lock.readOnly} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Col 1 — Invoice Details */}
               <div className="bg-surface-elevated border border-border-default rounded-xl p-5 flex flex-col gap-3">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Invoice Details</h2>
@@ -1494,9 +1508,9 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                   <p className="text-xs text-foreground-muted">Billing address same as shipping address.</p>
                 )}
               </div>
-            </div>
+            </LockedFieldset>
 
-            <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
+            <LockedFieldset readOnly={lock.readOnly} className="bg-surface-elevated border border-border-default rounded-xl p-5">
               <LineItemsSection
                 items={items}
                 onChange={setItems}
@@ -1534,9 +1548,10 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                   )
                 }}
               />
-            </div>
+            </LockedFieldset>
 
             <FormFooter
+              lock={isEdit && editIsDraft ? lock : null}
               onCancel={() => {
                 resetForm()
                 navigateView('list')
@@ -1673,6 +1688,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                               {draft.order_number}
                             </a>
                             <span className={`ml-2 ${badgeCls(draft.order_number?.startsWith('AMD-') ? 'blue' : 'amber')}`}>{draft.order_number?.startsWith('AMD-') ? 'Amendment Draft' : 'Draft'}</span>
+                            {draft.lock && <span className="ml-2"><DraftLockBadge lock={draft.lock} mine={draft.lock.mine} /></span>}
                           </td>
                           <td className="px-4 py-3 text-foreground">{draft.customer_name}</td>
                           <td className="px-4 py-3 text-xs text-foreground-secondary">{draft.customer_phone ? `+91 ${draft.customer_phone}` : '—'}</td>
@@ -1729,6 +1745,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                             {draft.order_number}
                           </a>
                           <span className={badgeCls(draft.order_number?.startsWith('AMD-') ? 'blue' : 'amber')}>{draft.order_number?.startsWith('AMD-') ? 'Amendment Draft' : 'Draft'}</span>
+                          <DraftLockBadge lock={draft.lock} mine={draft.lock?.mine} />
                         </div>
                         <span className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums text-foreground">₹{fmt(parseFloat(draft.total_amount))}</span>
                       </div>

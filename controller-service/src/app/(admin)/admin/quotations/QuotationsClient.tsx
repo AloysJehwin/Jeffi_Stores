@@ -4,7 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowDown, ArrowUp, Check, Plus } from 'lucide-react'
 import { QUOTATION_ALIASES, QUOTATION_FIELDS, QUOTATION_SEARCH } from '@jeffi/list-filters/fields'
-import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, TableSkeleton, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, ListFilters, fetchJson, useFilterQuery, useInfiniteList } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, LockedFieldset, TableSkeleton, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, ListFilters, fetchJson, useFilterQuery, useInfiniteList } from '@/components/admin/kit'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { lockHeaders } from '@/lib/client/draft-lock-client'
 import { useToast } from '@/contexts/ToastContext'
 import RowActions from '@/components/admin/RowActions'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -71,6 +73,8 @@ export interface Quotation {
   view_token: string | null
   from_rfq: boolean | null
   created_at: string
+  /** Who holds the draft (list endpoint). */
+  lock?: { ownerId: string; ownerName: string | null; lastActiveAt: string; mine: boolean } | null
 }
 
 type View = 'list' | 'editor'
@@ -150,6 +154,8 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   const [saveError, setSaveError] = useState('')
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'pending' | 'saving' | 'saved'>('idle')
   const [isFinal, setIsFinal] = useState(false)
+  // A draft quotation belongs to the admin editing it; everyone else sees it read-only.
+  const lock = useDraftLock({ resourceType: 'quotation', resourceId: view === 'editor' && editId && !isFinal ? editId : null })
   const [downloading, setDownloading] = useState(false)
   const [convertingInvoice, setConvertingInvoice] = useState(false)
   const [convertedOrderId, setConvertedOrderId] = useState<string | null>(null)
@@ -582,7 +588,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
       if (editId) {
         res = await fetch(`/api/admin/quotations/${editId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('quotation', editId) },
           body: JSON.stringify(body),
         })
       } else {
@@ -593,6 +599,12 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         })
       }
       const data = await res.json().catch(() => ({}))
+      if (res.status === 423) {
+        lock.markLocked(body)
+        if (newStatus) showToast(data.error || 'Someone else is editing this quotation', 'error')
+        setAutoSaveStatus('idle')
+        return
+      }
       if (!res.ok) throw new Error(apiErrorMessage(res, data, 'Save failed'))
       if (!editId) setEditId(data.quotation.id)
       setQuoteNumber(data.quotation.quote_number)
@@ -612,7 +624,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   }
 
   function scheduleAutoSave() {
-    if (isFinal) return
+    if (isFinal || lock.readOnly) return
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     setAutoSaveStatus('pending')
     autoSaveTimer.current = setTimeout(() => {
@@ -906,6 +918,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                         <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-foreground">₹{fmt2(Number(q.total_amount))}</td>
                         <td className="px-3 py-2.5">
                           <StatusBadge status={q.status} map={QUOTATION_STATUS} />
+                          {q.lock && <span className="ml-1.5"><DraftLockBadge lock={q.lock} mine={q.lock.mine} /></span>}
                         </td>
                         <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
@@ -1509,6 +1522,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         badges={editId ? <StatusBadge status={isFinal ? 'final' : 'draft'} map={QUOTATION_STATUS} /> : undefined}
         description={isFinal ? 'This quotation is finalised and cannot be edited' : editId ? 'Update and finalise the quotation' : 'Fill in details and add line items'}
       />
+      {editId && !isFinal && <DraftLockBanner lock={lock} scope="quotations:write" />}
 
       {isFinal && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-green-500/40 bg-green-500/5 px-4 py-3 text-sm text-foreground">
@@ -1581,7 +1595,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <LockedFieldset readOnly={lock.readOnly} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">Quote Details</h2>
           <div className="space-y-3">
@@ -1841,13 +1855,14 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
             </div>
           )}
         </div>
-      </div>
+      </LockedFieldset>
 
-      <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
+      <LockedFieldset readOnly={lock.readOnly} className="rounded-xl border border-border-default bg-surface-elevated p-5">
         <LineItemsSection items={isFinal ? items : items} onChange={isFinal ? () => {} : setItems} />
-      </div>
+      </LockedFieldset>
 
       <FormFooter
+        lock={editId && !isFinal ? lock : null}
         onCancel={() => navigateView('list')}
         cancelLabel="Back"
         secondary={
