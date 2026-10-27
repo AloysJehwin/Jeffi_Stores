@@ -473,7 +473,7 @@ function CartLoading() {
   return (
     <View className="flex-1 overflow-hidden px-4 pt-4">
       <Skeleton height={32} width={210} className="mb-4" />
-      <View className="overflow-hidden rounded-panel bg-surface-elevated dark:border dark:border-border-default">
+      <View className="overflow-hidden rounded-panel border border-transparent bg-surface-elevated dark:border-border-default">
         {[0, 1, 2].map(i => (
           <View key={i} className={`flex-row gap-4 p-4 ${i < 2 ? 'border-b border-border-default' : ''}`}>
             <Skeleton width={96} height={96} rounded="rounded-xl" />
