@@ -7,8 +7,6 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
-import { Plus } from 'lucide-react'
-import { TabAction, TabLinks } from '@/components/admin/channels/ui'
 import {
   type CampaignRow,
   getChannels,
@@ -132,18 +130,6 @@ export default function CampaignsListClient() {
 
   return (
     <div className="space-y-3">
-      <TabLinks
-        tabs={[
-          { id: 'campaigns', label: 'Campaigns', href: ap('/admin/campaigns') },
-          { id: 'scenarios', label: 'Scenarios', href: ap('/admin/campaigns/scenarios') },
-        ]}
-        value="campaigns"
-        actions={
-          <RequireWrite scope="campaigns:write">
-            <TabAction href={ap('/admin/campaigns/new')} icon={<Plus className="w-4 h-4" />} label="New Campaign" />
-          </RequireWrite>
-        }
-      />
 
       {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-2">

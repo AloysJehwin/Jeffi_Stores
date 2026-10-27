@@ -7,8 +7,6 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
-import { Plus } from 'lucide-react'
-import { TabAction, TabLinks } from '@/components/admin/channels/ui'
 import ScenariosMobileList from './_components/ScenariosMobileList'
 
 interface ScenarioCampaign {
@@ -124,24 +122,6 @@ export default function ScenariosListClient() {
 
   return (
     <div className="space-y-3">
-      <TabLinks
-        tabs={[
-          { id: 'campaigns', label: 'Campaigns', href: ap('/admin/campaigns') },
-          { id: 'scenarios', label: 'Scenarios', href: ap('/admin/campaigns/scenarios') },
-        ]}
-        value="scenarios"
-        actions={
-          <RequireWrite scope="campaigns:write">
-            <span className="hidden md:inline-flex">
-              <TabAction
-                href={ap('/admin/campaigns/scenarios/new')}
-                icon={<Plus className="w-4 h-4" />}
-                label="New scenario"
-              />
-            </span>
-          </RequireWrite>
-        }
-      />
 
       {loading && scenarios.length === 0 ? (
         <div className="pt-2">

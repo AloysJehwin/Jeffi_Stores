@@ -1,17 +1,8 @@
-import ScenariosListClient from './ScenariosListClient'
-import { PageBody, PageHeader } from '@/components/admin/kit'
+import { redirect } from 'next/navigation'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
-export default function ScenariosPage() {
-  return (
-    <PageBody>
-      <PageHeader
-        title="Scenarios"
-        description="Reusable behavioral triggers. Each scenario can power multiple campaigns."
-      />
-      <ScenariosListClient />
-    </PageBody>
-  )
+// Scenarios are a tab on the campaigns page.
+export default async function ScenariosPage() {
+  redirect(ap('/admin/campaigns?tab=scenarios', await getHost()))
 }
