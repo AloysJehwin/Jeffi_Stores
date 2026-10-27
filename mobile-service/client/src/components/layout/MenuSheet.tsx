@@ -22,6 +22,7 @@ import {
   Badge, IconButton, ListGroup, ListRow, ModalSheet, Text, cn, elevationClass, haptic, useElevation, type IconComponent,
 } from '../../ui'
 import { StoreLogo } from './StoreLogo'
+import { StoreSwitch } from './StoreSwitch'
 
 // The site menu as a sheet: account, shop, cart and wishlist, help pages, theme, sign out.
 
@@ -148,6 +149,7 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
       </View>
 
       <View className="gap-5">
+        <StoreSwitch defer={go} />
         {user ? (
           <ListGroup>
             <ListRow

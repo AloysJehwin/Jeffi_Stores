@@ -38,7 +38,7 @@ type Step = 'email' | 'otp' | 'details'
 
 export default function BusinessSignupScreen() {
   const router = useRouter()
-  useLeaveIfSignedIn()
+  useLeaveIfSignedIn('business')
   const params = useLocalSearchParams<{ email?: string; google?: string }>()
   const storeName = useStoreConfig().identity.name || 'Jeffi Stores'
 

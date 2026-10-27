@@ -1,5 +1,5 @@
 import '../global.css'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Stack, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -7,7 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { useColorScheme } from 'nativewind'
-import { useAuthStore } from '../src/stores/authStore'
+import { sessionUsable, useAuthStore } from '../src/stores/authStore'
 import { useCartStore } from '../src/stores/cartStore'
 import { useThemeStore } from '../src/stores/themeStore'
 import { getStoredToken, loadAuthPortal } from '../src/api/client'
@@ -51,12 +51,10 @@ function AuthRehydrator() {
     ;(async () => {
       try {
         // Bearer when a token is stored (the backend returns it at sign-in), else the session cookie.
-        const token = await getStoredToken()
         const portal = await loadAuthPortal()
+        const token = await getStoredToken()
         const user = await getMe()
-        // Only an approved business account keeps a session (approval or rejection revokes the old ones).
-        const businessOk = portal !== 'business' || (user as { approvalStatus?: string } | null)?.approvalStatus === 'approved'
-        if (user && businessOk) await setAuth(user, token ?? '', portal)
+        if (user && sessionUsable(user, portal)) await setAuth(user, token ?? '', portal)
         else if (portal === 'business') await clearAuth()
       } catch {
       } finally {
@@ -65,6 +63,17 @@ function AuthRehydrator() {
     })()
   }, [])
 
+  return null
+}
+
+// Signing in to the other store, or switching to it, must not show the last account's cart, orders or wishlist.
+function AccountCacheReset() {
+  const account = useAuthStore(s => (s.user ? `${s.portal}:${s.user.id}` : null))
+  const prev = useRef(account)
+  useEffect(() => {
+    if (prev.current && account && prev.current !== account) queryClient.clear()
+    prev.current = account
+  }, [account])
   return null
 }
 
@@ -114,6 +123,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthRehydrator />
+          <AccountCacheReset />
           <ScreenTracker />
           <CartRehydrator />
           <ThemeRehydrator />
