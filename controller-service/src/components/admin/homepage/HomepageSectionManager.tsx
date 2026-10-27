@@ -10,7 +10,9 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import {
   SECTION_META,
+  sectionPlacement,
   sectionTypesFor,
+  type HomepagePage,
   type HomepageSection,
   type HomepageSurface,
   type SectionType,
@@ -30,6 +32,10 @@ interface Props {
   initial: HomepageSection[]
   /** Which layout these rows belong to; new sections are created on it. */
   surface?: HomepageSurface
+  /** Which page's layout: the homepage, or a listing where sections sit between the products. */
+  page?: HomepagePage
+  /** How many sections the desktop layout of this page has, for the "Start from desktop" offer. */
+  desktopCount?: number
   options?: SectionOptions
   /** Rendered inside the expanded `hero` row — the slide editor lives there. */
   heroEditor?: React.ReactNode
@@ -40,6 +46,8 @@ interface Props {
 export default function HomepageSectionManager({
   initial,
   surface = 'web',
+  page = 'home',
+  desktopCount = 0,
   options,
   heroEditor,
   alwaysExpanded = false,
@@ -55,7 +63,9 @@ export default function HomepageSectionManager({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const usedTypes = new Set(sections.map(s => s.type))
-  const pickable = sectionTypesFor(surface)
+  const pickable = sectionTypesFor(surface, page)
+  const listing = page !== 'home'
+  const layoutName = surface === 'app' ? 'The app' : 'Phone browsers'
   // Why a type can't be added right now, or null when it can.
   const blockedReason = (type: SectionType): string | null => {
     const meta = SECTION_META[type]
@@ -64,8 +74,8 @@ export default function HomepageSectionManager({
     return clash ? `Can't be combined with ${SECTION_META[clash].label}` : null
   }
 
-  // "Start from the website layout": copies the website's sections and slides onto the app surface with
-  // new ids, then reloads so both managers (and the hero editor inside the Hero row) pick up the rows.
+  // "Start from the desktop layout": copies this page's desktop sections (and, on the homepage, its slides)
+  // onto this layout with new ids, then reloads so both managers (and the hero editor) pick up the rows.
   async function copyWebsiteLayout() {
     setCopying(true)
     try {
@@ -73,7 +83,7 @@ export default function HomepageSectionManager({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...homepage.headers() },
         credentials: 'include',
-        body: JSON.stringify({ from: 'web', to: surface }),
+        body: JSON.stringify({ from: 'web', to: surface, page }),
       })
       if (await homepage.locked(res)) {
         setCopying(false)
@@ -81,15 +91,15 @@ export default function HomepageSectionManager({
       }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        showToast(data.error || 'Failed to copy the website layout', 'error')
+        showToast(data.error || 'Failed to copy the desktop layout', 'error')
         setCopying(false)
         return
       }
-      showToast('Website layout copied to the draft', 'success')
+      showToast('Desktop layout copied to the draft', 'success')
       notifyHomepageDraftChanged()
       window.location.reload()
     } catch {
-      showToast('Failed to copy the website layout', 'error')
+      showToast('Failed to copy the desktop layout', 'error')
       setCopying(false)
     }
   }
@@ -122,7 +132,7 @@ export default function HomepageSectionManager({
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...homepage.headers() },
       credentials: 'include',
-      body: JSON.stringify({ type, surface }),
+      body: JSON.stringify({ type, surface, page }),
     })
     if (!res.ok) {
       if (!(await homepage.locked(res))) showToast('Failed to add section', 'error')
@@ -185,6 +195,7 @@ export default function HomepageSectionManager({
                 key={section.id}
                 section={section}
                 position={i + 1}
+                listing={listing}
                 canWrite={canWrite}
                 options={options}
                 onChange={update}
@@ -207,17 +218,19 @@ export default function HomepageSectionManager({
 
       {sections.length === 0 && surface === 'web' && (
         <p className="text-xs text-foreground-muted">
-          No sections configured — the homepage is using its built-in default layout.
+          {listing
+            ? 'No sections here yet. Add one and choose after how many products it appears; it shows between the products on every page of this kind.'
+            : 'No sections configured — the homepage is using its built-in default layout.'}
         </p>
       )}
 
-      {sections.length === 0 && surface === 'app' && (
+      {sections.length === 0 && surface !== 'web' && (listing ? desktopCount > 0 : true) && (
         <div className="rounded-lg border border-dashed border-border-secondary p-4 space-y-3">
           <div>
-            <p className="text-sm font-medium text-foreground">The app is showing the website layout</p>
+            <p className="text-sm font-medium text-foreground">{layoutName} show the desktop layout</p>
             <p className="text-xs text-foreground-muted mt-0.5">
-              Give the app its own homepage by starting from a copy of the website layout, or add sections below.
-              The website layout stays as it is.
+              Give this layout its own sections by starting from a copy of the desktop layout, or add sections below.
+              The desktop layout stays as it is.
             </p>
           </div>
           {canWrite && (
@@ -227,7 +240,7 @@ export default function HomepageSectionManager({
               onClick={copyWebsiteLayout}
               className="inline-flex items-center gap-1.5 px-3 h-control text-sm font-medium rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50"
             >
-              <Copy className="w-4 h-4" /> {copying ? 'Copying…' : 'Start from the website layout'}
+              <Copy className="w-4 h-4" /> {copying ? 'Copying…' : 'Start from the desktop layout'}
             </button>
           )}
         </div>
@@ -272,6 +285,8 @@ export default function HomepageSectionManager({
 interface RowProps {
   section: HomepageSection
   position: number
+  /** On a listing page: show where the section sits between the products. */
+  listing?: boolean
   canWrite: boolean
   options?: SectionOptions
   onChange: (id: string, patch: Partial<HomepageSection>) => void
@@ -286,6 +301,7 @@ interface RowProps {
 function SectionRow({
   section,
   position,
+  listing = false,
   canWrite,
   options,
   onChange,
@@ -295,6 +311,10 @@ function SectionRow({
   alwaysExpanded = false,
   defaultOpen = false,
 }: RowProps) {
+  const placement = listing ? sectionPlacement(section) : null
+  const where = placement
+    ? `After ${placement.after}${placement.every ? ` · every ${placement.every}` : ''}`
+    : null
   const [expanded, setExpanded] = useState(alwaysExpanded || defaultOpen)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id })
   const meta = SECTION_META[section.type]
@@ -326,6 +346,11 @@ function SectionRow({
           <div className="flex-1 flex items-center gap-2 min-w-0">
             <span className="text-sm font-medium text-foreground truncate">{section.title || meta.label}</span>
             <span className="text-xs text-foreground-muted shrink-0 hidden sm:inline">{meta.label}</span>
+            {where && (
+              <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded bg-accent-500/10 text-accent-600 dark:text-accent-400 shrink-0">
+                {where}
+              </span>
+            )}
             {!section.is_active && (
               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted shrink-0">
                 Hidden
@@ -341,6 +366,11 @@ function SectionRow({
           >
             <span className="text-sm font-medium text-foreground truncate">{section.title || meta.label}</span>
             <span className="text-xs text-foreground-muted shrink-0 hidden sm:inline">{meta.label}</span>
+            {where && (
+              <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded bg-accent-500/10 text-accent-600 dark:text-accent-400 shrink-0">
+                {where}
+              </span>
+            )}
             {!section.is_active && (
               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted shrink-0">
                 Hidden

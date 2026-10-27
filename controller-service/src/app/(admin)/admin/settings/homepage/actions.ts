@@ -47,6 +47,10 @@ export async function startHomepageDraft(formData: FormData) {
     if (!isDraftLockError(err)) throw err
   }
   const host = await getHost()
-  const surface = formData.get('surface') === 'app' ? '?surface=app' : ''
-  redirect(`${ap('/admin/settings/homepage', host)}${surface}`)
+  const q = new URLSearchParams()
+  for (const key of ['page', 'surface']) {
+    const v = formData.get(key)
+    if (typeof v === 'string' && /^[a-z_]{1,16}$/.test(v)) q.set(key, v)
+  }
+  redirect(`${ap('/admin/settings/homepage', host)}${q.size ? `?${q}` : ''}`)
 }

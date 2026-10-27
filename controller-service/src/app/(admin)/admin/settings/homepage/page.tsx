@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { queryOne, queryMany } from '@/lib/shared/db'
@@ -10,23 +11,51 @@ import HomepageFormFooter from '@/components/admin/homepage/HomepageFormFooter'
 import { HomepageLockBanner, HomepageLockProvider } from '@/components/admin/homepage/HomepageLock'
 import { HOMEPAGE_LOCK_ID, initialDraftLock } from '@/lib/admin/draft-locks'
 import { getStorefrontContent, getStoreIdentity } from '@/lib/catalog/site-controls'
-import { defaultAboutCopy, resolveAboutStats, rowSurface, type HomepageSurface } from '@/lib/catalog/homepage-sections'
+import {
+  HOMEPAGE_PAGES,
+  HOMEPAGE_SURFACES,
+  defaultAboutCopy,
+  resolveAboutStats,
+  rowPage,
+  rowSurface,
+  type HomepagePage,
+  type HomepageSurface,
+} from '@/lib/catalog/homepage-sections'
 import { getEditableHomepage, getHomepageDraftSummary, type DraftDiff } from '@/lib/catalog/homepage-draft'
 import type { SectionOptions } from '@/components/admin/homepage/editors/fields'
 import { Badge, PageHeader, TabLinks } from '@/components/admin/kit'
 import { resnapshotHomepageSession } from './actions'
 
-const SURFACE_COPY: Record<HomepageSurface, { tab: string; description: string }> = {
-  web: {
-    tab: 'Website',
+const PAGE_COPY: Record<HomepagePage, { tab: string; description: string }> = {
+  home: {
+    tab: 'Home',
     description:
-      'Everything on the website homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish.',
+      'Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish.',
   },
-  app: {
-    tab: 'Mobile app',
+  products: {
+    tab: 'All products',
     description:
-      'The mobile app\'s own homepage. Until it has sections of its own the app shows the website layout. Start from a copy of the website layout or add sections here; one publish covers both the website and the app.',
+      'Sections shown between the products on the all-products page. Each one appears after the number of products you set, and can repeat further down. Changes are saved as a draft and go live only when you publish.',
   },
+  category: {
+    tab: 'Category pages',
+    description:
+      'Sections shown between the products on every category page. Each one appears after the number of products you set, and can repeat further down. Changes are saved as a draft and go live only when you publish.',
+  },
+  brand: {
+    tab: 'Brand pages',
+    description:
+      'Sections shown between the products on every brand page. Each one appears after the number of products you set, and can repeat further down. Changes are saved as a draft and go live only when you publish.',
+  },
+}
+
+const SURFACE_TAB: Record<HomepageSurface, string> = { web: 'Desktop web', web_mobile: 'Mobile web', app: 'App' }
+
+// Phone browsers and the app use the desktop layout until they have sections of their own.
+const SURFACE_NOTE: Record<HomepageSurface, string> = {
+  web: 'Desktop and tablet browsers.',
+  web_mobile: 'Phone browsers. Until this layout has sections of its own it shows the desktop layout.',
+  app: 'The mobile app. Until this layout has sections of its own it shows the desktop layout.',
 }
 
 const changed = (d: DraftDiff) => d.added + d.removed + d.edited + (d.reordered ? 1 : 0) > 0
@@ -102,11 +131,17 @@ async function loadSectionOptions(
   }
 }
 
-export default async function HomepagePage({ searchParams }: { searchParams: Promise<{ surface?: string }> }) {
+export default async function HomepagePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ surface?: string; page?: string }>
+}) {
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
   const host = await getHost()
-  const surface: HomepageSurface = (await searchParams).surface === 'app' ? 'app' : 'web'
+  const params = await searchParams
+  const surface = rowSurface({ surface: params.surface })
+  const page = rowPage({ page: params.page })
 
   const admin = await queryOne<{ role: string; scopes: string[] }>(`SELECT role, scopes FROM admins WHERE id = $1`, [
     adminId,
@@ -123,14 +158,24 @@ export default async function HomepagePage({ searchParams }: { searchParams: Pro
   ])
   const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
   const draftPending = draftSummary.hasDraft && (changed(draftSummary.sections) || changed(draftSummary.slides))
-  const sections = editable.sections.filter(s => rowSurface(s) === surface)
+  const onPage = editable.sections.filter(s => rowPage(s) === page)
+  const sections = onPage.filter(s => rowSurface(s) === surface)
+  const desktopCount = onPage.filter(s => rowSurface(s) === 'web').length
   const heroSlides = editable.heroSlides.filter(s => rowSurface(s) === surface)
   const base = ap('/admin/settings/homepage', host)
-  // Pending-change counts per tab come from the server render; the footer keeps the live total.
-  const pendingOn = (s: HomepageSurface) => {
-    const d = draftSummary.bySurface[s]
-    return draftSummary.hasDraft ? d.sections.added + d.sections.removed + d.sections.edited + d.slides.added + d.slides.removed + d.slides.edited : 0
+  const hrefFor = (p: HomepagePage, s: HomepageSurface) => {
+    const q = new URLSearchParams()
+    if (p !== 'home') q.set('page', p)
+    if (s !== 'web') q.set('surface', s)
+    return q.size ? `${base}?${q}` : base
   }
+  // Pending-change counts per tab come from the server render; the footer keeps the live total.
+  const pendingOf = (d: { sections: DraftDiff; slides: DraftDiff }) =>
+    draftSummary.hasDraft
+      ? d.sections.added + d.sections.removed + d.sections.edited + d.slides.added + d.slides.removed + d.slides.edited
+      : 0
+  const pendingOnPage = (p: HomepagePage) =>
+    HOMEPAGE_SURFACES.reduce((n, s) => n + pendingOf(draftSummary.byPage[p][s]), 0)
 
   // Mirror the other migrated entities: header carries only title + description + badges;
   // one shared FormFooter at the bottom owns Cancel / Save as Draft / Publish / Discard.
@@ -139,25 +184,55 @@ export default async function HomepagePage({ searchParams }: { searchParams: Pro
       <div className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5">
         <PageHeader
           title="Homepage"
-          description={SURFACE_COPY[surface].description}
+          description={PAGE_COPY[page].description}
           badges={draftPending ? <Badge tone="amber">Draft pending</Badge> : null}
         />
 
         <TabLinks
-          value={surface}
+          value={page}
           scroll={false}
-          tabs={[
-            { id: 'web', label: SURFACE_COPY.web.tab, href: base, count: pendingOn('web') },
-            { id: 'app', label: SURFACE_COPY.app.tab, href: `${base}?surface=app`, count: pendingOn('app') },
-          ]}
+          tabs={HOMEPAGE_PAGES.map(p => ({
+            id: p,
+            label: PAGE_COPY[p].tab,
+            href: hrefFor(p, surface),
+            count: pendingOnPage(p),
+          }))}
         />
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div
+            role="tablist"
+            aria-label="Layout"
+            className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit"
+          >
+            {HOMEPAGE_SURFACES.map(s => {
+              const pending = pendingOf(draftSummary.byPage[page][s])
+              return (
+                <Link
+                  key={s}
+                  href={hrefFor(page, s)}
+                  scroll={false}
+                  role="tab"
+                  aria-selected={s === surface}
+                  className={`flex items-center gap-1.5 px-3 text-xs font-medium rounded-md ${s === surface ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+                >
+                  {SURFACE_TAB[s]}
+                  {pending > 0 && <span className="tabular-nums opacity-80">{pending}</span>}
+                </Link>
+              )
+            })}
+          </div>
+          <p className="text-xs text-foreground-muted">{SURFACE_NOTE[surface]}</p>
+        </div>
 
         <HomepageLockBanner />
 
-        {/* Keyed by surface: both managers seed their state from props once. */}
+        {/* Keyed by page and surface: both managers seed their state from props once. */}
         <HomepageSectionManager
-          key={surface}
+          key={`${page}:${surface}`}
           surface={surface}
+          page={page}
+          desktopCount={desktopCount}
           initial={sections}
           options={sectionOptions}
           heroEditor={
