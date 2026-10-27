@@ -230,10 +230,11 @@ async function channelsOff(tenantId: string): Promise<Set<string>> {
   const hit = switchCache.get(tenantId)
   if (hit && Date.now() - hit.at < 30_000) return hit.off
   const found = await poolsForTenant(tenantId).catch(() => null)
-  const own = !!found && (tenantId === tpl.PLATFORM_TENANT_ID || found.pool !== db)
+  const store = found?.pools?.tenant
+  const own = !!store && (tenantId === tpl.PLATFORM_TENANT_ID || found!.pool !== db)
   const rows = own
-    ? await found!.pools.tenant
-        .query<{ key: string; value: string | null }>(`SELECT key, value FROM site_settings WHERE key IN ('feature_sms_enabled','feature_whatsapp_enabled')`)
+    ? await Promise.resolve()
+        .then(() => store!.query<{ key: string; value: string | null }>(`SELECT key, value FROM site_settings WHERE key IN ('feature_sms_enabled','feature_whatsapp_enabled')`))
         .then(r => r.rows)
         .catch(() => [])
     : []
