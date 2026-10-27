@@ -233,15 +233,19 @@ export default function ProductCard({
             )
           )}
 
-          {(shownMrpDiscount > 0 || badge || digital || discountPct > 0) && (
+          {(bizDiscountPct > 0 || shownMrpDiscount > 0 || badge || digital || discountPct > 0) && (
             <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
-              {shownMrpDiscount > 0 ? (
+              {/* A business offer is the only offer label; phones get it here instead of the ribbon. */}
+              {bizDiscountPct > 0 ? (
+                <div className="sm:hidden bg-gradient-to-r from-rose-500 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                  Business offer
+                </div>
+              ) : shownMrpDiscount > 0 ? (
                 <div className="bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                   {shownMrpDiscount}% off
                 </div>
               ) : (
-                discountPct > 0 &&
-                bizDiscountPct <= 0 && (
+                discountPct > 0 && (
                   <div className="sm:hidden bg-gradient-to-r from-rose-500 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                     Sale
                   </div>

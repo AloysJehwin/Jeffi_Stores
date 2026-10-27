@@ -131,10 +131,12 @@ function ProductCard({ product, handlingDays = 2, imageAspect }: { product: Card
               </View>
             )}
 
-            {(offPct > 0 || product.discountPct > 0 || product.badge || digital) && (
+            {(bizPct > 0 || offPct > 0 || product.discountPct > 0 || product.badge || digital) && (
               <View pointerEvents="none" className="absolute left-2 top-2 items-start gap-1">
-                {bizPct > 0 ? <Pill label="Business price" tone="brand" /> : null}
-                {offPct > 0 ? (
+                {/* A business offer is the only offer label, as on the web. */}
+                {bizPct > 0 ? (
+                  <Pill label="Business offer" tone="brand" />
+                ) : offPct > 0 ? (
                   <Pill label={`${offPct}% off`} tone="accent" />
                 ) : product.discountPct > 0 ? (
                   <Pill label="Sale" tone="danger" />
