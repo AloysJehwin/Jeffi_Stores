@@ -213,7 +213,9 @@ function StockTab({ view }: { view: StockView }) {
       sortParams(params)
       const json = await fetchJson(`/api/admin/inventory/stock?${params}`, signal)
       if (pg === 1) setValuation(json)
-      return { rows: json?.products || [], total: json?.total || 0 }
+      // Pages are products but rows are their SKUs (variants), so page by product count.
+      const total = json?.total || 0
+      return { rows: json?.products || [], total, hasMore: pg * VALUATION_PAGE_SIZE < total }
     },
   })
   const loading = view === 'ledger' ? txList.loading : valList.loading
@@ -1677,7 +1679,7 @@ function StockTab({ view }: { view: StockView }) {
                   </table>
                 </div>
                 <div className="px-4 pb-4">
-                  <InfiniteFooter shown={allValRows.length} control={valList} noun="SKUs" />
+                  <InfiniteFooter shown={valTree.length} control={valList} noun="products" />
                 </div>
               </div>
             </>
