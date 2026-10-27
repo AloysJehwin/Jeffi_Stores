@@ -17,7 +17,8 @@ import CategoriesClient from './CategoriesClient'
 import BrochureButton from '@/components/admin/BrochureButton'
 import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { draftLockChips } from '@/lib/admin/draft-locks'
 import GroupOverview from './_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
 
@@ -60,6 +61,7 @@ async function CategoriesStats({ q }: { q: FilterQuery }) {
   const totalCategories = summary.total
   const subCategoriesCount = totalCategories - mainCategoriesCount
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
+  const locks = await draftLockChips('category', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.category_id)])
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -104,11 +106,13 @@ async function CategoriesStats({ q }: { q: FilterQuery }) {
                     discardPath={`/api/categories/${d.id}`}
                     discardConfirm={`Delete the draft category "${d.name}"? This cannot be undone.`}
                     entityLabel="category"
+                    lock={locks[d.id]}
                   />
                 ) : (
                   <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
                     <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
                     <span className="text-xs text-foreground-muted">new</span>
+                    <DraftLockBadge lock={locks[d.id]} mine={locks[d.id]?.mine} />
                   </div>
                 )
               )}
@@ -123,10 +127,12 @@ async function CategoriesStats({ q }: { q: FilterQuery }) {
                     publishPath={`/api/admin/categories/${d.category_id}/publish`}
                     discardPath={`/api/admin/categories/${d.category_id}/draft`}
                     entityLabel="category"
+                    lock={locks[d.category_id]}
                   />
                 ) : (
                   <div key={d.category_id} className="px-4 py-2.5 flex items-center gap-2">
                     <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
+                    <DraftLockBadge lock={locks[d.category_id]} mine={locks[d.category_id]?.mine} />
                   </div>
                 )
               )}

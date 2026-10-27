@@ -6,6 +6,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { queryOne } from '@/lib/shared/db'
+import { heldDraftForView } from '@/lib/admin/draft-locks'
 import { startSupplierDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -23,11 +24,11 @@ export default async function SupplierViewPage({ params }: { params: Promise<{ i
     redirect(ap('/admin/login', host))
   }
 
-  const draftRow = await queryOne<{ supplier_id: string }>(
-    `SELECT supplier_id FROM supplier_drafts WHERE supplier_id = $1`,
-    [id]
-  )
+  const [draftRow, held] = await Promise.all([
+    queryOne<{ supplier_id: string }>(`SELECT supplier_id FROM supplier_drafts WHERE supplier_id = $1`, [id]),
+    heldDraftForView('supplier', id, `/admin/suppliers/${id}/edit`),
+  ])
   const hasDraft = !!draftRow
 
-  return <SupplierDetailClient id={id} hasDraft={hasDraft} startDraftAction={startSupplierDraft.bind(null, id)} />
+  return <SupplierDetailClient id={id} hasDraft={hasDraft} startDraftAction={startSupplierDraft.bind(null, id)} heldDraft={held} />
 }

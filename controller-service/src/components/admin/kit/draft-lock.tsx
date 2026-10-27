@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { Lock, Users } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { lockSummary, type DraftViewer, type UseDraftLockResult } from '@/hooks/useDraftLock'
@@ -53,6 +54,19 @@ export function DraftLockBadge({ lock, mine }: { lock: Pick<DraftLockView, 'owne
       <Lock className="h-3 w-3" aria-hidden />
       {mine ? 'You' : (lock.ownerName ?? 'Another admin')}
     </span>
+  )
+}
+
+/** View-page action while another admin holds the draft: opens the editor read-only. */
+export function ViewDraftLink({ held, compact }: { held: { ownerName: string; href: string }; compact?: boolean }) {
+  return (
+    <Link
+      href={held.href}
+      className={`${compact ? 'control-sm text-xs' : 'control-md'} inline-flex items-center gap-1.5 border border-amber-500/40 bg-amber-500/10 font-semibold text-amber-700 hover:bg-amber-500/20 dark:text-amber-400`}
+    >
+      <Lock className="h-3.5 w-3.5" aria-hidden />
+      View draft (read-only) · {held.ownerName}
+    </Link>
   )
 }
 

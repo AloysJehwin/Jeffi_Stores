@@ -12,6 +12,7 @@ import { DataTable, type DataCol } from '@/components/admin/kit/data-table'
 import { DetailSkeleton, ErrorState } from '@/components/admin/kit/states'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
+import { ViewDraftLink } from '@/components/admin/kit/draft-lock'
 import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
 
 const formatINR = (n: number) => formatINRBase(n, 0)
@@ -39,10 +40,13 @@ export default function SupplierDetailClient({
   id,
   hasDraft = false,
   startDraftAction,
+  heldDraft,
 }: {
   id: string
   hasDraft?: boolean
   startDraftAction?: (formData: FormData) => void | Promise<void>
+  /** Another admin holds the draft: open it read-only instead of starting one. */
+  heldDraft?: { ownerName: string; href: string } | null
 }) {
   const canFinancial = useHasScope('financial:read')
   const canInventoryWrite = useHasScope('inventory:write')
@@ -195,7 +199,9 @@ export default function SupplierDetailClient({
         identifiers={s.gstin ? [{ label: 'GSTIN', value: s.gstin, copy: true }] : undefined}
         secondary={[{ key: 'all', label: 'All Suppliers', href: listHref }]}
         actions={
-          canInventoryWrite ? (
+          heldDraft ? (
+            <ViewDraftLink held={heldDraft} />
+          ) : canInventoryWrite ? (
             hasDraft ? (
               <Link
                 href={ap(`/admin/suppliers/${id}/edit`)}

@@ -16,9 +16,8 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
   const scope = sp.get('scope') === 'all' ? 'all' : sp.get('scope') === 'unclaimed' ? 'unclaimed' : 'mine'
   const want = sp.get('type')
-  const types = DRAFT_RESOURCE_TYPES.filter(
-    t => (!want || want === t) && hasScope(admin.role, admin.scopes, DRAFT_RESOURCES[t].readScope)
-  )
+  const readable = DRAFT_RESOURCE_TYPES.filter(t => hasScope(admin.role, admin.scopes, DRAFT_RESOURCES[t].readScope))
+  const types = readable.filter(t => !want || want === t)
   if (want && !isDraftResourceType(want)) return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10) || 1)
   const { rows, total } = await listDrafts(db, {
@@ -36,16 +35,21 @@ export async function GET(req: NextRequest) {
     pageSize: PAGE_SIZE,
     total,
     types,
+    typeOptions: readable.map(t => ({ value: t, label: DRAFT_RESOURCES[t].label })),
     items: rows.map(r => {
-      const writer = hasScope(admin.role, admin.scopes, DRAFT_RESOURCES[r.resourceType].writeScope)
+      const writeScope = DRAFT_RESOURCES[r.resourceType].writeScope
+      const writer = hasScope(admin.role, admin.scopes, writeScope)
       const held = !!r.lock?.ownerId && r.lock.ownerCanEdit
+      const isMine = !!r.lock?.ownerId && r.lock.ownerId === admin.adminId
       return {
         ...r,
         typeLabel: DRAFT_RESOURCES[r.resourceType].label,
+        writeScope,
         viewers: counts[`${r.resourceType}:${r.resourceId}`] ?? 0,
-        isMine: r.lock?.ownerId === admin.adminId,
+        isMine,
+        canEdit: writer && (isMine || !held),
         canClaim: writer && !held,
-        canTakeOver: writer && owner && held && r.lock?.ownerId !== admin.adminId,
+        canTakeOver: writer && owner && held && !isMine,
       }
     }),
   })

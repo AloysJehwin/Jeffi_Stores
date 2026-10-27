@@ -24,6 +24,14 @@ export interface DraftLockView {
   closedByName: string | null
 }
 
+/** A list row's lock badge: who holds the draft and whether it is the viewer. */
+export interface DraftLockChip {
+  ownerId: string
+  ownerName: string | null
+  lastActiveAt: string
+  mine: boolean
+}
+
 export interface DraftLockState {
   lock: DraftLockView | null
   draftExists: boolean

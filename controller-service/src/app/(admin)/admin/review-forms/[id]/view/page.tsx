@@ -10,11 +10,13 @@ import {
   StatusBadge,
   ACTIVE_STATUS,
   badgeCls,
+  ViewDraftLink,
 } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { formsHostForHost } from '@/lib/tenant-registry'
 import { queryOne } from '@/lib/shared/db'
+import { heldDraftForView } from '@/lib/admin/draft-locks'
 import { startReviewFormDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -60,10 +62,10 @@ export default async function ReviewFormViewPage({
   )
   if (!form) notFound()
 
-  const hasDraft = await queryOne<{ form_id: string }>(
-    `SELECT form_id FROM review_form_drafts WHERE form_id = $1`,
-    [id]
-  )
+  const [hasDraft, held] = await Promise.all([
+    queryOne<{ form_id: string }>(`SELECT form_id FROM review_form_drafts WHERE form_id = $1`, [id]),
+    heldDraftForView('review_form', id, `/admin/review-forms/${id}/edit`, backUrl),
+  ])
 
   const formsBase = `https://${formsHostForHost(host)}`
   const publicUrl = `${formsBase}/${form.slug}`
@@ -92,7 +94,9 @@ export default async function ReviewFormViewPage({
             { label: 'Created', value: day(form.created_at) },
           ]}
           actions={
-            form.is_draft || hasDraft ? (
+            held ? (
+              <ViewDraftLink held={held} />
+            ) : form.is_draft || hasDraft ? (
               <Link
                 href={ap(`/admin/review-forms/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
                 className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
