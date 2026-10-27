@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { generateOTP, storePhoneOTP, checkSendPhoneOtpRateLimit, recordSendPhoneOtp } from '@/lib/auth/otp'
-import { sendOTPSMS } from '@/lib/shared/sms'
+import { deliverPhoneOtp } from '@/lib/auth/phone-otp-delivery'
 import { queryOne } from '@/lib/shared/db'
 
 function normalizeIndianPhone(raw: string): string | null {
@@ -47,14 +47,19 @@ export async function POST(request: NextRequest) {
     const otp = generateOTP()
     await storePhoneOTP(cleaned, otp)
 
-    const sent = await sendOTPSMS({ phone: cleaned, otp })
-    if (!sent) {
+    // WhatsApp first, then SMS, then the account's email (see deliverPhoneOtp).
+    const account = await queryOne<{ email: string | null; first_name: string | null }>(
+      `SELECT email, first_name FROM users WHERE id = $1`,
+      [authUser.userId]
+    )
+    const channel = await deliverPhoneOtp({ phone: cleaned, otp, email: account?.email, name: account?.first_name })
+    if (!channel) {
       return NextResponse.json({ error: 'Failed to send OTP. Please try again.' }, { status: 500 })
     }
 
     await recordSendPhoneOtp(cleaned)
 
-    return NextResponse.json({ message: 'OTP sent', nextCooldown: rateLimit.nextCooldown })
+    return NextResponse.json({ message: 'OTP sent', channel, nextCooldown: rateLimit.nextCooldown })
   } catch {
     return NextResponse.json({ error: 'Failed to send OTP' }, { status: 500 })
   }

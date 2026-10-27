@@ -33,6 +33,8 @@ export default function PhoneVerifyModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [cooldown, setCooldown] = useState(0)
+  // Where the code went: WhatsApp, else SMS, else the account's email (Site Controls decides).
+  const [sentVia, setSentVia] = useState<'whatsapp' | 'sms' | 'email'>('whatsapp')
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -77,6 +79,8 @@ export default function PhoneVerifyModal({
         if (res.status === 429 && typeof data.retryAfter === 'number') setCooldown(data.retryAfter)
         throw new Error(data.error || 'Failed to send OTP')
       }
+      if (data.channel === 'sms' || data.channel === 'email') setSentVia(data.channel)
+      else setSentVia('whatsapp')
       setStage('otp')
       setCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 30)
     } catch (err: any) {
@@ -143,7 +147,9 @@ export default function PhoneVerifyModal({
         </h3>
         <p className="text-sm text-foreground-secondary mb-6">
           {stage === 'otp'
-            ? `Enter the 6-digit code sent to +91 ${phone}.`
+            ? sentVia === 'email'
+              ? `Enter the 6-digit code we emailed you to verify +91 ${phone}.`
+              : `Enter the 6-digit code sent ${sentVia === 'whatsapp' ? 'on WhatsApp' : 'by SMS'} to +91 ${phone}.`
             : `Add your mobile number${requiresPolicy ? ' and accept our policies' : ''} so we can keep you updated on your orders.`}
         </p>
 
