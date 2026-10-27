@@ -18,15 +18,28 @@ function token(claims: Record<string, unknown>) {
   return `${Buffer.from(payload).toString('base64url')}.${sig.toString('base64url')}`
 }
 
-async function forward(request: NextRequest, path: string, claims: Record<string, unknown>): Promise<NextResponse> {
-  // The platform's own store has no tenant; document-service serves it from the main DB.
+// The platform's own store has no tenant; document-service serves it from the main DB.
+async function tenantClaims() {
   const tenant = (await resolveTenant()) ?? { tenantId: FLAGSHIP_TENANT_ID, slug: 'platform' }
+  return { tenantId: tenant.tenantId, tenantSlug: tenant.slug }
+}
+
+/** Server-side GET from document-service as the given identity, following redirects (stored PDFs). */
+export async function docServiceFetch(path: string, claims: Record<string, unknown>): Promise<Response> {
+  return fetch(`${DOCUMENTS_URL}${path}`, {
+    headers: { authorization: `Bearer ${token({ ...(await tenantClaims()), ...claims })}` },
+    cache: 'no-store',
+  })
+}
+
+async function forward(request: NextRequest, path: string, claims: Record<string, unknown>): Promise<NextResponse> {
+  const tenant = await tenantClaims()
   const url = new URL(request.url)
   const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.text()
   const res = await fetch(`${DOCUMENTS_URL}${path}${url.search}`, {
     method: request.method,
     headers: {
-      authorization: `Bearer ${token({ tenantId: tenant.tenantId, tenantSlug: tenant.slug, ...claims })}`,
+      authorization: `Bearer ${token({ ...tenant, ...claims })}`,
       ...(body ? { 'content-type': request.headers.get('content-type') || 'application/json' } : {}),
       // Draft-lock fence for stale tabs (document-service checks it on draft writes).
       ...(request.headers.get('x-draft-lock-epoch') ? { 'x-draft-lock-epoch': request.headers.get('x-draft-lock-epoch')! } : {}),
