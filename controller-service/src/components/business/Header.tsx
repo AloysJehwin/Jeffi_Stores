@@ -46,11 +46,14 @@ export default function BusinessHeader() {
   }, [userMenuOpen])
 
   const NAV = [
+    { href: '/business', label: 'Home' },
     { href: '/business/products', label: 'Products' },
     { href: '/business/categories', label: 'Categories' },
     { href: '/business/about', label: 'About Us' },
     { href: '/business/support', label: 'Support' },
   ]
+  // Home is a prefix of every portal path, so it only lights up on itself.
+  const isActive = (href: string) => (href === '/business' ? pathname === bp(href) : pathname.startsWith(bp(href)))
 
   return (
     <>
@@ -86,7 +89,7 @@ export default function BusinessHeader() {
                   key={href}
                   href={bp(href)}
                   className={`font-medium transition-colors ${
-                    pathname.startsWith(bp(href))
+                    isActive(href)
                       ? 'text-accent-500'
                       : 'text-foreground-secondary hover:text-accent-500'
                   }`}
@@ -232,7 +235,7 @@ export default function BusinessHeader() {
                   key={href}
                   href={bp(href)}
                   className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    pathname.startsWith(bp(href))
+                    isActive(href)
                       ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400'
                       : 'text-foreground-secondary hover:bg-surface-secondary'
                   }`}

@@ -21,6 +21,7 @@ interface ProductRowSectionProps {
   badgeFor?: (product: any) => string | null
   /** Product image shape (width / height); unset keeps the card's own. */
   imageAspect?: number | null
+  portal?: 'storefront' | 'business'
 }
 
 export default function ProductRowSection({
@@ -40,6 +41,7 @@ export default function ProductRowSection({
   carousel = false,
   badgeFor,
   imageAspect,
+  portal,
 }: ProductRowSectionProps) {
   const heading = (
     <div>
@@ -54,6 +56,7 @@ export default function ProductRowSection({
       {...productCardProps(product, gstEnabled)}
       badge={badgeFor?.(product) ?? null}
       imageAspect={imageAspect}
+      portal={portal}
     />
   ))
 
