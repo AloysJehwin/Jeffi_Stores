@@ -9,6 +9,7 @@ import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import { DraftLockBadge } from '@/components/admin/kit/draft-lock'
 
 type PO = {
   id: string
@@ -21,6 +22,7 @@ type PO = {
   expected_date: string | null
   item_count: number
   total_amount: string
+  lock?: { ownerId: string; ownerName: string | null; lastActiveAt: string; mine: boolean } | null
 }
 
 interface Props {
@@ -110,6 +112,7 @@ export default function PurchaseOrdersMobileList({
               </span>
             </div>
             <div className="text-sm text-foreground truncate">{po.supplier_name}</div>
+            <DraftLockBadge lock={po.lock} mine={po.lock?.mine} />
             <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
               <span>
                 {formatDate(po.order_date)}
