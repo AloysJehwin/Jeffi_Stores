@@ -122,6 +122,8 @@ type Props = {
   /** Header video upload and AI header media from the store gallery. Defaults on unless the
    *  editor uploads to another console's asset route (assetsBase). */
   galleryMedia?: boolean
+  /** WhatsApp submit / re-check / reset with Meta. Admin turns it off with Site Controls' WhatsApp switch. */
+  metaActions?: boolean
 }
 
 const SMS_GSM_LIMIT = 160
@@ -155,6 +157,7 @@ export default function TemplateEditor({
   scenarioFillEndpoint,
   canResetToPlatform,
   galleryMedia = !assetsBase,
+  metaActions = true,
 }: Props) {
   const derived = campaignKind ?? (value.slug?.startsWith('campaign/') ? value.slug.slice('campaign/'.length) : null)
   const kind = isCampaignKind(derived) && value.channel !== 'whatsapp' ? derived : null
@@ -1222,24 +1225,28 @@ export default function TemplateEditor({
                     >
                       {value.approval_status === 'received' ? 'pending' : value.approval_status || 'unsubmitted'}
                     </span>
-                    <button
-                      type="button"
-                      disabled={submitting || !value.slug}
-                      className={`${TOOL} text-xs`}
-                      onClick={onSubmitForApproval}
-                    >
-                      {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Save &amp; submit to Meta
-                    </button>
-                    <button
-                      type="button"
-                      disabled={submitting || !value.id}
-                      className={`${TOOL} text-xs`}
-                      onClick={onReCheckApproval}
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      Re-check
-                    </button>
-                    {canResetToPlatform && value.id && (
+                    {metaActions && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={submitting || !value.slug}
+                          className={`${TOOL} text-xs`}
+                          onClick={onSubmitForApproval}
+                        >
+                          {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Save &amp; submit to Meta
+                        </button>
+                        <button
+                          type="button"
+                          disabled={submitting || !value.id}
+                          className={`${TOOL} text-xs`}
+                          onClick={onReCheckApproval}
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          Re-check
+                        </button>
+                      </>
+                    )}
+                    {metaActions && canResetToPlatform && value.id && (
                       <button
                         type="button"
                         disabled={resetBusy || submitting}

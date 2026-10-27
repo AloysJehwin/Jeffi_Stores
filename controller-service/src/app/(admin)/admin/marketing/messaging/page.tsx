@@ -15,6 +15,7 @@ import { MESSAGING_ENTITY } from '@/lib/filters/entities/messaging'
 import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messaging'
 import { getDraftLockMap } from '@/lib/admin/draft-locks'
 import { getAdminSession } from '@/lib/auth/admin-auth'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -40,13 +41,14 @@ const STATUS_STYLES: Record<string, string> = {
 type SP = Record<string, string | undefined>
 
 export default async function MailerPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const host = await getHost()
-  const sp = await searchParams
+  const [host, sp, flags] = await Promise.all([getHost(), searchParams, getFeatureFlags()])
+  // Only the channels Site Controls leaves on.
+  const sends = ['email', flags.smsEnabled && 'SMS', flags.whatsappEnabled && 'WhatsApp'].filter(Boolean).join(', ')
   const tab = isListUrl(sp, MESSAGING_FIELDS) ? 'list' : 'overview'
   const href = (t: string) => ap(tabHref('/admin/marketing/messaging', t, sp, MESSAGING_FIELDS), host)
   return (
     <PageBody>
-      <PageHeader title="Messaging" description="Send email, SMS and WhatsApp messages to your customers" />
+      <PageHeader title="Messaging" description={`Send ${sends.replace(/, ([^,]*)$/, ' and $1')} messages to your customers`} />
 
       <TabLinks
         tabs={[

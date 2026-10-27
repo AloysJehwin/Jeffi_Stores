@@ -22,6 +22,7 @@ import { useToast } from '@/contexts/ToastContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import { BackLink, DraftLockBanner, FormFooter, LockedFieldset, fieldInputCls } from '@/components/admin/kit'
@@ -120,7 +121,7 @@ export default function NewMessagePage() {
   const router = useRouter()
   const { showToast, showConfirm } = useToast()
   const [step, setStep] = useState(1)
-  const [channels, setChannels] = useState<Channels>({})
+  const [picked, setChannels] = useState<Channels>({})
   const [push, setPush] = useState<PushChannel | null>(null)
   const [vars, setVars] = useState<Record<string, string>>({})
   const [waVars, setWaVars] = useState<Record<string, string>>({})
@@ -168,6 +169,14 @@ export default function NewMessagePage() {
   const edit = useEditSession({ resourceType: 'mailer', resourceId: draftId, lock })
   const [showRestoreBanner, setShowRestoreBanner] = useState(false)
   const draftIdRef = useRef<string | null>(null)
+
+  // Site Controls' SMS/WhatsApp switches: an off channel is hidden and left out of what's saved/sent.
+  const { sms: smsOn, whatsapp: waOn } = useMessagingChannels()
+  const shown = (k: Tab) => (k === 'sms' ? smsOn : k === 'whatsapp' ? waOn : true)
+  const channels = useMemo<Channels>(() => {
+    const { sms, whatsapp, ...rest } = picked
+    return { ...rest, ...(smsOn && sms ? { sms } : {}), ...(waOn && whatsapp ? { whatsapp } : {}) }
+  }, [picked, smsOn, waOn])
 
   const tplActive = TEMPLATE_CHANNELS.filter(k => channels[k])
   const active: Tab[] = [...tplActive, ...(push ? (['push'] as const) : [])]
@@ -682,7 +691,7 @@ export default function NewMessagePage() {
               </Link>{' '}
               library.
             </p>
-            {CHANNELS.map(c => {
+            {CHANNELS.filter(c => shown(c.key)).map(c => {
               const on = isOn(c.key)
               const Icon = c.icon
               return (

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { InfiniteFooter } from '@/components/admin/kit/infinite'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import NoteAttachments from '@/components/admin/NoteAttachments'
 import type { NoteAttachment } from '@/lib/shared/customer-notes-shared'
 import {
@@ -34,8 +35,13 @@ const CHANNEL_META: Record<ConversationChannel, { Icon: LucideIcon; label: strin
   rfq: { Icon: FileText, label: 'RFQ' },
 }
 
-function filtersFor(isBusiness: boolean): { key: 'all' | ConversationChannel; label: string }[] {
-  const channels = CONVERSATION_CHANNELS.filter(c => c !== 'rfq' || isBusiness)
+function filtersFor(
+  isBusiness: boolean,
+  on: { sms: boolean; whatsapp: boolean }
+): { key: 'all' | ConversationChannel; label: string }[] {
+  const channels = CONVERSATION_CHANNELS.filter(
+    c => (c !== 'rfq' || isBusiness) && (c !== 'sms' || on.sms) && (c !== 'whatsapp' || on.whatsapp)
+  )
   return [{ key: 'all', label: 'All' }, ...channels.map(c => ({ key: c, label: CHANNEL_META[c].label }))]
 }
 
@@ -265,6 +271,9 @@ export default function CustomerConversations({
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
   const reqRef = useRef(0)
+  const { sms: smsOn, whatsapp: waOn } = useMessagingChannels()
+  // The WhatsApp reply action needs a phone and Site Controls' WhatsApp switch on.
+  const waPhone = waOn ? phone : null
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 300)
@@ -335,7 +344,7 @@ export default function CustomerConversations({
     return [...byDay.entries()]
   }, [items])
 
-  const filters = useMemo(() => filtersFor(isBusiness), [isBusiness])
+  const filters = useMemo(() => filtersFor(isBusiness, { sms: smsOn, whatsapp: waOn }), [isBusiness, smsOn, waOn])
 
   return (
     <div>
@@ -403,12 +412,12 @@ export default function CustomerConversations({
                       </p>
                       <div className="pl-3 border-l-2 border-border-default">
                         {thread.map(item => (
-                          <FeedItem key={item.id} item={item} phone={phone} />
+                          <FeedItem key={item.id} item={item} phone={waPhone} />
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <FeedItem key={thread[0].id} item={thread[0]} phone={phone} />
+                    <FeedItem key={thread[0].id} item={thread[0]} phone={waPhone} />
                   )
                 )}
               </div>
