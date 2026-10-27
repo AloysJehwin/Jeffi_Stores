@@ -1,6 +1,6 @@
 'use client'
 
-import { SECTION_META, rowPage, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
+import { SECTION_META, rowAudience, rowPage, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
 import {
   AiCopyScope,
   AspectField,
@@ -16,7 +16,11 @@ import BenefitsEditor from './editors/BenefitsEditor'
 import BlogTeaserEditor from './editors/BlogTeaserEditor'
 import BrandCarouselEditor from './editors/BrandCarouselEditor'
 import BundleSpotlightEditor from './editors/BundleSpotlightEditor'
+import BusinessAccountEditor from './editors/BusinessAccountEditor'
 import BusinessCtaEditor from './editors/BusinessCtaEditor'
+import BusinessOffersEditor from './editors/BusinessOffersEditor'
+import BusinessQuotesEditor from './editors/BusinessQuotesEditor'
+import BusinessReorderEditor from './editors/BusinessReorderEditor'
 import CategoryGridEditor from './editors/CategoryGridEditor'
 import CategoryShowcaseEditor from './editors/CategoryShowcaseEditor'
 import CategoryTabsEditor from './editors/CategoryTabsEditor'
@@ -45,7 +49,11 @@ const EDITORS: Partial<Record<SectionType, (props: EditorProps) => React.ReactEl
   blog_teaser: BlogTeaserEditor,
   brand_carousel: BrandCarouselEditor,
   bundle_spotlight: BundleSpotlightEditor,
+  business_account: BusinessAccountEditor,
   business_cta: BusinessCtaEditor,
+  business_offers: BusinessOffersEditor,
+  business_quotes: BusinessQuotesEditor,
+  business_reorder: BusinessReorderEditor,
   category_grid: CategoryGridEditor,
   category_showcase: CategoryShowcaseEditor,
   category_tabs: CategoryTabsEditor,
@@ -73,7 +81,8 @@ export default function SectionConfigFields(props: EditorProps) {
   const meta = SECTION_META[section.type]
   const surface = SURFACE_NAMES[rowSurface(section)]
   const page = rowPage(section)
-  const where = page === 'home' ? `the ${surface} homepage` : `the ${surface} ${PAGE_NAMES[page]}, between the products`
+  const home = rowAudience(section) === 'business' ? 'business homepage' : 'homepage'
+  const where = page === 'home' ? `the ${surface} ${home}` : `the ${surface} ${PAGE_NAMES[page]}, between the products`
   const heading = section.title ? ` Section heading: "${section.title}".` : ''
   const aiContext = `Section "${meta.label}" on ${where}: ${meta.description}${heading}`
 

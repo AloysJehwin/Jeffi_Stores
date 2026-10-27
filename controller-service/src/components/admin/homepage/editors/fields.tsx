@@ -12,6 +12,7 @@ import {
   PLACEMENT_MIN_EVERY,
   SECTION_ASPECTS,
   SECTION_META,
+  businessVisitorView,
   sectionAspectValue,
   sectionLayout,
   sectionLimit,
@@ -616,6 +617,26 @@ export function LimitField({
       disabled={!props.canWrite}
       hint={hint}
       onCommit={v => b.saveConfig({ limit: v })}
+    />
+  )
+}
+
+const VISITOR_OPTIONS = [
+  { value: 'hide', label: 'Nothing' },
+  { value: 'signin', label: 'A sign-in prompt' },
+]
+
+/** Business sections: what a signed-out visitor sees in the section's place. */
+export function VisitorField({ props }: { props: EditorProps }) {
+  const b = useSectionBinding(props)
+  return (
+    <Select
+      label="Signed-out visitors see"
+      value={businessVisitorView(props.section)}
+      options={VISITOR_OPTIONS}
+      disabled={!props.canWrite}
+      hint="The section needs a business account. A sign-in prompt asks visitors to sign in to their business account."
+      onChange={v => b.saveConfig({ visitor: v })}
     />
   )
 }

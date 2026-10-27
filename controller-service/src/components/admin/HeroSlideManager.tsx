@@ -12,7 +12,7 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { notifyHomepageDraftChanged } from '@/components/admin/homepage/draft-events'
 import { useHomepageLock } from '@/components/admin/homepage/HomepageLock'
 import { LockedFieldset } from '@/components/admin/kit'
-import type { HomepageSurface } from '@/lib/catalog/homepage-sections'
+import { rowAudience, type HomepageAudience, type HomepageSurface } from '@/lib/catalog/homepage-sections'
 
 export interface HeroSlideRow {
   id: string
@@ -37,6 +37,7 @@ export interface HeroSlideRow {
   filter_on_sale: boolean
   display_order: number
   is_active: boolean
+  audience?: HomepageAudience | null
 }
 
 interface Option {
@@ -48,6 +49,8 @@ interface Props {
   initialSlides: HeroSlideRow[]
   /** Which layout the slides belong to; new slides are created on it. */
   surface?: HomepageSurface
+  /** Which homepage the slides belong to: the store's or the business homepage. */
+  audience?: HomepageAudience
   categoryOptions: Option[]
   brandOptions: Option[]
   gradeOptions: Option[]
@@ -618,6 +621,7 @@ function SlideCard({
 export default function HeroSlideManager({
   initialSlides,
   surface = 'web',
+  audience = 'store',
   categoryOptions,
   brandOptions,
   gradeOptions,
@@ -627,7 +631,7 @@ export default function HeroSlideManager({
   const homepage = useHomepageLock()
   // Read-only while another admin holds the homepage draft.
   const canWrite = useCanWrite('settings:write') && !homepage.readOnly
-  const [slides, setSlides] = useState<HeroSlideRow[]>(initialSlides)
+  const [slides, setSlides] = useState<HeroSlideRow[]>(() => initialSlides.filter(s => rowAudience(s) === audience))
   const [creating, setCreating] = useState(false)
 
   async function addSlide() {
@@ -637,7 +641,7 @@ export default function HeroSlideManager({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...homepage.headers() },
         credentials: 'include',
-        body: JSON.stringify({ title: 'New slide', badgeColor: 'bg-primary-500', surface }),
+        body: JSON.stringify({ title: 'New slide', badgeColor: 'bg-primary-500', surface, audience }),
       })
       if (await homepage.locked(res)) return
       const data = await res.json().catch(() => ({}))

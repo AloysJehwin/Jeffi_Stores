@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Lock } from 'lucide-react'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { queryOne, queryMany } from '@/lib/shared/db'
@@ -12,15 +13,20 @@ import { HomepageLockBanner, HomepageLockProvider } from '@/components/admin/hom
 import { HOMEPAGE_LOCK_ID, initialDraftLock } from '@/lib/admin/draft-locks'
 import { getStorefrontContent, getStoreIdentity } from '@/lib/catalog/site-controls'
 import {
+  HOMEPAGE_AUDIENCES,
   HOMEPAGE_PAGES,
   HOMEPAGE_SURFACES,
   defaultAboutCopy,
   resolveAboutStats,
+  rowAudience,
   rowPage,
   rowSurface,
+  type HomepageAudience,
   type HomepagePage,
   type HomepageSurface,
+  type SectionType,
 } from '@/lib/catalog/homepage-sections'
+import { getHomepagePlan, planName } from '@/lib/catalog/homepage-plan'
 import { getEditableHomepage, getHomepageDraftSummary, type DraftDiff } from '@/lib/catalog/homepage-draft'
 import type { SectionOptions } from '@/components/admin/homepage/editors/fields'
 import { Badge, PageHeader, TabLinks } from '@/components/admin/kit'
@@ -48,6 +54,11 @@ const PAGE_COPY: Record<HomepagePage, { tab: string; description: string }> = {
       'Sections shown between the products on every brand page. Each one appears after the number of products you set, and can repeat further down. Changes are saved as a draft and go live only when you publish.',
   },
 }
+
+const BUSINESS_DESCRIPTION =
+  'The homepage business accounts see at /business and on the business store in the app. Drag to reorder, toggle to hide, and expand a section to edit it. Until it has sections of its own it shows the store homepage. Changes are saved as a draft and go live only when you publish.'
+
+const AUDIENCE_TAB: Record<HomepageAudience, string> = { store: 'Store', business: 'Business' }
 
 const SURFACE_TAB: Record<HomepageSurface, string> = { web: 'Desktop web', web_mobile: 'Mobile web', app: 'App' }
 
@@ -134,14 +145,13 @@ async function loadSectionOptions(
 export default async function HomepagePage({
   searchParams,
 }: {
-  searchParams: Promise<{ surface?: string; page?: string }>
+  searchParams: Promise<{ surface?: string; page?: string; audience?: string }>
 }) {
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
   const host = await getHost()
   const params = await searchParams
   const surface = rowSurface({ surface: params.surface })
-  const page = rowPage({ page: params.page })
 
   const admin = await queryOne<{ role: string; scopes: string[] }>(`SELECT role, scopes FROM admins WHERE id = $1`, [
     adminId,
@@ -150,22 +160,40 @@ export default async function HomepagePage({
     redirect(ap('/admin/settings', host))
   }
 
-  const [hero, editable, draftSummary, initialLock] = await Promise.all([
+  const [hero, editable, draftSummary, initialLock, plan] = await Promise.all([
     loadHeroData(),
     getEditableHomepage(),
     getHomepageDraftSummary(),
     initialDraftLock('homepage', HOMEPAGE_LOCK_ID),
+    getHomepagePlan(),
   ])
+  // The business homepage has no listing pages, and falls back to the store's without the plan.
+  const audience: HomepageAudience = params.audience === 'business' && plan.business ? 'business' : 'store'
+  const business = audience === 'business'
+  const page = business ? 'home' : rowPage({ page: params.page })
   const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
   const draftPending = draftSummary.hasDraft && (changed(draftSummary.sections) || changed(draftSummary.slides))
-  const onPage = editable.sections.filter(s => rowPage(s) === page)
+  const onPage = editable.sections.filter(s => rowAudience(s) === audience && rowPage(s) === page)
   const sections = onPage.filter(s => rowSurface(s) === surface)
   const desktopCount = onPage.filter(s => rowSurface(s) === 'web').length
-  const heroSlides = editable.heroSlides.filter(s => rowSurface(s) === surface)
+  const heroSlides = editable.heroSlides.filter(s => rowSurface(s) === surface && rowAudience(s) === audience)
+  // "Start from the store homepage" copies what the store shows here: this layout, or the desktop one it mirrors.
+  const storeSource: HomepageSurface = editable.sections.some(
+    s => rowAudience(s) === 'store' && rowPage(s) === 'home' && rowSurface(s) === surface
+  )
+    ? surface
+    : 'web'
+  const upgrade: Partial<Record<SectionType, string>> = {}
+  for (const [type, slug] of Object.entries(plan.upgrade)) {
+    const name = planName(slug)
+    if (name) upgrade[type as SectionType] = name
+  }
+  const businessNeeds = planName(plan.businessUpgrade)
   const base = ap('/admin/settings/homepage', host)
-  const hrefFor = (p: HomepagePage, s: HomepageSurface) => {
+  const hrefFor = (p: HomepagePage, s: HomepageSurface, a: HomepageAudience = audience) => {
     const q = new URLSearchParams()
-    if (p !== 'home') q.set('page', p)
+    if (a === 'business') q.set('audience', a)
+    else if (p !== 'home') q.set('page', p)
     if (s !== 'web') q.set('surface', s)
     return q.size ? `${base}?${q}` : base
   }
@@ -176,6 +204,12 @@ export default async function HomepagePage({
       : 0
   const pendingOnPage = (p: HomepagePage) =>
     HOMEPAGE_SURFACES.reduce((n, s) => n + pendingOf(draftSummary.byPage[p][s]), 0)
+  const pendingOnLayout = (s: HomepageSurface) =>
+    pendingOf(business ? draftSummary.business[s] : draftSummary.byPage[page][s])
+  const pendingFor: Record<HomepageAudience, number> = {
+    store: HOMEPAGE_PAGES.reduce((n, p) => n + pendingOnPage(p), 0),
+    business: HOMEPAGE_SURFACES.reduce((n, s) => n + pendingOf(draftSummary.business[s]), 0),
+  }
 
   // Mirror the other migrated entities: header carries only title + description + badges;
   // one shared FormFooter at the bottom owns Cancel / Save as Draft / Publish / Discard.
@@ -184,20 +218,57 @@ export default async function HomepagePage({
       <div className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5">
         <PageHeader
           title="Homepage"
-          description={PAGE_COPY[page].description}
+          description={business ? BUSINESS_DESCRIPTION : PAGE_COPY[page].description}
           badges={draftPending ? <Badge tone="amber">Draft pending</Badge> : null}
         />
 
-        <TabLinks
-          value={page}
-          scroll={false}
-          tabs={HOMEPAGE_PAGES.map(p => ({
-            id: p,
-            label: PAGE_COPY[p].tab,
-            href: hrefFor(p, surface),
-            count: pendingOnPage(p),
-          }))}
-        />
+        <div
+          role="tablist"
+          aria-label="Homepage"
+          className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit"
+        >
+          {HOMEPAGE_AUDIENCES.map(a =>
+            a === 'business' && !plan.business ? (
+              <span
+                key={a}
+                role="tab"
+                aria-selected={false}
+                aria-disabled="true"
+                title={businessNeeds ? `The business homepage comes with ${businessNeeds}` : 'Not in your plan'}
+                className="flex items-center gap-1.5 px-3 text-xs font-medium rounded-md text-foreground-muted opacity-70 cursor-not-allowed"
+              >
+                <Lock className="w-3 h-3" aria-hidden="true" />
+                {AUDIENCE_TAB[a]}
+                {businessNeeds && <span className="font-normal">· Comes with {businessNeeds}</span>}
+              </span>
+            ) : (
+              <Link
+                key={a}
+                href={hrefFor('home', surface, a)}
+                scroll={false}
+                role="tab"
+                aria-selected={a === audience}
+                className={`flex items-center gap-1.5 px-3 text-xs font-medium rounded-md ${a === audience ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+              >
+                {AUDIENCE_TAB[a]}
+                {pendingFor[a] > 0 && <span className="tabular-nums opacity-80">{pendingFor[a]}</span>}
+              </Link>
+            )
+          )}
+        </div>
+
+        {!business && (
+          <TabLinks
+            value={page}
+            scroll={false}
+            tabs={HOMEPAGE_PAGES.map(p => ({
+              id: p,
+              label: PAGE_COPY[p].tab,
+              href: hrefFor(p, surface),
+              count: pendingOnPage(p),
+            }))}
+          />
+        )}
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div
@@ -206,7 +277,7 @@ export default async function HomepagePage({
             className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit"
           >
             {HOMEPAGE_SURFACES.map(s => {
-              const pending = pendingOf(draftSummary.byPage[page][s])
+              const pending = pendingOnLayout(s)
               return (
                 <Link
                   key={s}
@@ -227,17 +298,22 @@ export default async function HomepagePage({
 
         <HomepageLockBanner />
 
-        {/* Keyed by page and surface: both managers seed their state from props once. */}
+        {/* Keyed by homepage, page and surface: both managers seed their state from props once. */}
         <HomepageSectionManager
-          key={`${page}:${surface}`}
+          key={`${audience}:${page}:${surface}`}
+          audience={audience}
           surface={surface}
           page={page}
           desktopCount={desktopCount}
+          storeSource={storeSource}
           initial={sections}
           options={sectionOptions}
+          planTypes={plan.types}
+          upgrade={upgrade}
           heroEditor={
             <HeroSlideManager
-              key={`hero-editor-${surface}`}
+              key={`hero-editor-${audience}-${surface}`}
+              audience={audience}
               surface={surface}
               initialSlides={heroSlides}
               categoryOptions={hero.categoryOptions}
