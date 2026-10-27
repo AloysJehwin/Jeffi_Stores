@@ -14,7 +14,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'dashboard:read',
     label: 'Dashboard (Read)',
     description: 'View dashboard analytics and traffic reports',
-    // /admin/drafts lists only the draft types the admin can read.
+    // /admin/drafts redirects to the dashboard; each list page shows its own drafts.
     routes: ['/admin/dashboard', '/admin/drafts'],
     group: 'Dashboard',
   },

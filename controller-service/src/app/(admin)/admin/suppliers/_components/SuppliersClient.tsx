@@ -10,6 +10,7 @@ import { tabHref } from '@/lib/admin/filter-url'
 import { SUPPLIER_FIELDS, SUPPLIER_LIST_PRESET } from '@/lib/filters/fields/suppliers'
 import SuppliersOverview from './SuppliersOverview'
 import SuppliersTab from './SuppliersTab'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 type Tab = 'overview' | 'suppliers'
 
@@ -43,7 +44,14 @@ export default function SuppliersClient() {
             </RequireWrite>
           }
         />
-        {tab === 'overview' ? <SuppliersOverview /> : <SuppliersTab />}
+        {tab === 'overview' ? (
+          <SuppliersOverview />
+        ) : (
+          <>
+            <PageDrafts type="supplier" />
+            <SuppliersTab />
+          </>
+        )}
       </div>
     </TabActionsHost>
   )

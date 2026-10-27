@@ -16,6 +16,7 @@ import { draftLockChips } from '@/lib/admin/draft-locks'
 import BrandsTable from './_components/BrandsTable'
 import GroupOverview from '../categories/_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -206,6 +207,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="brand" />
           <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
             <BrandsStats q={q} />
           </Suspense>

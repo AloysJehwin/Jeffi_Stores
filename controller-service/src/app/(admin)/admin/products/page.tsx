@@ -31,6 +31,7 @@ import { PRODUCT_SEARCH, productFields } from '@/lib/filters/fields/products'
 import { resolveListTab } from '@/lib/overviews/catalog'
 import ProductsOverview from './_components/ProductsOverview'
 import { TabLinks, TabMemory } from './_components/catalog-overview'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -304,6 +305,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="product" />
           <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
             <ProductsStats q={q} />
           </Suspense>

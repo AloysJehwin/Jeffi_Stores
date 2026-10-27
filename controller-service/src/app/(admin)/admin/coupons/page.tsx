@@ -18,6 +18,7 @@ import DraftRowActions from '@/components/admin/DraftRowActions'
 import { draftLockChips } from '@/lib/admin/draft-locks'
 import OverviewTabs from './_components/OverviewTabs'
 import CouponsOverview from './_components/CouponsOverview'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -55,6 +56,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="coupon" />
           <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
             <CouponsStats q={q} />
           </Suspense>

@@ -7,6 +7,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import QuotationsTabs from './QuotationsTabs'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export async function generateMetadata() {
   const { name } = await getStoreIdentity()
@@ -37,6 +38,7 @@ export default async function QuotationsPage() {
 
   return (
     <div className="p-4 sm:p-6">
+      <PageDrafts type="quotation" />
       <QuotationsTabs canWrite={canWrite} />
     </div>
   )

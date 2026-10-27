@@ -15,6 +15,7 @@ import { formsHostForHost } from '@/lib/tenant-registry'
 import { REVIEW_FORMS_ENTITY } from '@/lib/filters/entities/review-forms'
 import { REVIEW_FORM_FIELDS, REVIEW_FORM_SEARCH } from '@/lib/filters/fields/review-forms'
 import ReviewFormsOverview from './_components/ReviewFormsOverview'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -85,6 +86,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="review_form" />
           <ListFilters
             entity="review_forms"
             fields={REVIEW_FORM_FIELDS}
