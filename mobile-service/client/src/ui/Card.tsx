@@ -134,7 +134,8 @@ export function ListRow({ title, subtitle, icon: Icon, iconTone = 'neutral', lea
         ) : null}
       </View>
       {value ? <Text className="text-sm text-foreground-muted">{value}</Text> : null}
-      {trailing}
+      {/* Wrapped so a `self-start` trailer (Badge) still centres on the row. */}
+      {trailing ? <View>{trailing}</View> : null}
       {(chevron ?? !!onPress) ? <ChevronRight size={18} color={t.foregroundMuted} /> : null}
     </>
   )
