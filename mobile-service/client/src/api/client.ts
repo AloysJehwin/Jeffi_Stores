@@ -8,29 +8,38 @@ export const BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://mobile.jeff
 // Names the app and its OS in sessions and logs, instead of the bare okhttp/CFNetwork agent.
 export const APP_USER_AGENT = `JeffiStoresApp/${Constants.expoConfig?.version ?? '0'} (${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${Platform.Version})`
 
-const TOKEN_KEY = 'auth_token'
-const PORTAL_KEY = 'auth_portal'
-
-export async function getStoredToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(TOKEN_KEY)
-}
-
-export async function storeToken(token: string): Promise<void> {
-  await SecureStore.setItemAsync(TOKEN_KEY, token)
-}
-
-export async function clearToken(): Promise<void> {
-  await SecureStore.deleteItemAsync(TOKEN_KEY)
-}
-
-/** Which account the stored session belongs to: a customer, or a business (a separate account, as on the web). */
+/** Which account a session belongs to: a customer, or a business (a separate account, as on the web). */
 export type AuthPortal = 'customer' | 'business'
 let portal: AuthPortal = 'customer'
+
+// Each store keeps its own session, so the app can switch between them without signing in again.
+const TOKEN_KEY: Record<AuthPortal, string> = { customer: 'auth_token', business: 'auth_token_business' }
+const PORTAL_KEY = 'auth_portal'
+
+export async function getStoredToken(p: AuthPortal = portal): Promise<string | null> {
+  return SecureStore.getItemAsync(TOKEN_KEY[p])
+}
+
+export async function storeToken(token: string, p: AuthPortal = portal): Promise<void> {
+  await SecureStore.setItemAsync(TOKEN_KEY[p], token)
+}
+
+export async function clearToken(p: AuthPortal = portal): Promise<void> {
+  await SecureStore.deleteItemAsync(TOKEN_KEY[p])
+}
 
 export const getAuthPortal = () => portal
 
 export async function loadAuthPortal(): Promise<AuthPortal> {
   portal = (await SecureStore.getItemAsync(PORTAL_KEY)) === 'business' ? 'business' : 'customer'
+  // Builds before the store switch kept the one session, business or not, under the customer key.
+  if (portal === 'business' && !(await SecureStore.getItemAsync(TOKEN_KEY.business))) {
+    const legacy = await SecureStore.getItemAsync(TOKEN_KEY.customer)
+    if (legacy) {
+      await SecureStore.setItemAsync(TOKEN_KEY.business, legacy)
+      await SecureStore.deleteItemAsync(TOKEN_KEY.customer)
+    }
+  }
   return portal
 }
 

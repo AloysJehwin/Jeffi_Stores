@@ -3,6 +3,7 @@ import { useNavigation, useRouter } from 'expo-router'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getFeatureFlags, getMeFull, type AccountUser, type FeatureFlags } from '../../api/account'
 import { logout } from '../../api/auth'
+import type { AuthPortal } from '../../api/client'
 import { useAuthStore } from '../../stores/authStore'
 import { useCartStore } from '../../stores/cartStore'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
@@ -26,15 +27,17 @@ export function useLeaveAuth() {
 }
 
 /** The web's /login and /signup send a signed-in visitor back to the store. Checked once, when the saved
- *  session has been restored, so a sign-in finishing on the screen keeps its own flow. */
-export function useLeaveIfSignedIn() {
+ *  session has been restored, so a sign-in finishing on the screen keeps its own flow. Signed in to the
+ *  other store is fine: that's how the store switch signs in to a second one. */
+export function useLeaveIfSignedIn(portal: AuthPortal = 'customer') {
   const leave = useLeaveAuth()
   const isLoading = useAuthStore(s => s.isLoading)
   const checked = useRef(false)
   useEffect(() => {
     if (isLoading || checked.current) return
     checked.current = true
-    if (useAuthStore.getState().user) leave()
+    const s = useAuthStore.getState()
+    if (s.user && s.portal === portal) leave()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading])
 }
@@ -101,6 +104,25 @@ export function useSignOut() {
     await clearAuth()
     resetCart()
     qc.clear()
+  }
+}
+
+/** Switches between the storefront and the business store, each with its own session as on the web.
+ *  The business store without a session opens its sign in; the storefront without one is browsed as a guest. */
+export function useSwitchStore() {
+  const router = useRouter()
+  const qc = useQueryClient()
+  const resetCart = useCartStore(s => s.reset)
+  return async (next: AuthPortal) => {
+    const auth = useAuthStore.getState()
+    if (auth.portal === next) return
+    if (!(await auth.switchTo(next))) {
+      router.push('/(auth)/business-login')
+      return
+    }
+    resetCart()
+    qc.clear()
+    router.navigate('/(tabs)')
   }
 }
 

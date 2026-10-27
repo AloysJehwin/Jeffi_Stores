@@ -15,7 +15,7 @@ import { Button, FieldError, Notice, PhoneField, Text, TextField } from '../../s
 
 export default function BusinessLoginScreen() {
   const router = useRouter()
-  useLeaveIfSignedIn()
+  useLeaveIfSignedIn('business')
   const params = useLocalSearchParams<{ email?: string; notice?: string }>()
   const flags = useFeatureFlags()
   const signOut = useSignOut()

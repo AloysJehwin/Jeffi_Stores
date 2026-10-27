@@ -14,6 +14,7 @@ import { accent, useTokens } from '../../src/theme'
 import Gradient from '../../src/components/account/Gradient'
 import BuyAgainRow from '../../src/components/account/BuyAgainRow'
 import { DobNudge, useDobNudge } from '../../src/components/account/ProfileCard'
+import { StoreSwitch } from '../../src/components/layout/StoreSwitch'
 import { useAccountNavItems, useAccountUser, useBusiness, useSignOut } from '../../src/components/account/hooks'
 import {
   Badge, BodySmall, Button, Card, Chip, ChipGroup, EmptyState, IconButton, ListGroup, ListRow, Screen, ScreenHeader, Section, statusTone, Text,
@@ -211,6 +212,7 @@ export default function AccountScreen() {
       {/* Spacing comes from each block's mb-6 (Section has its own). */}
       <View className="px-4 pt-5">
         {nudge.show ? <DobNudge className="mb-6" onAdd={() => router.push('/account/profile')} onDismiss={nudge.dismiss} /> : null}
+        <StoreSwitch className="mb-6" />
         {isBusiness ? <CompanyCard /> : null}
 
         <ListGroup title="Shopping" className="mb-6">
