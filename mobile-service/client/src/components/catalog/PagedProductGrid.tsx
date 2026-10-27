@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, type ReactElement } from 'react'
+import { memo, useCallback, useMemo, useRef, type ReactElement } from 'react'
 import { FlatList, View, type ListRenderItem } from 'react-native'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { InfiniteFooter } from './Paged'
@@ -6,6 +6,7 @@ import { ProductGridSkeleton } from '../../ui'
 import { listProducts, type ProductQuery } from '../../api/products'
 import ProductCard from '../product/ProductCard'
 import { useColumnWidth } from '../home/layout'
+import { ListingFeedItem, listingFeed, useListingLayout, type ListingFeedEntry } from '../home/ListingFeed'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { toCard } from '../../lib/card'
 import type { CardProduct } from '../../types/home'
@@ -16,10 +17,38 @@ interface Row {
 }
 
 // A ServerPagedItems product grid (category and brand pages): newest first, pages appended on scroll.
+// Rows are packed here rather than with numColumns, so the sections placed between the products
+// (GET /api/home?page=category|brand) can span the full width.
 
-const keyOf = (row: Row) => row.card.id
+type Item = { type: 'row'; key: string; rows: Row[] } | { type: 'feed'; key: string; entry: ListingFeedEntry }
+
+const keyOf = (it: Item) => it.key
+
+// Memoized so a page load doesn't re-render the mounted rows.
+const ProductRow = memo(
+  function ProductRow({ rows, cols, width, gap }: { rows: Row[]; cols: 1 | 2; width: number; gap: number }) {
+    if (cols === 1) {
+      return (
+        <View style={{ paddingHorizontal: 16, marginBottom: gap }}>
+          <ProductCard product={rows[0].card} handlingDays={rows[0].handlingDays} />
+        </View>
+      )
+    }
+    return (
+      <View style={{ flexDirection: 'row', gap, paddingHorizontal: 16, marginBottom: gap }}>
+        {rows.map(r => (
+          <View key={r.card.id} style={{ width }}>
+            <ProductCard product={r.card} handlingDays={r.handlingDays} />
+          </View>
+        ))}
+      </View>
+    )
+  },
+  (a, b) => a.cols === b.cols && a.width === b.width && a.gap === b.gap && a.rows.length === b.rows.length && a.rows.every((r, i) => r === b.rows[i])
+)
 
 export default function PagedProductGrid({
+  page,
   base,
   pageSize,
   cols,
@@ -29,6 +58,8 @@ export default function PagedProductGrid({
   empty,
   bottomInset = 0,
 }: {
+  /** Whose placed sections go between the products. */
+  page: 'category' | 'brand'
   base: Pick<ProductQuery, 'category' | 'brand'>
   pageSize: number
   cols: 1 | 2
@@ -40,6 +71,7 @@ export default function PagedProductGrid({
 }) {
   const { gstEnabled } = useStoreConfig().flags
   const w = useColumnWidth(cols, gap)
+  const layout = useListingLayout(page)
   const q = useInfiniteQuery({
     queryKey: ['products', 'paged', base, pageSize],
     queryFn: ({ pageParam }) => listProducts({ ...base, sort: 'created_at', order: 'desc', page: pageParam, limit: pageSize }),
@@ -73,23 +105,31 @@ export default function PagedProductGrid({
     retry: () => (rows.length ? q.fetchNextPage() : q.refetch()),
   }
 
-  const renderItem = useCallback<ListRenderItem<Row>>(
-    ({ item }) => (
-      <View style={cols > 1 ? { width: w } : { paddingHorizontal: 16, marginBottom: gap }}>
-        <ProductCard product={item.card} handlingDays={item.handlingDays} />
-      </View>
-    ),
-    [cols, w, gap]
+  const items = useMemo<Item[]>(() => {
+    const feed = listingFeed(layout, rows.length, total ?? undefined, cols)
+    const out: Item[] = []
+    for (let i = 0, f = 0; i < rows.length; i += cols) {
+      for (; f < feed.length && feed[f].at <= i; f++) out.push({ type: 'feed', key: feed[f].key, entry: feed[f] })
+      out.push({ type: 'row', key: rows[i].card.id, rows: rows.slice(i, i + cols) })
+    }
+    return out
+  }, [rows, total, cols, layout])
+
+  const renderItem = useCallback<ListRenderItem<Item>>(
+    ({ item }) =>
+      item.type === 'feed' ? (
+        layout ? <ListingFeedItem entry={item.entry} data={layout.data} gap={gap} /> : null
+      ) : (
+        <ProductRow rows={item.rows} cols={cols} width={w} gap={gap} />
+      ),
+    [cols, w, gap, layout]
   )
   const listHeader = useMemo(() => header(total), [header, total])
 
   return (
     <FlatList
-      key={cols}
-      data={loading || total === 0 ? [] : rows}
+      data={loading || total === 0 ? [] : items}
       keyExtractor={keyOf}
-      numColumns={cols}
-      columnWrapperStyle={cols > 1 ? { gap, paddingHorizontal: 16, marginBottom: gap } : undefined}
       renderItem={renderItem}
       ListHeaderComponent={listHeader}
       ListEmptyComponent={

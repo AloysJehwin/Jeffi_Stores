@@ -7,6 +7,15 @@ export type SectionType =
   | 'category_tabs' | 'bundle_spotlight' | 'back_in_stock' | 'blog_teaser' | 'social_strip' | 'value_stats'
   | 'motion_hero' | 'stories' | 'product_spotlight' | 'rewards_game' | 'slides'
 
+/** Which page a layout belongs to: the homepage, or a listing whose sections sit between its products. */
+export type HomePage = 'home' | 'products' | 'category' | 'brand'
+
+/** After the first `after` products (0 = above them), then every `every` (≥ 4) when set. Ignored on home. */
+export interface SectionPlacement {
+  after: number
+  every: number | null
+}
+
 export interface SectionCopy {
   eyebrow?: string
   title?: string
@@ -33,6 +42,11 @@ export interface HomeSection {
   copy: SectionCopy
   /** Blog and social items may carry an optional `video` beside `imageUrl`. */
   items: Record<string, string>[] | null
+  // Absent from older servers.
+  page?: HomePage
+  placement?: SectionPlacement
+  /** Width / height of the section's cards or banner, or null for the component's own shape. */
+  aspect?: number | null
 }
 
 /** The web's productCardProps, plus the row badge. */

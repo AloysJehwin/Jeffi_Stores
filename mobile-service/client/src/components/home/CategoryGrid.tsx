@@ -148,9 +148,18 @@ export default function CategoryGrid({ section, data }: SectionProps) {
   const dark = useColorScheme().colorScheme === 'dark'
   const categories = data.mainCategories
   if (categories.length === 0) return null
+  // An admin-set tile shape; the content centres in it.
+  const aspect = section.aspect
 
   const items = categories.map(category => (
-    <Card key={category.id} onPress={() => router.push(`/category/${category.slug}`)} accessibilityLabel={category.name} padded={false} className="items-center gap-2.5 p-3">
+    <Card
+      key={category.id}
+      onPress={() => router.push(`/category/${category.slug}`)}
+      accessibilityLabel={category.name}
+      padded={false}
+      style={aspect ? { aspectRatio: aspect } : undefined}
+      className={`items-center gap-2.5 p-3${aspect ? ' flex-1 justify-center' : ''}`}
+    >
       <View className="h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/25">
         <CategoryIcon categoryName={category.name} color={dark ? primary[400] : primary[600]} />
       </View>

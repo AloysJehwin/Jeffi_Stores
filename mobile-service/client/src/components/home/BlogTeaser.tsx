@@ -47,7 +47,7 @@ export default function BlogTeaser({ section }: SectionProps) {
               padded={false}
               className="overflow-hidden"
             >
-              <View className="relative overflow-hidden bg-surface-secondary" style={{ aspectRatio: 16 / 9 }}>
+              <View className="relative overflow-hidden bg-surface-secondary" style={{ aspectRatio: section.aspect ?? 16 / 9 }}>
                 {img || item.video ? (
                   <View className="h-full w-full bg-gray-200 dark:bg-gray-700">
                     <FeedMedia image={img} video={item.video} style={{ width: '100%', height: '100%' }} transition={300} />

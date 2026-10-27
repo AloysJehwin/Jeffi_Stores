@@ -22,7 +22,7 @@ export default function CategoryShowcase({ section, data }: SectionProps) {
       <SectionHeading eyebrow={section.copy.eyebrow} title={section.copy.title} className="mb-6" />
       <Grid cols={2} gap={16}>
         {items.map(cat => (
-          <ShowcaseCard key={cat.id} cat={cat} />
+          <ShowcaseCard key={cat.id} cat={cat} aspect={section.aspect} />
         ))}
       </Grid>
     </View>
@@ -39,20 +39,21 @@ export function ShowcaseHead({ section }: { section: HomeSection }) {
   )
 }
 
-export const ShowcaseRow = memo(function ShowcaseRow({ cats, last }: { cats: ShowcaseCategory[]; last: boolean }) {
+export const ShowcaseRow = memo(function ShowcaseRow({ cats, last, aspect }: { cats: ShowcaseCategory[]; last: boolean; aspect?: number | null }) {
   const w = useColumnWidth(2, 16)
   return (
     <View className="flex-row px-4" style={{ gap: 16, paddingBottom: last ? 40 : 16 }}>
       {cats.map(cat => (
         <View key={cat.id} style={{ width: w }}>
-          <ShowcaseCard cat={cat} />
+          <ShowcaseCard cat={cat} aspect={aspect} />
         </View>
       ))}
     </View>
   )
 })
 
-function ShowcaseCard({ cat }: { cat: ShowcaseCategory }) {
+/** `aspect`: the product thumbnails' width / height; square by default. */
+function ShowcaseCard({ cat, aspect }: { cat: ShowcaseCategory; aspect?: number | null }) {
   const router = useRouter()
   const cardWidth = useColumnWidth(2, 16)
   // Card minus its 1px border and p-2, split into two columns with gap-1.
@@ -87,7 +88,7 @@ function ShowcaseCard({ cat }: { cat: ShowcaseCategory }) {
               className="gap-1.5 rounded-xl bg-surface p-2"
               style={{ width: tileWidth }}
             >
-              <View className="aspect-square items-center justify-center overflow-hidden rounded-lg bg-surface-secondary">
+              <View className="items-center justify-center overflow-hidden rounded-lg bg-surface-secondary" style={{ aspectRatio: aspect ?? 1 }}>
                 {src ? (
                   <Image recyclingKey={src} source={imgSource(src, tileWidth - 16)} contentFit="contain" style={{ width: '100%', height: '100%' }} accessibilityLabel={p.name} />
                 ) : (

@@ -8,6 +8,7 @@ import { listBrands } from '../../src/api/brands'
 import TopNav from '../../src/components/layout/TopNav'
 import ProductCard from '../../src/components/product/ProductCard'
 import RecentlyViewed from '../../src/components/home/RecentlyViewed'
+import { ListingFeedItem, listingFeed, useListingLayout, type ListingFeedEntry } from '../../src/components/home/ListingFeed'
 import { useColumnWidth } from '../../src/components/home/layout'
 import CompareBar, { CompareStrip } from '../../src/components/catalog/CompareBar'
 import FilterSheet, { FiltersButton } from '../../src/components/catalog/FilterSheet'
@@ -23,11 +24,13 @@ import type { HomeSection } from '../../src/types/home'
 // Mirror of controller-service app/(storefront)/products/page.tsx at the mobile breakpoint: heading,
 // CompareStrip, ProductGrid's control bar (MobileFilterSheet · Group by Category · grid/table), the
 // infinite grid with the promo banner after the sixth card, and Recently viewed. Data: GET
-// /api/products/listing (the page's own model: filters, sort, paging and facets server-side).
+// /api/products/listing (the page's own model: filters, sort, paging and facets server-side). The
+// sections an admin placed between the products come from GET /api/home?page=products.
 
 type Item =
   | { type: 'pair'; key: string; rows: ListingCard[] }
   | { type: 'promo'; key: string }
+  | { type: 'feed'; key: string; entry: ListingFeedEntry }
   | { type: 'group'; key: string; name: string; slug: string; count: number; gap: boolean }
   | { type: 'table'; key: string }
 
@@ -105,6 +108,7 @@ export default function ProductsScreen() {
   })
   // Brand slugs (links pass ?brand=<slug>) so the sheet can show them selected.
   const brandSlugs = useQuery({ queryKey: ['brands'], queryFn: listBrands, staleTime: 5 * 60_000 })
+  const layout = useListingLayout('products')
 
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false })
@@ -146,11 +150,16 @@ export default function ProductsScreen() {
         ...pairs(g.rows, `g:${name}:`),
       ])
     }
-    const out = pairs(rows, '')
-    // ProductGrid PROMO_AFTER = 6 cards (3 rows of two), page 1 only.
-    if (promo && rows.length > 6) out.splice(3, 0, { type: 'promo', key: 'promo' })
+    const feed = listingFeed(layout, rows.length, total, 2)
+    const out: Item[] = []
+    for (let i = 0, f = 0; i < rows.length; i += 2) {
+      // ProductGrid PROMO_AFTER = 6 cards (3 rows of two), page 1 only.
+      if (i === 6 && promo) out.push({ type: 'promo', key: 'promo' })
+      for (; f < feed.length && feed[f].at <= i; f++) out.push({ type: 'feed', key: feed[f].key, entry: feed[f] })
+      out.push({ type: 'pair', key: rows[i].id, rows: rows.slice(i, i + 2) })
+    }
     return out
-  }, [loading, rows, view, grouped, promo])
+  }, [loading, rows, view, grouped, promo, layout, total])
 
   const apply = useCallback((next: ListingParams) => router.setParams(toRouteParams(next)), [router])
   const toggleGrouped = () => apply({ ...params, sort: grouped ? undefined : 'category', order: undefined })
@@ -158,6 +167,7 @@ export default function ProductsScreen() {
   // Stable, so a screen re-render doesn't re-render every mounted row.
   const renderItem = useCallback<ListRenderItem<Item>>(
     ({ item }) => {
+      if (item.type === 'feed') return layout ? <ListingFeedItem entry={item.entry} data={layout.data} gap={12} /> : null
       if (item.type === 'promo') {
         return promo ? (
           <View className="mb-3 px-4">
@@ -185,7 +195,7 @@ export default function ProductsScreen() {
       }
       return <Pair rows={item.rows} width={cardW} />
     },
-    [promo, rows, router, apply, cardW]
+    [promo, rows, router, apply, cardW, layout]
   )
 
   const header = (

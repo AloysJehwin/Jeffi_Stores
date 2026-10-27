@@ -68,6 +68,7 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
           products={products}
           carousel={carousel}
           style={ROW_STYLES[rowIndex % ROW_STYLES.length]}
+          aspect={section.aspect}
         />
       )
     }
@@ -96,9 +97,9 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
 // mounts (and unmounts) it a row at a time instead of a whole section of cards in one frame mid-scroll.
 
 type Rows =
-  | { kind: 'products'; products: CardProduct[]; title: string; eyebrow: string; style: RowStyle }
+  | { kind: 'products'; products: CardProduct[]; title: string; eyebrow: string; style: RowStyle; aspect?: number | null }
   | { kind: 'deal'; products: CardProduct[] }
-  | { kind: 'showcase'; cats: HomeData['categoryShowcase'] }
+  | { kind: 'showcase'; cats: HomeData['categoryShowcase']; aspect?: number | null }
 
 export type FeedItem =
   | { key: string; type: 'section'; section: HomeSection; rowIndex: number }
@@ -115,6 +116,7 @@ function gridRows(section: HomeSection, data: HomeData, rowIndex: number): Rows 
         title: section.copy.title ?? 'Products',
         eyebrow: section.copy.eyebrow ?? '',
         style: ROW_STYLES[rowIndex % ROW_STYLES.length],
+        aspect: section.aspect,
       }
     case 'bundle_spotlight':
     case 'back_in_stock':
@@ -128,7 +130,7 @@ function gridRows(section: HomeSection, data: HomeData, rowIndex: number): Rows 
     case 'deal_of_the_day':
       return { kind: 'deal', products: data.dealOfTheDay }
     case 'category_showcase':
-      return { kind: 'showcase', cats: data.categoryShowcase }
+      return { kind: 'showcase', cats: data.categoryShowcase, aspect: section.aspect }
     default:
       return null
   }
@@ -171,8 +173,8 @@ export function FeedItemView({ item, data }: { item: FeedItem; data: HomeData })
     if (rows.kind === 'products') return <ProductRowHead title={rows.title} eyebrow={rows.eyebrow} style={rows.style} />
     return rows.kind === 'deal' ? <DealHead section={item.section} /> : <ShowcaseHead section={item.section} />
   }
-  if (rows.kind === 'showcase') return <ShowcaseRow cats={item.cats} last={item.last} />
+  if (rows.kind === 'showcase') return <ShowcaseRow cats={item.cats} last={item.last} aspect={rows.aspect} />
   const bg = rows.kind === 'deal' ? 'bg-surface-secondary' : rows.style.section
   const gap = rows.kind === 'deal' ? 12 : rows.style.gap
-  return <ProductPair products={item.products} bg={bg} gap={gap} last={item.last} />
+  return <ProductPair products={item.products} bg={bg} gap={gap} last={item.last} aspect={rows.kind === 'deal' ? null : rows.aspect} />
 }
