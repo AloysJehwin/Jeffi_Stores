@@ -19,6 +19,8 @@ export interface UseDraftLockOptions {
   initial?: DraftLockState | null
   /** Presence mode reported for this tab. */
   mode?: 'view' | 'edit'
+  /** false = no heartbeat (list rows act on a draft without being shown as viewing it). */
+  presence?: boolean
   /** Called when the lock moves away from this admin (takeover, handover, publish elsewhere). */
   onLost?: (lock: DraftLockView | null) => void
 }
@@ -61,7 +63,7 @@ function newTabId() {
 }
 
 /** Per-admin draft lock for an editor: live holder, presence, and the lock actions. */
-export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit', onLost }: UseDraftLockOptions): UseDraftLockResult {
+export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit', presence = true, onLost }: UseDraftLockOptions): UseDraftLockResult {
   const toast = useActionToast()
   const [state, setState] = useState<DraftLockState | null>(initial ?? null)
   const [viewers, setViewers] = useState<DraftViewer[]>([])
@@ -70,6 +72,8 @@ export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit',
   const tabId = useRef<string>('')
   if (!tabId.current) tabId.current = newTabId()
   const wasMine = useRef<boolean>(!!initial?.isMine)
+  // This tab's own release/handover already has its success toast.
+  const ownAction = useRef(false)
   const [me, setMe] = useState<string | null>(null)
   const onLostRef = useRef(onLost)
   onLostRef.current = onLost
@@ -89,7 +93,9 @@ export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit',
       if (next.viewers) setViewers(next.viewers)
       const l = next.lock
       if (wasMine.current && !next.isMine) {
-        if (l?.closedAt) toast.info(`${l.closedByName ?? 'Someone'} ${l.closedReason ?? 'closed'} this draft`)
+        if (ownAction.current) {
+          /* released or handed over from this tab */
+        } else if (l?.closedAt) toast.info(`${l.closedByName ?? 'Someone'} ${l.closedReason ?? 'closed'} this draft`)
         else if (l?.via === 'takeover') toast.warning(`${l.ownerName ?? 'An owner'} took over this draft${l.reason ? `: ${l.reason}` : ''}`)
         else if (l?.via === 'handover' && l.ownerName) toast.info(`${l.ownerName} now holds this draft`)
         else toast.warning('You no longer hold this draft')
@@ -131,7 +137,7 @@ export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit',
 
   // Heartbeat doubles as the poll fallback when the event stream is down.
   useEffect(() => {
-    if (!resourceId) return
+    if (!resourceId || !presence) return
     void beat()
     const t = setInterval(() => {
       if (document.visibilityState === 'visible') void beat()
@@ -149,7 +155,7 @@ export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit',
       void beat(true)
       setLockEpoch(resourceType, resourceId, null)
     }
-  }, [resourceId, resourceType, beat])
+  }, [resourceId, resourceType, presence, beat])
 
   useEffect(() => {
     if (!resourceId) return
@@ -174,7 +180,12 @@ export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit',
           void refresh()
           return false
         }
-        apply(data)
+        ownAction.current = true
+        try {
+          apply(data)
+        } finally {
+          ownAction.current = false
+        }
         if (ok) toast.success(ok)
         return true
       } catch {

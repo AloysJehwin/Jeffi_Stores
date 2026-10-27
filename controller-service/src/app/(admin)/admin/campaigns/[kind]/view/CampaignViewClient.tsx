@@ -13,6 +13,7 @@ import { WhatsAppPreview } from '@/components/admin/campaigns/WhatsAppTemplateEd
 import { PushPreview } from '@/components/admin/campaigns/PushEditor'
 import { campaignSupportsPush, scenarioPushCopy } from '@/lib/campaigns/push-kinds'
 import { CampaignDetailSkeleton, CampaignPageSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
+import { ViewDraftLink } from '@/components/admin/kit/draft-lock'
 import {
   type CampaignRow,
   getChannels,
@@ -72,9 +73,12 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 export default function CampaignViewClient({
   kind,
   hasDraftInitial = false,
+  heldDraft,
 }: {
   kind: string
   hasDraftInitial?: boolean
+  /** Another admin holds the draft: open it read-only instead of starting one. */
+  heldDraft?: { ownerName: string; href: string } | null
 }) {
   const canWrite = useHasScope('campaigns:write')
   const [c, setC] = useState<ViewCampaign | null>(null)
@@ -171,7 +175,11 @@ export default function CampaignViewClient({
                 </div>
                 {c.description && <p className="text-sm text-foreground-secondary mt-1">{c.description}</p>}
               </div>
-              {canWrite &&
+              {heldDraft ? (
+                <span className="hidden md:inline-flex">
+                  <ViewDraftLink held={heldDraft} compact />
+                </span>
+              ) : canWrite &&
                 (hasDraft ? (
                   <Link
                     href={ap(`/admin/campaigns/${kind}/edit`)}

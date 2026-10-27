@@ -1,3 +1,6 @@
+import { DraftLockBadge } from '@/components/admin/kit/draft-lock'
+import type { DraftLockChip } from '@/lib/client/draft-lock-client'
+
 interface Props {
   supplier: {
     name: string
@@ -7,6 +10,7 @@ interface Props {
     payment_terms: number
     po_count: number
     is_active: boolean
+    draft_lock?: DraftLockChip | null
   }
 }
 
@@ -15,7 +19,10 @@ export default function SupplierMobileCardBody({ supplier }: Props) {
     <>
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-foreground truncate">{supplier.name}</div>
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 text-sm font-semibold text-foreground truncate">{supplier.name}</div>
+            <DraftLockBadge lock={supplier.draft_lock} mine={supplier.draft_lock?.mine} />
+          </div>
           <div className="text-xs text-foreground-muted font-mono truncate">{supplier.gstin || 'No GSTIN'}</div>
         </div>
         <span

@@ -5,6 +5,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import ProductDetailClient from '../ProductDetailClient'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
+import { heldDraftForView } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,5 +25,6 @@ export default async function ProductViewPage({ params }: { params: Promise<{ id
     redirect(ap('/admin/login', host))
   }
 
-  return <ProductDetailClient id={id} hasInventory={hasInventory} />
+  const held = await heldDraftForView('product', id, `/admin/products/${id}/edit`, `/admin/products/${id}`)
+  return <ProductDetailClient id={id} hasInventory={hasInventory} heldDraft={held} />
 }

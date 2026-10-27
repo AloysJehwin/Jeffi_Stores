@@ -5,6 +5,7 @@ import { queryOne, withTransaction } from '@/lib/shared/db'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { listOffersAdmin, slugifyOffer } from '@/lib/catalog/product-offers'
+import { draftLockChips } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const offers = await listOffersAdmin()
-  return NextResponse.json({ offers })
+  const locks = await draftLockChips('offer', offers.map(o => o.id), admin.adminId)
+  return NextResponse.json({ offers: offers.map(o => (locks[o.id] ? { ...o, draft_lock: locks[o.id] } : o)) })
 }
 
 const bodySchema = z.object({

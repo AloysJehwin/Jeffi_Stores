@@ -42,6 +42,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const navLinks = [
     { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard:read' },
+    { href: '/admin/drafts', label: 'Drafts', scope: 'dashboard:read' },
     { href: '/admin/products', label: 'Products', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/categories', label: 'Categories', scope: 'categories:read', group: 'Catalogue' },
     { href: '/admin/brands', label: 'Brands', scope: 'brands:read', group: 'Catalogue' },

@@ -8,7 +8,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminImage from '@/components/admin/AdminImage'
 import { Plus } from 'lucide-react'
-import { DataTable, StatusBadge, type DataCol } from '@/components/admin/kit'
+import { DataTable, DraftLockBadge, StatusBadge, type DataCol } from '@/components/admin/kit'
+import type { DraftLockChip } from '@/lib/client/draft-lock-client'
 
 interface OfferListRow {
   id: string
@@ -18,6 +19,7 @@ interface OfferListRow {
   blurhash: string | null
   is_active: boolean
   product_count: number
+  draft_lock?: DraftLockChip | null
 }
 
 export default function OffersListClient({ canWrite: canWriteProp }: { canWrite: boolean }) {
@@ -89,6 +91,7 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
             )}
           </div>
           <span className="min-w-0 truncate font-semibold text-foreground group-hover:text-accent-500 transition-colors">{offer.title || 'Untitled offer'}</span>
+          <DraftLockBadge lock={offer.draft_lock} mine={offer.draft_lock?.mine} />
         </Link>
       ),
     },
@@ -144,6 +147,7 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
                 {offer.product_count} product{offer.product_count === 1 ? '' : 's'}
               </p>
             </div>
+            <DraftLockBadge lock={offer.draft_lock} mine={offer.draft_lock?.mine} />
             <StatusBadge status={String(offer.is_active)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />
           </Link>
         )}

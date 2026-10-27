@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import DraftRowActions from '@/components/admin/DraftRowActions'
+import { draftLockChips } from '@/lib/admin/draft-locks'
 import ReviewFormsTable, { type FormRow } from './_components/ReviewFormsTable'
 import { ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
@@ -109,6 +110,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
 
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
   if (pendingDraftsCount === 0) return null
+  const locks = await draftLockChips('review_form', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.form_id)])
 
   return (
     <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
@@ -144,6 +146,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
               discardPath={`/api/admin/review-forms/${d.id}`}
               discardConfirm={`Delete the draft form "${d.title}"? This cannot be undone.`}
               entityLabel="review form"
+              lock={locks[d.id]}
             />
           ))}
           {pendingDrafts.map(d => (
@@ -156,6 +159,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
               publishPath={`/api/admin/review-forms/${d.form_id}/publish`}
               discardPath={`/api/admin/review-forms/${d.form_id}/draft`}
               entityLabel="review form"
+              lock={locks[d.form_id]}
             />
           ))}
         </div>

@@ -12,10 +12,12 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { ap } from '@/lib/shared/admin-path'
 import { getRedisClient } from '@/lib/shared/redis'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import type { DraftLockChip } from '@/lib/client/draft-lock-client'
 import { publishLockEvent, type LockEventType } from './draft-lock-events'
 
 export { HOMEPAGE_LOCK_ID, DRAFT_RESOURCES, isDraftResourceType, isDraftLockError } from '@jeffi/draft-locks'
 export type { DraftLock, DraftResourceType } from '@jeffi/draft-locks'
+export type { DraftLockChip } from '@/lib/client/draft-lock-client'
 
 /** Who is writing. No actor = system writer (imports, crons, variant-status): never locked. */
 export type DraftActor = { adminId: string; role?: string; scopes?: string[] } | null | undefined
@@ -424,6 +426,35 @@ export async function getDraftLockMap(type: DraftResourceType, ids: string[]): P
   } catch {
     return {}
   }
+}
+
+/**
+ * List-row badges: the holder of each row's draft (only while they can still edit), keyed by id.
+ * `me` marks the viewer's own drafts; omitted, it is read from the session.
+ */
+export async function draftLockChips(
+  type: DraftResourceType,
+  ids: (string | null | undefined)[],
+  me?: string | null
+): Promise<Record<string, DraftLockChip>> {
+  const keys = [...new Set(ids.filter((v): v is string => !!v))]
+  if (!keys.length) return {}
+  const [locks, viewer] = await Promise.all([getDraftLockMap(type, keys), me === undefined ? actionActor() : null])
+  const self = me === undefined ? (viewer?.adminId ?? null) : me
+  const out: Record<string, DraftLockChip> = {}
+  for (const [id, l] of Object.entries(locks)) {
+    if (!l.ownerId || !l.ownerCanEdit) continue
+    out[id] = { ownerId: l.ownerId, ownerName: l.ownerName, lastActiveAt: l.lastActiveAt, mine: l.ownerId === self }
+  }
+  return out
+}
+
+/** View pages: where "View draft (read-only)" goes when another admin holds the draft, else null. */
+export async function heldDraftForView(type: DraftResourceType, id: string, editPath: string, back?: string | null) {
+  const s = await initialDraftLock(type, id)
+  const l = s?.lock
+  if (!s?.draftExists || !l || l.closedAt || !l.ownerId || !l.ownerCanEdit || s.isMine) return null
+  return { ownerName: l.ownerName ?? 'another admin', href: ap(draftEditUrl(editPath, back, false), await getHost()) }
 }
 
 /** Deactivated, deleted, or re-scoped admin: free their drafts (of `types`, else all) for others to claim. */

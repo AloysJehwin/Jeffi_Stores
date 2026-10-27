@@ -13,8 +13,9 @@ import { getCouponsSummary, queryCoupons } from '@/lib/queries/coupons'
 import { COUPONS_ENTITY } from '@/lib/filters/entities/coupons'
 import { COUPON_ALIASES, COUPON_FIELDS, COUPON_SEARCH } from '@/lib/filters/fields/coupons'
 import CouponsTable, { type CouponRow } from './_components/CouponsTable'
-import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import DraftRowActions from '@/components/admin/DraftRowActions'
+import { draftLockChips } from '@/lib/admin/draft-locks'
 import OverviewTabs from './_components/OverviewTabs'
 import CouponsOverview from './_components/CouponsOverview'
 
@@ -122,6 +123,7 @@ async function CouponsStats({ q }: { q: FilterQuery }) {
   ])
   const pendingDrafts = editDrafts
   const pendingDraftsCount = editDrafts.length + createDrafts.length
+  const locks = await draftLockChips('coupon', [...createDrafts.map(d => d.id), ...editDrafts.map(d => d.coupon_id)])
 
   const { total: totalCoupons, active: activeCoupons, expired: expiredCoupons, campaign: campaignCoupons } = summary
 
@@ -169,6 +171,7 @@ async function CouponsStats({ q }: { q: FilterQuery }) {
                     discardPath={`/api/admin/coupons/${d.id}`}
                     discardConfirm={`Delete the draft coupon "${d.code}"? This cannot be undone.`}
                     entityLabel="coupon"
+                    lock={locks[d.id]}
                   />
                 ) : (
                   <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
@@ -176,6 +179,7 @@ async function CouponsStats({ q }: { q: FilterQuery }) {
                       {d.code}
                     </p>
                     <span className="text-xs text-amber-600 dark:text-amber-400">new</span>
+                    <DraftLockBadge lock={locks[d.id]} mine={locks[d.id]?.mine} />
                   </div>
                 )
               )}
@@ -191,12 +195,14 @@ async function CouponsStats({ q }: { q: FilterQuery }) {
                     publishPath={`/api/admin/coupons/${d.coupon_id}/publish`}
                     discardPath={`/api/admin/coupons/${d.coupon_id}/draft`}
                     entityLabel="coupon"
+                    lock={locks[d.coupon_id]}
                   />
                 ) : (
                   <div key={d.coupon_id} className="px-4 py-2.5 flex items-center gap-2">
                     <p className="text-sm font-medium text-amber-700 dark:text-amber-400 font-mono truncate">
                       {d.code}
                     </p>
+                    <DraftLockBadge lock={locks[d.coupon_id]} mine={locks[d.coupon_id]?.mine} />
                   </div>
                 )
               )}

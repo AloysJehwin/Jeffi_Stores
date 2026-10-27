@@ -18,7 +18,7 @@ import {
 } from './_components/campaign-presentation'
 import CampaignsMobileList from './_components/CampaignsMobileList'
 import RowActions from '@/components/admin/RowActions'
-import { EmptyState, InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit'
+import { DraftLockBadge, EmptyState, InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit'
 
 export default function CampaignsListClient() {
   const { showToast } = useToast()
@@ -261,15 +261,18 @@ export default function CampaignsListClient() {
                     <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{d.name}</p>
                   </Link>
                   <div className="flex items-center gap-2 shrink-0">
+                    <DraftLockBadge lock={d.draft_lock} mine={d.draft_lock?.mine} />
                     <RequireWrite scope="campaigns:write">
-                      <button
-                        type="button"
-                        onClick={() => publishDraft(d)}
-                        disabled={busy === d.kind}
-                        className="control-sm bg-green-600 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-                      >
-                        Publish
-                      </button>
+                      {!(d.draft_lock && !d.draft_lock.mine) && (
+                        <button
+                          type="button"
+                          onClick={() => publishDraft(d)}
+                          disabled={busy === d.kind}
+                          className="control-sm bg-green-600 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                        >
+                          Publish
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => discardDraft(d)}
@@ -325,6 +328,7 @@ export default function CampaignsListClient() {
                         Draft pending
                       </span>
                     )}
+                    {c.draft_fields != null && <DraftLockBadge lock={c.draft_lock} mine={c.draft_lock?.mine} />}
                     {c.discount_percent > 0 && (
                       <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
                         {c.discount_percent}% off

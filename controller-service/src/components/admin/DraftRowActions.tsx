@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { DraftLockBadge } from '@/components/admin/kit/draft-lock'
+import type { DraftLockChip } from '@/lib/client/draft-lock-client'
 
 interface Props {
   entityId: string
@@ -21,6 +23,8 @@ interface Props {
   publishBody?: Record<string, unknown>
   publishConfirm?: string
   discardConfirm?: string
+  /** Who holds the draft (draftLockChips). Publish is hidden while someone else holds it. */
+  lock?: DraftLockChip | null
 }
 
 export default function DraftRowActions({
@@ -35,7 +39,9 @@ export default function DraftRowActions({
   publishBody,
   publishConfirm,
   discardConfirm,
+  lock,
 }: Props) {
+  const lockedByOther = !!lock && !lock.mine
   const router = useRouter()
   const confirm = useConfirm()
   const [publishing, setPublishing] = useState(false)
@@ -101,17 +107,20 @@ export default function DraftRowActions({
         {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
       </Link>
       <div className="flex items-center gap-2 shrink-0">
+        <DraftLockBadge lock={lock} mine={lock?.mine} />
         <p className="text-xs text-amber-500 mr-2">
           {new Date(updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
         </p>
         <RequireWrite scope="orders:write">
-          <button
-            onClick={handlePublish}
-            disabled={publishing || discarding}
-            className="px-2.5 h-control-sm text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50"
-          >
-            {publishing ? '…' : 'Publish'}
-          </button>
+          {!lockedByOther && (
+            <button
+              onClick={handlePublish}
+              disabled={publishing || discarding}
+              className="px-2.5 h-control-sm text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50"
+            >
+              {publishing ? '…' : 'Publish'}
+            </button>
+          )}
           <button
             onClick={handleDiscard}
             disabled={publishing || discarding}

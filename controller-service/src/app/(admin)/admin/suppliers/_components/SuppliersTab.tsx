@@ -10,6 +10,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { DataTable, type DataCol } from '@/components/admin/kit/data-table'
 import { fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { StatusBadge, ACTIVE_STATUS } from '@/components/admin/kit/status'
+import { DraftLockBadge } from '@/components/admin/kit/draft-lock'
 import SuppliersMobileList from './SuppliersMobileList'
 import { PAGE_SIZE, type Supplier } from '@/components/admin/purchasing/shared'
 
@@ -56,9 +57,12 @@ export default function SuppliersTab() {
       label: 'Name',
       sort: s => text(s.name),
       render: s => (
-        <Link href={ap(`/admin/suppliers/${s.id}/view`)} className="font-medium text-foreground hover:text-accent-500 hover:underline">
-          {s.name}
-        </Link>
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <Link href={ap(`/admin/suppliers/${s.id}/view`)} className="font-medium text-foreground hover:text-accent-500 hover:underline">
+            {s.name}
+          </Link>
+          <DraftLockBadge lock={s.draft_lock} mine={s.draft_lock?.mine} />
+        </span>
       ),
     },
     { key: 'gstin', label: 'GSTIN', sort: s => text(s.gstin), render: s => <span className="font-mono text-xs text-foreground-secondary">{s.gstin || '—'}</span> },

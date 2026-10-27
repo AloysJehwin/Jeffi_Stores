@@ -12,6 +12,7 @@ import { BRAND_ALIASES, BRAND_FIELDS, BRAND_SEARCH } from '@/lib/filters/fields/
 import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
 import BrochureButton from '@/components/admin/BrochureButton'
 import DraftRowActions from '@/components/admin/DraftRowActions'
+import { draftLockChips } from '@/lib/admin/draft-locks'
 import BrandsTable from './_components/BrandsTable'
 import GroupOverview from '../categories/_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
@@ -73,6 +74,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
   const activeBrands = stats?.active ?? 0
   const inactiveBrands = totalBrands - activeBrands
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
+  const locks = await draftLockChips('brand', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.brand_id)])
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -116,6 +118,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
                   discardPath={`/api/brands/${d.id}`}
                   discardConfirm={`Delete the draft brand "${d.name}"? This cannot be undone.`}
                   entityLabel="brand"
+                  lock={locks[d.id]}
                 />
               ))}
               {pendingDrafts.map(d => (
@@ -128,6 +131,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
                   publishPath={`/api/admin/brands/${d.brand_id}/publish`}
                   discardPath={`/api/admin/brands/${d.brand_id}/draft`}
                   entityLabel="brand"
+                  lock={locks[d.brand_id]}
                 />
               ))}
             </div>

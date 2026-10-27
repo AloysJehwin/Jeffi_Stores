@@ -6,6 +6,7 @@ import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validatio
 import { ensureBuiltinCampaignRows, migrateLegacyCampaignDrafts } from '@/lib/campaigns/ensure-builtin-campaigns'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
+import { draftLockChips } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
       SELECT
         c.*,
         (SELECT NULLIF(cd.fields, '{}'::jsonb) FROM campaign_drafts cd WHERE cd.kind = c.kind) AS draft_fields,
+        (SELECT cd.campaign_id FROM campaign_drafts cd WHERE cd.kind = c.kind) AS draft_lock_id,
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind), 0) AS total_sent,
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.opened_at IS NOT NULL), 0) AS total_opened,
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.clicked_at IS NOT NULL), 0) AS total_clicked,
@@ -50,8 +52,18 @@ export async function GET(req: NextRequest) {
     ),
     queryOne<{ total: string }>('SELECT COUNT(*) AS total FROM campaigns'),
   ])
+  const locks = await draftLockChips(
+    'campaign',
+    campaigns.filter(c => c.draft_fields != null).map(c => c.draft_lock_id),
+    admin.adminId
+  )
 
-  return NextResponse.json({ campaigns, total: parseInt(countRow?.total || '0', 10), limit, offset })
+  return NextResponse.json({
+    campaigns: campaigns.map(c => (c.draft_lock_id && locks[c.draft_lock_id] ? { ...c, draft_lock: locks[c.draft_lock_id] } : c)),
+    total: parseInt(countRow?.total || '0', 10),
+    limit,
+    offset,
+  })
 }
 
 export async function POST(req: NextRequest) {
