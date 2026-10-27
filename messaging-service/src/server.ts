@@ -10,7 +10,7 @@ import * as wallet from '@jeffi/wallet'
 import { sendPush } from '@jeffi/push'
 import { resolveServiceScope, scopeSql, inScope, verifyLink } from '@jeffi/tenancy'
 import { db, one } from './db.js'
-import { sendMessage, getMessage, resolveTemplate, systemVars, toApi as msgToApi, SendError, type MessageRow } from './send.js'
+import { assertChannelOn, sendMessage, getMessage, resolveTemplate, systemVars, toApi as msgToApi, SendError, type MessageRow } from './send.js'
 import { listTemplates, upsertTemplate, archiveTemplate, toApi as tplToApi } from './templates.js'
 import * as tpl from './templates-v2.js'
 import { CATALOG, WA_APPROVED_SIDS } from '../seed/catalog.js'
@@ -91,7 +91,7 @@ app.post('/messages/batch', async req => {
       else rejected.push({ to: r.to, reason: m.error ?? m.status })
     } catch (e: any) {
       rejected.push({ to: r.to, reason: e instanceof SendError ? e.code : 'error' })
-      if (e instanceof SendError && e.code === 'insufficient_balance') break
+      if (e instanceof SendError && (e.code === 'insufficient_balance' || e.code === 'channel_disabled')) break
     }
   }
   return { batch_id: batchId, accepted, rejected }
@@ -135,6 +135,7 @@ app.post('/push', async req => {
 app.post('/messages/bulk', { bodyLimit: 10_000_000 }, async (req, reply) => {
   const b = BulkMessagesRequest.parse(req.body)
   const { tenantId, tenantSlug, apiKeyId } = req.claims
+  await assertChannelOn(tenantId, b.channel, spaceOf(req))
   if (!(await resolveTemplate(tenantId, b.channel, b.template, spaceOf(req)))) throw new SendError(404, 'template_not_found', `No ${b.channel} template '${b.template}'`)
   const inputs = b.recipients.map(r => ({
     channel: b.channel, to: r.to, template: b.template, subject: b.subject,
