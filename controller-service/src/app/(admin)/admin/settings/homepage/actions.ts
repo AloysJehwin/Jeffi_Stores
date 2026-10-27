@@ -48,7 +48,7 @@ export async function startHomepageDraft(formData: FormData) {
   }
   const host = await getHost()
   const q = new URLSearchParams()
-  for (const key of ['page', 'surface']) {
+  for (const key of ['audience', 'page', 'surface']) {
     const v = formData.get(key)
     if (typeof v === 'string' && /^[a-z_]{1,16}$/.test(v)) q.set(key, v)
   }
