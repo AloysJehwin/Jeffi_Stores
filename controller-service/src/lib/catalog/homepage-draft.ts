@@ -1,7 +1,16 @@
 import type { PoolClient } from 'pg'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import { randomUUID } from 'crypto'
-import { rowSurface, withDefaults, type HomepageSection, type HomepageSurface } from '@/lib/catalog/homepage-sections'
+import {
+  HOMEPAGE_PAGES,
+  HOMEPAGE_SURFACES,
+  rowPage,
+  rowSurface,
+  withDefaults,
+  type HomepagePage,
+  type HomepageSection,
+  type HomepageSurface,
+} from '@/lib/catalog/homepage-sections'
 import type { HeroSlide } from '@/lib/catalog/hero-slides'
 import {
   HOMEPAGE_LOCK_ID,
@@ -54,8 +63,10 @@ export interface HomepageDraftSummary {
   updatedBy: string | null
   sections: DraftDiff
   slides: DraftDiff
-  /** The same diffs split by surface, for the Website / Mobile app tabs. */
+  /** The same diffs split by layout, for the Desktop web / Mobile web / App tabs. */
   bySurface: Record<HomepageSurface, { sections: DraftDiff; slides: DraftDiff }>
+  /** And by page then layout (hero slides count toward the homepage). */
+  byPage: Record<HomepagePage, Record<HomepageSurface, { sections: DraftDiff; slides: DraftDiff }>>
 }
 
 export type PublishCounts = { inserted: number; updated: number; deleted: number }
@@ -82,6 +93,7 @@ const SECTION_COLUMNS = [
   'starts_at',
   'ends_at',
   'surface',
+  'page',
 ] as const
 
 const SLIDE_COLUMNS = [
@@ -117,6 +129,7 @@ const NOT_NULL_DEFAULTS: Record<string, string> = {
   filter_in_stock: 'false',
   filter_on_sale: 'false',
   surface: `'web'`,
+  page: `'home'`,
 }
 
 const liveRows = (table: 'homepage_sections' | 'hero_slides') =>
@@ -178,8 +191,9 @@ class Unchanged extends Error {
 }
 
 const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : [])
-// Rows saved before the surface column existed read as web, so diffs and per-surface views agree.
+// Rows saved before the surface / page columns existed read as web / home, so diffs and per-tab views agree.
 const asRows = <T extends DraftRow>(value: unknown): T[] => asArray<T>(value).map(r => ({ ...r, surface: rowSurface(r) }))
+const asSections = (value: unknown): DraftSection[] => asRows<DraftSection>(value).map(r => ({ ...r, page: rowPage(r) }))
 const asUuid = (id: string | null | undefined) => (id && UUID_RE.test(id) ? id : null)
 const isUndefinedTable = (err: unknown) => (err as { code?: string } | null)?.code === '42P01'
 
@@ -252,40 +266,58 @@ export class SurfaceNotEmpty extends Error {
 
 export type CopySurfaceResult = { sections: number; slides: number; replaced: number }
 
+/** The next display_order on one page's layout. */
+export function nextDisplayOrderOn(rows: HomepageSection[], page: HomepagePage, surface: HomepageSurface): number {
+  return nextDisplayOrder(rows.filter(r => rowPage(r) === page && rowSurface(r) === surface))
+}
+
 /**
- * Copies one surface's layout onto another so it can be edited apart from the source. Rows get fresh
- * ids (publish upserts by id, so reusing them would move the originals) and `created_at` is now, so
- * the copies sort after nothing from before. A source with no saved sections contributes the built-in
- * default layout, which is what that surface is showing. Refuses to overwrite unless `replace`.
+ * Copies one surface's layout of a page onto another so it can be edited apart from the source. Rows
+ * get fresh ids (publish upserts by id, so reusing them would move the originals) and `created_at` is
+ * now, so the copies sort after nothing from before. A homepage source with no saved sections
+ * contributes the built-in default layout, which is what that surface is showing; hero slides are
+ * the homepage's. Refuses to overwrite unless `replace`.
  */
 export function copySurfaceLayout(
   draft: HomepageDraftState,
   from: HomepageSurface,
   to: HomepageSurface,
-  opts: { replace?: boolean; now?: string; newId?: () => string } = {}
+  opts: { page?: HomepagePage; replace?: boolean; now?: string; newId?: () => string } = {}
 ): CopySurfaceResult {
   if (from === to) throw new Error('Source and target surface are the same')
+  const page = opts.page ?? 'home'
+  const home = page === 'home'
   const now = opts.now ?? new Date().toISOString()
   const newId = opts.newId ?? randomUUID
-  const onTarget = (r: { surface?: string | null }) => rowSurface(r) === to
-  const replaced = draft.sections.filter(onTarget).length + draft.heroSlides.filter(onTarget).length
+  const onPage = (r: HomepageSection) => rowPage(r) === page
+  const onTarget = (r: HomepageSection) => onPage(r) && rowSurface(r) === to
+  const slideOnTarget = (r: { surface?: string | null }) => home && rowSurface(r) === to
+  const replaced = draft.sections.filter(onTarget).length + draft.heroSlides.filter(slideOnTarget).length
   if (replaced > 0 && !opts.replace) throw new SurfaceNotEmpty(to)
 
-  const sourceSections = sortByDisplayOrder(draft.sections.filter(r => rowSurface(r) === from))
-  const sections: DraftSection[] = withDefaults(sourceSections).map((s, i) => ({
-    ...s,
+  const sourceSections = sortByDisplayOrder(draft.sections.filter(r => onPage(r) && rowSurface(r) === from))
+  const sections: DraftSection[] = (home ? withDefaults(sourceSections) : sourceSections).map((s, i) => ({
+    ...(s as DraftSection),
     id: newId(),
     surface: to,
+    page,
     display_order: i,
     created_at: now,
     updated_at: now,
   }))
-  const slides: DraftHeroSlide[] = sortByDisplayOrder(draft.heroSlides.filter(r => rowSurface(r) === from)).map(
-    (s, i) => ({ ...s, id: newId(), surface: to, display_order: i, created_at: now, updated_at: now })
-  )
+  const slides: DraftHeroSlide[] = home
+    ? sortByDisplayOrder(draft.heroSlides.filter(r => rowSurface(r) === from)).map((s, i) => ({
+        ...s,
+        id: newId(),
+        surface: to,
+        display_order: i,
+        created_at: now,
+        updated_at: now,
+      }))
+    : []
 
   draft.sections = [...draft.sections.filter(r => !onTarget(r)), ...sections]
-  draft.heroSlides = [...draft.heroSlides.filter(r => !onTarget(r)), ...slides]
+  draft.heroSlides = [...draft.heroSlides.filter(r => !slideOnTarget(r)), ...slides]
   return { sections: sections.length, slides: slides.length, replaced }
 }
 
@@ -310,14 +342,14 @@ async function readDraft() {
 
 async function readLive(): Promise<HomepageDraftState> {
   const row = await queryOne<{ sections: unknown; hero_slides: unknown }>(READ_LIVE_SQL)
-  return { sections: asRows(row?.sections), heroSlides: asRows(row?.hero_slides) }
+  return { sections: asSections(row?.sections), heroSlides: asRows(row?.hero_slides) }
 }
 
 export async function getEditableHomepage(): Promise<EditableHomepage> {
   const draft = await readDraft()
   if (!draft) return { ...(await readLive()), draft: null }
   return {
-    sections: sortByDisplayOrder(asRows<DraftSection>(draft.sections)),
+    sections: sortByDisplayOrder(asSections(draft.sections)),
     heroSlides: sortByDisplayOrder(asRows<DraftHeroSlide>(draft.hero_slides)),
     draft: { updatedAt: toIso(draft.updated_at), updatedBy: draft.updated_by_name ?? null },
   }
@@ -328,7 +360,7 @@ async function lockDraft(client: PoolClient, updatedBy: string | null): Promise<
   for (let attempt = 0; attempt < 3; attempt++) {
     await client.query(ENSURE_DRAFT_SQL, [updatedBy])
     const { rows } = await client.query(LOCK_DRAFT_SQL)
-    if (rows[0]) return { sections: asRows(rows[0].sections), heroSlides: asRows(rows[0].hero_slides) }
+    if (rows[0]) return { sections: asSections(rows[0].sections), heroSlides: asRows(rows[0].hero_slides) }
   }
   throw new Error('Homepage draft is unavailable')
 }
@@ -447,27 +479,40 @@ function diffState(draft: HomepageDraftState, live: HomepageDraftState) {
   }
 }
 
-const onSurface = (state: HomepageDraftState, surface: HomepageSurface): HomepageDraftState => ({
-  sections: state.sections.filter(s => s.surface === surface),
-  heroSlides: state.heroSlides.filter(s => s.surface === surface),
+const onSurface = (state: HomepageDraftState, surface: HomepageSurface, page?: HomepagePage): HomepageDraftState => ({
+  sections: state.sections.filter(s => s.surface === surface && (!page || s.page === page)),
+  heroSlides: page && page !== 'home' ? [] : state.heroSlides.filter(s => s.surface === surface),
 })
+
+const perSurface = <T>(fn: (surface: HomepageSurface) => T) =>
+  Object.fromEntries(HOMEPAGE_SURFACES.map(s => [s, fn(s)])) as Record<HomepageSurface, T>
+
+const perPage = <T>(fn: (page: HomepagePage) => T) =>
+  Object.fromEntries(HOMEPAGE_PAGES.map(p => [p, fn(p)])) as Record<HomepagePage, T>
 
 export async function getHomepageDraftSummary(): Promise<HomepageDraftSummary> {
   const draft = await readDraft()
   if (!draft) {
     const none = () => ({ sections: noChanges(), slides: noChanges() })
-    return { hasDraft: false, updatedAt: null, updatedBy: null, ...none(), bySurface: { web: none(), app: none() } }
+    return {
+      hasDraft: false,
+      updatedAt: null,
+      updatedBy: null,
+      ...none(),
+      bySurface: perSurface(none),
+      byPage: perPage(() => perSurface(none)),
+    }
   }
   const live = await readLive()
-  const state: HomepageDraftState = { sections: asRows(draft.sections), heroSlides: asRows(draft.hero_slides) }
+  const state: HomepageDraftState = { sections: asSections(draft.sections), heroSlides: asRows(draft.hero_slides) }
   return {
     hasDraft: true,
     updatedAt: toIso(draft.updated_at),
     updatedBy: draft.updated_by_name ?? null,
     ...diffState(state, live),
-    bySurface: {
-      web: diffState(onSurface(state, 'web'), onSurface(live, 'web')),
-      app: diffState(onSurface(state, 'app'), onSurface(live, 'app')),
-    },
+    bySurface: perSurface(surface => diffState(onSurface(state, surface), onSurface(live, surface))),
+    byPage: perPage(page =>
+      perSurface(surface => diffState(onSurface(state, surface, page), onSurface(live, surface, page)))
+    ),
   }
 }

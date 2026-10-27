@@ -19,7 +19,10 @@ import { loadSectionExtras } from '@/lib/catalog/homepage-extras'
 import {
   forSurface,
   productRowKey,
+  rowPage,
+  sectionAspect,
   sectionLimit,
+  sectionPlacement,
   defaultAboutCopy,
   resolveAboutStats,
   sectionCopyDefaults,
@@ -34,11 +37,13 @@ import {
   storyGroups,
   LEGACY_APP_HIDDEN_TYPES,
   SECTION_TILE_DEFAULTS,
+  type HomepagePage,
   type HomepageSection,
   type HomepageSurface,
   type ProductSource,
   type SectionCopy,
   type SectionLayout,
+  type SectionPlacement,
   type SectionType,
 } from '@/lib/catalog/homepage-sections'
 import { listActiveOffers, listOffersByIds } from '@/lib/catalog/product-offers'
@@ -234,15 +239,49 @@ async function getCategoryShowcase() {
   return result.filter(c => c.products.length >= 2)
 }
 
-/** Everything the storefront home renders: the configured sections plus the data each one needs. */
-export async function buildHomeModel({
-  surface = 'web',
-  legacyClient = false,
-}: {
+export interface PageModelOptions {
   surface?: HomepageSurface
+  page?: HomepagePage
   /** An app build from before per-surface layouts: it gets the website layout minus the types it can't render. */
   legacyClient?: boolean
-} = {}): Promise<HomeModel> {
+}
+
+/** The sections a page shows: its layout for the surface, minus the types the plan doesn't include. */
+export async function getPageSections({
+  surface = 'web',
+  page = 'home',
+  legacyClient = false,
+}: PageModelOptions = {}): Promise<HomepageSection[]> {
+  const allSections = await getConfiguredSections(surface, page)
+  if (allSections.length === 0) return []
+  // The Business CTA promotes the B2B portal, which only exists on plans that sell it (Pro+); the
+  // rewards game issues coupons, a customer-programs feature on the same footing.
+  const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
+  const businessAllowed = allSections.some(s => s.type === 'business_cta')
+    ? (await currentTenantPlanGate('business_customers:read').catch(() => ({ allowed: false }))).allowed
+    : false
+  const programsAllowed = allSections.some(s => s.type === 'rewards_game')
+    ? await (await import('@/lib/loyalty/settings')).customerProgramsAllowed()
+    : false
+  return allSections.filter(
+    s =>
+      (businessAllowed || s.type !== 'business_cta') &&
+      (programsAllowed || s.type !== 'rewards_game') &&
+      !(legacyClient && LEGACY_APP_HIDDEN_TYPES.has(s.type))
+  )
+}
+
+/** Everything a page's sections render: the sections plus the data each one needs. */
+export async function buildHomeModel(opts: PageModelOptions = {}): Promise<HomeModel> {
+  const sections = await getPageSections(opts)
+  return { sections, data: await loadSectionData(sections, opts) }
+}
+
+/** The data the given sections need, and nothing else. */
+export async function loadSectionData(
+  sections: HomepageSection[],
+  { surface = 'web', page = 'home' }: Pick<PageModelOptions, 'surface' | 'page'> = {}
+): Promise<SectionData> {
   const storefront = await getStorefrontContent()
   const { gstEnabled } = await getFeatureFlags()
 
@@ -251,22 +290,7 @@ export async function buildHomeModel({
   const identity = await getStoreIdentity()
   const aboutCopy = defaultAboutCopy(storefront.aboutCopy, identity.name)
 
-  const allSections = await getConfiguredSections(surface)
-  // The Business CTA promotes the B2B portal, which only exists on plans that sell it (Pro+); the
-  // rewards game issues coupons, a customer-programs feature on the same footing.
-  const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
-  const businessAllowed = (await currentTenantPlanGate('business_customers:read').catch(() => ({ allowed: false })))
-    .allowed
-  const programsAllowed = allSections.some(s => s.type === 'rewards_game')
-    ? await (await import('@/lib/loyalty/settings')).customerProgramsAllowed()
-    : false
-  const sections = allSections.filter(
-    s =>
-      (businessAllowed || s.type !== 'business_cta') &&
-      (programsAllowed || s.type !== 'rewards_game') &&
-      !(legacyClient && LEGACY_APP_HIDDEN_TYPES.has(s.type))
-  )
-  const needs = planDataNeeds(sections, surface)
+  const needs = planDataNeeds(sections, surface, page)
   const rowPlan = planProductRows(sections)
 
   // Honor the offer-slider section's picked offers (config.offerIds); fall back to all active.
@@ -316,24 +340,21 @@ export async function buildHomeModel({
   const businessSignupUrl = isLocal ? '/business/signup' : `${businessOrigin}/signup`
 
   return {
-    sections,
-    data: {
-      heroSlides,
-      offers,
-      mainCategories,
-      topBrands,
-      categoryShowcase,
-      dealOfTheDay,
-      productRows,
-      freeShippingThreshold,
-      gstEnabled,
-      stats,
-      aboutCopy,
-      storeName: identity.name,
-      businessLandingUrl,
-      businessSignupUrl,
-      extras,
-    },
+    heroSlides,
+    offers,
+    mainCategories,
+    topBrands,
+    categoryShowcase,
+    dealOfTheDay,
+    productRows,
+    freeShippingThreshold,
+    gstEnabled,
+    stats,
+    aboutCopy,
+    storeName: identity.name,
+    businessLandingUrl,
+    businessSignupUrl,
+    extras,
   }
 }
 
@@ -342,9 +363,14 @@ export type HomeCard = CardProps & { badge: string | null }
 
 /** A section as the app reads it: copy defaults filled in, tiles validated (or the built-in ones). */
 export type HomeSectionJson = HomepageSection & {
+  page: HomepagePage
   layout: SectionLayout
   copy: SectionCopy
   items: Record<string, string>[] | null
+  /** Where it sits between the products on a listing page; ignored on the homepage. */
+  placement: SectionPlacement
+  /** Width / height for the section's cards or banner, or null for its own look. */
+  aspect: number | null
 }
 
 /**
@@ -448,6 +474,7 @@ export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
     const video = safeHref(typeof s.config?.video === 'string' ? s.config.video : null)
     return {
       ...s,
+      page: rowPage(s),
       layout: sectionLayout(s),
       copy: {
         eyebrow: s.eyebrow ?? d.eyebrow,
@@ -460,6 +487,8 @@ export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
         ctaUrl: s.cta_url ?? d.ctaUrl,
       },
       items: sectionItems(s, data),
+      placement: sectionPlacement(s),
+      aspect: sectionAspect(s),
     }
   })
   return {
