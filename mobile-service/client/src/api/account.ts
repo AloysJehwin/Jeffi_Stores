@@ -115,7 +115,7 @@ export async function postJson<T = any>(path: string, body: unknown, method = 'P
 }
 
 export const phoneSendOtp = (phone: string) =>
-  postJson<{ nextCooldown?: number; retryAfter?: number }>('/api/auth/phone/send-otp', { phone })
+  postJson<{ nextCooldown?: number; retryAfter?: number; channel?: 'whatsapp' | 'sms' | 'email' }>('/api/auth/phone/send-otp', { phone })
 export const phoneVerifyOtp = (phone: string, otp: string) => postJson('/api/auth/phone/verify-otp', { phone, otp })
 export const acceptPolicies = () => postJson('/api/user/accept-policies', {}).catch(() => null)
 export const abandonSignup = () => postJson('/api/auth/abandon-signup', {}).catch(() => null)
