@@ -35,7 +35,7 @@ export default function CountdownDealBanner({ section, data }: SectionProps) {
           <Pressable
             onPress={open}
             className="overflow-hidden rounded-xl bg-surface-elevated"
-            style={{ width: '100%', maxWidth: 384, aspectRatio: 1 }}
+            style={{ width: '100%', maxWidth: 384, aspectRatio: section.aspect ?? 1 }}
             accessible={false}
             importantForAccessibility="no-hide-descendants"
           >

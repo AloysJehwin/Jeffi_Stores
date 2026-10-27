@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { View } from 'react-native'
+import { View, useWindowDimensions } from 'react-native'
 import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg'
 import { Gradient, Media, Overline, Pager, Text, usePageParallax, usePageReveal, type PageInfo } from '../../ui'
 import { Image } from 'expo-image'
@@ -20,11 +20,12 @@ const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as c
 export default function MotionHero({ section, data }: SectionProps) {
   const hero = data.extras[section.id] as MotionHeroData | undefined
   if (!hero?.slides.length) return null
-  return <Hero hero={hero} />
+  return <Hero hero={hero} aspect={section.aspect} />
 }
 
-function Hero({ hero }: { hero: MotionHeroData }) {
+function Hero({ hero, aspect }: { hero: MotionHeroData; aspect?: number | null }) {
   const router = useRouter()
+  const screenH = useWindowDimensions().height
   const [current, setCurrent] = useState(0)
   const { ref, onLayout, onScreen } = useOnScreen(hero.slides.length > 1 || hero.slides.some(s => s.bgVideo))
   return (
@@ -32,7 +33,8 @@ function Hero({ hero }: { hero: MotionHeroData }) {
       <Pager
         data={hero.slides}
         keyExtractor={(slide, i) => `${i}-${slide.bgImage}`}
-        height={w => Math.min(420, Math.round(w * 0.9))}
+        // An admin-set shape, kept on screen.
+        height={w => (aspect ? Math.round(Math.min(w / aspect, screenH * 0.8)) : Math.min(420, Math.round(w * 0.9)))}
         // Off screen (or on another tab) it holds instead of paging under the feed.
         autoplay={onScreen}
         intervalMs={hero.intervalMs}

@@ -66,6 +66,7 @@ export default function BrandScreen() {
   return (
     <Screen header={header} mode="none">
       <PagedProductGrid
+        page="brand"
         base={{ brand: brand.id }}
         pageSize={PAGE_SIZE}
         cols={1}

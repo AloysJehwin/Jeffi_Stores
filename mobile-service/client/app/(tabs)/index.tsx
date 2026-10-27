@@ -19,7 +19,7 @@ export default function HomeScreen() {
   const t = useTokens()
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['home'],
-    queryFn: getHome,
+    queryFn: () => getHome(),
     staleTime: 120_000,
   })
   // Shared with sections that animate as they scroll into view (ProductSpotlight).

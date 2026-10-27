@@ -24,7 +24,8 @@ const BACKDROP = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, o
 const FILL = { width: '100%', height: '100%' } as const
 const PRESS_DELAY = 80
 
-function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; handlingDays?: number }) {
+/** `imageAspect`: the image box's width / height (a home section's admin-set shape); 5:3 by default. */
+function ProductCard({ product, handlingDays = 2, imageAspect }: { product: CardProduct; handlingDays?: number; imageAspect?: number | null }) {
   const router = useRouter()
   const t = useTokens()
   const user = useAuthStore(s => s.user)
@@ -99,7 +100,7 @@ function ProductCard({ product, handlingDays = 2 }: { product: CardProduct; hand
         <View className="px-3 pt-3">
           <View
             className="relative w-full overflow-hidden rounded-lg border-2 border-gray-300 dark:border-gray-600"
-            style={{ aspectRatio: 5 / 3 }}
+            style={{ aspectRatio: imageAspect ?? 5 / 3 }}
           >
             {img ? (
               <>
