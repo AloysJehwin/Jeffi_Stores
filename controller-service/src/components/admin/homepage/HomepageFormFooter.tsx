@@ -14,11 +14,11 @@ import { useHomepageLock } from './HomepageLock'
 
 const hasChanges = (d: DraftDiff) => d.added > 0 || d.removed > 0 || d.edited > 0 || d.reordered
 
-const SURFACE_LABEL = { web: 'website', app: 'mobile app' } as const
+const SURFACE_LABEL = { web: 'desktop web', web_mobile: 'mobile web', app: 'app' } as const
 
-/** Which layouts the draft touches: "website", "mobile app" or "website + mobile app". */
+/** Which layouts the draft touches: "desktop web", "app", "desktop web + mobile web" and so on. */
 function touchedSurfaces(summary: HomepageDraftSummary): string {
-  const names = (['web', 'app'] as const)
+  const names = (['web', 'web_mobile', 'app'] as const)
     .filter(s => hasChanges(summary.bySurface[s].sections) || hasChanges(summary.bySurface[s].slides))
     .map(s => SURFACE_LABEL[s])
   return names.join(' + ')

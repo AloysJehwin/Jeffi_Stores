@@ -1,7 +1,15 @@
 'use client'
 
-import { SECTION_META, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
-import { AiCopyScope, DateTimeField, Grid, useSectionBinding, type EditorProps } from './editors/fields'
+import { SECTION_META, rowPage, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
+import {
+  AiCopyScope,
+  AspectField,
+  DateTimeField,
+  Grid,
+  PlacementFields,
+  useSectionBinding,
+  type EditorProps,
+} from './editors/fields'
 import AboutEditor from './editors/AboutEditor'
 import BackInStockEditor from './editors/BackInStockEditor'
 import BenefitsEditor from './editors/BenefitsEditor'
@@ -63,9 +71,11 @@ export default function SectionConfigFields(props: EditorProps) {
   const { section } = props
   const Editor = EDITORS[section.type]
   const meta = SECTION_META[section.type]
-  const surface = rowSurface(section) === 'app' ? 'mobile app' : 'website'
+  const surface = SURFACE_NAMES[rowSurface(section)]
+  const page = rowPage(section)
+  const where = page === 'home' ? `the ${surface} homepage` : `the ${surface} ${PAGE_NAMES[page]}, between the products`
   const heading = section.title ? ` Section heading: "${section.title}".` : ''
-  const aiContext = `Section "${meta.label}" on the ${surface} homepage: ${meta.description}${heading}`
+  const aiContext = `Section "${meta.label}" on ${where}: ${meta.description}${heading}`
 
   return (
     <div className="space-y-4">
@@ -74,10 +84,24 @@ export default function SectionConfigFields(props: EditorProps) {
           <Editor {...props} />
         </AiCopyScope>
       )}
+      {(page !== 'home' || meta.aspect) && (
+        <div className="pt-3 border-t border-border-default space-y-3">
+          <p className="text-xs font-semibold text-foreground">Position and shape</p>
+          {page !== 'home' && <PlacementFields props={props} />}
+          {meta.aspect && (
+            <Grid>
+              <AspectField props={props} />
+            </Grid>
+          )}
+        </div>
+      )}
       <Scheduling {...props} />
     </div>
   )
 }
+
+const SURFACE_NAMES = { web: 'desktop website', web_mobile: 'mobile website', app: 'mobile app' } as const
+const PAGE_NAMES = { products: 'all-products page', category: 'category pages', brand: 'brand pages' } as const
 
 function Scheduling(props: EditorProps) {
   const { section, canWrite } = props
