@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Check } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { PageBody, PageHeader } from '@/components/admin/kit/layout'
-import { Badge } from '@/components/admin/kit'
+import { Badge, DraftLockBanner, LockedFieldset } from '@/components/admin/kit'
 import { FormButton, FormField, FormFooter, FormGrid, FormPage, FormSection, NumberInput, TextArea, TextInput } from '@/components/admin/kit/form'
 import { ErrorState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
@@ -16,6 +16,8 @@ import { useEditSession } from '@/hooks/useEditSession'
 import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { resnapshotSupplierSession } from './actions'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { assertDraftResponse, lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
 
 
 const emptyForm = {
@@ -73,7 +75,7 @@ function mergeDraft(live: SupplierForm, df: Record<string, any>): SupplierForm {
   }
 }
 
-export default function EditSupplierClient({ id }: { id: string }) {
+export default function EditSupplierClient({ id, initialLock }: { id: string; initialLock?: DraftLockState | null }) {
   const router = useRouter()
   const [form, setForm] = useState<SupplierForm>(emptyForm)
   const [loading, setLoading] = useState(true)
@@ -86,7 +88,10 @@ export default function EditSupplierClient({ id }: { id: string }) {
   const listHref = ap('/admin/suppliers?tab=suppliers&active=true')
   const viewHref = ap(`/admin/suppliers/${id}/view`)
   const [ifscLookup, setIfscLookup] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
-  const edit = useEditSession({ resourceType: 'supplier', resourceId: id ?? null })
+  const lock = useDraftLock({ resourceType: 'supplier', resourceId: id ?? null, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'supplier', resourceId: id ?? null, lock })
+  const readOnlyRef = useRef(lock.readOnly)
+  readOnlyRef.current = lock.readOnly
 
   // Autosave bookkeeping — mirrors the Product editor so Cancel/Discard can wait on in-flight.
   const autosaveBlockedRef = useRef(false)
@@ -95,27 +100,29 @@ export default function EditSupplierClient({ id }: { id: string }) {
 
   // Autosave shares the PATCH endpoint; payload stays byte-identical to Save as Draft.
   const autosave = useAutosaveDraft<SupplierForm>({
-    enabled: v => !!v.name.trim() && !autosaveBlockedRef.current,
+    enabled: v => !!v.name.trim() && !autosaveBlockedRef.current && !readOnlyRef.current,
     save: async (value, signal) => {
       inFlightRef.current = true
       try {
         const r = await fetch(`/api/admin/suppliers/${id}/draft`, {
           method: 'PATCH',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('supplier', id) },
           body: JSON.stringify(value),
           signal,
         })
-        if (!r.ok) {
-          const j = await r.json().catch(() => ({}))
-          throw new Error(j?.error || `HTTP ${r.status}`)
-        }
+        await assertDraftResponse(r)
         setHasDraft(true)
       } finally {
         inFlightRef.current = false
       }
     },
+    onLocked: (_err, unsaved) => lock.markLocked(unsaved),
   })
+  const { resume } = autosave
+  useEffect(() => {
+    if (lock.isMine) resume()
+  }, [lock.isMine, resume])
 
   async function hydrate() {
     try {
@@ -153,11 +160,11 @@ export default function EditSupplierClient({ id }: { id: string }) {
       try {
         const r = await fetch(`/api/admin/suppliers/${id}/draft`, { credentials: 'include' })
         const j = await r.json().catch(() => ({}))
-        if (!j?.draft_fields) {
+        if (!j?.draft_fields && !readOnlyRef.current) {
           await fetch(`/api/admin/suppliers/${id}/draft`, {
             method: 'PATCH',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...lockHeaders('supplier', id) },
             body: JSON.stringify({}),
           })
           setHasDraft(true)
@@ -219,8 +226,13 @@ export default function EditSupplierClient({ id }: { id: string }) {
     setPublishing(true)
     try {
       await autosave.flush(form)
-      const res = await fetch(`/api/admin/suppliers/${id}/draft`, { method: 'POST', credentials: 'include' })
+      const res = await fetch(`/api/admin/suppliers/${id}/draft`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: lockHeaders('supplier', id),
+      })
       if (!res.ok) {
+        if (res.status === 423) lock.markLocked()
         const j = await res.json().catch(() => ({}))
         setError(j.error || 'Failed to publish')
         setPublishing(false)
@@ -241,6 +253,7 @@ export default function EditSupplierClient({ id }: { id: string }) {
     try {
       const r = await fetch(`/api/admin/suppliers/${id}/draft`, { method: 'DELETE', credentials: 'include' })
       if (!r.ok) {
+        if (r.status === 423) lock.markLocked()
         const j = await r.json().catch(() => ({}))
         setError(j.error || 'Failed to discard draft')
         autosaveBlockedRef.current = false
@@ -300,6 +313,7 @@ export default function EditSupplierClient({ id }: { id: string }) {
           }
           footer={
             <FormFooter
+              lock={lock}
               autosave={<AutosaveStatusPill status={autosave.status} />}
               draftBadge={hasDraft ? <Badge tone="amber">Draft pending</Badge> : undefined}
               discard={hasDraft ? discardDraft : undefined}
@@ -330,85 +344,88 @@ export default function EditSupplierClient({ id }: { id: string }) {
             </FormFooter>
           }
         >
-          <FormSection title="Basic Information">
-            <FormGrid cols={3}>
-              <FormField label="Name" htmlFor="sup-name" required>
-                <TextInput id="sup-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Supplier or company name" />
-              </FormField>
-              <FormField label="GSTIN" htmlFor="sup-gstin">
-                <TextInput
-                  id="sup-gstin"
-                  className="font-mono"
-                  value={form.gstin}
-                  onChange={e => setForm(f => ({ ...f, gstin: e.target.value.toUpperCase() }))}
-                  placeholder="00XXXXX0000X0Z0"
-                  maxLength={15}
-                />
-              </FormField>
-              <FormField label="Payment Terms (days)" htmlFor="sup-terms">
-                <NumberInput id="sup-terms" min="0" value={form.payment_terms} onChange={e => setForm(f => ({ ...f, payment_terms: e.target.value }))} placeholder="30" />
-              </FormField>
-              <FormField label="Contact Name" htmlFor="sup-contact">
-                <TextInput id="sup-contact" value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} />
-              </FormField>
-              <FormField label="Phone" htmlFor="sup-phone">
-                <div className="flex">
-                  <span className="inline-flex h-control items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none">+91</span>
+          <DraftLockBanner lock={lock} scope="inventory:write" />
+          <LockedFieldset readOnly={lock.readOnly} className="space-y-5">
+            <FormSection title="Basic Information">
+              <FormGrid cols={3}>
+                <FormField label="Name" htmlFor="sup-name" required>
+                  <TextInput id="sup-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Supplier or company name" />
+                </FormField>
+                <FormField label="GSTIN" htmlFor="sup-gstin">
                   <TextInput
-                    id="sup-phone"
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={10}
-                    className="rounded-l-none"
-                    value={form.phone}
-                    onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                    placeholder="XXXXXXXXXX"
+                    id="sup-gstin"
+                    className="font-mono"
+                    value={form.gstin}
+                    onChange={e => setForm(f => ({ ...f, gstin: e.target.value.toUpperCase() }))}
+                    placeholder="00XXXXX0000X0Z0"
+                    maxLength={15}
                   />
-                </div>
-              </FormField>
-              <FormField label="Email" htmlFor="sup-email">
-                <TextInput id="sup-email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-              </FormField>
-              <FormField label="Address" htmlFor="sup-address" span={3}>
-                <TextArea id="sup-address" rows={2} value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
-              </FormField>
-              <FormField label="Notes" htmlFor="sup-notes" span={3}>
-                <TextArea id="sup-notes" rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-              </FormField>
-            </FormGrid>
-          </FormSection>
+                </FormField>
+                <FormField label="Payment Terms (days)" htmlFor="sup-terms">
+                  <NumberInput id="sup-terms" min="0" value={form.payment_terms} onChange={e => setForm(f => ({ ...f, payment_terms: e.target.value }))} placeholder="30" />
+                </FormField>
+                <FormField label="Contact Name" htmlFor="sup-contact">
+                  <TextInput id="sup-contact" value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} />
+                </FormField>
+                <FormField label="Phone" htmlFor="sup-phone">
+                  <div className="flex">
+                    <span className="inline-flex h-control items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none">+91</span>
+                    <TextInput
+                      id="sup-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      className="rounded-l-none"
+                      value={form.phone}
+                      onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                      placeholder="XXXXXXXXXX"
+                    />
+                  </div>
+                </FormField>
+                <FormField label="Email" htmlFor="sup-email">
+                  <TextInput id="sup-email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                </FormField>
+                <FormField label="Address" htmlFor="sup-address" span={3}>
+                  <TextArea id="sup-address" rows={2} value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+                </FormField>
+                <FormField label="Notes" htmlFor="sup-notes" span={3}>
+                  <TextArea id="sup-notes" rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+                </FormField>
+              </FormGrid>
+            </FormSection>
 
-          <FormSection title="Bank & Payment Details">
-            <FormGrid cols={2}>
-              <FormField label="IFSC Code" htmlFor="sup-ifsc">
-                <div className="relative">
-                  <TextInput
-                    id="sup-ifsc"
-                    value={form.ifsc}
-                    onChange={e => {
-                      setForm(f => ({ ...f, ifsc: e.target.value.toUpperCase() }))
-                      setIfscLookup('idle')
-                    }}
-                    onBlur={e => lookupIfsc(e.target.value)}
-                    placeholder="e.g. HDFC0001234"
-                    maxLength={11}
-                  />
-                  {ifscLookup === 'loading' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-foreground-secondary">…</span>}
-                  {ifscLookup === 'ok' && <Check className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-green-600 dark:text-green-400" />}
-                  {ifscLookup === 'error' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-red-500">?</span>}
-                </div>
-              </FormField>
-              <FormField label="Bank Name" htmlFor="sup-bank">
-                <TextInput id="sup-bank" className="bg-surface-secondary/60" value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} placeholder="Auto-filled from IFSC" />
-              </FormField>
-              <FormField label="Account Number" htmlFor="sup-account">
-                <TextInput id="sup-account" value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} />
-              </FormField>
-              <FormField label="UPI ID" htmlFor="sup-upi">
-                <TextInput id="sup-upi" value={form.upi_id} onChange={e => setForm(f => ({ ...f, upi_id: e.target.value }))} placeholder="supplier@upi" />
-              </FormField>
-            </FormGrid>
-          </FormSection>
+            <FormSection title="Bank & Payment Details">
+              <FormGrid cols={2}>
+                <FormField label="IFSC Code" htmlFor="sup-ifsc">
+                  <div className="relative">
+                    <TextInput
+                      id="sup-ifsc"
+                      value={form.ifsc}
+                      onChange={e => {
+                        setForm(f => ({ ...f, ifsc: e.target.value.toUpperCase() }))
+                        setIfscLookup('idle')
+                      }}
+                      onBlur={e => lookupIfsc(e.target.value)}
+                      placeholder="e.g. HDFC0001234"
+                      maxLength={11}
+                    />
+                    {ifscLookup === 'loading' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-foreground-secondary">…</span>}
+                    {ifscLookup === 'ok' && <Check className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-green-600 dark:text-green-400" />}
+                    {ifscLookup === 'error' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-red-500">?</span>}
+                  </div>
+                </FormField>
+                <FormField label="Bank Name" htmlFor="sup-bank">
+                  <TextInput id="sup-bank" className="bg-surface-secondary/60" value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} placeholder="Auto-filled from IFSC" />
+                </FormField>
+                <FormField label="Account Number" htmlFor="sup-account">
+                  <TextInput id="sup-account" value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} />
+                </FormField>
+                <FormField label="UPI ID" htmlFor="sup-upi">
+                  <TextInput id="sup-upi" value={form.upi_id} onChange={e => setForm(f => ({ ...f, upi_id: e.target.value }))} placeholder="supplier@upi" />
+                </FormField>
+              </FormGrid>
+            </FormSection>
+          </LockedFieldset>
         </FormPage>
       </form>
     </MobileEditBlock>

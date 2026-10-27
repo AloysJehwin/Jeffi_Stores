@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Badge, Dialog, FormFooter, Tabs } from '@/components/admin/kit'
+import { Badge, Dialog, DraftLockBanner, FormFooter, LockedFieldset, Tabs } from '@/components/admin/kit'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { Star, X } from 'lucide-react'
@@ -43,6 +43,8 @@ import { gstError, paiseString, priceErrors, publishShippingError } from '@/lib/
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
 
 interface Category {
   id: string
@@ -196,6 +198,8 @@ interface ProductFormProps {
   // Site Controls master switches (effective = master && the product's own flag).
   subscriptionsEnabled?: boolean // default true
   digitalProductsEnabled?: boolean // default true
+  /** Draft lock state from the server (initialDraftLock), so a non-holder renders read-only. */
+  initialLock?: DraftLockState | null
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
@@ -463,6 +467,7 @@ export default function ProductForm({
   hasReturns = true,
   subscriptionsEnabled = true,
   digitalProductsEnabled = true,
+  initialLock,
 }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -790,8 +795,11 @@ export default function ProductForm({
   const initialSnapshotRef = useRef<string | null>(null)
   const pendingLocalRef = useRef(false)
   const userEditedRef = useRef(false)
-  const [serverSaveStatus, setServerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const edit = useEditSession({ resourceType: 'product', resourceId: productId ?? null })
+  const [serverSaveStatus, setServerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'locked'>('idle')
+  const lock = useDraftLock({ resourceType: 'product', resourceId: productId ?? null, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'product', resourceId: productId ?? null, lock })
+  const readOnlyRef = useRef(lock.readOnly)
+  readOnlyRef.current = lock.readOnly
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
     if (product?.product_variants && product.product_variants.length > 0) {
@@ -1035,7 +1043,7 @@ export default function ProductForm({
   }
 
   async function serverSaveNow() {
-    if (!isDraft || !productId || autosaveBlockedRef.current) return
+    if (!isDraft || !productId || autosaveBlockedRef.current || readOnlyRef.current) return
     const form = formRef.current
     if (!form) return
     if (serverSaveInFlight.current) {
@@ -1147,7 +1155,7 @@ export default function ProductForm({
     try {
       const r = await fetch(`/api/admin/products/${productId}/draft`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('product', productId) },
         body: JSON.stringify({
           fields,
           imageOrder,
@@ -1165,7 +1173,13 @@ export default function ProductForm({
             }),
         }),
       })
-      if (r.ok) {
+      if (r.status === 423) {
+        // Someone else holds the draft: stop autosaving and go read-only.
+        autosaveBlockedRef.current = true
+        serverSavePending.current = false
+        setServerSaveStatus('locked')
+        lock.markLocked(fields)
+      } else if (r.ok) {
         saved = true
         setServerSaveStatus('saved')
         setAutosaveError(null)
@@ -1524,6 +1538,7 @@ export default function ProductForm({
     for (let i = 0; i < 100 && serverSaveInFlight.current; i++) await new Promise(r => setTimeout(r, 100))
     const r = await fetch(`/api/admin/products/${productId}/draft`, { method: 'DELETE' })
     if (!r.ok) {
+      if (r.status === 423) lock.markLocked()
       autosaveBlockedRef.current = false
       const j = await r.json().catch(() => ({}))
       showToast(j?.error || 'Failed to discard draft', 'error')
@@ -3551,2524 +3566,1841 @@ export default function ProductForm({
         }
         className="space-y-5"
       >
-        {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-        <Tabs tabs={tabItems} value={activeTab} onChange={setTab} />
-        {error && (
-          <div
-            ref={topErrorRef}
-            className="p-4 bg-red-500/5 border border-red-500/40 rounded-xl text-red-600 dark:text-red-400"
-          >
-            <p className="font-medium">{error}</p>
-            {errorDetails.length > 1 && (
-              <ul className="mt-2 list-disc pl-5 text-sm space-y-0.5">
-                {errorDetails.map(d => (
-                  <li key={d}>{d}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-        <div data-pf-tab="basics" role="tabpanel" hidden={activeTab !== 'basics'}>
-          <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              {/* Product Name */}
-              <div className="md:col-span-2">
-                <label htmlFor="name" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                  Product Name *
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  required
-                  value={productName}
-                  onChange={e => setProductName(e.target.value)}
-                  className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  placeholder="Enter product name"
-                />
-              </div>
-
-              {/* SKU */}
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">SKU</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    name="sku"
-                    value={sku}
-                    onChange={e => {
-                      setSku(e.target.value.toUpperCase())
-                      setSkuManuallyEdited(true)
-                    }}
-                    className="flex-1 field-normal border border-border-default bg-surface text-foreground font-mono text-sm uppercase focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    placeholder="Auto-generated"
-                  />
-                  <button
-                    type="button"
-                    title="Regenerate SKU from name, brand and category"
-                    onClick={() => {
-                      const brandName = brands.find(b => b.id === brandId)?.name || ''
-                      const categoryName = categories.find(c => c.id === categoryId)?.name || ''
-                      const generated = generateSku(productName, brandName)
-                      if (generated) {
-                        setSku(generated)
-                        setSkuManuallyEdited(false)
-                      }
-                    }}
-                    className="control-md control-icon border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-accent-500"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <p className="text-xs text-foreground-muted mt-1">
-                  {skuManuallyEdited
-                    ? 'Manually set — click ↺ to regenerate from name, brand & category'
-                    : 'Auto-generated from name, brand & category'}
-                </p>
-              </div>
-
-              {/* HSN/SAC Code */}
-              <div>
-                <label htmlFor="hsn_code" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                  HSN/SAC Code
-                </label>
-                <input
-                  type="text"
-                  id="hsn_code"
-                  name="hsn_code"
-                  defaultValue={product?.hsn_code}
-                  className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  placeholder="e.g., 8531"
-                />
-                <p className="text-xs text-foreground-muted mt-1">Required for GST invoices</p>
-              </div>
-
-              {/* MPN — hidden when has variants */}
-              {!hasVariants && (
-                <div>
-                  <label htmlFor="mpn" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                    MPN (Manufacturer Part No.)
-                  </label>
-                  <input
-                    type="text"
-                    id="mpn"
-                    name="mpn"
-                    defaultValue={product?.mpn}
-                    className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    placeholder="e.g., TVS-M6X30"
-                  />
-                  <p className="text-xs text-foreground-muted mt-1">Used in Google Shopping feed</p>
-                </div>
+        <DraftLockBanner lock={lock} scope="products:write" />
+        <LockedFieldset readOnly={lock.readOnly} className="space-y-5">
+          {backUrl && <input type="hidden" name="_back" value={backUrl} />}
+          <Tabs tabs={tabItems} value={activeTab} onChange={setTab} />
+          {error && (
+            <div
+              ref={topErrorRef}
+              className="p-4 bg-red-500/5 border border-red-500/40 rounded-xl text-red-600 dark:text-red-400"
+            >
+              <p className="font-medium">{error}</p>
+              {errorDetails.length > 1 && (
+                <ul className="mt-2 list-disc pl-5 text-sm space-y-0.5">
+                  {errorDetails.map(d => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
               )}
-
-              {/* GTIN/Barcode — hidden when has variants */}
-              {!hasVariants && (
-                <div>
-                  <label htmlFor="gtin" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                    GTIN / Barcode
-                  </label>
-                  <input
-                    type="text"
-                    id="gtin"
-                    name="gtin"
-                    defaultValue={product?.gtin}
-                    className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    placeholder="EAN/UPC barcode number"
-                  />
-                  <p className="text-xs text-foreground-muted mt-1">Used in Google Shopping feed</p>
-                </div>
-              )}
-
-              {/* Category */}
-              <AdminSelect
-                id="category_id"
-                name="category_id"
-                label="Category *"
-                required
-                value={categoryId}
-                onChange={setCategoryId}
-                placeholder="Select a category"
-                options={(() => {
-                  const opts = leafCategories.map(cat => {
-                    const parent = cat.parent_category_id ? categories.find(c => c.id === cat.parent_category_id) : null
-                    return {
-                      value: cat.id,
-                      label: cat.name,
-                      group: parent ? parent.name : 'Top-level',
-                      indent: !!parent,
-                      _hasParent: !!parent,
-                    }
-                  })
-                  opts.sort((a, b) => {
-                    if (a._hasParent !== b._hasParent) return a._hasParent ? -1 : 1
-                    if (a.group !== b.group) return a.group.localeCompare(b.group)
-                    return a.label.localeCompare(b.label)
-                  })
-                  return opts.map(({ _hasParent, ...rest }) => rest)
-                })()}
-              />
-
-              {/* Brand */}
-              <AdminSelect
-                id="brand_id"
-                name="brand_id"
-                label="Brand"
-                value={brandId}
-                onChange={setBrandId}
-                placeholder="No Brand"
-                options={[
-                  { value: '', label: 'No Brand' },
-                  ...brands.map(brand => ({
-                    value: brand.id,
-                    label: brand.name,
-                  })),
-                ]}
-              />
-
-              {/* Description */}
-              <div className="md:col-span-2">
-                <label htmlFor="description" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                  Description
-                </label>
-                <AIEnrichButton
-                  fieldLabel="Description"
-                  value={description}
-                  onChange={setDescription}
-                  scope="products:write"
-                  context={`Product: ${productName}`}
-                  multiline
-                >
-                  <textarea
-                    id="description"
-                    name="description"
-                    rows={4}
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    className="w-full field-normal pr-8 border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    placeholder="Enter product description"
-                  />
-                </AIEnrichButton>
-              </div>
-
-              {/* Checkboxes */}
-              <div className="md:col-span-2 flex flex-wrap gap-4 sm:gap-6">
-                <div>
-                  <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
-                  <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
-                </div>
-                <div>
-                  <input type="hidden" name="is_featured" value={isFeatured ? 'true' : ''} />
-                  <Toggle id="is_featured" checked={isFeatured} onChange={setIsFeatured} label="Featured Product" />
-                </div>
-                {!isDigital && (
-                  <Toggle
-                    id="has_variants_toggle"
-                    checked={hasVariants}
-                    onChange={setHasVariants}
-                    label="This product has variants"
-                  />
-                )}
-              </div>
             </div>
-          </section>
-        </div>
-        <div data-pf-tab="pricing" role="tabpanel" hidden={activeTab !== 'pricing'}>
-          <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              {/* MRP — hidden when has variants */}
-              {!hasVariants && (
-                <div className="grid grid-cols-2 gap-3">
+          )}
+          <div data-pf-tab="basics" role="tabpanel" hidden={activeTab !== 'basics'}>
+            <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                {/* Product Name */}
+                <div className="md:col-span-2">
+                  <label htmlFor="name" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                    Product Name *
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    required
+                    value={productName}
+                    onChange={e => setProductName(e.target.value)}
+                    className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    placeholder="Enter product name"
+                  />
+                </div>
+
+                {/* SKU */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">SKU</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="sku"
+                      value={sku}
+                      onChange={e => {
+                        setSku(e.target.value.toUpperCase())
+                        setSkuManuallyEdited(true)
+                      }}
+                      className="flex-1 field-normal border border-border-default bg-surface text-foreground font-mono text-sm uppercase focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      placeholder="Auto-generated"
+                    />
+                    <button
+                      type="button"
+                      title="Regenerate SKU from name, brand and category"
+                      onClick={() => {
+                        const brandName = brands.find(b => b.id === brandId)?.name || ''
+                        const categoryName = categories.find(c => c.id === categoryId)?.name || ''
+                        const generated = generateSku(productName, brandName)
+                        if (generated) {
+                          setSku(generated)
+                          setSkuManuallyEdited(false)
+                        }
+                      }}
+                      className="control-md control-icon border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-accent-500"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="text-xs text-foreground-muted mt-1">
+                    {skuManuallyEdited
+                      ? 'Manually set — click ↺ to regenerate from name, brand & category'
+                      : 'Auto-generated from name, brand & category'}
+                  </p>
+                </div>
+
+                {/* HSN/SAC Code */}
+                <div>
+                  <label htmlFor="hsn_code" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                    HSN/SAC Code
+                  </label>
+                  <input
+                    type="text"
+                    id="hsn_code"
+                    name="hsn_code"
+                    defaultValue={product?.hsn_code}
+                    className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    placeholder="e.g., 8531"
+                  />
+                  <p className="text-xs text-foreground-muted mt-1">Required for GST invoices</p>
+                </div>
+
+                {/* MPN — hidden when has variants */}
+                {!hasVariants && (
                   <div>
-                    <label htmlFor="mrp_ex_gst" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                      MRP (Ex. GST) *
+                    <label htmlFor="mpn" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                      MPN (Manufacturer Part No.)
                     </label>
-                    <div className="relative">
+                    <input
+                      type="text"
+                      id="mpn"
+                      name="mpn"
+                      defaultValue={product?.mpn}
+                      className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      placeholder="e.g., TVS-M6X30"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1">Used in Google Shopping feed</p>
+                  </div>
+                )}
+
+                {/* GTIN/Barcode — hidden when has variants */}
+                {!hasVariants && (
+                  <div>
+                    <label htmlFor="gtin" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                      GTIN / Barcode
+                    </label>
+                    <input
+                      type="text"
+                      id="gtin"
+                      name="gtin"
+                      defaultValue={product?.gtin}
+                      className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      placeholder="EAN/UPC barcode number"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1">Used in Google Shopping feed</p>
+                  </div>
+                )}
+
+                {/* Category */}
+                <AdminSelect
+                  id="category_id"
+                  name="category_id"
+                  label="Category *"
+                  required
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  placeholder="Select a category"
+                  options={(() => {
+                    const opts = leafCategories.map(cat => {
+                      const parent = cat.parent_category_id ? categories.find(c => c.id === cat.parent_category_id) : null
+                      return {
+                        value: cat.id,
+                        label: cat.name,
+                        group: parent ? parent.name : 'Top-level',
+                        indent: !!parent,
+                        _hasParent: !!parent,
+                      }
+                    })
+                    opts.sort((a, b) => {
+                      if (a._hasParent !== b._hasParent) return a._hasParent ? -1 : 1
+                      if (a.group !== b.group) return a.group.localeCompare(b.group)
+                      return a.label.localeCompare(b.label)
+                    })
+                    return opts.map(({ _hasParent, ...rest }) => rest)
+                  })()}
+                />
+
+                {/* Brand */}
+                <AdminSelect
+                  id="brand_id"
+                  name="brand_id"
+                  label="Brand"
+                  value={brandId}
+                  onChange={setBrandId}
+                  placeholder="No Brand"
+                  options={[
+                    { value: '', label: 'No Brand' },
+                    ...brands.map(brand => ({
+                      value: brand.id,
+                      label: brand.name,
+                    })),
+                  ]}
+                />
+
+                {/* Description */}
+                <div className="md:col-span-2">
+                  <label htmlFor="description" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                    Description
+                  </label>
+                  <AIEnrichButton
+                    fieldLabel="Description"
+                    value={description}
+                    onChange={setDescription}
+                    scope="products:write"
+                    context={`Product: ${productName}`}
+                    multiline
+                  >
+                    <textarea
+                      id="description"
+                      name="description"
+                      rows={4}
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      className="w-full field-normal pr-8 border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      placeholder="Enter product description"
+                    />
+                  </AIEnrichButton>
+                </div>
+
+                {/* Checkboxes */}
+                <div className="md:col-span-2 flex flex-wrap gap-4 sm:gap-6">
+                  <div>
+                    <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
+                    <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
+                  </div>
+                  <div>
+                    <input type="hidden" name="is_featured" value={isFeatured ? 'true' : ''} />
+                    <Toggle id="is_featured" checked={isFeatured} onChange={setIsFeatured} label="Featured Product" />
+                  </div>
+                  {!isDigital && (
+                    <Toggle
+                      id="has_variants_toggle"
+                      checked={hasVariants}
+                      onChange={setHasVariants}
+                      label="This product has variants"
+                    />
+                  )}
+                </div>
+              </div>
+            </section>
+          </div>
+          <div data-pf-tab="pricing" role="tabpanel" hidden={activeTab !== 'pricing'}>
+            <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                {/* MRP — hidden when has variants */}
+                {!hasVariants && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="mrp_ex_gst" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                        MRP (Ex. GST) *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          id="mrp_ex_gst"
+                          name="mrp_ex_gst"
+                          step="0.01"
+                          min="0"
+                          value={mrpExGst}
+                          onChange={e => {
+                            const v = e.target.value
+                            setMrpExGst(v)
+                            const mrpInclNew = v ? exToIncl(v, gstRate) : ''
+                            setMrp(mrpInclNew)
+                            const disc = parseFloat(discountPct)
+                            const mrpExN = parseFloat(v)
+                            if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
+                              const newSaleEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
+                              const newSaleIncl = exToIncl(newSaleEx, gstRate)
+                              setSalePrice(newSaleEx)
+                              setBasePrice(newSaleIncl)
+                            } else {
+                              setSalePrice('')
+                              setBasePrice('')
+                            }
+                          }}
+                          className="w-full field-md bg-surface text-foreground border border-border-secondary placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                          placeholder="From price catalog"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="mrp" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                        MRP (incl. GST)
+                      </label>
                       <input
                         type="number"
-                        id="mrp_ex_gst"
-                        name="mrp_ex_gst"
+                        id="mrp"
+                        name="mrp"
                         step="0.01"
                         min="0"
-                        value={mrpExGst}
-                        onChange={e => {
-                          const v = e.target.value
-                          setMrpExGst(v)
-                          const mrpInclNew = v ? exToIncl(v, gstRate) : ''
-                          setMrp(mrpInclNew)
-                          const disc = parseFloat(discountPct)
-                          const mrpExN = parseFloat(v)
-                          if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                            const newSaleEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
-                            const newSaleIncl = exToIncl(newSaleEx, gstRate)
-                            setSalePrice(newSaleEx)
-                            setBasePrice(newSaleIncl)
-                          } else {
-                            setSalePrice('')
-                            setBasePrice('')
-                          }
-                        }}
-                        className="w-full field-md bg-surface text-foreground border border-border-secondary placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                        placeholder="From price catalog"
+                        value={mrp}
+                        readOnly
+                        className="w-full field-md bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary"
+                        placeholder="Auto-calculated"
                       />
                     </div>
                   </div>
+                )}
+
+                {/* Selling Price — hidden when has variants */}
+                {!hasVariants && (
                   <div>
-                    <label htmlFor="mrp" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                      MRP (incl. GST)
+                    <label htmlFor="base_price" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                      Selling Price (incl. GST)
                     </label>
                     <input
                       type="number"
-                      id="mrp"
-                      name="mrp"
+                      id="base_price"
+                      name="base_price"
+                      required={!hasVariants}
                       step="0.01"
                       min="0"
-                      value={mrp}
+                      value={basePrice}
+                      readOnly
+                      className="w-full field-md bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary"
+                      placeholder="Auto-calculated"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1">MRP (Ex. GST) × (1 − Discount%) × (1 + GST%)</p>
+                  </div>
+                )}
+
+                {/* Discount % — product-level, applies to all variants */}
+                <div>
+                  <label htmlFor="discount_pct" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                    Discount % (off MRP)
+                  </label>
+                  <input
+                    type="number"
+                    id="discount_pct"
+                    name="discount_pct"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={discountPct}
+                    onChange={e => {
+                      const v = e.target.value
+                      setDiscountPct(v)
+                      const disc = parseFloat(v)
+                      const mrpExN = parseFloat(mrpExGst)
+                      if (!isNaN(disc) && !isNaN(mrpExN) && mrpExN > 0) {
+                        const newSaleEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
+                        const newSaleIncl = exToIncl(newSaleEx, gstRate)
+                        setSalePrice(newSaleEx)
+                        setBasePrice(newSaleIncl)
+                        setTopPriceLockSide('incl')
+                        // cascade to all variant rows
+                        if (hasVariants) {
+                          setVariants(prev =>
+                            prev.map(vr => {
+                              const mrpExN2 = parseFloat(vr.mrp_ex_gst)
+                              if (!isNaN(mrpExN2) && mrpExN2 > 0) {
+                                const newPriceEx = parseFloat((mrpExN2 * (1 - disc / 100)).toFixed(2)).toString()
+                                const newPriceIncl = exToIncl(newPriceEx, gstRate)
+                                return { ...vr, discount_pct: v, price_ex_gst: newPriceEx, price: newPriceIncl }
+                              }
+                              return { ...vr, discount_pct: v }
+                            })
+                          )
+                        }
+                      } else if (v === '') {
+                        setDiscountPct('')
+                      }
+                    }}
+                    className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-foreground-muted mt-1">
+                    Enter MRP (Ex. GST) + Discount % → selling price auto-fills for all variants.
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="cost_price" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                    Cost Price (Rs.)
+                  </label>
+                  <input
+                    type="number"
+                    id="cost_price"
+                    name="cost_price"
+                    step="0.01"
+                    min="0"
+                    value={costPrice}
+                    onChange={e => setCostPrice(e.target.value)}
+                    className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    placeholder="Your purchase / landed cost"
+                  />
+                  <p className="text-xs text-foreground-muted mt-1">
+                    Used for P&amp;L gross margin — not shown to customers
+                  </p>
+                </div>
+
+                {hasInventory && !hasVariants && (
+                  <div>
+                    <ProductSupplierList suppliers={suppliers} value={productSuppliers} onChange={setProductSuppliers} />
+                  </div>
+                )}
+
+                <div>
+                  <AdminSelect
+                    id="gst_percentage"
+                    name="gst_percentage"
+                    label="GST Rate *"
+                    value={String(gstRate)}
+                    onChange={v => setGstRate(parseFloat(v))}
+                    options={[
+                      { value: '0', label: '0% GST' },
+                      { value: '5', label: '5% GST' },
+                      { value: '12', label: '12% GST' },
+                      { value: '18', label: '18% GST' },
+                      { value: '28', label: '28% GST' },
+                    ]}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="extra_delivery_days" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                    Extra Delivery Days
+                  </label>
+                  <input
+                    type="number"
+                    id="extra_delivery_days"
+                    name="extra_delivery_days"
+                    step="1"
+                    min="0"
+                    value={extraDeliveryDays}
+                    onChange={e => setExtraDeliveryDays(e.target.value)}
+                    className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-foreground-muted mt-1">Added on top of zone TAT for every delivery estimate</p>
+                </div>
+
+                {/* Ex-GST Price — hidden when has variants */}
+                {!hasVariants && (
+                  <div>
+                    <label htmlFor="price_ex_gst" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                      Selling Price (Ex. GST)
+                    </label>
+                    <input
+                      type="number"
+                      id="price_ex_gst"
+                      name="price_ex_gst"
+                      step="0.01"
+                      min="0"
+                      value={salePrice}
                       readOnly
                       className="w-full field-md bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary"
                       placeholder="Auto-calculated"
                     />
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Selling Price — hidden when has variants */}
-              {!hasVariants && (
-                <div>
-                  <label htmlFor="base_price" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                    Selling Price (incl. GST)
-                  </label>
-                  <input
-                    type="number"
-                    id="base_price"
-                    name="base_price"
-                    required={!hasVariants}
-                    step="0.01"
-                    min="0"
-                    value={basePrice}
-                    readOnly
-                    className="w-full field-md bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary"
-                    placeholder="Auto-calculated"
-                  />
-                  <p className="text-xs text-foreground-muted mt-1">MRP (Ex. GST) × (1 − Discount%) × (1 + GST%)</p>
-                </div>
-              )}
-
-              {/* Discount % — product-level, applies to all variants */}
-              <div>
-                <label htmlFor="discount_pct" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                  Discount % (off MRP)
-                </label>
-                <input
-                  type="number"
-                  id="discount_pct"
-                  name="discount_pct"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={discountPct}
-                  onChange={e => {
-                    const v = e.target.value
-                    setDiscountPct(v)
-                    const disc = parseFloat(v)
-                    const mrpExN = parseFloat(mrpExGst)
-                    if (!isNaN(disc) && !isNaN(mrpExN) && mrpExN > 0) {
-                      const newSaleEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
-                      const newSaleIncl = exToIncl(newSaleEx, gstRate)
-                      setSalePrice(newSaleEx)
-                      setBasePrice(newSaleIncl)
-                      setTopPriceLockSide('incl')
-                      // cascade to all variant rows
-                      if (hasVariants) {
-                        setVariants(prev =>
-                          prev.map(vr => {
-                            const mrpExN2 = parseFloat(vr.mrp_ex_gst)
-                            if (!isNaN(mrpExN2) && mrpExN2 > 0) {
-                              const newPriceEx = parseFloat((mrpExN2 * (1 - disc / 100)).toFixed(2)).toString()
-                              const newPriceIncl = exToIncl(newPriceEx, gstRate)
-                              return { ...vr, discount_pct: v, price_ex_gst: newPriceEx, price: newPriceIncl }
-                            }
-                            return { ...vr, discount_pct: v }
-                          })
-                        )
-                      }
-                    } else if (v === '') {
-                      setDiscountPct('')
-                    }
-                  }}
-                  className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
-                <p className="text-xs text-foreground-muted mt-1">
-                  Enter MRP (Ex. GST) + Discount % → selling price auto-fills for all variants.
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="cost_price" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                  Cost Price (Rs.)
-                </label>
-                <input
-                  type="number"
-                  id="cost_price"
-                  name="cost_price"
-                  step="0.01"
-                  min="0"
-                  value={costPrice}
-                  onChange={e => setCostPrice(e.target.value)}
-                  className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  placeholder="Your purchase / landed cost"
-                />
-                <p className="text-xs text-foreground-muted mt-1">
-                  Used for P&amp;L gross margin — not shown to customers
-                </p>
-              </div>
-
-              {hasInventory && !hasVariants && (
-                <div>
-                  <ProductSupplierList suppliers={suppliers} value={productSuppliers} onChange={setProductSuppliers} />
-                </div>
-              )}
-
-              <div>
-                <AdminSelect
-                  id="gst_percentage"
-                  name="gst_percentage"
-                  label="GST Rate *"
-                  value={String(gstRate)}
-                  onChange={v => setGstRate(parseFloat(v))}
-                  options={[
-                    { value: '0', label: '0% GST' },
-                    { value: '5', label: '5% GST' },
-                    { value: '12', label: '12% GST' },
-                    { value: '18', label: '18% GST' },
-                    { value: '28', label: '28% GST' },
-                  ]}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="extra_delivery_days" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                  Extra Delivery Days
-                </label>
-                <input
-                  type="number"
-                  id="extra_delivery_days"
-                  name="extra_delivery_days"
-                  step="1"
-                  min="0"
-                  value={extraDeliveryDays}
-                  onChange={e => setExtraDeliveryDays(e.target.value)}
-                  className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  placeholder="0"
-                />
-                <p className="text-xs text-foreground-muted mt-1">Added on top of zone TAT for every delivery estimate</p>
-              </div>
-
-              {/* Ex-GST Price — hidden when has variants */}
-              {!hasVariants && (
-                <div>
-                  <label htmlFor="price_ex_gst" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                    Selling Price (Ex. GST)
-                  </label>
-                  <input
-                    type="number"
-                    id="price_ex_gst"
-                    name="price_ex_gst"
-                    step="0.01"
-                    min="0"
-                    value={salePrice}
-                    readOnly
-                    className="w-full field-md bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary"
-                    placeholder="Auto-calculated"
-                  />
-                </div>
-              )}
-
-              {/* Inventory sync — hidden for Basic plan (no inventory module) */}
-              {hasInventory && (
-                <div>
-                  <Toggle
-                    id="inventory_sync_toggle"
-                    checked={inventorySync}
-                    onChange={setInventorySync}
-                    label="Auto stock status (inventory sync)"
-                  />
-                  {/* Hidden inputs so the server-action formData carries these on explicit save */}
-                  <input type="hidden" name="inventory_sync" value={inventorySync ? 'true' : 'false'} />
-                  <input type="hidden" name="low_stock_threshold" value={lowStockThreshold} />
-                  <p className="text-xs text-foreground-muted mt-1">
-                    When on, In/Low/Out of Stock is set automatically from the on-hand quantity (inherited by variants
-                    &amp; sub-variants). When off, you set it manually below.
-                  </p>
-                  {inventorySync && (
-                    <div className="mt-2">
-                      <label
-                        htmlFor="low_stock_threshold_input"
-                        className="mb-1.5 block text-xs font-medium text-foreground-secondary"
-                      >
-                        Low stock threshold
-                      </label>
-                      <input
-                        type="number"
-                        id="low_stock_threshold_input"
-                        min="0"
-                        step="any"
-                        value={lowStockThreshold}
-                        onChange={e => setLowStockThreshold(e.target.value)}
-                        className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                        placeholder="e.g., 5 — at or below this qty shows Low Stock (leave blank for none)"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Stock Status — hidden when has variants OR when inventory sync is on */}
-              {!hasVariants && !inventorySync && (
-                <>
+                {/* Inventory sync — hidden for Basic plan (no inventory module) */}
+                {hasInventory && (
                   <div>
-                    <label htmlFor="stock_status" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                      Stock Status *
-                    </label>
-                    <AdminSelect
-                      id="stock_status"
-                      name="stock_status"
-                      required={!hasVariants && !inventorySync}
-                      defaultValue={product?.stock_status || 'In Stock'}
-                      options={[
-                        { value: 'In Stock', label: 'In Stock' },
-                        { value: 'Low Stock', label: 'Low Stock' },
-                        { value: 'Out of Stock', label: 'Out of Stock' },
-                      ]}
+                    <Toggle
+                      id="inventory_sync_toggle"
+                      checked={inventorySync}
+                      onChange={setInventorySync}
+                      label="Auto stock status (inventory sync)"
                     />
+                    {/* Hidden inputs so the server-action formData carries these on explicit save */}
+                    <input type="hidden" name="inventory_sync" value={inventorySync ? 'true' : 'false'} />
+                    <input type="hidden" name="low_stock_threshold" value={lowStockThreshold} />
                     <p className="text-xs text-foreground-muted mt-1">
-                      Availability shown to customers. Inventory quantity is managed separately.
+                      When on, In/Low/Out of Stock is set automatically from the on-hand quantity (inherited by variants
+                      &amp; sub-variants). When off, you set it manually below.
                     </p>
-                  </div>
-                </>
-              )}
-
-              {/* Shipping Weight — only when no variants; per-variant weight is in the variant table */}
-              {!hasVariants && (
-                <div>
-                  <label htmlFor="weight_grams" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                    Weight per piece (g) *
-                  </label>
-                  <input
-                    type="number"
-                    id="weight_grams"
-                    name="weight_grams"
-                    step="1"
-                    min="1"
-                    value={weightGrams}
-                    onChange={e => setWeightGrams(e.target.value)}
-                    className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    placeholder="e.g., 500"
-                  />
-                  {productPackageType === 'flat_poly_auto' && parseFloat(weightGrams) > 2000 && (
-                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                      Consider using corrugated_box for items over 2 kg for accurate shipping rates.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Shipping Dimensions — hidden when variants enabled; shown inside variants section instead */}
-              {!hasVariants && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Package Type</label>
-                  <input type="hidden" name="package_type" value={productPackageType} />
-                  <AdminSelect
-                    value={productPackageType}
-                    onChange={setProductPackageType}
-                    options={[
-                      { value: 'flat_poly_auto', label: 'Flat Poly (auto by weight)' },
-                      { value: 'flat_poly_s', label: 'Flat Poly S (≤100g)' },
-                      { value: 'flat_poly_m', label: 'Flat Poly M (≤500g)' },
-                      { value: 'flat_poly_l', label: 'Flat Poly L (≤1500g)' },
-                      { value: 'flat_poly_xl', label: 'Flat Poly XL (>1500g)' },
-                      { value: 'drill_bit_tube', label: 'Drill Bit Tube' },
-                      { value: 'drill_bit_set_case', label: 'Drill Bit Set Case' },
-                      { value: 'corrugated_box', label: 'Corrugated Box' },
-                      { value: 'long_tube', label: 'Long Tube / Rod / Pipe' },
-                    ]}
-                  />
-                  {['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube'].includes(
-                    productPackageType
-                  ) && (
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      <div>
+                    {inventorySync && (
+                      <div className="mt-2">
+                        <label
+                          htmlFor="low_stock_threshold_input"
+                          className="mb-1.5 block text-xs font-medium text-foreground-secondary"
+                        >
+                          Low stock threshold
+                        </label>
                         <input
                           type="number"
-                          id="length_cm"
-                          name="length_cm"
-                          step="0.1"
+                          id="low_stock_threshold_input"
                           min="0"
-                          defaultValue={product?.length_cm ?? ''}
-                          className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                          placeholder="L"
+                          step="any"
+                          value={lowStockThreshold}
+                          onChange={e => setLowStockThreshold(e.target.value)}
+                          className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                          placeholder="e.g., 5 — at or below this qty shows Low Stock (leave blank for none)"
                         />
-                        <p className="text-xs text-foreground-muted mt-1 text-center">Length</p>
                       </div>
-                      <div>
-                        <input
-                          type="number"
-                          id="breadth_cm"
-                          name="breadth_cm"
-                          step="0.1"
-                          min="0"
-                          defaultValue={product?.breadth_cm ?? ''}
-                          className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                          placeholder="B"
-                        />
-                        <p className="text-xs text-foreground-muted mt-1 text-center">Breadth</p>
-                      </div>
-                      <div>
-                        <input
-                          type="number"
-                          id="height_cm"
-                          name="height_cm"
-                          step="0.1"
-                          min="0"
-                          defaultValue={product?.height_cm ?? ''}
-                          className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                          placeholder="H"
-                        />
-                        <p className="text-xs text-foreground-muted mt-1 text-center">Height</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-        <div data-pf-tab="media" role="tabpanel" hidden={activeTab !== 'media'}>
-          <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              {/* Image Upload */}
-              <div className="md:col-span-2">
-                {useDraftImages ? (
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-medium text-foreground-secondary">Product Images</h3>
-                        <p className="text-xs text-foreground-muted mt-1">
-                          Up to 5 images. Drag to reorder, or star one to make it the main image.
-                        </p>
-                      </div>
-                      {productImages.length + productImagePendingAdds < 5 && (
-                        <AiMediaButton
-                          feature="product_image"
-                          label="AI image"
-                          sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
-                          defaultPrompt={buildProductImagePrompt({
-                            name: productName,
-                            brand: brands.find(b => b.id === brandId)?.name,
-                            category: categories.find(c => c.id === categoryId)?.name,
-                            specs: specifications,
-                            availableIn: hasVariants ? activeVariants.filter(v => v.is_active !== false).map(v => v.variant_name) : undefined,
-                          })}
-                          referenceImageUrl={(() => {
-                            const primary = productImages.find((i: any) => i.is_primary) ?? productImages[0]
-                            const url = primary?.image_url as string | undefined
-                            return url?.startsWith('http') ? url : undefined
-                          })()}
-                          usageRef={productId || undefined}
-                          saveToGallery
-                          onPick={img => {
-                            if (img.galleryId) void addProductImagesFromGallery([{ id: img.galleryId }])
-                          }}
-                        />
-                      )}
-                    </div>
-                    <ImageGalleryEditor
-                      images={productImages}
-                      maxImages={5}
-                      uploading={productImageUploading}
-                      pendingAdds={productImagePendingAdds}
-                      deleting={productImageDeleting}
-                      error={productImageError}
-                      onUpload={uploadProductImageFile}
-                      onDelete={deleteProductImageRow}
-                      onSetPrimary={setProductImagePrimary}
-                      onReorder={reorderProductImages}
-                      onOpenGallery={openProductGallery}
-                    />
-                    {productGalleryOpen && (
-                      <GalleryPicker
-                        mode="multi"
-                        maxSelect={Math.max(0, 5 - productImages.length)}
-                        onClose={() => setProductGalleryOpen(false)}
-                        onConfirm={addProductImagesFromGallery}
-                      />
                     )}
                   </div>
-                ) : (
-                  <ImageUpload
-                    productId={tempProductId}
-                    maxImages={5}
-                    ai={{
-                      defaultPrompt: buildProductImagePrompt({
-                        name: productName,
-                        brand: brands.find(b => b.id === brandId)?.name,
-                        category: categories.find(c => c.id === categoryId)?.name,
-                        specs: specifications,
-                      }),
-                    }}
-                    existingImages={product?.product_images || []}
-                    onImagesChange={(files, existingToKeep, galleryImgs, orderedKeys) => {
-                      setImageFiles(files)
-                      setExistingImagesToKeep(existingToKeep)
-                      setGalleryImageIds(galleryImgs)
-                      setImageOrder(orderedKeys)
-                    }}
-                  />
                 )}
-              </div>
-            </div>
-          </section>
-        </div>
-        <div data-pf-tab="details" role="tabpanel" hidden={activeTab !== 'details'}>
-          <section className="space-y-4 rounded-xl border border-border-default bg-surface-elevated p-5">
-            {/* Product Details */}
-            <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-              <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                <span>Product Details{showBootstrap ? ' — stock to assign' : ''}</span>
-              </div>
-              <div className="border-t border-border-default divide-y divide-border-default">
-                {/* Physical Attributes */}
-                <div>
-                  <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
-                    <span>Physical Attributes</span>
-                  </div>
-                  <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Grade</label>
-                        <input
-                          type="text"
-                          value={grade}
-                          onChange={e => setGrade(e.target.value)}
-                          className={inputCls}
-                          placeholder="e.g. 8.8, 10.9, 304, M2 HSS"
-                        />
-                      </div>
-                    </div>
+
+                {/* Stock Status — hidden when has variants OR when inventory sync is on */}
+                {!hasVariants && !inventorySync && (
+                  <>
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                        Technical Specifications
+                      <label htmlFor="stock_status" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                        Stock Status *
                       </label>
-                      <div className="space-y-2">
-                        {specifications.map((spec, i) => (
-                          <div key={i} className="flex gap-2">
-                            <input
-                              type="text"
-                              value={spec.key}
-                              onChange={e =>
-                                setSpecifications(s =>
-                                  s.map((x, j) => (j === i ? { ...x, key: e.target.value } : x))
-                                )
-                              }
-                              className={inputCls}
-                              placeholder="e.g. thread_type"
-                            />
-                            <input
-                              type="text"
-                              value={spec.value}
-                              onChange={e =>
-                                setSpecifications(s =>
-                                  s.map((x, j) => (j === i ? { ...x, value: e.target.value } : x))
-                                )
-                              }
-                              className={inputCls}
-                              placeholder="e.g. Metric"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setSpecifications(s => s.filter((_, j) => j !== i))}
-                              className="px-2 text-foreground-muted hover:text-red-500"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => setSpecifications(s => [...s, { key: '', value: '' }])}
-                          className="text-xs text-accent-600 hover:text-accent-700 font-medium"
-                        >
-                          + Add specification
-                        </button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Color</label>
-                        <input
-                          type="text"
-                          value={color}
-                          onChange={e => setColor(e.target.value)}
-                          className={inputCls}
-                          placeholder="e.g. Stainless Silver"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Color Hex
-                        </label>
-                        <div className="flex gap-2 items-center">
-                          <input
-                            type="color"
-                            value={colorHex}
-                            onChange={e => setColorHex(e.target.value)}
-                            className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface"
-                          />
-                          <input
-                            type="text"
-                            value={colorHex}
-                            onChange={e => setColorHex(e.target.value)}
-                            className={inputCls}
-                            placeholder="#000000"
-                            maxLength={7}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Volume (ml)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={volumeMl}
-                          onChange={e => setVolumeMl(e.target.value)}
-                          className={inputCls}
-                          placeholder="For liquids/paints"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Net Weight (g)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={netWeightGrams}
-                          onChange={e => setNetWeightGrams(e.target.value)}
-                          className={inputCls}
-                          placeholder="Product without packaging"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
-                      <Toggle id="fragile" checked={fragile} onChange={setFragile} label="Fragile" />
-                      <Toggle id="hazardous" checked={hazardous} onChange={setHazardous} label="Hazardous" />
-                      <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
-                      {hasInventory && (
-                        <Toggle
-                          id="perishable"
-                          checked={perishable}
-                          onChange={next => {
-                            if (!next && perishableBatchTotal > 0) {
-                              setConfirmUnperishable(true)
-                              return
-                            }
-                            setPerishable(next)
-                          }}
-                          label="Perishable"
-                        />
-                      )}
-                      {hasInventory && (
-                        <Toggle
-                          id="serialized"
-                          checked={serialized}
-                          onChange={next => {
-                            if (!next && serializedStockTotal > 0) {
-                              setConfirmUnSerialized(true)
-                              return
-                            }
-                            setSerialized(next)
-                          }}
-                          label="Serialized"
-                        />
-                      )}
-                    </div>
-
-                    {showBootstrap &&
-                      (() => {
-                        const sku = (product?.sku || '')
-                          .replace(/[^A-Z0-9]/gi, '')
-                          .slice(0, 8)
-                          .toUpperCase()
-                        const autoSerial = () => generateSerialNumber(sku)
-                        const keyOf = (g: BsGrain) => `${g.variant_id || ''}:${g.sub_variant_id || ''}`
-                        // Read a grain's entry, materialising the lazy default when absent.
-                        // Backfill the newer selected/assignQty fields for entries restored
-                        // from a pre-change draft (they'd otherwise be undefined).
-                        const entryOf = (g: BsGrain): BsEntry => {
-                          const e = bsEntries[keyOf(g)]
-                          if (!e) return _bsMakeEntry(g.qty)
-                          return {
-                            ...e,
-                            selected: e.selected ?? true,
-                            assignQty: e.assignQty ?? g.qty,
-                          }
-                        }
-                        const patchEntry = (g: BsGrain, patch: Partial<BsEntry>) => {
-                          const key = keyOf(g)
-                          setBsEntries(prev => {
-                            const base = prev[key] ?? _bsMakeEntry(g.qty)
-                            return { ...prev, [key]: { ...base, ...patch } }
-                          })
-                        }
-                        const regenLot = (g: BsGrain) => {
-                          patchEntry(g, { lot: generateLotNumber(sku) })
-                        }
-                        const updateSerial = (g: BsGrain, i: number, val: string) => {
-                          const key = keyOf(g)
-                          setBsEntries(prev => {
-                            const base = prev[key] ?? _bsMakeEntry(g.qty)
-                            const a = [...(base.serials || [])]
-                            a[i] = val
-                            return { ...prev, [key]: { ...base, serials: a } }
-                          })
-                        }
-                        const generateAll = (g: BsGrain) => {
-                          patchEntry(g, { serials: generateSerialRun(sku, bsSerialCount(g, entryOf(g).assignQty)) })
-                        }
-                        // Clamp an assignQty edit to [1, g.qty]; also trim serials to fit.
-                        const setAssignQty = (g: BsGrain, raw: number) => {
-                          const key = keyOf(g)
-                          const clamped = Math.max(1, Math.min(g.qty, Math.floor(raw) || 1))
-                          setBsEntries(prev => {
-                            const base = prev[key] ?? _bsMakeEntry(g.qty)
-                            const serials = (base.serials || []).slice(0, bsSerialCount(g, clamped))
-                            return { ...prev, [key]: { ...base, assignQty: clamped, serials } }
-                          })
-                        }
-                        // Running total of units that will be tracked (selected grains).
-                        const selectedTotal = bsGrains.reduce((s, g) => {
-                          const e = entryOf(g)
-                          return s + (e.selected === false ? 0 : e.assignQty)
-                        }, 0)
-                        return (
-                          <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 space-y-4">
-                            <div>
-                              <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
-                                Assign Existing Stock
-                              </p>
-                              <p className="text-xs text-foreground-secondary mt-0.5">
-                                Choose which variants and how many units to track.
-                              </p>
-                              <p className="text-xs text-foreground-muted mt-0.5">
-                                <span className="font-semibold">{selectedTotal}</span> of {_bsStockTotal} units will
-                                be tracked; {_bsStockTotal - selectedTotal} stay as plain stock.
-                              </p>
-                            </div>
-
-                            {bsGrains.map(g => {
-                              const entry = entryOf(g)
-                              const serials = entry.serials || []
-                              const entered = serials.filter(Boolean).length
-                              const isSelected = entry.selected !== false
-                              const assignQty = entry.assignQty
-                              const serialCount = bsSerialCount(g, assignQty)
-                              return (
-                                <div
-                                  key={keyOf(g)}
-                                  className="rounded-lg border border-border-default bg-surface/60 p-3 space-y-3"
-                                >
-                                  <div className="flex items-center justify-between gap-3">
-                                    <label className="flex items-center gap-2 min-w-0">
-                                      <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={e => patchEntry(g, { selected: e.target.checked })}
-                                        className="h-4 w-4 rounded border-border-default text-secondary-600 focus:ring-secondary-500"
-                                      />
-                                      <span className="text-xs font-semibold text-foreground truncate">
-                                        {g.label}
-                                      </span>
-                                    </label>
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <input
-                                        type="number"
-                                        min={1}
-                                        max={g.qty}
-                                        disabled={!isSelected}
-                                        value={assignQty}
-                                        onChange={e => setAssignQty(g, Number(e.target.value))}
-                                        className="field-compact w-16 border border-border-default bg-surface text-foreground text-xs text-right disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                      />
-                                      <span className="text-xs text-foreground-muted">/ {g.qty}</span>
-                                    </div>
-                                  </div>
-
-                                  {isSelected && _serializedPending && bsWriteOff(g, assignQty) > 0 && (
-                                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
-                                      <p className="text-xs text-foreground">
-                                        Sold in steps of {g.qty_step} — only {serialCount * (g.qty_step || 1)} of{' '}
-                                        {assignQty} units can be labelled.{' '}
-                                        <strong>
-                                          {bsWriteOff(g, assignQty)} unit{bsWriteOff(g, assignQty) !== 1 ? 's' : ''}{' '}
-                                          will be written off
-                                        </strong>{' '}
-                                        on save, leaving {serialCount * (g.qty_step || 1)} in stock.
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {isSelected && _perishablePending && (
-                                    <div className="rounded-lg border border-orange-500/40 bg-orange-500/5 p-3">
-                                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">
-                                        Batch Details
-                                      </p>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div>
-                                          <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
-                                            Expiry Date <span className="text-red-500">*</span>
-                                          </label>
-                                          <DatePicker
-                                            value={entry.expiry}
-                                            onChange={v => patchEntry(g, { expiry: v })}
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
-                                            Manufacture Date
-                                          </label>
-                                          <DatePicker value={entry.mfg} onChange={v => patchEntry(g, { mfg: v })} />
-                                        </div>
-                                        <div>
-                                          <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
-                                            Lot Number
-                                          </label>
-                                          <div className="flex gap-1">
-                                            <input
-                                              type="text"
-                                              className="field-compact border border-border-default bg-surface text-foreground flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                              value={entry.lot}
-                                              onChange={e => patchEntry(g, { lot: e.target.value })}
-                                            />
-                                            <button
-                                              type="button"
-                                              title="Regenerate"
-                                              onClick={() => regenLot(g)}
-                                              className="px-2 h-control-sm rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
-                                            >
-                                              ↺
-                                            </button>
-                                          </div>
-                                        </div>
-                                        <div>
-                                          <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
-                                            Shelf Location
-                                          </label>
-                                          <AdminSelect
-                                            id={`bs-location-${keyOf(g)}`}
-                                            value={entry.location}
-                                            onChange={v => patchEntry(g, { location: v })}
-                                            sm
-                                            options={[
-                                              { value: '', label: '— none —' },
-                                              ...bsShelfLocations.map(sl => ({
-                                                value: sl.id,
-                                                label: sl.display_code,
-                                              })),
-                                            ]}
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {isSelected && _serializedPending && (
-                                    <div className="rounded-lg border border-blue-500/40 bg-blue-500/5 p-3">
-                                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                        <div>
-                                          <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">
-                                            Serial Numbers
-                                          </p>
-                                          <span className="text-xs text-foreground-muted">
-                                            ({serialCount} required
-                                            {g.qty_step && g.qty_step !== 1 ? ` — 1 per ${g.qty_step} units` : ''})
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          {entered === serialCount ? (
-                                            <span className="text-xs text-green-600 dark:text-green-400">
-                                              {entered}/{serialCount} entered ✓
-                                            </span>
-                                          ) : (
-                                            <span className="text-xs text-amber-600 dark:text-amber-400">
-                                              {entered}/{serialCount} entered
-                                            </span>
-                                          )}
-                                          <button
-                                            type="button"
-                                            className="text-xs px-2 h-control-sm rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                                            onClick={() => generateAll(g)}
-                                          >
-                                            Generate All
-                                          </button>
-                                        </div>
-                                      </div>
-                                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
-                                        {Array.from({ length: serialCount }, (_, n) => (
-                                          <div key={n} className="flex gap-1">
-                                            <input
-                                              ref={el => {
-                                                bsSerialRefs.current[`${keyOf(g)}#${n}`] = el
-                                              }}
-                                              type="text"
-                                              placeholder={autoSerial()}
-                                              className="field-compact rounded border border-border-secondary bg-surface text-foreground font-mono text-xs flex-1 min-w-0 focus:outline-none focus:border-secondary-500"
-                                              value={serials[n] ?? ''}
-                                              onChange={e => updateSerial(g, n, e.target.value)}
-                                              onKeyDown={e => {
-                                                // A barcode scanner types the code then sends Enter — commit and
-                                                // jump to the next empty serial field (same for manual Enter).
-                                                if (e.key === 'Enter') {
-                                                  e.preventDefault()
-                                                  bsFocusNextSerial(`${keyOf(g)}#${n}`)
-                                                }
-                                              }}
-                                            />
-                                            <button
-                                              type="button"
-                                              title="Auto-generate"
-                                              className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                                              onClick={() => updateSerial(g, n, autoSerial())}
-                                            >
-                                              Auto
-                                            </button>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })}
-
-                            {bootstrapError && (
-                              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/40 text-red-600 dark:text-red-400 text-xs">
-                                {bootstrapError}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
-                  </div>
-                </div>
-
-                {/* Certifications & Standards */}
-                <div>
-                  <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
-                    <span>Certifications &amp; Standards</span>
-                  </div>
-                  <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="sm:col-span-2">
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Certifications
-                        </label>
-                        <input
-                          type="text"
-                          value={certifications}
-                          onChange={e => setCertifications(e.target.value)}
-                          className={inputCls}
-                          placeholder="BIS, CE, RoHS, ISO9001, FSSAI (comma-separated)"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Compliance Standard
-                        </label>
-                        <input
-                          type="text"
-                          value={complianceStandard}
-                          onChange={e => setComplianceStandard(e.target.value)}
-                          className={inputCls}
-                          placeholder="e.g. DIN, ISO, IS, ASTM"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Safety Rating
-                        </label>
-                        <input
-                          type="text"
-                          value={safetyRating}
-                          onChange={e => setSafetyRating(e.target.value)}
-                          className={inputCls}
-                          placeholder="e.g. IP65, Class I"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Warranty (months)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={warrantyMonths}
-                          onChange={e => setWarrantyMonths(e.target.value)}
-                          className={inputCls}
-                          placeholder="e.g. 12"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Warranty Type
-                        </label>
-                        <AdminSelect
-                          value={warrantyType}
-                          onChange={setWarrantyType}
-                          options={[
-                            { value: '', label: 'None' },
-                            { value: 'manufacturer', label: 'Manufacturer' },
-                            { value: 'seller', label: 'Seller' },
-                          ]}
-                          placeholder="Select type"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Condition & Lifecycle */}
-                <div>
-                  <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
-                    <span>Condition &amp; Lifecycle</span>
-                  </div>
-                  <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Condition
-                        </label>
-                        <AdminSelect
-                          value={condition}
-                          onChange={setCondition}
-                          options={[
-                            { value: 'new', label: 'New' },
-                            { value: 'refurbished', label: 'Refurbished' },
-                            { value: 'used', label: 'Used' },
-                            { value: 'open_box', label: 'Open Box' },
-                          ]}
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Sort Order
-                        </label>
-                        <input
-                          type="number"
-                          step="1"
-                          value={sortOrderVal}
-                          onChange={e => setSortOrderVal(e.target.value)}
-                          className={inputCls}
-                          placeholder="0"
-                        />
-                        <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Launch Date
-                        </label>
-                        <DatePicker value={launchDate} onChange={setLaunchDate} />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Discontinue Date
-                        </label>
-                        <DatePicker value={discontinueDate} onChange={setDiscontinueDate} />
-                      </div>
-                    </div>
-                    <Toggle
-                      id="is_cod_allowed"
-                      checked={isCodAllowed}
-                      onChange={setIsCodAllowed}
-                      label="COD Allowed"
-                    />
-                  </div>
-                </div>
-
-                {/* Shipping & Logistics */}
-                <div>
-                  <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
-                    <span>Shipping &amp; Logistics</span>
-                  </div>
-                  <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Handling Days
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={handlingDays}
-                          onChange={e => setHandlingDays(e.target.value)}
-                          className={inputCls}
-                          placeholder="1"
-                        />
-                        <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Shipping Class
-                        </label>
-                        <AdminSelect
-                          value={shippingClass}
-                          onChange={setShippingClass}
-                          options={[
-                            { value: 'standard', label: 'Standard' },
-                            { value: 'express', label: 'Express' },
-                            { value: 'freight', label: 'Freight' },
-                            { value: 'cold_chain', label: 'Cold Chain' },
-                          ]}
-                        />
-                      </div>
-                    </div>
-                    <Toggle
-                      id="is_oversized"
-                      checked={isOversized}
-                      onChange={setIsOversized}
-                      label="Oversized / Freight"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Identification & Compliance */}
-            <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-              <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                <span>Identification &amp; Compliance</span>
-              </div>
-              <div className="p-4 space-y-4 border-t border-border-default">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {!hasVariants && (
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                        Barcode (EAN/UPC)
-                      </label>
-                      <input
-                        type="text"
-                        value={barcode}
-                        onChange={e => setBarcode(e.target.value)}
-                        className={inputCls}
-                        placeholder="e.g. 8901234567890"
+                      <AdminSelect
+                        id="stock_status"
+                        name="stock_status"
+                        required={!hasVariants && !inventorySync}
+                        defaultValue={product?.stock_status || 'In Stock'}
+                        options={[
+                          { value: 'In Stock', label: 'In Stock' },
+                          { value: 'Low Stock', label: 'Low Stock' },
+                          { value: 'Out of Stock', label: 'Out of Stock' },
+                        ]}
                       />
+                      <p className="text-xs text-foreground-muted mt-1">
+                        Availability shown to customers. Inventory quantity is managed separately.
+                      </p>
                     </div>
-                  )}
-                  {!hasVariants && (
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ISBN</label>
-                      <input
-                        type="text"
-                        value={isbn}
-                        onChange={e => setIsbn(e.target.value)}
-                        className={inputCls}
-                        placeholder="For books"
-                      />
-                    </div>
-                  )}
-                  {!hasVariants && (
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ASIN</label>
-                      <input
-                        type="text"
-                        value={asin}
-                        onChange={e => setAsin(e.target.value)}
-                        className={inputCls}
-                        placeholder="Amazon reference"
-                      />
-                    </div>
-                  )}
-                  {!hasVariants && (
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                        Brand Part Number
-                      </label>
-                      <input
-                        type="text"
-                        value={brandPartNumber}
-                        onChange={e => setBrandPartNumber(e.target.value)}
-                        className={inputCls}
-                        placeholder="Manufacturer's part no."
-                      />
-                    </div>
-                  )}
+                  </>
+                )}
+
+                {/* Shipping Weight — only when no variants; per-variant weight is in the variant table */}
+                {!hasVariants && (
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                      Country of Origin
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={2}
-                      value={countryOfOrigin}
-                      onChange={e => setCountryOfOrigin(e.target.value.toUpperCase())}
-                      className={inputCls}
-                      placeholder="IN"
-                    />
-                    <p className="text-xs text-foreground-muted mt-1">ISO 3166 2-letter code</p>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                      Shelf Life (days)
+                    <label htmlFor="weight_grams" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                      Weight per piece (g) *
                     </label>
                     <input
                       type="number"
-                      min="0"
+                      id="weight_grams"
+                      name="weight_grams"
                       step="1"
-                      value={shelfLifeDays}
-                      onChange={e => setShelfLifeDays(e.target.value)}
-                      className={inputCls}
-                      placeholder="e.g. 365"
+                      min="1"
+                      value={weightGrams}
+                      onChange={e => setWeightGrams(e.target.value)}
+                      className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      placeholder="e.g., 500"
                     />
+                    {productPackageType === 'flat_poly_auto' && parseFloat(weightGrams) > 2000 && (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        Consider using corrugated_box for items over 2 kg for accurate shipping rates.
+                      </p>
+                    )}
                   </div>
-                </div>
-              </div>
-            </div>
+                )}
 
-            {/* Tax & Finance */}
-            <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-              <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                <span>Tax &amp; Finance</span>
-              </div>
-              <div className="p-4 space-y-4 border-t border-border-default">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Shipping Dimensions — hidden when variants enabled; shown inside variants section instead */}
+                {!hasVariants && (
                   <div>
-                    <label className="block text-xs font-medium text-foreground-muted mb-1">Tax Class</label>
+                    <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Package Type</label>
+                    <input type="hidden" name="package_type" value={productPackageType} />
                     <AdminSelect
-                      value={taxClass}
-                      onChange={v => setTaxClass(v)}
-                      className="w-full"
+                      value={productPackageType}
+                      onChange={setProductPackageType}
                       options={[
-                        { value: 'standard', label: 'Standard' },
-                        { value: 'reduced', label: 'Reduced' },
-                        { value: 'zero', label: 'Zero' },
-                        { value: 'exempt', label: 'Exempt' },
+                        { value: 'flat_poly_auto', label: 'Flat Poly (auto by weight)' },
+                        { value: 'flat_poly_s', label: 'Flat Poly S (≤100g)' },
+                        { value: 'flat_poly_m', label: 'Flat Poly M (≤500g)' },
+                        { value: 'flat_poly_l', label: 'Flat Poly L (≤1500g)' },
+                        { value: 'flat_poly_xl', label: 'Flat Poly XL (>1500g)' },
+                        { value: 'drill_bit_tube', label: 'Drill Bit Tube' },
+                        { value: 'drill_bit_set_case', label: 'Drill Bit Set Case' },
+                        { value: 'corrugated_box', label: 'Corrugated Box' },
+                        { value: 'long_tube', label: 'Long Tube / Rod / Pipe' },
                       ]}
                     />
+                    {['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube'].includes(
+                      productPackageType
+                    ) && (
+                      <div className="grid grid-cols-3 gap-2 mt-2">
+                        <div>
+                          <input
+                            type="number"
+                            id="length_cm"
+                            name="length_cm"
+                            step="0.1"
+                            min="0"
+                            defaultValue={product?.length_cm ?? ''}
+                            className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                            placeholder="L"
+                          />
+                          <p className="text-xs text-foreground-muted mt-1 text-center">Length</p>
+                        </div>
+                        <div>
+                          <input
+                            type="number"
+                            id="breadth_cm"
+                            name="breadth_cm"
+                            step="0.1"
+                            min="0"
+                            defaultValue={product?.breadth_cm ?? ''}
+                            className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                            placeholder="B"
+                          />
+                          <p className="text-xs text-foreground-muted mt-1 text-center">Breadth</p>
+                        </div>
+                        <div>
+                          <input
+                            type="number"
+                            id="height_cm"
+                            name="height_cm"
+                            step="0.1"
+                            min="0"
+                            defaultValue={product?.height_cm ?? ''}
+                            className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                            placeholder="H"
+                          />
+                          <p className="text-xs text-foreground-muted mt-1 text-center">Height</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <Toggle
-                  id="inclusive_tax"
-                  checked={inclusiveTax}
-                  onChange={setInclusiveTax}
-                  label="Price includes tax (inclusive tax)"
-                />
+                )}
               </div>
-            </div>
-
-            {/* Age & Audience */}
-            <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-              <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                <span>Age &amp; Audience</span>
-              </div>
-              <div className="p-4 space-y-4 border-t border-border-default">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-foreground-muted mb-1">Age Range</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        value={ageMin}
-                        onChange={e => setAgeMin(e.target.value)}
-                        placeholder="Min"
-                        className={inputCls}
+            </section>
+          </div>
+          <div data-pf-tab="media" role="tabpanel" hidden={activeTab !== 'media'}>
+            <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                {/* Image Upload */}
+                <div className="md:col-span-2">
+                  {useDraftImages ? (
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-medium text-foreground-secondary">Product Images</h3>
+                          <p className="text-xs text-foreground-muted mt-1">
+                            Up to 5 images. Drag to reorder, or star one to make it the main image.
+                          </p>
+                        </div>
+                        {productImages.length + productImagePendingAdds < 5 && (
+                          <AiMediaButton
+                            feature="product_image"
+                            label="AI image"
+                            sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
+                            defaultPrompt={buildProductImagePrompt({
+                              name: productName,
+                              brand: brands.find(b => b.id === brandId)?.name,
+                              category: categories.find(c => c.id === categoryId)?.name,
+                              specs: specifications,
+                              availableIn: hasVariants ? activeVariants.filter(v => v.is_active !== false).map(v => v.variant_name) : undefined,
+                            })}
+                            referenceImageUrl={(() => {
+                              const primary = productImages.find((i: any) => i.is_primary) ?? productImages[0]
+                              const url = primary?.image_url as string | undefined
+                              return url?.startsWith('http') ? url : undefined
+                            })()}
+                            usageRef={productId || undefined}
+                            saveToGallery
+                            onPick={img => {
+                              if (img.galleryId) void addProductImagesFromGallery([{ id: img.galleryId }])
+                            }}
+                          />
+                        )}
+                      </div>
+                      <ImageGalleryEditor
+                        images={productImages}
+                        maxImages={5}
+                        uploading={productImageUploading}
+                        pendingAdds={productImagePendingAdds}
+                        deleting={productImageDeleting}
+                        error={productImageError}
+                        onUpload={uploadProductImageFile}
+                        onDelete={deleteProductImageRow}
+                        onSetPrimary={setProductImagePrimary}
+                        onReorder={reorderProductImages}
+                        onOpenGallery={openProductGallery}
                       />
-                      <span className="text-foreground-muted text-sm">–</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={ageMax}
-                        onChange={e => setAgeMax(e.target.value)}
-                        placeholder="Max"
-                        className={inputCls}
-                      />
+                      {productGalleryOpen && (
+                        <GalleryPicker
+                          mode="multi"
+                          maxSelect={Math.max(0, 5 - productImages.length)}
+                          onClose={() => setProductGalleryOpen(false)}
+                          onConfirm={addProductImagesFromGallery}
+                        />
+                      )}
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-foreground-muted mb-1">Target Gender</label>
-                    <AdminSelect
-                      value={targetGender}
-                      onChange={v => setTargetGender(v)}
-                      className="w-full"
-                      options={[
-                        { value: '', label: '— any —' },
-                        { value: 'male', label: 'Male' },
-                        { value: 'female', label: 'Female' },
-                        { value: 'unisex', label: 'Unisex' },
-                      ]}
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium text-foreground-muted mb-1">
-                      Target Audience <span className="text-foreground-muted/60">(comma-separated)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={targetAudience}
-                      onChange={e => setTargetAudience(e.target.value)}
-                      placeholder="e.g. professionals, students, DIY"
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Digital & Subscription */}
-            <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-              <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                <span>Digital &amp; Subscription</span>
-              </div>
-              <div className="p-4 space-y-4 border-t border-border-default">
-                <div className="flex flex-wrap gap-6">
-                  {digitalProductsEnabled && (
-                    <Toggle
-                      id="is_digital"
-                      checked={isDigital}
-                      onChange={handleDigitalToggle}
-                      label="Digital Product"
+                  ) : (
+                    <ImageUpload
+                      productId={tempProductId}
+                      maxImages={5}
+                      ai={{
+                        defaultPrompt: buildProductImagePrompt({
+                          name: productName,
+                          brand: brands.find(b => b.id === brandId)?.name,
+                          category: categories.find(c => c.id === categoryId)?.name,
+                          specs: specifications,
+                        }),
+                      }}
+                      existingImages={product?.product_images || []}
+                      onImagesChange={(files, existingToKeep, galleryImgs, orderedKeys) => {
+                        setImageFiles(files)
+                        setExistingImagesToKeep(existingToKeep)
+                        setGalleryImageIds(galleryImgs)
+                        setImageOrder(orderedKeys)
+                      }}
                     />
                   )}
-                  <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
-                  {subscriptionsEnabled && (
-                    <Toggle
-                      id="is_subscription"
-                      checked={isSubscription}
-                      onChange={setIsSubscription}
-                      label="Subscription"
-                    />
-                  )}
                 </div>
-                {isDigital && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-muted mb-1">License Type</label>
-                      <input
-                        type="text"
-                        value={licenseType}
-                        onChange={e => setLicenseType(e.target.value)}
-                        placeholder="e.g. MIT, Commercial"
-                        className={inputCls}
+              </div>
+            </section>
+          </div>
+          <div data-pf-tab="details" role="tabpanel" hidden={activeTab !== 'details'}>
+            <section className="space-y-4 rounded-xl border border-border-default bg-surface-elevated p-5">
+              {/* Product Details */}
+              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                  <span>Product Details{showBootstrap ? ' — stock to assign' : ''}</span>
+                </div>
+                <div className="border-t border-border-default divide-y divide-border-default">
+                  {/* Physical Attributes */}
+                  <div>
+                    <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
+                      <span>Physical Attributes</span>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Grade</label>
+                          <input
+                            type="text"
+                            value={grade}
+                            onChange={e => setGrade(e.target.value)}
+                            className={inputCls}
+                            placeholder="e.g. 8.8, 10.9, 304, M2 HSS"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                          Technical Specifications
+                        </label>
+                        <div className="space-y-2">
+                          {specifications.map((spec, i) => (
+                            <div key={i} className="flex gap-2">
+                              <input
+                                type="text"
+                                value={spec.key}
+                                onChange={e =>
+                                  setSpecifications(s =>
+                                    s.map((x, j) => (j === i ? { ...x, key: e.target.value } : x))
+                                  )
+                                }
+                                className={inputCls}
+                                placeholder="e.g. thread_type"
+                              />
+                              <input
+                                type="text"
+                                value={spec.value}
+                                onChange={e =>
+                                  setSpecifications(s =>
+                                    s.map((x, j) => (j === i ? { ...x, value: e.target.value } : x))
+                                  )
+                                }
+                                className={inputCls}
+                                placeholder="e.g. Metric"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setSpecifications(s => s.filter((_, j) => j !== i))}
+                                className="px-2 text-foreground-muted hover:text-red-500"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setSpecifications(s => [...s, { key: '', value: '' }])}
+                            className="text-xs text-accent-600 hover:text-accent-700 font-medium"
+                          >
+                            + Add specification
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Color</label>
+                          <input
+                            type="text"
+                            value={color}
+                            onChange={e => setColor(e.target.value)}
+                            className={inputCls}
+                            placeholder="e.g. Stainless Silver"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Color Hex
+                          </label>
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="color"
+                              value={colorHex}
+                              onChange={e => setColorHex(e.target.value)}
+                              className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface"
+                            />
+                            <input
+                              type="text"
+                              value={colorHex}
+                              onChange={e => setColorHex(e.target.value)}
+                              className={inputCls}
+                              placeholder="#000000"
+                              maxLength={7}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Volume (ml)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={volumeMl}
+                            onChange={e => setVolumeMl(e.target.value)}
+                            className={inputCls}
+                            placeholder="For liquids/paints"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Net Weight (g)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={netWeightGrams}
+                            onChange={e => setNetWeightGrams(e.target.value)}
+                            className={inputCls}
+                            placeholder="Product without packaging"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+                        <Toggle id="fragile" checked={fragile} onChange={setFragile} label="Fragile" />
+                        <Toggle id="hazardous" checked={hazardous} onChange={setHazardous} label="Hazardous" />
+                        <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
+                        {hasInventory && (
+                          <Toggle
+                            id="perishable"
+                            checked={perishable}
+                            onChange={next => {
+                              if (!next && perishableBatchTotal > 0) {
+                                setConfirmUnperishable(true)
+                                return
+                              }
+                              setPerishable(next)
+                            }}
+                            label="Perishable"
+                          />
+                        )}
+                        {hasInventory && (
+                          <Toggle
+                            id="serialized"
+                            checked={serialized}
+                            onChange={next => {
+                              if (!next && serializedStockTotal > 0) {
+                                setConfirmUnSerialized(true)
+                                return
+                              }
+                              setSerialized(next)
+                            }}
+                            label="Serialized"
+                          />
+                        )}
+                      </div>
+
+                      {showBootstrap &&
+                        (() => {
+                          const sku = (product?.sku || '')
+                            .replace(/[^A-Z0-9]/gi, '')
+                            .slice(0, 8)
+                            .toUpperCase()
+                          const autoSerial = () => generateSerialNumber(sku)
+                          const keyOf = (g: BsGrain) => `${g.variant_id || ''}:${g.sub_variant_id || ''}`
+                          // Read a grain's entry, materialising the lazy default when absent.
+                          // Backfill the newer selected/assignQty fields for entries restored
+                          // from a pre-change draft (they'd otherwise be undefined).
+                          const entryOf = (g: BsGrain): BsEntry => {
+                            const e = bsEntries[keyOf(g)]
+                            if (!e) return _bsMakeEntry(g.qty)
+                            return {
+                              ...e,
+                              selected: e.selected ?? true,
+                              assignQty: e.assignQty ?? g.qty,
+                            }
+                          }
+                          const patchEntry = (g: BsGrain, patch: Partial<BsEntry>) => {
+                            const key = keyOf(g)
+                            setBsEntries(prev => {
+                              const base = prev[key] ?? _bsMakeEntry(g.qty)
+                              return { ...prev, [key]: { ...base, ...patch } }
+                            })
+                          }
+                          const regenLot = (g: BsGrain) => {
+                            patchEntry(g, { lot: generateLotNumber(sku) })
+                          }
+                          const updateSerial = (g: BsGrain, i: number, val: string) => {
+                            const key = keyOf(g)
+                            setBsEntries(prev => {
+                              const base = prev[key] ?? _bsMakeEntry(g.qty)
+                              const a = [...(base.serials || [])]
+                              a[i] = val
+                              return { ...prev, [key]: { ...base, serials: a } }
+                            })
+                          }
+                          const generateAll = (g: BsGrain) => {
+                            patchEntry(g, { serials: generateSerialRun(sku, bsSerialCount(g, entryOf(g).assignQty)) })
+                          }
+                          // Clamp an assignQty edit to [1, g.qty]; also trim serials to fit.
+                          const setAssignQty = (g: BsGrain, raw: number) => {
+                            const key = keyOf(g)
+                            const clamped = Math.max(1, Math.min(g.qty, Math.floor(raw) || 1))
+                            setBsEntries(prev => {
+                              const base = prev[key] ?? _bsMakeEntry(g.qty)
+                              const serials = (base.serials || []).slice(0, bsSerialCount(g, clamped))
+                              return { ...prev, [key]: { ...base, assignQty: clamped, serials } }
+                            })
+                          }
+                          // Running total of units that will be tracked (selected grains).
+                          const selectedTotal = bsGrains.reduce((s, g) => {
+                            const e = entryOf(g)
+                            return s + (e.selected === false ? 0 : e.assignQty)
+                          }, 0)
+                          return (
+                            <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 space-y-4">
+                              <div>
+                                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                                  Assign Existing Stock
+                                </p>
+                                <p className="text-xs text-foreground-secondary mt-0.5">
+                                  Choose which variants and how many units to track.
+                                </p>
+                                <p className="text-xs text-foreground-muted mt-0.5">
+                                  <span className="font-semibold">{selectedTotal}</span> of {_bsStockTotal} units will
+                                  be tracked; {_bsStockTotal - selectedTotal} stay as plain stock.
+                                </p>
+                              </div>
+
+                              {bsGrains.map(g => {
+                                const entry = entryOf(g)
+                                const serials = entry.serials || []
+                                const entered = serials.filter(Boolean).length
+                                const isSelected = entry.selected !== false
+                                const assignQty = entry.assignQty
+                                const serialCount = bsSerialCount(g, assignQty)
+                                return (
+                                  <div
+                                    key={keyOf(g)}
+                                    className="rounded-lg border border-border-default bg-surface/60 p-3 space-y-3"
+                                  >
+                                    <div className="flex items-center justify-between gap-3">
+                                      <label className="flex items-center gap-2 min-w-0">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={e => patchEntry(g, { selected: e.target.checked })}
+                                          className="h-4 w-4 rounded border-border-default text-secondary-600 focus:ring-secondary-500"
+                                        />
+                                        <span className="text-xs font-semibold text-foreground truncate">
+                                          {g.label}
+                                        </span>
+                                      </label>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={g.qty}
+                                          disabled={!isSelected}
+                                          value={assignQty}
+                                          onChange={e => setAssignQty(g, Number(e.target.value))}
+                                          className="field-compact w-16 border border-border-default bg-surface text-foreground text-xs text-right disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                        />
+                                        <span className="text-xs text-foreground-muted">/ {g.qty}</span>
+                                      </div>
+                                    </div>
+
+                                    {isSelected && _serializedPending && bsWriteOff(g, assignQty) > 0 && (
+                                      <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
+                                        <p className="text-xs text-foreground">
+                                          Sold in steps of {g.qty_step} — only {serialCount * (g.qty_step || 1)} of{' '}
+                                          {assignQty} units can be labelled.{' '}
+                                          <strong>
+                                            {bsWriteOff(g, assignQty)} unit{bsWriteOff(g, assignQty) !== 1 ? 's' : ''}{' '}
+                                            will be written off
+                                          </strong>{' '}
+                                          on save, leaving {serialCount * (g.qty_step || 1)} in stock.
+                                        </p>
+                                      </div>
+                                    )}
+
+                                    {isSelected && _perishablePending && (
+                                      <div className="rounded-lg border border-orange-500/40 bg-orange-500/5 p-3">
+                                        <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">
+                                          Batch Details
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                          <div>
+                                            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
+                                              Expiry Date <span className="text-red-500">*</span>
+                                            </label>
+                                            <DatePicker
+                                              value={entry.expiry}
+                                              onChange={v => patchEntry(g, { expiry: v })}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
+                                              Manufacture Date
+                                            </label>
+                                            <DatePicker value={entry.mfg} onChange={v => patchEntry(g, { mfg: v })} />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
+                                              Lot Number
+                                            </label>
+                                            <div className="flex gap-1">
+                                              <input
+                                                type="text"
+                                                className="field-compact border border-border-default bg-surface text-foreground flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                                value={entry.lot}
+                                                onChange={e => patchEntry(g, { lot: e.target.value })}
+                                              />
+                                              <button
+                                                type="button"
+                                                title="Regenerate"
+                                                onClick={() => regenLot(g)}
+                                                className="px-2 h-control-sm rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                                              >
+                                                ↺
+                                              </button>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
+                                              Shelf Location
+                                            </label>
+                                            <AdminSelect
+                                              id={`bs-location-${keyOf(g)}`}
+                                              value={entry.location}
+                                              onChange={v => patchEntry(g, { location: v })}
+                                              sm
+                                              options={[
+                                                { value: '', label: '— none —' },
+                                                ...bsShelfLocations.map(sl => ({
+                                                  value: sl.id,
+                                                  label: sl.display_code,
+                                                })),
+                                              ]}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {isSelected && _serializedPending && (
+                                      <div className="rounded-lg border border-blue-500/40 bg-blue-500/5 p-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                          <div>
+                                            <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">
+                                              Serial Numbers
+                                            </p>
+                                            <span className="text-xs text-foreground-muted">
+                                              ({serialCount} required
+                                              {g.qty_step && g.qty_step !== 1 ? ` — 1 per ${g.qty_step} units` : ''})
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            {entered === serialCount ? (
+                                              <span className="text-xs text-green-600 dark:text-green-400">
+                                                {entered}/{serialCount} entered ✓
+                                              </span>
+                                            ) : (
+                                              <span className="text-xs text-amber-600 dark:text-amber-400">
+                                                {entered}/{serialCount} entered
+                                              </span>
+                                            )}
+                                            <button
+                                              type="button"
+                                              className="text-xs px-2 h-control-sm rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                              onClick={() => generateAll(g)}
+                                            >
+                                              Generate All
+                                            </button>
+                                          </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                                          {Array.from({ length: serialCount }, (_, n) => (
+                                            <div key={n} className="flex gap-1">
+                                              <input
+                                                ref={el => {
+                                                  bsSerialRefs.current[`${keyOf(g)}#${n}`] = el
+                                                }}
+                                                type="text"
+                                                placeholder={autoSerial()}
+                                                className="field-compact rounded border border-border-secondary bg-surface text-foreground font-mono text-xs flex-1 min-w-0 focus:outline-none focus:border-secondary-500"
+                                                value={serials[n] ?? ''}
+                                                onChange={e => updateSerial(g, n, e.target.value)}
+                                                onKeyDown={e => {
+                                                  // A barcode scanner types the code then sends Enter — commit and
+                                                  // jump to the next empty serial field (same for manual Enter).
+                                                  if (e.key === 'Enter') {
+                                                    e.preventDefault()
+                                                    bsFocusNextSerial(`${keyOf(g)}#${n}`)
+                                                  }
+                                                }}
+                                              />
+                                              <button
+                                                type="button"
+                                                title="Auto-generate"
+                                                className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                                onClick={() => updateSerial(g, n, autoSerial())}
+                                              >
+                                                Auto
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+
+                              {bootstrapError && (
+                                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/40 text-red-600 dark:text-red-400 text-xs">
+                                  {bootstrapError}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+                    </div>
+                  </div>
+
+                  {/* Certifications & Standards */}
+                  <div>
+                    <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
+                      <span>Certifications &amp; Standards</span>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="sm:col-span-2">
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Certifications
+                          </label>
+                          <input
+                            type="text"
+                            value={certifications}
+                            onChange={e => setCertifications(e.target.value)}
+                            className={inputCls}
+                            placeholder="BIS, CE, RoHS, ISO9001, FSSAI (comma-separated)"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Compliance Standard
+                          </label>
+                          <input
+                            type="text"
+                            value={complianceStandard}
+                            onChange={e => setComplianceStandard(e.target.value)}
+                            className={inputCls}
+                            placeholder="e.g. DIN, ISO, IS, ASTM"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Safety Rating
+                          </label>
+                          <input
+                            type="text"
+                            value={safetyRating}
+                            onChange={e => setSafetyRating(e.target.value)}
+                            className={inputCls}
+                            placeholder="e.g. IP65, Class I"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Warranty (months)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={warrantyMonths}
+                            onChange={e => setWarrantyMonths(e.target.value)}
+                            className={inputCls}
+                            placeholder="e.g. 12"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Warranty Type
+                          </label>
+                          <AdminSelect
+                            value={warrantyType}
+                            onChange={setWarrantyType}
+                            options={[
+                              { value: '', label: 'None' },
+                              { value: 'manufacturer', label: 'Manufacturer' },
+                              { value: 'seller', label: 'Seller' },
+                            ]}
+                            placeholder="Select type"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Condition & Lifecycle */}
+                  <div>
+                    <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
+                      <span>Condition &amp; Lifecycle</span>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Condition
+                          </label>
+                          <AdminSelect
+                            value={condition}
+                            onChange={setCondition}
+                            options={[
+                              { value: 'new', label: 'New' },
+                              { value: 'refurbished', label: 'Refurbished' },
+                              { value: 'used', label: 'Used' },
+                              { value: 'open_box', label: 'Open Box' },
+                            ]}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Sort Order
+                          </label>
+                          <input
+                            type="number"
+                            step="1"
+                            value={sortOrderVal}
+                            onChange={e => setSortOrderVal(e.target.value)}
+                            className={inputCls}
+                            placeholder="0"
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Launch Date
+                          </label>
+                          <DatePicker value={launchDate} onChange={setLaunchDate} />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Discontinue Date
+                          </label>
+                          <DatePicker value={discontinueDate} onChange={setDiscontinueDate} />
+                        </div>
+                      </div>
+                      <Toggle
+                        id="is_cod_allowed"
+                        checked={isCodAllowed}
+                        onChange={setIsCodAllowed}
+                        label="COD Allowed"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-muted mb-1">File Format</label>
-                      <input
-                        type="text"
-                        value={fileFormat}
-                        onChange={e => setFileFormat(e.target.value)}
-                        placeholder="e.g. PDF, ZIP, EXE"
-                        className={inputCls}
+                  </div>
+
+                  {/* Shipping & Logistics */}
+                  <div>
+                    <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
+                      <span>Shipping &amp; Logistics</span>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Handling Days
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={handlingDays}
+                            onChange={e => setHandlingDays(e.target.value)}
+                            className={inputCls}
+                            placeholder="1"
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Shipping Class
+                          </label>
+                          <AdminSelect
+                            value={shippingClass}
+                            onChange={setShippingClass}
+                            options={[
+                              { value: 'standard', label: 'Standard' },
+                              { value: 'express', label: 'Express' },
+                              { value: 'freight', label: 'Freight' },
+                              { value: 'cold_chain', label: 'Cold Chain' },
+                            ]}
+                          />
+                        </div>
+                      </div>
+                      <Toggle
+                        id="is_oversized"
+                        checked={isOversized}
+                        onChange={setIsOversized}
+                        label="Oversized / Freight"
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Identification & Compliance */}
+              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                  <span>Identification &amp; Compliance</span>
+                </div>
+                <div className="p-4 space-y-4 border-t border-border-default">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {!hasVariants && (
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                          Barcode (EAN/UPC)
+                        </label>
+                        <input
+                          type="text"
+                          value={barcode}
+                          onChange={e => setBarcode(e.target.value)}
+                          className={inputCls}
+                          placeholder="e.g. 8901234567890"
+                        />
+                      </div>
+                    )}
+                    {!hasVariants && (
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ISBN</label>
+                        <input
+                          type="text"
+                          value={isbn}
+                          onChange={e => setIsbn(e.target.value)}
+                          className={inputCls}
+                          placeholder="For books"
+                        />
+                      </div>
+                    )}
+                    {!hasVariants && (
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ASIN</label>
+                        <input
+                          type="text"
+                          value={asin}
+                          onChange={e => setAsin(e.target.value)}
+                          className={inputCls}
+                          placeholder="Amazon reference"
+                        />
+                      </div>
+                    )}
+                    {!hasVariants && (
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                          Brand Part Number
+                        </label>
+                        <input
+                          type="text"
+                          value={brandPartNumber}
+                          onChange={e => setBrandPartNumber(e.target.value)}
+                          className={inputCls}
+                          placeholder="Manufacturer's part no."
+                        />
+                      </div>
+                    )}
                     <div>
-                      <label className="block text-xs font-medium text-foreground-muted mb-1">
-                        Platform Compatibility <span className="text-foreground-muted/60">(comma-separated)</span>
+                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                        Country of Origin
                       </label>
                       <input
                         type="text"
-                        value={platformCompatibility}
-                        onChange={e => setPlatformCompatibility(e.target.value)}
-                        placeholder="e.g. Windows, macOS, Linux"
+                        maxLength={2}
+                        value={countryOfOrigin}
+                        onChange={e => setCountryOfOrigin(e.target.value.toUpperCase())}
+                        className={inputCls}
+                        placeholder="IN"
+                      />
+                      <p className="text-xs text-foreground-muted mt-1">ISO 3166 2-letter code</p>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                        Shelf Life (days)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={shelfLifeDays}
+                        onChange={e => setShelfLifeDays(e.target.value)}
+                        className={inputCls}
+                        placeholder="e.g. 365"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tax & Finance */}
+              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                  <span>Tax &amp; Finance</span>
+                </div>
+                <div className="p-4 space-y-4 border-t border-border-default">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">Tax Class</label>
+                      <AdminSelect
+                        value={taxClass}
+                        onChange={v => setTaxClass(v)}
+                        className="w-full"
+                        options={[
+                          { value: 'standard', label: 'Standard' },
+                          { value: 'reduced', label: 'Reduced' },
+                          { value: 'zero', label: 'Zero' },
+                          { value: 'exempt', label: 'Exempt' },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                  <Toggle
+                    id="inclusive_tax"
+                    checked={inclusiveTax}
+                    onChange={setInclusiveTax}
+                    label="Price includes tax (inclusive tax)"
+                  />
+                </div>
+              </div>
+
+              {/* Age & Audience */}
+              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                  <span>Age &amp; Audience</span>
+                </div>
+                <div className="p-4 space-y-4 border-t border-border-default">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">Age Range</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={ageMin}
+                          onChange={e => setAgeMin(e.target.value)}
+                          placeholder="Min"
+                          className={inputCls}
+                        />
+                        <span className="text-foreground-muted text-sm">–</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={ageMax}
+                          onChange={e => setAgeMax(e.target.value)}
+                          placeholder="Max"
+                          className={inputCls}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">Target Gender</label>
+                      <AdminSelect
+                        value={targetGender}
+                        onChange={v => setTargetGender(v)}
+                        className="w-full"
+                        options={[
+                          { value: '', label: '— any —' },
+                          { value: 'male', label: 'Male' },
+                          { value: 'female', label: 'Female' },
+                          { value: 'unisex', label: 'Unisex' },
+                        ]}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">
+                        Target Audience <span className="text-foreground-muted/60">(comma-separated)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={targetAudience}
+                        onChange={e => setTargetAudience(e.target.value)}
+                        placeholder="e.g. professionals, students, DIY"
                         className={inputCls}
                       />
                     </div>
-                    {productId ? (
-                      <DigitalFilesPanel productId={productId} />
-                    ) : (
-                      <p className="sm:col-span-2 text-xs text-foreground-muted">
-                        Save the product first, then upload files in the Digital Files panel. Buyers open them in the
-                        vault.
-                      </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Digital & Subscription */}
+              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                  <span>Digital &amp; Subscription</span>
+                </div>
+                <div className="p-4 space-y-4 border-t border-border-default">
+                  <div className="flex flex-wrap gap-6">
+                    {digitalProductsEnabled && (
+                      <Toggle
+                        id="is_digital"
+                        checked={isDigital}
+                        onChange={handleDigitalToggle}
+                        label="Digital Product"
+                      />
+                    )}
+                    <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
+                    {subscriptionsEnabled && (
+                      <Toggle
+                        id="is_subscription"
+                        checked={isSubscription}
+                        onChange={setIsSubscription}
+                        label="Subscription"
+                      />
                     )}
                   </div>
-                )}
-                {subscriptionsEnabled && isSubscription && (
-                  <div className="pt-2 border-t border-border-default space-y-2">
-                    <AdminSelect
-                      label="Billing intervals offered"
-                      placeholder={
-                        subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length
-                          ? 'All intervals added'
-                          : 'Add a billing interval…'
-                      }
-                      value=""
-                      options={SUBSCRIPTION_INTERVALS.filter(o => !subscriptionIntervals.includes(o.value))}
-                      disabled={subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length}
-                      onChange={v => v && setSubscriptionIntervals(prev => (prev.includes(v) ? prev : [...prev, v]))}
-                    />
-                    {subscriptionIntervals.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {SUBSCRIPTION_INTERVALS.filter(o => subscriptionIntervals.includes(o.value)).map(opt => (
-                          <span
-                            key={opt.value}
-                            className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 text-accent-500 px-2.5 py-1 text-xs font-medium"
-                          >
-                            {opt.label}
-                            <button
-                              type="button"
-                              aria-label={`Remove ${opt.label}`}
-                              onClick={() => setSubscriptionIntervals(prev => prev.filter(v => v !== opt.value))}
-                              className="hover:text-red-600"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  {isDigital && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
                       <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">
-                          Number of billing cycles
-                        </label>
+                        <label className="block text-xs font-medium text-foreground-muted mb-1">License Type</label>
                         <input
-                          type="number"
-                          min={1}
-                          max={MAX_BILLING_CYCLES}
-                          step={1}
-                          value={totalCycles}
-                          onChange={e => setTotalCycles(e.target.value)}
-                          placeholder="Until cancelled"
+                          type="text"
+                          value={licenseType}
+                          onChange={e => setLicenseType(e.target.value)}
+                          placeholder="e.g. MIT, Commercial"
                           className={inputCls}
                         />
-                        <p className="text-xs text-foreground-muted mt-1">
-                          Leave blank to bill until the customer cancels.
-                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground-muted mb-1">File Format</label>
+                        <input
+                          type="text"
+                          value={fileFormat}
+                          onChange={e => setFileFormat(e.target.value)}
+                          placeholder="e.g. PDF, ZIP, EXE"
+                          className={inputCls}
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-foreground-muted mb-1">
-                          Minimum billing cycles
+                          Platform Compatibility <span className="text-foreground-muted/60">(comma-separated)</span>
                         </label>
                         <input
-                          type="number"
-                          min={1}
-                          max={MAX_BILLING_CYCLES}
-                          step={1}
-                          value={minCycles}
-                          onChange={e => setMinCycles(e.target.value)}
-                          placeholder="No minimum"
+                          type="text"
+                          value={platformCompatibility}
+                          onChange={e => setPlatformCompatibility(e.target.value)}
+                          placeholder="e.g. Windows, macOS, Linux"
                           className={inputCls}
                         />
-                        <p className="text-xs text-foreground-muted mt-1">
-                          Customers can&apos;t cancel or pause before this many charges.
-                        </p>
                       </div>
-                      {cyclesError && <p className="sm:col-span-2 text-xs text-red-600">{cyclesError}</p>}
-                    </div>
-                    <div className="pt-2">
-                      <p className="text-xs font-medium text-foreground-muted mb-1">Subscription prices</p>
-                      {offeredIntervals.length === 0 ? (
-                        <p className="text-xs text-foreground-muted">Add a billing interval to set its prices.</p>
+                      {productId ? (
+                        <DigitalFilesPanel productId={productId} />
                       ) : (
-                        <div className="overflow-x-auto rounded-md border border-border-default">
-                          <table className="w-full text-xs" data-testid="subscription-prices">
-                            <thead className="bg-surface-secondary text-foreground-muted">
-                              <tr>
-                                <th className="text-left font-medium px-3 py-2">Item</th>
-                                <th className="text-right font-medium px-3 py-2">One-time</th>
-                                {offeredIntervals.map(o => (
-                                  <th key={o.value} className="text-left font-medium px-3 py-2 whitespace-nowrap">
-                                    {o.label} (₹ per cycle)
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {sellableItems.map(item => (
-                                <tr key={item.key} className="border-t border-border-default align-top">
-                                  <td className="px-3 py-2">
-                                    <div className="text-foreground">{item.name}</div>
-                                    {item.sku && <div className="text-foreground-muted">{item.sku}</div>}
-                                  </td>
-                                  <td className="px-3 py-2 text-right text-foreground-secondary whitespace-nowrap">
-                                    {item.oneTimePrice != null ? `₹${item.oneTimePrice.toFixed(2)}` : '—'}
-                                  </td>
-                                  {offeredIntervals.map(o => {
-                                    const raw = item.subscriptionPrices[o.value] ?? ''
-                                    const effective = raw.trim() !== '' ? raw : item.subscriptionPrice
-                                    const err = subscriptionPriceError(raw)
-                                    const hint = err ? null : subscriptionPriceHint(item.oneTimePrice, effective)
-                                    const perMonth =
-                                      err || !isSubscriptionInterval(o.value)
-                                        ? null
-                                        : monthlyEquivalentLabel(o.value, effective)
-                                    const fallback =
-                                      item.subscriptionPrice ||
-                                      (item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : '')
-                                    return (
-                                      <td key={o.value} className="px-3 py-2">
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          max={MAX_CYCLE_AMOUNT_INR}
-                                          step="0.01"
-                                          inputMode="decimal"
-                                          aria-label={`${o.label} subscription price for ${item.name}`}
-                                          aria-invalid={!!err}
-                                          value={raw}
-                                          placeholder={fallback}
-                                          onChange={e => setSellableIntervalPrice(item, o.value, e.target.value)}
-                                          className={`${inputCls} w-28 ${err ? 'border-red-500' : ''}`}
-                                        />
-                                        {err && <div className="text-red-600 mt-0.5">{err}</div>}
-                                        {(hint || perMonth) && (
-                                          <div className="mt-0.5 space-x-1 whitespace-nowrap">
-                                            {perMonth && <span className="text-foreground-muted">{perMonth}</span>}
-                                            {hint && (
-                                              <span
-                                                className={
-                                                  hint.endsWith('less')
-                                                    ? 'text-green-700 dark:text-green-400'
-                                                    : 'text-amber-700 dark:text-amber-400'
-                                                }
-                                              >
-                                                {hint}
-                                              </span>
-                                            )}
-                                          </div>
-                                        )}
-                                      </td>
-                                    )
-                                  })}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        <p className="sm:col-span-2 text-xs text-foreground-muted">
+                          Save the product first, then upload files in the Digital Files panel. Buyers open them in the
+                          vault.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {subscriptionsEnabled && isSubscription && (
+                    <div className="pt-2 border-t border-border-default space-y-2">
+                      <AdminSelect
+                        label="Billing intervals offered"
+                        placeholder={
+                          subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length
+                            ? 'All intervals added'
+                            : 'Add a billing interval…'
+                        }
+                        value=""
+                        options={SUBSCRIPTION_INTERVALS.filter(o => !subscriptionIntervals.includes(o.value))}
+                        disabled={subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length}
+                        onChange={v => v && setSubscriptionIntervals(prev => (prev.includes(v) ? prev : [...prev, v]))}
+                      />
+                      {subscriptionIntervals.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {SUBSCRIPTION_INTERVALS.filter(o => subscriptionIntervals.includes(o.value)).map(opt => (
+                            <span
+                              key={opt.value}
+                              className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 text-accent-500 px-2.5 py-1 text-xs font-medium"
+                            >
+                              {opt.label}
+                              <button
+                                type="button"
+                                aria-label={`Remove ${opt.label}`}
+                                onClick={() => setSubscriptionIntervals(prev => prev.filter(v => v !== opt.value))}
+                                className="hover:text-red-600"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
                         </div>
                       )}
-                      {subscriptionPricesError && (
-                        <p className="text-xs text-red-600 mt-1">{subscriptionPricesError}</p>
-                      )}
-                      <p className="text-xs text-foreground-muted mt-1">
-                        GST-inclusive, like the one-time price. Leave blank to charge the one-time price each cycle.
-                        Max ₹{MAX_CYCLE_AMOUNT_INR.toLocaleString('en-IN')} per cycle.
-                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">
+                            Number of billing cycles
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={MAX_BILLING_CYCLES}
+                            step={1}
+                            value={totalCycles}
+                            onChange={e => setTotalCycles(e.target.value)}
+                            placeholder="Until cancelled"
+                            className={inputCls}
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">
+                            Leave blank to bill until the customer cancels.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">
+                            Minimum billing cycles
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={MAX_BILLING_CYCLES}
+                            step={1}
+                            value={minCycles}
+                            onChange={e => setMinCycles(e.target.value)}
+                            placeholder="No minimum"
+                            className={inputCls}
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">
+                            Customers can&apos;t cancel or pause before this many charges.
+                          </p>
+                        </div>
+                        {cyclesError && <p className="sm:col-span-2 text-xs text-red-600">{cyclesError}</p>}
+                      </div>
+                      <div className="pt-2">
+                        <p className="text-xs font-medium text-foreground-muted mb-1">Subscription prices</p>
+                        {offeredIntervals.length === 0 ? (
+                          <p className="text-xs text-foreground-muted">Add a billing interval to set its prices.</p>
+                        ) : (
+                          <div className="overflow-x-auto rounded-md border border-border-default">
+                            <table className="w-full text-xs" data-testid="subscription-prices">
+                              <thead className="bg-surface-secondary text-foreground-muted">
+                                <tr>
+                                  <th className="text-left font-medium px-3 py-2">Item</th>
+                                  <th className="text-right font-medium px-3 py-2">One-time</th>
+                                  {offeredIntervals.map(o => (
+                                    <th key={o.value} className="text-left font-medium px-3 py-2 whitespace-nowrap">
+                                      {o.label} (₹ per cycle)
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sellableItems.map(item => (
+                                  <tr key={item.key} className="border-t border-border-default align-top">
+                                    <td className="px-3 py-2">
+                                      <div className="text-foreground">{item.name}</div>
+                                      {item.sku && <div className="text-foreground-muted">{item.sku}</div>}
+                                    </td>
+                                    <td className="px-3 py-2 text-right text-foreground-secondary whitespace-nowrap">
+                                      {item.oneTimePrice != null ? `₹${item.oneTimePrice.toFixed(2)}` : '—'}
+                                    </td>
+                                    {offeredIntervals.map(o => {
+                                      const raw = item.subscriptionPrices[o.value] ?? ''
+                                      const effective = raw.trim() !== '' ? raw : item.subscriptionPrice
+                                      const err = subscriptionPriceError(raw)
+                                      const hint = err ? null : subscriptionPriceHint(item.oneTimePrice, effective)
+                                      const perMonth =
+                                        err || !isSubscriptionInterval(o.value)
+                                          ? null
+                                          : monthlyEquivalentLabel(o.value, effective)
+                                      const fallback =
+                                        item.subscriptionPrice ||
+                                        (item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : '')
+                                      return (
+                                        <td key={o.value} className="px-3 py-2">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max={MAX_CYCLE_AMOUNT_INR}
+                                            step="0.01"
+                                            inputMode="decimal"
+                                            aria-label={`${o.label} subscription price for ${item.name}`}
+                                            aria-invalid={!!err}
+                                            value={raw}
+                                            placeholder={fallback}
+                                            onChange={e => setSellableIntervalPrice(item, o.value, e.target.value)}
+                                            className={`${inputCls} w-28 ${err ? 'border-red-500' : ''}`}
+                                          />
+                                          {err && <div className="text-red-600 mt-0.5">{err}</div>}
+                                          {(hint || perMonth) && (
+                                            <div className="mt-0.5 space-x-1 whitespace-nowrap">
+                                              {perMonth && <span className="text-foreground-muted">{perMonth}</span>}
+                                              {hint && (
+                                                <span
+                                                  className={
+                                                    hint.endsWith('less')
+                                                      ? 'text-green-700 dark:text-green-400'
+                                                      : 'text-amber-700 dark:text-amber-400'
+                                                  }
+                                                >
+                                                  {hint}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+                                        </td>
+                                      )
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        {subscriptionPricesError && (
+                          <p className="text-xs text-red-600 mt-1">{subscriptionPricesError}</p>
+                        )}
+                        <p className="text-xs text-foreground-muted mt-1">
+                          GST-inclusive, like the one-time price. Leave blank to charge the one-time price each cycle.
+                          Max ₹{MAX_CYCLE_AMOUNT_INR.toLocaleString('en-IN')} per cycle.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        </div>
-        <div data-pf-tab="seo" role="tabpanel" hidden={activeTab !== 'seo'}>
-          <section className="space-y-4 rounded-xl border border-border-default bg-surface-elevated p-5">
-            {/* SEO */}
-            <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-              <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                <span>SEO &amp; Discoverability</span>
-              </div>
-              <div className="p-4 space-y-4 border-t border-border-default">
-                <div>
-                  <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
-                    <span>Meta Title</span>
-                    <span className={metaTitle.length > 160 ? 'text-red-500' : 'text-foreground-muted/60'}>
-                      {metaTitle.length}/160
-                    </span>
-                  </label>
-                  <AIEnrichButton
-                    fieldLabel="SEO meta title"
-                    value={metaTitle}
-                    onChange={setMetaTitle}
-                    scope="products:write"
-                    maxLength={160}
-                    write
-                    context={`SEO page title for the product "${productName}", ideally under 60 characters. ${description.replace(/<[^>]+>/g, ' ').slice(0, 300)}`}
-                  >
-                    <input
-                      type="text"
-                      maxLength={160}
-                      value={metaTitle}
-                      onChange={e => setMetaTitle(e.target.value)}
-                      placeholder="SEO page title"
-                      className={`${inputCls} pr-8`}
-                    />
-                  </AIEnrichButton>
-                </div>
-                <div>
-                  <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
-                    <span>Meta Description</span>
-                    <span className={metaDescription.length > 320 ? 'text-red-500' : 'text-foreground-muted/60'}>
-                      {metaDescription.length}/320
-                    </span>
-                  </label>
-                  <AIEnrichButton
-                    fieldLabel="SEO meta description"
-                    value={metaDescription}
-                    onChange={setMetaDescription}
-                    scope="products:write"
-                    maxLength={320}
-                    multiline
-                    write
-                    context={`Search-result description for the product "${productName}", ideally about 155 characters. ${description.replace(/<[^>]+>/g, ' ').slice(0, 600)}`}
-                  >
-                    <textarea
-                      maxLength={320}
-                      rows={3}
-                      value={metaDescription}
-                      onChange={e => setMetaDescription(e.target.value)}
-                      placeholder="SEO page description"
-                      className={`${inputCls} resize-none pr-8`}
-                    />
-                  </AIEnrichButton>
-                </div>
-                <Toggle
-                  id="is_searchable"
-                  checked={isSearchable}
-                  onChange={setIsSearchable}
-                  label="Searchable (show in search results)"
-                />
-              </div>
-            </div>
-          </section>
-        </div>
-        <div data-pf-tab="variants" role="tabpanel" hidden={activeTab !== 'variants'}>
-          {variantGalleryOpen && (
-            <GalleryPicker
-              mode="multi"
-              maxSelect={Math.max(0, 5 - (variantImagesMap[variantPopupId || '']?.length || 0))}
-              onClose={() => setVariantGalleryOpen(false)}
-              onConfirm={addVariantImagesFromGallery}
-            />
-          )}
-          {hasVariants && (
-            <div className="space-y-4">
-              {/* Toolbar: differentiator + jump-to + add variant (flat row, not a card) */}
-              <div className="flex flex-wrap items-center gap-2">
-                {groups[0] && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-foreground-muted">Differentiator:</span>
-                    <input
-                      type="text"
-                      value={groups[0].variant_type}
-                      onChange={e => updateGroupVariantType(groups[0].pricing_type, e.target.value)}
-                      className="field-compact h-control-sm border border-border-secondary bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 focus:border-transparent w-36"
-                      placeholder="e.g. Size, Pack, Colour"
-                    />
-                  </div>
-                )}
-                {activeVariants.length > 1 && (
-                  <>
-                    <span className="ml-2 mr-0.5 text-xs text-foreground-muted">Jump to</span>
-                    {activeVariants.map(v => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => {
-                          focusVariant(v.id)
-                          document
-                            .querySelector(`[data-variant-card="${v.id}"]`)
-                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                        }}
-                        className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground"
-                      >
-                        {v.variant_name || v.sku || 'Untitled variant'}
-                      </button>
-                    ))}
-                  </>
-                )}
-                <div className="ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const g = groups[0]
-                      if (g) addVariantToGroup(g.pricing_type, g.unit)
-                      else addGroup('unit')
-                    }}
-                    className="control-sm border border-accent-500/40 text-accent-500 hover:bg-accent-500/10 font-medium"
-                  >
-                    + Add variant
-                  </button>
+                  )}
                 </div>
               </div>
-
-              {groups.length === 0 && (
-                <div className="rounded-xl border border-dashed border-border-secondary p-6 text-center">
-                  <p className="text-sm text-foreground-muted">No variants yet. Click Add variant above to get started.</p>
+            </section>
+          </div>
+          <div data-pf-tab="seo" role="tabpanel" hidden={activeTab !== 'seo'}>
+            <section className="space-y-4 rounded-xl border border-border-default bg-surface-elevated p-5">
+              {/* SEO */}
+              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                  <span>SEO &amp; Discoverability</span>
                 </div>
-              )}
-              {groups.map(group => {
-                const groupVariants = variants.filter(v => v.pricing_type === group.pricing_type && !v._isDeleted)
-                const allGroupVariants = variants.filter(v => v.pricing_type === group.pricing_type)
-
-                return (
-                  <React.Fragment key={group.pricing_type}>
-                      {/* Mobile cards */}
-                      <div className="md:hidden space-y-3">
-                        {groupVariants.map(variant => {
-                          const index = variants.indexOf(variant)
-                          const perUnit = null
-                          return (
-                            <div
-                              key={variant.id || index}
-                              className="border border-border-default rounded-lg p-3 space-y-3 bg-surface"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-medium text-foreground-muted uppercase">Variant</span>
-                                {variant.is_active === false && <Badge tone="muted">Inactive</Badge>}
-                                <span className="ml-auto">
-                                  <Toggle
-                                    size="sm"
-                                    checked={variant.is_active !== false}
-                                    onChange={on => updateVariant(index, 'is_active', on)}
-                                    label="Active"
-                                  />
-                                </span>
-                                {groupVariants.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeVariant(index)}
-                                    className="text-red-500 hover:text-red-700 text-xs font-medium"
-                                  >
-                                    Remove
-                                  </button>
-                                )}
-                              </div>
-
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                  Name *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={variant.variant_name}
-                                  onChange={e => updateVariant(index, 'variant_name', e.target.value)}
-                                  className={inputCls}
-                                  placeholder="e.g. Small, M8, Red"
-                                  required
-                                />
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-3">
-                                {variant.sub_variant_type_on ? (
-                                  <>
-                                    <div className="col-span-2 rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-2.5">
-                                      <p className="text-xs text-foreground-secondary">
-                                        Pricing managed by sub-variants. Open this variant to add or edit
-                                        sub-variants.
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        Stock Status (from sub-variants)
-                                      </label>
-                                      <input
-                                        type="number"
-                                        value={sumSubVariantStock(subVariantsMap[variant.id || ''])}
-                                        readOnly
-                                        className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
-                                        placeholder="0"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        MPN
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={variant.mpn}
-                                        onChange={e => updateVariant(index, 'mpn', e.target.value)}
-                                        className={inputCls}
-                                        placeholder="Part No."
-                                      />
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        MRP (Ex. GST) *
-                                      </label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={variant.mrp_ex_gst}
-                                        onChange={e => {
-                                          const v = e.target.value
-                                          const updated = [...variants]
-                                          updated[index] = { ...updated[index], mrp_ex_gst: v }
-                                          const newMrpIncl = v ? exToIncl(v, gstRate) : ''
-                                          updated[index].mrp = newMrpIncl
-                                          const mrpExN = parseFloat(v)
-                                          const disc = parseFloat(discountPct || '0')
-                                          if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                                            const newPriceEx = parseFloat(
-                                              (mrpExN * (1 - disc / 100)).toFixed(2)
-                                            ).toString()
-                                            const newPriceIncl = exToIncl(newPriceEx, gstRate)
-                                            updated[index].price_ex_gst = newPriceEx
-                                            updated[index].price = newPriceIncl
-                                          } else {
-                                            updated[index].price_ex_gst = ''
-                                            updated[index].price = ''
-                                          }
-                                          setVariants(updated)
-                                        }}
-                                        className={inputCls}
-                                        placeholder="From catalog"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        Discount %
-                                      </label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        max="100"
-                                        readOnly
-                                        value={discountPct || '0'}
-                                        className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        Selling Price (incl. GST) *
-                                      </label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={variant.price}
-                                        readOnly
-                                        className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
-                                        placeholder="Auto-calculated"
-                                        required
-                                      />
-                                      {perUnit && (
-                                        <p className="text-xs text-accent-500 mt-0.5">
-                                          {perUnit}
-                                        </p>
-                                      )}
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        MRP (incl. GST)
-                                      </label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={variant.mrp}
-                                        readOnly
-                                        className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
-                                        placeholder="Auto-calculated"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        Selling Price (Ex. GST)
-                                      </label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={variant.price_ex_gst}
-                                        readOnly
-                                        className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
-                                        placeholder="Auto-calculated"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        {variant.sub_variant_type_on
-                                          ? 'Stock Status (from sub-variants)'
-                                          : 'Stock Status *'}
-                                      </label>
-                                      {variant.sub_variant_type_on ? (
-                                        <input
-                                          type="text"
-                                          value={
-                                            sumSubVariantStock(subVariantsMap[variant.id || '']) > 0
-                                              ? 'In Stock'
-                                              : 'Out of Stock'
-                                          }
-                                          readOnly
-                                          className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
-                                        />
-                                      ) : (
-                                        <AdminSelect
-                                          value={variant.stock_status}
-                                          onChange={v => updateVariant(index, 'stock_status', v)}
-                                          options={[
-                                            { value: 'In Stock', label: 'In Stock' },
-                                            { value: 'Low Stock', label: 'Low Stock' },
-                                            { value: 'Out of Stock', label: 'Out of Stock' },
-                                          ]}
-                                        />
-                                      )}
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        MPN
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={variant.mpn}
-                                        onChange={e => updateVariant(index, 'mpn', e.target.value)}
-                                        className={inputCls}
-                                        placeholder="Part No."
-                                      />
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                  GTIN / Barcode
-                                </label>
-                                <input
-                                  type="text"
-                                  value={variant.gtin}
-                                  onChange={e => updateVariant(index, 'gtin', e.target.value)}
-                                  className={inputCls}
-                                  placeholder="Barcode"
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                  Amazon ASIN
-                                </label>
-                                <input
-                                  type="text"
-                                  value={variant.asin}
-                                  onChange={e => updateVariant(index, 'asin', e.target.value)}
-                                  className={inputCls}
-                                  placeholder="e.g. B0XXXXXXXX"
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                  ISBN
-                                </label>
-                                <input
-                                  type="text"
-                                  value={variant.isbn}
-                                  onChange={e => updateVariant(index, 'isbn', e.target.value)}
-                                  className={inputCls}
-                                  placeholder="For books"
-                                />
-                              </div>
-                              {!variant.sub_variant_type_on && (
-                                <>
-                                  <div>
-                                    <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                      Weight per piece (g) *
-                                    </label>
-                                    <input
-                                      type="number"
-                                      step="1"
-                                      min="1"
-                                      value={variant.weight_grams}
-                                      onChange={e => updateVariant(index, 'weight_grams', e.target.value)}
-                                      className={inputCls}
-                                      placeholder="e.g. 500"
-                                    />
-                                    {(variant.package_type || 'flat_poly_auto') === 'flat_poly_auto' &&
-                                      parseFloat(variant.weight_grams) > 2000 && (
-                                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                                          Consider using corrugated_box for items over 2 kg for accurate shipping
-                                          rates.
-                                        </p>
-                                      )}
-                                  </div>
-                                  <div>
-                                    <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                      Package Type
-                                    </label>
-                                    <AdminSelect
-                                      value={variant.package_type || 'flat_poly_auto'}
-                                      onChange={val => updateVariant(index, 'package_type', val)}
-                                      options={[
-                                        { value: 'flat_poly_auto', label: 'Flat Poly (auto)' },
-                                        { value: 'flat_poly_s', label: 'Flat Poly S' },
-                                        { value: 'flat_poly_m', label: 'Flat Poly M' },
-                                        { value: 'flat_poly_l', label: 'Flat Poly L' },
-                                        { value: 'flat_poly_xl', label: 'Flat Poly XL' },
-                                        { value: 'drill_bit_tube', label: 'Drill Bit Tube' },
-                                        { value: 'drill_bit_set_case', label: 'Drill Bit Set Case' },
-                                        { value: 'corrugated_box', label: 'Corrugated Box' },
-                                        { value: 'long_tube', label: 'Long Tube / Rod' },
-                                      ]}
-                                      compact
-                                    />
-                                  </div>
-                                  {['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube'].includes(
-                                    variant.package_type || 'flat_poly_auto'
-                                  ) && (
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                        Dimensions per piece (L × B × H cm)
-                                      </label>
-                                      <div className="grid grid-cols-3 gap-1">
-                                        <input
-                                          type="number"
-                                          step="0.1"
-                                          min="0"
-                                          value={variant.length_cm}
-                                          onChange={e => updateVariant(index, 'length_cm', e.target.value)}
-                                          className={inputCls}
-                                          placeholder="L"
-                                        />
-                                        <input
-                                          type="number"
-                                          step="0.1"
-                                          min="0"
-                                          value={variant.breadth_cm}
-                                          onChange={e => updateVariant(index, 'breadth_cm', e.target.value)}
-                                          className={inputCls}
-                                          placeholder="B"
-                                        />
-                                        <input
-                                          type="number"
-                                          step="0.1"
-                                          min="0"
-                                          value={variant.height_cm}
-                                          onChange={e => updateVariant(index, 'height_cm', e.target.value)}
-                                          className={inputCls}
-                                          placeholder="H"
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                              <div className="pt-2 border-t border-border-default-default space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updated = [...variants]
-                                      const row = { ...updated[index] }
-                                      row.sub_variant_type_on = !row.sub_variant_type_on
-                                      if (row.sub_variant_type_on) row.use_own_images = true
-                                      updated[index] = row
-                                      setVariants(updated)
-                                    }}
-                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
-                                    role="switch"
-                                    aria-checked={variant.sub_variant_type_on}
-                                  >
-                                    <span
-                                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`}
-                                    />
-                                  </button>
-                                  <span className="text-xs font-medium text-foreground-secondary">
-                                    Has sub-variants
-                                  </span>
-                                </div>
-                                {variant.sub_variant_type_on && (
-                                  <div className="flex items-center gap-2 pl-11">
-                                    <span className="text-xs text-foreground-muted">Label</span>
-                                    <input
-                                      type="text"
-                                      value={variant.sub_variant_type}
-                                      onChange={e => updateVariant(index, 'sub_variant_type', e.target.value)}
-                                      className="w-32 field-xs border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs"
-                                      placeholder="e.g. Colour, Finish"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                              {product?.sku && variant.variant_name && (
-                                <div className="text-xs font-mono text-foreground-muted">
-                                  SKU: {product.sku}-{variant.variant_name.toUpperCase().replace(/[^A-Z0-9]/g, '')}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      {/* Desktop: one card per variant, details inline */}
-                      <div className="hidden md:block space-y-4">
-                        {groupVariants.map(variant => {
-                          const index = variants.indexOf(variant)
-                          const pos = activeVariants.indexOf(variant)
-                          const stockLabel = variant.sub_variant_type_on
-                            ? sumSubVariantStock(subVariantsMap[variant.id || '']) > 0
-                              ? 'In Stock'
-                              : 'Out of Stock'
-                            : variant.stock_status || 'In Stock'
-                          return (
-                            <div
-                              key={variant.id || index}
-                              data-variant-card={variant.id || undefined}
-                              className="scroll-mt-24 rounded-xl border border-border-default bg-surface-elevated shadow-sm"
-                              onFocusCapture={() => focusVariant(variant.id)}
-                              onPointerDownCapture={() => focusVariant(variant.id)}
-                            >
-                              <div className="flex flex-wrap items-center gap-2 rounded-t-xl border-b border-border-default bg-surface-secondary/40 px-4 py-2.5">
-                                <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                                  {variant.variant_name || 'Untitled variant'}
-                                </span>
-                                <span className="font-mono text-xs text-foreground-muted">{variant.sku || variantAutoSku(variant)}</span>
-                                <Badge tone={stockLabel === 'Out of Stock' ? 'red' : stockLabel === 'Low Stock' ? 'amber' : 'green'}>
-                                  {stockLabel}
-                                </Badge>
-                                {variant.is_active === false && <Badge tone="muted">Inactive</Badge>}
-                                <span className="ml-auto text-xs tabular-nums text-foreground-muted">
-                                  Variant {pos + 1} of {activeVariants.length}
-                                </span>
-                                <Toggle
-                                  size="sm"
-                                  checked={variant.is_active !== false}
-                                  onChange={on => updateVariant(index, 'is_active', on)}
-                                  label="Active"
-                                />
-                                {allGroupVariants.filter(v => !v._isDeleted).length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeVariant(index)}
-                                    className="text-red-400 hover:text-red-600 p-1 rounded transition-colors"
-                                    title="Remove"
-                                  >
-                                    <svg
-                                      className="w-3.5 h-3.5"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M6 18L18 6M6 6l12 12"
-                                      />
-                                    </svg>
-                                  </button>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4 xl:grid-cols-8">
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Name *</label>
-                              <input
-                                type="text"
-                                value={variant.variant_name}
-                                onChange={e => updateVariant(index, 'variant_name', e.target.value)}
-                                className="w-full field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                placeholder="e.g. M8, Red"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">SKU</label>
-                              <input
-                                type="text"
-                                value={variant.sku || variantAutoSku(variant)}
-                                onChange={e => updateVariant(index, 'sku', e.target.value.toUpperCase())}
-                                className="w-full field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                placeholder="Auto"
-                              />
-                            </div>
-                                {variant.sub_variant_type_on ? (
-                                  <p className="col-span-2 self-end pb-2 text-xs italic text-foreground-muted lg:col-span-4 xl:col-span-5">
-                                    Pricing managed by sub-variants
-                                  </p>
-                                ) : (
-                                  <>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">MRP (Ex. GST) *</label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={variant.mrp_ex_gst}
-                                        onChange={e => {
-                                          const v = e.target.value
-                                          const updated = [...variants]
-                                          updated[index] = { ...updated[index], mrp_ex_gst: v }
-                                          const newMrpIncl = v ? exToIncl(v, gstRate) : ''
-                                          updated[index].mrp = newMrpIncl
-                                          const mrpExN = parseFloat(v)
-                                          const disc = parseFloat(discountPct || '0')
-                                          if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                                            const newPriceEx = parseFloat(
-                                              (mrpExN * (1 - disc / 100)).toFixed(2)
-                                            ).toString()
-                                            const newPriceIncl = exToIncl(newPriceEx, gstRate)
-                                            updated[index].price_ex_gst = newPriceEx
-                                            updated[index].price = newPriceIncl
-                                          } else {
-                                            updated[index].price_ex_gst = ''
-                                            updated[index].price = ''
-                                          }
-                                          setVariants(updated)
-                                        }}
-                                        className="w-full field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                        placeholder="From catalog"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Disc %</label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        max="100"
-                                        readOnly
-                                        value={discountPct || '0'}
-                                        className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">MRP (incl)</label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={variant.mrp}
-                                        readOnly
-                                        className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                        placeholder="Auto"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Price (incl) *</label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={variant.price}
-                                        readOnly
-                                        className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                        placeholder="Auto"
-                                        required
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Price (Ex)</label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={variant.price_ex_gst}
-                                        readOnly
-                                        className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                        placeholder="Auto"
-                                      />
-                                    </div>
-                                  </>
-                                )}
-                                <div>
-                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Stock Status *</label>
-                                  {variant.sub_variant_type_on ? (
-                                    <input
-                                      type="text"
-                                      value={
-                                        sumSubVariantStock(subVariantsMap[variant.id || '']) > 0
-                                          ? 'In Stock'
-                                          : 'Out of Stock'
-                                      }
-                                      readOnly
-                                      className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                      title="Derived from sub-variants"
-                                    />
-                                  ) : (
-                                    <AdminSelect
-                                      value={variant.stock_status}
-                                      onChange={v => updateVariant(index, 'stock_status', v)}
-                                      sm
-                                      className="w-full"
-                                      options={[
-                                        { value: 'In Stock', label: 'In Stock' },
-                                        { value: 'Low Stock', label: 'Low Stock' },
-                                        { value: 'Out of Stock', label: 'Out of Stock' },
-                                      ]}
-                                    />
-                                  )}
-                                </div>
-                              </div>
-                              {variant.id && (
-                                <div className="border-t border-border-default">
-                                  {renderVariantDetail(
-                                    variant.id,
-                                    variant,
-                                    index,
-                                    variantUnitInfo[variant.id]?.unitKey || '',
-                                    variantUnitInfo[variant.id] || null
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                  </React.Fragment>
-                )
-              })}
-
-              <p className="text-xs text-foreground-muted">
-                Stock is managed per variant. Product-level stock is not used when variants are enabled.
-              </p>
-            </div>
-          )}
-        </div>
-        <div data-pf-tab="subvariants" role="tabpanel" hidden={activeTab !== 'subvariants'}>
-          {svParent && (() => {
-            const svList = (svParent.id && subVariantsMap[svParent.id]) || []
-            return (
-              <div className="space-y-4">
-                {/* Toolbar: variant selector + jump-to + add sub-variant (flat row, not a card) */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-foreground-muted">Variant:</span>
-                  {subVariantParents.map(v => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setSvVariantId(v.id ?? null)}
-                      aria-pressed={v.id === svParent.id}
-                      className={`control-sm border ${
-                        v.id === svParent.id
-                          ? 'border-accent-500 bg-accent-500/10 text-foreground font-medium'
-                          : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
-                      }`}
-                    >
-                      {v.variant_name || v.sku || 'Untitled variant'}
-                      <span className="ml-1 tabular-nums text-foreground-muted">
-                        ({(subVariantsMap[v.id || ''] || []).length})
+                <div className="p-4 space-y-4 border-t border-border-default">
+                  <div>
+                    <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
+                      <span>Meta Title</span>
+                      <span className={metaTitle.length > 160 ? 'text-red-500' : 'text-foreground-muted/60'}>
+                        {metaTitle.length}/160
                       </span>
-                    </button>
-                  ))}
-                  {svList.length > 1 && (
+                    </label>
+                    <AIEnrichButton
+                      fieldLabel="SEO meta title"
+                      value={metaTitle}
+                      onChange={setMetaTitle}
+                      scope="products:write"
+                      maxLength={160}
+                      write
+                      context={`SEO page title for the product "${productName}", ideally under 60 characters. ${description.replace(/<[^>]+>/g, ' ').slice(0, 300)}`}
+                    >
+                      <input
+                        type="text"
+                        maxLength={160}
+                        value={metaTitle}
+                        onChange={e => setMetaTitle(e.target.value)}
+                        placeholder="SEO page title"
+                        className={`${inputCls} pr-8`}
+                      />
+                    </AIEnrichButton>
+                  </div>
+                  <div>
+                    <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
+                      <span>Meta Description</span>
+                      <span className={metaDescription.length > 320 ? 'text-red-500' : 'text-foreground-muted/60'}>
+                        {metaDescription.length}/320
+                      </span>
+                    </label>
+                    <AIEnrichButton
+                      fieldLabel="SEO meta description"
+                      value={metaDescription}
+                      onChange={setMetaDescription}
+                      scope="products:write"
+                      maxLength={320}
+                      multiline
+                      write
+                      context={`Search-result description for the product "${productName}", ideally about 155 characters. ${description.replace(/<[^>]+>/g, ' ').slice(0, 600)}`}
+                    >
+                      <textarea
+                        maxLength={320}
+                        rows={3}
+                        value={metaDescription}
+                        onChange={e => setMetaDescription(e.target.value)}
+                        placeholder="SEO page description"
+                        className={`${inputCls} resize-none pr-8`}
+                      />
+                    </AIEnrichButton>
+                  </div>
+                  <Toggle
+                    id="is_searchable"
+                    checked={isSearchable}
+                    onChange={setIsSearchable}
+                    label="Searchable (show in search results)"
+                  />
+                </div>
+              </div>
+            </section>
+          </div>
+          <div data-pf-tab="variants" role="tabpanel" hidden={activeTab !== 'variants'}>
+            {variantGalleryOpen && (
+              <GalleryPicker
+                mode="multi"
+                maxSelect={Math.max(0, 5 - (variantImagesMap[variantPopupId || '']?.length || 0))}
+                onClose={() => setVariantGalleryOpen(false)}
+                onConfirm={addVariantImagesFromGallery}
+              />
+            )}
+            {hasVariants && (
+              <div className="space-y-4">
+                {/* Toolbar: differentiator + jump-to + add variant (flat row, not a card) */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {groups[0] && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-foreground-muted">Differentiator:</span>
+                      <input
+                        type="text"
+                        value={groups[0].variant_type}
+                        onChange={e => updateGroupVariantType(groups[0].pricing_type, e.target.value)}
+                        className="field-compact h-control-sm border border-border-secondary bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 focus:border-transparent w-36"
+                        placeholder="e.g. Size, Pack, Colour"
+                      />
+                    </div>
+                  )}
+                  {activeVariants.length > 1 && (
                     <>
                       <span className="ml-2 mr-0.5 text-xs text-foreground-muted">Jump to</span>
-                      {svList.map((sv: any) => (
+                      {activeVariants.map(v => (
                         <button
-                          key={sv.id}
+                          key={v.id}
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            focusVariant(v.id)
                             document
-                              .querySelector(`[data-sub-variant-card="${sv.id}"]`)
+                              .querySelector(`[data-variant-card="${v.id}"]`)
                               ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                          }
+                          }}
                           className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground"
                         >
-                          {sv.sub_variant_name || sv.sku || 'Untitled sub-variant'}
+                          {v.variant_name || v.sku || 'Untitled variant'}
                         </button>
                       ))}
                     </>
@@ -6077,56 +5409,744 @@ export default function ProductForm({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!svParent.id) return
-                        document
-                          .querySelector(`[data-add-subvariant-form="${svParent.id}"]`)
-                          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        const g = groups[0]
+                        if (g) addVariantToGroup(g.pricing_type, g.unit)
+                        else addGroup('unit')
                       }}
-                      disabled={!svParent.id || svParent.id.startsWith('temp-')}
-                      className="control-sm border border-accent-500/40 text-accent-500 hover:bg-accent-500/10 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="control-sm border border-accent-500/40 text-accent-500 hover:bg-accent-500/10 font-medium"
                     >
-                      + Add sub-variant
+                      + Add variant
                     </button>
                   </div>
                 </div>
-                {svParent.id &&
-                  renderSubVariants(
-                    svParent.id,
-                    svParent,
-                    variantUnitInfo[svParent.id]?.unitKey || '',
-                    variantUnitInfo[svParent.id] || null
-                  )}
+
+                {groups.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-border-secondary p-6 text-center">
+                    <p className="text-sm text-foreground-muted">No variants yet. Click Add variant above to get started.</p>
+                  </div>
+                )}
+                {groups.map(group => {
+                  const groupVariants = variants.filter(v => v.pricing_type === group.pricing_type && !v._isDeleted)
+                  const allGroupVariants = variants.filter(v => v.pricing_type === group.pricing_type)
+
+                  return (
+                    <React.Fragment key={group.pricing_type}>
+                        {/* Mobile cards */}
+                        <div className="md:hidden space-y-3">
+                          {groupVariants.map(variant => {
+                            const index = variants.indexOf(variant)
+                            const perUnit = null
+                            return (
+                              <div
+                                key={variant.id || index}
+                                className="border border-border-default rounded-lg p-3 space-y-3 bg-surface"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-medium text-foreground-muted uppercase">Variant</span>
+                                  {variant.is_active === false && <Badge tone="muted">Inactive</Badge>}
+                                  <span className="ml-auto">
+                                    <Toggle
+                                      size="sm"
+                                      checked={variant.is_active !== false}
+                                      onChange={on => updateVariant(index, 'is_active', on)}
+                                      label="Active"
+                                    />
+                                  </span>
+                                  {groupVariants.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeVariant(index)}
+                                      className="text-red-500 hover:text-red-700 text-xs font-medium"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                    Name *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={variant.variant_name}
+                                    onChange={e => updateVariant(index, 'variant_name', e.target.value)}
+                                    className={inputCls}
+                                    placeholder="e.g. Small, M8, Red"
+                                    required
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  {variant.sub_variant_type_on ? (
+                                    <>
+                                      <div className="col-span-2 rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-2.5">
+                                        <p className="text-xs text-foreground-secondary">
+                                          Pricing managed by sub-variants. Open this variant to add or edit
+                                          sub-variants.
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          Stock Status (from sub-variants)
+                                        </label>
+                                        <input
+                                          type="number"
+                                          value={sumSubVariantStock(subVariantsMap[variant.id || ''])}
+                                          readOnly
+                                          className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          MPN
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={variant.mpn}
+                                          onChange={e => updateVariant(index, 'mpn', e.target.value)}
+                                          className={inputCls}
+                                          placeholder="Part No."
+                                        />
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          MRP (Ex. GST) *
+                                        </label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={variant.mrp_ex_gst}
+                                          onChange={e => {
+                                            const v = e.target.value
+                                            const updated = [...variants]
+                                            updated[index] = { ...updated[index], mrp_ex_gst: v }
+                                            const newMrpIncl = v ? exToIncl(v, gstRate) : ''
+                                            updated[index].mrp = newMrpIncl
+                                            const mrpExN = parseFloat(v)
+                                            const disc = parseFloat(discountPct || '0')
+                                            if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
+                                              const newPriceEx = parseFloat(
+                                                (mrpExN * (1 - disc / 100)).toFixed(2)
+                                              ).toString()
+                                              const newPriceIncl = exToIncl(newPriceEx, gstRate)
+                                              updated[index].price_ex_gst = newPriceEx
+                                              updated[index].price = newPriceIncl
+                                            } else {
+                                              updated[index].price_ex_gst = ''
+                                              updated[index].price = ''
+                                            }
+                                            setVariants(updated)
+                                          }}
+                                          className={inputCls}
+                                          placeholder="From catalog"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          Discount %
+                                        </label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          max="100"
+                                          readOnly
+                                          value={discountPct || '0'}
+                                          className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          Selling Price (incl. GST) *
+                                        </label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={variant.price}
+                                          readOnly
+                                          className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
+                                          placeholder="Auto-calculated"
+                                          required
+                                        />
+                                        {perUnit && (
+                                          <p className="text-xs text-accent-500 mt-0.5">
+                                            {perUnit}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          MRP (incl. GST)
+                                        </label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={variant.mrp}
+                                          readOnly
+                                          className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
+                                          placeholder="Auto-calculated"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          Selling Price (Ex. GST)
+                                        </label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={variant.price_ex_gst}
+                                          readOnly
+                                          className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
+                                          placeholder="Auto-calculated"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          {variant.sub_variant_type_on
+                                            ? 'Stock Status (from sub-variants)'
+                                            : 'Stock Status *'}
+                                        </label>
+                                        {variant.sub_variant_type_on ? (
+                                          <input
+                                            type="text"
+                                            value={
+                                              sumSubVariantStock(subVariantsMap[variant.id || '']) > 0
+                                                ? 'In Stock'
+                                                : 'Out of Stock'
+                                            }
+                                            readOnly
+                                            className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
+                                          />
+                                        ) : (
+                                          <AdminSelect
+                                            value={variant.stock_status}
+                                            onChange={v => updateVariant(index, 'stock_status', v)}
+                                            options={[
+                                              { value: 'In Stock', label: 'In Stock' },
+                                              { value: 'Low Stock', label: 'Low Stock' },
+                                              { value: 'Out of Stock', label: 'Out of Stock' },
+                                            ]}
+                                          />
+                                        )}
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          MPN
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={variant.mpn}
+                                          onChange={e => updateVariant(index, 'mpn', e.target.value)}
+                                          className={inputCls}
+                                          placeholder="Part No."
+                                        />
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                    GTIN / Barcode
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={variant.gtin}
+                                    onChange={e => updateVariant(index, 'gtin', e.target.value)}
+                                    className={inputCls}
+                                    placeholder="Barcode"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                    Amazon ASIN
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={variant.asin}
+                                    onChange={e => updateVariant(index, 'asin', e.target.value)}
+                                    className={inputCls}
+                                    placeholder="e.g. B0XXXXXXXX"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                    ISBN
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={variant.isbn}
+                                    onChange={e => updateVariant(index, 'isbn', e.target.value)}
+                                    className={inputCls}
+                                    placeholder="For books"
+                                  />
+                                </div>
+                                {!variant.sub_variant_type_on && (
+                                  <>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                        Weight per piece (g) *
+                                      </label>
+                                      <input
+                                        type="number"
+                                        step="1"
+                                        min="1"
+                                        value={variant.weight_grams}
+                                        onChange={e => updateVariant(index, 'weight_grams', e.target.value)}
+                                        className={inputCls}
+                                        placeholder="e.g. 500"
+                                      />
+                                      {(variant.package_type || 'flat_poly_auto') === 'flat_poly_auto' &&
+                                        parseFloat(variant.weight_grams) > 2000 && (
+                                          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                            Consider using corrugated_box for items over 2 kg for accurate shipping
+                                            rates.
+                                          </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                        Package Type
+                                      </label>
+                                      <AdminSelect
+                                        value={variant.package_type || 'flat_poly_auto'}
+                                        onChange={val => updateVariant(index, 'package_type', val)}
+                                        options={[
+                                          { value: 'flat_poly_auto', label: 'Flat Poly (auto)' },
+                                          { value: 'flat_poly_s', label: 'Flat Poly S' },
+                                          { value: 'flat_poly_m', label: 'Flat Poly M' },
+                                          { value: 'flat_poly_l', label: 'Flat Poly L' },
+                                          { value: 'flat_poly_xl', label: 'Flat Poly XL' },
+                                          { value: 'drill_bit_tube', label: 'Drill Bit Tube' },
+                                          { value: 'drill_bit_set_case', label: 'Drill Bit Set Case' },
+                                          { value: 'corrugated_box', label: 'Corrugated Box' },
+                                          { value: 'long_tube', label: 'Long Tube / Rod' },
+                                        ]}
+                                        compact
+                                      />
+                                    </div>
+                                    {['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube'].includes(
+                                      variant.package_type || 'flat_poly_auto'
+                                    ) && (
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                                          Dimensions per piece (L × B × H cm)
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-1">
+                                          <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={variant.length_cm}
+                                            onChange={e => updateVariant(index, 'length_cm', e.target.value)}
+                                            className={inputCls}
+                                            placeholder="L"
+                                          />
+                                          <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={variant.breadth_cm}
+                                            onChange={e => updateVariant(index, 'breadth_cm', e.target.value)}
+                                            className={inputCls}
+                                            placeholder="B"
+                                          />
+                                          <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={variant.height_cm}
+                                            onChange={e => updateVariant(index, 'height_cm', e.target.value)}
+                                            className={inputCls}
+                                            placeholder="H"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                                <div className="pt-2 border-t border-border-default-default space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = [...variants]
+                                        const row = { ...updated[index] }
+                                        row.sub_variant_type_on = !row.sub_variant_type_on
+                                        if (row.sub_variant_type_on) row.use_own_images = true
+                                        updated[index] = row
+                                        setVariants(updated)
+                                      }}
+                                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                                      role="switch"
+                                      aria-checked={variant.sub_variant_type_on}
+                                    >
+                                      <span
+                                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`}
+                                      />
+                                    </button>
+                                    <span className="text-xs font-medium text-foreground-secondary">
+                                      Has sub-variants
+                                    </span>
+                                  </div>
+                                  {variant.sub_variant_type_on && (
+                                    <div className="flex items-center gap-2 pl-11">
+                                      <span className="text-xs text-foreground-muted">Label</span>
+                                      <input
+                                        type="text"
+                                        value={variant.sub_variant_type}
+                                        onChange={e => updateVariant(index, 'sub_variant_type', e.target.value)}
+                                        className="w-32 field-xs border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs"
+                                        placeholder="e.g. Colour, Finish"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                {product?.sku && variant.variant_name && (
+                                  <div className="text-xs font-mono text-foreground-muted">
+                                    SKU: {product.sku}-{variant.variant_name.toUpperCase().replace(/[^A-Z0-9]/g, '')}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Desktop: one card per variant, details inline */}
+                        <div className="hidden md:block space-y-4">
+                          {groupVariants.map(variant => {
+                            const index = variants.indexOf(variant)
+                            const pos = activeVariants.indexOf(variant)
+                            const stockLabel = variant.sub_variant_type_on
+                              ? sumSubVariantStock(subVariantsMap[variant.id || '']) > 0
+                                ? 'In Stock'
+                                : 'Out of Stock'
+                              : variant.stock_status || 'In Stock'
+                            return (
+                              <div
+                                key={variant.id || index}
+                                data-variant-card={variant.id || undefined}
+                                className="scroll-mt-24 rounded-xl border border-border-default bg-surface-elevated shadow-sm"
+                                onFocusCapture={() => focusVariant(variant.id)}
+                                onPointerDownCapture={() => focusVariant(variant.id)}
+                              >
+                                <div className="flex flex-wrap items-center gap-2 rounded-t-xl border-b border-border-default bg-surface-secondary/40 px-4 py-2.5">
+                                  <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                                    {variant.variant_name || 'Untitled variant'}
+                                  </span>
+                                  <span className="font-mono text-xs text-foreground-muted">{variant.sku || variantAutoSku(variant)}</span>
+                                  <Badge tone={stockLabel === 'Out of Stock' ? 'red' : stockLabel === 'Low Stock' ? 'amber' : 'green'}>
+                                    {stockLabel}
+                                  </Badge>
+                                  {variant.is_active === false && <Badge tone="muted">Inactive</Badge>}
+                                  <span className="ml-auto text-xs tabular-nums text-foreground-muted">
+                                    Variant {pos + 1} of {activeVariants.length}
+                                  </span>
+                                  <Toggle
+                                    size="sm"
+                                    checked={variant.is_active !== false}
+                                    onChange={on => updateVariant(index, 'is_active', on)}
+                                    label="Active"
+                                  />
+                                  {allGroupVariants.filter(v => !v._isDeleted).length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeVariant(index)}
+                                      className="text-red-400 hover:text-red-600 p-1 rounded transition-colors"
+                                      title="Remove"
+                                    >
+                                      <svg
+                                        className="w-3.5 h-3.5"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M6 18L18 6M6 6l12 12"
+                                        />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4 xl:grid-cols-8">
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Name *</label>
+                                <input
+                                  type="text"
+                                  value={variant.variant_name}
+                                  onChange={e => updateVariant(index, 'variant_name', e.target.value)}
+                                  className="w-full field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                                  placeholder="e.g. M8, Red"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">SKU</label>
+                                <input
+                                  type="text"
+                                  value={variant.sku || variantAutoSku(variant)}
+                                  onChange={e => updateVariant(index, 'sku', e.target.value.toUpperCase())}
+                                  className="w-full field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                                  placeholder="Auto"
+                                />
+                              </div>
+                                  {variant.sub_variant_type_on ? (
+                                    <p className="col-span-2 self-end pb-2 text-xs italic text-foreground-muted lg:col-span-4 xl:col-span-5">
+                                      Pricing managed by sub-variants
+                                    </p>
+                                  ) : (
+                                    <>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">MRP (Ex. GST) *</label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={variant.mrp_ex_gst}
+                                          onChange={e => {
+                                            const v = e.target.value
+                                            const updated = [...variants]
+                                            updated[index] = { ...updated[index], mrp_ex_gst: v }
+                                            const newMrpIncl = v ? exToIncl(v, gstRate) : ''
+                                            updated[index].mrp = newMrpIncl
+                                            const mrpExN = parseFloat(v)
+                                            const disc = parseFloat(discountPct || '0')
+                                            if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
+                                              const newPriceEx = parseFloat(
+                                                (mrpExN * (1 - disc / 100)).toFixed(2)
+                                              ).toString()
+                                              const newPriceIncl = exToIncl(newPriceEx, gstRate)
+                                              updated[index].price_ex_gst = newPriceEx
+                                              updated[index].price = newPriceIncl
+                                            } else {
+                                              updated[index].price_ex_gst = ''
+                                              updated[index].price = ''
+                                            }
+                                            setVariants(updated)
+                                          }}
+                                          className="w-full field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                                          placeholder="From catalog"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Disc %</label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          max="100"
+                                          readOnly
+                                          value={discountPct || '0'}
+                                          className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">MRP (incl)</label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={variant.mrp}
+                                          readOnly
+                                          className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                          placeholder="Auto"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Price (incl) *</label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={variant.price}
+                                          readOnly
+                                          className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                          placeholder="Auto"
+                                          required
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Price (Ex)</label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={variant.price_ex_gst}
+                                          readOnly
+                                          className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                          placeholder="Auto"
+                                        />
+                                      </div>
+                                    </>
+                                  )}
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Stock Status *</label>
+                                    {variant.sub_variant_type_on ? (
+                                      <input
+                                        type="text"
+                                        value={
+                                          sumSubVariantStock(subVariantsMap[variant.id || '']) > 0
+                                            ? 'In Stock'
+                                            : 'Out of Stock'
+                                        }
+                                        readOnly
+                                        className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                        title="Derived from sub-variants"
+                                      />
+                                    ) : (
+                                      <AdminSelect
+                                        value={variant.stock_status}
+                                        onChange={v => updateVariant(index, 'stock_status', v)}
+                                        sm
+                                        className="w-full"
+                                        options={[
+                                          { value: 'In Stock', label: 'In Stock' },
+                                          { value: 'Low Stock', label: 'Low Stock' },
+                                          { value: 'Out of Stock', label: 'Out of Stock' },
+                                        ]}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                                {variant.id && (
+                                  <div className="border-t border-border-default">
+                                    {renderVariantDetail(
+                                      variant.id,
+                                      variant,
+                                      index,
+                                      variantUnitInfo[variant.id]?.unitKey || '',
+                                      variantUnitInfo[variant.id] || null
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                    </React.Fragment>
+                  )
+                })}
+
+                <p className="text-xs text-foreground-muted">
+                  Stock is managed per variant. Product-level stock is not used when variants are enabled.
+                </p>
               </div>
-            )
-          })()}
-        </div>
-        <div data-pf-tab="units" role="tabpanel" hidden={activeTab !== 'units'}>
-          {/* Selling Units (product-level — applies to every variant) */}
-          {productId && isDigital && (
-            <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-1">Selling Units &amp; Conversions</h3>
-              <p className="text-xs text-foreground-muted" data-testid="digital-units-note">
-                {DIGITAL_UNIT_MESSAGE}.
-              </p>
-            </div>
-          )}
-          {productId && !isDigital && (
-            <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">Selling Units &amp; Conversions</h3>
-              <p className="text-xs text-foreground-muted mb-4">
-                Configure alternate units (e.g. box of 100, sheet of 4&apos;×8&apos;, tin of 5 L). The pricing engine
-                multiplies the base price by the factor automatically. Stock always lives in the BASE unit. Units
-                configured here apply to <strong>every variant</strong> by default — open a variant to override
-                per-variant. For bulk discounts, attach a tiered_price rule to the unit instead of overriding the price.
-              </p>
-              <UnitsManager productId={productId} basePrice={basePrice} isDraft={isDraft} />
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+          <div data-pf-tab="subvariants" role="tabpanel" hidden={activeTab !== 'subvariants'}>
+            {svParent && (() => {
+              const svList = (svParent.id && subVariantsMap[svParent.id]) || []
+              return (
+                <div className="space-y-4">
+                  {/* Toolbar: variant selector + jump-to + add sub-variant (flat row, not a card) */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-foreground-muted">Variant:</span>
+                    {subVariantParents.map(v => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setSvVariantId(v.id ?? null)}
+                        aria-pressed={v.id === svParent.id}
+                        className={`control-sm border ${
+                          v.id === svParent.id
+                            ? 'border-accent-500 bg-accent-500/10 text-foreground font-medium'
+                            : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                        }`}
+                      >
+                        {v.variant_name || v.sku || 'Untitled variant'}
+                        <span className="ml-1 tabular-nums text-foreground-muted">
+                          ({(subVariantsMap[v.id || ''] || []).length})
+                        </span>
+                      </button>
+                    ))}
+                    {svList.length > 1 && (
+                      <>
+                        <span className="ml-2 mr-0.5 text-xs text-foreground-muted">Jump to</span>
+                        {svList.map((sv: any) => (
+                          <button
+                            key={sv.id}
+                            type="button"
+                            onClick={() =>
+                              document
+                                .querySelector(`[data-sub-variant-card="${sv.id}"]`)
+                                ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                            }
+                            className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground"
+                          >
+                            {sv.sub_variant_name || sv.sku || 'Untitled sub-variant'}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    <div className="ml-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!svParent.id) return
+                          document
+                            .querySelector(`[data-add-subvariant-form="${svParent.id}"]`)
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }}
+                        disabled={!svParent.id || svParent.id.startsWith('temp-')}
+                        className="control-sm border border-accent-500/40 text-accent-500 hover:bg-accent-500/10 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        + Add sub-variant
+                      </button>
+                    </div>
+                  </div>
+                  {svParent.id &&
+                    renderSubVariants(
+                      svParent.id,
+                      svParent,
+                      variantUnitInfo[svParent.id]?.unitKey || '',
+                      variantUnitInfo[svParent.id] || null
+                    )}
+                </div>
+              )
+            })()}
+          </div>
+          <div data-pf-tab="units" role="tabpanel" hidden={activeTab !== 'units'}>
+            {/* Selling Units (product-level — applies to every variant) */}
+            {productId && isDigital && (
+              <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-1">Selling Units &amp; Conversions</h3>
+                <p className="text-xs text-foreground-muted" data-testid="digital-units-note">
+                  {DIGITAL_UNIT_MESSAGE}.
+                </p>
+              </div>
+            )}
+            {productId && !isDigital && (
+              <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">Selling Units &amp; Conversions</h3>
+                <p className="text-xs text-foreground-muted mb-4">
+                  Configure alternate units (e.g. box of 100, sheet of 4&apos;×8&apos;, tin of 5 L). The pricing engine
+                  multiplies the base price by the factor automatically. Stock always lives in the BASE unit. Units
+                  configured here apply to <strong>every variant</strong> by default — open a variant to override
+                  per-variant. For bulk discounts, attach a tiered_price rule to the unit instead of overriding the price.
+                </p>
+                <UnitsManager productId={productId} basePrice={basePrice} isDraft={isDraft} />
+              </div>
+            )}
+          </div>
+
+        </LockedFieldset>
 
         {/* Form Actions — shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
         <FormFooter
           sticky
+          lock={lock}
           autosave={
             isDraft && serverSaveStatus !== 'idle' ? (
               <AutosaveStatusPill status={serverSaveStatus as AutosaveStatus} />

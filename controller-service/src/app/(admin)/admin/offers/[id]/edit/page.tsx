@@ -6,6 +6,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { getOfferById } from '@/lib/catalog/product-offers'
 import type { AssignOption } from '@/components/admin/OffersProductPicker'
 import OfferDetailClient from '../OfferDetailClient'
+import { initialDraftLock } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,6 +85,7 @@ export default async function EditOfferPage({ params }: { params: Promise<{ id: 
       backHref={ap('/admin/offers?tab=offers', host)}
       categoryOptions={options.categories}
       brandOptions={options.brands}
+      initialLock={await initialDraftLock('offer', id)}
     />
   )
 }
