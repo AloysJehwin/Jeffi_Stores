@@ -117,7 +117,7 @@ describe('withHomepageDraft', () => {
     const [writeSql, writeParams] = mockClientQuery.mock.calls[2]
     expect(writeSql).toContain('UPDATE homepage_drafts')
     expect(JSON.parse(writeParams[0])[0].title).toBe('Changed')
-    expect(JSON.parse(writeParams[1])).toEqual([slide('s', 0, { surface: 'web' })])
+    expect(JSON.parse(writeParams[1])).toEqual([slide('s', 0, { surface: 'web', audience: 'store' })])
     expect(writeParams[2]).toBe(ADMIN_ID)
     expect(sqlCalls().some(s => /^(INSERT INTO|UPDATE|DELETE FROM) (homepage_sections|hero_slides)\b/.test(s))).toBe(
       false
@@ -171,10 +171,10 @@ describe('getEditableHomepage', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ sections: [section('a', 0)], hero_slides: [slide('s', 0)] })
     const editable = await getEditableHomepage()
-    // Rows from before the surface / page columns existed read as web / home.
+    // Rows from before the surface / page / audience columns existed read as web / home / store.
     expect(editable).toEqual({
-      sections: [section('a', 0, { surface: 'web', page: 'home' })],
-      heroSlides: [slide('s', 0, { surface: 'web' })],
+      sections: [section('a', 0, { surface: 'web', page: 'home', audience: 'store' })],
+      heroSlides: [slide('s', 0, { surface: 'web', audience: 'store' })],
       draft: null,
     })
     expect(mockQueryOne.mock.calls[1][0]).toContain('FROM homepage_sections t')
@@ -300,6 +300,7 @@ describe('getHomepageDraftSummary', () => {
       slides: { added: 0, removed: 0, edited: 1, reordered: false },
       bySurface,
       byPage: { home: bySurface, products: empty, category: empty, brand: empty },
+      business: empty,
     })
   })
 

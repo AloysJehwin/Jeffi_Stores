@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
 import { applyDraftPatch, endsBeforeStart, homepageLockFrom, withHomepageDraft, type DraftSection } from '@/lib/catalog/homepage-draft'
 import { lockedOr } from '@/lib/admin/draft-locks'
+import { getHomepagePlan, homepagePlanRefusal } from '@/lib/catalog/homepage-plan'
+import { rowAudience } from '@/lib/catalog/homepage-sections'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +45,7 @@ async function guard(request: NextRequest): Promise<AdminJWTPayload | NextRespon
   return admin
 }
 
-type PatchOutcome = { section: DraftSection } | { error: string; status: 400 | 404 }
+type PatchOutcome = { section: DraftSection } | { error: string; status: 400 | 403 | 404 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await guard(request)
@@ -61,9 +63,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
+  const plan = await getHomepagePlan()
   const outcome = await withHomepageDraft<PatchOutcome>(admin.adminId, draft => {
     const section = draft.sections.find(s => s.id === id)
     if (!section) return { error: 'Not found', status: 404 }
+    // Removing is still allowed, so a plan change never strands a section.
+    const refused = homepagePlanRefusal(plan, { type: section.type, audience: rowAudience(section) })
+    if (refused) return { error: refused, status: 403 }
     const next = { ...section, ...updates }
     if (endsBeforeStart(next.starts_at, next.ends_at)) {
       return { error: 'The end time must be after the start time', status: 400 }

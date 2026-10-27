@@ -94,6 +94,7 @@ describe('GET /api/admin/homepage-draft', () => {
       slides: none,
       bySurface: layouts,
       byPage: { home: layouts, products: layouts, category: layouts, brand: layouts },
+      business: layouts,
     })
   })
 

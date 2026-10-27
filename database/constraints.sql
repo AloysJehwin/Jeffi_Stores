@@ -1028,7 +1028,8 @@ ALTER TABLE ONLY public.homepage_sections
         'countdown_deal'::text, 'testimonials'::text, 'recently_viewed'::text, 'category_tabs'::text,
         'bundle_spotlight'::text, 'back_in_stock'::text, 'blog_teaser'::text, 'social_strip'::text,
         'value_stats'::text, 'motion_hero'::text, 'stories'::text, 'product_spotlight'::text,
-        'rewards_game'::text, 'slides'::text])));
+        'rewards_game'::text, 'slides'::text, 'business_reorder'::text, 'business_quotes'::text,
+        'business_offers'::text, 'business_account'::text])));
 
 
 --
@@ -1049,11 +1050,28 @@ ALTER TABLE ONLY public.homepage_sections
 
 
 --
+-- Name: homepage_sections homepage_sections_audience_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+-- The business audience has a homepage only.
+--
+
+ALTER TABLE ONLY public.homepage_sections
+    ADD CONSTRAINT homepage_sections_audience_check CHECK ((audience IS NOT NULL AND ((audience)::text = 'store'::text OR ((audience)::text = 'business'::text AND (page)::text = 'home'::text))));
+
+
+--
 -- Name: hero_slides hero_slides_surface_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.hero_slides
     ADD CONSTRAINT hero_slides_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'web_mobile'::text, 'app'::text])));
+
+
+--
+-- Name: hero_slides hero_slides_audience_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hero_slides
+    ADD CONSTRAINT hero_slides_audience_check CHECK ((audience IS NOT NULL AND (audience)::text = ANY (ARRAY['store'::text, 'business'::text])));
 
 
 

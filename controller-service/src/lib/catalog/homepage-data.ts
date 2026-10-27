@@ -1,12 +1,14 @@
 import { queryMany } from '@/lib/shared/db'
 import {
   forSurface,
+  rowAudience,
   rowPage,
   productRowKey,
   productSource,
   sectionLimit,
   visibleSections,
   withDefaults,
+  type HomepageAudience,
   type HomepagePage,
   type HomepageSection,
   type HomepageSurface,
@@ -14,33 +16,52 @@ import {
 } from '@/lib/catalog/homepage-sections'
 
 /**
- * `surface` and `page` are read through to_jsonb rather than named: a tenant whose schema fan-out
- * has not added the columns yet then keeps its layout (NULL reads as web / home) instead of failing
- * over to the built-in one. Same reason they are filtered in JS.
+ * `surface`, `page` and `audience` are read through to_jsonb rather than named: a tenant whose schema
+ * fan-out has not added the columns yet then keeps its layout (NULL reads as web / home / store)
+ * instead of failing over to the built-in one. Same reason they are filtered in JS.
  */
 export const SURFACE_COLUMN_SQL = (alias: string) => `to_jsonb(${alias}) ->> 'surface' AS surface`
 export const PAGE_COLUMN_SQL = (alias: string) => `to_jsonb(${alias}) ->> 'page' AS page`
+export const AUDIENCE_COLUMN_SQL = (alias: string) => `to_jsonb(${alias}) ->> 'audience' AS audience`
 
 export async function getConfiguredSections(
   surface: HomepageSurface = 'web',
   page: HomepagePage = 'home'
 ): Promise<HomepageSection[]> {
+  return (await getAudienceSections(surface, page, 'store')).sections
+}
+
+/**
+ * One page's visible sections for an audience, and the audience actually served: the business
+ * homepage falls back to the store's while it has nothing visible on this surface (or the website).
+ */
+export async function getAudienceSections(
+  surface: HomepageSurface,
+  page: HomepagePage,
+  audience: HomepageAudience
+): Promise<{ audience: HomepageAudience; sections: HomepageSection[] }> {
   const home = page === 'home'
   try {
     const rows = await queryMany<HomepageSection>(
       `SELECT id, type, title, subtitle, eyebrow, cta_label, cta_url, config,
-              display_order, is_active, starts_at, ends_at, ${SURFACE_COLUMN_SQL('s')}, ${PAGE_COLUMN_SQL('s')}
+              display_order, is_active, starts_at, ends_at,
+              ${SURFACE_COLUMN_SQL('s')}, ${PAGE_COLUMN_SQL('s')}, ${AUDIENCE_COLUMN_SQL('s')}
        FROM homepage_sections s
        ORDER BY display_order ASC, created_at ASC`
     )
     // Page first, so a listing's rows never count as a layout of the homepage's (or vice versa).
-    const own = forSurface(rows.filter(r => rowPage(r) === page), surface)
+    const onPage = rows.filter(r => rowPage(r) === page)
     // Window filtering happens in JS, never SQL: a SQL NOW() would be baked into the
     // page's ISR cache entry and never re-evaluate.
-    return visibleSections(home ? withDefaults(own) : own)
+    if (audience === 'business' && home) {
+      const business = visibleSections(forSurface(onPage.filter(r => rowAudience(r) === 'business'), surface))
+      if (business.length > 0) return { audience: 'business', sections: business }
+    }
+    const own = forSurface(onPage.filter(r => rowAudience(r) === 'store'), surface)
+    return { audience: 'store', sections: visibleSections(home ? withDefaults(own) : own) }
   } catch {
     // Table missing or unreachable — fall back to the built-in layout rather than an empty page.
-    return visibleSections(home ? withDefaults([]) : [])
+    return { audience: 'store', sections: visibleSections(home ? withDefaults([]) : []) }
   }
 }
 

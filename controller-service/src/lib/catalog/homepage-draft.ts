@@ -4,9 +4,12 @@ import { randomUUID } from 'crypto'
 import {
   HOMEPAGE_PAGES,
   HOMEPAGE_SURFACES,
+  SECTION_META,
+  rowAudience,
   rowPage,
   rowSurface,
   withDefaults,
+  type HomepageAudience,
   type HomepagePage,
   type HomepageSection,
   type HomepageSurface,
@@ -65,8 +68,10 @@ export interface HomepageDraftSummary {
   slides: DraftDiff
   /** The same diffs split by layout, for the Desktop web / Mobile web / App tabs. */
   bySurface: Record<HomepageSurface, { sections: DraftDiff; slides: DraftDiff }>
-  /** And by page then layout (hero slides count toward the homepage). */
+  /** The store's, by page then layout (hero slides count toward the homepage). */
   byPage: Record<HomepagePage, Record<HomepageSurface, { sections: DraftDiff; slides: DraftDiff }>>
+  /** The business homepage's, by layout. */
+  business: Record<HomepageSurface, { sections: DraftDiff; slides: DraftDiff }>
 }
 
 export type PublishCounts = { inserted: number; updated: number; deleted: number }
@@ -76,6 +81,7 @@ interface DraftRow {
   id: string
   display_order: number
   surface?: HomepageSurface | null
+  audience?: HomepageAudience | null
   created_at?: string
   updated_at?: string
 }
@@ -94,6 +100,7 @@ const SECTION_COLUMNS = [
   'ends_at',
   'surface',
   'page',
+  'audience',
 ] as const
 
 const SLIDE_COLUMNS = [
@@ -119,6 +126,7 @@ const SLIDE_COLUMNS = [
   'display_order',
   'is_active',
   'surface',
+  'audience',
 ] as const
 
 // Draft rows copied before a column existed have no key for it; jsonb_populate_recordset gives NULL.
@@ -130,6 +138,7 @@ const NOT_NULL_DEFAULTS: Record<string, string> = {
   filter_on_sale: 'false',
   surface: `'web'`,
   page: `'home'`,
+  audience: `'store'`,
 }
 
 const liveRows = (table: 'homepage_sections' | 'hero_slides') =>
@@ -191,8 +200,10 @@ class Unchanged extends Error {
 }
 
 const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : [])
-// Rows saved before the surface / page columns existed read as web / home, so diffs and per-tab views agree.
-const asRows = <T extends DraftRow>(value: unknown): T[] => asArray<T>(value).map(r => ({ ...r, surface: rowSurface(r) }))
+// Rows saved before the surface / page / audience columns existed read as web / home / store, so diffs and
+// per-tab views agree.
+const asRows = <T extends DraftRow>(value: unknown): T[] =>
+  asArray<T>(value).map(r => ({ ...r, surface: rowSurface(r), audience: rowAudience(r) }))
 const asSections = (value: unknown): DraftSection[] => asRows<DraftSection>(value).map(r => ({ ...r, page: rowPage(r) }))
 const asUuid = (id: string | null | undefined) => (id && UUID_RE.test(id) ? id : null)
 const isUndefinedTable = (err: unknown) => (err as { code?: string } | null)?.code === '42P01'
@@ -267,49 +278,74 @@ export class SurfaceNotEmpty extends Error {
 export type CopySurfaceResult = { sections: number; slides: number; replaced: number }
 
 /** The next display_order on one page's layout. */
-export function nextDisplayOrderOn(rows: HomepageSection[], page: HomepagePage, surface: HomepageSurface): number {
-  return nextDisplayOrder(rows.filter(r => rowPage(r) === page && rowSurface(r) === surface))
+export function nextDisplayOrderOn(
+  rows: HomepageSection[],
+  page: HomepagePage,
+  surface: HomepageSurface,
+  audience: HomepageAudience = 'store'
+): number {
+  return nextDisplayOrder(
+    rows.filter(r => rowPage(r) === page && rowSurface(r) === surface && rowAudience(r) === audience)
+  )
 }
 
 /**
  * Copies one surface's layout of a page onto another so it can be edited apart from the source. Rows
  * get fresh ids (publish upserts by id, so reusing them would move the originals) and `created_at` is
- * now, so the copies sort after nothing from before. A homepage source with no saved sections
+ * now, so the copies sort after nothing from before. A store homepage source with no saved sections
  * contributes the built-in default layout, which is what that surface is showing; hero slides are
- * the homepage's. Refuses to overwrite unless `replace`.
+ * the homepage's. `audience` is the target homepage and `fromAudience` the source (the store's, to
+ * start the business homepage from it); types the target can't use are left out. Refuses to
+ * overwrite unless `replace`.
  */
 export function copySurfaceLayout(
   draft: HomepageDraftState,
   from: HomepageSurface,
   to: HomepageSurface,
-  opts: { page?: HomepagePage; replace?: boolean; now?: string; newId?: () => string } = {}
+  opts: {
+    page?: HomepagePage
+    audience?: HomepageAudience
+    fromAudience?: HomepageAudience
+    replace?: boolean
+    now?: string
+    newId?: () => string
+  } = {}
 ): CopySurfaceResult {
-  if (from === to) throw new Error('Source and target surface are the same')
+  const audience = opts.audience ?? 'store'
+  const fromAudience = opts.fromAudience ?? audience
+  if (from === to && fromAudience === audience) throw new Error('Source and target surface are the same')
   const page = opts.page ?? 'home'
   const home = page === 'home'
   const now = opts.now ?? new Date().toISOString()
   const newId = opts.newId ?? randomUUID
   const onPage = (r: HomepageSection) => rowPage(r) === page
-  const onTarget = (r: HomepageSection) => onPage(r) && rowSurface(r) === to
-  const slideOnTarget = (r: { surface?: string | null }) => home && rowSurface(r) === to
+  const isTarget = (r: DraftRow) => rowSurface(r) === to && rowAudience(r) === audience
+  const isSource = (r: DraftRow) => rowSurface(r) === from && rowAudience(r) === fromAudience
+  const onTarget = (r: HomepageSection) => onPage(r) && isTarget(r as DraftSection)
+  const slideOnTarget = (r: DraftRow) => home && isTarget(r)
   const replaced = draft.sections.filter(onTarget).length + draft.heroSlides.filter(slideOnTarget).length
   if (replaced > 0 && !opts.replace) throw new SurfaceNotEmpty(to)
 
-  const sourceSections = sortByDisplayOrder(draft.sections.filter(r => onPage(r) && rowSurface(r) === from))
-  const sections: DraftSection[] = (home ? withDefaults(sourceSections) : sourceSections).map((s, i) => ({
-    ...(s as DraftSection),
-    id: newId(),
-    surface: to,
-    page,
-    display_order: i,
-    created_at: now,
-    updated_at: now,
-  }))
+  const sourceSections = sortByDisplayOrder(draft.sections.filter(r => onPage(r) && isSource(r)))
+  const usable = (s: HomepageSection) => SECTION_META[s.type]?.audiences?.includes(audience) ?? true
+  const sections: DraftSection[] = (home && fromAudience === 'store' ? withDefaults(sourceSections) : sourceSections)
+    .filter(usable)
+    .map((s, i) => ({
+      ...(s as DraftSection),
+      id: newId(),
+      surface: to,
+      page,
+      audience,
+      display_order: i,
+      created_at: now,
+      updated_at: now,
+    }))
   const slides: DraftHeroSlide[] = home
-    ? sortByDisplayOrder(draft.heroSlides.filter(r => rowSurface(r) === from)).map((s, i) => ({
+    ? sortByDisplayOrder(draft.heroSlides.filter(isSource)).map((s, i) => ({
         ...s,
         id: newId(),
         surface: to,
+        audience,
         display_order: i,
         created_at: now,
         updated_at: now,
@@ -479,10 +515,18 @@ function diffState(draft: HomepageDraftState, live: HomepageDraftState) {
   }
 }
 
-const onSurface = (state: HomepageDraftState, surface: HomepageSurface, page?: HomepagePage): HomepageDraftState => ({
-  sections: state.sections.filter(s => s.surface === surface && (!page || s.page === page)),
-  heroSlides: page && page !== 'home' ? [] : state.heroSlides.filter(s => s.surface === surface),
-})
+const onSurface = (
+  state: HomepageDraftState,
+  surface: HomepageSurface,
+  page?: HomepagePage,
+  audience?: HomepageAudience
+): HomepageDraftState => {
+  const mine = (r: DraftRow) => r.surface === surface && (!audience || rowAudience(r) === audience)
+  return {
+    sections: state.sections.filter(s => mine(s) && (!page || s.page === page)),
+    heroSlides: page && page !== 'home' ? [] : state.heroSlides.filter(mine),
+  }
+}
 
 const perSurface = <T>(fn: (surface: HomepageSurface) => T) =>
   Object.fromEntries(HOMEPAGE_SURFACES.map(s => [s, fn(s)])) as Record<HomepageSurface, T>
@@ -501,6 +545,7 @@ export async function getHomepageDraftSummary(): Promise<HomepageDraftSummary> {
       ...none(),
       bySurface: perSurface(none),
       byPage: perPage(() => perSurface(none)),
+      business: perSurface(none),
     }
   }
   const live = await readLive()
@@ -512,7 +557,12 @@ export async function getHomepageDraftSummary(): Promise<HomepageDraftSummary> {
     ...diffState(state, live),
     bySurface: perSurface(surface => diffState(onSurface(state, surface), onSurface(live, surface))),
     byPage: perPage(page =>
-      perSurface(surface => diffState(onSurface(state, surface, page), onSurface(live, surface, page)))
+      perSurface(surface =>
+        diffState(onSurface(state, surface, page, 'store'), onSurface(live, surface, page, 'store'))
+      )
+    ),
+    business: perSurface(surface =>
+      diffState(onSurface(state, surface, 'home', 'business'), onSurface(live, surface, 'home', 'business'))
     ),
   }
 }
