@@ -1411,7 +1411,7 @@ export default function LineItemsSection({
                                 updateItem(item.id, 'quantity', String(clamp(isNaN(v) ? qMin : v)))
                               }}
                               required
-                              className="h-full flex-1 min-w-0 p-0 text-center text-sm font-medium bg-transparent border-none outline-none focus:ring-0 text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                              className="!h-full flex-1 min-w-0 p-0 text-center text-sm font-medium bg-transparent border-none outline-none focus:ring-0 text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                             />
                             <button
                               type="button"
