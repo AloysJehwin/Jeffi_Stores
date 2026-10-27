@@ -20,6 +20,12 @@ vi.mock('@/lib/shared/email-campaigns', () => ({
   sendCampaign: vi.fn(),
 }))
 
+// Draft-lock bookkeeping is out of scope here: with no actor the writes run unlocked.
+vi.mock('@/lib/admin/draft-locks', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/admin/draft-locks')>()),
+  actorOf: () => null,
+}))
+
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/(admin)/admin/mailer/[id]/send/route'

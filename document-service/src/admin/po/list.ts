@@ -3,9 +3,10 @@ import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne, withTransaction } from '@jeffi/tenancy'
 import { round2 } from '../../lib/gst'
-import { PO_OPEN_SQL, PURCHASE_ORDERS_ENTITY, buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { PO_OPEN_SQL, PURCHASE_ORDERS_ENTITY, buildWhere, normalizeQuery, sortClause } from '@jeffi/list-filters'
 import { z } from 'zod'
 import { parseBody, zUuid, zCurrency } from '../../lib/validate'
+import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom, lockBadges, lockNewDraft } from '../../lib/draft-locks'
 
 
 const poItemSchema = z
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '20') || 20), 200)
     const offset = (page - 1) * limit
 
     const w = buildWhere(PURCHASE_ORDERS_ENTITY, normalizeQuery(PURCHASE_ORDERS_ENTITY, searchParams))
@@ -73,12 +74,20 @@ export async function GET(request: NextRequest) {
        LEFT JOIN purchase_order_items poi ON poi.po_id = po.id
        WHERE ${where}
        GROUP BY po.id, s.id
-       ORDER BY po.created_at DESC
+       ${sortClause(searchParams, { sorts: PURCHASE_ORDERS_ENTITY.sorts ?? {}, defaultSql: 'po.created_at DESC', tiebreak: 'po.id DESC' })}
        LIMIT $${i} OFFSET $${i + 1}`,
       [...params, limit, offset]
     )
 
-    return NextResponse.json({ purchase_orders: rows || [], total, page, limit, summary })
+    // Owner badge: the draft PO's editor, or whoever is mid-receipt.
+    const all = rows || []
+    const draftLocks = await lockBadges(admin, 'purchase_order', all.filter(r => r.status === 'draft').map(r => r.id))
+    const receiveLocks = await lockBadges(admin, 'po_receive', all.filter(r => r.status !== 'draft').map(r => r.id))
+    const withLocks = all.map(r => {
+      const lock = draftLocks[r.id] ?? receiveLocks[r.id]
+      return lock ? { ...r, lock } : r
+    })
+    return NextResponse.json({ purchase_orders: withLocks, total, page, limit, summary })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
@@ -210,6 +219,8 @@ export async function POST(request: NextRequest) {
 
     const { supplier_id, items } = parsed.data
     const { order_date, expected_date, notes, status = 'draft' } = body
+    // The new-PO draft this was built from (promoted in the same transaction).
+    const draftId: string | null = typeof body.draft_id === 'string' && body.draft_id ? body.draft_id : null
 
     if (!supplier_id) return NextResponse.json({ error: 'supplier_id is required' }, { status: 400 })
 
@@ -330,11 +341,22 @@ export async function POST(request: NextRequest) {
           purchaseUnitFactor: factor,
         })
       }
-      return { id: poId }
+      // Creating the PO publishes the caller's new-PO draft; a draft PO is the creator's to edit.
+      let draftLock = null
+      if (draftId) {
+        draftLock = await assertHolder(client, admin, 'po_new', draftId, { epoch: epochFrom(request) })
+        await client.query(`DELETE FROM po_drafts WHERE id = $1 AND promoted_po_id IS NULL`, [draftId])
+        await closeLock(client, admin, 'po_new', draftId, 'published')
+      }
+      return { id: poId, draftLock }
     })
+    if (draftId) await announceLock(admin, 'po_new', draftId, po?.draftLock)
+    if (status === 'draft' && po?.id) await lockNewDraft(admin, 'purchase_order', po.id)
 
     return NextResponse.json({ success: true, id: po?.id, po_number: poNumber })
   } catch (err: any) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

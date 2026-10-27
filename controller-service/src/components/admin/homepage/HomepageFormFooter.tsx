@@ -10,21 +10,21 @@ import { Badge, FormButton, FormFooter } from '@/components/admin/kit'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import type { DraftDiff, HomepageDraftSummary } from '@/lib/catalog/homepage-draft'
 import { HOMEPAGE_DRAFT_CHANGED } from './draft-events'
+import { useHomepageLock } from './HomepageLock'
 
 const hasChanges = (d: DraftDiff) => d.added > 0 || d.removed > 0 || d.edited > 0 || d.reordered
 
-const SURFACE_LABEL = { web: 'website', app: 'mobile app' } as const
+const SURFACE_LABEL = { web: 'desktop web', web_mobile: 'mobile web', app: 'app' } as const
 
-/** Which layouts the draft touches: "website", "mobile app" or "website + mobile app". */
+/** Which layouts the draft touches: "desktop web", "app", "desktop web + mobile web" and so on. */
 function touchedSurfaces(summary: HomepageDraftSummary): string {
-  const names = (['web', 'app'] as const)
+  const names = (['web', 'web_mobile', 'app'] as const)
     .filter(s => hasChanges(summary.bySurface[s].sections) || hasChanges(summary.bySurface[s].slides))
     .map(s => SURFACE_LABEL[s])
   return names.join(' + ')
 }
 
 interface Props {
-  adminId: string
   initialSummary: HomepageDraftSummary
   cancelHref: string
   /** Server action that resnapshots the admin's open homepage session so Cancel reverts to A2. */
@@ -37,10 +37,12 @@ interface Props {
 // autosave status pill, Draft pending badge, Discard draft, Cancel (rolls draft
 // back to session snapshot), Save as Draft (resnapshots so Cancel reverts here)
 // and Update & Publish.
-export default function HomepageFormFooter({ adminId, initialSummary, cancelHref, resnapshotAction }: Props) {
+export default function HomepageFormFooter({ initialSummary, cancelHref, resnapshotAction }: Props) {
   const router = useRouter()
   const { showToast, showConfirm } = useToast()
-  const edit = useEditSession({ resourceType: 'homepage', resourceId: adminId })
+  // The session opens only for the lock holder (or on an unclaimed draft, which claims it).
+  const homepage = useHomepageLock()
+  const edit = useEditSession({ resourceType: 'homepage', resourceId: homepage.lockId, lock: homepage.lock })
   const [summary, setSummary] = useState(initialSummary)
   const [autosave, setAutosave] = useState<AutosaveStatus>('idle')
   const [busy, setBusy] = useState<'publish' | 'discard' | 'draft' | null>(null)
@@ -86,10 +88,10 @@ export default function HomepageFormFooter({ adminId, initialSummary, cancelHref
     autosaveBlockedRef.current = true
     setBusy('discard')
     try {
-      const res = await fetch('/api/admin/homepage-draft', { method: 'DELETE', credentials: 'include' })
+      const res = await fetch('/api/admin/homepage-draft', { method: 'DELETE', credentials: 'include', headers: homepage.headers() })
       if (!res.ok) {
         autosaveBlockedRef.current = false
-        showToast('Failed to discard the draft', 'error')
+        if (!(await homepage.locked(res))) showToast('Failed to discard the draft', 'error')
         setBusy(null)
         return
       }
@@ -117,7 +119,13 @@ export default function HomepageFormFooter({ adminId, initialSummary, cancelHref
       const res = await fetch('/api/admin/homepage-draft/publish', {
         method: 'POST',
         credentials: 'include',
+        headers: homepage.headers(),
       })
+      if (await homepage.locked(res)) {
+        autosaveBlockedRef.current = false
+        setBusy(null)
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         autosaveBlockedRef.current = false
@@ -128,6 +136,8 @@ export default function HomepageFormFooter({ adminId, initialSummary, cancelHref
       // Stay on the editor: close this session and start a new one so Cancel reverts to the published state.
       if (edit.sessionId) await edit.save()
       await edit.reopen()
+      // Publish closed the lock and reopening took it again: pick up the new epoch before the next write.
+      await homepage.lock?.refresh()
       await refresh()
       autosaveBlockedRef.current = false
       setBusy(null)
@@ -168,6 +178,7 @@ export default function HomepageFormFooter({ adminId, initialSummary, cancelHref
   return (
     <FormFooter
       sticky
+      lock={homepage.lock}
       autosave={autosave !== 'idle' ? <AutosaveStatusPill status={autosave} /> : null}
       draftBadge={pending ? <Badge tone="amber">Draft pending{touched ? ` · ${touched}` : ''}</Badge> : null}
       discard={pending ? handleDiscard : undefined}

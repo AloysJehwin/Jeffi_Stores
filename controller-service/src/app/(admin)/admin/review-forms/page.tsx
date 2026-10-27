@@ -1,11 +1,12 @@
 import { Suspense } from 'react'
-import { buildWhere, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
+import { buildWhere, normalizeQuery, sortClause, type FilterQuery, type SortDef } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import DraftRowActions from '@/components/admin/DraftRowActions'
+import { draftLockChips } from '@/lib/admin/draft-locks'
 import ReviewFormsTable, { type FormRow } from './_components/ReviewFormsTable'
 import { ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
@@ -14,6 +15,7 @@ import { formsHostForHost } from '@/lib/tenant-registry'
 import { REVIEW_FORMS_ENTITY } from '@/lib/filters/entities/review-forms'
 import { REVIEW_FORM_FIELDS, REVIEW_FORM_SEARCH } from '@/lib/filters/fields/review-forms'
 import ReviewFormsOverview from './_components/ReviewFormsOverview'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -22,12 +24,25 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function getForms(q: FilterQuery, page = 1) {
+const FORM_SORT: SortDef = {
+  sorts: {
+    title: 'rf.title',
+    template: 'rf.template_type',
+    link: 'rf.slug',
+    coupon: 'c.code',
+    subs: 'rf.submissions_count',
+    status: '(NOT rf.is_active)',
+  },
+  defaultSql: 'rf.created_at DESC',
+  tiebreak: 'rf.id DESC',
+}
+
+async function getForms(q: FilterQuery, page = 1, sp: SP = {}) {
   const w = buildWhere(REVIEW_FORMS_ENTITY, q)
   const offset = (page - 1) * PAGE_SIZE
   const [forms, total] = await Promise.all([
     queryMany(
-      `SELECT rf.*, c.code AS coupon_code FROM review_forms rf LEFT JOIN coupons c ON rf.coupon_id = c.id ${w.where} ORDER BY rf.created_at DESC LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
+      `SELECT rf.*, c.code AS coupon_code FROM review_forms rf LEFT JOIN coupons c ON rf.coupon_id = c.id ${w.where} ${sortClause({ get: k => sp[k] ?? null }, FORM_SORT)} LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
       [...w.params, PAGE_SIZE, offset]
     ),
     queryCount(`SELECT COUNT(*) FROM review_forms rf ${w.where}`, w.params),
@@ -71,6 +86,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="review_form" />
           <ListFilters
             entity="review_forms"
             fields={REVIEW_FORM_FIELDS}
@@ -109,6 +125,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
 
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
   if (pendingDraftsCount === 0) return null
+  const locks = await draftLockChips('review_form', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.form_id)])
 
   return (
     <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
@@ -144,6 +161,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
               discardPath={`/api/admin/review-forms/${d.id}`}
               discardConfirm={`Delete the draft form "${d.title}"? This cannot be undone.`}
               entityLabel="review form"
+              lock={locks[d.id]}
             />
           ))}
           {pendingDrafts.map(d => (
@@ -156,6 +174,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
               publishPath={`/api/admin/review-forms/${d.form_id}/publish`}
               discardPath={`/api/admin/review-forms/${d.form_id}/draft`}
               entityLabel="review form"
+              lock={locks[d.form_id]}
             />
           ))}
         </div>
@@ -176,7 +195,7 @@ function ReviewFormsListSection({ resolvedSearchParams, host }: { resolvedSearch
 async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const q = normalizeQuery(REVIEW_FORMS_ENTITY, resolvedSearchParams)
-  const { forms, total } = await getForms(q, page)
+  const { forms, total } = await getForms(q, page, resolvedSearchParams)
   const formsBase = `https://${formsHostForHost(host)}`
   const listUrl = tabHref('/admin/review-forms', 'list', resolvedSearchParams, REVIEW_FORM_FIELDS)
 

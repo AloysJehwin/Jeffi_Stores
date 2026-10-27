@@ -1,18 +1,7 @@
 import { buildWhere, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
-import { queryOne, queryMany, queryCount } from './shared'
+import { queryOne, queryMany, queryCount, entityOrderBy } from './shared'
 import type { CustomerStats } from './analytics'
 import { CUSTOMERS_ENTITY } from '@/lib/filters/entities/customers'
-
-const CUSTOMER_SORT_COLS: Record<string, string> = {
-  name: "u.first_name || ' ' || u.last_name",
-  email: 'u.email',
-  phone: 'u.phone',
-  joined: 'u.created_at',
-  orders: 'o.order_count',
-  lifetime_value: 'o.lifetime_value',
-  status: 'u.is_active',
-  health: 'COALESCE(ch.score, -1)',
-}
 
 /** One page of customers for a normalised filter query, plus the matching total. */
 export async function queryCustomers(
@@ -23,8 +12,6 @@ export async function queryCustomers(
   const i = w.nextIdx
   const limit = opts.limit || 50
   const offset = ((opts.page || 1) - 1) * limit
-  const safeCol = (opts.sort && CUSTOMER_SORT_COLS[opts.sort]) || 'u.created_at'
-  const safeDir = opts.dir === 'asc' ? 'ASC' : 'DESC'
 
   const [customers, total] = await Promise.all([
     queryMany(
@@ -61,7 +48,7 @@ export async function queryCustomers(
         FROM orders GROUP BY user_id
       ) o ON u.id = o.user_id
       ${w.where}
-      ORDER BY ${safeCol} ${safeDir}
+      ${entityOrderBy(CUSTOMERS_ENTITY, opts.sort, opts.dir)}
       LIMIT $${i} OFFSET $${i + 1}
     `,
       [...w.params, limit, offset]

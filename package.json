@@ -70,6 +70,7 @@
     "openai": "^6.37.0",
     "otplib": "^13.4.0",
     "papaparse": "5.5.3",
+    "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
     "pdf-to-img": "^7.0.0",
     "pdfjs-dist": "^6.4.299",

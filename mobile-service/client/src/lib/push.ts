@@ -19,6 +19,7 @@ const QUIET = new Set<string>(['offers', 'price_alerts'])
 const TOKEN_KEY = 'push.token'
 const OFFERS_KEY = 'push.offersOptIn'
 const DECLINED_KEY = 'push.softAskDeclinedAt'
+const WELCOME_KEY = 'push.welcomeAskedAt'
 const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000
 
 export const PUSH_PERMISSION_KEY = ['push-permission'] as const
@@ -172,5 +173,14 @@ export async function maybePromptForPush(reason: PushPromptReason): Promise<void
     if (p.granted) return
     if (reason !== 'settings' && (!p.canAskAgain || (await coolingDown()))) return
     openPushPrompt(reason)
+  } catch {}
+}
+
+/** First launch: the soft ask once per install (skipped when push is on or blocked in Settings). */
+export async function maybePromptOnFirstLaunch(): Promise<void> {
+  try {
+    if (await AsyncStorage.getItem(WELCOME_KEY)) return
+    await AsyncStorage.setItem(WELCOME_KEY, String(Date.now()))
+    await maybePromptForPush('welcome')
   } catch {}
 }

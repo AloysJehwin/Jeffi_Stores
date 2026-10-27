@@ -43,6 +43,8 @@ import PdpCompareSection, { type CompareItem } from '../../src/components/pdp/Pd
 import CustomersAlsoViewed from '../../src/components/pdp/CustomersAlsoViewed'
 import PdpRecentlyViewed from '../../src/components/pdp/PdpRecentlyViewed'
 import FeaturedForYou from '../../src/components/pdp/FeaturedForYou'
+import { RequestQuoteSheet } from '../../src/components/business/RequestQuoteSheet'
+import { useBusiness } from '../../src/components/account/hooks'
 
 // Mirror of controller-service app/(storefront)/products/[slug]/page.tsx + ProductDetailClient at the mobile breakpoint.
 
@@ -161,6 +163,8 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
 
   const [notifyEmail, setNotifyEmail] = useState(user?.email ?? '')
   const [notifySubmitted, setNotifySubmitted] = useState(false)
+  const [quoteOpen, setQuoteOpen] = useState(false)
+  const business = useBusiness()
 
   const { data: vault } = useQuery({
     queryKey: ['pdp-vault-owned', product.id, user?.id],
@@ -354,6 +358,7 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
                     launchDate={product.launch_date ?? null}
                     optionsRef={optionsRef}
                     buyRef={buyRef}
+                    onRequestQuote={business.approved ? () => setQuoteOpen(true) : undefined}
                   />
 
                   <RazorpayOffers />
@@ -439,6 +444,20 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
         aboveCompareBar={compareCount >= 2}
       />
       <CompareBar />
+      {business.approved ? (
+        <RequestQuoteSheet
+          open={quoteOpen}
+          onClose={() => setQuoteOpen(false)}
+          product={{
+            id: product.id,
+            name: product.name,
+            variantId: purchase.selectedVariantId ?? undefined,
+            subVariantId: purchase.selectedSubVariantId ?? undefined,
+            price: purchase.effectivePrice * purchase.unitFactor,
+            unitLabel: purchase.effectiveUnitLabel ?? undefined,
+          }}
+        />
+      ) : null}
     </Screen>
   )
 }

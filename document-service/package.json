@@ -17,6 +17,7 @@
     "@aws-sdk/s3-request-presigner": "^3.700.0",
     "@jeffi/api-contracts": "*",
     "@jeffi/bulk": "*",
+    "@jeffi/draft-locks": "*",
     "@jeffi/gst": "*",
     "@jeffi/list-filters": "*",
     "@jeffi/pricing": "*",

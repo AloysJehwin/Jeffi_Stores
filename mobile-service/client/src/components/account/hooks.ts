@@ -3,13 +3,15 @@ import { useNavigation, useRouter } from 'expo-router'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getFeatureFlags, getMeFull, type AccountUser, type FeatureFlags } from '../../api/account'
 import { logout } from '../../api/auth'
+import type { AuthPortal } from '../../api/client'
 import { useAuthStore } from '../../stores/authStore'
 import { useCartStore } from '../../stores/cartStore'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
-import { FileText, Gift, Heart, MapPin, Receipt, RefreshCw, ShoppingBag, User, UserPlus } from 'lucide-react-native'
+import { FileText, Gift, Heart, MapPin, MonitorSmartphone, Receipt, RefreshCw, ShoppingBag, User, UserPlus } from 'lucide-react-native'
 import type { IconComponent } from '../../ui'
 
-const OFF: FeatureFlags = { smsEnabled: true, whatsappEnabled: true, loyaltyEnabled: false, birthdayEnabled: false, referralEnabled: false }
+// Until the flags arrive (or if they can't), SMS and WhatsApp stay hidden: a switched-off channel never shows.
+const OFF: FeatureFlags = { smsEnabled: false, whatsappEnabled: false, loyaltyEnabled: false, birthdayEnabled: false, referralEnabled: false }
 
 /**
  * Closes the sign-in modal from any of its screens. router.dismissAll() is a POP_TO_TOP on the nearest
@@ -26,15 +28,17 @@ export function useLeaveAuth() {
 }
 
 /** The web's /login and /signup send a signed-in visitor back to the store. Checked once, when the saved
- *  session has been restored, so a sign-in finishing on the screen keeps its own flow. */
-export function useLeaveIfSignedIn() {
+ *  session has been restored, so a sign-in finishing on the screen keeps its own flow. Signed in to the
+ *  other store is fine: that's how the store switch signs in to a second one. */
+export function useLeaveIfSignedIn(portal: AuthPortal = 'customer') {
   const leave = useLeaveAuth()
   const isLoading = useAuthStore(s => s.isLoading)
   const checked = useRef(false)
   useEffect(() => {
     if (isLoading || checked.current) return
     checked.current = true
-    if (useAuthStore.getState().user) leave()
+    const s = useAuthStore.getState()
+    if (s.user && s.portal === portal) leave()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading])
 }
@@ -44,7 +48,14 @@ export function useFeatureFlags(): FeatureFlags {
   return useFeatureFlagsState().flags
 }
 
-/** The flags plus whether they have actually arrived: the fallback assumes every OTP channel is on. */
+/** "WhatsApp, SMS & email": the update channels a customer actually gets, for copy. */
+export function useUpdateChannelsLabel(): string {
+  const { smsEnabled, whatsappEnabled } = useFeatureFlags()
+  const list = [whatsappEnabled && 'WhatsApp', smsEnabled && 'SMS', 'email'].filter(Boolean) as string[]
+  return list.length > 1 ? `${list.slice(0, -1).join(', ')} & ${list[list.length - 1]}` : list[0]
+}
+
+/** The flags plus whether they have actually arrived (the fallback keeps SMS and WhatsApp off). */
 export function useFeatureFlagsState(): { flags: FeatureFlags; loaded: boolean } {
   const { data, isPending } = useQuery({ queryKey: ['feature-flags'], queryFn: getFeatureFlags, staleTime: 5 * 60_000 })
   // A failed request still settles, so the form shows with the fallback instead of waiting forever.
@@ -66,6 +77,24 @@ export function useRequireAuth(): AccountUser | null {
   return user
 }
 
+/** The signed-in business account, as the web's business portal reads it. Business prices are per category. */
+export function useBusiness() {
+  const user = useAccountUser()
+  const isBusiness = useAuthStore(s => s.portal === 'business') && !!user
+  const approved = isBusiness && user?.approvalStatus === 'approved'
+  const map = approved ? user?.businessDiscountMap : undefined
+  return {
+    isBusiness,
+    approved,
+    profile: isBusiness ? user : null,
+    /** The extra business discount for a category, in percent (0 when none). */
+    discountFor: (categoryId?: string | null) => (map && categoryId ? map[categoryId] ?? 0 : 0),
+  }
+}
+
+/** applyDiscount in lib/catalog/pricing.ts. */
+export const applyDiscount = (price: number, pct: number) => price * (1 - pct / 100)
+
 /** AuthContext.refreshUser: re-read /api/auth/me into the store (token untouched). */
 export async function refreshUser(): Promise<AccountUser | null> {
   const user = await getMeFull().catch(() => null)
@@ -83,6 +112,25 @@ export function useSignOut() {
     await clearAuth()
     resetCart()
     qc.clear()
+  }
+}
+
+/** Switches between the storefront and the business store, each with its own session as on the web.
+ *  The business store without a session opens its sign in; the storefront without one is browsed as a guest. */
+export function useSwitchStore() {
+  const router = useRouter()
+  const qc = useQueryClient()
+  const resetCart = useCartStore(s => s.reset)
+  return async (next: AuthPortal) => {
+    const auth = useAuthStore.getState()
+    if (auth.portal === next) return
+    if (!(await auth.switchTo(next))) {
+      router.push('/(auth)/business-login')
+      return
+    }
+    resetCart()
+    qc.clear()
+    router.navigate('/(tabs)')
   }
 }
 
@@ -105,15 +153,16 @@ const SUBSCRIPTIONS: AccountNavItem = { href: '/account/subscriptions', route: '
 const REWARDS: AccountNavItem = { href: '/account/rewards', route: '/account/rewards', label: 'Rewards', exact: false, icon: Gift }
 const REFERRALS: AccountNavItem = { href: '/account/referrals', route: '/account/referrals', label: 'Refer & Earn', exact: false, icon: UserPlus }
 const QUOTES: AccountNavItem = { href: '/account/quotes', route: '/account/quotes', label: 'My Quotes', exact: false, icon: FileText }
+const SESSIONS: AccountNavItem = { href: '/account/sessions', route: '/account/sessions', label: 'Signed-in devices', exact: false, icon: MonitorSmartphone }
 
-/** The web's useAccountNavItems (+ the approved-business quotes tab). */
+/** The web's useAccountNavItems; a business account gets the business portal's tabs instead of rewards. */
 export function useAccountNavItems(): AccountNavItem[] {
-  const user = useAccountUser()
+  const { isBusiness, approved } = useBusiness()
   const { loyaltyEnabled, referralEnabled } = useFeatureFlags()
   const subscriptionsEnabled = useStoreConfig().flags.subscriptionsEnabled
   let items = subscriptionsEnabled ? [...NAV.slice(0, 2), SUBSCRIPTIONS, ...NAV.slice(2)] : NAV
-  if (loyaltyEnabled && !user?.isBusiness) items = referralEnabled ? [...items, REWARDS, REFERRALS] : [...items, REWARDS]
-  if (user?.isBusiness && user.approvalStatus === 'approved') items = [...items, QUOTES]
+  if (isBusiness) return approved ? [...items.slice(0, 2), QUOTES, ...items.slice(2), SESSIONS] : [NAV[0], SESSIONS]
+  if (loyaltyEnabled) items = referralEnabled ? [...items, REWARDS, REFERRALS] : [...items, REWARDS]
   return items
 }
 

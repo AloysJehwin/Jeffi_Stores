@@ -1380,12 +1380,14 @@ export default function LineItemsSection({
                     return (
                       <div>
                         {su ? (
-                          <div className="flex items-center gap-0.5 w-full px-1 py-1.5 rounded border border-border-default bg-surface-secondary">
+                          // The same 32px field box as the inputs beside it.
+                          <div className="field-sm w-full flex items-center gap-0.5 px-0.5 border border-border-secondary bg-surface focus-within:ring-2 focus-within:ring-accent-500 focus-within:border-transparent">
                             <button
                               type="button"
+                              aria-label="Decrease quantity"
                               onClick={() => updateItem(item.id, 'quantity', String(clamp(cur - qStep)))}
                               disabled={cur <= qMin}
-                              className="px-1 text-foreground-secondary hover:text-foreground disabled:opacity-30 transition-colors"
+                              className="h-full px-1.5 text-foreground-secondary hover:text-foreground disabled:opacity-30 transition-colors"
                             >
                               <svg
                                 className="w-3 h-3"
@@ -1409,13 +1411,14 @@ export default function LineItemsSection({
                                 updateItem(item.id, 'quantity', String(clamp(isNaN(v) ? qMin : v)))
                               }}
                               required
-                              className="flex-1 min-w-0 text-center text-sm font-medium bg-transparent border-none outline-none text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                              className="!h-full flex-1 min-w-0 p-0 text-center text-sm font-medium bg-transparent border-none outline-none focus:ring-0 text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                             />
                             <button
                               type="button"
+                              aria-label="Increase quantity"
                               onClick={() => updateItem(item.id, 'quantity', String(clamp(cur + qStep)))}
                               disabled={qMax != null && cur >= qMax}
-                              className="px-1 text-foreground-secondary hover:text-foreground disabled:opacity-30 transition-colors"
+                              className="h-full px-1.5 text-foreground-secondary hover:text-foreground disabled:opacity-30 transition-colors"
                             >
                               <svg
                                 className="w-3 h-3"
@@ -1564,15 +1567,29 @@ export default function LineItemsSection({
               {Number(item.unit_price) > 0 && (
                 <div className="flex items-center justify-between text-xs text-foreground-secondary">
                   {Number(item.discount_pct) > 0 ? (
-                    <span>
-                      MRP: <span className="line-through text-foreground-muted">₹{fmt(Number(item.unit_price))}</span>
-                      {' · '}Disc:{' '}
-                      <span className="text-green-700 dark:text-green-400 font-medium">{item.discount_pct}%</span>
-                      {' · '}Net:{' '}
-                      <span className="font-medium text-foreground">
-                        ₹{fmt(calcLine({ ...item, quantity: 1 }, gstEnabled))}
-                      </span>
-                    </span>
+                    (() => {
+                      // MRP is per piece; a pack unit (set of 10) also shows the net for one pack.
+                      const su = getSelectedUnit(item)
+                      const pack = su && su.dimension === 'count' && su.factor > 1 ? su : null
+                      const perPiece = pack ? calcLine({ ...item, quantity: 1 / pack.factor }, gstEnabled) : calcLine({ ...item, quantity: 1 }, gstEnabled)
+                      return (
+                        <span>
+                          MRP: <span className="line-through text-foreground-muted">₹{fmt(Number(item.unit_price))}</span>
+                          {pack ? '/pc' : ''}
+                          {' · '}Disc:{' '}
+                          <span className="text-green-700 dark:text-green-400 font-medium">{item.discount_pct}%</span>
+                          {' · '}Net:{' '}
+                          <span className="font-medium text-foreground">₹{fmt(perPiece)}</span>
+                          {pack ? (
+                            <>
+                              /pc{' · '}
+                              <span className="font-medium text-foreground">₹{fmt(calcLine({ ...item, quantity: 1 }, gstEnabled))}</span>/
+                              {pack.display_label}
+                            </>
+                          ) : null}
+                        </span>
+                      )
+                    })()
                   ) : (
                     <span />
                   )}

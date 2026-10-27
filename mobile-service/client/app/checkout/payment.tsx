@@ -204,7 +204,7 @@ export default function CheckoutPaymentScreen() {
         phone: a.phone,
       },
       notes: r.notes,
-      paymentMethod: 'cod',
+      paymentMethod: r.method === 'manual' ? 'manual' : 'cod',
       couponId: r.couponId,
       discountAmount: r.discountAmount,
       shippingAmount: r.shippingAmount,
@@ -245,7 +245,7 @@ export default function CheckoutPaymentScreen() {
 
   // No back button: like the hardware back, it can't abandon a payment mid-flight.
   return (
-    <Screen header={<ScreenHeader title="Payment" back={false} />} mode="none">
+    <Screen header={<ScreenHeader title="Payment" back={false} menu={false} />} mode="none">
       <Stack.Screen options={{ gestureEnabled: false }} />
       {phase === 'verifying' ? (
         <View className="flex-1 items-center justify-center px-4 py-8">
@@ -283,7 +283,7 @@ export default function CheckoutPaymentScreen() {
           </Card>
         </View>
       ) : (
-        <Spinner label={request?.method === 'cod' ? 'Placing Order...' : 'Processing...'} />
+        <Spinner label={request?.method === 'razorpay' ? 'Processing...' : 'Placing Order...'} />
       )}
     </Screen>
   )

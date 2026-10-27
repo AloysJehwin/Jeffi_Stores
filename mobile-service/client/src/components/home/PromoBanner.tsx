@@ -14,7 +14,7 @@ const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as c
 
 export default function PromoBanner({ section }: SectionProps) {
   const router = useRouter()
-  const { width } = useWindowDimensions()
+  const { width, height } = useWindowDimensions()
   const cfg = section.config ?? {}
   const { title, subtitle, eyebrow, cta_label: ctaLabel, cta_url: ctaUrl } = section
   const imageUrl = str(cfg.imageUrl)
@@ -28,11 +28,13 @@ export default function PromoBanner({ section }: SectionProps) {
   if (!title && !subtitle && !eyebrow && !mobileImg && !video && !showCta) return null
   const src = absUrl(mobileImg)
   const titleSize = Math.min(48, Math.max(24, width * 0.04)) // text-[clamp(1.5rem,4vw,3rem)]
+  // An admin-set shape inside px-4, kept on screen; the copy can still grow it.
+  const shape = section.aspect ? { minHeight: Math.min((width - 32) / section.aspect, height * 0.8), justifyContent: 'center' as const } : undefined
 
   return (
     <View className="bg-surface px-4 py-8">
       <View style={shadow} className={`rounded-panel ${elevationClass('overlay')}`}>
-        <View className="min-h-[14rem] overflow-hidden rounded-panel bg-black">
+        <View className={`${shape ? '' : 'min-h-[14rem] '}overflow-hidden rounded-panel bg-black`} style={shape}>
           {mobileImg || video ? (
             <>
               <FeedMedia image={src} video={video} blurhash={blurhash} style={FILL} />

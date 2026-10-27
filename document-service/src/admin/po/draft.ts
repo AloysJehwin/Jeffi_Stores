@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from '../../next'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
-import { query, queryOne } from '@jeffi/tenancy'
+import { queryOne, withTransaction } from '@jeffi/tenancy'
 import { z } from 'zod'
 import { parseBody } from '../../lib/validate'
+import { canDiscard, closeLock, draftLockResponse, epochFrom, withDraftWrite } from '../../lib/draft-locks'
 
 
-async function assertOwned(adminId: string, id: string) {
-  const row = await queryOne<{ id: string }>(
-    `SELECT id FROM po_drafts WHERE id = $1 AND admin_id = $2 AND promoted_po_id IS NULL`,
-    [id, adminId]
-  )
+// Any inventory writer can open a draft; only its lock holder writes it (others read-only).
+async function openDraft(id: string) {
+  const row = await queryOne<{ id: string }>(`SELECT id FROM po_drafts WHERE id = $1 AND promoted_po_id IS NULL`, [id])
   return !!row
 }
 
@@ -21,10 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!hasScope(admin.role, admin.scopes, 'inventory:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const row = await queryOne(
-    `SELECT * FROM po_drafts WHERE id = $1 AND admin_id = $2 AND promoted_po_id IS NULL`,
-    [id, admin.id]
-  )
+  const row = await queryOne(`SELECT * FROM po_drafts WHERE id = $1 AND promoted_po_id IS NULL`, [id])
   if (!row) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   return NextResponse.json({ draft: row })
 }
@@ -47,7 +43,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!hasScope(admin.role, admin.scopes, 'inventory:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  if (!(await assertOwned(admin.id, id))) {
+  if (!(await openDraft(id))) {
     return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   }
 
@@ -75,12 +71,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     vals.push(JSON.stringify(d.line_items ?? []))
   }
   if (sets.length === 0) return NextResponse.json({ ok: true })
-  vals.push(id, admin.id)
-  await query(
-    `UPDATE po_drafts SET ${sets.join(', ')}, updated_at = now()
-     WHERE id = $${i++} AND admin_id = $${i} AND promoted_po_id IS NULL`,
-    vals
-  )
+  vals.push(id)
+  try {
+    await withDraftWrite(
+      admin,
+      'po_new',
+      id,
+      client => client.query(`UPDATE po_drafts SET ${sets.join(', ')}, updated_at = now() WHERE id = $${i} AND promoted_po_id IS NULL`, vals),
+      { epoch: epochFrom(request) }
+    )
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ ok: true })
 }
 
@@ -91,9 +95,18 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasScope(admin.role, admin.scopes, 'inventory:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  await query(
-    `DELETE FROM po_drafts WHERE id = $1 AND admin_id = $2 AND promoted_po_id IS NULL`,
-    [id, admin.id]
-  )
+  try {
+    await withTransaction(async client => {
+      const denied = await canDiscard(admin, 'po_new', id, client)
+      if (denied) throw denied
+      const r = await client.query(`DELETE FROM po_drafts WHERE id = $1 AND promoted_po_id IS NULL`, [id])
+      // Nothing deleted (already turned into a PO): leave its lock's tombstone alone.
+      if (r.rowCount) await closeLock(client, admin, 'po_new', id, 'discarded')
+    })
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ ok: true })
 }

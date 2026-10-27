@@ -1,4 +1,4 @@
-import { buildWhere, type FilterQuery } from '@jeffi/list-filters'
+import { buildWhere, sortClause, type FilterQuery, type SortDef } from '@jeffi/list-filters'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { WALLET_ENTITY } from '@/lib/filters/entities/wallet'
 
@@ -16,7 +16,18 @@ export interface LedgerRow {
   occurred_at: string
 }
 
-export async function listWalletLedger(q: FilterQuery, page: number, pageSize: number) {
+const SORT: SortDef = {
+  sorts: {
+    date: 'wl.occurred_at',
+    cat: 'COALESCE(wl.category, wl.entry_type)',
+    ref: 'COALESCE(wl.order_ref, wl.awb, wl.note)',
+    amount: 'wl.amount',
+  },
+  defaultSql: 'wl.occurred_at DESC',
+  tiebreak: 'wl.id DESC',
+}
+
+export async function listWalletLedger(q: FilterQuery, page: number, pageSize: number, sort?: { get(name: string): string | null }) {
   const ctx = (await WALLET_ENTITY.context?.(q)) ?? {}
   const w = buildWhere(WALLET_ENTITY, q, 1, { ctx })
   const pool = controlPlanePool()
@@ -24,7 +35,7 @@ export async function listWalletLedger(q: FilterQuery, page: number, pageSize: n
     pool.query<LedgerRow>(
       `SELECT wl.id, wl.entry_type, wl.category, wl.amount, wl.order_ref, wl.awb, wl.note, wl.occurred_at
          FROM wallet_ledger wl ${w.where}
-        ORDER BY wl.occurred_at DESC, wl.id DESC
+        ${sortClause(sort ?? new URLSearchParams(), SORT)}
         LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
       [...w.params, pageSize, (Math.max(1, page) - 1) * pageSize]
     ),

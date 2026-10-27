@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import RowActions from '@/components/admin/RowActions'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function MailerRowActions({
   id,
@@ -15,9 +16,12 @@ export default function MailerRowActions({
   canDelete: boolean
 }) {
   const router = useRouter()
+  const { showToast } = useToast()
 
   async function deleteCampaign() {
-    await fetch(`/api/admin/mailer/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/admin/mailer/${id}`, { method: 'DELETE' })
+    // 423: another admin is editing this draft.
+    if (res.status === 423) showToast((await res.json().catch(() => ({}))).error || 'Someone else is editing this message', 'error')
     router.refresh()
   }
 

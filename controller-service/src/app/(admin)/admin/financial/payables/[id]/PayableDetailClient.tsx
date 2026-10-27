@@ -18,12 +18,12 @@ const METHOD_LABELS: Record<string, string> = {
 }
 
 const PAYMENT_COLS: DataCol<any>[] = [
-  { key: 'date', label: 'Date', sort: p => p.payment_date, render: p => <span className="whitespace-nowrap text-foreground-secondary">{formatDate(p.payment_date)}</span> },
-  { key: 'method', label: 'Method', render: p => <span className="text-foreground-secondary">{METHOD_LABELS[p.payment_method] || p.payment_method}</span> },
+  { key: 'date', label: 'Date', sortType: 'date', sort: p => p.payment_date, render: p => <span className="whitespace-nowrap text-foreground-secondary">{formatDate(p.payment_date)}</span> },
+  { key: 'method', label: 'Method', sort: p => METHOD_LABELS[p.payment_method] || p.payment_method, render: p => <span className="text-foreground-secondary">{METHOD_LABELS[p.payment_method] || p.payment_method}</span> },
   { key: 'amount', label: 'Amount', num: true, sort: p => parseFloat(p.amount), render: p => <span className="font-semibold text-foreground">{formatINR(parseFloat(p.amount))}</span> },
-  { key: 'ref', label: 'Reference / UTR', render: p => <span className="font-mono text-xs text-foreground-secondary">{p.reference || '-'}</span> },
-  { key: 'payout', label: 'Payout ID', render: p => <span className="font-mono text-xs text-foreground-secondary">{p.payout_id || '-'}</span> },
-  { key: 'status', label: 'Status', render: p => payoutBadge(p.payout_status) },
+  { key: 'ref', label: 'Reference / UTR', sort: p => p.reference || '', render: p => <span className="font-mono text-xs text-foreground-secondary">{p.reference || '-'}</span> },
+  { key: 'payout', label: 'Payout ID', sort: p => p.payout_id || '', render: p => <span className="font-mono text-xs text-foreground-secondary">{p.payout_id || '-'}</span> },
+  { key: 'status', label: 'Status', sort: p => p.payout_status ?? '', render: p => payoutBadge(p.payout_status) },
 ]
 
 function PaymentCard({ p }: { p: any }) {

@@ -106,6 +106,7 @@ export function OrderTotals({ order }: { order: Order }) {
         <Line label="Subtotal" value={inrCur(order.subtotal)} />
         {order.taxAmount > 0 && <Line label="Incl. GST" value={inrCur(order.taxAmount)} tone="muted" />}
         {order.discountAmount > 0 && <Line label="Discount" value={`−${inrCur(order.discountAmount)}`} tone="success" />}
+        {(order.businessDiscountAmount ?? 0) > 0 && <Line label="Business discount" value={`−${inrCur(order.businessDiscountAmount ?? 0)}`} tone="success" />}
         {order.shippingAmount > 0 && <Line label="Delivery" value={inrCur(order.shippingAmount)} />}
         {(order.codFeeAmount ?? 0) > 0 && <Line label="COD handling fee" value={inrCur(order.codFeeAmount ?? 0)} />}
         <View className="flex-row items-center justify-between pt-2">

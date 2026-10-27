@@ -8,6 +8,7 @@ import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import type { PoolClient } from 'pg'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
+import { closeAfter, guardDraftAction } from '@/lib/admin/draft-locks'
 
 // Keep the admin's open editor session's snapshot in step with the draft just saved.
 // After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
@@ -43,6 +44,7 @@ export async function updateBrand(brandId: string, formData: FormData) {
   const replacement_window_days = Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
   const intent = formData.get('intent') as string | null
   const host = await getHost()
+  const actor = await guardDraftAction('brand', brandId, `/admin/brands/${brandId}/edit`, intent)
 
   const draftRow = await queryOne<{ brand_id: string }>(`SELECT brand_id FROM brand_drafts WHERE brand_id = $1`, [
     brandId,
@@ -87,8 +89,9 @@ export async function updateBrand(brandId: string, formData: FormData) {
       ]
     )
     revalidatePath('/admin/brands')
+    if (publish) await closeAfter(actor, 'brand', brandId, 'published')
     // Save-as-Draft on a create-draft: resnapshot so Cancel reverts here.
-    if (!publish) await resnapshotBrandSession(brandId)
+    else await resnapshotBrandSession(brandId)
     // Publish → /view (new standardized destination); save-as-draft stays on list.
     redirect(ap(publish ? `/admin/brands/${brandId}/view` : '/admin/brands', host))
   }
@@ -97,6 +100,7 @@ export async function updateBrand(brandId: string, formData: FormData) {
     if (hasDraft || intent === 'draft') {
       if (intent === 'discard') {
         await query(`DELETE FROM brand_drafts WHERE brand_id = $1`, [brandId])
+        await closeAfter(actor, 'brand', brandId, 'discarded')
         revalidatePath(`/admin/brands/${brandId}/edit`)
         redirect(ap(`/admin/brands/${brandId}/edit`, host))
       }
@@ -136,6 +140,7 @@ export async function updateBrand(brandId: string, formData: FormData) {
           }
           await client.query('DELETE FROM brand_drafts WHERE brand_id=$1', [brandId])
         })
+        await closeAfter(actor, 'brand', brandId, 'published')
         revalidatePath('/admin/brands')
         redirect(ap('/admin/brands', host))
       }

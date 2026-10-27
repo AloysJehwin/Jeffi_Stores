@@ -2,7 +2,7 @@ import { query, queryMany } from '@/lib/shared/db'
 import { hasScope } from '@/lib/auth/scopes'
 
 export type AdminNotificationCategory =
-  'orders' | 'returns' | 'reviews' | 'b2b' | 'support' | 'kyc' | 'inventory' | 'finance' | 'marketing'
+  'orders' | 'returns' | 'reviews' | 'b2b' | 'support' | 'kyc' | 'inventory' | 'finance' | 'marketing' | 'drafts'
 
 export type AdminNotificationSeverity = 'info' | 'warning' | 'critical'
 
@@ -17,6 +17,7 @@ export interface AdminNotification {
   entity_id: string | null
   severity: AdminNotificationSeverity
   scope: string | null
+  recipient_admin_id?: string | null
   is_read: boolean
   created_at: string
 }
@@ -31,6 +32,8 @@ interface CreateParams {
   entityId?: string | null
   severity?: AdminNotificationSeverity
   scope?: string | null
+  /** Only this admin sees the row; omitted = everyone whose scopes allow it. */
+  recipientAdminId?: string | null
 }
 
 export async function createAdminNotification(params: CreateParams): Promise<void> {
@@ -39,15 +42,16 @@ export async function createAdminNotification(params: CreateParams): Promise<voi
       const existing = await query(
         `SELECT 1 FROM admin_notifications
          WHERE entity_type = $1 AND entity_id = $2 AND type = $3 AND is_read = false
+           AND recipient_admin_id IS NOT DISTINCT FROM $4::uuid
          LIMIT 1`,
-        [params.entityType, params.entityId, params.type]
+        [params.entityType, params.entityId, params.type, params.recipientAdminId ?? null]
       )
       if (existing.rowCount && existing.rowCount > 0) return
     }
     await query(
       `INSERT INTO admin_notifications
-         (type, category, title, message, link, entity_type, entity_id, severity, scope)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         (type, category, title, message, link, entity_type, entity_id, severity, scope, recipient_admin_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         params.type,
         params.category,
@@ -58,6 +62,7 @@ export async function createAdminNotification(params: CreateParams): Promise<voi
         params.entityId ?? null,
         params.severity ?? 'info',
         params.scope ?? null,
+        params.recipientAdminId ?? null,
       ]
     )
   } catch (err: any) {
@@ -77,15 +82,17 @@ function visible(row: AdminNotification, role: string, scopes: string[]): boolea
 export async function listAdminNotifications(
   role: string,
   scopes: string[],
-  limit = 30
+  limit = 30,
+  adminId: string | null = null
 ): Promise<{ items: AdminNotification[]; unreadCount: number }> {
   const rows = await queryMany<AdminNotification>(
     `SELECT id, type, category, title, message, link, entity_type, entity_id,
-            severity, scope, is_read, created_at
+            severity, scope, recipient_admin_id, is_read, created_at
      FROM admin_notifications
+     WHERE recipient_admin_id IS NULL OR recipient_admin_id = $2::uuid
      ORDER BY created_at DESC
      LIMIT $1`,
-    [Math.max(1, Math.min(limit, 100))]
+    [Math.max(1, Math.min(limit, 100)), adminId]
   )
   const items = rows.filter(r => visible(r, role, scopes))
   const unreadCount = items.filter(r => !r.is_read).length
@@ -101,6 +108,10 @@ export async function markRead(ids: string[]): Promise<void> {
   )
 }
 
-export async function markAllRead(): Promise<void> {
-  await query(`UPDATE admin_notifications SET is_read = true, read_at = now() WHERE is_read = false`, [])
+export async function markAllRead(adminId: string | null = null): Promise<void> {
+  await query(
+    `UPDATE admin_notifications SET is_read = true, read_at = now()
+     WHERE is_read = false AND (recipient_admin_id IS NULL OR recipient_admin_id = $1::uuid)`,
+    [adminId]
+  )
 }

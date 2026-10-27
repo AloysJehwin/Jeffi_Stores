@@ -5,6 +5,24 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import CopySku from '@/components/ui/CopySku'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { timeAgo } from '@/lib/client/draft-lock-client'
+
+// Lock resource type for each entity route segment.
+const LOCK_TYPE: Record<string, string> = {
+  products: 'product',
+  brands: 'brand',
+  categories: 'category',
+  coupons: 'coupon',
+  'review-forms': 'review_form',
+  suppliers: 'supplier',
+}
+
+interface HeldDraft {
+  message: string
+  ownerName: string | null
+  startedAt: string | null
+  canTakeOver: boolean
+}
 
 interface Props {
   productId: string
@@ -31,6 +49,13 @@ export default function DraftConfirmModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mounted, setMounted] = useState(false)
+  // 423: someone else holds the draft.
+  const [held, setHeld] = useState<HeldDraft | null>(null)
+  const [reason, setReason] = useState('')
+  const [notice, setNotice] = useState('')
+  const lockType = LOCK_TYPE[entity] ?? entity
+  const lockApi = `/api/admin/draft-locks/${lockType}/${productId}`
+  const editUrl = `${apPrefix}/admin/${entity}/${productId}/edit${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
 
   // Mount portal after hydration to avoid SSR/hydration mismatch
   useEffect(() => {
@@ -46,9 +71,20 @@ export default function DraftConfirmModal({
       if (!res.ok) {
         // 409 = draft already exists — reload this same edit page to show the draft form
         if (res.status === 409) {
-          router.push(
-            `${apPrefix}/admin/${entity}/${productId}/edit${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
-          )
+          router.push(editUrl)
+          return
+        }
+        // 423 = someone else holds the draft: offer read-only, request access, or (owners) take over
+        if (res.status === 423) {
+          const st = await fetch(lockApi, { cache: 'no-store' })
+            .then(r => (r.ok ? r.json() : null))
+            .catch(() => null)
+          setHeld({
+            message: data.error || 'Someone else is editing this draft',
+            ownerName: data.lock?.ownerName ?? null,
+            startedAt: data.lock?.startedAt ?? null,
+            canTakeOver: !!st?.canTakeOver,
+          })
           return
         }
         setError(data.error || 'Failed to create draft')
@@ -63,6 +99,42 @@ export default function DraftConfirmModal({
     } finally {
       setLoading(false)
     }
+  }
+
+  async function lockAction(payload: Record<string, unknown>): Promise<boolean> {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(lockApi, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || 'Could not update the draft lock')
+        return false
+      }
+      return true
+    } catch {
+      setError('Something went wrong. Please try again.')
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function requestAccess() {
+    if (await lockAction({ action: 'request_access' }))
+      setNotice(`Asked ${held?.ownerName ?? 'the holder'} for this draft`)
+  }
+
+  async function takeOver() {
+    if (!reason.trim()) {
+      setError('Give a reason for taking over')
+      return
+    }
+    if (await lockAction({ action: 'takeover', reason: reason.trim() })) router.push(editUrl)
   }
 
   function goBack() {
@@ -125,6 +197,26 @@ export default function DraftConfirmModal({
           </div>
         )}
 
+        {held && (
+          <div className="mb-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            <p className="font-semibold">
+              Draft by {held.ownerName ?? 'another admin'}
+              {held.startedAt ? ` · started ${timeAgo(held.startedAt)}` : ''}
+            </p>
+            <p className="mt-0.5">{held.message}. You can open it read-only.</p>
+            {held.canTakeOver && (
+              <textarea
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="Reason for taking over (required)"
+                rows={2}
+                className="mt-2 w-full rounded-lg border border-border-default bg-surface px-2 py-1.5 text-xs text-foreground"
+              />
+            )}
+            {notice && <p className="mt-1 font-semibold">{notice}</p>}
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-xs text-red-700 dark:text-red-400">
             {error}
@@ -135,6 +227,37 @@ export default function DraftConfirmModal({
           Your edits will be saved as a draft. The live product stays unchanged until you publish.
         </p>
 
+        {held ? (
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => router.push(editUrl)}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-border-default text-sm font-semibold text-foreground-secondary hover:bg-surface-secondary transition-colors disabled:opacity-50"
+            >
+              Open read-only
+            </button>
+            <RequireWrite
+              scope={`${lockType === 'review_form' ? 'review_forms' : lockType === 'supplier' ? 'inventory' : entity}:write`}
+            >
+              <button
+                onClick={() => void requestAccess()}
+                disabled={loading || !!notice}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border-default text-sm font-semibold text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
+              >
+                Request access
+              </button>
+              {held.canTakeOver && (
+                <button
+                  onClick={() => void takeOver()}
+                  disabled={loading}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                >
+                  Take over
+                </button>
+              )}
+            </RequireWrite>
+          </div>
+        ) : (
         <div className="flex gap-3">
           <button
             onClick={goBack}
@@ -145,14 +268,7 @@ export default function DraftConfirmModal({
           </button>
           <RequireWrite scope="orders:write">
             <button
-              onClick={
-                existingDraftId
-                  ? () =>
-                      router.push(
-                        `${apPrefix}/admin/${entity}/${productId}/edit${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
-                      )
-                  : createDraft
-              }
+                onClick={existingDraftId ? () => router.push(editUrl) : createDraft}
               disabled={loading}
               className="flex-1 px-4 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
@@ -169,6 +285,7 @@ export default function DraftConfirmModal({
             </button>
           </RequireWrite>
         </div>
+        )}
       </div>
     </div>,
     document.body

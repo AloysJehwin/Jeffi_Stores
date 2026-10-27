@@ -15,7 +15,7 @@ function useColumn(cols: number, gap: number) {
 /** ProductCard: 5:3 image, two title lines, meta, price and stock row. */
 export function ProductCardSkeleton({ width }: { width?: number }) {
   return (
-    <View style={{ width }} className="overflow-hidden rounded-panel bg-surface-elevated dark:border dark:border-border-default">
+    <View style={{ width }} className="overflow-hidden rounded-panel border border-transparent bg-surface-elevated dark:border-border-default">
       <View className="px-3 pt-3">
         <Skeleton aspectRatio={5 / 3} rounded="rounded-lg" />
       </View>
@@ -114,7 +114,7 @@ export function ListRowSkeleton({ icon = true, trailing = true }: { icon?: boole
 /** A card of list rows. */
 export function ListSkeleton({ rows = 5, icon = true, className }: { rows?: number; icon?: boolean; className?: string }) {
   return (
-    <View className={cn('overflow-hidden rounded-panel bg-surface-elevated dark:border dark:border-border-default', className)}>
+    <View className={cn('overflow-hidden rounded-panel border border-transparent bg-surface-elevated dark:border-border-default', className)}>
       {Array.from({ length: rows }).map((_, i) => (
         <View key={i}>
           {i > 0 ? <View className={cn('h-px bg-border-default', icon && 'ml-16')} /> : null}

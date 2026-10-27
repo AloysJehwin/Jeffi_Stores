@@ -2,12 +2,14 @@ import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 import SectionRenderer from '@/components/visitor/home/SectionRenderer'
 import Reveal from '@/components/visitor/home/Reveal'
 import { buildHomeModel } from '@/lib/catalog/homepage-model'
+import { getWebSurface } from '@/lib/catalog/web-surface'
 
 export const revalidate = 120
 
-export default async function HomePage() {
-  // Same model the app reads from GET /api/home.
-  const { sections, data } = await buildHomeModel()
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ layout?: string }> }) {
+  // Same model the app reads from GET /api/home; phones get the mobile web layout.
+  const surface = await getWebSurface((await searchParams).layout)
+  const { sections, data } = await buildHomeModel({ surface })
 
   return (
     <div className="bg-surface">

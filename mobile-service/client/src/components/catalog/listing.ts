@@ -1,20 +1,24 @@
 // The storefront /products listing's URL state (web: app/(storefront)/products/page.tsx and MobileFilterSheet).
 // Filtering, sorting, paging and facets all happen server-side in GET /api/products/listing.
 
+// The shared product sorts (web, business portal, app). packages/api-contracts is in metro.config.js watchFolders.
+export {
+  PRODUCT_SORTS,
+  PRODUCT_TABLE_COLUMNS,
+  nextTableSort,
+  productSortKey,
+  tableSortState,
+  type ProductSortId,
+  type ProductSortOption,
+  type ProductTableColumn,
+} from '../../../../../packages/api-contracts/src/product-sort'
+
 export const LISTING_KEYS = [
-  'search', 'category', 'brand', 'offer', 'sort', 'order', 'minPrice', 'maxPrice', 'inStock', 'onSale', 'minRating',
+  'search', 'category', 'brand', 'offer', 'sort', 'dir', 'order', 'minPrice', 'maxPrice', 'inStock', 'onSale', 'minRating',
   'color', 'grade', 'material', 'finish', 'compliance', 'origin', 'variantType', 'variantValue', 'specKey', 'specValue',
 ] as const
 export type ListingKey = (typeof LISTING_KEYS)[number]
 export type ListingParams = Partial<Record<ListingKey, string>>
-
-export const SORT_OPTIONS = [
-  { label: 'Default', sort: '', order: '' },
-  { label: 'Newest First', sort: 'created_at', order: 'desc' },
-  { label: 'Name A–Z', sort: 'name', order: 'asc' },
-  { label: 'Price: Low → High', sort: 'price', order: 'asc' },
-  { label: 'Price: High → Low', sort: 'price', order: 'desc' },
-]
 
 export function readListingParams(raw: Record<string, string | string[] | undefined>): ListingParams {
   const out: ListingParams = {}

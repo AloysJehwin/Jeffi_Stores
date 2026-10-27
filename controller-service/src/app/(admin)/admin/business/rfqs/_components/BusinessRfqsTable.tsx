@@ -24,16 +24,18 @@ export default function BusinessRfqsTable({ rfqs, total, page, pageSize }: { rfq
     {
       key: 'rfq',
       label: 'RFQ #',
+      sortParam: 'rfq',
       render: r => (
         <Link href={r.href} className="font-mono text-xs font-semibold text-foreground hover:text-accent-500 hover:underline">
           {r.rfq_number}
         </Link>
       ),
     },
-    { key: 'company', label: 'Company', render: r => <span className="font-medium text-foreground">{r.company_name || '-'}</span> },
+    { key: 'company', label: 'Company', sortParam: 'company', render: r => <span className="font-medium text-foreground">{r.company_name || '-'}</span> },
     {
       key: 'contact',
       label: 'Contact',
+      sortParam: 'contact',
       hideBelow: 'lg',
       render: r => (
         <div className="min-w-0">
@@ -44,9 +46,9 @@ export default function BusinessRfqsTable({ rfqs, total, page, pageSize }: { rfq
         </div>
       ),
     },
-    { key: 'items', label: 'Items', num: true, render: r => <span className="text-foreground-secondary">{r.item_count}</span> },
-    { key: 'status', label: 'Status', render: r => <StatusBadge status={r.status} map={RFQ_STATUS} /> },
-    { key: 'submitted', label: 'Submitted', render: r => <span className="text-xs text-foreground-secondary">{fmtDay(r.created_at)}</span> },
+    { key: 'items', label: 'Items', num: true, sortParam: 'items', render: r => <span className="text-foreground-secondary">{r.item_count}</span> },
+    { key: 'status', label: 'Status', sortParam: 'status', render: r => <StatusBadge status={r.status} map={RFQ_STATUS} /> },
+    { key: 'submitted', label: 'Submitted', sortParam: 'created_at', sortType: 'date', render: r => <span className="text-xs text-foreground-secondary">{fmtDay(r.created_at)}</span> },
   ]
 
   return (

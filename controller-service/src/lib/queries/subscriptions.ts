@@ -1,5 +1,5 @@
 import 'server-only'
-import { buildWhere, type FilterQuery, type ScopeSql } from '@jeffi/list-filters'
+import { buildWhere, orderByClause, parseSort, type FilterQuery, type ScopeSql, type SortDef } from '@jeffi/list-filters'
 import { queryOne, queryMany, queryCount } from './shared'
 import { CYCLE_PAISE_SQL, SUBSCRIPTIONS_ENTITY } from '@/lib/filters/entities/subscriptions'
 import {
@@ -139,12 +139,27 @@ export async function listAdminSubscriptions(filters: { status?: string; q?: str
 }
 
 /** One page for a normalised filter query (the admin list). */
-export async function queryAdminSubscriptions(q: FilterQuery, page = 1) {
-  const w = buildWhere(SUBSCRIPTIONS_ENTITY, q, 1)
-  return selectSubscriptions(w.where, w.params, Math.max(1, Math.floor(page)))
+const ADMIN_SORT: SortDef = {
+  sorts: {
+    customer: "concat_ws(' ', u.first_name, u.last_name)",
+    product: 'p.name',
+    plan: 's.interval',
+    cycle: 's.current_cycle',
+    amount: CYCLE_PAISE_SQL,
+    next: 's.current_end',
+    status: 's.status',
+  },
+  defaultSql: 's.created_at DESC',
+  tiebreak: 's.id DESC',
 }
 
-async function selectSubscriptions(where: string, params: unknown[], page: number) {
+export async function queryAdminSubscriptions(q: FilterQuery, page = 1, sort?: { get(name: string): string | null }) {
+  const w = buildWhere(SUBSCRIPTIONS_ENTITY, q, 1)
+  const order = sort ? orderByClause(ADMIN_SORT, parseSort(sort, ADMIN_SORT.sorts)) : undefined
+  return selectSubscriptions(w.where, w.params, Math.max(1, Math.floor(page)), order)
+}
+
+async function selectSubscriptions(where: string, params: unknown[], page: number, order = 'ORDER BY s.created_at DESC') {
   const from = `FROM subscriptions s JOIN users u ON u.id = s.user_id JOIN products p ON p.id = s.product_id`
   const offset = (page - 1) * ADMIN_SUBSCRIPTIONS_PAGE_SIZE
 
@@ -155,7 +170,7 @@ async function selectSubscriptions(where: string, params: unknown[], page: numbe
               ${CYCLE_PAISE_SQL}::text AS cycle_paise, s.current_cycle, s.term_cycles, s.current_end::text,
               s.cancel_at_cycle_end, s.collecting_account, s.razorpay_subscription_id, s.created_at::text
          ${from} ${where}
-        ORDER BY s.created_at DESC
+        ${order}
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, ADMIN_SUBSCRIPTIONS_PAGE_SIZE, offset]
     ),

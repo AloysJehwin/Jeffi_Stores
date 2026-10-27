@@ -3,7 +3,8 @@
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import { query } from '@/lib/shared/db'
+import { query, queryOne } from '@/lib/shared/db'
+import { draftEditUrl, tryAcquireForAction } from '@/lib/admin/draft-locks'
 
 // Create (or reuse) an edit-draft for the campaign kind, then redirect to /edit.
 // Mirrors startCouponDraft / startBrandDraft. The edit page's own guard sends
@@ -42,7 +43,9 @@ export async function startCampaignDraft(kind: string, formData: FormData) {
        WHERE campaign_drafts.fields = '{}'::jsonb`,
     [kind]
   )
+  const row = await queryOne<{ campaign_id: string }>(`SELECT campaign_id FROM campaign_drafts WHERE kind = $1`, [kind])
+  // Someone else's draft opens read-only (the seed above never overwrites a started draft).
+  const mine = row ? await tryAcquireForAction('campaign', row.campaign_id) : true
   const host = await getHost()
-  const qs = back ? `?back=${encodeURIComponent(back)}` : ''
-  redirect(ap(`/admin/campaigns/${kind}/edit${qs}`, host))
+  redirect(ap(draftEditUrl(`/admin/campaigns/${kind}/edit`, back, mine), host))
 }

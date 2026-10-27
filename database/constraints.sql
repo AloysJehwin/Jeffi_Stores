@@ -1028,7 +1028,8 @@ ALTER TABLE ONLY public.homepage_sections
         'countdown_deal'::text, 'testimonials'::text, 'recently_viewed'::text, 'category_tabs'::text,
         'bundle_spotlight'::text, 'back_in_stock'::text, 'blog_teaser'::text, 'social_strip'::text,
         'value_stats'::text, 'motion_hero'::text, 'stories'::text, 'product_spotlight'::text,
-        'rewards_game'::text, 'slides'::text])));
+        'rewards_game'::text, 'slides'::text, 'business_reorder'::text, 'business_quotes'::text,
+        'business_offers'::text, 'business_account'::text])));
 
 
 --
@@ -1037,7 +1038,24 @@ ALTER TABLE ONLY public.homepage_sections
 --
 
 ALTER TABLE ONLY public.homepage_sections
-    ADD CONSTRAINT homepage_sections_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'app'::text])));
+    ADD CONSTRAINT homepage_sections_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'web_mobile'::text, 'app'::text])));
+
+
+--
+-- Name: homepage_sections homepage_sections_page_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.homepage_sections
+    ADD CONSTRAINT homepage_sections_page_check CHECK ((page IS NOT NULL AND (page)::text = ANY (ARRAY['home'::text, 'products'::text, 'category'::text, 'brand'::text])));
+
+
+--
+-- Name: homepage_sections homepage_sections_audience_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+-- The business audience has a homepage only.
+--
+
+ALTER TABLE ONLY public.homepage_sections
+    ADD CONSTRAINT homepage_sections_audience_check CHECK ((audience IS NOT NULL AND ((audience)::text = 'store'::text OR ((audience)::text = 'business'::text AND (page)::text = 'home'::text))));
 
 
 --
@@ -1045,7 +1063,15 @@ ALTER TABLE ONLY public.homepage_sections
 --
 
 ALTER TABLE ONLY public.hero_slides
-    ADD CONSTRAINT hero_slides_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'app'::text])));
+    ADD CONSTRAINT hero_slides_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'web_mobile'::text, 'app'::text])));
+
+
+--
+-- Name: hero_slides hero_slides_audience_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hero_slides
+    ADD CONSTRAINT hero_slides_audience_check CHECK ((audience IS NOT NULL AND (audience)::text = ANY (ARRAY['store'::text, 'business'::text])));
 
 
 
@@ -3756,7 +3782,36 @@ ALTER TABLE ONLY public.editor_sessions
 
 ALTER TABLE public.editor_sessions
     ADD CONSTRAINT editor_sessions_closed_reason_check
-    CHECK (closed_reason IN ('save','cancel','expired') OR closed_reason IS NULL);
+    CHECK (closed_reason IN ('save','cancel','expired','superseded') OR closed_reason IS NULL);
+
+--
+-- draft_locks / draft_presence
+--
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_pkey PRIMARY KEY (resource_type, resource_id);
+ALTER TABLE public.draft_locks
+    ADD CONSTRAINT draft_locks_acquired_via_check
+    CHECK (acquired_via IN ('start','claim','handover','takeover','backfill'));
+ALTER TABLE public.draft_locks
+    ADD CONSTRAINT draft_locks_closed_reason_check
+    CHECK (closed_reason IN ('published','discarded','finalized','sent','converted','deleted','orphaned') OR closed_reason IS NULL);
+ALTER TABLE public.draft_locks
+    ADD CONSTRAINT draft_locks_takeover_reason_check
+    CHECK (acquired_via <> 'takeover' OR takeover_reason IS NOT NULL);
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_owner_admin_id_fkey FOREIGN KEY (owner_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_started_by_admin_id_fkey FOREIGN KEY (started_by_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_previous_owner_admin_id_fkey FOREIGN KEY (previous_owner_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.draft_locks
+    ADD CONSTRAINT draft_locks_closed_by_admin_id_fkey FOREIGN KEY (closed_by_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.draft_presence
+    ADD CONSTRAINT draft_presence_pkey PRIMARY KEY (resource_type, resource_id, admin_id, tab_id);
+ALTER TABLE public.draft_presence
+    ADD CONSTRAINT draft_presence_mode_check CHECK (mode IN ('view','edit'));
+ALTER TABLE ONLY public.admin_notifications
+    ADD CONSTRAINT admin_notifications_recipient_admin_id_fkey FOREIGN KEY (recipient_admin_id) REFERENCES public.admins(id) ON DELETE CASCADE;
 
 --
 -- campaign_drafts

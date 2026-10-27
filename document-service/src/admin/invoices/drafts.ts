@@ -6,6 +6,7 @@ import { isInterState, round2 } from '../../lib/gst'
 import { getBusinessValues, getFeatureFlags } from '../../lib/site-controls'
 import { parseBody } from '../../lib/validate'
 import { draftInvoiceSchema, priceInvoiceLines } from '../../lib/invoice-line-items'
+import { lockBadges, lockNewDraft } from '../../lib/draft-locks'
 
 
 export async function GET(request: NextRequest) {
@@ -107,7 +108,8 @@ export async function GET(request: NextRequest) {
        LIMIT 100`
     )
 
-    return NextResponse.json({ drafts: rows || [] })
+    const locks = await lockBadges(admin, 'invoice', (rows || []).map((r: any) => r.id))
+    return NextResponse.json({ drafts: (rows || []).map((r: any) => (locks[r.id] ? { ...r, lock: locks[r.id] } : r)) })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
@@ -240,6 +242,7 @@ export async function POST(request: NextRequest) {
 
       return { orderId, orderNumber: orderResult.rows[0].order_number }
     })
+    await lockNewDraft(admin, 'invoice', result.orderId)
 
     return NextResponse.json({ success: true, draftId: result.orderId, orderNumber: result.orderNumber })
   } catch (err: any) {

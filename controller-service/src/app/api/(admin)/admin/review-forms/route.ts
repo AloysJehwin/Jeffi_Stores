@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import { buildSearchClause } from '@/lib/catalog/search'
+import { actorOf, lockNewDraft } from '@/lib/admin/draft-locks'
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
         JSON.stringify(custom_fields || []),
       ]
     )
+    if (result[0]?.id) await lockNewDraft(actorOf(admin), 'review_form', result[0].id)
     return NextResponse.json({ form: result[0] }, { status: 201 })
   } catch (err: unknown) {
     if ((err as { code?: string }).code === '23505')

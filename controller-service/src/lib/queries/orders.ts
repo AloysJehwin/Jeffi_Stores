@@ -1,6 +1,6 @@
 import { buildWhere, normalizeQuery, type FilterCtx, type FilterQuery } from '@jeffi/list-filters'
-import { queryOne, queryMany, queryCount } from './shared'
-import { ORDERS_ENTITY, ORDER_SORTS } from '@/lib/filters/entities/orders'
+import { queryOne, queryMany, queryCount, entityOrderBy } from './shared'
+import { ORDERS_ENTITY } from '@/lib/filters/entities/orders'
 import { FULFILLED_SQL } from '@/lib/orders/fulfilled-status'
 import { orderItemFactorSql, orderItemUnitSql } from '@/lib/orders/unit-conversion'
 
@@ -37,14 +37,12 @@ export async function queryOrders(
   const w = buildWhere(ORDERS_ENTITY, q, 1, { ctx })
   const limit = opts.limit || 25
   const offset = ((opts.page || 1) - 1) * limit
-  const sortCol = ORDER_SORTS[opts.sort || ''] || 'o.created_at'
-  const sortDir = opts.dir === 'asc' ? 'ASC' : 'DESC'
 
   const [orders, countResult] = await Promise.all([
     queryMany(
       `${ORDER_LIST_SELECT}
       ${w.where}
-      ORDER BY ${sortCol} ${sortDir}
+      ${entityOrderBy(ORDERS_ENTITY, opts.sort, opts.dir)}
       LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}
     `,
       [...w.params, limit, offset]

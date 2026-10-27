@@ -1,7 +1,8 @@
 import { query, queryOne, queryMany, getClient } from '@/lib/shared/db'
 import { PoolClient } from 'pg'
-import type { FilterScope } from '@jeffi/list-filters'
+import { orderByClause, parseSort, type FilterScope } from '@jeffi/list-filters'
 import { LEDGER_COUNT_CAP } from '@/lib/filters/fields/inventory'
+import { LEDGER_SORTS, VAL_SORTS } from '@/lib/filters/entities/inventory'
 import { buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
 import { round2 } from '@/lib/catalog/gst'
 
@@ -227,6 +228,8 @@ export async function getStockLedger(filters: {
   offset?: number
   /** The ledger list's other filters (on it), from the filter registry. */
   scope?: FilterScope
+  sort?: string
+  dir?: string
 }) {
   const conditions: string[] = ['1=1']
   const params: any[] = []
@@ -279,10 +282,14 @@ export async function getStockLedger(filters: {
   const total = Math.min(counted, LEDGER_COUNT_CAP)
   const capped = counted > LEDGER_COUNT_CAP
 
-  const limit = filters.limit || 50
+  const limit = Math.min(Math.max(1, filters.limit || 50), 200)
   const offset = filters.offset || 0
 
-  // Step 1: the page's group keys, ordered by event recency.
+  // Step 1: the page's group keys, ordered by event recency or the picked (whitelisted) sort.
+  const groupOrder = orderByClause(
+    { sorts: LEDGER_SORTS, defaultSql: 'MAX(it.created_at) DESC', tiebreak: 'group_key' },
+    parseSort(new URLSearchParams({ sort: filters.sort ?? '', dir: filters.dir ?? '' }), LEDGER_SORTS)
+  )
   const pageParams = [...params, limit, offset]
   const groupRows = await queryMany<{ group_key: string }>(
     `SELECT ${GROUP_KEY} AS group_key, MAX(it.created_at) AS ts
@@ -291,7 +298,7 @@ export async function getStockLedger(filters: {
      LEFT JOIN product_variants pv ON pv.id = it.variant_id
      WHERE ${where}
      GROUP BY group_key
-     ORDER BY ts DESC
+     ${groupOrder}
      LIMIT $${i} OFFSET $${i + 1}`,
     pageParams
   )
@@ -299,7 +306,7 @@ export async function getStockLedger(filters: {
   if (!groupRows || groupRows.length === 0) return { rows: [], total, capped }
 
   // Step 2: all child rows for exactly those groups, kept contiguous and in the
-  // same group order (by the group's newest timestamp) so the UI groups cleanly.
+  // page's group order so the UI groups cleanly.
   const keys = groupRows.map(g => g.group_key)
   const rowParams = [...params, keys]
   const rows = await queryMany<any>(
@@ -345,7 +352,7 @@ export async function getStockLedger(filters: {
     LEFT JOIN cash_sales cs ON it.reference_type = 'cash_sale' AND cs.id = it.reference_id
     LEFT JOIN grns g    ON it.reference_type = 'grn'       AND g.id  = it.reference_id
     WHERE ${where} AND ${GROUP_KEY} = ANY($${i}::text[])
-    ORDER BY MAX(it.created_at) OVER (PARTITION BY ${GROUP_KEY}) DESC, ${GROUP_KEY}, it.created_at DESC
+    ORDER BY array_position($${i}::text[], ${GROUP_KEY}), it.created_at DESC
   `,
     rowParams
   )
@@ -367,7 +374,8 @@ export async function getStockValuation(
     scope?: FilterScope
   } = {}
 ) {
-  const { limit = 50, offset = 0, search, categoryName, brandName, stockStatus, sort, dir, scope } = filters
+  const { offset = 0, search, categoryName, brandName, stockStatus, sort, dir, scope } = filters
+  const limit = Math.min(Math.max(1, filters.limit || 50), 200)
 
   // Build WHERE conditions applied to each UNION leg via a wrapping CTE
   const havingClauses: string[] = []
@@ -593,34 +601,22 @@ export async function getStockValuation(
     .then(r => r?.n || 0)
     .catch(() => 0)
 
-  // Server-side sort (across ALL matching SKUs, not just the page). Whitelist columns.
-  const VAL_SORT_COLS: Record<string, string> = {
-    product: 'rows.name',
-    variant: 'rows.variant_name',
-    sku: 'rows.row_sku',
-    stock: 'rows.inventory_quantity',
-    price: 'rows.cost_price',
-    value: 'rows.stock_value',
-  }
-  const sortCol = (sort && VAL_SORT_COLS[sort]) || null
-  const sortDir = dir === 'asc' ? 'ASC' : 'DESC'
+  // Server-side sort (across ALL matching SKUs, not just the page), per product.
+  const spec = parseSort(new URLSearchParams({ sort: sort ?? '', dir: dir ?? '' }), VAL_SORTS)
 
   // Relevance ordering: when the user is searching (and hasn't picked an explicit
   // sort column), order paginated products by the shared product-search rank — same
   // as the line-item picker — so the strongest name match lands on page 1 instead of
   // being buried alphabetically behind loose fuzzy hits.
   let rankParams: any[] = []
-  let productOrderBy: string
-  if (sortCol) {
-    productOrderBy = `ORDER BY MIN(${sortCol}) ${sortDir} NULLS LAST, MIN(rows.name)`
-  } else if (search) {
+  let defaultSql = 'MIN(rows.name)'
+  if (!spec && search) {
     const rk = buildProductSearchRank(search, 'rows.name', 'rows.search_vector', i)
     rankParams = rk.params
-    productOrderBy = `ORDER BY MIN(${rk.rank}) ASC, MIN(rows.name)`
+    defaultSql = `MIN(${rk.rank}) ASC, MIN(rows.name)`
     i = rk.nextIdx
-  } else {
-    productOrderBy = `ORDER BY MIN(rows.name)`
   }
+  const productOrderBy = orderByClause({ sorts: VAL_SORTS, defaultSql, tiebreak: 'MIN(rows.name), rows.id' }, spec)
 
   // Paginate over distinct product IDs, then fetch all leaves for those products.
   const pageParams = [...params, ...rankParams, limit, offset]
@@ -632,7 +628,7 @@ export async function getStockValuation(
   const products =
     idList.length > 0
       ? await queryMany<any>(
-          `${baseQuery} SELECT rows.* FROM rows WHERE rows.id = ANY($1) ORDER BY rows.name, rows.variant_name, rows.sub_variant_name`,
+          `${baseQuery} SELECT rows.* FROM rows WHERE rows.id = ANY($1) ORDER BY array_position($1, rows.id), rows.variant_name, rows.sub_variant_name`,
           [idList]
         )
       : []

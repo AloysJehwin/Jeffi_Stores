@@ -12,7 +12,7 @@ import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
-import { Dialog, DetailHeader, DetailSkeleton, ErrorState, badgeCls, useActionToast } from '@/components/admin/kit'
+import { Dialog, DetailHeader, DetailSkeleton, ErrorState, ViewDraftLink, badgeCls, useActionToast } from '@/components/admin/kit'
 import { formatINR, formatDate } from '@/lib/shared/format'
 import {
   deriveSellableItems,
@@ -758,7 +758,16 @@ function StatusToggle({
   )
 }
 
-export default function ProductDetailClient({ id, hasInventory = true }: { id: string; hasInventory?: boolean }) {
+export default function ProductDetailClient({
+  id,
+  hasInventory = true,
+  heldDraft,
+}: {
+  id: string
+  hasInventory?: boolean
+  /** Another admin holds the draft: open it read-only instead of starting one. */
+  heldDraft?: { ownerName: string; href: string } | null
+}) {
   const [product, setProduct] = useState<any>(null)
   const canWriteProducts = useCanWrite('products')
   const canEnrich = useHasScope('catalog_enrichment:read')
@@ -920,15 +929,19 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             >
               Analytics
             </Link>
-            <RequireWrite scope="products:write">
-              <button
-                type="button"
-                onClick={() => setShowDraftModal(true)}
-                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-              >
-                Edit
-              </button>
-            </RequireWrite>
+            {heldDraft ? (
+              <ViewDraftLink held={heldDraft} />
+            ) : (
+              <RequireWrite scope="products:write">
+                <button
+                  type="button"
+                  onClick={() => setShowDraftModal(true)}
+                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+                >
+                  Edit
+                </button>
+              </RequireWrite>
+            )}
           </>
         }
       />

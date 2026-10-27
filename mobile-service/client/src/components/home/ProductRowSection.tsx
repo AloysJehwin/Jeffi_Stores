@@ -20,15 +20,18 @@ export default function ProductRowSection({
   products,
   carousel,
   style,
+  aspect,
 }: {
   title: string
   eyebrow: string
   products: CardProduct[]
   carousel: boolean
   style: RowStyle
+  /** The cards' image shape (width / height), when the admin set one. */
+  aspect?: number | null
 }) {
   // "View All" is hidden below sm on the web, so the mobile view has none.
-  const cards = products.map(p => <ProductCard key={p.id} product={p} />)
+  const cards = products.map(p => <ProductCard key={p.id} product={p} imageAspect={aspect} />)
   return (
     <View className={`px-4 py-12 ${style.section}`}>
       <SectionHeading eyebrow={eyebrow} title={title} eyebrowClassName={style.eyebrow} barClassName={style.bar} />
@@ -48,13 +51,13 @@ export function ProductRowHead({ title, eyebrow, style }: { title: string; eyebr
 }
 
 /** One row of a two-column card grid; `last` closes the section's bottom padding (py-12). */
-export const ProductPair = memo(function ProductPair({ products, bg, gap, last }: { products: CardProduct[]; bg: string; gap: number; last: boolean }) {
+export const ProductPair = memo(function ProductPair({ products, bg, gap, last, aspect }: { products: CardProduct[]; bg: string; gap: number; last: boolean; aspect?: number | null }) {
   const w = useColumnWidth(2, gap)
   return (
     <View className={`flex-row px-4 ${bg}`} style={{ gap, paddingBottom: last ? 48 : gap }}>
       {products.map(p => (
         <View key={p.id} style={{ width: w }}>
-          <ProductCard product={p} />
+          <ProductCard product={p} imageAspect={aspect} />
         </View>
       ))}
     </View>

@@ -1,6 +1,14 @@
+import { orderByClause, parseSort, type FilterEntity } from '@jeffi/list-filters'
 import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
 
 export { queryOne, queryMany, queryCount }
+
+/** `ORDER BY …` for a list's `sort` / `dir` options against the entity's whitelist; `defaultSql` overrides the entity's. */
+export function entityOrderBy(entity: FilterEntity, sort?: string, dir?: string, defaultSql?: string) {
+  const sorts = entity.sorts ?? {}
+  const spec = parseSort(new URLSearchParams({ sort: sort ?? '', dir: dir ?? '' }), sorts)
+  return orderByClause({ sorts, defaultSql: defaultSql ?? entity.defaultSql ?? `${entity.alias}.id DESC`, tiebreak: entity.tiebreak }, spec)
+}
 
 export type AnalyticsRange = 'today' | '7d' | '30d' | '90d' | 'month' | 'year'
 export type RevenuePeriod = '3m' | '6m' | '12m' | 'ytd' | 'all'

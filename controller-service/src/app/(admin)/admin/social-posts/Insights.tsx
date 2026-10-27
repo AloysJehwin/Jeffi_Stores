@@ -127,7 +127,7 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
               rowKey={r => r.network}
               empty="No posted content in this period."
               cols={[
-                { key: 'n', label: 'Network', render: r => r.network },
+                { key: 'n', label: 'Network', render: r => r.network, sort: r => r.network },
                 { key: 'posts', label: 'Posts', num: true, render: r => count(r.posts), sort: r => r.posts },
                 {
                   key: 'imp',
@@ -157,6 +157,7 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
                 {
                   key: 'post',
                   label: 'Post',
+                  sort: r => (r.title || r.caption || '').toLowerCase(),
                   render: r => (
                     <div className="max-w-md">
                       <p className="truncate">{r.title || r.caption || '-'}</p>

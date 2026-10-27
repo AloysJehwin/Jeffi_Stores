@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const admin = await authenticateAdmin(request, { passive: true })
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { items, unreadCount } = await listAdminNotifications(admin.role, admin.scopes)
+    const { items, unreadCount } = await listAdminNotifications(admin.role, admin.scopes, 30, admin.adminId)
     return NextResponse.json({ items, unreadCount })
   } catch (err) {
     console.error('[notifications]', err)

@@ -3,6 +3,7 @@ import { resolveGrainUnit } from '../../lib/selling-unit'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryOne, queryMany, getClient } from '@jeffi/tenancy'
+import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
 import { round2 } from '../../lib/gst'
 import { logStockMovement, updateWeightedAvgCost, recomputeStockStatusForProduct } from '../../lib/inventory'
 import { adjustStock, syncPerishableStock, getOrCreateOpenShelf } from '../../lib/shelf'
@@ -312,7 +313,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         await recomputeStockStatusForProduct(client, item.product_id)
       }
 
+      // Posting the receipt is the receive draft's holder's call; it spends the draft and its lock.
+      const receiveLock = await assertHolder(client, admin, 'po_receive', id, { epoch: epochFrom(request) })
+      await client.query(`DELETE FROM po_receive_drafts WHERE po_id = $1`, [id])
+      await closeLock(client, admin, 'po_receive', id, 'finalized')
+
       await client.query('COMMIT')
+      await announceLock(admin, 'po_receive', id, receiveLock)
 
       // Update shelf_stock for any item that had a location assigned.
       // Batch-tracked (perishable or serialized): recompute shelf_stock from
@@ -438,6 +445,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       client.release()
     }
   } catch (err: any) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

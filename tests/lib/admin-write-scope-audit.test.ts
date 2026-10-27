@@ -21,6 +21,9 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'refresh',
   // Activity heartbeat on the caller's own session: extends its idle window, mutates nothing else.
   'session/heartbeat',
+  // Draft presence heartbeat: records that the caller has a draft open (display only); passive,
+  // gated on the draft type's read scope like viewing the draft itself.
+  'draft-locks/presence',
   'mfa/enroll-start',
   'mfa/enroll-confirm',
   'mfa/verify',

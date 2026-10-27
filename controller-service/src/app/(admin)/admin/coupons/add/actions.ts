@@ -5,6 +5,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/shared/db'
+import { actionActor, lockNewDraft } from '@/lib/admin/draft-locks'
 
 export async function createCoupon(formData: FormData) {
   const code = (formData.get('code') as string).toUpperCase().trim()
@@ -63,6 +64,7 @@ export async function createCoupon(formData: FormData) {
     }
   }
 
+  await lockNewDraft(await actionActor(), 'coupon', couponId)
   revalidatePath('/admin/coupons')
   const host = await getHost()
   redirect(ap('/admin/coupons', host))

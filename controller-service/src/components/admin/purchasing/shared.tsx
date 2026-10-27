@@ -1,6 +1,7 @@
 import { formatINR as formatINRBase } from '@/lib/shared/format'
 import { Kpi } from '@/components/admin/kit/core'
 import { TONE_CLS } from '@/components/admin/kit/tones'
+import type { DraftLockChip } from '@/lib/client/draft-lock-client'
 
 // Helpers shared by the inventory, suppliers and purchase-order pages.
 
@@ -59,4 +60,6 @@ export type Supplier = {
   account_number: string | null
   ifsc: string | null
   upi_id: string | null
+  /** Who holds the supplier's draft (list endpoint only). */
+  draft_lock?: DraftLockChip | null
 }

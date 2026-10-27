@@ -61,6 +61,18 @@ const SQL: Record<CustomerKey, FieldSql> = {
   marketing_opt_out: { kind: 'bool', expr: 'u.marketing_opt_out' },
 }
 
+// Columns of the list query (its joins: customer_health ch, order rollup o).
+export const CUSTOMER_SORTS: Record<string, string> = {
+  name: "u.first_name || ' ' || u.last_name",
+  email: 'u.email',
+  phone: 'u.phone',
+  joined: 'u.created_at',
+  orders: 'o.order_count',
+  lifetime_value: 'o.lifetime_value',
+  status: 'u.is_active',
+  health: 'COALESCE(ch.score, -1)',
+}
+
 export const CUSTOMERS_ENTITY: FilterEntity<CustomerKey> = {
   key: 'customers',
   scope: 'customers:read',
@@ -73,6 +85,9 @@ export const CUSTOMERS_ENTITY: FilterEntity<CustomerKey> = {
   sql: SQL,
   period: 'joined',
   search: { build: (q, idx) => buildSearchClause(q, ['u.email', 'u.first_name', 'u.last_name', 'u.phone'], idx) },
+  sorts: CUSTOMER_SORTS,
+  defaultSql: 'u.created_at DESC',
+  tiebreak: 'u.id DESC',
   facets: true,
   export: {
     columns: [

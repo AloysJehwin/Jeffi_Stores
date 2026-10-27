@@ -612,8 +612,10 @@ CREATE TABLE public.hero_slides (
     filter_on_sale boolean DEFAULT false NOT NULL,
     display_order integer DEFAULT 0 NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
-    -- Which storefront shows the slide: the website or the mobile app (each has its own carousel).
+    -- Which storefront shows the slide: desktop web, phone browsers or the app (each has its own carousel).
     surface character varying(10) DEFAULT 'web'::character varying NOT NULL,
+    -- The store's homepage or the business homepage (/business and the app's business store).
+    audience character varying(10) DEFAULT 'store'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT hero_slides_pkey PRIMARY KEY (id)
@@ -697,8 +699,12 @@ CREATE TABLE public.homepage_sections (
     is_active boolean DEFAULT true NOT NULL,
     starts_at timestamp with time zone,
     ends_at timestamp with time zone,
-    -- Which storefront the section is part of: the website or the mobile app (separate layouts).
+    -- Which storefront the section is part of: desktop web, phone browsers or the app (separate layouts).
     surface character varying(10) DEFAULT 'web'::character varying NOT NULL,
+    -- The homepage, or a listing (products, category, brand) where it sits between the products.
+    page character varying(16) DEFAULT 'home'::character varying NOT NULL,
+    -- The store's pages, or the business homepage (/business and the app's business store; home only).
+    audience character varying(10) DEFAULT 'store'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT homepage_sections_pkey PRIMARY KEY (id),

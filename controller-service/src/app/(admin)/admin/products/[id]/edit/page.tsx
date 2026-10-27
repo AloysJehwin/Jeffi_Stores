@@ -8,6 +8,7 @@ import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateProduct } from './actions'
+import { initialDraftLock } from '@/lib/admin/draft-locks'
 
 export default async function EditProductPage({
   params,
@@ -129,8 +130,10 @@ export default async function EditProductPage({
       ])
     : withDraftSubVariants(liveVariants)
 
+  const initialLock = await initialDraftLock('product', id)
   // Those variants' live images were never staged; stage them so image edits reconcile correctly.
-  if (liveOnlyInactive.length > 0) {
+  // Only the holder (or anyone, on a draft nobody holds) normalises it.
+  if (liveOnlyInactive.length > 0 && (initialLock?.canEdit ?? true)) {
     await query(
       `UPDATE product_drafts d SET variant_images = COALESCE(d.variant_images, '[]'::jsonb) || COALESCE(
          (SELECT jsonb_agg(to_jsonb(vi) ORDER BY vi.display_order) FROM variant_images vi
@@ -230,6 +233,7 @@ export default async function EditProductPage({
       }
     >
       <ProductForm
+        initialLock={initialLock}
         categories={categories || []}
         brands={brands || []}
         product={productForForm}

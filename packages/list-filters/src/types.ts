@@ -89,6 +89,9 @@ export interface FilterEntity<K extends string = string> {
   aliases?: FilterAlias[]
   search?: { param?: string; build: (q: string, startIdx: number) => SearchClause }
   sorts?: Record<string, string>
+  /** ORDER BY body with no sort picked, and the unique tie-breaker (see `SortDef`). */
+  defaultSql?: string
+  tiebreak?: string
   facets?: boolean
   defaultWindowDays?: number
   /** Loads what context-bound predicates need; called only by the runners. */

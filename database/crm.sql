@@ -295,6 +295,11 @@ CREATE TABLE public.push_queue (
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+--
+-- Name: admin_notifications; Type: TABLE; Schema: public; Owner: -
+-- Admin bell feed. recipient_admin_id NULL = every admin whose scopes allow the row; set = that admin only.
+--
+
 CREATE TABLE public.admin_notifications (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     type character varying(50) NOT NULL,
@@ -308,5 +313,6 @@ CREATE TABLE public.admin_notifications (
     scope character varying(48),
     is_read boolean DEFAULT false NOT NULL,
     read_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    recipient_admin_id uuid
 );

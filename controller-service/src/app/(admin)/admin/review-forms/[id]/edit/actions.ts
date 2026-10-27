@@ -3,9 +3,13 @@
 import { query } from '@/lib/shared/db'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
+import { actionActor, closeAfter, draftActionError } from '@/lib/admin/draft-locks'
 
 export async function discardReviewFormDraft(formId: string) {
+  const denied = await draftActionError('review_form', formId, 'discard')
+  if (denied) throw new Error(denied)
   await query(`DELETE FROM review_form_drafts WHERE form_id = $1`, [formId])
+  await closeAfter(await actionActor(), 'review_form', formId, 'discarded')
 }
 
 // Resnapshot the admin's open review_form session to the just-saved draft so

@@ -20,6 +20,7 @@ import { findDigitalProductIds } from '../../lib/digital-guard'
 import { currentBrandNameAsync } from '../../lib/brand'
 import { getRazorpayInstance } from '../../lib/razorpay'
 import sharp from 'sharp'
+import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom, lockNewDraft } from '../../lib/draft-locks'
 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -394,6 +395,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         id,
       ])
 
+      // Converting ends the quotation's lock; a draft invoice it leaves behind is the converter's.
+      const quoteLock = await assertHolder(client, admin, 'quotation', id, { epoch: epochFrom(request) })
+      await closeLock(client, admin, 'quotation', id, 'converted')
+
       return {
         id: newOrder.id,
         order_number: newOrder.order_number,
@@ -401,8 +406,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         saveAsDraft,
         insufficientItems,
         shortfalls,
+        quoteLock,
+        invoiceDraft: orderStatus === 'draft',
       }
     })
+    await announceLock(admin, 'quotation', id, result.quoteLock)
+    if (result.invoiceDraft) await lockNewDraft(admin, 'invoice', result.id)
 
     if (!result.saveAsDraft && result.invoice_number) {
       if (customerEmail) {
@@ -504,6 +513,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       needsDelivery: enableDelivery && !result.saveAsDraft,
     })
   } catch (err: any) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     if (err instanceof InsufficientStockError)
       return NextResponse.json({ error: err.message, code: err.code }, { status: 409 })
     console.error(`[quotations/${id}/convert-to-invoice] failed`, err)

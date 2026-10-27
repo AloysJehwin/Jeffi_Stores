@@ -57,9 +57,9 @@ async function BusinessCustomersStats({ q, resolved, host }: { q: FilterQuery; r
   )
 }
 
-async function BusinessCustomersListContent({ q, page: pageParam, host }: { q: FilterQuery; page?: string; host: string }) {
+async function BusinessCustomersListContent({ q, page: pageParam, sp, host }: { q: FilterQuery; page?: string; sp: SP; host: string }) {
   const page = Math.max(1, parseInt(pageParam || '1', 10) || 1)
-  const { rows: customers, total } = await listBusinessCustomers(q, page, PAGE_SIZE)
+  const { rows: customers, total } = await listBusinessCustomers(q, page, PAGE_SIZE, { get: k => sp[k] ?? null })
 
   return (
     <BusinessCustomersTable
@@ -134,7 +134,7 @@ export default async function BusinessCustomersPage({ searchParams }: { searchPa
 
           {/* Table re-shimmers on filter/pagination change while the shell stays mounted */}
           <Suspense key={listKey(resolvedSearchParams)} fallback={<TableSkeleton rows={8} cols={6} />}>
-            <BusinessCustomersListContent q={q} page={resolvedSearchParams.page} host={host} />
+            <BusinessCustomersListContent q={q} page={resolvedSearchParams.page} sp={resolvedSearchParams} host={host} />
           </Suspense>
         </>
       )}

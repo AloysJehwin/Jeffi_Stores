@@ -8,6 +8,7 @@ import { deductOrderStock, InsufficientStockError } from '../../lib/inventory-de
 import { getFeatureFlags } from '../../lib/site-controls'
 import { sendInvoiceFinalizedEmail } from '../../lib/mail'
 import { generateOrderInvoice, assignInvoiceNumber } from '../../lib/invoice'
+import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -78,8 +79,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         [targetStatus, id]
       )
 
-      return { invoiceNumber, orderId: id }
+      // A draft belongs to its lock holder; finalizing ends the lock.
+      let lock = null
+      if (order.status === 'draft') {
+        lock = await assertHolder(client, admin, 'invoice', id, { epoch: epochFrom(request) })
+        await closeLock(client, admin, 'invoice', id, 'finalized')
+      }
+      return { invoiceNumber, orderId: id, lock }
     })
+    await announceLock(admin, 'invoice', id, result.lock)
 
     if (result.invoiceNumber) {
       if (order.customer_email) {
@@ -102,6 +110,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       invoiceUrl: result.invoiceNumber ? `/api/orders/${result.orderId}/invoice` : null,
     })
   } catch (err: any) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     if (err instanceof InsufficientStockError)
       return NextResponse.json({ error: `Cannot finalize — ${err.message}`, code: err.code }, { status: 409 })
     console.error(`[admin/invoices/drafts/${(await params).id}/finalize] failed`, err)

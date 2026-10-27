@@ -20,11 +20,13 @@ function relativeTime(date: string | null): string {
 
 export default function ServiceAccountsTable({ accounts, scopeLabels, canWrite }: { accounts: any[]; scopeLabels: Record<string, string>; canWrite: boolean }) {
   const cols: DataCol<any>[] = [
-    { key: 'name', label: 'Account', render: sa => <span className="font-medium text-foreground">{sa.name}</span> },
-    { key: 'cn', label: 'Cert CN', hideBelow: 'lg', render: sa => <span className="font-mono text-xs text-foreground-muted">{sa.common_name}</span> },
+    { key: 'name', label: 'Account', sort: sa => String(sa.name).toLowerCase(), render: sa => <span className="font-medium text-foreground">{sa.name}</span> },
+    { key: 'cn', label: 'Cert CN', sort: sa => String(sa.common_name ?? ''), hideBelow: 'lg', render: sa => <span className="font-mono text-xs text-foreground-muted">{sa.common_name}</span> },
     {
       key: 'scopes',
       label: 'Scopes',
+      sortType: 'number',
+      sort: sa => (sa.allowed_scopes || []).length,
       render: sa => {
         const s: string[] = sa.allowed_scopes || []
         if (!s.length) return <span className="text-xs text-foreground-muted">None</span>
@@ -41,11 +43,14 @@ export default function ServiceAccountsTable({ accounts, scopeLabels, canWrite }
         )
       },
     },
-    { key: 'status', label: 'Status', render: sa => <span className={badgeCls(sa.is_revoked ? 'red' : 'green')}>{sa.is_revoked ? 'Revoked' : 'Active'}</span> },
-    { key: 'created', label: 'Created', render: sa => <span className="text-xs text-foreground-secondary">{new Date(sa.created_at).toLocaleDateString('en-IN')}</span> },
+    { key: 'status', label: 'Status', sort: sa => (sa.is_revoked ? 1 : 0), render: sa => <span className={badgeCls(sa.is_revoked ? 'red' : 'green')}>{sa.is_revoked ? 'Revoked' : 'Active'}</span> },
+    { key: 'created', label: 'Created', sortParam: 'created_at', sortType: 'date', sort: sa => new Date(sa.created_at).getTime(), render: sa => <span className="text-xs text-foreground-secondary">{new Date(sa.created_at).toLocaleDateString('en-IN')}</span> },
     {
       key: 'used',
       label: 'Last Used',
+      sortParam: 'last_used',
+      sortType: 'date',
+      sort: sa => (sa.last_used_at ? new Date(sa.last_used_at).getTime() : 0),
       render: sa =>
         sa.last_used_at ? (
           <span className="text-xs text-foreground-secondary" title={new Date(sa.last_used_at).toLocaleString('en-IN')}>
@@ -74,11 +79,11 @@ export default function ServiceAccountsTable({ accounts, scopeLabels, canWrite }
       cols={cols}
       rowKey={sa => String(sa.id)}
       pageSize={Math.max(25, accounts.length)}
-      mobile={
+      mobile={rows => (
         <div className="p-4">
-          <ServiceAccountsMobileList accounts={accounts as any} scopeLabels={scopeLabels} canWrite={canWrite} />
+          <ServiceAccountsMobileList accounts={rows as any} scopeLabels={scopeLabels} canWrite={canWrite} />
         </div>
-      }
+      )}
       bare
     />
   )

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   const [summary, { rows, total }] = await Promise.all([
     getGmcSummary(),
-    getGmcStatusPage({ page, pageSize, search, status }),
+    getGmcStatusPage({ page, pageSize, search, status, sort: searchParams }),
   ])
 
   return NextResponse.json({ summary, rows, total, page, pageSize })

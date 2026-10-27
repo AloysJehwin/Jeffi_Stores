@@ -1,3 +1,4 @@
+import { orderByClause, type SortDef, type SortSpec } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { type ProductOffer, offerHref, slugifyOffer } from '@/lib/catalog/product-offers-shared'
 
@@ -43,13 +44,20 @@ export async function listOffersByIds(ids: string[]): Promise<ProductOffer[]> {
 }
 
 /** Every offer for the admin manager, with how many products each holds. */
-export async function listOffersAdmin(): Promise<ProductOfferWithCount[]> {
+/** The admin list's sortable columns; no sort = the slider's display order. */
+export const OFFER_SORT: SortDef = {
+  sorts: { title: 'o.title', slug: 'o.slug', products: 'COUNT(i.product_id)', status: 'o.is_active' },
+  defaultSql: 'o.display_order ASC, o.created_at ASC',
+  tiebreak: 'o.id',
+}
+
+export async function listOffersAdmin(sort: SortSpec | null = null): Promise<ProductOfferWithCount[]> {
   return queryMany<ProductOfferWithCount>(
     `SELECT o.*, COUNT(i.product_id)::int AS product_count
        FROM product_offers o
        LEFT JOIN product_offer_items i ON i.offer_id = o.id
       GROUP BY o.id
-      ORDER BY o.display_order ASC, o.created_at ASC`
+      ${orderByClause(OFFER_SORT, sort)}`
   )
 }
 

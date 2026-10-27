@@ -34,6 +34,7 @@ import {
 } from '@/lib/subscriptions/sub-variant-prices'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
+import { actionActor, closeAfter, draftActionError } from '@/lib/admin/draft-locks'
 
 // Keep the admin's open editor session's snapshot in step with the draft just saved.
 // After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
@@ -192,6 +193,9 @@ export async function updateProduct(productId: string, formData: FormData): Prom
 
   const intent = formData.get('intent') as string | null
   const isPublish = intent === 'publish'
+  const lockError = await draftActionError('product', productId, intent)
+  if (lockError) return { error: lockError }
+  const actor = (await actionActor()) ?? undefined
   const noRedirect = formData.get('_no_redirect') === '1'
   const rawName = ((formData.get('name') as string) || '').trim()
   const name = rawName || DRAFT_NAME_PLACEHOLDER
@@ -636,7 +640,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
       // Publish: draft fields just saved — call publishProductDraft directly (no HTTP roundtrip)
       if (isPublish) {
         try {
-          await publishProductDraft(productId, { activate: true })
+          await publishProductDraft(productId, { activate: true, actor })
         } catch (err: any) {
           console.error('[product-edit] publishProductDraft failed for', productId, err)
           return { error: `Draft saved, but publishing failed: ${productErrorMessage(err, 'unknown error')}` }
@@ -1294,6 +1298,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
 
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/${productId}/edit`)
+    if (isPublish) await closeAfter(actor, 'product', productId, 'published')
     // Save-as-Draft on a create-draft (is_draft=true, in-place): resnapshot too, so Cancel reverts here.
     if (!isPublish) await resnapshotProductSession(productId)
     return finish(intent === 'draft-stay' ? stayDest() : listDest)

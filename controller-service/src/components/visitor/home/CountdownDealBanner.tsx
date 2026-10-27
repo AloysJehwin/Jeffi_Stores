@@ -7,6 +7,11 @@ import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.countdown_deal
 
+const IMAGE_BOX = 'relative block w-full mx-auto rounded-xl bg-surface-elevated overflow-hidden'
+const SQUARE_BOX = 'relative block w-full max-w-sm mx-auto aspect-square rounded-xl bg-surface-elevated overflow-hidden'
+// The width cap keeps a tall shape under the banner height cap without breaking its ratio.
+const shaped = (aspect: number) => ({ aspectRatio: aspect, maxWidth: `calc(min(80vh, 640px) * ${aspect})` })
+
 const inr = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 interface CountdownDealBannerProps {
@@ -15,9 +20,18 @@ interface CountdownDealBannerProps {
   eyebrow?: string | null
   title?: string | null
   ctaLabel?: string | null
+  /** Product image shape (width / height); unset keeps a small square. */
+  aspect?: number | null
 }
 
-export default function CountdownDealBanner({ product, endsAt, eyebrow, title, ctaLabel }: CountdownDealBannerProps) {
+export default function CountdownDealBanner({
+  product,
+  endsAt,
+  eyebrow,
+  title,
+  ctaLabel,
+  aspect,
+}: CountdownDealBannerProps) {
   const href = `/products/${product.slug}`
   const image = product.primaryImage
   const showMrp = product.mrp != null && product.mrp > product.displayPrice
@@ -29,7 +43,8 @@ export default function CountdownDealBanner({ product, endsAt, eyebrow, title, c
           <div className="grid md:grid-cols-2 items-center gap-6 md:gap-10 p-5 md:p-10">
             <Link
               href={href}
-              className="relative block w-full max-w-sm mx-auto aspect-square rounded-xl bg-surface-elevated overflow-hidden"
+              className={aspect ? IMAGE_BOX : SQUARE_BOX}
+              style={aspect ? shaped(aspect) : undefined}
             >
               {image ? (
                 <StoreImage

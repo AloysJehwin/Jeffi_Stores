@@ -3,6 +3,7 @@ import { View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { loginWithOtp, requestOtp, type OtpChannel } from '../../src/api/auth'
 import { updateProfile } from '../../src/api/account'
+import { businessLogin } from '../../src/api/business'
 import { showToast } from '../../src/stores/toastStore'
 import { AuthScreen } from '../../src/components/account/AuthScreen'
 import { Button, FieldError, OtpField, Text, TextButton, type FieldRef } from '../../src/ui'
@@ -10,12 +11,21 @@ import { PolicyConsent } from '../../src/components/account/ui'
 import { finishSignIn } from '../../src/components/account/authFlow'
 import { useLeaveAuth } from '../../src/components/account/hooks'
 
-// The code step of controller-service app/(auth)/login/page.tsx.
+// The code step of controller-service app/(auth)/login/page.tsx, and of the business sign-in (portal=business).
 
 export default function OtpScreen() {
   const router = useRouter()
   const done = useLeaveAuth()
-  const params = useLocalSearchParams<{ email: string; channel?: string; phone?: string; requiresPolicy?: string; cooldown?: string; error?: string }>()
+  const params = useLocalSearchParams<{
+    email: string
+    channel?: string
+    phone?: string
+    portal?: string
+    requiresPolicy?: string
+    cooldown?: string
+    error?: string
+  }>()
+  const business = params.portal === 'business'
   const email = params.email
   const channel = (params.channel as OtpChannel) || 'email'
   const loginPhone = params.phone || ''
@@ -43,6 +53,10 @@ export default function OtpScreen() {
     setError('')
     setIsLoading(true)
     try {
+      if (business) {
+        await submitBusinessLogin(otpValue)
+        return
+      }
       const result = await loginWithOtp(email, otpValue, requiresPolicy ? { policiesAccepted: policyAccepted } : {})
       if (result.isNewUser) {
         router.replace({ pathname: '/(auth)/signup', params: { email, from: 'login' } })
@@ -67,6 +81,27 @@ export default function OtpScreen() {
     }
   }
 
+  // /api/business/login: an unknown email applies, a pending or rejected one gets no session.
+  const submitBusinessLogin = async (otpValue: string) => {
+    const res = await businessLogin({ email, otp: otpValue, policiesAccepted: requiresPolicy ? policyAccepted : undefined })
+    const data = res.data
+    if (!res.ok) {
+      if (data.notBusinessAccount) {
+        router.replace({ pathname: '/(auth)/business-signup', params: { email } })
+        return
+      }
+      throw new Error(data.error || 'Login failed')
+    }
+    if (data.approvalStatus === 'rejected') throw new Error('Your business account application was not approved. Please contact support.')
+    if (data.approvalStatus !== 'approved' || !data.user || !data.token) {
+      router.replace({ pathname: '/business/pending', params: { status: 'pending' } })
+      return
+    }
+    await finishSignIn(data.user, data.token, 'business')
+    updateProfile({ notificationChannel: channel }).catch(() => {})
+    done()
+  }
+
   useEffect(() => {
     if (otp.length !== 6 || isLoading) return
     if (requiresPolicy && !policyAccepted) return
@@ -80,7 +115,13 @@ export default function OtpScreen() {
     submittedRef.current = ''
     setIsLoading(true)
     try {
-      const res = await requestOtp({ email, phone: loginPhone ? `+91${loginPhone}` : undefined, channel, isSignup: false })
+      const res = await requestOtp({
+        email,
+        phone: loginPhone ? `+91${loginPhone}` : undefined,
+        channel,
+        isSignup: false,
+        ...(business ? { userType: 'business' as const } : {}),
+      })
       if (!res.ok) {
         if (res.status === 429 && typeof res.data.retryAfter === 'number') setResendCooldown(res.data.retryAfter)
         throw new Error(res.data.error || 'Failed to resend the code')
@@ -129,8 +170,12 @@ export default function OtpScreen() {
 
         <Text className="text-center text-sm text-foreground-secondary">
           New here?{' '}
-          <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/signup')}>
-            Create an account
+          <Text
+            accessibilityRole="link"
+            className="font-semibold text-accent-600 dark:text-accent-400"
+            onPress={() => router.replace(business ? '/(auth)/business-signup' : '/(auth)/signup')}
+          >
+            {business ? 'Apply for a business account' : 'Create an account'}
           </Text>
         </Text>
       </View>

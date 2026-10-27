@@ -462,7 +462,7 @@ export default function BatchSerialLabelPicker({
                           <button
                             type="button"
                             onClick={() => updateBatchCount(b.id, cnt - 1)}
-                            className="w-6 h-6 rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary"
+                            className="w-[26px] h-[26px] rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary"
                           >
                             −
                           </button>
@@ -471,12 +471,12 @@ export default function BatchSerialLabelPicker({
                             min={1}
                             value={cnt}
                             onChange={e => updateBatchCount(b.id, parseInt(e.target.value) || 1)}
-                            className="w-12 px-1 py-0.5 text-center text-sm rounded border border-border-default bg-surface"
+                            className="field-xs w-12 text-center border border-border-default bg-surface"
                           />
                           <button
                             type="button"
                             onClick={() => updateBatchCount(b.id, cnt + 1)}
-                            className="w-6 h-6 rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary"
+                            className="w-[26px] h-[26px] rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary"
                           >
                             +
                           </button>

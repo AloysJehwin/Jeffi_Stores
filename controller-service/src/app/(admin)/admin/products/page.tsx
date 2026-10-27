@@ -21,7 +21,8 @@ import { queryOne, queryMany } from '@/lib/shared/db'
 import CopySku from '@/components/ui/CopySku'
 import ProductsTableClient from './ProductsTableClient'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { draftLockChips } from '@/lib/admin/draft-locks'
 import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { getSpecFilterFields } from '@/lib/catalog/product-attribute-filters'
@@ -30,6 +31,7 @@ import { PRODUCT_SEARCH, productFields } from '@/lib/filters/fields/products'
 import { resolveListTab } from '@/lib/overviews/catalog'
 import ProductsOverview from './_components/ProductsOverview'
 import { TabLinks, TabMemory } from './_components/catalog-overview'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -125,6 +127,7 @@ async function ProductsStats({ q }: { q: FilterQuery }) {
   const totalCount = summary.total
   const categoryCount = stats.categories
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
+  const locks = await draftLockChips('product', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.product_id)])
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -175,6 +178,7 @@ async function ProductsStats({ q }: { q: FilterQuery }) {
                         discardPath={`/api/admin/products/${d.id}/draft`}
                         discardConfirm={`Delete the draft product "${d.name}"? This cannot be undone.`}
                         entityLabel="product"
+                        lock={locks[d.id]}
                       />
                     ) : (
                       <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
@@ -184,6 +188,7 @@ async function ProductsStats({ q }: { q: FilterQuery }) {
                           {d.sku && <CopySku sku={d.sku} />}
                         </p>
                         <span className="text-xs text-foreground-muted">new</span>
+                        <DraftLockBadge lock={locks[d.id]} mine={locks[d.id]?.mine} />
                       </div>
                     )
                   )}
@@ -199,6 +204,7 @@ async function ProductsStats({ q }: { q: FilterQuery }) {
                         publishPath={`/api/admin/products/${d.product_id}/publish`}
                         discardPath={`/api/admin/products/${d.product_id}/draft`}
                         entityLabel="product"
+                        lock={locks[d.product_id]}
                       />
                     ) : (
                       <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
@@ -207,6 +213,7 @@ async function ProductsStats({ q }: { q: FilterQuery }) {
                           {d.sku}
                           {d.sku && <CopySku sku={d.sku} />}
                         </p>
+                        <DraftLockBadge lock={locks[d.product_id]} mine={locks[d.product_id]?.mine} />
                       </div>
                     )
                   )}
@@ -298,6 +305,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="product" />
           <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
             <ProductsStats q={q} />
           </Suspense>

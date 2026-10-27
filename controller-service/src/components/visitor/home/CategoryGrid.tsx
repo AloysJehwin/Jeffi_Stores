@@ -10,15 +10,20 @@ interface CategoryGridProps {
   title?: string | null
   eyebrow?: string | null
   carousel?: boolean
+  /** Tile shape (width / height); a tile still grows to fit its icon and name. */
+  aspect?: number | null
 }
 
-export default function CategoryGrid({ categories, title, eyebrow, carousel = false }: CategoryGridProps) {
+const TILE =
+  'flex flex-col items-center text-center gap-1.5 sm:gap-2.5 p-1 sm:p-4 rounded-xl sm:rounded-2xl sm:bg-surface-elevated sm:border sm:border-border-default sm:hover:border-primary-400/60 sm:hover:bg-primary-50 dark:sm:hover:bg-primary-900/10 sm:hover:shadow-lg sm:hover:-translate-y-0.5 transition-all duration-200'
+
+export default function CategoryGrid({ categories, title, eyebrow, carousel = false, aspect }: CategoryGridProps) {
   // Phones: a compact 4-up icon grid (icon tile + label, no card); the card tile is sm and up.
   const items = categories.map(category => (
     <Link key={category.id} href={`/categories/${category.slug}`} className="group">
       <div
-        className="flex flex-col items-center text-center gap-1.5 sm:gap-2.5 p-1 sm:p-4 rounded-xl sm:rounded-2xl sm:bg-surface-elevated sm:border sm:border-border-default
-                      sm:hover:border-primary-400/60 sm:hover:bg-primary-50 dark:sm:hover:bg-primary-900/10 sm:hover:shadow-lg sm:hover:-translate-y-0.5 transition-all duration-200"
+        className={aspect ? `${TILE} justify-center` : TILE}
+        style={aspect ? { aspectRatio: aspect } : undefined}
       >
         <div className="w-14 h-14 sm:w-12 sm:h-12 bg-primary-100 dark:bg-primary-900/25 rounded-2xl sm:rounded-xl flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 group-active:scale-95 transition-all shrink-0">
           <CategoryIcon categoryName={category.name} className="w-6 h-6 text-primary-600 dark:text-primary-400" />

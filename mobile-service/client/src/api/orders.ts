@@ -1,4 +1,4 @@
-import { api, BASE_URL, getStoredToken } from './client'
+import { api, APP_USER_AGENT, authHeaders, BASE_URL } from './client'
 import type { Order, ReturnRequest } from '../types'
 
 interface OrdersResponse {
@@ -35,10 +35,9 @@ export interface PostResult<T> {
 }
 
 async function post<T>(path: string, body: unknown): Promise<PostResult<T>> {
-  const token = await getStoredToken()
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { 'Content-Type': 'application/json', 'User-Agent': APP_USER_AGENT, ...(await authHeaders()) },
     body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
@@ -84,7 +83,7 @@ export function placeUnpaidOrder(
   body: {
     shippingAddress: ShippingAddressBody
     notes: string
-    paymentMethod: 'cod'
+    paymentMethod: 'cod' | 'manual'
     couponId: string | null
     discountAmount: number
     shippingAmount: number

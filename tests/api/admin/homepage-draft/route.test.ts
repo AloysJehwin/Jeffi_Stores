@@ -15,6 +15,12 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: (fn: any) => fake.db.withTransaction(fn),
 }))
 
+// Draft-lock bookkeeping is out of scope here: with no actor the writes run unlocked.
+vi.mock('@/lib/admin/draft-locks', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/admin/draft-locks')>()),
+  actorOf: () => null,
+}))
+
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { revalidatePath } from 'next/cache'
@@ -79,13 +85,16 @@ describe('authorization', () => {
 describe('GET /api/admin/homepage-draft', () => {
   it('reports nothing pending when there is no draft', async () => {
     const none = { added: 0, removed: 0, edited: 0, reordered: false }
+    const layouts = { web: { sections: none, slides: none }, web_mobile: { sections: none, slides: none }, app: { sections: none, slides: none } }
     expect(await (await GET(req('GET'))).json()).toEqual({
       hasDraft: false,
       updatedAt: null,
       updatedBy: null,
       sections: none,
       slides: none,
-      bySurface: { web: { sections: none, slides: none }, app: { sections: none, slides: none } },
+      bySurface: layouts,
+      byPage: { home: layouts, products: layouts, category: layouts, brand: layouts },
+      business: layouts,
     })
   })
 

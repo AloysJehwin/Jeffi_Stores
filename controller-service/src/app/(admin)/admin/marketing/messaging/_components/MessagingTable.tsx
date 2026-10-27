@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import MailerRowActions from '@/components/admin/MailerRowActions'
 import { ap } from '@/lib/shared/admin-path'
-import { DataTable, StatusBadge, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { DataTable, DraftLockBadge, StatusBadge, type DataCol, type StatusMap } from '@/components/admin/kit'
+import type { DraftLockView } from '@/lib/client/draft-lock-client'
 import MailerMobileList from './MailerMobileList'
 
 export interface Campaign {
@@ -22,6 +23,9 @@ export interface Campaign {
   created_at: string
   error?: string | null
 }
+
+/** Open draft locks by campaign id, for the owner badge. */
+export type MailerLocks = Record<string, Pick<DraftLockView, 'ownerId' | 'ownerName' | 'lastActiveAt'>>
 
 export const MESSAGE_STATUS: StatusMap = {
   draft: { label: 'Draft', tone: 'muted' },
@@ -56,6 +60,8 @@ export default function MessagingTable({
   currentListUrl,
   templateLabels,
   statusStyles,
+  locks = {},
+  meId = null,
 }: {
   campaigns: Campaign[]
   total: number
@@ -66,6 +72,8 @@ export default function MessagingTable({
   currentListUrl: string
   templateLabels: Record<string, string>
   statusStyles: Record<string, string>
+  locks?: MailerLocks
+  meId?: string | null
 }) {
   const viewHref = (c: Campaign) =>
     ap(`/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)
@@ -83,6 +91,7 @@ export default function MessagingTable({
     {
       key: 'title',
       label: 'Title',
+      sortParam: 'title',
       render: c => (
         <div className="min-w-0">
           <Link
@@ -98,11 +107,13 @@ export default function MessagingTable({
     {
       key: 'template',
       label: 'Template',
+      sortParam: 'template',
       render: c => <span className="text-foreground-secondary">{channelLabel(c, templateLabels)}</span>,
     },
     {
       key: 'audience',
       label: 'Audience',
+      sortParam: 'audience',
       hideBelow: 'lg',
       render: c => <span className="capitalize text-foreground-secondary">{c.audience_type.replace('_', ' ')}</span>,
     },
@@ -110,12 +121,25 @@ export default function MessagingTable({
       key: 'recipients',
       label: 'Recipients',
       num: true,
+      sortParam: 'recipients',
       render: c => <span className="text-foreground-secondary">{c.recipient_count ?? '—'}</span>,
     },
-    { key: 'status', label: 'Status', render: c => <StatusBadge status={c.status} map={MESSAGE_STATUS} title={c.error ?? undefined} /> },
+    {
+      key: 'status',
+      label: 'Status',
+      sortParam: 'status',
+      render: c => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <StatusBadge status={c.status} map={MESSAGE_STATUS} title={c.error ?? undefined} />
+          <DraftLockBadge lock={locks[c.id]} mine={!!meId && locks[c.id]?.ownerId === meId} />
+        </div>
+      ),
+    },
     {
       key: 'date',
       label: 'Date',
+      sortParam: 'date',
+      sortType: 'date',
       hideBelow: 'lg',
       render: c => (
         <span className="whitespace-nowrap text-xs text-foreground-secondary">
@@ -158,6 +182,8 @@ export default function MessagingTable({
           statusStyles={statusStyles}
           currentListUrl={currentListUrl}
           host={host}
+          locks={locks}
+          meId={meId}
         />
       )}
       empty={{

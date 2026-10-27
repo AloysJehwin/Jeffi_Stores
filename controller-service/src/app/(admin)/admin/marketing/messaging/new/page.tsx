@@ -22,8 +22,11 @@ import { useToast } from '@/contexts/ToastContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
+import { useDraftLock } from '@/hooks/useDraftLock'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
-import { BackLink, fieldInputCls } from '@/components/admin/kit'
+import { BackLink, DraftLockBanner, FormFooter, LockedFieldset, fieldInputCls } from '@/components/admin/kit'
+import { assertDraftResponse, isDraftLockedError, lockHeaders } from '@/lib/client/draft-lock-client'
 
 type Channel = 'email' | 'sms' | 'whatsapp'
 // Push has no library template: its copy is written here and stored as channels.push.
@@ -110,15 +113,15 @@ interface Recipient {
   phone: string | null
   first_name: string | null
 }
-type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'locked'
 
 const DRAFT_STORAGE_KEY = 'mailer_draft_id'
 
 export default function NewMessagePage() {
   const router = useRouter()
-  const { showToast } = useToast()
+  const { showToast, showConfirm } = useToast()
   const [step, setStep] = useState(1)
-  const [channels, setChannels] = useState<Channels>({})
+  const [picked, setChannels] = useState<Channels>({})
   const [push, setPush] = useState<PushChannel | null>(null)
   const [vars, setVars] = useState<Record<string, string>>({})
   const [waVars, setWaVars] = useState<Record<string, string>>({})
@@ -159,9 +162,21 @@ export default function NewMessagePage() {
 
   const [draftId, setDraftId] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('idle')
-  const edit = useEditSession({ resourceType: 'mailer', resourceId: draftId })
+  // Per-admin draft lock: a non-holder sees the draft read-only and nothing autosaves.
+  const lock = useDraftLock({ resourceType: 'mailer', resourceId: draftId })
+  const lockRef = useRef(lock)
+  lockRef.current = lock
+  const edit = useEditSession({ resourceType: 'mailer', resourceId: draftId, lock })
   const [showRestoreBanner, setShowRestoreBanner] = useState(false)
   const draftIdRef = useRef<string | null>(null)
+
+  // Site Controls' SMS/WhatsApp switches: an off channel is hidden and left out of what's saved/sent.
+  const { sms: smsOn, whatsapp: waOn } = useMessagingChannels()
+  const shown = (k: Tab) => (k === 'sms' ? smsOn : k === 'whatsapp' ? waOn : true)
+  const channels = useMemo<Channels>(() => {
+    const { sms, whatsapp, ...rest } = picked
+    return { ...rest, ...(smsOn && sms ? { sms } : {}), ...(waOn && whatsapp ? { whatsapp } : {}) }
+  }, [picked, smsOn, waOn])
 
   const tplActive = TEMPLATE_CHANNELS.filter(k => channels[k])
   const active: Tab[] = [...tplActive, ...(push ? (['push'] as const) : [])]
@@ -265,26 +280,35 @@ export default function NewMessagePage() {
   )
 
   const triggerAutoSave = useCallback(() => {
+    if (lockRef.current.readOnly) return
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
     setSaveState('saving')
     autoSaveRef.current = setTimeout(async () => {
+      if (lockRef.current.readOnly) return setSaveState('idle')
       try {
+        const payload = {
+          draft_id: draftIdRef.current,
+          template_key: 'library',
+          title: title || subject || 'Draft',
+          subject,
+          channels: payloadChannels,
+          audience_type: audienceType,
+          audience_filter: buildAudienceFilter(),
+          scheduled_at: scheduledAt || null,
+          wizard_step: step,
+        }
         const res = await fetch('/api/admin/mailer/draft', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('mailer', draftIdRef.current) },
           credentials: 'include',
-          body: JSON.stringify({
-            draft_id: draftIdRef.current,
-            template_key: 'library',
-            title: title || subject || 'Draft',
-            subject,
-            channels: payloadChannels,
-            audience_type: audienceType,
-            audience_filter: buildAudienceFilter(),
-            scheduled_at: scheduledAt || null,
-            wizard_step: step,
-          }),
+          body: JSON.stringify(payload),
         })
+        if (res.status === 423) {
+          // Someone else holds the draft: stop autosaving; offer the edits only if this tab held it.
+          setSaveState('locked')
+          lockRef.current.markLocked(lockRef.current.isMine ? payload : undefined)
+          return
+        }
         if (!res.ok) throw new Error()
         const data = await res.json()
         if (!draftIdRef.current) {
@@ -364,6 +388,22 @@ export default function NewMessagePage() {
     localStorage.removeItem(DRAFT_STORAGE_KEY)
     setShowRestoreBanner(false)
     setDraftId(null)
+  }
+
+  // Read-only footer: owner roles may discard another admin's draft (audited server-side).
+  async function discardLockedDraft() {
+    if (!draftId) return
+    const ok = await showConfirm({
+      title: 'Discard this draft?',
+      message: `${lock.lock?.ownerName ?? 'Another admin'} is editing it. It is deleted for everyone.`,
+      confirmText: 'Discard',
+      type: 'danger',
+    })
+    if (!ok) return
+    const res = await fetch(`/api/admin/mailer/${draftId}`, { method: 'DELETE', credentials: 'include' })
+    if (!res.ok) return setError((await res.json().catch(() => ({}))).error || 'Failed to discard the draft')
+    localStorage.removeItem(DRAFT_STORAGE_KEY)
+    router.push(ap('/admin/marketing/messaging'))
   }
 
   const loadPreview = useCallback(async () => {
@@ -529,11 +569,11 @@ export default function NewMessagePage() {
       if (id) {
         const r = await fetch(`/api/admin/mailer/${id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('mailer', id) },
           credentials: 'include',
           body: JSON.stringify({ ...fields, scheduled_at: scheduledAt || null }),
         })
-        if (!r.ok) throw new Error((await r.json()).error || 'Failed to update message')
+        await assertDraftResponse(r, 'Failed to update message')
       } else {
         const createRes = await fetch('/api/admin/mailer', {
           method: 'POST',
@@ -545,17 +585,20 @@ export default function NewMessagePage() {
         id = (await createRes.json()).id
       }
       if (sendNow || scheduledAt) {
-        await fetch(`/api/admin/mailer/${id}/send`, {
+        // Only the draft's holder may send it (423 otherwise).
+        const sent = await fetch(`/api/admin/mailer/${id}/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('mailer', id) },
           credentials: 'include',
           body: JSON.stringify(sendNow ? { dispatchNow: true } : { dispatchNow: false, scheduled_at: scheduledAt }),
         })
+        await assertDraftResponse(sent, 'Failed to send message')
       }
       localStorage.removeItem(DRAFT_STORAGE_KEY)
       router.push(ap('/admin/marketing/messaging'))
     } catch (err) {
-      setError(String(err))
+      if (isDraftLockedError(err)) lock.markLocked()
+      setError(isDraftLockedError(err) ? err.message : String(err))
       setSubmitting(false)
     }
   }
@@ -617,14 +660,22 @@ export default function NewMessagePage() {
               onCancel={edit.cancel}
               cancelHref={ap('/admin/marketing/messaging')}
               saveLabel="Save draft"
+              readOnly={lock.readOnly}
             />
           )}
         </div>
 
+        <DraftLockBanner lock={lock} scope="mailer:write" className="mb-4" />
+
+        {/* Read-only viewers step through the draft here; the step buttons are disabled for them. */}
         <div className="flex gap-1 mb-6 max-w-3xl">
           {[1, 2, 3].map(s => (
-            <div
+            <button
               key={s}
+              type="button"
+              aria-label={`Step ${s}`}
+              disabled={!lock.readOnly}
+              onClick={() => setStep(s)}
               className={`h-1.5 flex-1 rounded-full transition-colors ${s <= step ? 'bg-accent-500' : 'bg-border-default'}`}
             />
           ))}
@@ -632,7 +683,7 @@ export default function NewMessagePage() {
 
         {/* ── Step 1: channels + a library template per channel ── */}
         {step === 1 && (
-          <div className="max-w-3xl space-y-4">
+          <LockedFieldset readOnly={lock.readOnly} className="max-w-3xl space-y-4">
             <p className="text-sm text-foreground-secondary">
               Pick one or more channels and a template for each from your{' '}
               <Link href={ap('/admin/marketing/messaging-templates')} className="text-accent-500 hover:underline">
@@ -640,7 +691,7 @@ export default function NewMessagePage() {
               </Link>{' '}
               library.
             </p>
-            {CHANNELS.map(c => {
+            {CHANNELS.filter(c => shown(c.key)).map(c => {
               const on = isOn(c.key)
               const Icon = c.icon
               return (
@@ -687,13 +738,13 @@ export default function NewMessagePage() {
             <button type="button" onClick={() => setStep(2)} disabled={!step1Ready} className={btnPrimary}>
               Continue
             </button>
-          </div>
+          </LockedFieldset>
         )}
 
         {/* ── Step 2: fill the templates' variables, edit them, preview ── */}
         {step === 2 && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
-            <div className="space-y-5">
+            <LockedFieldset readOnly={lock.readOnly} className="space-y-5">
               {canUseAi && channels.email && (
                 <div className="bg-violet-500/5 border border-violet-500/40 rounded-lg p-4 space-y-3">
                   <div className="flex items-center gap-2">
@@ -915,7 +966,7 @@ export default function NewMessagePage() {
                   Continue
                 </button>
               </div>
-            </div>
+            </LockedFieldset>
 
             <div className="sticky top-6">
               <div className="flex gap-1 mb-2">
@@ -972,7 +1023,7 @@ export default function NewMessagePage() {
         {/* ── Step 3: audience + schedule ── */}
         {step === 3 && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
-            <div className="space-y-5">
+            <LockedFieldset readOnly={lock.readOnly} className="space-y-5">
               <AdminSelect
                 label="Audience"
                 options={AUDIENCE_OPTIONS}
@@ -1121,7 +1172,7 @@ export default function NewMessagePage() {
                   </p>
                 )}
               </div>
-            </div>
+            </LockedFieldset>
 
             <div className="sticky top-6">
               <div className="flex items-center justify-between mb-2">
@@ -1189,6 +1240,10 @@ export default function NewMessagePage() {
               </div>
             </div>
           </div>
+        )}
+
+        {lock.readOnly && (
+          <FormFooter lock={lock} cancelHref={ap('/admin/marketing/messaging')} discard={discardLockedDraft} />
         )}
       </div>
     </MobileEditBlock>

@@ -4,20 +4,34 @@ import { useState } from 'react'
 import {
   InfiniteFooter,
   ListFilters,
+  SortTh,
   PageHeader,
   TONE_CLS,
   fetchJson,
   useActionToast,
   useFilterQuery,
   useInfiniteList,
+  useListSort,
+  type SortCol,
 } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
+import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { PACKING_DEFAULT_DAYS, PACKING_FIELDS, PACKING_SEARCH } from '@/lib/filters/fields/packing-slips'
 import PackingSlipsMobileList from './_components/PackingSlipsMobileList'
+import {
+  DOC_META,
+  DOC_ORDER,
+  DOWNLOAD_ICON,
+  DocumentSetPicker,
+  Icon,
+  docAvailable,
+  downloadDocuments,
+  useDocumentSet,
+  type DocKey,
+  type DocOrder,
+} from './_components/order-documents'
 
-interface Order {
-  id: string
-  order_number: string
+interface Order extends DocOrder {
   customer_name: string
   created_at: string
   status: string
@@ -34,6 +48,15 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: TONE_CLS.red,
 }
 
+const SORT_COLS: SortCol[] = [
+  { key: 'order', label: 'Order #' },
+  { key: 'customer', label: 'Customer' },
+  { key: 'created_at', label: 'Date', type: 'date' },
+  { key: 'status', label: 'Status' },
+  { key: 'total', label: 'Total', type: 'number' },
+]
+const col = (k: string) => SORT_COLS.find(c => c.key === k)!
+
 function statusLabel(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
@@ -41,19 +64,29 @@ function statusLabel(s: string) {
 export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [downloading, setDownloading] = useState(false)
+  // `${orderId}:${doc|'set'}` while that row's download is being built.
+  const [busy, setBusy] = useState<string | null>(null)
   const toast = useActionToast()
+  const canOrders = useHasScope('orders:read')
+  const canBulk = useCanWrite('packing_slips')
+  const [docSet, setDocSet] = useDocumentSet(canOrders)
   // The list filters live in the URL; from / to are the order date (without them, the last 30 days).
   const filters = useFilterQuery(PACKING_FIELDS)
 
+  const { sort, dir } = useListSort()
   const PAGE_SIZE = 25
   const list = useInfiniteList<Order>({
-    key: filters,
+    key: `${filters}|${sort ?? ''}|${dir}`,
     pageSize: PAGE_SIZE,
     getKey: o => o.id,
     fetchPage: async (page, signal) => {
       const params = new URLSearchParams(filters)
       params.set('page', String(page))
       params.set('pageSize', String(PAGE_SIZE))
+      if (sort) {
+        params.set('sort', sort)
+        params.set('dir', dir)
+      }
       const data = await fetchJson(`/api/admin/packing-slips/list?${params}`, signal)
       return { rows: data.orders || [], total: data.total ?? null }
     },
@@ -83,28 +116,14 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
   }
 
   async function downloadBulk() {
-    const ids = Array.from(selectedIds)
-    if (ids.length === 0) return
+    if (selectedIds.size === 0) return
+    // Per-order grouping follows the list order; selections no longer loaded go last.
+    const loaded = orders.filter(o => selectedIds.has(o.id)).map(o => o.id)
+    const ids = [...loaded, ...[...selectedIds].filter(id => !loaded.includes(id))]
     setDownloading(true)
     try {
-      const res = await fetch('/api/admin/packing-slips/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_ids: ids }),
-      })
-      if (!res.ok) {
-        const d = await res.json()
-        throw new Error(d.error || 'Download failed')
-      }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `packing-slips-${new Date().toISOString().slice(0, 10)}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      const skipped = await downloadDocuments({ orderIds: ids }, docSet)
+      if (skipped) toast.warning(`Downloaded ${ids.length} orders, but ${skipped}.`)
     } catch (e: any) {
       toast.error(e.message)
     } finally {
@@ -112,10 +131,26 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
     }
   }
 
+  async function downloadRow(order: Order, docs: DocKey[] | 'set') {
+    const key = `${order.id}:${docs === 'set' ? 'set' : docs.join(',')}`
+    setBusy(key)
+    try {
+      const skipped = await downloadDocuments({ orderId: order.id }, docs === 'set' ? docSet : { ...docSet, docs })
+      if (skipped) toast.warning(`Downloaded #${order.order_number}, but ${skipped}.`)
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const rowDocs = DOC_ORDER.filter(d => canOrders || d === 'packing_slip')
+  const setLabel = docSet.docs.map(d => DOC_META[d].label.toLowerCase()).join(' + ')
+
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-5">
-        <PageHeader title="Packing Slips" description="Download packing slips to attach to parcels" />
+        <PageHeader title="Packing Slips" description="Packing slips, shipping labels and invoices for each order" />
       </div>
 
       {tabs}
@@ -143,23 +178,20 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
               {list.total != null && list.total > orders.length ? `${orders.length} of ${list.total}` : orders.length}
             </span>
           </h2>
-          {selectedIds.size > 0 && (
-            <button
-              onClick={downloadBulk}
-              disabled={downloading}
-              className="inline-flex items-center gap-2 px-4 h-control-sm bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-              {downloading ? 'Generating…' : `Download Selected (${selectedIds.size})`}
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <DocumentSetPicker value={docSet} onChange={setDocSet} canOrders={canOrders} />
+            {canBulk && selectedIds.size > 0 && (
+              <button
+                onClick={downloadBulk}
+                disabled={downloading}
+                title={`Download ${setLabel} for the selected orders as one PDF`}
+                className="inline-flex items-center gap-2 px-4 h-control-sm bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
+              >
+                <Icon d={DOWNLOAD_ICON} />
+                {downloading ? 'Generating…' : `Download Selected (${selectedIds.size})`}
+              </button>
+            )}
+          </div>
         </div>
 
         {orders.length === 0 ? (
@@ -175,6 +207,10 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
                 statusLabel={statusLabel}
                 selectedIds={selectedIds}
                 onToggleOne={toggleOne}
+                docs={rowDocs}
+                setLabel={docSet.docs.length > 1 ? setLabel : null}
+                setReady={o => docSet.docs.some(d => docAvailable(o, d))}
+                onDownload={downloadRow}
               />
             </div>
             <div className="hidden lg:block overflow-x-auto">
@@ -191,12 +227,12 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
                         className="rounded border-border-default"
                       />
                     </th>
-                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Order #</th>
-                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Customer</th>
-                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Date</th>
-                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Status</th>
-                    <th className="px-4 py-3 text-right font-semibold text-foreground-secondary">Total</th>
-                    <th className="px-4 py-3 text-center font-semibold text-foreground-secondary">Slip</th>
+                    <SortTh col={col('order')} className="px-4 py-3 font-semibold text-foreground-secondary" />
+                    <SortTh col={col('customer')} className="px-4 py-3 font-semibold text-foreground-secondary" />
+                    <SortTh col={col('created_at')} className="px-4 py-3 font-semibold text-foreground-secondary" />
+                    <SortTh col={col('status')} className="px-4 py-3 font-semibold text-foreground-secondary" />
+                    <SortTh col={col('total')} align="right" className="px-4 py-3 font-semibold text-foreground-secondary" />
+                    <th className="px-4 py-3 text-center font-semibold text-foreground-secondary">Documents</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-default">
@@ -240,22 +276,35 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
                           maximumFractionDigits: 2,
                         })}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <a
-                          href={`/api/admin/packing-slips/${order.id}`}
-                          download
-                          title="Download Packing Slip"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                            />
-                          </svg>
-                        </a>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {rowDocs.map(doc => {
+                            const ok = docAvailable(order, doc)
+                            return (
+                              <button
+                                key={doc}
+                                type="button"
+                                onClick={() => downloadRow(order, [doc])}
+                                disabled={!ok || busy === `${order.id}:${doc}`}
+                                title={ok ? `Download ${DOC_META[doc].label.toLowerCase()}` : DOC_META[doc].unavailable}
+                                aria-label={`${DOC_META[doc].label} for #${order.order_number}`}
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                              >
+                                <Icon d={DOC_META[doc].icon} />
+                              </button>
+                            )
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => downloadRow(order, 'set')}
+                            disabled={!docSet.docs.some(d => docAvailable(order, d)) || busy === `${order.id}:set`}
+                            title={`Download ${setLabel} as one PDF`}
+                            aria-label={`Download chosen documents for #${order.order_number}`}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <Icon d={DOWNLOAD_ICON} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

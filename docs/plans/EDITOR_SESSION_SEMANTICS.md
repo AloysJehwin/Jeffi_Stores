@@ -47,6 +47,41 @@ Discard at any step deletes the draft regardless of snapshot.
 - The snapshot lives on the server (per editor-session row) and survives client crashes.
 - Discard removes the whole draft regardless of snapshot and closes the session.
 - Publish is final; no session afterwards.
+- Only the draft's lock holder writes it; everyone else sees it read-only (see Draft locks).
+
+## Draft locks: one editor per draft
+
+A draft belongs to one admin at a time. The lock is a row in `draft_locks`, keyed by `(resource_type, resource_id)`; the shared logic is `packages/draft-locks` (`@jeffi/draft-locks`), wrapped by `controller-service/src/lib/admin/draft-locks.ts` and `document-service/src/lib/draft-locks.ts`. Lockable types and their write scopes are the package registry (`DRAFT_RESOURCES`): products, brands, categories, coupons, review forms, suppliers, offers, campaigns, homepage, mailer messages, invoices, quotations, purchase orders, new POs and PO receipts.
+
+### Ownership
+
+- **Start / create** acquires the lock. A draft with no lock row is **unclaimed**: the first admin to open or write it claims it. A few types seed the lock from an owner hint on first read (`po_drafts.admin_id`, `quotations.created_by`, `email_campaigns.created_by`, …) when that admin is still active and can write.
+- **The holder keeps it until the draft is published or discarded** (or finalized / sent / converted). Closing keeps the row as a tombstone for 7 days, so viewers read "Published by Priya".
+- **Everyone else is read-only.** Edit pages render with the server's lock state (`initialDraftLock`): the banner names the holder, start time, last activity and live viewers, the form sits in a disabled fieldset, and Save / Publish / Cancel are hidden. View pages show "View draft (read-only) · Priya" instead of the start/edit action. Lists show an owner badge on draft rows.
+- **Every draft write asserts the holder** inside the write's transaction (`withDraftWrite` / `assertHolder`). The lock row stays locked until commit, so a takeover waits for an in-flight save. A refusal is HTTP **423** `{ error, code: 'DRAFT_LOCKED' | 'DRAFT_LOCK_STALE', lock }`. Publish asserts and closes the lock in the same transaction. Discard needs the holder, or an owner role (audited as `discard_override`, holder notified).
+- **No actor means no lock**: system writers (imports, crons, variant status) pass straight through.
+
+### Handing a draft on
+
+- **Hand over**: the holder picks an active admin who has the type's write scope. They become the holder and are notified; the old holder becomes read-only.
+- **Release**: the holder lets go; the draft is unclaimed and anyone with the write scope may claim it.
+- **Request access**: a read-only admin asks the holder (one notification per requester, rate-limited).
+- **Take over**: administrator / super_admin only, with a required reason. The previous holder is notified with the reason, their next save gets 423, and their editor switches to read-only.
+- **Owner gone**: deactivating or deleting an admin releases their drafts; changing their role or scopes releases the drafts whose write scope they lost (`releaseLocksOfAdmin`, `/api/admin/users/[id]`). A holder who is inactive or lost the scope is treated as absent: anyone with the scope can claim the draft.
+
+### Fencing stale tabs: the epoch
+
+Every owner change (claim, handover, release, takeover, close) bumps `draft_locks.epoch`. The editor sends the epoch it last saw as `x-draft-lock-epoch` on draft writes; a write whose epoch is out of date gets **423 `DRAFT_LOCK_STALE`**, even from the same admin. Two tabs of the same holder both edit; a tab that missed a handover is stopped at its next save. When autosave hits a 423 it stops retrying, switches to read-only and offers "Copy them" for the unsaved changes.
+
+### Superseded editor sessions
+
+Opening an editor session acquires the lock in the same transaction (423 if someone else holds it); viewers never open sessions. When the lock moves away (handover, takeover, claim from an absent holder, release), the losing admin's open sessions close as `superseded`. **Cancel restores the snapshot only for the current holder, and only for a session started after they acquired the lock.** A superseded session's Cancel restores nothing, so a late Cancel cannot overwrite the new holder's work.
+
+### Realtime and housekeeping
+
+- Lock changes go out on the admin event stream (`dl:<tenant>` pub/sub, plus a `draft_locks.updated_at` poll so changes arrive without Redis and from document-service). Editors open on a draft heartbeat presence every 20 s; a viewer drops out after 45 s without one.
+- `/admin/drafts` lists drafts by tab: **Mine**, **All locked**, **Unclaimed**, with claim / release / hand over / take over where allowed.
+- The 5-minute `cron/sweep-sessions` job deletes stale presence, closes locks whose draft no longer exists (`orphaned`), releases locks held by inactive admins, and deletes tombstones older than 7 days.
 
 ## UI: the shared `FormFooter` bottom bar
 

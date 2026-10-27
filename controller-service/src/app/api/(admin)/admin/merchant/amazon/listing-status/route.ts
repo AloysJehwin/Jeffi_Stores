@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const [summary, { rows, total }] = await Promise.all([
     getAmazonSummary(filters),
-    getAmazonStatusPage({ page, pageSize, filters }),
+    getAmazonStatusPage({ page, pageSize, filters, sort: searchParams }),
   ])
 
   return NextResponse.json({ summary, rows, total, page, pageSize })

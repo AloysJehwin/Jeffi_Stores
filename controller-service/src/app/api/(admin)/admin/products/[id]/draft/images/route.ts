@@ -10,6 +10,7 @@ import {
   UploadValidationError,
 } from '@/lib/shared/s3'
 import { parseBody, zUuid } from '@/lib/shared/validate'
+import { actorOf, assertDraftHolder, draftLockResponse, epochFrom, type DraftActor } from '@/lib/admin/draft-locks'
 
 // Draft-scoped MAIN product images. Uploads go to S3 immediately, but the ROW is
 // staged in product_drafts.images — NOT in live product_images. publishProductDraft()
@@ -36,6 +37,11 @@ async function getStage(productId: string): Promise<any[]> {
   return Array.isArray(row?.images) ? row!.images : []
 }
 
+const lockOf = (req: NextRequest, admin: { adminId?: string; role?: string; scopes?: string[] }) => ({
+  actor: actorOf(admin),
+  epoch: epochFrom(req),
+})
+
 class StageError extends Error {
   constructor(
     message: string,
@@ -47,7 +53,11 @@ class StageError extends Error {
 
 // Read-modify-write of the staged array under a row lock, so concurrent uploads/edits never
 // overwrite each other. `fn` returns the next array, or null for no change.
-async function mutateStage<T>(productId: string, fn: (stage: any[]) => { next: any[] | null; result: T }): Promise<T> {
+async function mutateStage<T>(
+  productId: string,
+  fn: (stage: any[]) => { next: any[] | null; result: T },
+  lock?: { actor: DraftActor; epoch: number | null }
+): Promise<T> {
   return withTransaction(async client => {
     const r = await client.query(`SELECT images FROM product_drafts WHERE product_id = $1 FOR UPDATE`, [productId])
     if (!r.rows[0]) throw new StageError('No draft exists for this product. Reload the edit page and try again.', 404)
@@ -58,12 +68,16 @@ async function mutateStage<T>(productId: string, fn: (stage: any[]) => { next: a
         productId,
         JSON.stringify(next),
       ])
+      // Same transaction: a refusal (someone else holds the draft) rolls the write back.
+      await assertDraftHolder(client, lock?.actor, 'product', productId, { epoch: lock?.epoch })
     }
     return result
   })
 }
 
 function errorResponse(err: any, productId: string, action: string) {
+  const locked = draftLockResponse(err)
+  if (locked) return locked
   if (err instanceof StageError) return NextResponse.json({ error: err.message }, { status: err.status })
   if (err instanceof UploadValidationError) return NextResponse.json({ error: err.message }, { status: 400 })
   console.error(`[draft-images] ${action} failed for`, productId, err)
@@ -145,11 +159,15 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
     uploaded = { s3_key: staged.s3_key, s3_thumbnail_key: staged.s3_thumbnail_key || '' }
-    const image = await mutateStage(id, stage => {
-      if (stage.length >= MAX_IMAGES) throw new StageError(`Maximum ${MAX_IMAGES} images per product`, 400)
-      const img = { ...staged, display_order: stage.length, is_primary: stage.length === 0 }
-      return { next: [...stage, img], result: img }
-    })
+    const image = await mutateStage(
+      id,
+      stage => {
+        if (stage.length >= MAX_IMAGES) throw new StageError(`Maximum ${MAX_IMAGES} images per product`, 400)
+        const img = { ...staged, display_order: stage.length, is_primary: stage.length === 0 }
+        return { next: [...stage, img], result: img }
+      },
+      lockOf(request, admin)
+    )
     return NextResponse.json({ image })
   } catch (err: any) {
     // The file reached S3 but was not staged — remove it so it doesn't orphan.
@@ -172,15 +190,19 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const { imageId } = parsedDel.data
 
   try {
-    await mutateStage(id, stage => {
-      const removed = stage.find((img: any) => img.id === imageId)
-      let next = stage.filter((img: any) => img.id !== imageId)
-      if (removed?.is_primary) {
-        const rest = [...next].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-        if (rest[0]) next = next.map((img: any) => (img.id === rest[0].id ? { ...img, is_primary: true } : img))
-      }
-      return { next, result: null }
-    })
+    await mutateStage(
+      id,
+      stage => {
+        const removed = stage.find((img: any) => img.id === imageId)
+        let next = stage.filter((img: any) => img.id !== imageId)
+        if (removed?.is_primary) {
+          const rest = [...next].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+          if (rest[0]) next = next.map((img: any) => (img.id === rest[0].id ? { ...img, is_primary: true } : img))
+        }
+        return { next, result: null }
+      },
+      lockOf(request, admin)
+    )
     return NextResponse.json({ success: true })
   } catch (err: any) {
     return errorResponse(err, id, 'remove')
@@ -201,14 +223,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const { imageId, isPrimary, displayOrder } = parsedPatch.data
 
   try {
-    await mutateStage(id, stage => ({
-      next: stage.map((img: any) => {
-        if (isPrimary) return { ...img, is_primary: img.id === imageId }
-        if (displayOrder !== undefined && img.id === imageId) return { ...img, display_order: displayOrder }
-        return img
+    await mutateStage(
+      id,
+      stage => ({
+        next: stage.map((img: any) => {
+          if (isPrimary) return { ...img, is_primary: img.id === imageId }
+          if (displayOrder !== undefined && img.id === imageId) return { ...img, display_order: displayOrder }
+          return img
+        }),
+        result: null,
       }),
-      result: null,
-    }))
+      lockOf(request, admin)
+    )
     return NextResponse.json({ success: true })
   } catch (err: any) {
     return errorResponse(err, id, 'update')

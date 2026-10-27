@@ -29,6 +29,7 @@ function toCardProps(p: RecCard) {
       : null,
     brandName: p.brands?.name || null,
     categoryName: p.categories?.name || null,
+    categoryId: p.category_id ?? null,
     discountPct: Number(p.discount_pct ?? 0),
     extraDeliveryDays: Number(p.extra_delivery_days ?? 0),
     handlingDays: Number(p.handling_days ?? 2),

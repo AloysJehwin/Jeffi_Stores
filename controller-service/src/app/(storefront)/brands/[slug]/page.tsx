@@ -11,8 +11,11 @@ import {
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductCard from '@/components/visitor/ProductCard'
-import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { ListingPagedItems } from '@/components/visitor/listing/listing-sections'
+import { getWebSurface } from '@/lib/catalog/web-surface'
 import { round2 } from '@/lib/catalog/gst'
+import { positiveInt, productOrderBy, type ProductSortQuery } from '@/lib/catalog/product-sort'
+import SortDropdown from '@/components/visitor/SortDropdown'
 
 const PAGE_SIZE = 25
 
@@ -20,7 +23,7 @@ async function getBrandBySlug(slug: string) {
   return queryOne('SELECT * FROM brands WHERE slug = $1 AND is_active = true LIMIT 1', [slug])
 }
 
-async function getBrandProducts(brandId: string, page: number, gstEnabled: boolean) {
+async function getBrandProducts(brandId: string, page: number, gstEnabled: boolean, sort: ProductSortQuery) {
   const offset = (page - 1) * PAGE_SIZE
   const countRow = await queryOne<{ total: string }>(
     `SELECT COUNT(*)::text AS total FROM products WHERE brand_id = $1 AND is_active = true`,
@@ -45,9 +48,10 @@ async function getBrandProducts(brandId: string, page: number, gstEnabled: boole
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.brand_id = $1 AND p.is_active = true
-    ORDER BY p.created_at DESC
+    ORDER BY ${productOrderBy(sort, { gstEnabled })}
     LIMIT $2 OFFSET $3
   `,
     [brandId, PAGE_SIZE, offset]
@@ -61,7 +65,7 @@ export default async function BrandDetailPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>
-  searchParams: Promise<{ page?: string }>
+  searchParams: Promise<{ page?: string; layout?: string; sort?: string; dir?: string; order?: string }>
 }) {
   const { slug } = await params
   const resolvedSearchParams = await searchParams
@@ -71,9 +75,10 @@ export default async function BrandDetailPage({
     notFound()
   }
 
-  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const page = positiveInt(resolvedSearchParams.page, 1)
   const { gstEnabled } = await getFeatureFlags()
-  const { products, total } = await getBrandProducts(brand.id, page, gstEnabled)
+  const { products, total } = await getBrandProducts(brand.id, page, gstEnabled, resolvedSearchParams)
+  const surface = await getWebSurface(resolvedSearchParams.layout)
 
   return (
     <div className="bg-surface min-h-screen">
@@ -123,8 +128,9 @@ export default async function BrandDetailPage({
 
       <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         <div>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <h2 className="text-xl font-bold text-foreground">Products ({total})</h2>
+            {total > 1 && <SortDropdown basePath={`/brands/${brand.slug}`} />}
           </div>
 
           {products.length > 0 ? (
@@ -180,13 +186,14 @@ export default async function BrandDetailPage({
                   }
                 })
                 return (
-                  <ServerPagedItems
+                  <ListingPagedItems
                     items={items}
+                    listing={{ page: 'brand', surface, pageNum: page, pageSize: PAGE_SIZE, total }}
                     page={page}
                     total={total}
                     noun="products"
                     wrap="div"
-                    wrapClassName="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
+                    wrapClassName="grid grid-flow-row-dense grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
                   />
                 )
               })()}

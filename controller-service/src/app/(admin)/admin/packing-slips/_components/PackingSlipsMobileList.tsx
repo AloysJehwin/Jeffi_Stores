@@ -5,10 +5,9 @@ import { ap } from '@/lib/shared/admin-path'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import { DOC_META, docAvailable, type DocKey, type DocOrder } from './order-documents'
 
-interface Order {
-  id: string
-  order_number: string
+interface Order extends DocOrder {
   customer_name: string
   created_at: string
   status: string
@@ -21,6 +20,12 @@ interface Props {
   statusLabel: (s: string) => string
   selectedIds: Set<string>
   onToggleOne: (id: string) => void
+  /** The documents this admin can download one by one. */
+  docs: DocKey[]
+  /** The chosen set when it's more than one document, e.g. "invoice + packing slip". */
+  setLabel: string | null
+  setReady: (order: Order) => boolean
+  onDownload: (order: Order, docs: DocKey[] | 'set') => void
 }
 
 function fmtDate(s: string) {
@@ -31,19 +36,33 @@ function fmtAmount(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export default function PackingSlipsMobileList({ orders, statusColors, statusLabel, selectedIds, onToggleOne }: Props) {
+export default function PackingSlipsMobileList({
+  orders,
+  statusColors,
+  statusLabel,
+  selectedIds,
+  onToggleOne,
+  docs,
+  setLabel,
+  setReady,
+  onDownload,
+}: Props) {
   const [selected, setSelected] = useState<Order | null>(null)
   const [actionsOpen, setActionsOpen] = useState(false)
 
   function buildActions(order: Order): MobileAction[] {
     return [
-      {
-        key: 'slip',
-        label: 'Download packing slip',
-        onSelect: () => {
-          window.location.href = `/api/admin/packing-slips/${order.id}`
-        },
-      },
+      ...(setLabel
+        ? [{ key: 'set', label: `Download ${setLabel}`, disabled: !setReady(order), onSelect: () => onDownload(order, 'set') }]
+        : []),
+      ...docs.map(doc => ({
+        key: doc,
+        label: docAvailable(order, doc)
+          ? `Download ${DOC_META[doc].label.toLowerCase()}`
+          : `${DOC_META[doc].label}: ${DOC_META[doc].unavailable.toLowerCase()}`,
+        disabled: !docAvailable(order, doc),
+        onSelect: () => onDownload(order, [doc]),
+      })),
       {
         key: 'order',
         label: 'View order',

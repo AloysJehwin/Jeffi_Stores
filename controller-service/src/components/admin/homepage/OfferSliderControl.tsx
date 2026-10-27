@@ -9,6 +9,7 @@ import { ap } from '@/lib/shared/admin-path'
 import type { HomepageSection } from '@/lib/catalog/homepage-sections'
 import type { SaveSectionConfig } from './HomepageSectionManager'
 import OfferSlideDisplayEditor, { type OfferSlide } from './OfferSlideDisplayEditor'
+import { useHomepageLock } from './HomepageLock'
 
 interface OfferOption extends OfferSlide {}
 
@@ -26,7 +27,8 @@ export default function OfferSliderControl({
   saveConfig: SaveSectionConfig
 }) {
   const { showToast } = useToast()
-  const canPick = useCanWrite('settings:write')
+  const { readOnly } = useHomepageLock()
+  const canPick = useCanWrite('settings:write') && !readOnly
   const [offers, setOffers] = useState<OfferOption[]>([])
   const [loading, setLoading] = useState(true)
   const [order, setOrder] = useState<string[]>(() => readOfferIds(section))

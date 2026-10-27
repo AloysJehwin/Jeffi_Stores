@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { buildWhere, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
+import { buildWhere, normalizeQuery, sortClause, type FilterQuery, type SortDef } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { Plus } from 'lucide-react'
@@ -12,9 +12,11 @@ import { BRAND_ALIASES, BRAND_FIELDS, BRAND_SEARCH } from '@/lib/filters/fields/
 import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
 import BrochureButton from '@/components/admin/BrochureButton'
 import DraftRowActions from '@/components/admin/DraftRowActions'
+import { draftLockChips } from '@/lib/admin/draft-locks'
 import BrandsTable from './_components/BrandsTable'
 import GroupOverview from '../categories/_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -23,12 +25,19 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function getFilteredBrands(q: FilterQuery, opts: { page?: number; limit?: number } = {}) {
+const BRAND_SORT: SortDef = {
+  sorts: { name: 'b.name', slug: 'b.slug', website: 'b.website', status: '(NOT b.is_active)' },
+  defaultSql: 'b.name ASC',
+  tiebreak: 'b.id',
+}
+
+async function getFilteredBrands(q: FilterQuery, opts: { page?: number; limit?: number; sp?: SP } = {}) {
   const w = buildWhere(BRANDS_ENTITY, q)
   const limit = opts.limit || 25
   const offset = ((opts.page || 1) - 1) * limit
+  const order = sortClause({ get: k => opts.sp?.[k] ?? null }, BRAND_SORT)
   const [brands, total] = await Promise.all([
-    queryMany(`SELECT b.* FROM brands b ${w.where} ORDER BY b.name ASC LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`, [
+    queryMany(`SELECT b.* FROM brands b ${w.where} ${order} LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`, [
       ...w.params,
       limit,
       offset,
@@ -73,6 +82,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
   const activeBrands = stats?.active ?? 0
   const inactiveBrands = totalBrands - activeBrands
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
+  const locks = await draftLockChips('brand', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.brand_id)])
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -116,6 +126,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
                   discardPath={`/api/brands/${d.id}`}
                   discardConfirm={`Delete the draft brand "${d.name}"? This cannot be undone.`}
                   entityLabel="brand"
+                  lock={locks[d.id]}
                 />
               ))}
               {pendingDrafts.map(d => (
@@ -128,6 +139,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
                   publishPath={`/api/admin/brands/${d.brand_id}/publish`}
                   discardPath={`/api/admin/brands/${d.brand_id}/draft`}
                   entityLabel="brand"
+                  lock={locks[d.brand_id]}
                 />
               ))}
             </div>
@@ -141,7 +153,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
 async function BrandsListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const q = normalizeQuery(BRANDS_ENTITY, resolvedSearchParams)
-  const { brands, total } = await getFilteredBrands(q, { page, limit: PAGE_SIZE })
+  const { brands, total } = await getFilteredBrands(q, { page, limit: PAGE_SIZE, sp: resolvedSearchParams })
   const currentListUrl = tabHref('/admin/brands', 'list', resolvedSearchParams, BRAND_FIELDS, { aliases: BRAND_ALIASES })
 
   return (
@@ -195,6 +207,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="brand" />
           <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
             <BrandsStats q={q} />
           </Suspense>

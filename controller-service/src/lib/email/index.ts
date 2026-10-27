@@ -1,7 +1,7 @@
 import 'server-only'
 
 export { transporter } from './shared'
-export { sendOTPEmail, sendAdminOTPEmail, sendWelcomeEmail } from './auth'
+export { sendOTPEmail, sendPhoneOTPEmail, sendAdminOTPEmail, sendWelcomeEmail } from './auth'
 export { sendOrderConfirmationEmail, sendNewOrderNotification } from './order-confirmation'
 export { sendOrderStatusUpdate, sendPaymentStatusUpdate } from './order-status'
 export { sendAdminCertificateEmail, sendCertInviteEmail } from './certificates'

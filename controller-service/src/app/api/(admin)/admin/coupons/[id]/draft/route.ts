@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
+import { actorOf, closeAfter, discardGuard } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 interface Params {
@@ -16,6 +17,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'coupons:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const actor = actorOf(admin)
+  const denied = await discardGuard(actor, 'coupon', id)
+  if (denied) return denied
   await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
+  await closeAfter(actor, 'coupon', id, 'discarded')
   return NextResponse.json({ success: true })
 }

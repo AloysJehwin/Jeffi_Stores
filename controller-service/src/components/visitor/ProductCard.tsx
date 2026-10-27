@@ -36,10 +36,13 @@ interface ProductCardProps {
   badge?: string | null
   isDigital?: boolean
   portal?: 'storefront' | 'business'
+  /** The image box's width / height, in place of 5:3. */
+  imageAspect?: number | null
 }
 
 // Two columns on phones, two or three beside the filters on wider screens.
 const CARD_SIZES = '(min-width: 1280px) 30vw, (min-width: 768px) 40vw, 50vw'
+const IMAGE_BOX = 'border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3'
 
 export default function ProductCard({
   id,
@@ -63,6 +66,7 @@ export default function ProductCard({
   badge,
   isDigital = false,
   portal = 'storefront',
+  imageAspect,
 }: ProductCardProps) {
   const { user } = useAuth()
   const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
@@ -178,7 +182,10 @@ export default function ProductCard({
         style={{ WebkitTouchCallout: 'none', userSelect: 'none' } as React.CSSProperties}
       >
         {/* Image */}
-        <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
+        <div
+          className={imageAspect ? `relative ${IMAGE_BOX}` : `relative aspect-[5/3] ${IMAGE_BOX}`}
+          style={imageAspect ? { aspectRatio: imageAspect } : undefined}
+        >
           {primaryImage ? (
             <>
               <img
@@ -226,15 +233,19 @@ export default function ProductCard({
             )
           )}
 
-          {(shownMrpDiscount > 0 || badge || digital || discountPct > 0) && (
+          {(bizDiscountPct > 0 || shownMrpDiscount > 0 || badge || digital || discountPct > 0) && (
             <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
-              {shownMrpDiscount > 0 ? (
+              {/* A business offer is the only offer label; phones get it here instead of the ribbon. */}
+              {bizDiscountPct > 0 ? (
+                <div className="sm:hidden bg-gradient-to-r from-rose-500 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                  Business offer
+                </div>
+              ) : shownMrpDiscount > 0 ? (
                 <div className="bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                   {shownMrpDiscount}% off
                 </div>
               ) : (
-                discountPct > 0 &&
-                bizDiscountPct <= 0 && (
+                discountPct > 0 && (
                   <div className="sm:hidden bg-gradient-to-r from-rose-500 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                     Sale
                   </div>

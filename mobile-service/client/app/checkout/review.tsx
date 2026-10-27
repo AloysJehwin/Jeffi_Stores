@@ -26,6 +26,8 @@ import { listAddresses } from '../../src/api/addresses'
 import { cancelOrder } from '../../src/api/orders'
 import { api } from '../../src/api/client'
 import { useAuthStore } from '../../src/stores/authStore'
+import { useBusiness, useUpdateChannelsLabel } from '../../src/components/account/hooks'
+import { businessDiscountPreview } from '../../src/api/business'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { invalidateEddCache } from '../../src/lib/edd'
 import { trackBeginCheckout } from '../../src/lib/analytics'
@@ -45,9 +47,9 @@ interface ShippingQuote {
 }
 
 const HEADING = 'font-display text-xl font-extrabold text-foreground'
-const PROMISES = [
+const promises = (updatesVia: string) => [
   'Orders placed before 5 PM are dispatched the same day',
-  'Tracked shipment with SMS & email updates',
+  `Tracked shipment with ${updatesVia} updates`,
   'Secure packaging to ensure safe delivery',
 ]
 
@@ -113,6 +115,7 @@ function ReviewLoading() {
 
 export default function CheckoutReviewScreen() {
   const router = useRouter()
+  const updatesVia = useUpdateChannelsLabel()
   const qc = useQueryClient()
   const t = useTokens()
   const params = useLocalSearchParams<{ intent?: string; couponCode?: string; addressId?: string }>()
@@ -193,7 +196,8 @@ export default function CheckoutReviewScreen() {
   const [couponError, setCouponError] = useState('')
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<PayMethod>(razorpayEnabled ? 'razorpay' : 'cod')
+  const business = useBusiness()
+  const [paymentMethod, setPaymentMethod] = useState<PayMethod>(razorpayEnabled ? 'razorpay' : business.isBusiness ? 'manual' : 'cod')
   const [cancellingPrevious, setCancellingPrevious] = useState(false)
 
   // Fresh visit: no stale error from an earlier attempt.
@@ -238,7 +242,22 @@ export default function CheckoutReviewScreen() {
   const hasDigital = isBuyNow ? !!buyNow!.isDigital : cartItems.some(isDigitalLine)
   const allDigital = isBuyNow ? !!buyNow!.isDigital : cartItems.length > 0 && cartItems.every(isDigitalLine)
   const physicalSubtotal = isBuyNow ? cartSubtotal : Math.max(0, cartSubtotal - digitalLinesSubtotal(cartItems, gstEnabled))
-  const businessDiscountAmount = isBuyNow && Number(buyNow!.businessDiscount) > 0 ? Math.round(Number(buyNow!.businessDiscount) * 100) / 100 : 0
+  // A business account's per-category discount, worked out by the server as the order will be.
+  const bizPreviewQ = useQuery({
+    queryKey: ['business-discount', intentToken, isBuyNow ? 'buyNow' : JSON.stringify(cartItems.map(i => [i.id, i.quantity]))],
+    queryFn: () =>
+      businessDiscountPreview(
+        isBuyNow
+          ? { mode: 'buyNow', productId: buyNow!.productId, variantId: buyNow!.variantId, subVariantId: buyNow!.subVariantId, qty: buyNow!.qty, price: buyNow!.price }
+          : { mode: 'cart' }
+      ),
+    enabled: business.approved && (isBuyNow || cartItems.length > 0),
+  })
+  const businessDiscountAmount = business.approved
+    ? Math.round(Number(bizPreviewQ.data?.businessDiscountAmount ?? 0) * 100) / 100
+    : isBuyNow && Number(buyNow!.businessDiscount) > 0
+      ? Math.round(Number(buyNow!.businessDiscount) * 100) / 100
+      : 0
   const pin = selectedAddress?.postal_code ?? null
 
   const shipItems = isBuyNow
@@ -293,15 +312,25 @@ export default function CheckoutReviewScreen() {
   const belowMinimum = minOrderAmount > 0 && cartSubtotal > 0 && cartSubtotal < minOrderAmount
   const tax = isBuyNow ? 0 : cartTax(cartItems, gstEnabled)
 
+  // The business portal offers online or manual payment, never COD; manual can't deliver digital lines.
   const codAvailable =
-    !hasDigital && codEnabled && (isBuyNow ? true : cartItems.length > 0 && cartItems.every(i => i.products?.is_cod_allowed !== false))
-  const noPaymentMethod = !razorpayEnabled && !codAvailable
+    !business.isBusiness &&
+    !hasDigital &&
+    codEnabled &&
+    (isBuyNow ? true : cartItems.length > 0 && cartItems.every(i => i.products?.is_cod_allowed !== false))
+  const manualAvailable = business.isBusiness && !hasDigital
+  const noPaymentMethod = !razorpayEnabled && !codAvailable && !manualAvailable
+  const methodUnavailable =
+    (paymentMethod === 'razorpay' && !razorpayEnabled) ||
+    (paymentMethod === 'cod' && !codAvailable) ||
+    (paymentMethod === 'manual' && !manualAvailable)
 
   // Keep the chosen method valid as flags / the cart change.
   useEffect(() => {
-    if (paymentMethod === 'razorpay' && !razorpayEnabled && codAvailable) setPaymentMethod('cod')
-    else if (paymentMethod === 'cod' && !codAvailable && razorpayEnabled) setPaymentMethod('razorpay')
-  }, [paymentMethod, razorpayEnabled, codAvailable])
+    if (!methodUnavailable) return
+    const next: PayMethod | null = razorpayEnabled ? 'razorpay' : manualAvailable ? 'manual' : codAvailable ? 'cod' : null
+    if (next && next !== paymentMethod) setPaymentMethod(next)
+  }, [paymentMethod, methodUnavailable, razorpayEnabled, codAvailable, manualAvailable])
 
   // ── coupon ──
   const runApply = async (code: string) => {
@@ -357,7 +386,7 @@ export default function CheckoutReviewScreen() {
       return toast.info(`Minimum order value is ₹${minOrderAmount}. Add ${money(minOrderAmount - cartSubtotal)} more to proceed.`)
     }
     if (!serviceable) return toast.info('Delivery is not available to this pincode. Please use a different delivery address.')
-    if (noPaymentMethod || (paymentMethod === 'razorpay' && !razorpayEnabled) || (paymentMethod === 'cod' && !codAvailable)) {
+    if (noPaymentMethod || methodUnavailable) {
       return toast.info('No payment method is available for this order.')
     }
     useCheckoutStore.getState().begin({
@@ -391,7 +420,7 @@ export default function CheckoutReviewScreen() {
     belowMinimum ||
     isLoadingShipping ||
     !serviceable ||
-    (paymentMethod === 'cod' && !codAvailable) ||
+    methodUnavailable ||
     (shippingCharge === null && !shippingError)
 
   const recapItems = isBuyNow
@@ -530,7 +559,7 @@ export default function CheckoutReviewScreen() {
                 <View className="flex-1">
                   <Text accessibilityRole="header" className="mb-2 font-display text-base font-extrabold text-foreground">Our Delivery Promise</Text>
                   <View className="gap-1.5">
-                    {PROMISES.map(p => (
+                    {promises(updatesVia).map(p => (
                       <View key={p} className="flex-row items-center gap-2">
                         <Check size={16} color={status.success} strokeWidth={3} />
                         <Text className="flex-1 text-sm text-foreground-secondary">{p}</Text>
@@ -700,6 +729,21 @@ export default function CheckoutReviewScreen() {
                 label="Cash on Delivery"
                 description="Pay when your order arrives"
               />
+            )}
+            {manualAvailable && (
+              <Radio
+                card
+                selected={paymentMethod === 'manual'}
+                onSelect={() => setPaymentMethod('manual')}
+                label="Manual payment"
+                description="Bank transfer or invoice — our team will contact you"
+              />
+            )}
+            {paymentMethod === 'manual' && manualAvailable && (
+              <Notice tone="info">
+                Your order is placed unpaid. Our team will contact you with payment details; you can also pay it online later from
+                the order page.
+              </Notice>
             )}
             {noPaymentMethod && <Text className="text-xs text-red-600 dark:text-red-400">No payment method is available for this order.</Text>}
             {!serviceable && (

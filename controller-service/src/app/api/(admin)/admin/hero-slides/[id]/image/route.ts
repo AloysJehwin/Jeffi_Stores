@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { uploadGalleryMedia } from '@/lib/shared/s3'
-import { applyDraftPatch, getEditableHomepage, withHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { applyDraftPatch, getEditableHomepage, homepageLockFrom, withHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { HOMEPAGE_LOCK_ID, actorOf, lockedByOther, lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
+    // Refuse before spending on the image when another admin holds the draft.
+    const held = await lockedByOther(actorOf(admin), 'homepage', HOMEPAGE_LOCK_ID)
+    if (held) return held
     const { heroSlides } = await getEditableHomepage()
     if (!heroSlides.some(s => s.id === id)) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
 
@@ -38,7 +42,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const slide = draft.heroSlides.find(s => s.id === id)
       if (slide) applyDraftPatch(slide, { [field]: url, [hashField]: blurhash ?? null })
       return !!slide
-    })
+    }, homepageLockFrom(admin, request)).catch(lockedOr)
+    if (saved instanceof NextResponse) return saved
     if (!saved) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
     return NextResponse.json({ url, field, blurhash })
   } catch (err: any) {

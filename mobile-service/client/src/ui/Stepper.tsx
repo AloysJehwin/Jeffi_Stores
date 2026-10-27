@@ -101,7 +101,8 @@ export function Stepper({
           selectTextOnFocus
           accessibilityLabel={`Quantity${suffix}`}
           placeholderTextColor={t.foregroundMuted}
-          style={{ width, fontVariant: ['tabular-nums'] }}
+          // Android's default input padding is uneven top and bottom, which lifted the number off the buttons' centre.
+          style={{ width, fontVariant: ['tabular-nums'], paddingVertical: 0, includeFontPadding: false, textAlignVertical: 'center' }}
           className="h-full text-center font-inter text-base font-semibold text-foreground"
         />
       )}

@@ -10,6 +10,10 @@ import { bp } from '@/lib/shared/business-path'
 import { round2 } from '@/lib/catalog/gst'
 import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import { onImgError, responsiveImg } from '@/lib/shared/image-url'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+// Deep import: the package index pulls zod into the client bundle.
+import { PRODUCT_TABLE_COLUMNS, nextTableSort, tableSortState, type ProductTableColumn } from '@jeffi/api-contracts/src/product-sort'
+import { ListingViewContext } from './listing/listing-view'
 
 interface ProductItem {
   is_digital?: boolean
@@ -70,7 +74,7 @@ interface Props {
   // When provided, grid-view + non-grouped renders ServerPagedItems so pages 2..N
   // accumulate client-side instead of needing a page-number pager. Each item is a
   // server-rendered node; the page itself has already applied GST / discount maths.
-  pagedItems?: { key: string; node: ReactNode }[]
+  pagedItems?: { key: string; node: ReactNode; extra?: boolean }[]
   page?: number
   /** Where sort changes navigate (the listing's own path). */
   basePath?: string
@@ -78,7 +82,7 @@ interface Props {
   gridClassName?: string
 }
 
-const DEFAULT_GRID = 'grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6'
+const DEFAULT_GRID = 'grid grid-flow-row-dense grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6'
 const CHIP_H = 'h-11 lg:h-9'
 
 type ViewMode = 'grid' | 'table'
@@ -349,15 +353,41 @@ export default function ProductGrid({
 
   function toggleGrouped() {
     const params = new URLSearchParams(searchParams.toString())
-    if (grouped) {
-      params.delete('sort')
-      params.delete('order')
-    } else {
-      params.set('sort', 'category')
-      params.delete('order')
-    }
+    if (grouped) params.delete('sort')
+    else params.set('sort', 'category')
+    params.delete('dir')
+    params.delete('order')
     params.delete('page')
     router.push(`?${params.toString()}`)
+  }
+
+  // Table view: column titles are the sort (natural → flipped → cleared), not the dropdown.
+  const sortParam = searchParams.get('sort')
+  const dirParam = searchParams.get('dir') ?? searchParams.get('order')
+  function sortByColumn(key: ProductTableColumn['key']) {
+    const next = nextTableSort(key, sortParam, dirParam)
+    const params = new URLSearchParams(searchParams.toString())
+    for (const k of ['sort', 'dir', 'order', 'page']) params.delete(k)
+    if (next.sort) params.set('sort', next.sort)
+    if (next.dir) params.set('dir', next.dir)
+    const qs = params.toString()
+    router.replace(basePath + (qs ? `?${qs}` : ''), { scroll: false })
+  }
+  const columnHead = (key: ProductTableColumn['key']) => {
+    const col = PRODUCT_TABLE_COLUMNS.find(c => c.key === key)!
+    const state = tableSortState(key, sortParam, dirParam)
+    const Arrow = state === 'asc' ? ArrowUp : state === 'desc' ? ArrowDown : ArrowUpDown
+    return (
+      <button
+        type="button"
+        onClick={() => sortByColumn(key)}
+        aria-sort={state === 'asc' ? 'ascending' : state === 'desc' ? 'descending' : 'none'}
+        className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${state ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted hover:text-foreground'}`}
+      >
+        {col.label}
+        <Arrow className={`w-3 h-3 ${state ? '' : 'opacity-30'}`} />
+      </button>
+    )
   }
 
   // Group the already-sorted products by category name for section headers
@@ -374,6 +404,7 @@ export default function ProductGrid({
     : [{ name: '', slug: '', items: products }]
 
   return (
+    <ListingViewContext.Provider value={viewMode}>
     <div>
       {/* Single control bar: filters · group · view mode · sort. Sticks under the header on phones and tablets. */}
       <div className="sticky top-[calc(4rem+env(safe-area-inset-top,0px))] z-20 -mx-4 px-4 py-2 mb-4 bg-surface border-b border-border-default flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:static lg:mx-0 lg:px-0 lg:py-0 lg:mb-6 lg:bg-transparent lg:border-0 lg:overflow-visible lg:flex-wrap">
@@ -439,27 +470,21 @@ export default function ProductGrid({
             </svg>
           </button>
         </div>
-        <div className="hidden lg:flex ml-auto">
-          <SortDropdown basePath={basePath} />
-        </div>
+        {viewMode === 'grid' && (
+          <div className="hidden lg:flex ml-auto">
+            <SortDropdown basePath={basePath} />
+          </div>
+        )}
       </div>
 
       {viewMode === 'table' ? (
         <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
           <div className="flex items-center gap-3 px-4 py-2.5 bg-surface-secondary border-b border-border-default">
             <div className="w-10 shrink-0" />
-            <div className="flex-1 text-[10px] font-semibold text-foreground-muted uppercase tracking-wider">
-              Product
-            </div>
-            <div className="shrink-0 min-w-[80px] text-right text-[10px] font-semibold text-foreground-muted uppercase tracking-wider">
-              Price
-            </div>
-            <div className="shrink-0 w-10 text-center text-[10px] font-semibold text-foreground-muted uppercase tracking-wider">
-              Off
-            </div>
-            <div className="shrink-0 text-[10px] font-semibold text-foreground-muted uppercase tracking-wider">
-              Stock
-            </div>
+            <div className="flex-1">{columnHead('name')}</div>
+            <div className="shrink-0 min-w-[80px] flex justify-end">{columnHead('price')}</div>
+            <div className="shrink-0 w-10 flex justify-center">{columnHead('discount')}</div>
+            <div className="shrink-0">{columnHead('stock')}</div>
             <div className="shrink-0 w-3.5" />
           </div>
           {products.map((product, idx) => (
@@ -578,5 +603,6 @@ export default function ProductGrid({
         </div>
       )}
     </div>
+    </ListingViewContext.Provider>
   )
 }

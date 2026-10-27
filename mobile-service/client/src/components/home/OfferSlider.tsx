@@ -18,14 +18,15 @@ const MAX_CARD = 360 // card width cap on tablets
 
 export default function OfferSlider({ section, data }: SectionProps) {
   if (data.offers.length === 0) return null
-  return <Offers offers={data.offers} title={section.copy.title} eyebrow={section.copy.eyebrow} />
+  return <Offers offers={data.offers} title={section.copy.title} eyebrow={section.copy.eyebrow} aspect={section.aspect} />
 }
 
 const shopLabel = (o: ProductOffer) => [`Shop ${o.title}`, o.badge_text, o.subtitle].filter(Boolean).join(', ')
 
-function Offers({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: string | null; eyebrow?: string | null }) {
+function Offers({ offers, title, eyebrow, aspect }: { offers: ProductOffer[]; title?: string | null; eyebrow?: string | null; aspect?: number | null }) {
   const router = useRouter()
-  const { width } = useWindowDimensions()
+  const { width, height } = useWindowDimensions()
+  const ratio = aspect ?? ASPECT
   const open = (o: ProductOffer) => openHref(router, `/products?offer=${encodeURIComponent(o.slug)}`)
   const single = offers.length === 1
   const [current, setCurrent] = useState(0)
@@ -40,7 +41,8 @@ function Offers({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
       {single ? (
         <View className="px-3">
           <Pressable onPress={() => open(offers[0])} accessibilityRole="button" accessibilityLabel={shopLabel(offers[0])}>
-            <OfferBanner offer={offers[0]} width={width} active={onScreen} />
+            {/* An admin-set shape for the lone banner, inside px-3 and kept on screen. */}
+            <OfferBanner offer={offers[0]} width={width} active={onScreen} height={aspect ? Math.min((width - 24) / aspect, height * 0.8) : undefined} />
           </Pressable>
         </View>
       ) : (
@@ -48,12 +50,12 @@ function Offers({ offers, title, eyebrow }: { offers: ProductOffer[]; title?: st
           data={offers}
           keyExtractor={o => o.id}
           peek={Math.min(0.72, MAX_CARD / width)}
-          height={w => Math.round(w / ASPECT) + SHADOW_ROOM.top + SHADOW_ROOM.bottom}
+          height={w => Math.round(w / ratio) + SHADOW_ROOM.top + SHADOW_ROOM.bottom}
           onPress={o => open(o)}
           itemLabel={shopLabel}
           dots={{ tone: 'primary', label: i => `Go to offer ${i + 1}`, className: 'mt-1' }}
           onIndexChange={setCurrent}
-          renderItem={(o, { width: w, index }) => <OfferCard offer={o} width={w} height={Math.round(w / ASPECT)} active={onScreen && index === current} />}
+          renderItem={(o, { width: w, index }) => <OfferCard offer={o} width={w} height={Math.round(w / ratio)} active={onScreen && index === current} />}
         />
       )}
     </Animated.View>
@@ -93,9 +95,9 @@ function OfferCard({ offer, width, height, active }: { offer: ProductOffer; widt
   )
 }
 
-function OfferBanner({ offer, width, active }: { offer: ProductOffer; width: number; active: boolean }) {
+function OfferBanner({ offer, width, active, height: fixed }: { offer: ProductOffer; width: number; active: boolean; height?: number }) {
   const shadow = useElevation('overlay')
-  const height = Math.min(352, Math.max(176, width * 0.44)) // h-[clamp(11rem,44vw,22rem)]
+  const height = fixed ?? Math.min(352, Math.max(176, width * 0.44)) // h-[clamp(11rem,44vw,22rem)]
   const titleSize = Math.min(36, Math.max(20, width * 0.032))
   const src = absUrl(offer.image_url_mobile ?? offer.image_url)
   const blurhash = offer.blurhash_mobile || offer.blurhash || null

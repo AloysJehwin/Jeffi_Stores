@@ -1,4 +1,4 @@
-import { buildWhere, type FilterQuery } from '@jeffi/list-filters'
+import { buildWhere, sortClause, type FilterQuery, type SortDef } from '@jeffi/list-filters'
 import { queryCount, queryMany, queryOne } from '@/lib/shared/db'
 import { B2B_ENTITY } from '@/lib/filters/entities/business-customers'
 
@@ -20,7 +20,20 @@ export interface BusinessCustomerRow {
 
 const FROM = 'FROM business_profiles bp JOIN users u ON u.id = bp.user_id'
 
-export async function listBusinessCustomers(q: FilterQuery, page: number, pageSize: number) {
+const SORT: SortDef = {
+  sorts: {
+    company: 'bp.company_name',
+    contact: "concat_ws(' ', u.first_name, u.last_name)",
+    gst: 'bp.gst_number',
+    industry: 'bp.industry',
+    status: 'bp.approval_status',
+    created_at: 'bp.created_at',
+  },
+  defaultSql: 'bp.created_at DESC',
+  tiebreak: 'bp.id DESC',
+}
+
+export async function listBusinessCustomers(q: FilterQuery, page: number, pageSize: number, sort?: { get(name: string): string | null }) {
   const w = buildWhere(B2B_ENTITY, q)
   const [rows, total] = await Promise.all([
     queryMany<BusinessCustomerRow>(
@@ -29,7 +42,7 @@ export async function listBusinessCustomers(q: FilterQuery, page: number, pageSi
               bp.created_at, bp.approved_at
        ${FROM}
        ${w.where}
-       ORDER BY bp.created_at DESC, bp.id DESC
+       ${sortClause(sort ?? new URLSearchParams(), SORT)}
        LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
       [...w.params, pageSize, (Math.max(1, page) - 1) * pageSize]
     ),

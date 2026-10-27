@@ -28,6 +28,7 @@ import {
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
+import { actorOf, lockNewDraft } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -287,6 +288,9 @@ export async function POST(request: NextRequest) {
 
       return { orderId, orderNumber: finalOrderNumber, invoiceNumber, saveAsDraft, insufficientItems, shortfalls }
     })
+
+    // Short on stock: the invoice is saved as a draft that belongs to this admin.
+    if (result.saveAsDraft) await lockNewDraft(actorOf(admin), 'invoice', result.orderId)
 
     if (!result.saveAsDraft && result.invoiceNumber && customerEmail) {
       try {

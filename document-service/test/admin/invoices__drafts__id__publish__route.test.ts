@@ -105,8 +105,8 @@ describe('POST /api/admin/invoices/drafts/[id]/publish', () => {
     expect(body.success).toBe(true)
     expect(body.orderId).toBe('orig-1')
 
-    // UPDATE original, DELETE original items, INSERT copied items, DELETE draft
-    expect(clientQuery).toHaveBeenCalledTimes(4)
+    // UPDATE original, DELETE original items, INSERT copied items, DELETE draft, then the draft lock closes
+    expect(clientQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE draft_locks SET closed_at'), expect.anything())
     expect(clientQuery).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('UPDATE orders SET'),

@@ -10,7 +10,9 @@ import { useCanWrite, RequireWrite, RequireAi } from '@/contexts/AdminScopesCont
 import MediaField from '@/components/admin/media/MediaField'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { notifyHomepageDraftChanged } from '@/components/admin/homepage/draft-events'
-import type { HomepageSurface } from '@/lib/catalog/homepage-sections'
+import { useHomepageLock } from '@/components/admin/homepage/HomepageLock'
+import { LockedFieldset } from '@/components/admin/kit'
+import { rowAudience, type HomepageAudience, type HomepageSurface } from '@/lib/catalog/homepage-sections'
 
 export interface HeroSlideRow {
   id: string
@@ -35,6 +37,7 @@ export interface HeroSlideRow {
   filter_on_sale: boolean
   display_order: number
   is_active: boolean
+  audience?: HomepageAudience | null
 }
 
 interface Option {
@@ -46,6 +49,8 @@ interface Props {
   initialSlides: HeroSlideRow[]
   /** Which layout the slides belong to; new slides are created on it. */
   surface?: HomepageSurface
+  /** Which homepage the slides belong to: the store's or the business homepage. */
+  audience?: HomepageAudience
   categoryOptions: Option[]
   brandOptions: Option[]
   gradeOptions: Option[]
@@ -100,6 +105,7 @@ function SlideCard({
   onDelete: () => void
 }) {
   const { showToast } = useToast()
+  const homepage = useHomepageLock()
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
@@ -114,12 +120,12 @@ function SlideCard({
       try {
         const res = await fetch(`/api/admin/hero-slides/${slide.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...homepage.headers() },
           credentials: 'include',
           body: JSON.stringify(patch),
         })
         if (!res.ok) {
-          showToast('Failed to save', 'error')
+          if (!(await homepage.locked(res))) showToast('Failed to save', 'error')
           return
         }
         notifyHomepageDraftChanged()
@@ -129,7 +135,7 @@ function SlideCard({
         setSaving(false)
       }
     },
-    [slide.id, showToast]
+    [slide.id, showToast, homepage]
   )
 
   // The image route saves to the draft as it uploads (and keeps GIFs); gallery, AI and video picks save through PATCH.
@@ -137,7 +143,8 @@ function SlideCard({
     const form = new FormData()
     form.append('file', file)
     form.append('field', target)
-    const res = await fetch(`/api/admin/hero-slides/${slide.id}/image`, { method: 'POST', body: form, credentials: 'include' })
+    const res = await fetch(`/api/admin/hero-slides/${slide.id}/image`, { method: 'POST', body: form, credentials: 'include', headers: homepage.headers() })
+    if (await homepage.locked(res)) throw new Error('Someone else is editing the homepage')
     const data = await res.json().catch(() => ({}))
     if (!res.ok || !data.url) throw new Error(data.error || 'Upload failed')
     notifyHomepageDraftChanged()
@@ -151,10 +158,11 @@ function SlideCard({
     try {
       const res = await fetch(`/api/admin/hero-slides/${slide.id}/generate-image`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...homepage.headers() },
         credentials: 'include',
         body: JSON.stringify({ prompt, field: 'image_url' }),
       })
+      if (await homepage.locked(res)) return
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.url) {
         onChange({ image_url: data.url, blurhash: data.blurhash ?? null })
@@ -289,7 +297,7 @@ function SlideCard({
       </div>
 
       {expanded && (
-        <div className="p-4 space-y-4">
+        <LockedFieldset readOnly={!canWrite} className="p-4 space-y-4">
           {/* Media: desktop banner (image or video) and the optional mobile image */}
           <div className="space-y-4">
             <MediaField
@@ -604,7 +612,7 @@ function SlideCard({
               </button>
             </div>
           </RequireWrite>
-        </div>
+        </LockedFieldset>
       )}
     </div>
   )
@@ -613,14 +621,17 @@ function SlideCard({
 export default function HeroSlideManager({
   initialSlides,
   surface = 'web',
+  audience = 'store',
   categoryOptions,
   brandOptions,
   gradeOptions,
   materialOptions,
 }: Props) {
   const { showToast, showConfirm } = useToast()
-  const canWrite = useCanWrite('settings:write')
-  const [slides, setSlides] = useState<HeroSlideRow[]>(initialSlides)
+  const homepage = useHomepageLock()
+  // Read-only while another admin holds the homepage draft.
+  const canWrite = useCanWrite('settings:write') && !homepage.readOnly
+  const [slides, setSlides] = useState<HeroSlideRow[]>(() => initialSlides.filter(s => rowAudience(s) === audience))
   const [creating, setCreating] = useState(false)
 
   async function addSlide() {
@@ -628,10 +639,11 @@ export default function HeroSlideManager({
     try {
       const res = await fetch('/api/admin/hero-slides', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...homepage.headers() },
         credentials: 'include',
-        body: JSON.stringify({ title: 'New slide', badgeColor: 'bg-primary-500', surface }),
+        body: JSON.stringify({ title: 'New slide', badgeColor: 'bg-primary-500', surface, audience }),
       })
+      if (await homepage.locked(res)) return
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.slide) {
         setSlides(prev => [...prev, data.slide])
@@ -657,12 +669,12 @@ export default function HeroSlideManager({
       cancelText: 'Cancel',
       type: 'danger',
       onConfirm: async () => {
-        const res = await fetch(`/api/admin/hero-slides/${id}`, { method: 'DELETE', credentials: 'include' })
+        const res = await fetch(`/api/admin/hero-slides/${id}`, { method: 'DELETE', credentials: 'include', headers: homepage.headers() })
         if (res.ok) {
           setSlides(prev => prev.filter(s => s.id !== id))
           showToast('Slide removed from draft', 'success')
           notifyHomepageDraftChanged()
-        } else showToast('Failed to delete', 'error')
+        } else if (!(await homepage.locked(res))) showToast('Failed to delete', 'error')
       },
     })
   }
@@ -676,11 +688,12 @@ export default function HeroSlideManager({
     setSlides(next)
     const res = await fetch('/api/admin/hero-slides', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...homepage.headers() },
       credentials: 'include',
       body: JSON.stringify({ order: next.map(s => s.id) }),
     }).catch(() => null)
     if (res?.ok) notifyHomepageDraftChanged()
+    else if (res && (await homepage.locked(res))) setSlides(slides)
   }
 
   return (
@@ -692,7 +705,7 @@ export default function HeroSlideManager({
         <div key={slide.id} className="flex items-start gap-2">
           {/* Reorder controls */}
           <RequireWrite scope="settings:write">
-            <div className="flex flex-col gap-1 pt-3">
+            <LockedFieldset readOnly={!canWrite} className="flex flex-col gap-1 pt-3">
               <button
                 type="button"
                 onClick={() => move(slide.id, -1)}
@@ -715,7 +728,7 @@ export default function HeroSlideManager({
                   <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-            </div>
+            </LockedFieldset>
           </RequireWrite>
           <div className="flex-1 min-w-0">
             <SlideCard
@@ -735,7 +748,7 @@ export default function HeroSlideManager({
         <button
           type="button"
           onClick={addSlide}
-          disabled={creating}
+          disabled={creating || !canWrite}
           className="w-full py-2.5 rounded-xl border-2 border-dashed border-border-default text-sm font-medium text-foreground-secondary hover:border-accent-400 hover:text-accent-600 dark:hover:text-accent-400 transition-colors disabled:opacity-50"
         >
           {creating ? 'Adding…' : '+ Add hero slide'}
