@@ -11,9 +11,17 @@ interface DealOfTheDayProps {
   title?: string | null
   eyebrow?: string | null
   countdownEndsAt?: string | null
+  portal?: 'storefront' | 'business'
 }
 
-export default function DealOfTheDay({ products, gstEnabled, title, eyebrow, countdownEndsAt }: DealOfTheDayProps) {
+export default function DealOfTheDay({
+  products,
+  gstEnabled,
+  title,
+  eyebrow,
+  countdownEndsAt,
+  portal,
+}: DealOfTheDayProps) {
   const heading = title ?? COPY.title
   const endsAt = countdownEndsAt && Date.parse(countdownEndsAt) > Date.now() ? countdownEndsAt : null
 
@@ -35,7 +43,7 @@ export default function DealOfTheDay({ products, gstEnabled, title, eyebrow, cou
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
           {products.map((product: any) => (
-            <ProductCard key={product.id} {...productCardProps(product, gstEnabled)} />
+            <ProductCard key={product.id} {...productCardProps(product, gstEnabled)} portal={portal} />
           ))}
         </div>
       </div>

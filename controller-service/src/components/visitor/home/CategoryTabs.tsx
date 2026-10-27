@@ -19,9 +19,10 @@ interface CategoryTabsProps {
   tabs: CategoryTabData[]
   eyebrow?: string | null
   title?: string | null
+  portal?: 'storefront' | 'business'
 }
 
-export default function CategoryTabs({ tabs, eyebrow, title }: CategoryTabsProps) {
+export default function CategoryTabs({ tabs, eyebrow, title, portal }: CategoryTabsProps) {
   const [active, setActive] = useState(0)
   const current = tabs[Math.min(active, tabs.length - 1)]
   // Per instance: a listing page can show the same section more than once.
@@ -81,7 +82,7 @@ export default function CategoryTabs({ tabs, eyebrow, title }: CategoryTabsProps
         <div id={panelId(current.id)} role="tabpanel" aria-labelledby={tabId(current.id)}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
             {current.products.map(p => (
-              <ProductCard key={p.id} {...p} />
+              <ProductCard key={p.id} {...p} portal={portal} />
             ))}
           </div>
           <div className="text-center mt-7">

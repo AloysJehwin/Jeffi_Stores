@@ -32,7 +32,7 @@ function BusinessSignInPage() {
 
   useEffect(() => {
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'approved') {
-      go(callbackUrl || bp('/business/products'), 'replace')
+      go(callbackUrl || bp('/business'), 'replace')
     }
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'pending') {
       go(bp('/business/pending'), 'replace')
@@ -215,7 +215,7 @@ function BusinessSignInPage() {
         body: JSON.stringify({ notificationChannel: channel }),
       }).catch(() => {})
       // Redirect to business portal
-      go(callbackUrl || bp('/business/products'), 'hard')
+      go(callbackUrl || bp('/business'), 'hard')
     } catch (err: any) {
       setError(err.message)
       setOtp('')
@@ -316,7 +316,7 @@ function BusinessSignInPage() {
         setShowPhoneModal(true)
         return
       }
-      go(callbackUrl || bp('/business/products'), 'hard')
+      go(callbackUrl || bp('/business'), 'hard')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -355,7 +355,7 @@ function BusinessSignInPage() {
           body: JSON.stringify({}),
         }).catch(() => {})
       }
-      go(bp('/business/products'), 'hard')
+      go(bp('/business'), 'hard')
     } catch (err: any) {
       setPhoneError(err.message)
     } finally {
