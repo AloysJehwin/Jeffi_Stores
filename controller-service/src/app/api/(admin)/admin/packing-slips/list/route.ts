@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { buildWhere, normalizeQuery, sortClause, type SortDef } from '@jeffi/list-filters'
 import { queryMany } from '@/lib/shared/db'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -11,7 +11,13 @@ const COLUMNS = `o.id, o.order_number, o.customer_name, o.created_at, o.status, 
   (EXISTS (SELECT 1 FROM order_items i WHERE i.order_id = o.id AND i.is_digital)
    AND NOT EXISTS (SELECT 1 FROM order_items i WHERE i.order_id = o.id AND i.is_digital IS NOT TRUE)) AS digital_only`
 
-// The slips list: the list filters (from / to are the order date); without dates or a search, the
+const SORT: SortDef = {
+  sorts: { order: 'o.order_number', customer: 'o.customer_name', created_at: 'o.created_at', status: 'o.status', total: 'o.total_amount' },
+  defaultSql: 'o.created_at DESC',
+  tiebreak: 'o.id DESC',
+}
+
+// The slips list (?sort&dir): the list filters (from / to are the order date); without dates or a search, the
 // last 30 days. page + pageSize pages and adds `total`; without pageSize, up to 500 rows.
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -49,7 +55,7 @@ export async function GET(request: NextRequest) {
       `SELECT ${COLUMNS}
        FROM orders o
        ${where}
-       ORDER BY o.created_at DESC, o.id DESC
+       ${sortClause(searchParams, SORT)}
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, pageSize, (page - 1) * pageSize]
     ),

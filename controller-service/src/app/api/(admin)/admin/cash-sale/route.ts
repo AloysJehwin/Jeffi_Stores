@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { buildWhere, normalizeQuery, sortClause } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { CASH_SALE_ENTITY, CASH_SALE_SORTS } from '@/lib/filters/entities/cash-sale'
 
@@ -25,11 +25,11 @@ export async function GET(request: NextRequest) {
     const params = w.params
     const i = w.nextIdx
 
-    const sortCol = CASH_SALE_SORTS[searchParams.get('sort') || ''] || null
-    const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
-    const orderBy = sortCol
-      ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, cs.created_at DESC`
-      : `ORDER BY cs.created_at DESC`
+    const orderBy = sortClause(searchParams, {
+      sorts: CASH_SALE_SORTS,
+      defaultSql: 'cs.created_at DESC',
+      tiebreak: 'cs.created_at DESC, cs.id DESC',
+    })
 
     const [rows, countRow] = await Promise.all([
       queryMany(

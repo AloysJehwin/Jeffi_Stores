@@ -8,7 +8,7 @@ import { useDraftLock } from '@/hooks/useDraftLock'
 import { useDraftsList, type DraftListItem, type DraftsScope } from '@/hooks/useDraftsList'
 import { timeAgo } from '@/lib/client/draft-lock-client'
 import Select from '@/components/ui/Select'
-import { DataTable, DraftLockBadge, HandoverDialog, TakeoverDialog, Tabs, useActionToast, type DataCol } from '@/components/admin/kit'
+import { DataTable, DraftLockBadge, HandoverDialog, TakeoverDialog, Tabs, useActionToast, useListSort, type DataCol } from '@/components/admin/kit'
 
 const TABS = [
   { id: 'mine', label: 'Mine' },
@@ -103,7 +103,8 @@ function RowLockActions({ r, onChanged }: { r: DraftListItem; onChanged: () => v
 export default function DraftsClient({ initialScope }: { initialScope: DraftsScope }) {
   const [scope, setScope] = useState<DraftsScope>(initialScope)
   const [type, setType] = useState('')
-  const list = useDraftsList(scope, type)
+  const { sort, dir } = useListSort()
+  const list = useDraftsList(scope, type, sort, dir)
   const refresh = () => void list.refresh()
 
   const entity = (r: DraftListItem) => (
@@ -112,23 +113,25 @@ export default function DraftsClient({ initialScope }: { initialScope: DraftsSco
     </Link>
   )
   const cols: DataCol<DraftListItem>[] = [
-    { key: 'entity', label: 'Draft', sort: r => r.label.toLowerCase(), render: entity },
-    { key: 'type', label: 'Type', sort: r => r.typeLabel, render: r => <span className="text-foreground-secondary">{r.typeLabel}</span> },
-    { key: 'owner', label: 'Owner', sort: r => (r.lock?.ownerName ?? '').toLowerCase(), render: r => <Owner r={r} /> },
+    { key: 'entity', label: 'Draft', sortParam: 'label', render: entity },
+    { key: 'type', label: 'Type', sortParam: 'type', render: r => <span className="text-foreground-secondary">{r.typeLabel}</span> },
+    { key: 'owner', label: 'Owner', sortParam: 'owner', render: r => <Owner r={r} /> },
     {
       key: 'started',
       label: 'Started',
       hideBelow: 'lg',
-      sort: r => r.lock?.startedAt ?? '',
+      sortParam: 'started',
+      sortType: 'date',
       render: r => <span className="whitespace-nowrap text-foreground-secondary">{r.lock?.startedAt ? timeAgo(r.lock.startedAt) : '—'}</span>,
     },
     {
       key: 'active',
       label: 'Last active',
-      sort: r => r.lock?.lastActiveAt ?? r.updatedAt ?? '',
+      sortParam: 'active',
+      sortType: 'date',
       render: r => <span className="whitespace-nowrap text-foreground-secondary">{timeAgo(r.lock?.lastActiveAt ?? r.updatedAt) || '—'}</span>,
     },
-    { key: 'viewers', label: 'Viewers', num: true, hideBelow: 'md', sort: r => r.viewers, render: r => <span className="text-foreground-secondary">{r.viewers || '—'}</span> },
+    { key: 'viewers', label: 'Viewers', num: true, hideBelow: 'md', sortParam: 'viewers', render: r => <span className="text-foreground-secondary">{r.viewers || '—'}</span> },
     { key: 'actions', label: '', render: r => <RowLockActions r={r} onChanged={refresh} /> },
   ]
 

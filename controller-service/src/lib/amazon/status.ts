@@ -1,4 +1,4 @@
-import { buildWhere, hasFilters, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
+import { buildWhere, hasFilters, normalizeQuery, sortClause, type FilterQuery, type SortDef } from '@jeffi/list-filters'
 import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { AMAZON_LISTINGS_ENTITY } from '@/lib/filters/entities/amazon-listings'
 import { searchListingsItems } from './client'
@@ -151,6 +151,14 @@ export interface AmazonPageParams {
   status?: string
   /** The listings tab's filters (normalised); `search` / `status` are the old params. */
   filters?: FilterQuery
+  /** ?sort&dir */
+  sort?: { get(name: string): string | null }
+}
+
+const LISTING_SORT: SortDef = {
+  sorts: { sku: 'al.sku', title: 'al.title', status: 'al.status', issue: "al.issues->0->>'message'" },
+  defaultSql: "(al.status = 'disapproved') DESC, (al.status = 'pending') DESC",
+  tiebreak: 'al.sku',
 }
 
 export async function getAmazonStatusPage(
@@ -170,7 +178,7 @@ export async function getAmazonStatusPage(
   const rows = await queryMany<AmazonStatusRow>(
     `SELECT al.sku, al.title, al.status, al.parent_sku, al.asin, al.price, al.issues, al.synced_at
        FROM amazon_listing_status al ${w.where}
-      ORDER BY (al.status = 'disapproved') DESC, (al.status = 'pending') DESC, al.sku
+      ${sortClause(params.sort ?? new URLSearchParams(), LISTING_SORT)}
       LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
     [...w.params, pageSize, (page - 1) * pageSize]
   )

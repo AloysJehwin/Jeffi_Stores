@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { buildWhere, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
+import { buildWhere, normalizeQuery, sortClause, type FilterQuery, type SortDef } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { Plus } from 'lucide-react'
@@ -24,12 +24,19 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function getFilteredBrands(q: FilterQuery, opts: { page?: number; limit?: number } = {}) {
+const BRAND_SORT: SortDef = {
+  sorts: { name: 'b.name', slug: 'b.slug', website: 'b.website', status: '(NOT b.is_active)' },
+  defaultSql: 'b.name ASC',
+  tiebreak: 'b.id',
+}
+
+async function getFilteredBrands(q: FilterQuery, opts: { page?: number; limit?: number; sp?: SP } = {}) {
   const w = buildWhere(BRANDS_ENTITY, q)
   const limit = opts.limit || 25
   const offset = ((opts.page || 1) - 1) * limit
+  const order = sortClause({ get: k => opts.sp?.[k] ?? null }, BRAND_SORT)
   const [brands, total] = await Promise.all([
-    queryMany(`SELECT b.* FROM brands b ${w.where} ORDER BY b.name ASC LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`, [
+    queryMany(`SELECT b.* FROM brands b ${w.where} ${order} LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`, [
       ...w.params,
       limit,
       offset,
@@ -145,7 +152,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
 async function BrandsListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const q = normalizeQuery(BRANDS_ENTITY, resolvedSearchParams)
-  const { brands, total } = await getFilteredBrands(q, { page, limit: PAGE_SIZE })
+  const { brands, total } = await getFilteredBrands(q, { page, limit: PAGE_SIZE, sp: resolvedSearchParams })
   const currentListUrl = tabHref('/admin/brands', 'list', resolvedSearchParams, BRAND_FIELDS, { aliases: BRAND_ALIASES })
 
   return (

@@ -1,5 +1,5 @@
 import { buildWhere, type FilterQuery } from '@jeffi/list-filters'
-import { queryOne, queryMany, queryCount } from './shared'
+import { queryOne, queryMany, queryCount, entityOrderBy } from './shared'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
 import { buildAttributeFilterClauses, type FilterParams } from '@/lib/catalog/product-attribute-filters'
 import { PRODUCTS_ENTITY, productQuickClauses } from '@/lib/filters/entities/products'
@@ -200,20 +200,6 @@ export async function getBrandsWithProducts() {
   `)
 }
 
-const PRODUCT_SORT_COLS: Record<string, string> = {
-  name: 'p.name',
-  sku: 'p.sku',
-  // products has no `price` column — use the effective display price (min active variant
-  // price, else base_price). Sorting by 'p.price' errored the whole page.
-  price:
-    '(COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price))',
-  stock: 'p.stock_status',
-  created_at: 'p.created_at',
-  category: 'c.name',
-  brand: 'b.name',
-  status: 'p.is_active',
-}
-
 export async function getFilteredProducts(filters: {
   category_id?: string
   brand_id?: string
@@ -282,12 +268,12 @@ export async function getFilteredProducts(filters: {
 
   const limit = filters.limit || 25
   const offset = ((filters.page || 1) - 1) * limit
-  const hasSortFilter = filters.sort && PRODUCT_SORT_COLS[filters.sort]
-  const sortCol = hasSortFilter ? PRODUCT_SORT_COLS[filters.sort!] : null
-  const sortDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
-  const orderBy = sortCol
-    ? `${sortCol} ${sortDir}`
-    : `${rankExpr}, p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
+  const orderBy = entityOrderBy(
+    PRODUCTS_ENTITY,
+    filters.sort,
+    filters.dir,
+    `${rankExpr}, p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
+  )
 
   const [products, total] = await Promise.all([
     queryMany(
@@ -369,7 +355,7 @@ export async function getFilteredProducts(filters: {
       LEFT JOIN categories pc ON c.parent_category_id = pc.id
       LEFT JOIN brands b ON p.brand_id = b.id
       ${where}
-      ORDER BY ${orderBy}
+      ${orderBy}
       LIMIT $${i} OFFSET $${i + 1}
     `,
       [...params, limit, offset]

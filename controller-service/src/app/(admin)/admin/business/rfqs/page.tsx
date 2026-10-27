@@ -110,7 +110,7 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
 
           {/* Table re-shimmers on filter/pagination change while the shell stays mounted */}
           <Suspense key={listKey(resolvedSearchParams)} fallback={<TableSkeleton rows={8} cols={6} />}>
-            <BusinessRFQsListContent q={q} page={resolvedSearchParams.page} host={host} />
+            <BusinessRFQsListContent q={q} page={resolvedSearchParams.page} sp={resolvedSearchParams} host={host} />
           </Suspense>
         </>
       )}
@@ -131,9 +131,9 @@ function StatsSkeleton() {
   )
 }
 
-async function BusinessRFQsListContent({ q, page: pageParam, host }: { q: FilterQuery; page?: string; host: string }) {
+async function BusinessRFQsListContent({ q, page: pageParam, sp, host }: { q: FilterQuery; page?: string; sp: SP; host: string }) {
   const page = Math.max(1, parseInt(pageParam || '1', 10) || 1)
-  const { rows: rfqs, total } = await listBusinessRfqs(q, page, PAGE_SIZE)
+  const { rows: rfqs, total } = await listBusinessRfqs(q, page, PAGE_SIZE, { get: k => sp[k] ?? null })
 
   return (
     <BusinessRfqsTable

@@ -182,6 +182,7 @@ export default function CustomersTable({
       key: 'joined',
       label: 'Joined',
       sortParam: 'joined',
+      sortType: 'date',
       hideBelow: 'lg',
       render: c => (
         <Tooltip
@@ -211,6 +212,7 @@ export default function CustomersTable({
       key: 'health',
       label: 'Health',
       sortParam: 'health',
+      sortType: 'number',
       render: c =>
         c.health_score == null ? (
           <span className="text-xs text-foreground-muted">—</span>

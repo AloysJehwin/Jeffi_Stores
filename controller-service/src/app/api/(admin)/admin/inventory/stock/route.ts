@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
 
     if (view === 'valuation') {
       const valPage = Math.max(1, parseInt(searchParams.get('page') || '1'))
-      const valLimit = parseInt(searchParams.get('limit') || '50')
+      const valLimit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '50') || 50), 200)
       // The list filters (old val_* names included); search keeps the valuation's own ranking.
       const q = normalizeQuery(VALUATION_ENTITY, searchParams)
       const data = await getStockValuation({
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     }
 
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '50') || 50), 200)
     // The list filters (old ledger_* names included). Without dates or a product, the last 30 days.
     const q = normalizeQuery(LEDGER_ENTITY, searchParams)
     const productId = searchParams.get('product_id') || undefined
@@ -140,6 +140,8 @@ export async function GET(request: NextRequest) {
       limit,
       offset: (page - 1) * limit,
       scope: filterScope(LEDGER_ENTITY, q, { omit: ['created', 'search'] }),
+      sort: searchParams.get('sort') || undefined,
+      dir: searchParams.get('dir') || undefined,
     })
 
     return NextResponse.json({

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { SortTh, type SortCol } from '@/components/admin/kit/list-sort'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getReferralStats, listReferralSignups, type ReferralStats, type ReferralStatus } from '@/lib/referrals/queries'
 import { getReferralSettings } from '@/lib/referrals/settings'
@@ -40,15 +41,25 @@ export interface ReferralQuery {
   page: number
   status: string
   search: string
+  sort?: string
+  dir?: string
 }
 
+const COLS: SortCol[] = [
+  { key: 'referrer', label: 'Referrer' },
+  { key: 'friend', label: 'Friend' },
+  { key: 'status', label: 'Status' },
+  { key: 'points', label: 'Points', type: 'number' },
+  { key: 'signed_up_at', label: 'Joined', type: 'date' },
+]
+
 export default async function ReferralProgram({ host, query }: { host: string; query: ReferralQuery }) {
-  const { page, status, search } = query
+  const { page, status, search, sort, dir } = query
   const [settings, loyalty, stats, list, campaign] = await Promise.all([
     getReferralSettings(),
     getLoyaltySettings(),
     getReferralStats().catch(() => NO_STATS),
-    listReferralSignups({ page, pageSize: PAGE_SIZE, status, search }).catch(() => ({ rows: [], total: 0 })),
+    listReferralSignups({ page, pageSize: PAGE_SIZE, status, search, sort: new URLSearchParams({ sort: sort ?? '', dir: dir ?? '' }) }).catch(() => ({ rows: [], total: 0 })),
     queryOne<{ enabled: boolean }>(`SELECT enabled FROM campaigns WHERE kind = 'referral_invite'`).catch(() => null),
   ])
   const live = settings.enabled && loyalty.enabled
@@ -94,6 +105,8 @@ export default async function ReferralProgram({ host, query }: { host: string; q
           <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Referrals</h3>
           <form method="get" action={basePath} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="tab" value="referrals" />
+            {sort && <input type="hidden" name="sort" value={sort} />}
+            {sort && dir && <input type="hidden" name="dir" value={dir} />}
             <input
               type="search"
               name="search"
@@ -191,11 +204,9 @@ export default async function ReferralProgram({ host, query }: { host: string; q
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wide text-foreground-muted">
-                    <th className="px-4 py-3 font-medium">Referrer</th>
-                    <th className="px-4 py-3 font-medium">Friend</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium text-right">Points</th>
-                    <th className="px-4 py-3 font-medium">Joined</th>
+                    {COLS.map(c => (
+                      <SortTh key={c.key} col={c} align={c.type === 'number' ? 'right' : 'left'} className="px-4 py-3 font-medium" />
+                    ))}
                   </tr>
                 </thead>
                 <ServerPagedItems

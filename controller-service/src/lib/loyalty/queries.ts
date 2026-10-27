@@ -1,3 +1,4 @@
+import { sortClause, type SortDef } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { orderStateParams, orderStatesCte } from './reconcile'
 import { REWARD_COUPON_CAMPAIGN } from './redeem'
@@ -229,11 +230,25 @@ export interface LoyaltyMember {
   updatedAt: string
 }
 
+const MEMBER_SORT: SortDef = {
+  sorts: {
+    customer: "COALESCE(NULLIF(concat_ws(' ', u.first_name, u.last_name), ''), u.email)",
+    tier: 'la.tier',
+    points: 'la.points',
+    lifetime: 'la.lifetime_points',
+    updated_at: 'la.updated_at',
+  },
+  defaultSql: 'la.lifetime_points DESC, la.updated_at DESC',
+  tiebreak: 'la.user_id',
+}
+
 export async function listLoyaltyMembers(opts: {
   page: number
   pageSize: number
   tier?: string | null
   search?: string | null
+  /** ?sort&dir */
+  sort?: { get(name: string): string | null }
 }): Promise<{ members: LoyaltyMember[]; total: number }> {
   const tier = opts.tier && (TIER_KEYS as readonly string[]).includes(opts.tier) ? opts.tier : null
   const search = opts.search?.trim() ? `%${opts.search.trim()}%` : null
@@ -258,7 +273,7 @@ export async function listLoyaltyMembers(opts: {
       `SELECT la.user_id::text AS user_id, u.first_name, u.last_name, u.email, u.phone,
               la.tier, la.points, la.lifetime_points, la.updated_at
        ${where}
-       ORDER BY la.lifetime_points DESC, la.updated_at DESC
+       ${sortClause(opts.sort ?? new URLSearchParams(), MEMBER_SORT)}
        LIMIT $3 OFFSET $4`,
       [tier, search, opts.pageSize, (opts.page - 1) * opts.pageSize]
     ),

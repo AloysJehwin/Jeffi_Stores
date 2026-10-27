@@ -91,13 +91,27 @@ async function labels(c: SqlClient, rows: { resourceType: DraftResourceType; res
   return out
 }
 
+/** The dashboard's sortable columns (whitelist for `?sort`). */
+export const DRAFT_LIST_SORTS = ['label', 'type', 'owner', 'started', 'active', 'viewers'] as const
+export type DraftListSort = (typeof DRAFT_LIST_SORTS)[number]
+export const isDraftListSort = (k: string | null | undefined): k is DraftListSort => DRAFT_LIST_SORTS.includes(k as DraftListSort)
+
 /**
  * The drafts dashboard. `mine` = locks the admin holds, `all` = every held lock, `unclaimed` =
  * drafts nobody holds (no lock row yet, or released). `types` limits to what the caller may read.
  */
 export async function listDrafts(
   c: SqlClient,
-  opts: { scope: 'mine' | 'all' | 'unclaimed'; adminId: string; types: DraftResourceType[]; limit: number; offset: number; hasScope?: HasScopeFn }
+  opts: {
+    scope: 'mine' | 'all' | 'unclaimed'
+    adminId: string
+    types: DraftResourceType[]
+    limit: number
+    offset: number
+    hasScope?: HasScopeFn
+    /** Over every matching draft before paging; the default order is kept for ties. */
+    sort?: { key: DraftListSort; dir: 'asc' | 'desc' }
+  }
 ): Promise<{ rows: DraftListRow[]; total: number }> {
   const hasScope = opts.hasScope ?? defaultHasScope
   if (!opts.types.length) return { rows: [], total: 0 }
@@ -132,8 +146,30 @@ export async function listDrafts(
     base = r.rows.map(row => ({ resourceType: row.resource_type, resourceId: row.resource_id, lock: toLock(row, hasScope), updatedAt: null }))
   }
   const total = base.length
+  let allNames: Awaited<ReturnType<typeof labels>> | null = null
+  if (opts.sort) {
+    const { key, dir } = opts.sort
+    if (key === 'label') allNames = await labels(c, base)
+    const counts = key === 'viewers' ? await viewerCounts(c, base.map(b => ({ type: b.resourceType, id: b.resourceId }))) : {}
+    const value = (b: (typeof base)[number]): string | number | null => {
+      const k = `${b.resourceType}:${b.resourceId}`
+      if (key === 'label') return (allNames!.get(k)?.label ?? DRAFT_RESOURCES[b.resourceType].label).toLowerCase()
+      if (key === 'type') return DRAFT_RESOURCES[b.resourceType].label
+      if (key === 'owner') return b.lock?.ownerName?.toLowerCase() ?? null
+      if (key === 'started') return b.lock?.startedAt ?? null
+      if (key === 'active') return b.lock?.lastActiveAt ?? b.updatedAt ?? null
+      return counts[k] ?? 0
+    }
+    const keyed = base.map((b, i) => ({ b, i, v: value(b) }))
+    keyed.sort((x, y) => {
+      if (x.v == null || y.v == null) return x.v == null && y.v == null ? x.i - y.i : x.v == null ? 1 : -1
+      const d = x.v < y.v ? -1 : x.v > y.v ? 1 : 0
+      return (dir === 'asc' ? d : -d) || x.i - y.i
+    })
+    base = keyed.map(k => k.b)
+  }
   const page = base.slice(opts.offset, opts.offset + opts.limit)
-  const names = await labels(c, page)
+  const names = allNames ?? (await labels(c, page))
   return {
     total,
     rows: page.map(p => {

@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
         q: sp.get('q'),
         page: Number(sp.get('page')) || 1,
         pageSize: Number(sp.get('pageSize')) || 25,
+        sort: sp.get('sort') || undefined,
+        dir: sp.get('dir') || undefined,
       })
     )
   } catch (e: any) {

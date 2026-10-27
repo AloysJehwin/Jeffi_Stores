@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { buildWhere, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
+import { buildWhere, normalizeQuery, sortClause, type FilterQuery, type SortDef } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { Plus } from 'lucide-react'
@@ -23,12 +23,25 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function getForms(q: FilterQuery, page = 1) {
+const FORM_SORT: SortDef = {
+  sorts: {
+    title: 'rf.title',
+    template: 'rf.template_type',
+    link: 'rf.slug',
+    coupon: 'c.code',
+    subs: 'rf.submissions_count',
+    status: '(NOT rf.is_active)',
+  },
+  defaultSql: 'rf.created_at DESC',
+  tiebreak: 'rf.id DESC',
+}
+
+async function getForms(q: FilterQuery, page = 1, sp: SP = {}) {
   const w = buildWhere(REVIEW_FORMS_ENTITY, q)
   const offset = (page - 1) * PAGE_SIZE
   const [forms, total] = await Promise.all([
     queryMany(
-      `SELECT rf.*, c.code AS coupon_code FROM review_forms rf LEFT JOIN coupons c ON rf.coupon_id = c.id ${w.where} ORDER BY rf.created_at DESC LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
+      `SELECT rf.*, c.code AS coupon_code FROM review_forms rf LEFT JOIN coupons c ON rf.coupon_id = c.id ${w.where} ${sortClause({ get: k => sp[k] ?? null }, FORM_SORT)} LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
       [...w.params, PAGE_SIZE, offset]
     ),
     queryCount(`SELECT COUNT(*) FROM review_forms rf ${w.where}`, w.params),
@@ -180,7 +193,7 @@ function ReviewFormsListSection({ resolvedSearchParams, host }: { resolvedSearch
 async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const q = normalizeQuery(REVIEW_FORMS_ENTITY, resolvedSearchParams)
-  const { forms, total } = await getForms(q, page)
+  const { forms, total } = await getForms(q, page, resolvedSearchParams)
   const formsBase = `https://${formsHostForHost(host)}`
   const listUrl = tabHref('/admin/review-forms', 'list', resolvedSearchParams, REVIEW_FORM_FIELDS)
 

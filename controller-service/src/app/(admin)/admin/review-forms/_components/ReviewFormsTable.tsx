@@ -104,6 +104,7 @@ export default function ReviewFormsTable({
     {
       key: 'title',
       label: 'Title',
+      sortParam: 'title',
       render: f => (
         <HoverCard
           trigger={
@@ -139,10 +140,11 @@ export default function ReviewFormsTable({
         </HoverCard>
       ),
     },
-    { key: 'template', label: 'Template', render: f => <TemplateTag type={f.template_type} /> },
+    { key: 'template', label: 'Template', sortParam: 'template', render: f => <TemplateTag type={f.template_type} /> },
     {
       key: 'link',
       label: 'Shareable Link',
+      sortParam: 'link',
       hideBelow: 'lg',
       render: f => (
         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -161,6 +163,7 @@ export default function ReviewFormsTable({
     {
       key: 'coupon',
       label: 'Coupon',
+      sortParam: 'coupon',
       render: f =>
         f.coupon_code ? (
           <span className="font-mono text-xs text-foreground-secondary">{f.coupon_code}</span>
@@ -171,6 +174,8 @@ export default function ReviewFormsTable({
     {
       key: 'subs',
       label: 'Submissions',
+      sortParam: 'subs',
+      sortType: 'number',
       render: f => (
         <Link
           href={ap(`/admin/review-forms/${f.id}/submissions`)}
@@ -181,7 +186,7 @@ export default function ReviewFormsTable({
         </Link>
       ),
     },
-    { key: 'status', label: 'Status', render: f => <StatusBadge status={String(f.is_active)} map={ACTIVE_STATUS} /> },
+    { key: 'status', label: 'Status', sortParam: 'status', render: f => <StatusBadge status={String(f.is_active)} map={ACTIVE_STATUS} /> },
   ]
 
   return (

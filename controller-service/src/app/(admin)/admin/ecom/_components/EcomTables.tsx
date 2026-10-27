@@ -25,10 +25,11 @@ export function EcomCustomersTable({ tenants }: { tenants: TenantRow[] }) {
   const router = useRouter()
   const view = (t: TenantRow) => `/admin/ecom/customers/${t.id}/view?tab=overview`
   const cols: DataCol<TenantRow>[] = [
-    { key: 'name', label: 'Customer', render: t => nameLink(view(t), t.display_name) },
+    { key: 'name', label: 'Customer', sort: t => t.display_name.toLowerCase(), render: t => nameLink(view(t), t.display_name) },
     {
       key: 'subdomain',
       label: 'Subdomain',
+      sort: t => (isStore(t) ? t.slug : '~'),
       render: t =>
         isStore(t) ? (
           <span className="text-foreground-secondary">{t.slug}.jeffistores.in</span>
@@ -46,10 +47,12 @@ export function EcomCustomersTable({ tenants }: { tenants: TenantRow[] }) {
           </span>
         ),
     },
-    { key: 'plan', label: 'Plan', render: t => (isStore(t) ? <span className="capitalize text-foreground-secondary">{t.plan || '-'}</span> : null) },
+    { key: 'plan', label: 'Plan', sort: t => (isStore(t) ? t.plan || '' : ''), render: t => (isStore(t) ? <span className="capitalize text-foreground-secondary">{t.plan || '-'}</span> : null) },
     {
       key: 'price',
       label: 'Price',
+      sortType: 'number',
+      sort: t => (isStore(t) ? Number(t.monthly_price_inr) || 0 : 0),
       render: t =>
         isStore(t) ? (
           <span className="text-foreground-secondary">
@@ -58,8 +61,8 @@ export function EcomCustomersTable({ tenants }: { tenants: TenantRow[] }) {
           </span>
         ) : null,
     },
-    { key: 'status', label: 'Status', render: t => <StatusPill status={t.status} /> },
-    { key: 'created', label: 'Created', render: t => <span className="text-foreground-muted">{new Date(t.created_at).toLocaleDateString('en-IN')}</span> },
+    { key: 'status', label: 'Status', sort: t => t.status, render: t => <StatusPill status={t.status} /> },
+    { key: 'created', label: 'Created', sortParam: 'created_at', sortType: 'date', sort: t => new Date(t.created_at).getTime(), render: t => <span className="text-foreground-muted">{new Date(t.created_at).toLocaleDateString('en-IN')}</span> },
     {
       key: 'actions',
       label: <span className="sr-only">Actions</span>,
@@ -79,7 +82,7 @@ export function EcomCustomersTable({ tenants }: { tenants: TenantRow[] }) {
       rowKey={t => t.id}
       empty="No tenants match."
       onRowClick={t => router.push(view(t))}
-      mobile={<EcomCustomersMobileList tenants={tenants} />}
+      mobile={rows => <EcomCustomersMobileList tenants={rows} />}
     />
   )
 }
@@ -88,11 +91,11 @@ export function EcomBillingTable({ tenants }: { tenants: TenantRow[] }) {
   const router = useRouter()
   const view = (t: TenantRow) => `/admin/ecom/billing/${t.id}/view`
   const cols: DataCol<TenantRow>[] = [
-    { key: 'name', label: 'Store', render: t => nameLink(view(t), t.display_name) },
-    { key: 'plan', label: 'Plan', render: t => <span className="capitalize text-foreground-secondary">{t.plan || '-'}</span> },
-    { key: 'monthly', label: 'Monthly', render: t => <span className="text-foreground-secondary">{inr(t.monthly_price_inr)}</span> },
-    { key: 'payout', label: 'Payout', render: t => <span className="text-foreground-secondary">{t.daily_payout ? 'Daily (+5%)' : 'Weekly'}</span> },
-    { key: 'status', label: 'Status', render: t => <StatusPill status={t.status} /> },
+    { key: 'name', label: 'Store', sort: t => t.display_name.toLowerCase(), render: t => nameLink(view(t), t.display_name) },
+    { key: 'plan', label: 'Plan', sort: t => t.plan || '', render: t => <span className="capitalize text-foreground-secondary">{t.plan || '-'}</span> },
+    { key: 'monthly', label: 'Monthly', sortType: 'number', sort: t => Number(t.monthly_price_inr) || 0, render: t => <span className="text-foreground-secondary">{inr(t.monthly_price_inr)}</span> },
+    { key: 'payout', label: 'Payout', sort: t => (t.daily_payout ? 0 : 1), render: t => <span className="text-foreground-secondary">{t.daily_payout ? 'Daily (+5%)' : 'Weekly'}</span> },
+    { key: 'status', label: 'Status', sort: t => t.status, render: t => <StatusPill status={t.status} /> },
   ]
   return (
     <DataTable
@@ -101,7 +104,7 @@ export function EcomBillingTable({ tenants }: { tenants: TenantRow[] }) {
       rowKey={t => t.id}
       empty="No tenants match."
       onRowClick={t => router.push(view(t))}
-      mobile={<EcomBillingMobileList tenants={tenants} />}
+      mobile={rows => <EcomBillingMobileList tenants={rows} />}
     />
   )
 }
@@ -110,15 +113,16 @@ export function EcomInstancesTable({ tenants }: { tenants: TenantRow[] }) {
   const router = useRouter()
   const view = (t: TenantRow) => `/admin/ecom/instances/${t.id}/view`
   const cols: DataCol<TenantRow>[] = [
-    { key: 'name', label: 'Store', render: t => nameLink(view(t), t.display_name) },
+    { key: 'name', label: 'Store', sort: t => t.display_name.toLowerCase(), render: t => nameLink(view(t), t.display_name) },
     {
       key: 'rds',
       label: 'RDS endpoint',
+      sort: t => t.rds_endpoint || '',
       render: t => <span className="font-mono text-xs text-foreground-secondary">{t.rds_endpoint || <span className="text-amber-500">not provisioned</span>}</span>,
     },
-    { key: 'ec2', label: 'EC2 target', render: t => <span className="text-foreground-secondary">{t.ec2_target || 'pool'}</span> },
-    { key: 's3', label: 'S3 bucket', render: t => <span className="font-mono text-xs text-foreground-secondary">{t.s3_bucket || '-'}</span> },
-    { key: 'region', label: 'Region', render: t => <span className="text-foreground-secondary">{t.region || '-'}</span> },
+    { key: 'ec2', label: 'EC2 target', sort: t => t.ec2_target || 'pool', render: t => <span className="text-foreground-secondary">{t.ec2_target || 'pool'}</span> },
+    { key: 's3', label: 'S3 bucket', sort: t => t.s3_bucket || '', render: t => <span className="font-mono text-xs text-foreground-secondary">{t.s3_bucket || '-'}</span> },
+    { key: 'region', label: 'Region', sort: t => t.region || '', render: t => <span className="text-foreground-secondary">{t.region || '-'}</span> },
   ]
   return (
     <DataTable
@@ -127,7 +131,7 @@ export function EcomInstancesTable({ tenants }: { tenants: TenantRow[] }) {
       rowKey={t => t.id}
       empty="No tenants match."
       onRowClick={t => router.push(view(t))}
-      mobile={<EcomInstancesMobileList tenants={tenants} />}
+      mobile={rows => <EcomInstancesMobileList tenants={rows} />}
     />
   )
 }

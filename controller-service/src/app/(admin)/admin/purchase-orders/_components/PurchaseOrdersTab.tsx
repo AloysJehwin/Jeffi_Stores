@@ -5,7 +5,7 @@ import { productLabel as grainLabel } from '@/lib/catalog/product-label'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { PO_ALIASES, PO_FIELDS, PO_SEARCH } from '@jeffi/list-filters/fields'
-import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
+import { SortTh, useListSort, type SortCol } from '@/components/admin/kit/list-sort'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
@@ -43,6 +43,18 @@ const PO_STATUS: StatusMap = {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const SORT_TH = 'px-6 py-3 text-xs font-medium text-foreground-muted uppercase tracking-wider'
+
+const PO_SORT_COLS: SortCol[] = [
+  { key: 'po_number', label: 'PO #' },
+  { key: 'supplier', label: 'Supplier' },
+  { key: 'date', label: 'Date', type: 'date' },
+  { key: 'expected', label: 'Expected', type: 'date' },
+  { key: 'items', label: 'Items', type: 'number' },
+  { key: 'total', label: 'Total', type: 'number' },
+  { key: 'status', label: 'Status' },
+]
 
 type PO = {
   id: string
@@ -191,8 +203,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   const [receiveWarehouseId, setReceiveWarehouseId] = useState('')
   const [editWarehouses, setEditWarehouses] = useState<{ id: string; name: string; code: string }[]>([])
   const [shelfLocations, setShelfLocations] = useState<{ id: string; display_code: string }[]>([])
-  const [poSortCol, setPoSortCol] = useState<string | undefined>(undefined)
-  const [poSortDir, setPoSortDir] = useState<SortDir | undefined>(undefined)
+  const { sort, dir } = useListSort()
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const [scanSerials, setScanSerials] = useState(true)
   const [draftRestored, setDraftRestored] = useState(false)
@@ -357,24 +368,19 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     }
   }
 
-  const PO_SORT_KEYS: Record<string, keyof PO> = {
-    po_number: 'po_number',
-    supplier: 'supplier_name',
-    date: 'order_date',
-    expected: 'expected_date',
-    items: 'item_count',
-    total: 'total_amount',
-    status: 'status',
-  }
-
+  // Ordered server-side across all POs via ?sort&dir.
   const list = useInfiniteList<PO>({
-    key: filters,
+    key: `${filters}|${sort}|${dir}`,
     pageSize: PAGE_SIZE,
     getKey: p => p.id,
     fetchPage: async (pg, signal) => {
       const params = new URLSearchParams(filters)
       params.set('page', String(pg))
       params.set('limit', String(PAGE_SIZE))
+      if (sort) {
+        params.set('sort', sort)
+        params.set('dir', dir)
+      }
       const json = await fetchJson(`/api/admin/inventory/po?${params}`, signal)
       if (pg === 1) setSummary(json?.summary ?? null)
       return { rows: json?.purchase_orders || [], total: json?.total || 0 }
@@ -384,19 +390,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   const loading = list.loading
   const load = list.reload
 
-  const sortedPOs =
-    poSortCol && PO_SORT_KEYS[poSortCol]
-      ? [...pos].sort((a, b) => {
-          const k = PO_SORT_KEYS[poSortCol]
-          const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
-          return poSortDir === 'asc' ? cmp : -cmp
-        })
-      : pos
-
-  function handlePoSort(col: string, dir: SortDir) {
-    setPoSortCol(col)
-    setPoSortDir(dir)
-  }
 
   // ?po= takes a PO id or a PO number (number links predate the id ones).
   const deepLinked = React.useRef(false)
@@ -1480,7 +1473,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
               </p>
             ) : (
               <PurchaseOrdersMobileList
-                pos={sortedPOs}
+                pos={pos}
                 statusBadge={STATUS_BADGE}
                 sendingEmailId={sendingEmailId}
                 onView={openPO}
@@ -1495,67 +1488,13 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
                 <tr>
-                  <SortableHeader
-                    label="PO #"
-                    column="po_number"
-                    options={sortOptions('text')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                  />
-                  <SortableHeader
-                    label="Supplier"
-                    column="supplier"
-                    options={sortOptions('text')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                  />
-                  <SortableHeader
-                    label="Date"
-                    column="date"
-                    options={sortOptions('date')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                    className="hidden sm:table-cell"
-                  />
-                  <SortableHeader
-                    label="Expected"
-                    column="expected"
-                    options={sortOptions('date')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                    className="hidden md:table-cell"
-                  />
-                  <SortableHeader
-                    label="Items"
-                    column="items"
-                    options={sortOptions('number')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                    className="hidden lg:table-cell"
-                    align="right"
-                  />
-                  <SortableHeader
-                    label="Total"
-                    column="total"
-                    options={sortOptions('number')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                    align="right"
-                  />
-                  <SortableHeader
-                    label="Status"
-                    column="status"
-                    options={sortOptions('text')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                  />
+                  <SortTh col={PO_SORT_COLS[0]} className={SORT_TH} />
+                  <SortTh col={PO_SORT_COLS[1]} className={SORT_TH} />
+                  <SortTh col={PO_SORT_COLS[2]} className={`${SORT_TH} hidden sm:table-cell`} />
+                  <SortTh col={PO_SORT_COLS[3]} className={`${SORT_TH} hidden md:table-cell`} />
+                  <SortTh col={PO_SORT_COLS[4]} align="right" className={`${SORT_TH} hidden lg:table-cell`} />
+                  <SortTh col={PO_SORT_COLS[5]} align="right" className={SORT_TH} />
+                  <SortTh col={PO_SORT_COLS[6]} className={SORT_TH} />
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
                     Actions
                   </th>
@@ -1569,7 +1508,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                     </td>
                   </tr>
                 )}
-                {sortedPOs.map(po => (
+                {pos.map(po => (
                   <tr key={po.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs font-medium">
                       <button

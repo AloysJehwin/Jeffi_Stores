@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne, query } from '@/lib/shared/db'
-import { buildWhere, normalizeQuery } from '@jeffi/list-filters'
-import { SUPPLIERS_ENTITY } from '@/lib/filters/entities/suppliers'
+import { buildWhere, normalizeQuery, sortClause } from '@jeffi/list-filters'
+import { SUPPLIERS_ENTITY, SUPPLIER_SORTS } from '@/lib/filters/entities/suppliers'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 import { draftLockChips } from '@/lib/admin/draft-locks'
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '20') || 20), 1000)
     const offset = (page - 1) * limit
 
     // The list's filters; without ?all=true or a Status choice only active suppliers (PO pickers).
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       `SELECT s.*, (SELECT COUNT(*)::int FROM purchase_orders po WHERE po.supplier_id = s.id) AS po_count
        FROM suppliers s
        ${w.where}
-       ORDER BY s.name
+       ${sortClause(searchParams, { sorts: SUPPLIER_SORTS, defaultSql: 's.name', tiebreak: 's.id' })}
        LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
       [...w.params, limit, offset]
     )

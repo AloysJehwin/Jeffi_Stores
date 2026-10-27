@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Check, Plus } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import { QUOTATION_ALIASES, QUOTATION_FIELDS, QUOTATION_SEARCH } from '@jeffi/list-filters/fields'
-import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, LockedFieldset, TableSkeleton, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, ListFilters, fetchJson, useFilterQuery, useInfiniteList } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, LockedFieldset, TableSkeleton, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, ListFilters, SortTh, fetchJson, useFilterQuery, useInfiniteList, useListSort, type SortCol } from '@/components/admin/kit'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders } from '@/lib/client/draft-lock-client'
 import { useToast } from '@/contexts/ToastContext'
@@ -32,13 +32,20 @@ import SerialEntryModal, {
   type SerialAssignment,
   SerialPicker,
 } from '@/components/admin/SerialEntryModal'
-import { type SortDir } from '@/components/admin/sortOptions'
 import DatePicker from '@/components/ui/DatePicker'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
 import { lineItemExGst } from '@/lib/catalog/pricing'
 import QuotationsMobileList from './_components/QuotationsMobileList'
 import { round2 } from '@/lib/catalog/gst'
+
+const QUOTE_SORT_COLS: SortCol[] = [
+  { key: 'quote_number', label: 'Quote #' },
+  { key: 'quote_date', label: 'Date', type: 'date' },
+  { key: 'consignee_name', label: 'Consignee' },
+  { key: 'total_amount', label: 'Total', type: 'number' },
+  { key: 'status', label: 'Status' },
+]
 
 export interface Quotation {
   id: string
@@ -138,16 +145,9 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   }
   // Filters live in the URL (from / to is the quote date, shared with the Overview period).
   const filters = useFilterQuery(QUOTATION_FIELDS, { aliases: QUOTATION_ALIASES })
-  const [sortCol, setSortCol] = useState<string | undefined>(undefined)
-  const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
+  const { sort, dir } = useListSort()
 
   const PAGE_SIZE = 25
-
-  function handleSort(col: string, dir: SortDir) {
-    setSortCol(col || undefined)
-    setSortDir(col ? dir : undefined)
-    // Server-side sort — a useEffect keyed on sortCol/sortDir refetches page 1.
-  }
 
   const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -243,25 +243,16 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
 
   const isEditorMounted = useRef(false)
 
-  const QUOTE_SORT_KEYS: Record<string, keyof Quotation> = {
-    quote_number: 'quote_number',
-    date: 'quote_date',
-    consignee: 'consignee_name',
-    total: 'total_amount',
-    status: 'status',
-  }
-
-
-  // Ordered server-side across all quotations via sort/dir params.
+  // Ordered server-side across all quotations via ?sort&dir.
   const list = useInfiniteList<Quotation>({
-    key: view === 'list' ? `${filters}|${sortCol}|${sortDir}` : null,
+    key: view === 'list' ? `${filters}|${sort}|${dir}` : null,
     pageSize: PAGE_SIZE,
     getKey: q => q.id,
     fetchPage: async (p, signal) => {
       const params = new URLSearchParams(filters)
-      if (sortCol && QUOTE_SORT_KEYS[sortCol]) {
-        params.set('sort', QUOTE_SORT_KEYS[sortCol])
-        params.set('dir', sortDir || 'desc')
+      if (sort) {
+        params.set('sort', sort)
+        params.set('dir', dir)
       }
       params.set('page', String(p))
       params.set('pageSize', String(PAGE_SIZE))
@@ -857,11 +848,9 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
-                      <SortTh label="Quote #" col="quote_number" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh label="Date" col="date" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh label="Consignee" col="consignee" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh label="Total" col="total" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} num />
-                      <SortTh label="Status" col="status" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                      {QUOTE_SORT_COLS.map(c => (
+                        <SortTh key={c.key} col={c} align={c.type === 'number' ? 'right' : 'left'} className="px-3 py-2.5 font-medium" />
+                      ))}
                       <th className="px-3 py-2.5 text-right font-medium">
                         <span className="sr-only">Actions</span>
                       </th>
@@ -2542,22 +2531,5 @@ function QuotationDetailModal({ q: maybe, onClose }: { q: Quotation | null; onCl
           </div>
         </div>
     </Dialog>
-  )
-}
-
-/** Header cell that toggles the server sort for one column (desc first, then asc). */
-function SortTh({ label, col, sortCol, sortDir, onSort, num }: { label: string; col: string; sortCol?: string; sortDir?: SortDir; onSort: (c: string, d: SortDir) => void; num?: boolean }) {
-  const on = sortCol === col
-  return (
-    <th
-      aria-sort={on ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
-      onClick={() => onSort(col, on && sortDir !== 'asc' ? 'asc' : 'desc')}
-      className={`cursor-pointer select-none whitespace-nowrap px-3 py-2.5 font-medium hover:text-foreground ${num ? 'text-right' : 'text-left'}`}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {on && (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-      </span>
-    </th>
   )
 }

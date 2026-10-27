@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { groupSyncErrors, countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
-import { DataTable, fetchJson, useInfiniteList, Kpi, StatusBadge, btnGhost, btnPrimary, count, fieldInputCls, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { DataTable, fetchJson, useInfiniteList, useListSort, Kpi, StatusBadge, btnGhost, btnPrimary, count, fieldInputCls, type DataCol, type StatusMap } from '@/components/admin/kit'
 
 interface Summary {
   last_refreshed_at: string | null
@@ -65,12 +65,13 @@ const ITEM_STATUS: StatusMap = {
 }
 
 const ITEM_COLS: DataCol<Row>[] = [
-  { key: 'offer', label: 'Offer ID', render: r => <span className="font-mono text-xs">{r.offer_id}</span> },
-  { key: 'title', label: 'Title', render: r => <span className="block max-w-md truncate">{r.title || '-'}</span> },
-  { key: 'status', label: 'Status', render: r => <StatusBadge status={(r.status || 'unknown').toLowerCase()} map={ITEM_STATUS} /> },
+  { key: 'offer', label: 'Offer ID', sortParam: 'offer', render: r => <span className="font-mono text-xs">{r.offer_id}</span> },
+  { key: 'title', label: 'Title', sortParam: 'title', render: r => <span className="block max-w-md truncate">{r.title || '-'}</span> },
+  { key: 'status', label: 'Status', sortParam: 'status', render: r => <StatusBadge status={(r.status || 'unknown').toLowerCase()} map={ITEM_STATUS} /> },
   {
     key: 'issue',
     label: 'Top issue',
+    sortParam: 'issue',
     render: r => <span className="block max-w-xs truncate text-xs text-foreground-secondary">{r.item_issues?.[0]?.description || (r.status === 'approved' ? '-' : '')}</span>,
   },
 ]
@@ -86,14 +87,19 @@ export default function GoogleMerchantPanel() {
   const [syncRunning, setSyncRunning] = useState(false)
   const { showToast } = useToast()
 
+  const { sort, dir } = useListSort()
   const list = useInfiniteList<Row>({
-    key: `${applied}|${statusFilter}`,
+    key: `${applied}|${statusFilter}|${sort ?? ''}|${dir}`,
     pageSize: PAGE_SIZE,
     getKey: r => r.offer_id,
     fetchPage: async (p, signal) => {
       const params = new URLSearchParams({ page: String(p), pageSize: String(PAGE_SIZE) })
       if (applied) params.set('search', applied)
       if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
+      if (sort) {
+        params.set('sort', sort)
+        params.set('dir', dir)
+      }
       const data = await fetchJson(`/api/admin/merchant/gmc-status?${params.toString()}`, signal)
       if (p === 1) setSummary(data.summary)
       return { rows: data.rows, total: data.total }

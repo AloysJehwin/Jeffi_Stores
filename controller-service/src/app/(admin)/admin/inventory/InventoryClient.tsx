@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import HoverCard from '@/components/ui/HoverCard'
-import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
+import { SortTh, useListSort, type SortCol } from '@/components/admin/kit/list-sort'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
@@ -55,6 +55,30 @@ type StockTransaction = {
 }
 
 type StockView = 'ledger' | 'valuation'
+
+const LEDGER_SORT_COLS: SortCol[] = [
+  { key: 'date', label: 'Date', type: 'date' },
+  { key: 'product', label: 'Product' },
+  { key: 'type', label: 'Type' },
+  { key: 'change', label: 'Change', type: 'number' },
+  { key: 'balance', label: 'Balance', type: 'number' },
+  { key: 'reference', label: 'Reference' },
+  { key: 'batch', label: 'Batch' },
+]
+
+const SORT_TH = 'px-6 py-3 text-xs font-medium text-foreground-muted uppercase tracking-wider'
+
+const VAL_SORT_COLS: SortCol[] = [
+  { key: 'product', label: 'Product' },
+  { key: 'variant', label: 'Variant' },
+  { key: 'sku', label: 'SKU' },
+  { key: 'stock', label: 'Stock', type: 'number' },
+  { key: 'unit', label: 'Sell Unit' },
+  { key: 'price', label: 'Price ex-GST', type: 'number' },
+  { key: 'gst', label: 'GST %', type: 'number' },
+  { key: 'value', label: 'Stock Value (ex-GST)', type: 'number' },
+  { key: 'value_incl', label: 'Stock Value (incl. GST)', type: 'number' },
+]
 
 function StockTab({ view }: { view: StockView }) {
   const canFinancial = useHasScope('financial:read')
@@ -150,23 +174,18 @@ function StockTab({ view }: { view: StockView }) {
     setLoadingBatchRow(null)
   }
 
-  const [ledgerSortCol, setLedgerSortCol] = useState<string | undefined>(undefined)
-  const [ledgerSortDir, setLedgerSortDir] = useState<SortDir | undefined>(undefined)
-  const [valSortCol, setValSortCol] = useState<string | undefined>(undefined)
-  const [valSortDir, setValSortDir] = useState<SortDir | undefined>(undefined)
-
-  const LEDGER_SORT_KEYS: Record<string, keyof StockTransaction> = {
-    date: 'created_at',
-    product: 'product_name',
-    type: 'transaction_type',
-    change: 'quantity_change',
-    balance: 'quantity_after',
-    reference: 'reference_type',
+  // Both tabs sort server-side via ?sort&dir (each API ignores keys it doesn't know).
+  const { sort, dir } = useListSort()
+  const sortParams = (p: URLSearchParams) => {
+    if (sort) {
+      p.set('sort', sort)
+      p.set('dir', dir)
+    }
   }
 
   // Ledger groups are rebuilt from every loaded row, so a group split across pages merges.
   const txList = useInfiniteList<StockTransaction>({
-    key: view === 'ledger' ? ledgerFilters : null,
+    key: view === 'ledger' ? `${ledgerFilters}|${sort}|${dir}` : null,
     pageSize: STOCK_PAGE_SIZE,
     getKey: t => t.id,
     fetchPage: async (pg, signal) => {
@@ -174,6 +193,7 @@ function StockTab({ view }: { view: StockView }) {
       params.set('view', 'ledger')
       params.set('page', String(pg))
       params.set('limit', String(STOCK_PAGE_SIZE))
+      sortParams(params)
       const json = await fetchJson(`/api/admin/inventory/stock?${params}`, signal)
       if (pg === 1) setLedgerMeta({ window: json?.window ?? null, capped: !!json?.capped })
       return { rows: json?.transactions || [], total: json?.total || 0 }
@@ -183,32 +203,20 @@ function StockTab({ view }: { view: StockView }) {
 
   // Totals and filter options come with page 1; later pages only add rows.
   const valList = useInfiniteList<any>({
-    key: view === 'valuation' ? `${valFilters}|${valSortCol}|${valSortDir}` : null,
+    key: view === 'valuation' ? `${valFilters}|${sort}|${dir}` : null,
     pageSize: VALUATION_PAGE_SIZE,
     fetchPage: async (pg, signal) => {
       const params = new URLSearchParams(valFilters)
       params.set('view', 'valuation')
       params.set('page', String(pg))
       params.set('limit', String(VALUATION_PAGE_SIZE))
-      if (valSortCol) {
-        params.set('sort', valSortCol)
-        params.set('dir', valSortDir || 'desc')
-      }
+      sortParams(params)
       const json = await fetchJson(`/api/admin/inventory/stock?${params}`, signal)
       if (pg === 1) setValuation(json)
       return { rows: json?.products || [], total: json?.total || 0 }
     },
   })
   const loading = view === 'ledger' ? txList.loading : valList.loading
-
-  const sortedTransactions =
-    ledgerSortCol && LEDGER_SORT_KEYS[ledgerSortCol]
-      ? [...transactions].sort((a, b) => {
-          const k = LEDGER_SORT_KEYS[ledgerSortCol]
-          const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
-          return ledgerSortDir === 'asc' ? cmp : -cmp
-        })
-      : transactions
 
   // Group by reference_id, preserving order of first appearance
   // refId is a COMPOSITE grouping key (reference_id + type [+ timestamp]); it is
@@ -221,7 +229,7 @@ function StockTab({ view }: { view: StockView }) {
     date: string
     txs: StockTransaction[]
   }[] = []
-  for (const tx of sortedTransactions) {
+  for (const tx of transactions) {
     // Group by reference_id + transaction_type so sale and return events for the
     // same order appear as separate groups instead of netting to 0.
     // Manual adjustments carry the PRODUCT id as reference_id, so every adjustment
@@ -252,22 +260,13 @@ function StockTab({ view }: { view: StockView }) {
 
   // The server orders rows by ITS group key, which lumps every manual adjustment for
   // a product into one block. Splitting those by timestamp above creates groups the
-  // server never ordered, so re-sort by each group's own newest event.
-  if (!ledgerSortCol) ledgerGroups.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-
-  function handleLedgerSort(col: string, dir: SortDir) {
-    setLedgerSortCol(col)
-    setLedgerSortDir(dir)
-  }
-  function handleValSort(col: string, dir: SortDir) {
-    setValSortCol(col || undefined)
-    setValSortDir(col ? dir : undefined)
-  }
+  // server never ordered, so re-sort by each group's own newest event (unless a sort was picked).
+  if (!LEDGER_SORT_COLS.some(c => c.key === sort)) ledgerGroups.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 
   const allValRows = valList.rows
   const valTotal = valuation?.total || 0
 
-  // Rows are sorted server-side (across all SKUs) via the sort/dir params, so render as-is.
+  // Rows are sorted server-side (across all SKUs) via ?sort&dir, so render as-is.
   const sortedValRows = allValRows
 
   const valTree = useMemo(() => {
@@ -854,60 +853,13 @@ function StockTab({ view }: { view: StockView }) {
                 <table className="w-full text-sm">
                   <thead className="bg-surface-secondary border-b border-border-default">
                     <tr>
-                      <SortableHeader
-                        label="Date"
-                        column="date"
-                        options={sortOptions('date')}
-                        currentSort={ledgerSortCol}
-                        currentDir={ledgerSortDir}
-                        onSort={handleLedgerSort}
-                      />
-                      <SortableHeader
-                        label="Product"
-                        column="product"
-                        options={sortOptions('text')}
-                        currentSort={ledgerSortCol}
-                        currentDir={ledgerSortDir}
-                        onSort={handleLedgerSort}
-                      />
-                      <SortableHeader
-                        label="Type"
-                        column="type"
-                        options={sortOptions('text')}
-                        currentSort={ledgerSortCol}
-                        currentDir={ledgerSortDir}
-                        onSort={handleLedgerSort}
-                      />
-                      <SortableHeader
-                        label="Change"
-                        column="change"
-                        options={sortOptions('number')}
-                        currentSort={ledgerSortCol}
-                        currentDir={ledgerSortDir}
-                        onSort={handleLedgerSort}
-                        align="right"
-                      />
-                      <SortableHeader
-                        label="Balance"
-                        column="balance"
-                        options={sortOptions('number')}
-                        currentSort={ledgerSortCol}
-                        currentDir={ledgerSortDir}
-                        onSort={handleLedgerSort}
-                        align="right"
-                      />
-                      <SortableHeader
-                        label="Reference"
-                        column="reference"
-                        options={sortOptions('text')}
-                        currentSort={ledgerSortCol}
-                        currentDir={ledgerSortDir}
-                        onSort={handleLedgerSort}
-                        className="hidden md:table-cell"
-                      />
-                      <th className="px-4 py-3 text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden md:table-cell">
-                        Batch
-                      </th>
+                      <SortTh col={LEDGER_SORT_COLS[0]} className={SORT_TH} />
+                      <SortTh col={LEDGER_SORT_COLS[1]} className={SORT_TH} />
+                      <SortTh col={LEDGER_SORT_COLS[2]} className={SORT_TH} />
+                      <SortTh col={LEDGER_SORT_COLS[3]} align="right" className={SORT_TH} />
+                      <SortTh col={LEDGER_SORT_COLS[4]} align="right" className={SORT_TH} />
+                      <SortTh col={LEDGER_SORT_COLS[5]} className={`${SORT_TH} hidden md:table-cell`} />
+                      <SortTh col={LEDGER_SORT_COLS[6]} className={`${SORT_TH} hidden md:table-cell`} />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default">
@@ -1490,69 +1442,15 @@ function StockTab({ view }: { view: StockView }) {
                   <table className="w-full text-sm max-md:[&>*>tr>:nth-child(6)]:hidden max-md:[&>*>tr>:nth-child(7)]:hidden max-md:[&>*>tr>:nth-child(9)]:hidden">
                     <thead className="bg-surface-secondary border-b border-border-default">
                       <tr>
-                        <SortableHeader
-                          label="Product"
-                          column="product"
-                          options={sortOptions('text')}
-                          currentSort={valSortCol}
-                          currentDir={valSortDir}
-                          onSort={handleValSort}
-                        />
-                        <SortableHeader
-                          label="Variant"
-                          column="variant"
-                          options={sortOptions('text')}
-                          currentSort={valSortCol}
-                          currentDir={valSortDir}
-                          onSort={handleValSort}
-                          className="hidden sm:table-cell"
-                        />
-                        <SortableHeader
-                          label="SKU"
-                          column="sku"
-                          options={sortOptions('text')}
-                          currentSort={valSortCol}
-                          currentDir={valSortDir}
-                          onSort={handleValSort}
-                          className="hidden md:table-cell"
-                        />
-                        <SortableHeader
-                          label="Stock"
-                          column="stock"
-                          options={sortOptions('number')}
-                          currentSort={valSortCol}
-                          currentDir={valSortDir}
-                          onSort={handleValSort}
-                          align="right"
-                          className="w-[110px]"
-                        />
-                        <th className="px-4 py-3 text-center text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">
-                          Sell Unit
-                        </th>
-                        <SortableHeader
-                          label="Price ex-GST"
-                          column="price"
-                          options={sortOptions('number')}
-                          currentSort={valSortCol}
-                          currentDir={valSortDir}
-                          onSort={handleValSort}
-                          align="right"
-                        />
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-                          GST %
-                        </th>
-                        <SortableHeader
-                          label="Stock Value (ex-GST)"
-                          column="value"
-                          options={sortOptions('number')}
-                          currentSort={valSortCol}
-                          currentDir={valSortDir}
-                          onSort={handleValSort}
-                          align="right"
-                        />
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-                          Stock Value (incl. GST)
-                        </th>
+                        <SortTh col={VAL_SORT_COLS[0]} className={SORT_TH} />
+                        <SortTh col={VAL_SORT_COLS[1]} className={`${SORT_TH} hidden sm:table-cell`} />
+                        <SortTh col={VAL_SORT_COLS[2]} className={`${SORT_TH} hidden md:table-cell`} />
+                        <SortTh col={VAL_SORT_COLS[3]} align="right" className={`${SORT_TH} w-[110px]`} />
+                        <SortTh col={VAL_SORT_COLS[4]} align="center" className={`${SORT_TH} hidden sm:table-cell`} />
+                        <SortTh col={VAL_SORT_COLS[5]} align="right" className={SORT_TH} />
+                        <SortTh col={VAL_SORT_COLS[6]} align="right" className={SORT_TH} />
+                        <SortTh col={VAL_SORT_COLS[7]} align="right" className={SORT_TH} />
+                        <SortTh col={VAL_SORT_COLS[8]} align="right" className={SORT_TH} />
                         <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide w-[130px]">
                           Actions
                         </th>

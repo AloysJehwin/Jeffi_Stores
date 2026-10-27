@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { topupAmounts } from '@/lib/billing/topup-amounts'
 import { aiFeatureLabel, aiLedgerNote } from '@/lib/ai/feature-labels'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { Banner, Card, DataTable, FormButton, FormField, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, badgeCls, fetchJson, fieldInputCls, useActionToast, useFilterQuery, useInfiniteList, type DataCol } from '@/components/admin/kit'
+import { Banner, Card, DataTable, FormButton, FormField, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, badgeCls, fetchJson, fieldInputCls, useActionToast, useFilterQuery, useInfiniteList, useListSort, type DataCol } from '@/components/admin/kit'
 import { WALLET_FIELDS, WALLET_SEARCH } from '@/lib/filters/fields/wallet'
 
 type LedgerEntry = {
@@ -75,13 +75,18 @@ export default function WalletClient({
   // credit / debit cards total every matching entry.
   const filters = useFilterQuery(WALLET_FIELDS)
   const [totals, setTotals] = useState({ credit: 0, debit: 0 })
+  const ledgerSort = useListSort('ledger')
   const list = useInfiniteList<LedgerEntry>({
-    key: filters,
+    key: `${filters}|${ledgerSort.sort ?? ''}|${ledgerSort.dir}`,
     pageSize: PAGE_SIZE,
     getKey: e => e.id,
     fetchPage: async (p, signal) => {
       const params = new URLSearchParams(filters)
       params.set('page', String(p))
+      if (ledgerSort.sort) {
+        params.set('sort', ledgerSort.sort)
+        params.set('dir', ledgerSort.dir)
+      }
       const data = await fetchJson(`/api/admin/financial/wallet/topup/ledger?${params}`, signal)
       if (p === 1) setTotals({ credit: Number(data.credit) || 0, debit: Number(data.debit) || 0 })
       return { rows: data.rows || [], total: data.total ?? 0 }
@@ -154,11 +159,12 @@ export default function WalletClient({
   const when = (iso: string) =>
     new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
   const cols: DataCol<LedgerEntry>[] = [
-    { key: 'date', label: 'Date', render: e => <span className="whitespace-nowrap text-foreground-secondary">{when(e.occurred_at)}</span> },
-    { key: 'cat', label: 'Category', render: e => <span className={badgeCls('muted')}>{catLabel(catOf(e))}</span> },
+    { key: 'date', label: 'Date', sortParam: 'date', sortType: 'date', render: e => <span className="whitespace-nowrap text-foreground-secondary">{when(e.occurred_at)}</span> },
+    { key: 'cat', label: 'Category', sortParam: 'cat', render: e => <span className={badgeCls('muted')}>{catLabel(catOf(e))}</span> },
     {
       key: 'ref',
       label: 'Reference',
+      sortParam: 'ref',
       render: e => (
         <span className="text-foreground-secondary">
           {e.order_ref && <span className="mr-2">{e.order_ref}</span>}
@@ -171,6 +177,7 @@ export default function WalletClient({
       key: 'amount',
       label: 'Amount',
       num: true,
+      sortParam: 'amount',
       render: e => {
         const amt = Number(e.amount)
         return (
@@ -224,7 +231,7 @@ export default function WalletClient({
         <div className="px-5 pb-4">
           <ListFilters entity="wallet" fields={WALLET_FIELDS} search={WALLET_SEARCH} noun="Entries" exportable />
         </div>
-        <DataTable<LedgerEntry> bare rows={list.rows} infinite={list} cols={cols} rowKey={e => e.id} empty="No matching entries." />
+        <DataTable<LedgerEntry> bare sortNs="ledger" rows={list.rows} infinite={list} cols={cols} rowKey={e => e.id} empty="No matching entries." />
       </Card>
     </PageBody>
   )
@@ -234,9 +241,9 @@ function AiSpendSection({ rows, days }: { rows: AiSpendRow[]; days: number }) {
   const total = rows.reduce((a, r) => a + r.spent, 0)
   const unpaid = rows.reduce((a, r) => a + r.unpaid, 0)
   const cols: DataCol<AiSpendRow>[] = [
-    { key: 'feature', label: 'Feature', render: r => <span className="text-foreground">{aiFeatureLabel(r.feature)}</span> },
-    { key: 'calls', label: 'Calls', num: true, render: r => <span className="text-foreground-secondary">{r.calls.toLocaleString('en-IN')}</span> },
-    { key: 'spent', label: 'Spent', num: true, render: r => <span className="font-semibold text-foreground">{inr(r.spent)}</span> },
+    { key: 'feature', label: 'Feature', sort: r => aiFeatureLabel(r.feature).toLowerCase(), render: r => <span className="text-foreground">{aiFeatureLabel(r.feature)}</span> },
+    { key: 'calls', label: 'Calls', num: true, sort: r => r.calls, render: r => <span className="text-foreground-secondary">{r.calls.toLocaleString('en-IN')}</span> },
+    { key: 'spent', label: 'Spent', num: true, sort: r => r.spent, render: r => <span className="font-semibold text-foreground">{inr(r.spent)}</span> },
   ]
   return (
     <Card
@@ -249,7 +256,7 @@ function AiSpendSection({ rows, days }: { rows: AiSpendRow[]; days: number }) {
         </p>
       }
     >
-      <DataTable<AiSpendRow> bare rows={rows} cols={cols} rowKey={r => r.feature} />
+      <DataTable<AiSpendRow> bare sortNs="ai" rows={rows} cols={cols} rowKey={r => r.feature} />
     </Card>
   )
 }

@@ -24,6 +24,7 @@ export default function BusinessCustomersTable({ customers, total, page, pageSiz
     {
       key: 'company',
       label: 'Company',
+      sortParam: 'company',
       render: c => (
         <Link href={c.href} className="font-medium text-foreground hover:text-accent-500 transition-colors">
           {c.company_name}
@@ -33,6 +34,7 @@ export default function BusinessCustomersTable({ customers, total, page, pageSiz
     {
       key: 'contact',
       label: 'Contact',
+      sortParam: 'contact',
       render: c => (
         <div className="min-w-0">
           <p className="text-foreground">
@@ -42,10 +44,10 @@ export default function BusinessCustomersTable({ customers, total, page, pageSiz
         </div>
       ),
     },
-    { key: 'gst', label: 'GST', hideBelow: 'lg', render: c => <span className="font-mono text-xs text-foreground-secondary">{c.gst_number}</span> },
-    { key: 'industry', label: 'Industry', hideBelow: 'lg', render: c => <span className="text-foreground-secondary">{c.industry}</span> },
-    { key: 'status', label: 'Status', render: c => <StatusBadge status={c.approval_status} map={APPROVAL_STATUS} /> },
-    { key: 'joined', label: 'Joined', render: c => <span className="text-xs text-foreground-secondary">{fmtDay(c.created_at)}</span> },
+    { key: 'gst', label: 'GST', sortParam: 'gst', hideBelow: 'lg', render: c => <span className="font-mono text-xs text-foreground-secondary">{c.gst_number}</span> },
+    { key: 'industry', label: 'Industry', sortParam: 'industry', hideBelow: 'lg', render: c => <span className="text-foreground-secondary">{c.industry}</span> },
+    { key: 'status', label: 'Status', sortParam: 'status', render: c => <StatusBadge status={c.approval_status} map={APPROVAL_STATUS} /> },
+    { key: 'joined', label: 'Joined', sortParam: 'created_at', sortType: 'date', render: c => <span className="text-xs text-foreground-secondary">{fmtDay(c.created_at)}</span> },
   ]
 
   return (

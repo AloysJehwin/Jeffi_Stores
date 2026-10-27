@@ -46,6 +46,7 @@ export default function SubscriptionsTable({
     {
       key: 'customer',
       label: 'Customer',
+      sortParam: 'customer',
       render: s => (
         <>
           <Link href={href(s)} className="font-medium text-accent-500 hover:underline">
@@ -58,6 +59,7 @@ export default function SubscriptionsTable({
     {
       key: 'product',
       label: 'Product',
+      sortParam: 'product',
       render: s => (
         <>
           {s.productName}
@@ -68,6 +70,7 @@ export default function SubscriptionsTable({
     {
       key: 'plan',
       label: 'Plan',
+      sortParam: 'plan',
       hideBelow: 'lg',
       render: s => (
         <>
@@ -76,10 +79,10 @@ export default function SubscriptionsTable({
         </>
       ),
     },
-    { key: 'amount', label: 'Per cycle', num: true, render: s => inr(s.amount) },
-    { key: 'cycle', label: 'Cycle', hideBelow: 'lg', render: s => `${s.currentCycle}${s.totalCycles ? ` of ${s.totalCycles}` : ''}` },
-    { key: 'next', label: 'Next charge', hideBelow: 'xl', render: s => (s.status === 'active' && !s.cancelAtCycleEnd ? fmtDate(s.currentEnd) : '—') },
-    { key: 'status', label: 'Status', render: s => <Status s={s} /> },
+    { key: 'amount', label: 'Per cycle', num: true, sortParam: 'amount', render: s => inr(s.amount) },
+    { key: 'cycle', label: 'Cycle', sortParam: 'cycle', sortType: 'number', hideBelow: 'lg', render: s => `${s.currentCycle}${s.totalCycles ? ` of ${s.totalCycles}` : ''}` },
+    { key: 'next', label: 'Next charge', sortParam: 'next', sortType: 'date', hideBelow: 'xl', render: s => (s.status === 'active' && !s.cancelAtCycleEnd ? fmtDate(s.currentEnd) : '—') },
+    { key: 'status', label: 'Status', sortParam: 'status', render: s => <Status s={s} /> },
   ]
 
   return (
