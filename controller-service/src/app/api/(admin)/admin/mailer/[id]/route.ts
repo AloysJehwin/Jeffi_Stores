@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, queryCount, query } from '@/lib/shared/db'
+import { actorOf, closeIfLocked, discardGuard, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -53,29 +54,44 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       ? null
       : undefined
 
-  await query(
-    `UPDATE email_campaigns SET
-      title = COALESCE($1, title),
-      template_key = COALESCE($2, template_key),
-      subject = COALESCE($3, subject),
-      template_data = COALESCE($4, template_data),
-      audience_type = COALESCE($5, audience_type),
-      audience_filter = COALESCE($6, audience_filter),
-      scheduled_at = $7,
-      channels = COALESCE($9, channels)
-     WHERE id = $8`,
-    [
-      title,
-      template_key,
-      subject,
-      template_data ? JSON.stringify(template_data) : null,
-      audience_type,
-      audience_filter ? JSON.stringify(audience_filter) : null,
-      scheduled_at || null,
+  // A draft is written only by its lock holder (423 otherwise); scheduled/failed ones are not drafts.
+  const actor = campaign.status === 'draft' ? actorOf(admin) : null
+  try {
+    await withDraftWrite(
+      actor,
+      'mailer',
       id,
-      channels ? JSON.stringify(channels) : null,
-    ]
-  )
+      db =>
+        db.query(
+          `UPDATE email_campaigns SET
+            title = COALESCE($1, title),
+            template_key = COALESCE($2, template_key),
+            subject = COALESCE($3, subject),
+            template_data = COALESCE($4, template_data),
+            audience_type = COALESCE($5, audience_type),
+            audience_filter = COALESCE($6, audience_filter),
+            scheduled_at = $7,
+            channels = COALESCE($9, channels)
+           WHERE id = $8`,
+          [
+            title,
+            template_key,
+            subject,
+            template_data ? JSON.stringify(template_data) : null,
+            audience_type,
+            audience_filter ? JSON.stringify(audience_filter) : null,
+            scheduled_at || null,
+            id,
+            channels ? JSON.stringify(channels) : null,
+          ]
+        ),
+      { epoch: epochFrom(request) }
+    )
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
 
   return NextResponse.json({ success: true })
 }
@@ -93,6 +109,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: 'Cannot delete a campaign while it is sending' }, { status: 400 })
   }
 
+  // Deleting a draft is a discard: its holder, or an owner role (audited).
+  const actor = campaign.status === 'draft' ? actorOf(admin) : null
+  const denied = await discardGuard(actor, 'mailer', id)
+  if (denied) return denied
   await query('DELETE FROM email_campaigns WHERE id = $1', [id])
+  if (actor) await closeIfLocked(actor, 'mailer', id, 'discarded')
   return NextResponse.json({ success: true })
 }

@@ -13,6 +13,8 @@ import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { listCampaigns } from '@/lib/admin/messaging'
 import { MESSAGING_ENTITY } from '@/lib/filters/entities/messaging'
 import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messaging'
+import { getDraftLockMap } from '@/lib/admin/draft-locks'
+import { getAdminSession } from '@/lib/auth/admin-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -92,6 +94,11 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
   } catch {
     migrationPending = true
   }
+  // Who is editing each draft (owner badge).
+  const [locks, session] = await Promise.all([
+    getDraftLockMap('mailer', campaigns.filter(c => c.status === 'draft').map(c => c.id)),
+    getAdminSession(),
+  ])
 
   // Back link from a message: this tab, these filters, this page.
   const currentListUrl = (() => {
@@ -126,6 +133,8 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
       currentListUrl={currentListUrl}
       templateLabels={TEMPLATE_LABELS}
       statusStyles={STATUS_STYLES}
+      locks={locks}
+      meId={session?.adminId ?? null}
     />
   )
 }

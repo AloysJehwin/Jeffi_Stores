@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { randomUUID } from 'crypto'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryCount, query } from '@/lib/shared/db'
+import { queryMany, queryCount } from '@/lib/shared/db'
+import { actorOf, withDraftCreate } from '@/lib/admin/draft-locks'
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -40,19 +42,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const result = await query(
-    `INSERT INTO email_campaigns (title, template_key, subject, template_data, audience_type, audience_filter, created_by, channels)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-    [
-      title,
-      template_key,
-      subject,
-      JSON.stringify(template_data || {}),
-      audience_type,
-      JSON.stringify(audience_filter || {}),
-      admin.adminId,
-      JSON.stringify(channels || {}),
-    ]
+  // A new campaign is a draft: its creator takes the draft lock in the same transaction.
+  const id = randomUUID()
+  const result = await withDraftCreate(actorOf(admin), 'mailer', id, db =>
+    db.query(
+      `INSERT INTO email_campaigns (id, title, template_key, subject, template_data, audience_type, audience_filter, created_by, channels)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [
+        id,
+        title,
+        template_key,
+        subject,
+        JSON.stringify(template_data || {}),
+        audience_type,
+        JSON.stringify(audience_filter || {}),
+        admin.adminId,
+        JSON.stringify(channels || {}),
+      ]
+    )
   )
 
   return NextResponse.json({ id: result.rows[0].id }, { status: 201 })
