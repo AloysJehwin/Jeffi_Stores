@@ -9,6 +9,8 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import { DraftLockBadge } from '@/components/admin/kit'
+import type { MailerLocks } from './MessagingTable'
 
 interface Campaign {
   id: string
@@ -30,6 +32,8 @@ interface Props {
   statusStyles: Record<string, string>
   currentListUrl: string
   host?: string
+  locks?: MailerLocks
+  meId?: string | null
 }
 
 const channelLabel = (
@@ -58,7 +62,7 @@ function formatDate(c: Campaign): string {
   return new Date(c.created_at).toLocaleDateString('en-IN')
 }
 
-export default function MailerMobileList({ campaigns, templateLabels, statusStyles, currentListUrl, host }: Props) {
+export default function MailerMobileList({ campaigns, templateLabels, statusStyles, currentListUrl, host, locks = {}, meId = null }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
   const canWrite = useCanWrite('campaigns:write')
@@ -165,6 +169,11 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
           </p>
           {c.recipient_count != null && (
             <p className="text-xs text-foreground-muted mt-0.5">{c.recipient_count} recipients</p>
+          )}
+          {locks[c.id] && (
+            <div className="mt-1.5">
+              <DraftLockBadge lock={locks[c.id]} mine={!!meId && locks[c.id].ownerId === meId} />
+            </div>
           )}
         </MobileListCard>
       ))}

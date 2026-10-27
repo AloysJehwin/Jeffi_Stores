@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
+import { actorOf, draftLockResponse, epochFrom, lockNewDraft, withDraftPublish } from '@/lib/admin/draft-locks'
 
 const BATCH_SIZE = 50 // emails per batch
 const BATCH_DELAY = 1000 // ms between batches — stays under SES rate limits
@@ -33,27 +34,41 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       : `${rawScheduled}:00+05:30`
     : undefined
 
-  // If a scheduled_at was passed in the body, persist it and mark scheduled
-  if (!dispatchNow && scheduledAt) {
-    const schedDate = new Date(scheduledAt)
-    if (schedDate > new Date()) {
-      await query(`UPDATE email_campaigns SET status = 'scheduled', scheduled_at = $1 WHERE id = $2`, [scheduledAt, id])
-      return NextResponse.json({ scheduled: true, scheduled_at: scheduledAt })
+  // Only the draft's lock holder sends it; leaving 'draft' (scheduled or sending) closes the lock as sent.
+  const actor = campaign.status === 'draft' ? actorOf(admin) : null
+  const send = (sql: string, params: unknown[]) =>
+    withDraftPublish(actor, 'mailer', id, db => db.query(sql, params), { epoch: epochFrom(request), reason: 'sent' })
+
+  try {
+    // If a scheduled_at was passed in the body, persist it and mark scheduled
+    if (!dispatchNow && scheduledAt) {
+      const schedDate = new Date(scheduledAt)
+      if (schedDate > new Date()) {
+        await send(`UPDATE email_campaigns SET status = 'scheduled', scheduled_at = $1 WHERE id = $2`, [scheduledAt, id])
+        return NextResponse.json({ scheduled: true, scheduled_at: scheduledAt })
+      }
     }
+
+    // If already scheduled (from DB) and not dispatchNow, just confirm
+    if (!dispatchNow && campaign.scheduled_at && new Date(campaign.scheduled_at) > new Date()) {
+      await send(`UPDATE email_campaigns SET status = 'scheduled' WHERE id = $1`, [id])
+      return NextResponse.json({ scheduled: true, scheduled_at: campaign.scheduled_at })
+    }
+
+    // Mark as queued immediately — return fast to the client
+    await send(`UPDATE email_campaigns SET status = 'sending' WHERE id = $1`, [id])
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
   }
 
-  // If already scheduled (from DB) and not dispatchNow, just confirm
-  if (!dispatchNow && campaign.scheduled_at && new Date(campaign.scheduled_at) > new Date()) {
-    await query(`UPDATE email_campaigns SET status = 'scheduled' WHERE id = $1`, [id])
-    return NextResponse.json({ scheduled: true, scheduled_at: campaign.scheduled_at })
-  }
-
-  // Mark as queued immediately — return fast to the client
-  await query(`UPDATE email_campaigns SET status = 'sending' WHERE id = $1`, [id])
-
-  // Fire-and-forget background send (does NOT block the response)
+  // Fire-and-forget background send (does NOT block the response). On failure the campaign is a
+  // draft again and goes back to the admin who sent it.
   sendInBackground(id, BATCH_SIZE, BATCH_DELAY).catch(() => {
-    query(`UPDATE email_campaigns SET status = 'draft' WHERE id = $1`, [id]).catch(() => {})
+    query(`UPDATE email_campaigns SET status = 'draft' WHERE id = $1`, [id])
+      .then(() => lockNewDraft(actor, 'mailer', id))
+      .catch(() => {})
   })
 
   return NextResponse.json({ queued: true, batch_size: BATCH_SIZE })
