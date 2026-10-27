@@ -41,7 +41,7 @@ export default function CategoryScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
   const bottomInset = useBottomInset(0)
   const { data: all, isLoading, error, refetch } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
-  const { data: home } = useQuery({ queryKey: ['home'], queryFn: () => getHome(), staleTime: 120_000 })
+  const { data: home } = useQuery({ queryKey: ['home', 'store'], queryFn: () => getHome(), staleTime: 120_000 })
   const categories = withDetails(all ?? [], home?.data.mainCategories as Record<string, any>[] | undefined)
   const category = categories.find(c => c.slug === slug)
   const subcategories = category

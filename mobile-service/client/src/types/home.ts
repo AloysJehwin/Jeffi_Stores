@@ -6,6 +6,10 @@ export type SectionType =
   | 'why_us' | 'about' | 'business_cta' | 'countdown_deal' | 'testimonials' | 'recently_viewed'
   | 'category_tabs' | 'bundle_spotlight' | 'back_in_stock' | 'blog_teaser' | 'social_strip' | 'value_stats'
   | 'motion_hero' | 'stories' | 'product_spotlight' | 'rewards_game' | 'slides'
+  | 'business_reorder' | 'business_quotes' | 'business_offers' | 'business_account'
+
+/** Which homepage a model is: the store's, or the business one an approved business sees once it's published. */
+export type HomeAudience = 'store' | 'business'
 
 /** Which page a layout belongs to: the homepage, or a listing whose sections sit between its products. */
 export type HomePage = 'home' | 'products' | 'category' | 'brand'
@@ -272,6 +276,21 @@ export interface RewardGameState {
   lastPlay: RewardGamePlay | null
 }
 
+// extras[section.id] of a business_* section (homepage-sections.ts businessSectionPublic). Its data is the
+// signed-in business's own, from GET /api/business/home.
+export interface BusinessContact {
+  name: string | null
+  phone: string | null
+  email: string | null
+}
+
+export interface BusinessSectionData {
+  visitor: 'hide' | 'signin'
+  limit: number
+  offers?: { source: 'auto' | 'picked'; productIds: string[] }
+  account?: { tiles: ('orders' | 'payments' | 'quotes')[]; contact: BusinessContact | null }
+}
+
 export interface HomeData {
   heroSlides: HeroSlide[]
   offers: ProductOffer[]
@@ -293,6 +312,8 @@ export interface HomeData {
 export interface HomeModel {
   sections: HomeSection[]
   data: HomeData
+  /** What was served; absent from older servers (store). */
+  audience?: HomeAudience
 }
 
 /** Every home section component takes the section and the shared data, like the web's SectionRenderer. */

@@ -52,6 +52,7 @@ function AuthRehydrator() {
       try {
         // Bearer when a token is stored (the backend returns it at sign-in), else the session cookie.
         const portal = await loadAuthPortal()
+        useAuthStore.setState({ savedPortal: portal })
         const token = await getStoredToken()
         const user = await getMe()
         if (user && sessionUsable(user, portal)) await setAuth(user, token ?? '', portal)

@@ -25,6 +25,10 @@ import Stories from './Stories'
 import ProductSpotlight from './ProductSpotlight'
 import RewardsGame from './RewardsGame'
 import SlidesSection from './SlidesSection'
+import BusinessReorder from './business/BusinessReorder'
+import BusinessOffers from './business/BusinessOffers'
+import BusinessQuotes from './business/BusinessQuotes'
+import BusinessAccount from './business/BusinessAccount'
 
 // Mirror of controller-service components/visitor/home/SectionRenderer.tsx.
 const SIMPLE = {
@@ -53,7 +57,12 @@ const SIMPLE = {
   blog_teaser: BlogTeaser,
   social_strip: SocialStrip,
   value_stats: ValueStats,
+  business_quotes: BusinessQuotes,
+  business_account: BusinessAccount,
 } as const
+
+/** Rows that take a turn in the product rows' alternating look. */
+const isRow = (type: HomeSection['type']) => type === 'product_row' || type === 'business_reorder' || type === 'business_offers'
 
 export default function SectionRenderer({ section, data, rowIndex }: { section: HomeSection; data: HomeData; rowIndex: number }) {
   const carousel = section.layout === 'carousel'
@@ -86,6 +95,11 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
         />
       )
     }
+    // The signed-in business's own products, loaded per user, so they stay one item in the feed.
+    case 'business_reorder':
+      return <BusinessReorder section={section} data={data} style={ROW_STYLES[rowIndex % ROW_STYLES.length]} />
+    case 'business_offers':
+      return <BusinessOffers section={section} data={data} style={ROW_STYLES[rowIndex % ROW_STYLES.length]} />
     default: {
       const Component = SIMPLE[section.type]
       return Component ? <Component section={section} data={data} /> : null
@@ -142,8 +156,8 @@ export function feedItems(sections: HomeSection[], data: HomeData): FeedItem[] {
   const out: FeedItem[] = []
   let n = 0
   for (const section of sections) {
-    // Each product_row's position among the rows, for its alternating style.
-    const rowIndex = section.type === 'product_row' ? n++ : n
+    // Each product row's position among the rows, for its alternating style.
+    const rowIndex = isRow(section.type) ? n++ : n
     const rows = gridRows(section, data, rowIndex)
     if (!rows) {
       out.push({ key: section.id, type: 'section', section, rowIndex })

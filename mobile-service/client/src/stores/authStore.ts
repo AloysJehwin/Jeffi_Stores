@@ -13,6 +13,8 @@ interface AuthState {
   user: User | null
   token: string | null
   portal: AuthPortal
+  /** The store the app was last in, read from storage at launch (null until then), before the session is checked. */
+  savedPortal: AuthPortal | null
   isLoading: boolean
   setAuth: (user: User, token: string, portal?: AuthPortal) => Promise<void>
   /** Signs out of the active store; the other store's saved session, if any, takes over. */
@@ -28,6 +30,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   portal: 'customer',
+  savedPortal: null,
   isLoading: true,
   setAuth: async (user, token, portal = 'customer') => {
     await setAuthPortal(portal)

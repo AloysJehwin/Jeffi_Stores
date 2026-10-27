@@ -89,7 +89,7 @@ function CategoryCardSkeleton() {
 export default function CategoriesScreen() {
   const bottomInset = useBottomInset(32)
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
-  const { data: home } = useQuery({ queryKey: ['home'], queryFn: () => getHome(), staleTime: 120_000 })
+  const { data: home } = useQuery({ queryKey: ['home', 'store'], queryFn: () => getHome(), staleTime: 120_000 })
   const categories = withDetails(data ?? [], home?.data.mainCategories as Record<string, any>[] | undefined)
   const main = categories.filter(c => !c.parent_category_id)
   const subsOf = (id: string) => categories.filter(c => c.parent_category_id === id)

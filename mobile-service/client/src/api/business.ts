@@ -1,5 +1,6 @@
 import { api } from './client'
 import { postJson, type AccountUser } from './account'
+import type { CardProduct } from '../types/home'
 
 // The business portal's API (controller-service app/api/(public)/business/*). A business account is a separate
 // login from a customer one; its session rides as the bearer with X-Auth-Portal: business (see client.ts).
@@ -167,6 +168,50 @@ export const respondToOffer = (id: string, body: { action: 'accept' | 'decline';
 
 export const resubmitRfq = (id: string, notes?: string) =>
   api<{ rfq: { id: string; rfq_number: string } }>(`/api/business/rfqs/${id}/resubmit`, { method: 'POST', body: JSON.stringify({ notes }) })
+
+// ── Business homepage (GET /api/business/home): the signed-in business's own data for its sections ──
+
+export type BusinessHomePart = 'reorder' | 'quotes' | 'offers' | 'account'
+
+export interface BusinessHomeParams {
+  sections: BusinessHomePart[]
+  /** Business offers section ids, whose settings the server reads from the published section. */
+  offers: string[]
+  reorderLimit: number
+  quotesLimit: number
+}
+
+export interface BusinessHomeQuote {
+  id: string
+  rfqNumber: string
+  status: RfqStatus
+  itemCount: number
+  createdAt: string
+}
+
+export interface BusinessHomeOrder {
+  id: string
+  orderNumber: string
+  status: string
+  total: number
+  createdAt: string
+}
+
+export interface BusinessHome {
+  company: { name: string | null; gstNumber: string | null }
+  reorder?: CardProduct[]
+  /** Also returned with `account`. */
+  quotes?: { open: number; items: BusinessHomeQuote[] }
+  account?: { recentOrders: BusinessHomeOrder[]; paymentsDue: { count: number; total: number } }
+  offers?: Record<string, CardProduct[]>
+}
+
+/** 401/403 unless signed in as an approved business. */
+export function getBusinessHome(p: BusinessHomeParams) {
+  const q = new URLSearchParams({ sections: p.sections.join(','), reorderLimit: String(p.reorderLimit), quotesLimit: String(p.quotesLimit) })
+  if (p.offers.length > 0) q.set('offers', p.offers.join(','))
+  return api<BusinessHome>(`/api/business/home?${q.toString()}`)
+}
 
 // ── Signed-in devices ──
 
