@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { buildLabelPDF, type LabelItem } from '@/lib/documents/shipping-label-pdf'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { DelhiveryLabelError, fetchDelhiveryA4Label } from '@/lib/documents/delhivery-label'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -80,23 +81,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       })
     }
 
-    const labelUrl = `https://track.delhivery.com/api/p/packing_slip?wbns=${encodeURIComponent(order.awb_number)}&pdf=true`
-    const res = await fetch(labelUrl, { headers: { Authorization: `Token ${TOKEN}` }, next: { revalidate: 0 } })
-    if (!res.ok) return NextResponse.json({ error: `Delhivery label API returned ${res.status}` }, { status: 502 })
-
-    const contentType = res.headers.get('content-type') || ''
     let buffer: ArrayBuffer
-
-    if (contentType.includes('application/pdf')) {
-      buffer = await res.arrayBuffer()
-    } else {
-      const json = await res.json()
-      const pdfUrl: string | undefined = json?.packages?.[0]?.pdf_download_link
-      if (!pdfUrl) return NextResponse.json({ error: 'No PDF link in Delhivery response' }, { status: 502 })
-      const pdfRes = await fetch(pdfUrl)
-      if (!pdfRes.ok)
-        return NextResponse.json({ error: `Failed to fetch PDF from S3: ${pdfRes.status}` }, { status: 502 })
-      buffer = await pdfRes.arrayBuffer()
+    try {
+      buffer = await fetchDelhiveryA4Label(order.awb_number, TOKEN)
+    } catch (e) {
+      if (e instanceof DelhiveryLabelError) return NextResponse.json({ error: e.message }, { status: 502 })
+      throw e
     }
 
     if (print) {
