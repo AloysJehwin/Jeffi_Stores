@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from '../../next'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
-import { queryOne, withTransaction } from '@jeffi/tenancy'
+import { queryOne } from '@jeffi/tenancy'
+import { draftLockResponse, epochFrom, withDraftWrite } from '../../lib/draft-locks'
 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const originalId = original.id
 
-    await withTransaction(async client => {
+    await withDraftWrite(admin, 'invoice', id, async client => {
       await client.query(
         `UPDATE orders SET
           total_amount          = $1,
@@ -79,10 +80,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
 
       await client.query(`DELETE FROM orders WHERE id = $1`, [id])
-    })
+    }, { epoch: epochFrom(request), close: 'published' })
 
     return NextResponse.json({ success: true, orderId: originalId })
   } catch (err: any) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

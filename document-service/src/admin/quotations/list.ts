@@ -12,6 +12,7 @@ import {
   insertQuotationItem,
 } from '../../lib/invoice-line-items'
 import { getFeatureFlags } from '../../lib/site-controls'
+import { lockBadges, lockNewDraft } from '../../lib/draft-locks'
 
 function buildQuoteNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -67,7 +68,9 @@ export async function GET(request: NextRequest) {
        FROM quotations q ${where} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`,
       dataParams
     )
-    return NextResponse.json({ quotations: rows || [], total, page, pageSize })
+    const locks = await lockBadges(admin, 'quotation', (rows || []).filter((r: any) => r.status === 'draft').map((r: any) => r.id))
+    const withLocks = (rows || []).map((r: any) => (locks[r.id] ? { ...r, lock: locks[r.id] } : r))
+    return NextResponse.json({ quotations: withLocks, total, page, pageSize })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 })
   }
@@ -164,6 +167,7 @@ export async function POST(request: NextRequest) {
       ).rows
       return { qt, savedItems }
     })
+    await lockNewDraft(admin, 'quotation', qt.id)
     return NextResponse.json({ quotation: qt, items: savedItems }, { status: 201 })
   } catch (e: any) {
     console.error('[admin/quotations POST] failed', e)
