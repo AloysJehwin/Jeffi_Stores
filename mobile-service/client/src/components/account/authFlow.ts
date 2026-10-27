@@ -1,6 +1,7 @@
 import type { User } from '../../types'
 import type { AccountUser } from '../../api/account'
 import { useAuthStore } from '../../stores/authStore'
+import type { AuthPortal } from '../../api/client'
 import { refreshUser } from './hooks'
 
 // Glue between the login / otp / signup screens.
@@ -14,8 +15,8 @@ export const setPendingGoogle = (v: GoogleSignup | null) => {
 }
 export const getPendingGoogle = () => pendingGoogle
 
-/** Store the session the way the app always has, then load the full /api/auth/me user. */
-export async function finishSignIn(user: User, token: string): Promise<AccountUser> {
-  await useAuthStore.getState().setAuth(user, token)
+/** Store the session the way the app always has, then load the full /api/auth/me (or /api/business/me) user. */
+export async function finishSignIn(user: User, token: string, portal: AuthPortal = 'customer'): Promise<AccountUser> {
+  await useAuthStore.getState().setAuth(user, token, portal)
   return (await refreshUser()) ?? (user as AccountUser)
 }

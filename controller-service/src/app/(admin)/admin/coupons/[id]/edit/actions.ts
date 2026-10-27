@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/shared/db'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
+import { closeAfter, guardDraftAction } from '@/lib/admin/draft-locks'
 
 // Keep the admin's open editor session's snapshot in step with the draft just saved.
 // After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
@@ -43,6 +44,7 @@ export async function updateCoupon(id: string, formData: FormData) {
   const is_active = formData.get('is_active') === 'true'
   const intent = formData.get('intent') as string | null
   const host = await getHost()
+  const actor = await guardDraftAction('coupon', id, `/admin/coupons/${id}/edit`, intent)
   const rawBack = formData.get('_back') as string | null
   const destination = rawBack && rawBack.startsWith('/admin/coupons') ? rawBack : '/admin/coupons'
 
@@ -63,6 +65,7 @@ export async function updateCoupon(id: string, formData: FormData) {
   try {
     if (intent === 'discard') {
       await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
+      await closeAfter(actor, 'coupon', id, 'discarded')
       revalidatePath(`/admin/coupons/${id}/edit`)
       revalidatePath(`/admin/coupons/${id}/view`)
       // Draft discarded; redirect to the view page (edit now redirects to view when no draft).
@@ -99,6 +102,7 @@ export async function updateCoupon(id: string, formData: FormData) {
         ]
       )
       await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
+      await closeAfter(actor, 'coupon', id, 'published')
       revalidatePath('/admin/coupons')
       redirect(ap('/admin/coupons', host))
     }

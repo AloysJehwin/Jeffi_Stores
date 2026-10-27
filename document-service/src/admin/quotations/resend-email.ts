@@ -4,6 +4,7 @@ import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryOne } from '@jeffi/tenancy'
 import { sendQuotationFinalizedEmail } from '../../lib/mail'
+import { lockedByOther } from '../../lib/draft-locks'
 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (!qt.consignee_email) return NextResponse.json({ error: 'No email address on file' }, { status: 400 })
+    const locked = await lockedByOther(admin, 'quotation', id)
+    if (locked) return locked
 
     const viewUrl = await documentUrl('quotation', qt.view_token)
 

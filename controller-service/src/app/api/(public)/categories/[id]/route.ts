@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryCount } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
+import { actorOf, closeIfLocked, discardGuard } from '@/lib/admin/draft-locks'
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -30,7 +31,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       )
     }
 
+    const actor = actorOf(admin)
+    const denied = await discardGuard(actor, 'category', categoryId)
+    if (denied) return denied
     await query('DELETE FROM categories WHERE id = $1', [categoryId])
+    await closeIfLocked(actor, 'category', categoryId)
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

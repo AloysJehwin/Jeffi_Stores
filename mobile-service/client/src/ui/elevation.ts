@@ -17,6 +17,8 @@ export function useElevation(level: Elevation): ViewStyle {
   return { boxShadow: SHADOW[level] }
 }
 
+// The border is always there, clear in light mode: on Android, removing a clipping view's border width
+// (dark→light) left its children clipped to nothing, blanking every list card until it remounted.
 export function elevationClass(level: Elevation): string {
-  return level === 'none' ? '' : 'dark:border dark:border-border-default'
+  return level === 'none' ? '' : 'border border-transparent dark:border-border-default'
 }

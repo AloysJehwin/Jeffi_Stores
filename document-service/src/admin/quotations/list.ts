@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from '../../next'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne, withTransaction } from '@jeffi/tenancy'
-import { QUOTATIONS_ENTITY, QUOTE_SUBTOTAL_SQL, QUOTE_TOTAL_SQL, buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { QUOTATIONS_ENTITY, QUOTE_SUBTOTAL_SQL, QUOTE_TOTAL_SQL, buildWhere, normalizeQuery, sortClause } from '@jeffi/list-filters'
 import { z } from 'zod'
 import { parseBody, zNonEmpty, zEmail } from '../../lib/validate'
 import {
@@ -12,6 +12,7 @@ import {
   insertQuotationItem,
 } from '../../lib/invoice-line-items'
 import { getFeatureFlags } from '../../lib/site-controls'
+import { lockBadges, lockNewDraft } from '../../lib/draft-locks'
 
 function buildQuoteNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -41,9 +42,11 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * pageSize
 
     // Whitelisted server-side sort (columns/aliases available in the SELECT below).
-    const sortCol = QUOTATIONS_ENTITY.sorts?.[searchParams.get('sort') || ''] || null
-    const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
-    const orderBy = sortCol ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, created_at DESC` : `ORDER BY created_at DESC`
+    const orderBy = sortClause(searchParams, {
+      sorts: QUOTATIONS_ENTITY.sorts ?? {},
+      defaultSql: 'q.created_at DESC',
+      tiebreak: 'q.created_at DESC, q.id DESC',
+    })
 
     const { where, params, nextIdx: i } = buildWhere(QUOTATIONS_ENTITY, normalizeQuery(QUOTATIONS_ENTITY, searchParams))
 
@@ -67,7 +70,9 @@ export async function GET(request: NextRequest) {
        FROM quotations q ${where} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`,
       dataParams
     )
-    return NextResponse.json({ quotations: rows || [], total, page, pageSize })
+    const locks = await lockBadges(admin, 'quotation', (rows || []).filter((r: any) => r.status === 'draft').map((r: any) => r.id))
+    const withLocks = (rows || []).map((r: any) => (locks[r.id] ? { ...r, lock: locks[r.id] } : r))
+    return NextResponse.json({ quotations: withLocks, total, page, pageSize })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 })
   }
@@ -164,6 +169,7 @@ export async function POST(request: NextRequest) {
       ).rows
       return { qt, savedItems }
     })
+    await lockNewDraft(admin, 'quotation', qt.id)
     return NextResponse.json({ quotation: qt, items: savedItems }, { status: 201 })
   } catch (e: any) {
     console.error('[admin/quotations POST] failed', e)

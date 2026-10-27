@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from '../../next'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne } from '@jeffi/tenancy'
-import { INVOICES_ENTITY, buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { INVOICES_ENTITY, buildWhere, normalizeQuery, sortClause } from '@jeffi/list-filters'
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,9 +48,12 @@ export async function GET(request: NextRequest) {
       ${cw.where}
     `
     // Whitelisted server-side sort over the full combined set (before LIMIT/OFFSET).
-    const sortCol = INVOICES_ENTITY.sorts?.[searchParams.get('sort') || ''] || 'invoice_number'
-    const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
-    const fullQuery = `SELECT * FROM (${unionQuery}) combined ORDER BY ${sortCol} ${sortDir} NULLS LAST, invoice_number DESC NULLS LAST`
+    const orderBy = sortClause(searchParams, {
+      sorts: INVOICES_ENTITY.sorts ?? {},
+      defaultSql: 'invoice_number DESC NULLS LAST',
+      tiebreak: 'invoice_number DESC NULLS LAST, id DESC',
+    })
+    const fullQuery = `SELECT * FROM (${unionQuery}) combined ${orderBy}`
 
     const [rows, countRow] = await Promise.all([
       queryMany(`${fullQuery} LIMIT $${i} OFFSET $${i + 1}`, [...params, limit, offset]),

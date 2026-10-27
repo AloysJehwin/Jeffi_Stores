@@ -1,15 +1,19 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { StyleSheet, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, { Easing, cancelAnimation, makeMutable, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { useColorScheme } from 'nativewind'
 import { status } from '../theme'
 import { cn } from './cn'
+import { linearGradient } from './Gradient'
 import { useMotion } from './motion'
 
 // Placeholder blocks with a shimmer that sweeps across them. One clock drives every block on screen, so
 // a page's skeleton shimmers as one; it runs only while a skeleton is mounted, and not at all with
 // reduced motion on.
+
+const sheen = (o: number) => linearGradient([[0, status.white, 0], [0.5, status.white, o], [1, status.white, 0]], 'r')
+const SHEEN_LIGHT = sheen(0.55)
+const SHEEN_DARK = sheen(0.07)
 
 const clock = makeMutable(0)
 let mounted = 0
@@ -42,7 +46,6 @@ export function Skeleton({ width, height = 14, rounded = 'rounded-lg', aspectRat
   const { animate } = useMotion()
   const { colorScheme } = useColorScheme()
   const [w, setW] = useState(0)
-  const id = `s${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   useClock(animate)
   const band = useAnimatedStyle(() => ({ transform: [{ translateX: -w + clock.value * 2 * w }] }))
   return (
@@ -54,18 +57,7 @@ export function Skeleton({ width, height = 14, rounded = 'rounded-lg', aspectRat
       className={cn('overflow-hidden bg-surface-secondary', rounded, className)}
     >
       {animate && w > 0 ? (
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, band]}>
-          <Svg width="100%" height="100%">
-            <Defs>
-              <LinearGradient id={id} x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor={status.white} stopOpacity={0} />
-                <Stop offset="0.5" stopColor={status.white} stopOpacity={colorScheme === 'dark' ? 0.07 : 0.55} />
-                <Stop offset="1" stopColor={status.white} stopOpacity={0} />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill={`url(#${id})`} />
-          </Svg>
-        </Animated.View>
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { experimental_backgroundImage: colorScheme === 'dark' ? SHEEN_DARK : SHEEN_LIGHT }, band]} />
       ) : null}
     </View>
   )

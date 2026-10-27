@@ -29,6 +29,10 @@ export type SectionType =
   | 'product_spotlight'
   | 'rewards_game'
   | 'slides'
+  | 'business_reorder'
+  | 'business_quotes'
+  | 'business_offers'
+  | 'business_account'
 
 export const SECTION_TYPES: SectionType[] = [
   'hero',
@@ -59,7 +63,19 @@ export const SECTION_TYPES: SectionType[] = [
   'product_spotlight',
   'rewards_game',
   'slides',
+  'business_reorder',
+  'business_quotes',
+  'business_offers',
+  'business_account',
 ]
+
+/** Sections that load the signed-in business's own data on the client (GET /api/business/home). */
+export const BUSINESS_SECTION_TYPES: ReadonlySet<SectionType> = new Set<SectionType>([
+  'business_reorder',
+  'business_quotes',
+  'business_offers',
+  'business_account',
+])
 
 /**
  * Types an app build from before per-surface layouts never sees: a GET /api/home with no ?surface
@@ -79,10 +95,23 @@ export type ProductSource = 'featured' | 'new_arrivals' | 'best_sellers' | 'on_s
 
 export type SectionLayout = 'grid' | 'carousel'
 
-/** The website and the mobile app each have their own homepage layout (sections and hero slides). */
-export type HomepageSurface = 'web' | 'app'
+/**
+ * Desktop web, phone browsers and the app each have their own layout (sections and hero slides).
+ * `web` is the desktop website; phone browsers and the app fall back to it until they have rows.
+ */
+export type HomepageSurface = 'web' | 'web_mobile' | 'app'
 
-export const HOMEPAGE_SURFACES: HomepageSurface[] = ['web', 'app']
+export const HOMEPAGE_SURFACES: HomepageSurface[] = ['web', 'web_mobile', 'app']
+
+/** The page a section is on: the homepage, or between products on a listing (every category shares one, as does every brand). */
+export type HomepagePage = 'home' | 'products' | 'category' | 'brand'
+
+export const HOMEPAGE_PAGES: HomepagePage[] = ['home', 'products', 'category', 'brand']
+
+/** Who the homepage is for: the store, or business accounts (/business and the app's business store). Business has a homepage only. */
+export type HomepageAudience = 'store' | 'business'
+
+export const HOMEPAGE_AUDIENCES: HomepageAudience[] = ['store', 'business']
 
 export interface HomepageSection {
   id: string
@@ -99,15 +128,30 @@ export interface HomepageSection {
   ends_at: string | null
   /** Absent on rows saved before the column existed; read it through rowSurface(). */
   surface?: HomepageSurface | null
+  /** Absent on rows saved before the column existed; read it through rowPage(). */
+  page?: HomepagePage | null
+  /** Absent on rows saved before the column existed; read it through rowAudience(). */
+  audience?: HomepageAudience | null
 }
 
 export function rowSurface(row: { surface?: string | null }): HomepageSurface {
-  return row.surface === 'app' ? 'app' : 'web'
+  return row.surface === 'app' || row.surface === 'web_mobile' ? row.surface : 'web'
 }
 
+export function rowPage(row: { page?: string | null }): HomepagePage {
+  return HOMEPAGE_PAGES.includes(row.page as HomepagePage) ? (row.page as HomepagePage) : 'home'
+}
+
+export function rowAudience(row: { audience?: string | null }): HomepageAudience {
+  return row.audience === 'business' ? 'business' : 'store'
+}
+
+export const isListingPage = (page: HomepagePage) => page !== 'home'
+
 /**
- * The rows that belong to a surface. The app mirrors the website until it has a layout of its own
- * (any app row, active or not), so a store that never opens the Mobile app tab keeps one layout.
+ * The rows that belong to a surface. Phone browsers and the app mirror the desktop website until
+ * they have a layout of their own (any row of theirs, active or not), so a store that never opens
+ * those tabs keeps one layout. Pass the rows of one page.
  */
 export function forSurface<T extends { surface?: string | null }>(rows: T[], surface: HomepageSurface): T[] {
   const own = rows.filter(r => rowSurface(r) === surface)
@@ -120,19 +164,88 @@ export interface SectionMeta {
   description: string
   /** A singleton may only appear once on the page. */
   singleton?: boolean
-  /** Surfaces that can use the type; absent means both. */
+  /** Surfaces that can use the type; absent means all. Phone browsers count as the website. */
   surfaces?: HomepageSurface[]
+  /** Pages that can use the type; absent means all. */
+  pages?: HomepagePage[]
+  /** Homepages that can use the type; absent means both. */
+  audiences?: HomepageAudience[]
+  /** The plan scope the type needs (see getHomepagePlan); absent means every plan. */
+  plan?: string
   /** Types this one cannot share a layout with (two auto-advancing heroes, say). */
   excludes?: SectionType[]
+  /** The admin can set the shape of what this names ("Banner", "Card image"); `auto` keeps the component's own. */
+  aspect?: string
 }
 
-/** The types the picker offers on a surface. */
-export function sectionTypesFor(surface: HomepageSurface): SectionType[] {
+/** The types the picker offers on a surface, page and homepage. */
+export function sectionTypesFor(
+  surface: HomepageSurface,
+  page: HomepagePage = 'home',
+  audience: HomepageAudience = 'store'
+): SectionType[] {
+  const asSurface = surface === 'web_mobile' ? 'web' : surface
   return SECTION_TYPES.filter(t => {
-    const only = SECTION_META[t].surfaces
-    return !only || only.includes(surface)
+    const { surfaces, pages, audiences } = SECTION_META[t]
+    return (
+      (!surfaces || surfaces.includes(asSurface)) &&
+      (!pages || pages.includes(page)) &&
+      (!audiences || audiences.includes(audience))
+    )
   })
 }
+
+/** Where a listing-page section sits: after the Nth product, and again every M products. */
+export interface SectionPlacement {
+  after: number
+  every: number | null
+}
+
+export const PLACEMENT_DEFAULT_AFTER = 12
+export const PLACEMENT_MIN_EVERY = 4
+const PLACEMENT_MAX_REPEATS = 12
+
+export function sectionPlacement(section: Pick<HomepageSection, 'config'>): SectionPlacement {
+  const p = (section.config?.placement ?? {}) as { after?: unknown; every?: unknown }
+  const after = Number(p.after)
+  const every = Number(p.every)
+  return {
+    after: p.after != null && Number.isInteger(after) && after >= 0 && after <= 1000 ? after : PLACEMENT_DEFAULT_AFTER,
+    every: Number.isInteger(every) && every >= PLACEMENT_MIN_EVERY ? every : null,
+  }
+}
+
+/** The product counts a section follows, within `total`: a section never trails the last product. */
+export function placementPositions(p: SectionPlacement, total: number, max = PLACEMENT_MAX_REPEATS): number[] {
+  const out: number[] = []
+  for (let at = p.after; at < total && out.length < (p.every ? max : 1); at += p.every ?? total) out.push(at)
+  return out
+}
+
+export const SECTION_ASPECTS = ['auto', '21:9', '16:9', '3:1', '5:3', '4:3', '1:1', '4:5', '3:4'] as const
+export type SectionAspect = (typeof SECTION_ASPECTS)[number]
+
+export const aspectRatioOf = (aspect: SectionAspect): number | null => {
+  if (aspect === 'auto') return null
+  const [w, h] = aspect.split(':').map(Number)
+  return w / h
+}
+
+export function sectionAspectValue(section: Pick<HomepageSection, 'type' | 'config'>): SectionAspect {
+  const value = section.config?.aspect as SectionAspect | undefined
+  return SECTION_META[section.type]?.aspect && value && SECTION_ASPECTS.includes(value) ? value : 'auto'
+}
+
+/** The section's chosen shape as width / height, or null for the component's own look. */
+export const sectionAspect = (section: Pick<HomepageSection, 'type' | 'config'>): number | null =>
+  aspectRatioOf(sectionAspectValue(section))
+
+const HOME_ONLY: HomepagePage[] = ['home']
+const STORE_ONLY: HomepageAudience[] = ['store']
+const BUSINESS_ONLY: HomepageAudience[] = ['business']
+
+/** The plan scope of the B2B portal; the business homepage needs it too. */
+export const BUSINESS_PLAN_SCOPE = 'business_customers:read'
 
 export const SECTION_META: Record<SectionType, SectionMeta> = {
   hero: {
@@ -140,19 +253,37 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     description: 'Full-width rotating banner at the top of the page.',
     singleton: true,
     excludes: ['motion_hero'],
+    pages: HOME_ONLY,
   },
   offer_slider: {
     label: 'Offer slider',
     description: 'Centered offer cards with left and right peek, each linking to its filtered products.',
     singleton: true,
+    aspect: 'Offer cards',
   },
   trust_strip: { label: 'Trust strip', description: 'Row of delivery, returns and payment reassurances.' },
-  category_grid: { label: 'Shop by category', description: 'Grid or carousel of top-level categories.' },
+  category_grid: {
+    label: 'Shop by category',
+    description: 'Grid or carousel of top-level categories.',
+    aspect: 'Category tiles',
+  },
   brand_carousel: { label: 'Shop by brand', description: 'Grid or carousel of brands you stock.' },
-  product_row: { label: 'Product row', description: 'Featured, new arrivals, best sellers, on sale, or one category.' },
-  category_showcase: { label: 'Category showcase', description: 'Large category cards with product thumbnails.' },
+  product_row: {
+    label: 'Product row',
+    description: 'Featured, new arrivals, best sellers, on sale, or one category.',
+    aspect: 'Product images',
+  },
+  category_showcase: {
+    label: 'Category showcase',
+    description: 'Large category cards with product thumbnails.',
+    aspect: 'Product thumbnails',
+  },
   deal_of_the_day: { label: 'Deal of the day', description: 'A small set of highlighted offers.' },
-  promo_banner: { label: 'Promo banner', description: 'Seasonal or sale banner. Supports a start and end date.' },
+  promo_banner: {
+    label: 'Promo banner',
+    description: 'Seasonal or sale banner. Supports a start and end date.',
+    aspect: 'Banner',
+  },
   featured_for_you: {
     label: 'Featured for you',
     description: 'Personalised picks. Hidden for signed-out visitors.',
@@ -160,11 +291,18 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
   },
   benefits: { label: 'Benefits', description: 'Why-shop-with-us tiles.' },
   why_us: { label: 'Why us', description: 'Three larger cards explaining what sets the store apart.', singleton: true },
-  about: { label: 'About', description: 'Store story with stats.', singleton: true },
-  business_cta: { label: 'Business CTA', description: 'Banner promoting the B2B/bulk experience.', singleton: true },
+  about: { label: 'About', description: 'Store story with stats.', singleton: true, pages: HOME_ONLY },
+  business_cta: {
+    label: 'Business CTA',
+    description: 'Banner promoting the B2B/bulk experience.',
+    singleton: true,
+    audiences: STORE_ONLY,
+    plan: BUSINESS_PLAN_SCOPE,
+  },
   countdown_deal: {
     label: 'Countdown deal',
     description: 'One product in a full-width banner with a live countdown. Hides itself when the timer ends.',
+    aspect: 'Product image',
   },
   testimonials: {
     label: 'Testimonials',
@@ -175,6 +313,7 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     label: 'Recently viewed',
     description: "Each visitor's own recently viewed products. Hidden until they have viewed enough.",
     singleton: true,
+    pages: ['home', 'category', 'brand'],
   },
   category_tabs: {
     label: 'Category tabs',
@@ -193,6 +332,7 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     label: 'Guides and articles',
     description: 'Cards linking to your guides, articles or blog posts.',
     singleton: true,
+    aspect: 'Article images',
   },
   social_strip: {
     label: 'Social strip',
@@ -209,24 +349,63 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     description: 'Layered slides with a foreground image that drifts over the background and a headline that reveals itself.',
     singleton: true,
     excludes: ['hero'],
+    aspect: 'Banner',
   },
   stories: {
     label: 'Stories',
     description: 'A row of tappable rings that open full-screen image stories with a Shop button.',
     singleton: true,
+    pages: HOME_ONLY,
   },
   product_spotlight: {
     label: 'Product spotlight',
     description: 'One product, large, with callouts that appear as the visitor scrolls past.',
+    pages: HOME_ONLY,
   },
   rewards_game: {
     label: 'Rewards game',
     description: 'A spin-the-wheel or scratch card that gives signed-in customers a coupon.',
     singleton: true,
+    pages: HOME_ONLY,
+    audiences: STORE_ONLY,
+    plan: 'campaigns:read',
   },
   slides: {
     label: 'Slides',
     description: 'A slider of offers, categories, products or your own animated slides.',
+  },
+  business_reorder: {
+    label: 'Reorder',
+    description: "The business's most-ordered products, with quick add. Signed-in businesses only.",
+    singleton: true,
+    pages: HOME_ONLY,
+    audiences: BUSINESS_ONLY,
+    plan: BUSINESS_PLAN_SCOPE,
+    aspect: 'Product images',
+  },
+  business_quotes: {
+    label: 'Quotes',
+    description: "Request a quote, and the business's open quotes with their status.",
+    singleton: true,
+    pages: HOME_ONLY,
+    audiences: BUSINESS_ONLY,
+    plan: 'business_rfqs:read',
+  },
+  business_offers: {
+    label: 'Business offers',
+    description: 'Products on a business discount: picked automatically for each business, or chosen by you.',
+    pages: HOME_ONLY,
+    audiences: BUSINESS_ONLY,
+    plan: BUSINESS_PLAN_SCOPE,
+    aspect: 'Product images',
+  },
+  business_account: {
+    label: 'Account snapshot',
+    description: 'Company, recent orders, payments due, open quotes and a sales contact. Signed-in businesses only.',
+    singleton: true,
+    pages: HOME_ONLY,
+    audiences: BUSINESS_ONLY,
+    plan: BUSINESS_PLAN_SCOPE,
   },
 }
 
@@ -278,6 +457,15 @@ export const SECTION_COPY_DEFAULTS = {
   stories: { eyebrow: 'Fresh today', title: 'Stories' },
   product_spotlight: { eyebrow: 'Spotlight', ctaLabel: 'Shop now' },
   rewards_game: { eyebrow: 'Your reward', title: 'Spin to win', ctaLabel: 'Play now' },
+  business_reorder: { eyebrow: 'Buy again', title: 'Reorder your regulars' },
+  business_quotes: {
+    eyebrow: 'Quotes',
+    title: 'Buying in bulk?',
+    subtitle: 'Send us your list and get a quote on business terms.',
+    ctaLabel: 'Request a quote',
+  },
+  business_offers: { eyebrow: 'Business prices', title: 'Your business offers' },
+  business_account: { eyebrow: 'Your account', title: 'Account at a glance' },
 } satisfies Partial<Record<SectionType, SectionCopy>>
 
 export function sectionCopyDefaults(type: SectionType): SectionCopy {
@@ -368,6 +556,9 @@ const DEFAULT_LIMITS: Partial<Record<SectionType, number>> = {
   recently_viewed: 6,
   bundle_spotlight: 4,
   back_in_stock: 8,
+  business_reorder: 8,
+  business_offers: 8,
+  business_quotes: 3,
 }
 
 export function sectionLimit(section: Pick<HomepageSection, 'type' | 'config'>, fallback?: number): number {
@@ -755,6 +946,82 @@ export function rewardsGamePublic(section: Pick<HomepageSection, 'config'>): Rew
     mode: game.mode,
     playLimit: game.playLimit,
     prizes: game.prizes.map(p => ({ id: p.id, label: p.label, kind: p.kind })),
+  }
+}
+
+// Business sections. Their data is the signed-in business's own, so it loads per user on the client.
+
+/** What a signed-out visitor sees where a section needs a business account: nothing, or a sign-in prompt. */
+export type BusinessVisitorView = 'hide' | 'signin'
+
+export const businessVisitorView = (section: Pick<HomepageSection, 'config'>): BusinessVisitorView =>
+  section.config?.visitor === 'signin' ? 'signin' : 'hide'
+
+export type BusinessOffersSource = 'auto' | 'picked'
+
+export interface BusinessOffersConfig {
+  /** `auto`: products in the categories the business has a discount on, biggest discount first. */
+  source: BusinessOffersSource
+  productIds: string[]
+  limit: number
+}
+
+export function businessOffersConfig(section: Pick<HomepageSection, 'type' | 'config'>): BusinessOffersConfig {
+  const productIds = configIds(section, 'productIds').slice(0, 24)
+  return {
+    source: section.config?.source === 'picked' && productIds.length > 0 ? 'picked' : 'auto',
+    productIds,
+    limit: Math.min(sectionLimit(section), 24),
+  }
+}
+
+export const BUSINESS_ACCOUNT_TILES = ['orders', 'payments', 'quotes'] as const
+export type BusinessAccountTile = (typeof BUSINESS_ACCOUNT_TILES)[number]
+
+export interface BusinessContact {
+  name: string | null
+  phone: string | null
+  email: string | null
+}
+
+export interface BusinessAccountConfig {
+  tiles: BusinessAccountTile[]
+  /** Who the business can call; null when the section has none. */
+  contact: BusinessContact | null
+}
+
+export function businessAccountConfig(section: Pick<HomepageSection, 'config'>): BusinessAccountConfig {
+  const raw = section.config?.tiles
+  const tiles = Array.isArray(raw)
+    ? BUSINESS_ACCOUNT_TILES.filter(t => raw.includes(t))
+    : [...BUSINESS_ACCOUNT_TILES]
+  const c = (section.config?.contact ?? {}) as Record<string, unknown>
+  const contact = { name: str(c.name), phone: str(c.phone), email: str(c.email) }
+  return { tiles, contact: contact.name || contact.phone || contact.email ? contact : null }
+}
+
+/** A business section's settings as the clients read them; null for any other type. */
+export interface BusinessSectionPublic {
+  visitor: BusinessVisitorView
+  limit: number
+  offers?: Pick<BusinessOffersConfig, 'source' | 'productIds'>
+  account?: BusinessAccountConfig
+}
+
+export function businessSectionPublic(section: Pick<HomepageSection, 'type' | 'config'>): BusinessSectionPublic | null {
+  if (!BUSINESS_SECTION_TYPES.has(section.type)) return null
+  const visitor = businessVisitorView(section)
+  switch (section.type) {
+    case 'business_offers': {
+      const { source, productIds, limit } = businessOffersConfig(section)
+      return { visitor, limit, offers: { source, productIds } }
+    }
+    case 'business_account':
+      return { visitor, limit: 3, account: businessAccountConfig(section) }
+    case 'business_quotes':
+      return { visitor, limit: Math.min(sectionLimit(section), 10) }
+    default:
+      return { visitor, limit: Math.min(sectionLimit(section), 24) }
   }
 }
 

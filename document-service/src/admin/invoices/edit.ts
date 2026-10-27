@@ -19,6 +19,7 @@ import {
   formatShortfall,
   type Shortfall,
 } from '../../lib/invoice-line-items'
+import { announceLock, assertHolder, draftLockResponse, epochFrom, lockNewDraft } from '../../lib/draft-locks'
 
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -369,8 +370,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         }
       }
 
-      return { moveToDraft, insufficientItems, shortfalls, savedItemIds }
+      // A draft is edited only by its lock holder; one this edit sent back to draft is the editor's.
+      const lock = order.status === 'draft' ? await assertHolder(client, admin, 'invoice', id, { epoch: epochFrom(request) }) : null
+      return { moveToDraft, insufficientItems, shortfalls, savedItemIds, lock }
     })
+    await announceLock(admin, 'invoice', id, result.lock)
+    if (result.moveToDraft && order.status !== 'draft') await lockNewDraft(admin, 'invoice', id)
 
     if (result.moveToDraft) {
       return NextResponse.json({
@@ -396,6 +401,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({ success: true, savedItemIds: result.savedItemIds })
   } catch (err: any) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     console.error(`[admin/invoices/${(await params).id} PATCH] failed`, err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

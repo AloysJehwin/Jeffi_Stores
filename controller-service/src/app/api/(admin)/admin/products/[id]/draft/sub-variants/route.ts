@@ -5,6 +5,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import { isDigitalProduct } from '@/lib/catalog/digital-guard'
 import { priceErrors, roundMoneyFields } from '@/lib/catalog/product-validation'
+import { actorOf, assertDraftHolder, draftLockResponse, epochFrom, type DraftActor } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,6 +87,8 @@ function nameClash(all: any[], variantId: string | null, name: unknown, exceptId
 }
 
 function errorResponse(err: any, productId: string, action: string) {
+  const locked = draftLockResponse(err)
+  if (locked) return locked
   if (err instanceof RouteError) return NextResponse.json({ error: err.message }, { status: err.status })
   console.error(`[draft-sub-variants] ${action} failed for`, productId, err)
   return NextResponse.json({ error: err?.message || `Failed to ${action} sub-variant` }, { status: 500 })
@@ -112,7 +115,8 @@ type Client = { query: (sql: string, params?: unknown[]) => Promise<{ rows: any[
 // serialise on the draft row instead of overwriting each other's array.
 async function mutateSubVariants<T>(
   productId: string,
-  fn: (all: any[], client: Client) => Promise<{ next: any[]; result: T }>
+  fn: (all: any[], client: Client) => Promise<{ next: any[]; result: T }>,
+  lock?: { actor: DraftActor; epoch: number | null }
 ): Promise<T> {
   return withTransaction(async client => {
     const r = await client.query(`SELECT sub_variants FROM product_drafts WHERE product_id = $1 FOR UPDATE`, [
@@ -125,6 +129,8 @@ async function mutateSubVariants<T>(
       productId,
       JSON.stringify(next),
     ])
+    // Same transaction: a refusal (someone else holds the draft) rolls the write back.
+    await assertDraftHolder(client, lock?.actor, 'product', productId, { epoch: lock?.epoch })
     return result
   })
 }
@@ -141,11 +147,14 @@ async function ensureVariantSeeded(client: Client, variantId: string, all: any[]
   return [...all, ...live.map(sv => ({ ...sv, _seeded: true }))]
 }
 
-async function gate(req: NextRequest, write: boolean) {
+async function gate(req: NextRequest, write: boolean): Promise<{ denied: NextResponse | null; actor: DraftActor }> {
   const a = await authenticateAdmin(req)
-  if (!a) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!a) return { denied: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }), actor: null }
   const allowed = write ? hasScope(a.role, a.scopes, 'products:write') : hasScope(a.role, a.scopes, 'products:read')
-  return allowed ? null : NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  return {
+    denied: allowed ? null : NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+    actor: actorOf(a),
+  }
 }
 
 // GET — return the complete sub-variant set for a variant. If the variant has been
@@ -153,7 +162,7 @@ async function gate(req: NextRequest, write: boolean) {
 // otherwise fall back to the live rows.
 export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params
-  const denied = await gate(req, false)
+  const { denied } = await gate(req, false)
   if (denied) return denied
 
   const variantId = req.nextUrl.searchParams.get('variant_id')
@@ -178,8 +187,9 @@ export async function GET(req: NextRequest, { params }: Params) {
 // a complete snapshot, then append the new draft row.
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
-  const denied = await gate(req, true)
+  const { denied, actor } = await gate(req, true)
   if (denied) return denied
+  const lock = { actor, epoch: epochFrom(req) }
 
   try {
     const variantId = req.nextUrl.searchParams.get('variant_id')
@@ -188,16 +198,20 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await readBody(req, PostSchema)
     priceCheck(body)
 
-    const newSv = await mutateSubVariants(id, async (stored, client) => {
-      const all = await ensureVariantSeeded(client, variantId, stored)
-      nameClash(all, variantId, body.sub_variant_name)
-      const sv = {
-        ...roundMoneyFields(body),
-        id: `draft-sv-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        variant_id: variantId,
-      }
-      return { next: [...all, sv], result: sv }
-    })
+    const newSv = await mutateSubVariants(
+      id,
+      async (stored, client) => {
+        const all = await ensureVariantSeeded(client, variantId, stored)
+        nameClash(all, variantId, body.sub_variant_name)
+        const sv = {
+          ...roundMoneyFields(body),
+          id: `draft-sv-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          variant_id: variantId,
+        }
+        return { next: [...all, sv], result: sv }
+      },
+      lock
+    )
     return NextResponse.json({ sub_variant: newSv }, { status: 201 })
   } catch (err) {
     return errorResponse(err, id, 'add')
@@ -208,22 +222,27 @@ export async function POST(req: NextRequest, { params }: Params) {
 // (live rows also leave a _cleared sentinel so publish deletes them).
 export async function DELETE(req: NextRequest, { params }: Params) {
   const { id } = await params
-  const denied = await gate(req, true)
+  const { denied, actor } = await gate(req, true)
   if (denied) return denied
+  const lock = { actor, epoch: epochFrom(req) }
 
   try {
     const variantId = req.nextUrl.searchParams.get('variant_id')
     const { id: svId } = await readBody(req, DeleteSchema)
-    await mutateSubVariants(id, async (stored, client) => {
-      const all = variantId ? await ensureVariantSeeded(client, variantId, stored) : stored
-      const filtered = all.filter((sv: any) => sv.id !== svId)
-      // Live sub-variants (real UUID ids) get a cleared sentinel so publish deletes them;
-      // draft-sv- rows are just dropped.
-      if (!String(svId).startsWith('draft-sv-')) {
-        filtered.push({ _cleared: true, id: `cleared-sv-${Date.now()}`, variant_id: variantId, original_id: svId })
-      }
-      return { next: filtered, result: null }
-    })
+    await mutateSubVariants(
+      id,
+      async (stored, client) => {
+        const all = variantId ? await ensureVariantSeeded(client, variantId, stored) : stored
+        const filtered = all.filter((sv: any) => sv.id !== svId)
+        // Live sub-variants (real UUID ids) get a cleared sentinel so publish deletes them;
+        // draft-sv- rows are just dropped.
+        if (!String(svId).startsWith('draft-sv-')) {
+          filtered.push({ _cleared: true, id: `cleared-sv-${Date.now()}`, variant_id: variantId, original_id: svId })
+        }
+        return { next: filtered, result: null }
+      },
+      lock
+    )
     return NextResponse.json({ success: true })
   } catch (err) {
     return errorResponse(err, id, 'delete')
@@ -234,27 +253,32 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 // place by id (never append a lone live row again).
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params
-  const denied = await gate(req, true)
+  const { denied, actor } = await gate(req, true)
   if (denied) return denied
+  const lock = { actor, epoch: epochFrom(req) }
 
   try {
     const variantId = req.nextUrl.searchParams.get('variant_id')
     const body = await readBody(req, PatchSchema)
     const { id: svId, ...updates } = roundMoneyFields(body)
 
-    const result = await mutateSubVariants(id, async (stored, client) => {
-      const all = variantId ? await ensureVariantSeeded(client, variantId, stored) : stored
-      const existing = all.find((sv: any) => sv.id === svId)
-      priceCheck({ ...(existing || {}), ...updates })
-      if (updates.sub_variant_name !== undefined)
-        nameClash(all, existing?.variant_id ?? variantId, updates.sub_variant_name, svId)
-      // Merge onto the existing row and mark it edited so publish reliably detects a change;
-      // a row not found even after seeding (a brand-new client id) is added.
-      const next = existing
-        ? all.map((sv: any) => (sv.id === svId ? { ...sv, ...updates, _edited: true } : sv))
-        : [...all, { ...body, variant_id: variantId, _edited: true }]
-      return { next, result: next.find((sv: any) => sv.id === svId) }
-    })
+    const result = await mutateSubVariants(
+      id,
+      async (stored, client) => {
+        const all = variantId ? await ensureVariantSeeded(client, variantId, stored) : stored
+        const existing = all.find((sv: any) => sv.id === svId)
+        priceCheck({ ...(existing || {}), ...updates })
+        if (updates.sub_variant_name !== undefined)
+          nameClash(all, existing?.variant_id ?? variantId, updates.sub_variant_name, svId)
+        // Merge onto the existing row and mark it edited so publish reliably detects a change;
+        // a row not found even after seeding (a brand-new client id) is added.
+        const next = existing
+          ? all.map((sv: any) => (sv.id === svId ? { ...sv, ...updates, _edited: true } : sv))
+          : [...all, { ...body, variant_id: variantId, _edited: true }]
+        return { next, result: next.find((sv: any) => sv.id === svId) }
+      },
+      lock
+    )
     return NextResponse.json({ sub_variant: result })
   } catch (err) {
     return errorResponse(err, id, 'update')

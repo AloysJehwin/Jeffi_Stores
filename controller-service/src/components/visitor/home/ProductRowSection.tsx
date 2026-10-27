@@ -19,6 +19,9 @@ interface ProductRowSectionProps {
   footerCta?: { href: string; label: string }
   carousel?: boolean
   badgeFor?: (product: any) => string | null
+  /** Product image shape (width / height); unset keeps the card's own. */
+  imageAspect?: number | null
+  portal?: 'storefront' | 'business'
 }
 
 export default function ProductRowSection({
@@ -37,6 +40,8 @@ export default function ProductRowSection({
   footerCta,
   carousel = false,
   badgeFor,
+  imageAspect,
+  portal,
 }: ProductRowSectionProps) {
   const heading = (
     <div>
@@ -46,7 +51,13 @@ export default function ProductRowSection({
   )
 
   const cards = products.map((product: any) => (
-    <ProductCard key={product.id} {...productCardProps(product, gstEnabled)} badge={badgeFor?.(product) ?? null} />
+    <ProductCard
+      key={product.id}
+      {...productCardProps(product, gstEnabled)}
+      badge={badgeFor?.(product) ?? null}
+      imageAspect={imageAspect}
+      portal={portal}
+    />
   ))
 
   return (

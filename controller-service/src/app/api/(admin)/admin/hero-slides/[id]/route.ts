@@ -3,7 +3,8 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
-import { applyDraftPatch, withHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { applyDraftPatch, homepageLockFrom, withHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,7 +78,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const row = draft.heroSlides.find(s => s.id === id)
     if (row) applyDraftPatch(row, updates)
     return row ?? null
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (slide instanceof NextResponse) return slide
   if (!slide) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
   return NextResponse.json({ slide })
 }
@@ -90,8 +92,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasScope(admin.role, admin.scopes, 'settings:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  await withHomepageDraft(admin.adminId, draft => {
+  const saved = await withHomepageDraft(admin.adminId, draft => {
     draft.heroSlides = draft.heroSlides.filter(s => s.id !== id)
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (saved instanceof NextResponse) return saved
   return NextResponse.json({ success: true })
 }

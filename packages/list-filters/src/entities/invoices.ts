@@ -141,6 +141,7 @@ export const INVOICE_SORTS: Record<string, string> = {
   total_amount: 'total_amount',
   payment_status: 'payment_status',
   source: 'source',
+  irn_status: 'irn_status',
 }
 
 export const INVOICES_ENTITY = unionEntity<InvoiceKey>({

@@ -13,6 +13,10 @@ import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { listCampaigns } from '@/lib/admin/messaging'
 import { MESSAGING_ENTITY } from '@/lib/filters/entities/messaging'
 import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messaging'
+import { getDraftLockMap } from '@/lib/admin/draft-locks'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -38,13 +42,14 @@ const STATUS_STYLES: Record<string, string> = {
 type SP = Record<string, string | undefined>
 
 export default async function MailerPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const host = await getHost()
-  const sp = await searchParams
+  const [host, sp, flags] = await Promise.all([getHost(), searchParams, getFeatureFlags()])
+  // Only the channels Site Controls leaves on.
+  const sends = ['email', flags.smsEnabled && 'SMS', flags.whatsappEnabled && 'WhatsApp'].filter(Boolean).join(', ')
   const tab = isListUrl(sp, MESSAGING_FIELDS) ? 'list' : 'overview'
   const href = (t: string) => ap(tabHref('/admin/marketing/messaging', t, sp, MESSAGING_FIELDS), host)
   return (
     <PageBody>
-      <PageHeader title="Messaging" description="Send email, SMS and WhatsApp messages to your customers" />
+      <PageHeader title="Messaging" description={`Send ${sends.replace(/, ([^,]*)$/, ' and $1')} messages to your customers`} />
 
       <TabLinks
         tabs={[
@@ -67,6 +72,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="mailer" />
           <ListFilters entity="messaging" fields={MESSAGING_FIELDS} search={MESSAGING_SEARCH} noun="Messages" tab="list" exportable />
           <Suspense key={listKey(sp)} fallback={<TableSkeleton rows={8} cols={6} />}>
             <MailerListContent resolvedSearchParams={sp} />
@@ -88,10 +94,15 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
   let migrationPending = false
 
   try {
-    ;({ campaigns, total } = await listCampaigns<Campaign>(q, page, PAGE_SIZE))
+    ;({ campaigns, total } = await listCampaigns<Campaign>(q, page, PAGE_SIZE, { get: k => resolvedSearchParams[k] ?? null }))
   } catch {
     migrationPending = true
   }
+  // Who is editing each draft (owner badge).
+  const [locks, session] = await Promise.all([
+    getDraftLockMap('mailer', campaigns.filter(c => c.status === 'draft').map(c => c.id)),
+    getAdminSession(),
+  ])
 
   // Back link from a message: this tab, these filters, this page.
   const currentListUrl = (() => {
@@ -126,6 +137,8 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
       currentListUrl={currentListUrl}
       templateLabels={TEMPLATE_LABELS}
       statusStyles={STATUS_STYLES}
+      locks={locks}
+      meId={session?.adminId ?? null}
     />
   )
 }

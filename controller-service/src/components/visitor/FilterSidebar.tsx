@@ -33,7 +33,7 @@ interface FilterSidebarProps {
 }
 
 // brand is now a filter param, not just a preserved param
-const PRESERVED_PARAMS = ['search', 'sort', 'order', 'category'] as const
+const PRESERVED_PARAMS = ['search', 'sort', 'dir', 'order', 'category'] as const
 
 const PRICE_PRESETS: { label: string; min: number | null; max: number | null }[] = [
   { label: 'Under ₹500', min: null, max: 500 },

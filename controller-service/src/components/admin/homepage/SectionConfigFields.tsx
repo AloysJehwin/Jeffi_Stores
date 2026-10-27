@@ -1,14 +1,26 @@
 'use client'
 
-import { SECTION_META, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
-import { AiCopyScope, DateTimeField, Grid, useSectionBinding, type EditorProps } from './editors/fields'
+import { SECTION_META, rowAudience, rowPage, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
+import {
+  AiCopyScope,
+  AspectField,
+  DateTimeField,
+  Grid,
+  PlacementFields,
+  useSectionBinding,
+  type EditorProps,
+} from './editors/fields'
 import AboutEditor from './editors/AboutEditor'
 import BackInStockEditor from './editors/BackInStockEditor'
 import BenefitsEditor from './editors/BenefitsEditor'
 import BlogTeaserEditor from './editors/BlogTeaserEditor'
 import BrandCarouselEditor from './editors/BrandCarouselEditor'
 import BundleSpotlightEditor from './editors/BundleSpotlightEditor'
+import BusinessAccountEditor from './editors/BusinessAccountEditor'
 import BusinessCtaEditor from './editors/BusinessCtaEditor'
+import BusinessOffersEditor from './editors/BusinessOffersEditor'
+import BusinessQuotesEditor from './editors/BusinessQuotesEditor'
+import BusinessReorderEditor from './editors/BusinessReorderEditor'
 import CategoryGridEditor from './editors/CategoryGridEditor'
 import CategoryShowcaseEditor from './editors/CategoryShowcaseEditor'
 import CategoryTabsEditor from './editors/CategoryTabsEditor'
@@ -37,7 +49,11 @@ const EDITORS: Partial<Record<SectionType, (props: EditorProps) => React.ReactEl
   blog_teaser: BlogTeaserEditor,
   brand_carousel: BrandCarouselEditor,
   bundle_spotlight: BundleSpotlightEditor,
+  business_account: BusinessAccountEditor,
   business_cta: BusinessCtaEditor,
+  business_offers: BusinessOffersEditor,
+  business_quotes: BusinessQuotesEditor,
+  business_reorder: BusinessReorderEditor,
   category_grid: CategoryGridEditor,
   category_showcase: CategoryShowcaseEditor,
   category_tabs: CategoryTabsEditor,
@@ -63,9 +79,12 @@ export default function SectionConfigFields(props: EditorProps) {
   const { section } = props
   const Editor = EDITORS[section.type]
   const meta = SECTION_META[section.type]
-  const surface = rowSurface(section) === 'app' ? 'mobile app' : 'website'
+  const surface = SURFACE_NAMES[rowSurface(section)]
+  const page = rowPage(section)
+  const home = rowAudience(section) === 'business' ? 'business homepage' : 'homepage'
+  const where = page === 'home' ? `the ${surface} ${home}` : `the ${surface} ${PAGE_NAMES[page]}, between the products`
   const heading = section.title ? ` Section heading: "${section.title}".` : ''
-  const aiContext = `Section "${meta.label}" on the ${surface} homepage: ${meta.description}${heading}`
+  const aiContext = `Section "${meta.label}" on ${where}: ${meta.description}${heading}`
 
   return (
     <div className="space-y-4">
@@ -74,10 +93,24 @@ export default function SectionConfigFields(props: EditorProps) {
           <Editor {...props} />
         </AiCopyScope>
       )}
+      {(page !== 'home' || meta.aspect) && (
+        <div className="pt-3 border-t border-border-default space-y-3">
+          <p className="text-xs font-semibold text-foreground">Position and shape</p>
+          {page !== 'home' && <PlacementFields props={props} />}
+          {meta.aspect && (
+            <Grid>
+              <AspectField props={props} />
+            </Grid>
+          )}
+        </div>
+      )}
       <Scheduling {...props} />
     </div>
   )
 }
+
+const SURFACE_NAMES = { web: 'desktop website', web_mobile: 'mobile website', app: 'mobile app' } as const
+const PAGE_NAMES = { products: 'all-products page', category: 'category pages', brand: 'brand pages' } as const
 
 function Scheduling(props: EditorProps) {
   const { section, canWrite } = props

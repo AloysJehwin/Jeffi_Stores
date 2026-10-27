@@ -4,9 +4,10 @@ import { hasScope } from '../../lib/scopes'
 import { query, queryMany, queryOne } from '@jeffi/tenancy'
 import { z } from 'zod'
 import { parseBody } from '../../lib/validate'
+import { acquireLock, isDraftLockError, lockNewDraft } from '../../lib/draft-locks'
 
 
-/** List my open PO drafts (promoted_po_id IS NULL). */
+/** List my open PO drafts (promoted_po_id IS NULL): ones I hold, or started and nobody holds. */
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,7 +19,9 @@ export async function GET(request: NextRequest) {
             d.status, d.notes, jsonb_array_length(d.line_items) AS line_count, d.updated_at
        FROM po_drafts d
        LEFT JOIN suppliers s ON s.id = d.supplier_id
-      WHERE d.admin_id = $1 AND d.promoted_po_id IS NULL
+       LEFT JOIN draft_locks l ON l.resource_type = 'po_new' AND l.resource_id = d.id AND l.closed_at IS NULL
+      WHERE d.promoted_po_id IS NULL
+        AND (l.owner_admin_id = $1 OR (d.admin_id = $1 AND l.owner_admin_id IS NULL))
       ORDER BY d.updated_at DESC`,
     [admin.id]
   )
@@ -49,7 +52,16 @@ export async function POST(request: NextRequest) {
     `SELECT id FROM po_drafts WHERE admin_id = $1 AND promoted_po_id IS NULL LIMIT 1`,
     [admin.id]
   )
-  if (existing) return NextResponse.json({ id: existing.id, resumed: true })
+  if (existing) {
+    // Handed over or taken over: still this admin's one open draft, opened read-only (423).
+    try {
+      await acquireLock(null, admin, 'po_new', existing.id)
+    } catch (err) {
+      if (!isDraftLockError(err)) throw err
+      return NextResponse.json({ ...err.body(), id: existing.id, resumed: true }, { status: 423 })
+    }
+    return NextResponse.json({ id: existing.id, resumed: true })
+  }
 
   const parsed = parseBody(createSchema, await request.json().catch(() => ({})))
   if (!parsed.ok) return parsed.response
@@ -69,5 +81,6 @@ export async function POST(request: NextRequest) {
       JSON.stringify(d.line_items ?? []),
     ]
   )
+  if (row?.id) await lockNewDraft(admin, 'po_new', row.id)
   return NextResponse.json({ id: row?.id, resumed: false })
 }

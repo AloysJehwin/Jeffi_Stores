@@ -220,7 +220,8 @@ function findScrollParent(): HTMLElement | null {
  * param change starts over. A fresh mount with page>1 (refresh, back) is replaced to page 1, so
  * the list is always complete from the top without fetching pages 1..N at once.
  */
-export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param = 'page' }: { rows: T[]; page: number; total: number; rowKey: (r: T) => string; pageHref?: (p: number) => string; param?: string }): { rows: T[]; resetting: boolean; control: InfiniteControl } {
+/** `isExtra` marks rows that aren't part of the paged total (a promo or section between products). */
+export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param = 'page', isExtra }: { rows: T[]; page: number; total: number; rowKey: (r: T) => string; pageHref?: (p: number) => string; param?: string; isExtra?: (r: T) => boolean }): { rows: T[]; shown: number; resetting: boolean; control: InfiniteControl } {
   const sp = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -275,7 +276,8 @@ export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param =
       }
     }
   }
-  const hasMore = !resetting && rows.length > 0 && merged.length < total
+  const shown = isExtra ? merged.filter(r => !isExtra(r)).length : merged.length
+  const hasMore = !resetting && rows.length > 0 && shown < total
   useEffect(() => {
     if (!pending && requested.current && !requested.current.endsWith('#1')) requested.current = null
   }, [pending, page])
@@ -318,21 +320,21 @@ export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param =
     startTransition(() => router.replace(href(page + 1), { scroll: false }))
   }, [pending, hasMore, router, href, page, key])
 
-  return { rows: merged, resetting, control: { total, hasMore, loadingMore: pending, loadMore } }
+  return { rows: merged, shown, resetting, control: { total, hasMore, loadingMore: pending, loadMore } }
 }
 
 /**
  * Server components with ?page lists of rendered nodes (no row data on the client): pass this
  * page's rendered items; earlier pages are kept and the footer advances the URL.
  */
-export function ServerPagedItems({ items, page, total, noun, wrap, param, wrapClassName, footerClassName }: { items: { key: string; node: ReactNode }[]; page: number; total: number; noun?: string; wrap?: 'tbody' | 'div' | 'ul'; param?: string; wrapClassName?: string; footerClassName?: string }) {
-  const { rows, resetting, control } = useServerPages({ rows: items, page, total, rowKey: i => i.key, param })
+export function ServerPagedItems({ items, page, total, noun, wrap, param, wrapClassName, footerClassName }: { items: { key: string; node: ReactNode; extra?: boolean }[]; page: number; total: number; noun?: string; wrap?: 'tbody' | 'div' | 'ul'; param?: string; wrapClassName?: string; footerClassName?: string }) {
+  const { rows, shown, resetting, control } = useServerPages({ rows: items, page, total, rowKey: i => i.key, param, isExtra: i => !!i.extra })
   if (resetting) return null
   const nodes = rows.map(i => <FragmentKey key={i.key}>{i.node}</FragmentKey>)
   return (
     <>
       {wrap === 'tbody' ? <tbody className={wrapClassName}>{nodes}</tbody> : wrap === 'ul' ? <ul className={wrapClassName}>{nodes}</ul> : <div className={wrapClassName}>{nodes}</div>}
-      <InfiniteFooterOutsideTable wrap={wrap} shown={rows.length} control={control} noun={noun} className={footerClassName} />
+      <InfiniteFooterOutsideTable wrap={wrap} shown={shown} control={control} noun={noun} className={footerClassName} />
     </>
   )
 }

@@ -5,6 +5,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { suggestIcon } from '@/lib/shared/icon-suggest'
 import { canUseAi } from '@/lib/auth/ai-scope'
 import { revalidatePath } from 'next/cache'
+import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -17,10 +18,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Publish a create-draft: flip is_draft = false (+ is_active) without requiring the full body.
   if (body.is_draft === false && body.name === undefined) {
-    await query(`UPDATE categories SET is_draft = false, is_active = COALESCE($2::boolean, is_active) WHERE id = $1`, [
-      id,
-      typeof body.is_active === 'boolean' ? body.is_active : null,
-    ])
+    try {
+      await withDraftPublish(
+        actorOf(admin),
+        'category',
+        id,
+        db =>
+          db.query(
+            `UPDATE categories SET is_draft = false, is_active = COALESCE($2::boolean, is_active) WHERE id = $1`,
+            [id, typeof body.is_active === 'boolean' ? body.is_active : null]
+          ),
+        { epoch: epochFrom(req) }
+      )
+    } catch (err) {
+      const locked = draftLockResponse(err)
+      if (locked) return locked
+      throw err
+    }
     revalidatePath('/admin/categories')
     const updated = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [id])
     return NextResponse.json(updated)

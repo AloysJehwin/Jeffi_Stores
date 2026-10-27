@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin, type AdminJWTPayload } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
-import { discardHomepageDraft, getHomepageDraftSummary } from '@/lib/catalog/homepage-draft'
+import { discardHomepageDraft, getHomepageDraftSummary, homepageLockFrom } from '@/lib/catalog/homepage-draft'
+import { lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,9 @@ export async function DELETE(request: NextRequest) {
   const admin = await guard(request)
   if (admin instanceof NextResponse) return admin
 
-  const discarded = await discardHomepageDraft()
+  // Holder, or an owner role (audited); 423 for anyone else.
+  const discarded = await discardHomepageDraft(homepageLockFrom(admin, request)).catch(lockedOr)
+  if (discarded instanceof NextResponse) return discarded
   if (discarded) {
     await logAdminAudit({
       adminId: admin.adminId,

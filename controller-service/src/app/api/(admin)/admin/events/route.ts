@@ -4,6 +4,10 @@ import { listAdminNotifications } from '@/lib/shared/admin-notify'
 import { getSessionDeadline, revokeSessionById } from '@/lib/auth/auth-sessions'
 import { subscribeSessionEvents } from '@/lib/auth/session-events'
 import { resolveTenant, runWithTenantContext } from '@/lib/tenancy/tenant-context'
+import { changedSince, DRAFT_RESOURCES } from '@jeffi/draft-locks'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
+import { subscribeLockFrames, type LockFrame } from '@/lib/admin/draft-lock-events'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -13,7 +17,9 @@ const KEEPALIVE_MS = 25000
 const DEADLINE_GRACE_MS = 1500
 
 /**
- * One event stream per admin tab. Frames are `{ kind: 'session' | 'notifications', ... }`.
+ * One event stream per admin tab. Frames are `{ kind: 'session' | 'notifications' | 'lock', ... }`.
+ * Lock frames come from the tenant's pub/sub channel and from a draft_locks.updated_at poll on
+ * the same 5 s tick (no Redis, other instances, document-service); clients treat them as idempotent.
  * Session frames: `hello` (current deadline on connect), `deadline` (another tab or browser
  * touched the session), `logout` (the session ended anywhere). The server also arms a timer at
  * the deadline and, when it fires, re-reads the row and revokes it if still idle, so the tab
@@ -35,6 +41,7 @@ export async function GET(request: NextRequest) {
     async start(controller) {
       let deadlineTimer: ReturnType<typeof setTimeout> | null = null
       let unsubscribe: (() => void) | null = null
+      let unsubscribeLocks: (() => void) | null = null
       let pollTimer: ReturnType<typeof setInterval> | null = null
       let keepaliveTimer: ReturnType<typeof setInterval> | null = null
 
@@ -53,6 +60,7 @@ export async function GET(request: NextRequest) {
         if (pollTimer) clearInterval(pollTimer)
         if (keepaliveTimer) clearInterval(keepaliveTimer)
         unsubscribe?.()
+        unsubscribeLocks?.()
         try {
           controller.close()
         } catch {
@@ -105,11 +113,34 @@ export async function GET(request: NextRequest) {
         armDeadline()
       })
 
+      // Only drafts the admin may read.
+      const canRead = (t: LockFrame['resourceType']) =>
+        !!DRAFT_RESOURCES[t] && hasScope(admin.role, admin.scopes, DRAFT_RESOURCES[t].readScope)
+      unsubscribeLocks = subscribeLockFrames(tenant?.tenantId ?? null, frame => {
+        if (!closed && canRead(frame.resourceType)) send(frame)
+      })
+      let lockCursor: string | null = null
+      const db = { query: (t: string, p?: unknown[]) => query(t, p as any[]) }
+      const pollLocks = async () => {
+        try {
+          const r = await inCtx(() => changedSince(db, lockCursor, { hasScope }))
+          lockCursor = r.cursor
+          for (const lock of r.locks) {
+            if (!canRead(lock.resourceType)) continue
+            const type = lock.closedAt ? 'closed' : !lock.ownerId ? 'released' : lock.via === 'takeover' ? 'takeover' : lock.via === 'handover' ? 'handover' : 'acquired'
+            send({ kind: 'lock', type, resourceType: lock.resourceType, resourceId: lock.resourceId, lock, by: null, reason: lock.reason, at: lock.updatedAt } satisfies LockFrame)
+          }
+        } catch {
+          /* table missing or transient */
+        }
+      }
+
       let lastSignature = ''
       const tick = async () => {
         if (closed) return
+        await pollLocks()
         try {
-          const { items, unreadCount } = await inCtx(() => listAdminNotifications(admin.role, admin.scopes))
+          const { items, unreadCount } = await inCtx(() => listAdminNotifications(admin.role, admin.scopes, 30, admin.adminId))
           const signature = `${unreadCount}:${items[0]?.id ?? ''}:${items[0]?.is_read ?? ''}`
           if (signature !== lastSignature) {
             lastSignature = signature

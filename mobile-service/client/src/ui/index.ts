@@ -34,7 +34,7 @@ export { Overlay } from './Overlay'
 export { Stepper } from './Stepper'
 export { confirm, notify, ConfirmHost } from './ConfirmSheet'
 export { KeyboardScroll } from './KeyboardScroll'
-export { Screen, ScreenHeader, ScreenFooter, Section, GUTTER, useBottomInset, type ScreenProps, type ScreenHeaderProps } from './Screen'
+export { Screen, ScreenHeader, ScreenFooter, Section, GUTTER, HeaderMenuContext, useBottomInset, type ScreenProps, type ScreenHeaderProps } from './Screen'
 export { toast } from './toaster'
 export {
   ProductCardSkeleton, ProductGridSkeleton, ProductRailSkeleton, SectionTitleSkeleton, CircleRowSkeleton, HomeSkeleton,

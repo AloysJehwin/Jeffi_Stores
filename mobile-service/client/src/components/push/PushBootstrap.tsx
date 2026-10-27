@@ -5,11 +5,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import * as Notifications from 'expo-notifications'
 import { markNotificationOpened } from '../../api/notifications'
 import { openHref } from '../../lib/links'
-import { detachPushDevice, initPush, maybePromptForPush, PUSH_PERMISSION_KEY, pushData, syncPushDevice } from '../../lib/push'
+import { detachPushDevice, initPush, maybePromptForPush, maybePromptOnFirstLaunch, PUSH_PERMISSION_KEY, pushData, syncPushDevice } from '../../lib/push'
 import { useAuthStore } from '../../stores/authStore'
 
 // Root-level push wiring: channels and handler, device registration per signed-in user, taps from a
-// warm or cold start, and the soft ask after an order is placed.
+// warm or cold start, and the soft ask on first launch and after an order is placed.
 
 export function PushBootstrap() {
   const router = useRouter()
@@ -74,6 +74,14 @@ export function PushBootstrap() {
     if (link) openHref(router, link)
     else if (userId) router.push('/notifications')
   }, [tap, authLoading, navReady, userId, router, qc])
+
+  // First launch: offer notifications once the storefront has settled (once per install).
+  const onTabs = segments[0] === '(tabs)'
+  useEffect(() => {
+    if (!navReady || authLoading || !onTabs) return
+    const timer = setTimeout(() => void maybePromptOnFirstLaunch(), 2500)
+    return () => clearTimeout(timer)
+  }, [navReady, authLoading, onTabs])
 
   // The order placed page: offer delivery updates once the celebration has played.
   const onConfirmation = segments.join('/') === 'checkout/confirmation'

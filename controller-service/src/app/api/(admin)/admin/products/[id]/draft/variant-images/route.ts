@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, query } from '@/lib/shared/db'
-import { uploadVariantImage, getS3Url, currentBucket, UploadValidationError } from '@/lib/shared/s3'
+import { queryOne } from '@/lib/shared/db'
+import { uploadVariantImage, getS3Url, currentBucket, deleteProductImage, UploadValidationError } from '@/lib/shared/s3'
 import { parseBody, zUuid } from '@/lib/shared/validate'
+import { actorOf, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
 
 // Draft-scoped variant images. Uploads go to S3 immediately (a file must physically
 // exist before publish), but the ROW is staged in product_drafts.variant_images —
@@ -42,11 +43,31 @@ async function getStage(productId: string): Promise<any[]> {
   return Array.isArray(row?.variant_images) ? row!.variant_images : []
 }
 
-async function saveStage(productId: string, stage: any[]): Promise<void> {
-  await query(`UPDATE product_drafts SET variant_images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-    productId,
-    JSON.stringify(stage),
-  ])
+// Write the stage under the draft lock: a 423 response when someone else holds the draft.
+async function saveStage(
+  req: NextRequest,
+  admin: { adminId?: string; role?: string; scopes?: string[] },
+  productId: string,
+  stage: any[]
+): Promise<NextResponse | null> {
+  try {
+    await withDraftWrite(
+      actorOf(admin),
+      'product',
+      productId,
+      db =>
+        db.query(`UPDATE product_drafts SET variant_images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+          productId,
+          JSON.stringify(stage),
+        ]),
+      { epoch: epochFrom(req), assertAfter: true }
+    )
+    return null
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
 }
 
 function forVariant(stage: any[], variantId: string): any[] {
@@ -135,7 +156,12 @@ export async function POST(request: NextRequest, { params }: Params) {
         _staged: true, // freshly uploaded S3 file, not yet in live variant_images
       }
     }
-    await saveStage(id, [...stage, staged])
+    const locked = await saveStage(request, admin, id, [...stage, staged])
+    if (locked) {
+      if (staged?._staged && staged.s3_key)
+        await deleteProductImage(staged.s3_key, staged.s3_thumbnail_key || '').catch(() => {})
+      return locked
+    }
     return NextResponse.json({ image: staged })
   } catch (err: any) {
     if (err instanceof UploadValidationError) return NextResponse.json({ error: err.message }, { status: 400 })
@@ -172,7 +198,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
     if (rest[0]) next = next.map((vi: any) => (vi.id === rest[0].id ? { ...vi, is_primary: true } : vi))
   }
-  await saveStage(id, next)
+  const locked = await saveStage(request, admin, id, next)
+  if (locked) return locked
   return NextResponse.json({ success: true })
 }
 
@@ -198,6 +225,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (displayOrder !== undefined && vi.id === imageId) return { ...vi, display_order: displayOrder }
     return vi
   })
-  await saveStage(id, next)
+  const locked = await saveStage(request, admin, id, next)
+  if (locked) return locked
   return NextResponse.json({ success: true })
 }

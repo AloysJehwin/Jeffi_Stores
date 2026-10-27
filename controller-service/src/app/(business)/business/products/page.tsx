@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL } from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { positiveInt, productOrderBy, productSortSql } from '@/lib/catalog/product-sort'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import FilterSidebar from '@/components/visitor/FilterSidebar'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
@@ -77,39 +78,6 @@ function buildListingConditions(searchParams: any) {
 async function getProducts(searchParams: any) {
   const { conditions, params, paramIndex } = buildListingConditions(searchParams)
 
-  const sortBy = searchParams.sort || 'created_at'
-  const sortOrder = searchParams.order === 'asc' ? 'ASC' : 'DESC'
-
-  const allowedSortColumns: Record<string, string> = {
-    created_at: 'p.created_at',
-    name: 'p.name',
-    category: 'c.name, p.name',
-    base_price: `CASE WHEN p.has_variants THEN (
-      SELECT MIN(price) FROM (
-        SELECT pv2.price FROM product_variants pv2
-        WHERE pv2.product_id = p.id AND pv2.is_active = true AND pv2.price IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv2 WHERE sv2.variant_id = pv2.id AND sv2.is_active = true)
-        UNION ALL
-        SELECT sv2.price FROM product_sub_variants sv2
-        JOIN product_variants pv2 ON pv2.id = sv2.variant_id
-        WHERE pv2.product_id = p.id AND pv2.is_active = true AND sv2.is_active = true AND sv2.price IS NOT NULL
-      ) AS ep
-    ) ELSE COALESCE(p.price_ex_gst, p.base_price) END`,
-    price: `CASE WHEN p.has_variants THEN (
-      SELECT MIN(price) FROM (
-        SELECT pv2.price FROM product_variants pv2
-        WHERE pv2.product_id = p.id AND pv2.is_active = true AND pv2.price IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv2 WHERE sv2.variant_id = pv2.id AND sv2.is_active = true)
-        UNION ALL
-        SELECT sv2.price FROM product_sub_variants sv2
-        JOIN product_variants pv2 ON pv2.id = sv2.variant_id
-        WHERE pv2.product_id = p.id AND pv2.is_active = true AND sv2.is_active = true AND sv2.price IS NOT NULL
-      ) AS ep
-    ) ELSE COALESCE(p.price_ex_gst, p.base_price) END`,
-  }
-  const sortColumn = allowedSortColumns[sortBy] || 'p.created_at'
-  const hasExplicitSort = !!searchParams.sort
-
   const whereClause = conditions.join(' AND ')
 
   const countRow = await queryOne<{ total: string }>(
@@ -118,22 +86,18 @@ async function getProducts(searchParams: any) {
   )
   const total = Number(countRow?.total ?? 0)
 
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const page = positiveInt(searchParams.page, 1)
   const offset = (page - 1) * PAGE_SIZE
 
+  const { gstEnabled } = await getFeatureFlags()
   const rankParams: unknown[] = []
-  let orderBy: string
-  if (hasExplicitSort) {
-    orderBy = `${sortColumn} ${sortOrder}`
-  } else if (searchParams.search) {
+  let fallback: string | undefined
+  if (searchParams.search && !productSortSql(searchParams, gstEnabled)) {
     const rk = buildProductSearchRank(searchParams.search, 'p.name', 'p.search_vector', paramIndex)
     rankParams.push(...rk.params)
-    orderBy = `${rk.rank}, p.name ASC`
-  } else {
-    orderBy = `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
+    fallback = `${rk.rank}, p.name ASC`
   }
-
-  const { gstEnabled } = await getFeatureFlags()
+  const orderBy = productOrderBy(searchParams, { gstEnabled, fallback })
   const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
 
   const sql = `
@@ -294,6 +258,7 @@ function buildPageUrl(searchParams: Record<string, string | undefined>, page: nu
     'offer',
     'search',
     'sort',
+    'dir',
     'order',
     'minPrice',
     'maxPrice',
@@ -445,6 +410,7 @@ export default async function BusinessProductsPage({
                       promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined}
                       pagedItems={items}
                       page={page}
+                      basePath={basePath}
                     />
                   )
                 })()}

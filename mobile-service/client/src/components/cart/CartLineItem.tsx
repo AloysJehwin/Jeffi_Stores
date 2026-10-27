@@ -16,8 +16,11 @@ export default function CartLineItem({
   onQuantity,
   onSave,
   onRemove,
+  businessPct = 0,
 }: {
   item: CartLine
+  /** A business account's discount for this line's category, in percent. */
+  businessPct?: number
   updating: boolean
   last: boolean
   onQuantity: (qty: number) => void
@@ -29,8 +32,12 @@ export default function CartLineItem({
   const custom = isCustomQty(item)
   const factor = unitFactor(item)
   const unitPrice = inclusiveUnit(item)
-  const price = custom ? Number(item.price_at_addition) : unitPrice * factor
-  const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
+  const biz = custom ? 0 : businessPct
+  const listPrice = custom ? Number(item.price_at_addition) : unitPrice * factor
+  const price = biz > 0 ? listPrice * (1 - biz / 100) : listPrice
+  const rawMrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
+  // The business price strikes through the regular one when there's no higher MRP.
+  const mrp = biz > 0 && !(rawMrp != null && Number(rawMrp) * factor > listPrice) ? unitPrice : rawMrp
   const inactive = item.products?.is_active === false
   const qty = Number(item.quantity)
   const itemTotal = custom ? Number(item.price_at_addition) * qty : price * Math.round(qty)
@@ -90,7 +97,8 @@ export default function CartLineItem({
               {money(price)}
               {custom ? `/\u2009${unitText(unitLabel || item.buy_unit)}` : showUnitLabel ? `/\u2009${unitText(unitLabel)}` : ''}
             </Text>
-            {!custom && factor > 1 ? <Text className="text-xs text-foreground-muted">{money(unitPrice)}/pc</Text> : null}
+            {!custom && factor > 1 ? <Text className="text-xs text-foreground-muted">{money(price / factor)}/pc</Text> : null}
+            {biz > 0 ? <Badge label="Business price" tone="brand" /> : null}
             {showMrp ? (
               <>
                 <Text className="text-sm text-foreground-muted line-through">{money(Number(mrp) * factor)}</Text>

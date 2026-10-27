@@ -160,8 +160,8 @@ function Body({ data }: { data: Data }) {
           rowKey={x => x.id}
           empty="No points earned in this period."
           cols={[
-            { key: 'name', label: 'Customer', render: customer },
-            { key: 'tier', label: 'Tier', render: x => <Badge>{tierName(x.tier)}</Badge> },
+            { key: 'name', label: 'Customer', render: customer, sort: x => x.name.toLowerCase() },
+            { key: 'tier', label: 'Tier', render: x => <Badge>{tierName(x.tier)}</Badge>, sort: x => x.tier },
             { key: 'earned', label: 'Earned', num: true, render: x => count(x.earned), sort: x => x.earned },
             { key: 'redeemed', label: 'Redeemed', num: true, render: x => count(x.redeemed), sort: x => x.redeemed },
             { key: 'points', label: 'Balance', num: true, render: x => count(x.points), sort: x => x.points },
@@ -215,7 +215,7 @@ function Body({ data }: { data: Data }) {
           rowKey={x => x.id}
           empty="No referral signups in this period."
           cols={[
-            { key: 'name', label: 'Referrer', render: customer },
+            { key: 'name', label: 'Referrer', render: customer, sort: x => x.name.toLowerCase() },
             { key: 'signups', label: 'Signups', num: true, render: x => count(x.signups), sort: x => x.signups },
             { key: 'rewarded', label: 'Rewarded', num: true, render: x => count(x.rewarded), sort: x => x.rewarded },
             {

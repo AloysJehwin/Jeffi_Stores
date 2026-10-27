@@ -8,9 +8,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { FileText, ExternalLink, Plus, X } from 'lucide-react'
-import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, ListFilters, PageHeader, TableSkeleton, badgeCls, fetchJson, useActionToast, useFilterQuery, useInfiniteList, type StatusMap } from '@/components/admin/kit'
+import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, ListFilters, PageHeader, SortTh, TableSkeleton, badgeCls, fetchJson, useActionToast, useFilterQuery, useInfiniteList, useListSort, type SortCol, type StatusMap } from '@/components/admin/kit'
 import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
-import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 import HoverCard from '@/components/ui/HoverCard'
 import RowActions from '@/components/admin/RowActions'
@@ -23,6 +22,14 @@ import SerialEntryModal, {
 } from '@/components/admin/SerialEntryModal'
 import CashSaleMobileList from './_components/CashSaleMobileList'
 import { CASH_SALE_ALIASES, CASH_SALE_FIELDS, CASH_SALE_SEARCH } from '@/lib/filters/fields/cash-sale'
+
+const SORT_COLS: SortCol[] = [
+  { key: 'invoice_number', label: 'Receipt No' },
+  { key: 'invoice_date', label: 'Date', type: 'date' },
+  { key: 'customer_name', label: 'Customer' },
+  { key: 'total_amount', label: 'Amount', type: 'number' },
+  { key: 'payment_status', label: 'Payment' },
+]
 
 interface CashSale {
   id: string
@@ -112,10 +119,9 @@ export default function CashSaleClient() {
 
   const [selectedSale, setSelectedSale] = useState<CashSale | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
-  // The list filters live in the URL (from / to are the bill date); sorting stays local.
+  // The list filters and sort live in the URL (from / to are the bill date).
   const filters = useFilterQuery(CASH_SALE_FIELDS, { aliases: CASH_SALE_ALIASES })
-  const [sortCol, setSortCol] = useState<string | undefined>(undefined)
-  const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
+  const { sort, dir } = useListSort()
 
   const [paymentMode, setPaymentMode] = useState('cash')
   const [notes, setNotes] = useState('')
@@ -160,24 +166,16 @@ export default function CashSaleClient() {
     })
   }, [items])
 
-  const SORT_KEYS: Record<string, keyof CashSale> = {
-    invoice_number: 'invoice_number',
-    date: 'invoice_date',
-    amount: 'total_amount',
-    payment: 'payment_status',
-  }
-
-
-  // Ordered server-side across all sales via sort/dir params; 25 per page.
+  // Ordered server-side across all sales via ?sort&dir; 25 per page.
   const list = useInfiniteList<CashSale>({
-    key: `${filters}|${sortCol}|${sortDir}`,
+    key: `${filters}|${sort}|${dir}`,
     pageSize: 25,
     getKey: s => s.id,
     fetchPage: async (p, signal) => {
       const params = new URLSearchParams(filters)
-      if (sortCol && SORT_KEYS[sortCol]) {
-        params.set('sort', SORT_KEYS[sortCol])
-        params.set('dir', sortDir || 'desc')
+      if (sort) {
+        params.set('sort', sort)
+        params.set('dir', dir)
       }
       params.set('page', String(p))
       const data = await fetchJson(`/api/admin/cash-sale?${params}`, signal)
@@ -816,51 +814,9 @@ export default function CashSaleClient() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border-default bg-surface-secondary/50">
-                    <SortableHeader
-                      label="Receipt No"
-                      column="invoice_number"
-                      options={sortOptions('text')}
-                      onSort={(c, d) => {
-                        setSortCol(c)
-                        setSortDir(d)
-                      }}
-                      currentSort={sortCol}
-                      currentDir={sortDir}
-                    />
-                    <SortableHeader
-                      label="Date"
-                      column="date"
-                      options={sortOptions('date')}
-                      onSort={(c, d) => {
-                        setSortCol(c)
-                        setSortDir(d)
-                      }}
-                      currentSort={sortCol}
-                      currentDir={sortDir}
-                    />
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Customer</th>
-                    <SortableHeader
-                      label="Amount"
-                      column="amount"
-                      options={sortOptions('number')}
-                      onSort={(c, d) => {
-                        setSortCol(c)
-                        setSortDir(d)
-                      }}
-                      currentSort={sortCol}
-                      currentDir={sortDir}
-                    />
-                    <SortableHeader
-                      label="Payment"
-                      column="payment"
-                      options={sortOptions('text')}
-                      onSort={(c, d) => {
-                        setSortCol(c)
-                        setSortDir(d)
-                      }}
-                      currentSort={sortCol}
-                      currentDir={sortDir}
-                    />
+                    {SORT_COLS.map(c => (
+                      <SortTh key={c.key} col={c} className="px-4 py-3 text-xs font-semibold text-foreground-secondary" />
+                    ))}
                     <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary">Actions</th>
                   </tr>
                 </thead>

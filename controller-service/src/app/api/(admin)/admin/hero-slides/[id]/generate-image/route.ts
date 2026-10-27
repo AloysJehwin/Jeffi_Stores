@@ -4,7 +4,8 @@ import { aiDenial, AI_ADMIN_SCOPE } from '@/lib/auth/ai-scope'
 import { currentTenantPlanGate } from '@/lib/auth/plan-gate'
 import { generateImage } from '@/lib/ai/media'
 import { aiMediaErrorResponse } from '@/lib/ai/media-route'
-import { applyDraftPatch, getEditableHomepage, withHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { applyDraftPatch, getEditableHomepage, homepageLockFrom, withHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { HOMEPAGE_LOCK_ID, actorOf, lockedByOther, lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180
@@ -22,6 +23,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const plan = await currentTenantPlanGate(AI_ADMIN_SCOPE)
     if (!plan.allowed) return NextResponse.json({ error: 'AI tools are not available for your plan' }, { status: 403 })
 
+    // Refuse before spending on the image when another admin holds the draft.
+    const held = await lockedByOther(actorOf(admin), 'homepage', HOMEPAGE_LOCK_ID)
+    if (held) return held
     const { heroSlides } = await getEditableHomepage()
     if (!heroSlides.some(s => s.id === id)) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
 
@@ -50,7 +54,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const slide = draft.heroSlides.find(s => s.id === id)
       if (slide) applyDraftPatch(slide, { [field]: url, [hashField]: blurhash ?? null })
       return !!slide
-    })
+    }, homepageLockFrom(admin, request)).catch(lockedOr)
+    if (saved instanceof NextResponse) return saved
     if (!saved) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
     return NextResponse.json({ url, field, blurhash })
   } catch (err: any) {

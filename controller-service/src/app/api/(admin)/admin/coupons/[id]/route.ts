@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
+import {
+  actorOf,
+  closeIfLocked,
+  discardGuard,
+  draftLockResponse,
+  epochFrom,
+  withDraftPublish,
+  withDraftWrite,
+  type DraftDb,
+} from '@/lib/admin/draft-locks'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -39,7 +49,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (updates.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
   values.push(id)
-  const result = await queryMany(`UPDATE coupons SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`, values)
+  const sql = `UPDATE coupons SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`
+  // A body with is_draft is a create-draft save: a draft write, or its publish when false.
+  let result: any[]
+  try {
+    if (!('is_draft' in body)) result = await queryMany(sql, values)
+    else {
+      const write = async (db: DraftDb) => (await db.query(sql, values)).rows
+      const opts = { epoch: epochFrom(request) }
+      result =
+        body.is_draft === false
+          ? await withDraftPublish(actorOf(admin), 'coupon', id, write, opts)
+          : await withDraftWrite(actorOf(admin), 'coupon', id, write, { ...opts, ensure: true })
+    }
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   if (!result.length) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({ coupon: result[0] })
 }
@@ -58,8 +85,12 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       { status: 409 }
     )
 
+  const actor = actorOf(admin)
+  const denied = await discardGuard(actor, 'coupon', id)
+  if (denied) return denied
   // Unlink from campaigns before deleting to avoid FK violation
   await query('UPDATE campaigns SET coupon_id = NULL WHERE coupon_id = $1', [id])
   await queryOne('DELETE FROM coupons WHERE id = $1', [id])
+  await closeIfLocked(actor, 'coupon', id)
   return NextResponse.json({ success: true })
 }

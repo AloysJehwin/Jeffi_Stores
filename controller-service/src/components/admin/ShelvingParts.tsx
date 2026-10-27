@@ -456,14 +456,14 @@ export function StockRow({
                 onClick={saveQty}
                 disabled={saving}
                 aria-label="Save"
-                className="w-7 h-7 flex items-center justify-center rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-50"
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-50"
               >
                 <Check className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setEditing(false)}
                 aria-label="Cancel"
-                className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-default hover:bg-surface-secondary text-foreground-secondary transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-default hover:bg-surface-secondary text-foreground-secondary transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

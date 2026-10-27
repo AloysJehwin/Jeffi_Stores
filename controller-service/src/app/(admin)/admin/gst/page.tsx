@@ -115,72 +115,73 @@ const money = (v: string | number) => INR(typeof v === 'string' ? parseFloat(v) 
 type Tax = { taxable: number; cgst: number; sgst: number; igst: number; total: number }
 function taxCols<T>(pick: (r: T) => Tax, totalLabel = 'Total'): DataCol<T>[] {
   return [
-    { key: 'taxable', label: 'Taxable', num: true, render: r => INR(pick(r).taxable) },
-    { key: 'cgst', label: 'CGST', num: true, render: r => INR(pick(r).cgst) },
-    { key: 'sgst', label: 'SGST', num: true, render: r => INR(pick(r).sgst) },
-    { key: 'igst', label: 'IGST', num: true, render: r => INR(pick(r).igst) },
-    { key: 'total', label: totalLabel, num: true, render: r => <span className="font-medium text-foreground">{INR(pick(r).total)}</span> },
+    { key: 'taxable', label: 'Taxable', num: true, sort: r => pick(r).taxable, render: r => INR(pick(r).taxable) },
+    { key: 'cgst', label: 'CGST', num: true, sort: r => pick(r).cgst, render: r => INR(pick(r).cgst) },
+    { key: 'sgst', label: 'SGST', num: true, sort: r => pick(r).sgst, render: r => INR(pick(r).sgst) },
+    { key: 'igst', label: 'IGST', num: true, sort: r => pick(r).igst, render: r => INR(pick(r).igst) },
+    { key: 'total', label: totalLabel, num: true, sort: r => pick(r).total, render: r => <span className="font-medium text-foreground">{INR(pick(r).total)}</span> },
   ]
 }
 const invTax = (r: InvoiceRow): Tax => ({ taxable: parseFloat(r.taxable_amount), cgst: parseFloat(r.cgst_amount), sgst: parseFloat(r.sgst_amount), igst: parseFloat(r.igst_amount), total: parseFloat(r.total_amount) })
 function invoiceCols(b2b: boolean): DataCol<InvoiceRow & K>[] {
-  const gstin: DataCol<InvoiceRow & K>[] = b2b ? [{ key: 'gstin', label: 'GSTIN', render: r => <span className="font-mono text-xs text-foreground-secondary">{r.buyer_gstin}</span> }] : []
+  const gstin: DataCol<InvoiceRow & K>[] = b2b ? [{ key: 'gstin', label: 'GSTIN', sort: r => r.buyer_gstin ?? '', render: r => <span className="font-mono text-xs text-foreground-secondary">{r.buyer_gstin}</span> }] : []
   return [
-    { key: 'no', label: 'Invoice No', render: r => <span className="whitespace-nowrap font-medium text-foreground">{r.invoice_number}</span> },
-    { key: 'date', label: 'Date', render: r => <span className="whitespace-nowrap text-foreground-secondary">{fmtDate(r.invoice_date)}</span> },
-    { key: 'customer', label: 'Customer', render: r => <span className="block max-w-[200px] truncate">{r.customer_name}</span> },
+    { key: 'no', label: 'Invoice No', sort: r => r.invoice_number, render: r => <span className="whitespace-nowrap font-medium text-foreground">{r.invoice_number}</span> },
+    { key: 'date', label: 'Date', sortType: 'date', sort: r => new Date(r.invoice_date).getTime() || 0, render: r => <span className="whitespace-nowrap text-foreground-secondary">{fmtDate(r.invoice_date)}</span> },
+    { key: 'customer', label: 'Customer', sort: r => (r.customer_name ?? '').toLowerCase(), render: r => <span className="block max-w-[200px] truncate">{r.customer_name}</span> },
     ...gstin,
     ...taxCols<InvoiceRow & K>(invTax),
   ]
 }
 const hsnCols: DataCol<HsnRow & K>[] = [
-  { key: 'hsn', label: 'HSN Code', render: r => <span className="font-mono font-medium text-foreground">{r.hsnCode}</span> },
-  { key: 'rate', label: 'GST Rate', num: true, render: r => `${r.gstRate}%` },
+  { key: 'hsn', label: 'HSN Code', sort: r => r.hsnCode, render: r => <span className="font-mono font-medium text-foreground">{r.hsnCode}</span> },
+  { key: 'rate', label: 'GST Rate', num: true, sort: r => r.gstRate, render: r => `${r.gstRate}%` },
   ...taxCols<HsnRow & K>(r => ({ taxable: r.taxableVal, cgst: r.cgstAmt, sgst: r.sgstAmt, igst: r.igstAmt, total: r.totalTax }), 'Total Tax'),
 ]
 type RateRow = GSTR3BData['summary']['byGstRate'][number] & K
 const rateCols: DataCol<RateRow>[] = [
-  { key: 'rate', label: 'GST Rate', render: r => <span className="font-medium text-foreground">{r.gstRate}%</span> },
-  { key: 'type', label: 'Supply Type', render: r => <span className="text-foreground-secondary">{r.isIgst ? 'Inter-State' : 'Intra-State'}</span> },
+  { key: 'rate', label: 'GST Rate', sortType: 'number', sort: r => r.gstRate, render: r => <span className="font-medium text-foreground">{r.gstRate}%</span> },
+  { key: 'type', label: 'Supply Type', sort: r => (r.isIgst ? 'Inter-State' : 'Intra-State'), render: r => <span className="text-foreground-secondary">{r.isIgst ? 'Inter-State' : 'Intra-State'}</span> },
   ...taxCols<RateRow>(r => ({ taxable: r.taxable, cgst: r.cgst, sgst: r.sgst, igst: r.igst, total: r.cgst + r.sgst + r.igst }), 'Total Tax'),
 ]
 const irnCols: DataCol<InvoiceRow & K>[] = [
-  { key: 'no', label: 'Invoice No', render: r => <span className="whitespace-nowrap font-medium text-foreground">{r.invoice_number}</span> },
-  { key: 'date', label: 'Date', render: r => <span className="whitespace-nowrap text-foreground-secondary">{fmtDate(r.invoice_date)}</span> },
-  { key: 'customer', label: 'Customer', render: r => <span className="block max-w-[160px] truncate">{r.customer_name}</span> },
-  { key: 'type', label: 'Type', render: r => <span className={badgeCls(r.buyer_gstin ? 'blue' : 'muted')}>{r.buyer_gstin ? 'B2B' : 'B2C'}</span> },
-  { key: 'amount', label: 'Amount', num: true, render: r => <span className="font-medium text-foreground">{money(r.total_amount)}</span> },
+  { key: 'no', label: 'Invoice No', sort: r => r.invoice_number, render: r => <span className="whitespace-nowrap font-medium text-foreground">{r.invoice_number}</span> },
+  { key: 'date', label: 'Date', sortType: 'date', sort: r => new Date(r.invoice_date).getTime() || 0, render: r => <span className="whitespace-nowrap text-foreground-secondary">{fmtDate(r.invoice_date)}</span> },
+  { key: 'customer', label: 'Customer', sort: r => (r.customer_name ?? '').toLowerCase(), render: r => <span className="block max-w-[160px] truncate">{r.customer_name}</span> },
+  { key: 'type', label: 'Type', sort: r => (r.buyer_gstin ? 'B2B' : 'B2C'), render: r => <span className={badgeCls(r.buyer_gstin ? 'blue' : 'muted')}>{r.buyer_gstin ? 'B2B' : 'B2C'}</span> },
+  { key: 'amount', label: 'Amount', num: true, sort: r => parseFloat(r.total_amount) || 0, render: r => <span className="font-medium text-foreground">{money(r.total_amount)}</span> },
   {
     key: 'irn',
     label: 'IRN',
+    sort: r => r.irn ?? '',
     render: r => (
       <span className="block max-w-[120px] truncate font-mono text-xs text-foreground-secondary" title={r.irn || ''}>
         {r.irn ? r.irn.slice(0, 16) + '…' : <span className="text-amber-600 dark:text-amber-400">Pending</span>}
       </span>
     ),
   },
-  { key: 'ack', label: 'Ack No', render: r => <span className="text-xs text-foreground-secondary">{r.irn_ack_no || '—'}</span> },
-  { key: 'ackdt', label: 'Ack Date', render: r => <span className="whitespace-nowrap text-xs text-foreground-secondary">{r.irn_ack_dt ? fmtDate(r.irn_ack_dt) : '—'}</span> },
-  { key: 'status', label: 'Status', render: r => <StatusBadge status={r.irn_status} map={IRN_STATUS} label={r.irn_status && IRN_STATUS[r.irn_status] ? undefined : 'No IRN'} /> },
+  { key: 'ack', label: 'Ack No', sort: r => r.irn_ack_no ?? '', render: r => <span className="text-xs text-foreground-secondary">{r.irn_ack_no || '—'}</span> },
+  { key: 'ackdt', label: 'Ack Date', sortType: 'date', sort: r => (r.irn_ack_dt ? new Date(r.irn_ack_dt).getTime() : 0), render: r => <span className="whitespace-nowrap text-xs text-foreground-secondary">{r.irn_ack_dt ? fmtDate(r.irn_ack_dt) : '—'}</span> },
+  { key: 'status', label: 'Status', sort: r => r.irn_status ?? '', render: r => <StatusBadge status={r.irn_status} map={IRN_STATUS} label={r.irn_status && IRN_STATUS[r.irn_status] ? undefined : 'No IRN'} /> },
 ]
 type SupRow = ITCData['supplierSummary'][number] & K
 const supplierCols: DataCol<SupRow>[] = [
-  { key: 'supplier', label: 'Supplier', render: r => <span className="font-medium text-foreground">{r.supplierName}</span> },
-  { key: 'gstin', label: 'GSTIN', render: r => <span className="font-mono text-xs text-foreground-secondary">{r.gstin || <span className="italic text-foreground-muted">No GSTIN</span>}</span> },
-  { key: 'pos', label: 'POs', num: true, render: r => r.poCount },
-  { key: 'taxable', label: 'Taxable', num: true, render: r => INR(r.taxable) },
-  { key: 'tax', label: 'ITC (Tax)', num: true, render: r => <span className="font-medium text-green-700 dark:text-green-400">{INR(r.tax)}</span> },
+  { key: 'supplier', label: 'Supplier', sort: r => r.supplierName.toLowerCase(), render: r => <span className="font-medium text-foreground">{r.supplierName}</span> },
+  { key: 'gstin', label: 'GSTIN', sort: r => r.gstin ?? '', render: r => <span className="font-mono text-xs text-foreground-secondary">{r.gstin || <span className="italic text-foreground-muted">No GSTIN</span>}</span> },
+  { key: 'pos', label: 'POs', num: true, sort: r => r.poCount, render: r => r.poCount },
+  { key: 'taxable', label: 'Taxable', num: true, sort: r => r.taxable, render: r => INR(r.taxable) },
+  { key: 'tax', label: 'ITC (Tax)', num: true, sort: r => r.tax, render: r => <span className="font-medium text-green-700 dark:text-green-400">{INR(r.tax)}</span> },
 ]
 const itcCols: DataCol<ITCRow & K>[] = [
-  { key: 'po', label: 'PO No', render: r => <span className="whitespace-nowrap font-medium text-foreground">{r.po_number}</span> },
-  { key: 'date', label: 'Date', render: r => <span className="whitespace-nowrap text-foreground-secondary">{fmtDate(r.order_date)}</span> },
-  { key: 'supplier', label: 'Supplier', render: r => <span className="block max-w-[140px] truncate">{r.supplier_name}</span> },
-  { key: 'product', label: 'Product', render: r => <span className="block max-w-[160px] truncate">{r.product_name}</span> },
-  { key: 'qty', label: 'Qty', num: true, render: r => fmtQty(r.quantity) },
-  { key: 'unit', label: 'Unit Cost', num: true, render: r => money(r.unit_cost) },
-  { key: 'rate', label: 'GST %', num: true, render: r => `${parseFloat(r.tax_rate)}%` },
-  { key: 'taxable', label: 'Taxable', num: true, render: r => money(r.taxable_amount) },
-  { key: 'itc', label: 'ITC', num: true, render: r => <span className="font-medium text-green-700 dark:text-green-400">{money(r.tax_amount)}</span> },
+  { key: 'po', label: 'PO No', sort: r => r.po_number, render: r => <span className="whitespace-nowrap font-medium text-foreground">{r.po_number}</span> },
+  { key: 'date', label: 'Date', sortType: 'date', sort: r => new Date(r.order_date).getTime() || 0, render: r => <span className="whitespace-nowrap text-foreground-secondary">{fmtDate(r.order_date)}</span> },
+  { key: 'supplier', label: 'Supplier', sort: r => (r.supplier_name ?? '').toLowerCase(), render: r => <span className="block max-w-[140px] truncate">{r.supplier_name}</span> },
+  { key: 'product', label: 'Product', sort: r => (r.product_name ?? '').toLowerCase(), render: r => <span className="block max-w-[160px] truncate">{r.product_name}</span> },
+  { key: 'qty', label: 'Qty', num: true, sort: r => Number(r.quantity) || 0, render: r => fmtQty(r.quantity) },
+  { key: 'unit', label: 'Unit Cost', num: true, sort: r => parseFloat(r.unit_cost) || 0, render: r => money(r.unit_cost) },
+  { key: 'rate', label: 'GST %', num: true, sort: r => parseFloat(r.tax_rate) || 0, render: r => `${parseFloat(r.tax_rate)}%` },
+  { key: 'taxable', label: 'Taxable', num: true, sort: r => parseFloat(r.taxable_amount) || 0, render: r => money(r.taxable_amount) },
+  { key: 'itc', label: 'ITC', num: true, sort: r => parseFloat(r.tax_amount) || 0, render: r => <span className="font-medium text-green-700 dark:text-green-400">{money(r.tax_amount)}</span> },
 ]
 
 function CsvButton({ onClick }: { onClick: () => void }) {
@@ -356,13 +357,13 @@ export default function GSTPage() {
           ) : (
             <>
               <Card title={`B2B Invoices (${gstr1B2B.length})`} flush action={<CsvButton onClick={() => downloadCSV('gstr1')} />}>
-                <DataTable bare rows={keyed(gstr1B2B)} cols={invoiceCols(true)} rowKey={kk} empty="No B2B invoices in this period." />
+                <DataTable bare sortNs="b2b" rows={keyed(gstr1B2B)} cols={invoiceCols(true)} rowKey={kk} empty="No B2B invoices in this period." />
               </Card>
               <Card title={`B2C Invoices (${gstr1B2C.length})`} flush>
-                <DataTable bare rows={keyed(gstr1B2C)} cols={invoiceCols(false)} rowKey={kk} empty="No B2C invoices in this period." />
+                <DataTable bare sortNs="b2c" rows={keyed(gstr1B2C)} cols={invoiceCols(false)} rowKey={kk} empty="No B2C invoices in this period." />
               </Card>
               <Card title="HSN Summary" flush>
-                <DataTable bare rows={keyed(hsnSummary)} cols={hsnCols} rowKey={kk} empty="No HSN lines in this period." />
+                <DataTable bare sortNs="hsn" rows={keyed(hsnSummary)} cols={hsnCols} rowKey={kk} empty="No HSN lines in this period." />
               </Card>
             </>
           )}
@@ -388,7 +389,7 @@ export default function GSTPage() {
                 </KpiGrid>
               </Card>
               <Card title="Tax Breakup by GST Rate" flush>
-                <DataTable bare rows={keyed(gstr3b.summary.byGstRate)} cols={rateCols} rowKey={kk} empty="No tax lines in this period." />
+                <DataTable bare sortNs="rate" rows={keyed(gstr3b.summary.byGstRate)} cols={rateCols} rowKey={kk} empty="No tax lines in this period." />
               </Card>
               <Card title="6. Payment of Tax">
                 <KpiGrid>
@@ -417,6 +418,7 @@ export default function GSTPage() {
         >
           <DataTable
             bare
+            sortNs="irn"
             rows={keyed(allInvoices)}
             cols={irnCols}
             rowKey={kk}
@@ -449,11 +451,12 @@ export default function GSTPage() {
                 </KpiGrid>
               </Card>
               <Card title="By Supplier" flush>
-                <DataTable bare rows={keyed(itcData.supplierSummary)} cols={supplierCols} rowKey={kk} empty="No suppliers in this period." />
+                <DataTable bare sortNs="itcsup" rows={keyed(itcData.supplierSummary)} cols={supplierCols} rowKey={kk} empty="No suppliers in this period." />
               </Card>
               <Card title="Line-level Detail" flush>
                 <DataTable
                   bare
+                  sortNs="itc"
                   rows={keyed(itcData.rows)}
                   cols={itcCols}
                   rowKey={kk}

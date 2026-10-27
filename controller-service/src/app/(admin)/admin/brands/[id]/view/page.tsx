@@ -5,7 +5,8 @@ import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
-import { Card, DetailHeader, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, EmptyState, Badge } from '@/components/admin/kit'
+import { Card, DetailHeader, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, EmptyState, Badge, ViewDraftLink } from '@/components/admin/kit'
+import { heldDraftForView } from '@/lib/admin/draft-locks'
 import { startBrandDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -48,8 +49,9 @@ export default async function BrandViewPageDetail({
   const brand = await queryOne<Brand>('SELECT * FROM brands WHERE id = $1', [id])
   if (!brand) notFound()
 
-  const [hasDraft, products, counts] = await Promise.all([
+  const [hasDraft, held, products, counts] = await Promise.all([
     queryOne<{ brand_id: string }>('SELECT brand_id FROM brand_drafts WHERE brand_id = $1', [id]),
+    heldDraftForView('brand', id, `/admin/brands/${id}/edit`, backUrl),
     queryMany<ProductRow>(
       'SELECT id, name, sku, is_active, base_price FROM products WHERE brand_id = $1 ORDER BY name LIMIT 20',
       [id]
@@ -87,7 +89,9 @@ export default async function BrandViewPageDetail({
           subtitle={brand.description || undefined}
           identifiers={[{ label: 'Created', value: created }]}
           actions={
-            hasDraft ? (
+            held ? (
+              <ViewDraftLink held={held} />
+            ) : hasDraft ? (
               <Link
                 href={ap(`/admin/brands/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
                 className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
@@ -113,7 +117,11 @@ export default async function BrandViewPageDetail({
           <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
             <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-foreground">
-              This brand has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to review and publish them.
+              {held ? (
+                <>This brand has unpublished draft changes by {held.ownerName}. You can view them read-only.</>
+              ) : (
+                <>This brand has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to review and publish them.</>
+              )}
             </p>
           </div>
         )

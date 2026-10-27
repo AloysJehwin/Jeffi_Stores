@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AlertCircle, CheckCircle2, TrendingDown, TrendingUp } from 'lucide-react'
 import { badgeCls, type Tone } from './tones'
 import { InfiniteFooter, useReveal } from './infinite'
+import { SortArrow, naturalDir, type SortType } from './list-sort'
 
 // Core admin kit: cards, KPIs, badges, tabs, the client table, fetch and number helpers.
 // Originally the channel consoles' building blocks (channels/ui re-exports this),
@@ -288,6 +289,7 @@ export interface Col<T> {
   label: string
   render: (r: T) => React.ReactNode
   sort?: (r: T) => number | string
+  sortType?: SortType
   num?: boolean
 }
 
@@ -320,15 +322,19 @@ export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows:
                   className={`py-2 px-2 font-medium whitespace-nowrap ${c.num ? 'text-right' : 'text-left'} ${c.sort ? 'cursor-pointer select-none hover:text-foreground' : ''}`}
                   onClick={() => {
                     if (!c.sort) return
-                    if (sortKey === c.key) setDesc(d => !d)
-                    else {
+                    // Same cycle as list headers: natural direction → flipped → cleared.
+                    const natural = naturalDir(c.sortType ?? (c.num ? 'number' : 'text')) === 'desc'
+                    if (sortKey !== c.key) {
                       setSortKey(c.key)
-                      setDesc(true)
-                    }
+                      setDesc(natural)
+                    } else if (desc === natural) setDesc(!natural)
+                    else setSortKey(null)
                   }}
                 >
-                  {c.label}
-                  {sortKey === c.key ? (desc ? ' ↓' : ' ↑') : ''}
+                  <span className="inline-flex items-center gap-1">
+                    {c.label}
+                    {c.sort && <SortArrow state={sortKey === c.key ? (desc ? 'desc' : 'asc') : null} />}
+                  </span>
                 </th>
               ))}
             </tr>

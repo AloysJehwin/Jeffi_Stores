@@ -5,6 +5,12 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn(() => true) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), query: vi.fn() }))
+// Lock bookkeeping is out of scope here: run the create-draft publish write straight on the pool.
+vi.mock('@/lib/admin/draft-locks', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/admin/draft-locks')>()
+  const { query } = await import('@/lib/shared/db')
+  return { ...actual, withDraftPublish: async (_a: unknown, _t: unknown, _i: unknown, fn: any) => fn({ query }) }
+})
 vi.mock('@/lib/catalog/product-draft', () => {
   class OpenOrdersBlockError extends Error {}
   class UnitChangeBlockedError extends Error {}
@@ -81,7 +87,7 @@ describe('POST /api/admin/products/[id]/publish — edit-draft', () => {
 
   it('publishes and activates', async () => {
     expect((await call()).status).toBe(200)
-    expect(publishProductDraft).toHaveBeenCalledWith(ID, { activate: true })
+    expect(publishProductDraft).toHaveBeenCalledWith(ID, expect.objectContaining({ activate: true }))
   })
 
   it('maps fixable problems to 400 and unit blocks to 409', async () => {

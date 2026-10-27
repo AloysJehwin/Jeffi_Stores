@@ -44,11 +44,15 @@ export const PURCHASE_ORDERS_ENTITY: FilterEntity<PoKey> = {
   search: { build: (s, idx) => buildSearchClause(s, ['po.po_number', PO_SUPPLIER_NAME_SQL], idx) },
   sorts: {
     po_number: 'po.po_number',
+    supplier: PO_SUPPLIER_NAME_SQL,
     date: 'po.order_date',
     expected: 'po.expected_date',
+    items: '(SELECT COUNT(*) FROM purchase_order_items x WHERE x.po_id = po.id)',
     total: 'po.total_amount',
     status: 'po.status',
   },
+  defaultSql: 'po.created_at DESC',
+  tiebreak: 'po.id DESC',
   facets: true,
   export: {
     columns: [

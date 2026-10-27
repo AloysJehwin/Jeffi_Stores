@@ -201,6 +201,7 @@ export const ORDER_SORTS: Record<string, string> = {
   order_number: 'o.order_number',
   customer: 'o.customer_name',
   date: 'o.created_at',
+  edd: 'o.estimated_delivery_date',
   total: 'o.total_amount',
   status: 'o.status',
   payment: 'o.payment_status',
@@ -283,6 +284,8 @@ export const ORDERS_ENTITY: FilterEntity<OrderKey> = {
       ),
   },
   sorts: ORDER_SORTS,
+  defaultSql: 'o.created_at DESC',
+  tiebreak: 'o.id DESC',
   facets: true,
   export: { columns: EXPORT_COLUMNS, keyset: ['o.created_at', 'o.id'] },
   context: async q => {

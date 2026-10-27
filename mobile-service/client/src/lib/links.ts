@@ -57,7 +57,8 @@ export function imageSource(url: string | null | undefined, width: number, resiz
   return uri.startsWith(RESIZED) ? { uri, headers: WEBP_ACCEPT } : { uri }
 }
 
-const PRODUCT_PARAMS = ['category', 'brand', 'search', 'q', 'grade', 'material', 'minPrice', 'maxPrice', 'inStock', 'onSale', 'offer', 'sort']
+const PRODUCT_PARAMS = ['category', 'brand', 'search', 'q', 'grade', 'material', 'minPrice', 'maxPrice', 'inStock', 'onSale', 'offer', 'sort', 'dir', 'order']
+const SORT_PARAMS = ['sort', 'dir', 'order']
 
 /**
  * Open a storefront href in the app: product, category and listing paths map to app screens;
@@ -81,8 +82,13 @@ export function openHref(router: Router, href: string | null | undefined) {
   const m = (re: RegExp) => path.match(re)?.[1]
   let slug: string | undefined
   if ((slug = m(/^\/products?\/([^/]+)$/))) return router.push(`/product/${slug}`)
-  if ((slug = m(/^\/(?:category|categories)\/([^/]+)$/))) return router.push(`/category/${slug}`)
-  if ((slug = m(/^\/brands\/([^/]+)$/))) return router.push(`/brands/${slug}`)
+  const sortParams: Record<string, string> = {}
+  for (const k of SORT_PARAMS) {
+    const v = url.searchParams.get(k)
+    if (v) sortParams[k] = v
+  }
+  if ((slug = m(/^\/(?:category|categories)\/([^/]+)$/))) return router.push({ pathname: '/category/[slug]', params: { slug, ...sortParams } })
+  if ((slug = m(/^\/brands\/([^/]+)$/))) return router.push({ pathname: '/brands/[slug]', params: { slug, ...sortParams } })
   if ((slug = m(/^\/(?:account\/)?orders\/([^/]+)$/)) && slug !== 'confirmation') return router.push(`/orders/${slug}`)
   if ((slug = m(/^\/legal\/([^/]+)$/))) return router.push(`/legal/${slug}`)
   // A coupon link (a win, an old "use at checkout" link) opens the cart, which applies it.

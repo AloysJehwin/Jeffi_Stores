@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from '../../next'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryOne, withTransaction } from '@jeffi/tenancy'
+import { acquireLock, isDraftLockError, lockNewDraft } from '../../lib/draft-locks'
 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,10 +29,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const existingDraft = await queryOne<any>(`SELECT id FROM orders WHERE draft_of_id = $1`, [id])
     if (existingDraft) {
-      return NextResponse.json(
-        { error: 'An amendment draft already exists for this invoice', draftId: existingDraft.id },
-        { status: 409 }
-      )
+      // 409 = the draft is (now) yours, go edit; 423 = someone else holds it (open it read-only).
+      try {
+        const res = await acquireLock(null, admin, 'invoice', existingDraft.id)
+        return NextResponse.json(
+          { error: 'An amendment draft already exists for this invoice', draftId: existingDraft.id, lock: res?.lock ?? null },
+          { status: 409 }
+        )
+      } catch (err) {
+        if (!isDraftLockError(err)) throw err
+        return NextResponse.json({ ...err.body(), draftId: existingDraft.id }, { status: 423 })
+      }
     }
 
     const result = await withTransaction(async client => {
@@ -133,6 +141,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
       return { draftId, orderNumber: draftOrderNumber }
     })
+    await lockNewDraft(admin, 'invoice', result.draftId)
 
     return NextResponse.json({ draftId: result.draftId, orderNumber: result.orderNumber })
   } catch (err: any) {

@@ -5,7 +5,8 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import CopySku from '@/components/ui/CopySku'
-import { ACTIVE_STATUS, Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge } from '@/components/admin/kit'
+import { ACTIVE_STATUS, Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ViewDraftLink } from '@/components/admin/kit'
+import { heldDraftForView } from '@/lib/admin/draft-locks'
 import { startCategoryDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -60,8 +61,9 @@ export default async function CategoryViewPage({
   const category = await queryOne<Category>('SELECT * FROM categories WHERE id = $1', [id])
   if (!category) notFound()
 
-  const [hasDraft, parent, subcategories, products, counts] = await Promise.all([
+  const [hasDraft, held, parent, subcategories, products, counts] = await Promise.all([
     queryOne<{ category_id: string }>('SELECT category_id FROM category_drafts WHERE category_id = $1', [id]),
+    heldDraftForView('category', id, `/admin/categories/${id}/edit`, backUrl),
     category.parent_category_id
       ? queryOne<{
           id: string
@@ -114,7 +116,9 @@ export default async function CategoryViewPage({
           subtitle={category.description || undefined}
           identifiers={[{ label: 'Created', value: created }]}
           actions={
-            hasDraft ? (
+            held ? (
+              <ViewDraftLink held={held} />
+            ) : hasDraft ? (
               <Link
                 href={ap(`/admin/categories/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
                 className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
@@ -140,7 +144,11 @@ export default async function CategoryViewPage({
           <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
             <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-foreground">
-              This category has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to review and publish them.
+              {held ? (
+                <>This category has unpublished draft changes by {held.ownerName}. You can view them read-only.</>
+              ) : (
+                <>This category has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to review and publish them.</>
+              )}
             </p>
           </div>
         )

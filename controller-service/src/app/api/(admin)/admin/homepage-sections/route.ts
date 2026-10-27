@@ -4,15 +4,30 @@ import { authenticateAdmin, type AdminJWTPayload } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
-import { HOMEPAGE_SURFACES, SECTION_TYPES, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
+import {
+  HOMEPAGE_AUDIENCES,
+  HOMEPAGE_PAGES,
+  HOMEPAGE_SURFACES,
+  PLACEMENT_DEFAULT_AFTER,
+  SECTION_META,
+  SECTION_TYPES,
+  rowAudience,
+  rowPage,
+  rowSurface,
+  sectionTypesFor,
+  type SectionType,
+} from '@/lib/catalog/homepage-sections'
+import { getHomepagePlan, homepagePlanRefusal } from '@/lib/catalog/homepage-plan'
 import {
   applyDraftOrder,
   endsBeforeStart,
   getEditableHomepage,
-  nextDisplayOrder,
+  homepageLockFrom,
+  nextDisplayOrderOn,
   withHomepageDraft,
   type DraftSection,
 } from '@/lib/catalog/homepage-draft'
+import { lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,6 +59,8 @@ const bodySchema = z.object({
   startsAt: z.string().datetime().nullish(),
   endsAt: z.string().datetime().nullish(),
   surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
+  page: z.enum(HOMEPAGE_PAGES as [string, ...string[]]).optional(),
+  audience: z.enum(HOMEPAGE_AUDIENCES as [string, ...string[]]).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -58,19 +75,37 @@ export async function POST(request: NextRequest) {
   }
 
   const surface = rowSurface({ surface: d.surface })
+  const page = rowPage({ page: d.page })
+  const audience = rowAudience({ audience: d.audience })
+  const type = d.type as SectionType
+  const refused = homepagePlanRefusal(await getHomepagePlan(), { type, audience })
+  if (refused) return NextResponse.json({ error: refused }, { status: 403 })
+  if (audience === 'business' && page !== 'home') {
+    return NextResponse.json({ error: 'The business homepage has no listing pages' }, { status: 400 })
+  }
+  if (!sectionTypesFor(surface, page, audience).includes(type)) {
+    return NextResponse.json({ error: `${SECTION_META[type].label} can't go on this page` }, { status: 400 })
+  }
+  // Listing sections sit between the products; start them after the first few rows.
+  const config =
+    page === 'home' || d.config?.placement
+      ? (d.config ?? {})
+      : { ...d.config, placement: { after: PLACEMENT_DEFAULT_AFTER } }
   const section = await withHomepageDraft(admin.adminId, draft => {
     const now = new Date().toISOString()
     const row: DraftSection = {
       id: randomUUID(),
-      type: d.type as SectionType,
+      type,
       surface,
+      page,
+      audience,
       title: d.title ?? null,
       subtitle: d.subtitle ?? null,
       eyebrow: d.eyebrow ?? null,
       cta_label: d.ctaLabel ?? null,
       cta_url: d.ctaUrl ?? null,
-      config: d.config ?? {},
-      display_order: nextDisplayOrder(draft.sections.filter(s => rowSurface(s) === surface)),
+      config,
+      display_order: nextDisplayOrderOn(draft.sections, page, surface, audience),
       is_active: d.isActive ?? true,
       starts_at: d.startsAt ?? null,
       ends_at: d.endsAt ?? null,
@@ -79,7 +114,8 @@ export async function POST(request: NextRequest) {
     }
     draft.sections.push(row)
     return row
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (section instanceof NextResponse) return section
 
   return NextResponse.json({ section })
 }
@@ -92,9 +128,10 @@ export async function PATCH(request: NextRequest) {
   const order: string[] = Array.isArray(body?.order) ? body.order : []
   if (order.length === 0) return NextResponse.json({ error: 'order[] required' }, { status: 400 })
 
-  await withHomepageDraft(admin.adminId, draft => {
+  const saved = await withHomepageDraft(admin.adminId, draft => {
     draft.sections = applyDraftOrder(draft.sections, order)
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (saved instanceof NextResponse) return saved
 
   return NextResponse.json({ success: true })
 }

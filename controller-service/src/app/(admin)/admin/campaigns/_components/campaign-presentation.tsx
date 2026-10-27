@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { Bell } from 'lucide-react'
 import { campaignSupportsPush } from '@/lib/campaigns/push-kinds'
+import type { DraftLockChip } from '@/lib/client/draft-lock-client'
 
 export interface CampaignRow {
   kind: string
@@ -20,6 +21,8 @@ export interface CampaignRow {
   sent_last_24h: string | null
   last_run_at: string | null
   draft_fields: Record<string, unknown> | null
+  /** Who holds the pending draft (list endpoint only). */
+  draft_lock?: DraftLockChip | null
   updated_at: string | null
   parameters?: Record<string, unknown> | null
   scenario_kind?: string | null
@@ -44,14 +47,21 @@ const WA_KINDS = [
   'back_in_stock_alert',
 ]
 
+/** `on` is Site Controls' switches (useMessagingChannels): an off channel gets no chip or filter. */
 export function getChannels(
   kind: string,
-  params?: Record<string, unknown> | null,
-  scenarioKind?: string | null
+  params: Record<string, unknown> | null | undefined,
+  scenarioKind: string | null | undefined,
+  on: { whatsapp: boolean }
 ): CampaignChannel[] {
-  const out: CampaignChannel[] = WA_KINDS.includes(kind) ? ['email', 'whatsapp'] : ['email']
+  const out: CampaignChannel[] = on.whatsapp && WA_KINDS.includes(kind) ? ['email', 'whatsapp'] : ['email']
   if (params?.pushEnabled === true && (campaignSupportsPush(kind) || campaignSupportsPush(scenarioKind ?? ''))) out.push('push')
   return out
+}
+
+/** "Also send via SMS/WhatsApp" params of a channel Site Controls has switched off. */
+export function channelParamOff(key: string, on: { sms: boolean; whatsapp: boolean }): boolean {
+  return (key === 'smsEnabled' && !on.sms) || (key === 'whatsappEnabled' && !on.whatsapp)
 }
 
 export function rate(num: number, den: number): string {

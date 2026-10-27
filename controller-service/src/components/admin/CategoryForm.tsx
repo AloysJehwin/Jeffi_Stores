@@ -9,7 +9,9 @@ import AIEnrichButton from './AIEnrichButton'
 import ImageUrlInput from './ImageUrlInput'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 import { useEditSession } from '@/hooks/useEditSession'
-import { FormButton, FormFooter, FormSection, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { DraftLockBanner, FormButton, FormFooter, FormSection, LockedFieldset, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import type { DraftLockState } from '@/lib/client/draft-lock-client'
 
 const ICON_OPTIONS = [
   'Anchor',
@@ -93,6 +95,8 @@ interface CategoryFormProps {
   submitLabel?: string
   /** Server action to discard the draft (receives FormData with intent=discard). */
   discardAction?: (formData: FormData) => Promise<void>
+  /** Draft lock state from the server (initialDraftLock), so a non-holder renders read-only. */
+  initialLock?: DraftLockState | null
 }
 
 function IconPreview({ name, className }: { name: string; className?: string }) {
@@ -228,6 +232,7 @@ export default function CategoryForm({
   isDraft = false,
   submitLabel,
   discardAction,
+  initialLock,
 }: CategoryFormProps) {
   const isSubcat = !!category?.parent_category_id
   const isCurrentlyInherited = isSubcat && category?.return_allowed == null
@@ -260,7 +265,8 @@ export default function CategoryForm({
     category?.replacement_window_days ?? parentCat?.replacement_window_days ?? 7
   )
   const nameRef = useRef<HTMLInputElement>(null)
-  const edit = useEditSession({ resourceType: 'category', resourceId: category?.id ?? null })
+  const lock = useDraftLock({ resourceType: 'category', resourceId: category?.id ?? null, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'category', resourceId: category?.id ?? null, lock })
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
 
@@ -316,353 +322,357 @@ export default function CategoryForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-      <FormSection title="Category" description="Name, icon, parent, ordering and description.">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <label htmlFor="name" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-              Category Name *
-            </label>
-            <input
-              ref={nameRef}
-              type="text"
-              id="name"
-              name="name"
-              required
-              value={categoryName}
-              onChange={e => setCategoryName(e.target.value)}
-              className={`${fieldInputCls}`}
-              placeholder="Enter category name"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Category Icon</label>
-
-            <input type="hidden" name="icon_name" value={selectedIcon} />
-
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-lg bg-accent-500/10 flex items-center justify-center border-2 border-accent-500/40 shrink-0">
-                <IconPreview name={selectedIcon} className="w-7 h-7 text-accent-500" />
-              </div>
-              <div className="flex flex-col gap-1.5 min-w-0">
-                <p className="text-sm font-semibold text-foreground">{selectedIcon}</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <RequireAi scope="categories:write">
-                    <button
-                      type="button"
-                      onClick={handleGenerate}
-                      disabled={generating}
-                      className="control-sm bg-accent-500 hover:bg-accent-600 text-white font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {generating ? (
-                        <>
-                          <Icons.Loader2 className="w-3 h-3 animate-spin" />
-                          Generating…
-                        </>
-                      ) : (
-                        <>
-                          <Icons.Sparkles className="w-3 h-3" />
-                          Generate with AI
-                        </>
-                      )}
-                    </button>
-                  </RequireAi>
-                  <button
-                    type="button"
-                    onClick={() => setShowPicker(v => !v)}
-                    className="control-sm border border-border-secondary text-foreground-secondary hover:bg-surface-secondary font-medium"
-                  >
-                    <Icons.Grid2x2 className="w-3 h-3" />
-                    {showPicker ? 'Close' : 'Browse'}
-                  </button>
-                </div>
-              </div>
+      <DraftLockBanner lock={lock} scope="categories:write" />
+      <LockedFieldset readOnly={lock.readOnly} className="space-y-5">
+        <FormSection title="Category" description="Name, icon, parent, ordering and description.">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label htmlFor="name" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                Category Name *
+              </label>
+              <input
+                ref={nameRef}
+                type="text"
+                id="name"
+                name="name"
+                required
+                value={categoryName}
+                onChange={e => setCategoryName(e.target.value)}
+                className={`${fieldInputCls}`}
+                placeholder="Enter category name"
+              />
             </div>
 
-            {showPicker && (
-              <div className="mt-3 border border-border-secondary rounded-lg bg-surface p-3">
-                <input
-                  type="text"
-                  placeholder="Search icons…"
-                  value={iconSearch}
-                  onChange={e => setIconSearch(e.target.value)}
-                  className={`${fieldInputCls} mb-3`}
-                />
-                <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-1.5 max-h-52 overflow-y-auto">
-                  {filteredIcons.map(name => (
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Category Icon</label>
+
+              <input type="hidden" name="icon_name" value={selectedIcon} />
+
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-lg bg-accent-500/10 flex items-center justify-center border-2 border-accent-500/40 shrink-0">
+                  <IconPreview name={selectedIcon} className="w-7 h-7 text-accent-500" />
+                </div>
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{selectedIcon}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <RequireAi scope="categories:write">
+                      <button
+                        type="button"
+                        onClick={handleGenerate}
+                        disabled={generating}
+                        className="control-sm bg-accent-500 hover:bg-accent-600 text-white font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {generating ? (
+                          <>
+                            <Icons.Loader2 className="w-3 h-3 animate-spin" />
+                            Generating…
+                          </>
+                        ) : (
+                          <>
+                            <Icons.Sparkles className="w-3 h-3" />
+                            Generate with AI
+                          </>
+                        )}
+                      </button>
+                    </RequireAi>
                     <button
-                      key={name}
                       type="button"
-                      title={name}
-                      onClick={() => {
-                        setSelectedIcon(name)
-                        setShowPicker(false)
-                        setIconSearch('')
-                      }}
-                      className={`p-2 rounded-md flex items-center justify-center transition-colors ${
-                        selectedIcon === name
-                          ? 'bg-accent-500 text-white'
-                          : 'hover:bg-surface-secondary text-foreground-muted hover:text-foreground'
-                      }`}
+                      onClick={() => setShowPicker(v => !v)}
+                      className="control-sm border border-border-secondary text-foreground-secondary hover:bg-surface-secondary font-medium"
                     >
-                      <IconPreview name={name} className="w-5 h-5" />
+                      <Icons.Grid2x2 className="w-3 h-3" />
+                      {showPicker ? 'Close' : 'Browse'}
                     </button>
-                  ))}
-                  {filteredIcons.length === 0 && (
-                    <p className="col-span-12 text-xs text-foreground-muted text-center py-4">No icons match</p>
+                  </div>
+                </div>
+              </div>
+
+              {showPicker && (
+                <div className="mt-3 border border-border-secondary rounded-lg bg-surface p-3">
+                  <input
+                    type="text"
+                    placeholder="Search icons…"
+                    value={iconSearch}
+                    onChange={e => setIconSearch(e.target.value)}
+                    className={`${fieldInputCls} mb-3`}
+                  />
+                  <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-1.5 max-h-52 overflow-y-auto">
+                    {filteredIcons.map(name => (
+                      <button
+                        key={name}
+                        type="button"
+                        title={name}
+                        onClick={() => {
+                          setSelectedIcon(name)
+                          setShowPicker(false)
+                          setIconSearch('')
+                        }}
+                        className={`p-2 rounded-md flex items-center justify-center transition-colors ${
+                          selectedIcon === name
+                            ? 'bg-accent-500 text-white'
+                            : 'hover:bg-surface-secondary text-foreground-muted hover:text-foreground'
+                        }`}
+                      >
+                        <IconPreview name={name} className="w-5 h-5" />
+                      </button>
+                    ))}
+                    {filteredIcons.length === 0 && (
+                      <p className="col-span-12 text-xs text-foreground-muted text-center py-4">No icons match</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Category image</label>
+              <ImageUrlInput
+                name="image_url"
+                value={imageUrl}
+                onChange={setImageUrl}
+                className={fieldInputCls}
+                placeholder="https://… or upload"
+                ai={{
+                  feature: 'category_image',
+                  size: ['square', 'portrait', 'landscape'],
+                  defaultPrompt: categoryName
+                    ? `${categoryName} products arranged neatly, soft studio light, plain light backdrop, no text`
+                    : undefined,
+                  usageRef: category?.id,
+                }}
+              />
+              <p className="text-xs text-foreground-muted mt-1">
+                Shown on category cards. Leave empty to use the category&apos;s top product photo.
+              </p>
+            </div>
+
+            <AdminSelect
+              id="parent_id"
+              name="parent_id"
+              label="Parent Category"
+              defaultValue={category?.parent_category_id || ''}
+              hint="Leave empty to create a main category"
+              placeholder="None (Main Category)"
+              options={[
+                { value: '', label: 'None (Main Category)' },
+                ...mainCategories.map(cat => ({
+                  value: cat.id,
+                  label: cat.name,
+                })),
+              ]}
+            />
+
+            <div>
+              <label htmlFor="display_order" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                Display Order *
+              </label>
+              <input
+                type="number"
+                id="display_order"
+                name="display_order"
+                required
+                min="0"
+                defaultValue={category?.display_order || 0}
+                className={`${fieldInputCls}`}
+                placeholder="0"
+              />
+              <p className="text-xs text-foreground-muted mt-1">Lower numbers appear first</p>
+            </div>
+
+            <div>
+              <label htmlFor="sku_prefix" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                SKU Prefix
+              </label>
+              <input
+                type="text"
+                id="sku_prefix"
+                name="sku_prefix"
+                maxLength={10}
+                defaultValue={category?.sku_prefix || ''}
+                className={`${fieldInputCls} uppercase`}
+                placeholder="e.g. BOLT, NUT, WSH"
+              />
+              <p className="text-xs text-foreground-muted mt-1">
+                Used for auto-generating product SKUs (e.g. BOLT-001). If empty, first 3 letters of name are used.
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
+              <label
+                htmlFor="google_product_category"
+                className="mb-1.5 block text-xs font-medium text-foreground-secondary"
+              >
+                Google Product Category
+              </label>
+              <input
+                type="text"
+                id="google_product_category"
+                name="google_product_category"
+                defaultValue={category?.google_product_category || ''}
+                className={`${fieldInputCls}`}
+                placeholder="e.g., Hardware > Fasteners > Bolts"
+              />
+              <p className="text-xs text-foreground-muted mt-1">
+                Google taxonomy path or ID for Merchant Center.{' '}
+                <a
+                  href="https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent-500 underline"
+                >
+                  Google Product Taxonomy
+                </a>
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="description" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                Description
+              </label>
+              <AIEnrichButton
+                fieldLabel="Description"
+                value={description}
+                onChange={setDescription}
+                scope="categories:write"
+                context={`Category: ${categoryName}`}
+                multiline
+              >
+                <textarea
+                  id="description"
+                  name="description"
+                  rows={3}
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  className={`${fieldInputCls} py-2 pr-8`}
+                  placeholder="Enter category description"
+                />
+              </AIEnrichButton>
+            </div>
+
+            <div className="md:col-span-2">
+              <div className="flex items-center">
+                <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
+                <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
+              </div>
+            </div>
+          </div>
+        </FormSection>
+
+        <FormSection title="Return & Replacement Policy" description="Category policy is the default. Brand policy can override per product.">
+
+          <input type="hidden" name="policy_override" value={overriding ? 'true' : 'false'} />
+
+          {isSubcat && !overriding ? (
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-sm bg-surface-secondary border border-border-secondary text-foreground-secondary px-3 py-1.5 rounded-full">
+                <svg className="w-3.5 h-3.5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                Inherited from {parentCat?.name ?? 'parent category'}
+                {' — '}
+                {(parentCat?.return_allowed ?? true) ? `Returns ${parentCat?.return_window_days ?? 7}d` : 'No returns'}
+                {' · '}
+                {(parentCat?.replacement_allowed ?? true)
+                  ? `Replacement ${parentCat?.replacement_window_days ?? 7}d`
+                  : 'No replacement'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setOverriding(true)}
+                className="text-sm text-accent-500 hover:text-accent-600 font-medium underline underline-offset-2"
+              >
+                Override for this subcategory
+              </button>
+            </div>
+          ) : (
+            <>
+              {isSubcat && (
+                <button
+                  type="button"
+                  onClick={() => setOverriding(false)}
+                  className="text-xs text-foreground-muted hover:text-foreground underline underline-offset-2 mb-4 block"
+                >
+                  Reset to inherited (use parent policy)
+                </button>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
+                    <Toggle
+                      id="return_allowed"
+                      checked={returnAllowed}
+                      onChange={setReturnAllowed}
+                      label="Returns Allowed"
+                    />
+                  </div>
+                  {returnAllowed && (
+                    <div>
+                      <label
+                        htmlFor="return_window_days"
+                        className="mb-1.5 block text-xs font-medium text-foreground-secondary"
+                      >
+                        Return window (days)
+                      </label>
+                      <input
+                        type="number"
+                        id="return_window_days"
+                        name="return_window_days"
+                        min={1}
+                        max={90}
+                        value={returnDays}
+                        onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
+                        className={`${fieldInputCls}`}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
+                    <Toggle
+                      id="replacement_allowed"
+                      checked={replacementAllowed}
+                      onChange={setReplacementAllowed}
+                      label="Replacement Allowed"
+                    />
+                  </div>
+                  {replacementAllowed && (
+                    <div>
+                      <label
+                        htmlFor="replacement_window_days"
+                        className="mb-1.5 block text-xs font-medium text-foreground-secondary"
+                      >
+                        Replacement window (days)
+                      </label>
+                      <input
+                        type="number"
+                        id="replacement_window_days"
+                        name="replacement_window_days"
+                        min={1}
+                        max={90}
+                        value={replacementDays}
+                        onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
+                        className={`${fieldInputCls}`}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
-            )}
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Category image</label>
-            <ImageUrlInput
-              name="image_url"
-              value={imageUrl}
-              onChange={setImageUrl}
-              className={fieldInputCls}
-              placeholder="https://… or upload"
-              ai={{
-                feature: 'category_image',
-                size: ['square', 'portrait', 'landscape'],
-                defaultPrompt: categoryName
-                  ? `${categoryName} products arranged neatly, soft studio light, plain light backdrop, no text`
-                  : undefined,
-                usageRef: category?.id,
-              }}
-            />
-            <p className="text-xs text-foreground-muted mt-1">
-              Shown on category cards. Leave empty to use the category&apos;s top product photo.
-            </p>
-          </div>
-
-          <AdminSelect
-            id="parent_id"
-            name="parent_id"
-            label="Parent Category"
-            defaultValue={category?.parent_category_id || ''}
-            hint="Leave empty to create a main category"
-            placeholder="None (Main Category)"
-            options={[
-              { value: '', label: 'None (Main Category)' },
-              ...mainCategories.map(cat => ({
-                value: cat.id,
-                label: cat.name,
-              })),
-            ]}
-          />
-
-          <div>
-            <label htmlFor="display_order" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-              Display Order *
-            </label>
-            <input
-              type="number"
-              id="display_order"
-              name="display_order"
-              required
-              min="0"
-              defaultValue={category?.display_order || 0}
-              className={`${fieldInputCls}`}
-              placeholder="0"
-            />
-            <p className="text-xs text-foreground-muted mt-1">Lower numbers appear first</p>
-          </div>
-
-          <div>
-            <label htmlFor="sku_prefix" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-              SKU Prefix
-            </label>
-            <input
-              type="text"
-              id="sku_prefix"
-              name="sku_prefix"
-              maxLength={10}
-              defaultValue={category?.sku_prefix || ''}
-              className={`${fieldInputCls} uppercase`}
-              placeholder="e.g. BOLT, NUT, WSH"
-            />
-            <p className="text-xs text-foreground-muted mt-1">
-              Used for auto-generating product SKUs (e.g. BOLT-001). If empty, first 3 letters of name are used.
-            </p>
-          </div>
-
-          <div className="md:col-span-2">
-            <label
-              htmlFor="google_product_category"
-              className="mb-1.5 block text-xs font-medium text-foreground-secondary"
-            >
-              Google Product Category
-            </label>
-            <input
-              type="text"
-              id="google_product_category"
-              name="google_product_category"
-              defaultValue={category?.google_product_category || ''}
-              className={`${fieldInputCls}`}
-              placeholder="e.g., Hardware > Fasteners > Bolts"
-            />
-            <p className="text-xs text-foreground-muted mt-1">
-              Google taxonomy path or ID for Merchant Center.{' '}
-              <a
-                href="https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent-500 underline"
-              >
-                Google Product Taxonomy
-              </a>
-            </p>
-          </div>
-
-          <div className="md:col-span-2">
-            <label htmlFor="description" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-              Description
-            </label>
-            <AIEnrichButton
-              fieldLabel="Description"
-              value={description}
-              onChange={setDescription}
-              scope="categories:write"
-              context={`Category: ${categoryName}`}
-              multiline
-            >
-              <textarea
-                id="description"
-                name="description"
-                rows={3}
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                className={`${fieldInputCls} py-2 pr-8`}
-                placeholder="Enter category description"
-              />
-            </AIEnrichButton>
-          </div>
-
-          <div className="md:col-span-2">
-            <div className="flex items-center">
-              <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
-              <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
-            </div>
-          </div>
-        </div>
-      </FormSection>
-
-      <FormSection title="Return & Replacement Policy" description="Category policy is the default. Brand policy can override per product.">
-
-        <input type="hidden" name="policy_override" value={overriding ? 'true' : 'false'} />
-
-        {isSubcat && !overriding ? (
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 text-sm bg-surface-secondary border border-border-secondary text-foreground-secondary px-3 py-1.5 rounded-full">
-              <svg className="w-3.5 h-3.5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              Inherited from {parentCat?.name ?? 'parent category'}
-              {' — '}
-              {(parentCat?.return_allowed ?? true) ? `Returns ${parentCat?.return_window_days ?? 7}d` : 'No returns'}
-              {' · '}
-              {(parentCat?.replacement_allowed ?? true)
-                ? `Replacement ${parentCat?.replacement_window_days ?? 7}d`
-                : 'No replacement'}
-            </span>
-            <button
-              type="button"
-              onClick={() => setOverriding(true)}
-              className="text-sm text-accent-500 hover:text-accent-600 font-medium underline underline-offset-2"
-            >
-              Override for this subcategory
-            </button>
-          </div>
-        ) : (
-          <>
-            {isSubcat && (
-              <button
-                type="button"
-                onClick={() => setOverriding(false)}
-                className="text-xs text-foreground-muted hover:text-foreground underline underline-offset-2 mb-4 block"
-              >
-                Reset to inherited (use parent policy)
-              </button>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
-                  <Toggle
-                    id="return_allowed"
-                    checked={returnAllowed}
-                    onChange={setReturnAllowed}
-                    label="Returns Allowed"
-                  />
-                </div>
-                {returnAllowed && (
-                  <div>
-                    <label
-                      htmlFor="return_window_days"
-                      className="mb-1.5 block text-xs font-medium text-foreground-secondary"
-                    >
-                      Return window (days)
-                    </label>
-                    <input
-                      type="number"
-                      id="return_window_days"
-                      name="return_window_days"
-                      min={1}
-                      max={90}
-                      value={returnDays}
-                      onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                      className={`${fieldInputCls}`}
-                    />
-                  </div>
-                )}
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
-                  <Toggle
-                    id="replacement_allowed"
-                    checked={replacementAllowed}
-                    onChange={setReplacementAllowed}
-                    label="Replacement Allowed"
-                  />
-                </div>
-                {replacementAllowed && (
-                  <div>
-                    <label
-                      htmlFor="replacement_window_days"
-                      className="mb-1.5 block text-xs font-medium text-foreground-secondary"
-                    >
-                      Replacement window (days)
-                    </label>
-                    <input
-                      type="number"
-                      id="replacement_window_days"
-                      name="replacement_window_days"
-                      min={1}
-                      max={90}
-                      value={replacementDays}
-                      onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                      className={`${fieldInputCls}`}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </FormSection>
+            </>
+          )}
+        </FormSection>
+      </LockedFieldset>
 
       {/* Form Actions — shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
       <FormFooter
         sticky
+        lock={lock}
         discard={isDraft && discardAction ? handleDiscard : undefined}
         cancel={edit.sessionId ? handleCancel : undefined}
         cancelHref={edit.sessionId ? undefined : ap('/admin/categories')}

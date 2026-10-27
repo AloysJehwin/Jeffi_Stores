@@ -25,6 +25,10 @@ import Stories from './Stories'
 import ProductSpotlight from './ProductSpotlight'
 import RewardsGame from './RewardsGame'
 import SlidesSection from './SlidesSection'
+import BusinessReorder from './business/BusinessReorder'
+import BusinessOffers from './business/BusinessOffers'
+import BusinessQuotes from './business/BusinessQuotes'
+import BusinessAccount from './business/BusinessAccount'
 
 // Mirror of controller-service components/visitor/home/SectionRenderer.tsx.
 const SIMPLE = {
@@ -53,7 +57,12 @@ const SIMPLE = {
   blog_teaser: BlogTeaser,
   social_strip: SocialStrip,
   value_stats: ValueStats,
+  business_quotes: BusinessQuotes,
+  business_account: BusinessAccount,
 } as const
+
+/** Rows that take a turn in the product rows' alternating look. */
+const isRow = (type: HomeSection['type']) => type === 'product_row' || type === 'business_reorder' || type === 'business_offers'
 
 export default function SectionRenderer({ section, data, rowIndex }: { section: HomeSection; data: HomeData; rowIndex: number }) {
   const carousel = section.layout === 'carousel'
@@ -68,6 +77,7 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
           products={products}
           carousel={carousel}
           style={ROW_STYLES[rowIndex % ROW_STYLES.length]}
+          aspect={section.aspect}
         />
       )
     }
@@ -85,6 +95,11 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
         />
       )
     }
+    // The signed-in business's own products, loaded per user, so they stay one item in the feed.
+    case 'business_reorder':
+      return <BusinessReorder section={section} data={data} style={ROW_STYLES[rowIndex % ROW_STYLES.length]} />
+    case 'business_offers':
+      return <BusinessOffers section={section} data={data} style={ROW_STYLES[rowIndex % ROW_STYLES.length]} />
     default: {
       const Component = SIMPLE[section.type]
       return Component ? <Component section={section} data={data} /> : null
@@ -96,9 +111,9 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
 // mounts (and unmounts) it a row at a time instead of a whole section of cards in one frame mid-scroll.
 
 type Rows =
-  | { kind: 'products'; products: CardProduct[]; title: string; eyebrow: string; style: RowStyle }
+  | { kind: 'products'; products: CardProduct[]; title: string; eyebrow: string; style: RowStyle; aspect?: number | null }
   | { kind: 'deal'; products: CardProduct[] }
-  | { kind: 'showcase'; cats: HomeData['categoryShowcase'] }
+  | { kind: 'showcase'; cats: HomeData['categoryShowcase']; aspect?: number | null }
 
 export type FeedItem =
   | { key: string; type: 'section'; section: HomeSection; rowIndex: number }
@@ -115,6 +130,7 @@ function gridRows(section: HomeSection, data: HomeData, rowIndex: number): Rows 
         title: section.copy.title ?? 'Products',
         eyebrow: section.copy.eyebrow ?? '',
         style: ROW_STYLES[rowIndex % ROW_STYLES.length],
+        aspect: section.aspect,
       }
     case 'bundle_spotlight':
     case 'back_in_stock':
@@ -128,7 +144,7 @@ function gridRows(section: HomeSection, data: HomeData, rowIndex: number): Rows 
     case 'deal_of_the_day':
       return { kind: 'deal', products: data.dealOfTheDay }
     case 'category_showcase':
-      return { kind: 'showcase', cats: data.categoryShowcase }
+      return { kind: 'showcase', cats: data.categoryShowcase, aspect: section.aspect }
     default:
       return null
   }
@@ -140,8 +156,8 @@ export function feedItems(sections: HomeSection[], data: HomeData): FeedItem[] {
   const out: FeedItem[] = []
   let n = 0
   for (const section of sections) {
-    // Each product_row's position among the rows, for its alternating style.
-    const rowIndex = section.type === 'product_row' ? n++ : n
+    // Each product row's position among the rows, for its alternating style.
+    const rowIndex = isRow(section.type) ? n++ : n
     const rows = gridRows(section, data, rowIndex)
     if (!rows) {
       out.push({ key: section.id, type: 'section', section, rowIndex })
@@ -171,8 +187,8 @@ export function FeedItemView({ item, data }: { item: FeedItem; data: HomeData })
     if (rows.kind === 'products') return <ProductRowHead title={rows.title} eyebrow={rows.eyebrow} style={rows.style} />
     return rows.kind === 'deal' ? <DealHead section={item.section} /> : <ShowcaseHead section={item.section} />
   }
-  if (rows.kind === 'showcase') return <ShowcaseRow cats={item.cats} last={item.last} />
+  if (rows.kind === 'showcase') return <ShowcaseRow cats={item.cats} last={item.last} aspect={rows.aspect} />
   const bg = rows.kind === 'deal' ? 'bg-surface-secondary' : rows.style.section
   const gap = rows.kind === 'deal' ? 12 : rows.style.gap
-  return <ProductPair products={item.products} bg={bg} gap={gap} last={item.last} />
+  return <ProductPair products={item.products} bg={bg} gap={gap} last={item.last} aspect={rows.kind === 'deal' ? null : rows.aspect} />
 }

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 50
 
-// The wallet page's ledger: ?page= plus its filters. Under the topup prefix so it is reachable on
+// The wallet page's ledger: ?page= plus its filters and ?sort&dir. Under the topup prefix so it is reachable on
 // delhivery:read like the page itself.
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'delhivery:read')
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10) || 1)
   try {
-    return NextResponse.json({ page, ...(await listWalletLedger(normalizeQuery(WALLET_ENTITY, sp), page, PAGE_SIZE)) })
+    return NextResponse.json({ page, ...(await listWalletLedger(normalizeQuery(WALLET_ENTITY, sp), page, PAGE_SIZE, sp)) })
   } catch (err) {
     console.error('[wallet/ledger]', err)
     return NextResponse.json({ error: 'Failed to load the ledger' }, { status: 500 })

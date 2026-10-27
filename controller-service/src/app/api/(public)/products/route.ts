@@ -8,6 +8,7 @@ import {
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { positiveInt, productOrderBy, productSortSql } from '@/lib/catalog/product-sort'
 
 const PAGE_SIZE = 21
 
@@ -17,10 +18,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')?.trim() || ''
     const categorySlug = searchParams.get('category')?.trim() || ''
     const brand = searchParams.get('brand')?.trim() || ''
-    const sort = searchParams.get('sort') || ''
-    const order = searchParams.get('order') === 'asc' ? 'ASC' : 'DESC'
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || String(PAGE_SIZE), 10)))
+    const sortQuery = { sort: searchParams.get('sort'), dir: searchParams.get('dir'), order: searchParams.get('order') }
+    const page = positiveInt(searchParams.get('page'), 1, 100_000)
+    const limit = positiveInt(searchParams.get('limit'), PAGE_SIZE, 100)
     const offset = (page - 1) * limit
 
     const conditions: string[] = [
@@ -54,27 +54,19 @@ export async function GET(request: NextRequest) {
       params.push(brand)
     }
 
-    const allowedSort: Record<string, string> = {
-      created_at: 'p.created_at',
-      name: 'p.name',
-      base_price: 'p.base_price',
-    }
-    const sortCol = allowedSort[sort] || null
-    const orderBy = sortCol
-      ? `${sortCol} ${order}`
-      : search
-        ? (() => {
-            const { rank, params: rp, nextIdx: ni } = buildProductSearchRank(search, 'p.name', 'p.search_vector', idx)
-            params.push(...rp)
-            idx = ni
-            return `${rank}, p.name ASC`
-          })()
-        : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
-
     const whereClause = conditions.join(' AND ')
 
     const { gstEnabled } = await getFeatureFlags()
     const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
+    // The count query binds only the filter params; the search rank's params are appended after it.
+    const rankParams: unknown[] = []
+    let fallback: string | undefined
+    if (search && !productSortSql(sortQuery, gstEnabled)) {
+      const rk = buildProductSearchRank(search, 'p.name', 'p.search_vector', idx)
+      rankParams.push(...rk.params)
+      fallback = `${rk.rank}, p.name ASC`
+    }
+    const orderBy = productOrderBy(sortQuery, { gstEnabled, fallback })
 
     const countRow = await queryOne<{ total: string }>(
       `SELECT COUNT(*) AS total FROM products p WHERE ${whereClause}`,
@@ -104,7 +96,7 @@ export async function GET(request: NextRequest) {
        WHERE ${whereClause}
        ORDER BY ${orderBy}
        LIMIT ${limit} OFFSET ${offset}`,
-      params
+      [...params, ...rankParams]
     )
 
     // Public route: never return the store's cost price, supplier link or search index.

@@ -141,6 +141,17 @@ describe('GET /api/admin/customers', () => {
     expect(mockGetCustomers).toHaveBeenCalledWith(expect.objectContaining({ sort: 'lifetime_value', dir: 'desc' }))
   })
 
+  it('passes a whitelisted sort and dir through', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockGetCustomers.mockResolvedValue({ customers: [] } as any)
+
+    await GET(makeRequest({ sort: 'joined', dir: 'asc' }))
+    expect(mockGetCustomers).toHaveBeenCalledWith(expect.objectContaining({ sort: 'joined', dir: 'asc' }))
+    await GET(makeRequest({ sort: 'nope', dir: 'asc' }))
+    expect(mockGetCustomers).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'lifetime_value', dir: 'desc' }))
+  })
+
   it('returns empty list when no customers found', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)

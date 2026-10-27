@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { InfiniteFooter, fetchJson, useReveal } from '@/components/admin/kit/infinite'
 import { MessageCircle, ChevronDown } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
 
 export interface EligibleRecipient {
   reference_id: string
@@ -365,11 +366,13 @@ export function RecentSendsPanel({
 
 /**
  * WhatsApp Log — the API returns the recent batch; pagination is pure client-side slicing.
- * Gated to kinds that support WhatsApp (returns null otherwise so callers can render it unconditionally).
+ * Gated to kinds that support WhatsApp and to Site Controls' WhatsApp switch (null otherwise, so callers
+ * can render it unconditionally).
  */
 export function WhatsAppLogPanel({ kind, logs }: { kind: string; logs: WhatsAppLog[] }) {
   const wa = useReveal(logs, WA_LIMIT)
-  if (!campaignSupportsWhatsApp(kind)) return null
+  const { whatsapp } = useMessagingChannels()
+  if (!whatsapp || !campaignSupportsWhatsApp(kind)) return null
   return (
     <CollapsibleCard
       title="WhatsApp Log"

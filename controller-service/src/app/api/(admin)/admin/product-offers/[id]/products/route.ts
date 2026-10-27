@@ -5,15 +5,15 @@ import { query, queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { findOpenSession } from '@/lib/admin/editor-sessions'
-import { ensureOfferDraft } from '@/lib/admin/offer-drafts'
+import { ensureOfferDraft, ensureOfferDraftTx } from '@/lib/admin/offer-drafts'
+import { actorOf, draftLockResponse, epochFrom, lockedByOther, withDraftWrite } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
 async function draftProductIds(offerId: string): Promise<string[] | null> {
-  const row = await queryOne<{ products: string[] | null }>(
-    `SELECT products FROM offer_drafts WHERE offer_id = $1`,
-    [offerId]
-  )
+  const row = await queryOne<{ products: string[] | null }>(`SELECT products FROM offer_drafts WHERE offer_id = $1`, [
+    offerId,
+  ])
   return (row?.products ?? null) as string[] | null
 }
 
@@ -81,15 +81,32 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!parsed.ok) return parsed.response
   const productIds = Array.from(new Set(parsed.data.productIds))
 
+  const actor = actorOf(admin)
   const session = await findOpenSession(admin.adminId, 'offer', id)
   if (session) {
-    await ensureOfferDraft(id)
-    await query(
-      `UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE offer_id = $2`,
-      [JSON.stringify(productIds), id]
-    )
+    try {
+      await withDraftWrite(
+        actor,
+        'offer',
+        id,
+        async db => {
+          await ensureOfferDraftTx(db, id)
+          await db.query(`UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE offer_id = $2`, [
+            JSON.stringify(productIds),
+            id,
+          ])
+        },
+        { epoch: epochFrom(request), ensure: true }
+      )
+    } catch (err) {
+      const locked = draftLockResponse(err)
+      if (locked) return locked
+      throw err
+    }
     return NextResponse.json({ success: true, count: productIds.length, draft: true })
   }
+  const denied = await lockedByOther(actor, 'offer', id)
+  if (denied) return denied
 
   await withTransaction(async client => {
     await client.query(`DELETE FROM product_offer_items WHERE offer_id = $1`, [id])
@@ -143,21 +160,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const matched = await queryMany<{ id: string }>(matchIdsSql, [categoryId ?? brandId])
   const matchedIds = matched.map(m => m.id)
 
+  const actor = actorOf(admin)
   const session = await findOpenSession(admin.adminId, 'offer', id)
   if (session) {
-    await ensureOfferDraft(id)
-    const current = (await draftProductIds(id)) ?? []
-    const next =
-      action === 'add'
-        ? Array.from(new Set([...current, ...matchedIds]))
-        : current.filter(pid => !matchedIds.includes(pid))
-    const changed = Math.abs(next.length - current.length)
-    await query(
-      `UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE offer_id = $2`,
-      [JSON.stringify(next), id]
-    )
-    return NextResponse.json({ changed, total: next.length, draft: true })
+    try {
+      const out = await withDraftWrite(
+        actor,
+        'offer',
+        id,
+        async db => {
+          await ensureOfferDraftTx(db, id)
+          const cur = await db.query(`SELECT products FROM offer_drafts WHERE offer_id = $1 FOR UPDATE`, [id])
+          const current = ((cur.rows[0]?.products ?? null) as string[] | null) ?? []
+          const next =
+            action === 'add'
+              ? Array.from(new Set([...current, ...matchedIds]))
+              : current.filter(pid => !matchedIds.includes(pid))
+          await db.query(`UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE offer_id = $2`, [
+            JSON.stringify(next),
+            id,
+          ])
+          return { changed: Math.abs(next.length - current.length), total: next.length }
+        },
+        { epoch: epochFrom(request), ensure: true }
+      )
+      return NextResponse.json({ ...out, draft: true })
+    } catch (err) {
+      const locked = draftLockResponse(err)
+      if (locked) return locked
+      throw err
+    }
   }
+  const denied = await lockedByOther(actor, 'offer', id)
+  if (denied) return denied
 
   await withTransaction(async client => {
     if (action === 'add') {
@@ -168,10 +203,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         [id, matchedIds]
       )
     } else {
-      await client.query(
-        `DELETE FROM product_offer_items WHERE offer_id = $1 AND product_id = ANY($2::uuid[])`,
-        [id, matchedIds]
-      )
+      await client.query(`DELETE FROM product_offer_items WHERE offer_id = $1 AND product_id = ANY($2::uuid[])`, [
+        id,
+        matchedIds,
+      ])
     }
   })
   const total = await queryOne<{ n: number }>(
@@ -180,4 +215,3 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   )
   return NextResponse.json({ changed: matchedIds.length, total: total?.n ?? 0 })
 }
-

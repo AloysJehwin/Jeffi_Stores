@@ -6,7 +6,10 @@ import AdminImage from '@/components/admin/AdminImage'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import SlidesSection from '@/components/visitor/home/SlidesSection'
 import {
+  BUSINESS_SECTION_TYPES,
+  businessOffersConfig,
   motionHeroSlides,
+  rowAudience,
   rowSurface,
   slidesConfig,
   spotlightConfig,
@@ -132,13 +135,31 @@ function PreviewTile({ kind, item }: { kind: Exclude<PreviewKind, 'none'>; item:
   return <AdminImage src={item.image_url} alt="" className="w-full h-full object-cover" fallback={icon} />
 }
 
+// Business sections show each signed-in business its own data, so there is nothing shared to fetch.
+function businessNote(section: HomepageSection): string {
+  switch (section.type) {
+    case 'business_reorder':
+      return 'Shows each signed-in business its own most-ordered products.'
+    case 'business_quotes':
+      return 'Shows a quote request button and each signed-in business its own open quotes.'
+    case 'business_offers':
+      return businessOffersConfig(section).source === 'picked'
+        ? "Shows the products you picked, each at the signed-in business's own price."
+        : 'Shows each signed-in business the products on its own discount, biggest discount first.'
+    default:
+      return 'Shows each signed-in business its own company, orders, payments and quotes.'
+  }
+}
+
 export default function SectionPreview({ section }: { section: HomepageSection }) {
   const [data, setData] = useState<PreviewResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const configKey = JSON.stringify(previewConfig(section))
+  const perBusiness = BUSINESS_SECTION_TYPES.has(section.type)
 
   useEffect(() => {
+    if (perBusiness) return
     let cancelled = false
     const controller = new AbortController()
     setLoading(true)
@@ -146,7 +167,12 @@ export default function SectionPreview({ section }: { section: HomepageSection }
 
     const timer = setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ type: section.type, config: configKey, surface: rowSurface(section) })
+        const params = new URLSearchParams({
+          type: section.type,
+          config: configKey,
+          surface: rowSurface(section),
+          audience: rowAudience(section),
+        })
         const res = await fetch(`/api/admin/homepage/preview?${params.toString()}`, {
           credentials: 'include',
           signal: controller.signal,
@@ -166,9 +192,11 @@ export default function SectionPreview({ section }: { section: HomepageSection }
       controller.abort()
       clearTimeout(timer)
     }
-  }, [section.type, configKey, section.surface])
+  }, [section.type, configKey, section.surface, section.audience, perBusiness])
 
   const hero = section.type === 'hero' || section.type === 'motion_hero'
+
+  if (perBusiness) return <p className="text-xs text-foreground-muted py-2">{businessNote(section)}</p>
 
   if (loading && !data) {
     return <p className="text-xs text-foreground-muted py-2">Loading live preview…</p>

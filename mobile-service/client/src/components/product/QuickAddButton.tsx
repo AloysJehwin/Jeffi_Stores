@@ -12,6 +12,7 @@ export default function QuickAddButton({ product, inStock }: { product: CardProd
   const t = useTokens()
   const addedSeq = useQuickAddStore(s => (s.addedProductId === product.id ? s.addedSeq : 0))
   const scale = useSharedValue(1)
+  const bounced = useSharedValue(false)
   const seen = useRef(addedSeq)
   const { animate } = useMotion()
 
@@ -20,10 +21,12 @@ export default function QuickAddButton({ product, inStock }: { product: CardProd
     if (!addedSeq || addedSeq === seen.current) return
     seen.current = addedSeq
     if (!animate) return
+    bounced.value = true
     scale.value = withSequence(withSpring(1.35, { damping: 6, stiffness: 320 }), withSpring(1, { damping: 10, stiffness: 220 }))
-  }, [addedSeq, scale, animate])
+  }, [addedSeq, scale, bounced, animate])
 
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+  // Empty until the first bounce, like usePressScale, so a list of cards doesn't each register a style.
+  const style = useAnimatedStyle(() => (bounced.value ? { transform: [{ scale: scale.value }] } : {}))
 
   if (!inStock) {
     return (

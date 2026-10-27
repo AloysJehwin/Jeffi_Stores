@@ -9,6 +9,8 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import DurationField from '@/components/admin/campaigns/DurationField'
 import type { DurationUnit } from '@/lib/campaigns/duration'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
+import { channelParamOff } from '../../_components/campaign-presentation'
 
 interface ParamDef {
   type: 'integer' | 'number' | 'boolean' | 'duration'
@@ -56,6 +58,8 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
   const [loading, setLoading] = useState(true)
   const [overrides, setOverrides] = useState<Record<string, Record<string, number | boolean | string>>>({})
   const [savingKey, setSavingKey] = useState<string | null>(null)
+  // Site Controls' switches hide an off channel's "Also send via" params (saved values untouched).
+  const msg = useMessagingChannels()
 
   useEffect(() => {
     load()
@@ -160,7 +164,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
         <div className="mt-4">
           <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-2">Scenario default parameters</p>
           <div className="p-3 bg-surface-secondary rounded-lg font-mono text-xs space-y-0.5 break-words">
-            {Object.entries(scenario.default_parameters).map(([k, v]) => {
+            {Object.entries(scenario.default_parameters).filter(([k]) => !channelParamOff(k, msg)).map(([k, v]) => {
               const def = scenario.param_schema[k]
               return (
                 <div key={k}>
@@ -263,7 +267,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {Object.entries(scenario.param_schema).map(([key, def]) => {
+                      {Object.entries(scenario.param_schema).filter(([key]) => !channelParamOff(key, msg)).map(([key, def]) => {
                         const defaultVal = scenario.default_parameters[key]
                         const overrideVal = ov[key]
                         const isOverridden = overrideVal !== undefined && overrideVal !== null

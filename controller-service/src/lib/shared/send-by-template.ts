@@ -33,7 +33,20 @@ export async function brandFields(channel: Channel): Promise<{ brand?: string; k
   } catch { return {} }
 }
 
+// Site Controls' SMS / WhatsApp switches; messaging-service enforces them too.
+async function channelOn(channel: Channel): Promise<boolean> {
+  if (channel === 'email') return true
+  try {
+    const { getFeatureFlags } = await import('@/lib/catalog/site-controls')
+    const flags = await getFeatureFlags()
+    return channel === 'sms' ? flags.smsEnabled : flags.whatsappEnabled
+  } catch {
+    return process.env[channel === 'sms' ? 'SMS_DISABLED' : 'WHATSAPP_DISABLED'] !== 'true'
+  }
+}
+
 export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult> {
+  if (!(await channelOn(i.channel))) return { status: 'skipped', error: 'channel_disabled' }
   const tenant = await messagingTenant()
   const extra = await brandFields(i.channel)
   const body = {

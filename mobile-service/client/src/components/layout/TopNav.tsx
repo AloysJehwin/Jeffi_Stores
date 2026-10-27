@@ -1,24 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardEvents } from 'react-native-keyboard-controller'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Clock, ImageIcon, Layers, Menu, Search, Sparkles, X } from 'lucide-react-native'
+import { ChevronRight, Clock, ImageIcon, Layers, Search, Sparkles, X } from 'lucide-react-native'
 import { api } from '../../api/client'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
-import { useUnreadCount } from '../../hooks/useNotifications'
-import { useCartStore } from '../../stores/cartStore'
 import { useAuthStore } from '../../stores/authStore'
 import { inr } from '../../lib/format'
 import { accent, useTokens } from '../../theme'
 import { Button, Card, EmptyState, IconButton, Overline, Overlay, Skeleton, Text, TextButton, TextField, useElevation, type FieldRef } from '../../ui'
-import { MenuSheet } from './MenuSheet'
+import { MenuButton } from './MenuButton'
 import { StoreLogo } from './StoreLogo'
 
-// Mirror of controller-service visitor/Header.tsx + SearchBar.tsx at the mobile breakpoint; the menu is MenuSheet.
+// Mirror of controller-service visitor/Header.tsx + SearchBar.tsx at the mobile breakpoint; the menu is MenuButton.
 
 interface SearchProduct {
   id: string
@@ -82,14 +80,9 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
   const isDark = colorScheme === 'dark'
   const barShadow = useElevation('raised')
   const fieldShadow = useElevation('overlay')
-  const cartCount = useCartStore(s => s.count)
   const user = useAuthStore(s => s.user)
   const { identity } = useStoreConfig()
-  const unread = useUnreadCount()
-  const refreshUnread = unread.refresh
-  useFocusEffect(useCallback(() => refreshUnread(), [refreshUnread]))
 
-  const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
@@ -184,14 +177,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
               <IconButton icon={Sparkles} label="Ask the assistant" color={iconColor} onPress={() => router.push('/info/support')} />
             ) : null}
             {/* Cart, notifications and account moved into the menu to keep the bar to three icons. */}
-            <IconButton
-              icon={Menu}
-              label="Open menu"
-              badge={cartCount + unread.count}
-              accessibilityLabel={cartCount + unread.count > 0 ? `Open menu, ${cartCount} in cart, ${unread.count} unread` : 'Open menu'}
-              color={iconColor}
-              onPress={() => setMenuOpen(true)}
-            />
+            <MenuButton />
           </View>
         </View>
       </View>
@@ -348,7 +334,6 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
         </View>
       </Overlay>
 
-      <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
     </>
   )
 }

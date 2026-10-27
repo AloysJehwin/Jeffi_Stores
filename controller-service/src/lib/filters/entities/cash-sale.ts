@@ -20,6 +20,7 @@ const SQL: Record<CashSaleKey, FieldSql> = {
 export const CASH_SALE_SORTS: Record<string, string> = {
   invoice_number: 'cs.invoice_number',
   invoice_date: 'cs.invoice_date',
+  customer_name: 'cs.customer_name',
   total_amount: 'cs.total_amount',
   payment_status: 'cs.payment_status',
 }

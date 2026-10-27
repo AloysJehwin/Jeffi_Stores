@@ -6,6 +6,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { getOfferById } from '@/lib/catalog/product-offers'
 import type { AssignOption } from '@/components/admin/OffersProductPicker'
 import OfferDetailClient from '../OfferDetailClient'
+import { initialDraftLock } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,13 +71,15 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
   const offer = await getOfferById(id)
   if (!offer) notFound()
 
-  const [host, options] = await Promise.all([getHost(), loadAssignOptions()])
+  // Someone else's draft renders read-only from the first paint, with their name in the banner.
+  const [host, options, initialLock] = await Promise.all([getHost(), loadAssignOptions(), initialDraftLock('offer', id)])
   return (
     <OfferDetailClient
       offer={offer}
       backHref={ap('/admin/offers?tab=offers', host)}
       categoryOptions={options.categories}
       brandOptions={options.brands}
+      initialLock={initialLock}
     />
   )
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
-import { EmptyState, InfiniteFooter, PageBody, fetchJson, useInfiniteList, PageHeader, TableSkeleton, badgeCls, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { EmptyState, InfiniteFooter, PageBody, SortTh, fetchJson, useInfiniteList, useListSort, PageHeader, TableSkeleton, badgeCls, fieldInputCls, useActionToast, type SortCol } from '@/components/admin/kit'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import InflationHistoryMobileList from './_components/InflationHistoryMobileList'
@@ -80,6 +80,14 @@ const PREVIEW_COLS: { key: keyof PriceSnapshot; label: string }[] = [
   { key: 'base_price', label: 'Selling Price (incl. GST)' },
 ]
 
+const LOG_COLS: SortCol[] = [
+  { key: 'category', label: 'Category' },
+  { key: 'pct', label: '%', type: 'number' },
+  { key: 'products', label: 'Products', type: 'number' },
+  { key: 'applied_by', label: 'Applied by' },
+  { key: 'applied_at', label: 'Date', type: 'date' },
+]
+
 function fmt(val: number | null): string {
   if (val == null) return '—'
   return `₹${val.toFixed(2)}`
@@ -122,12 +130,14 @@ export default function InflationClient({ categories, brands }: { categories: Ca
   }, [rollbackError, toast])
 
   const PAGE_SIZE = 25
+  const logSort = useListSort('log')
   const logList = useInfiniteList<InflationLog>({
-    key: 'logs',
+    key: `logs|${logSort.sort ?? ''}|${logSort.dir}`,
     pageSize: PAGE_SIZE,
     getKey: l => l.id,
     fetchPage: async (p, signal) => {
-      const data = await fetchJson(`/api/admin/inflation/logs?limit=${PAGE_SIZE}&offset=${(p - 1) * PAGE_SIZE}`, signal)
+      const sortQs = logSort.sort ? `&sort=${encodeURIComponent(logSort.sort)}&dir=${logSort.dir}` : ''
+      const data = await fetchJson(`/api/admin/inflation/logs?limit=${PAGE_SIZE}&offset=${(p - 1) * PAGE_SIZE}${sortQs}`, signal)
       return { rows: data.logs || [], total: data.total ?? null }
     },
   })
@@ -572,11 +582,11 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                   <table className="w-full text-sm">
                     <thead className="bg-surface-secondary/50 border-b border-border-default">
                       <tr>
-                        <th className="text-left py-2.5 px-4 font-medium text-xs text-foreground-muted">Category</th>
-                        <th className="text-right py-2.5 px-3 font-medium text-xs text-foreground-muted">%</th>
-                        <th className="text-right py-2.5 px-3 font-medium text-xs text-foreground-muted">Products</th>
-                        <th className="text-left py-2.5 px-3 font-medium text-xs text-foreground-muted">Applied by</th>
-                        <th className="text-left py-2.5 px-3 font-medium text-xs text-foreground-muted">Date</th>
+                        <SortTh ns="log" col={LOG_COLS[0]} className="py-2.5 px-4 font-medium text-xs text-foreground-muted" />
+                        <SortTh ns="log" col={LOG_COLS[1]} align="right" className="py-2.5 px-3 font-medium text-xs text-foreground-muted" />
+                        <SortTh ns="log" col={LOG_COLS[2]} align="right" className="py-2.5 px-3 font-medium text-xs text-foreground-muted" />
+                        <SortTh ns="log" col={LOG_COLS[3]} className="py-2.5 px-3 font-medium text-xs text-foreground-muted" />
+                        <SortTh ns="log" col={LOG_COLS[4]} className="py-2.5 px-3 font-medium text-xs text-foreground-muted" />
                         <th className="py-2.5 px-3"></th>
                       </tr>
                     </thead>

@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation'
 import { Eye, Send, Trash2 } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import { DraftLockBadge } from '@/components/admin/kit'
+import type { MailerLocks } from './MessagingTable'
 
 interface Campaign {
   id: string
@@ -30,6 +33,8 @@ interface Props {
   statusStyles: Record<string, string>
   currentListUrl: string
   host?: string
+  locks?: MailerLocks
+  meId?: string | null
 }
 
 const channelLabel = (
@@ -58,9 +63,10 @@ function formatDate(c: Campaign): string {
   return new Date(c.created_at).toLocaleDateString('en-IN')
 }
 
-export default function MailerMobileList({ campaigns, templateLabels, statusStyles, currentListUrl, host }: Props) {
+export default function MailerMobileList({ campaigns, templateLabels, statusStyles, currentListUrl, host, locks = {}, meId = null }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
+  const { showToast } = useToast()
   const canWrite = useCanWrite('campaigns:write')
 
   const [selected, setSelected] = useState<Campaign | null>(null)
@@ -79,11 +85,12 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
     if (busy) return
     setBusy(true)
     try {
-      await fetch(`/api/admin/marketing/messaging/${c.id}/send`, {
+      const res = await fetch(`/api/admin/mailer/${c.id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dispatchNow: true }),
       })
+      if (!res.ok) return showToast((await res.json().catch(() => ({}))).error || 'Could not send this message', 'error')
       setSelected(null)
       router.refresh()
     } finally {
@@ -102,7 +109,8 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
     if (!ok || busy) return
     setBusy(true)
     try {
-      await fetch(`/api/admin/marketing/messaging/${c.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/admin/mailer/${c.id}`, { method: 'DELETE' })
+      if (!res.ok) return showToast((await res.json().catch(() => ({}))).error || 'Could not delete this message', 'error')
       setSelected(null)
       router.refresh()
     } finally {
@@ -165,6 +173,11 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
           </p>
           {c.recipient_count != null && (
             <p className="text-xs text-foreground-muted mt-0.5">{c.recipient_count} recipients</p>
+          )}
+          {locks[c.id] && (
+            <div className="mt-1.5">
+              <DraftLockBadge lock={locks[c.id]} mine={!!meId && locks[c.id].ownerId === meId} />
+            </div>
           )}
         </MobileListCard>
       ))}

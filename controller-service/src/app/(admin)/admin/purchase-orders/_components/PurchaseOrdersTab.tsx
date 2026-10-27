@@ -5,7 +5,7 @@ import { productLabel as grainLabel } from '@/lib/catalog/product-label'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { PO_ALIASES, PO_FIELDS, PO_SEARCH } from '@jeffi/list-filters/fields'
-import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
+import { SortTh, useListSort, type SortCol } from '@/components/admin/kit/list-sort'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
@@ -29,6 +29,9 @@ import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
 import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, STATUS_BADGE } from '@/components/admin/purchasing/shared'
 import { FormFooter } from '@/components/admin/kit/form'
+import { DraftLockBadge, DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { lockHeaders } from '@/lib/client/draft-lock-client'
 import { resnapshotPoReceiveSession } from './receive-actions'
 
 const PO_STATUS: StatusMap = {
@@ -41,6 +44,18 @@ const PO_STATUS: StatusMap = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+const SORT_TH = 'px-6 py-3 text-xs font-medium text-foreground-muted uppercase tracking-wider'
+
+const PO_SORT_COLS: SortCol[] = [
+  { key: 'po_number', label: 'PO #' },
+  { key: 'supplier', label: 'Supplier' },
+  { key: 'date', label: 'Date', type: 'date' },
+  { key: 'expected', label: 'Expected', type: 'date' },
+  { key: 'items', label: 'Items', type: 'number' },
+  { key: 'total', label: 'Total', type: 'number' },
+  { key: 'status', label: 'Status' },
+]
+
 type PO = {
   id: string
   po_number: string
@@ -52,6 +67,8 @@ type PO = {
   expected_date: string | null
   item_count: number
   total_amount: string
+  /** Who holds the draft PO or the PO's receipt (list endpoint). */
+  lock?: { ownerId: string; ownerName: string | null; lastActiveAt: string; mine: boolean } | null
 }
 
 type POItem = {
@@ -173,6 +190,8 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   const [summary, setSummary] = useState<{ open: number; open_value: number } | null>(null)
   const [viewPO, setViewPO] = useState<{ po: any; items: POItem[]; grns: any[] } | null>(null)
   const [receiveMode, setReceiveMode] = useState<{ po: any } | null>(null)
+  // One receipt per PO belongs to the admin receiving it; others watch read-only.
+  const receiveLock = useDraftLock({ resourceType: 'po_receive', resourceId: receiveMode?.po?.id ?? null })
   // Receive edit-session id — opened on modal open, closed on submit (save) or
   // cancel (rollback). Kept in a ref because closers run outside the setter.
   const receiveSessionIdRef = React.useRef<string | null>(null)
@@ -184,8 +203,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   const [receiveWarehouseId, setReceiveWarehouseId] = useState('')
   const [editWarehouses, setEditWarehouses] = useState<{ id: string; name: string; code: string }[]>([])
   const [shelfLocations, setShelfLocations] = useState<{ id: string; display_code: string }[]>([])
-  const [poSortCol, setPoSortCol] = useState<string | undefined>(undefined)
-  const [poSortDir, setPoSortDir] = useState<SortDir | undefined>(undefined)
+  const { sort, dir } = useListSort()
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const [scanSerials, setScanSerials] = useState(true)
   const [draftRestored, setDraftRestored] = useState(false)
@@ -262,13 +280,13 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     [showToast]
   )
 
-  useBarcodeScanner({ onScan: fillNextSerial, enabled: !!receiveMode && scanSerials, captureInInputs: true })
+  useBarcodeScanner({ onScan: fillNextSerial, enabled: !!receiveMode && scanSerials && !receiveLock.readOnly, captureInInputs: true })
 
   // Autosave the in-progress receive form to localStorage (keyed by PO id) so a
   // long receive isn't lost on navigate-away/refresh. Restored in openReceive.
   // Also mirrors to po_receive_drafts on the server so Cancel rolls back cleanly.
   useEffect(() => {
-    if (!receiveMode?.po?.id || receiveItems.length === 0) return
+    if (!receiveMode?.po?.id || receiveItems.length === 0 || receiveLock.readOnly) return
     const poId = receiveMode.po.id
     const key = `po_receive_draft:${poId}`
     const t = setTimeout(() => {
@@ -292,16 +310,21 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
       // Mirror to server draft (fire-and-forget — localStorage still works offline).
       void fetch(`/api/admin/inventory/po/${poId}/receive/draft`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('po_receive', poId) },
         credentials: 'include',
         body: JSON.stringify({
           line_items: slim,
           serials: slim.flatMap(r => (Array.isArray(r.serial_numbers) ? r.serial_numbers : [])),
         }),
-      }).catch(() => {})
+      })
+        .then(r => {
+          if (r.status === 423) receiveLock.markLocked(slim)
+        })
+        .catch(() => {})
     }, 600)
     return () => clearTimeout(t)
-  }, [receiveMode, receiveItems, receiveNotes, receiveWarehouseId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiveMode, receiveItems, receiveNotes, receiveWarehouseId, receiveLock.readOnly])
 
   async function printReceivedSerialLabels() {
     if (!lastReceivedSerials.length) return
@@ -345,24 +368,19 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     }
   }
 
-  const PO_SORT_KEYS: Record<string, keyof PO> = {
-    po_number: 'po_number',
-    supplier: 'supplier_name',
-    date: 'order_date',
-    expected: 'expected_date',
-    items: 'item_count',
-    total: 'total_amount',
-    status: 'status',
-  }
-
+  // Ordered server-side across all POs via ?sort&dir.
   const list = useInfiniteList<PO>({
-    key: filters,
+    key: `${filters}|${sort}|${dir}`,
     pageSize: PAGE_SIZE,
     getKey: p => p.id,
     fetchPage: async (pg, signal) => {
       const params = new URLSearchParams(filters)
       params.set('page', String(pg))
       params.set('limit', String(PAGE_SIZE))
+      if (sort) {
+        params.set('sort', sort)
+        params.set('dir', dir)
+      }
       const json = await fetchJson(`/api/admin/inventory/po?${params}`, signal)
       if (pg === 1) setSummary(json?.summary ?? null)
       return { rows: json?.purchase_orders || [], total: json?.total || 0 }
@@ -372,19 +390,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   const loading = list.loading
   const load = list.reload
 
-  const sortedPOs =
-    poSortCol && PO_SORT_KEYS[poSortCol]
-      ? [...pos].sort((a, b) => {
-          const k = PO_SORT_KEYS[poSortCol]
-          const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
-          return poSortDir === 'asc' ? cmp : -cmp
-        })
-      : pos
-
-  function handlePoSort(col: string, dir: SortDir) {
-    setPoSortCol(col)
-    setPoSortDir(dir)
-  }
 
   // ?po= takes a PO id or a PO number (number links predate the id ones).
   const deepLinked = React.useRef(false)
@@ -563,13 +568,18 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     try {
       const r = await fetch(`/api/admin/inventory/po/${poId}/receive/draft`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('po_receive', poId) },
         credentials: 'include',
         body: JSON.stringify({
           line_items: slim,
           serials: slim.flatMap(r => (Array.isArray(r.serial_numbers) ? r.serial_numbers : [])),
         }),
       })
+      if (r.status === 423) {
+        receiveLock.markLocked(slim)
+        showToast('Someone else is receiving this PO — your entries were not saved', 'error')
+        return
+      }
       if (!r.ok) flushed = false
     } catch {
       flushed = false
@@ -644,7 +654,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
       }))
     const res = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...lockHeaders('po_receive', receiveMode.po.id) },
       body: JSON.stringify({
         items,
         notes: receiveNotes,
@@ -653,6 +663,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     })
     const json = await res.json()
     setReceiveSaving(false)
+    if (res.status === 423) receiveLock.markLocked()
     if (json.success) {
       // Clear the autosaved draft for this PO now that it's received.
       try {
@@ -746,6 +757,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
           </button>
           }
         />
+        <DraftLockBanner lock={receiveLock} scope="inventory:write" />
         {draftRestored && (
           <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-amber-500/40 bg-amber-500/5">
             <svg
@@ -775,7 +787,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             </button>
           </div>
         )}
-        <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+        <LockedFieldset readOnly={receiveLock.readOnly} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
@@ -1080,9 +1092,9 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
               </tbody>
             </table>
           </div>
-        </div>
+        </LockedFieldset>
         {editWarehouses.length > 0 && (
-          <div>
+          <LockedFieldset readOnly={receiveLock.readOnly}>
             <label className={labelCls}>
               Warehouse <span className="text-foreground-muted font-normal">(stock destination)</span>
             </label>
@@ -1096,9 +1108,9 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                 Stock with no specific bin will land on the open shelf. Override per-item below.
               </p>
             )}
-          </div>
+          </LockedFieldset>
         )}
-        <div>
+        <LockedFieldset readOnly={receiveLock.readOnly}>
           <label className={labelCls}>Notes</label>
           <textarea
             className={inputCls}
@@ -1106,8 +1118,9 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             value={receiveNotes}
             onChange={e => setReceiveNotes(e.target.value)}
           />
-        </div>
+        </LockedFieldset>
         <FormFooter
+          lock={receiveLock}
           cancel={cancelReceive}
           cancelLabel="Cancel"
         >
@@ -1460,7 +1473,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
               </p>
             ) : (
               <PurchaseOrdersMobileList
-                pos={sortedPOs}
+                pos={pos}
                 statusBadge={STATUS_BADGE}
                 sendingEmailId={sendingEmailId}
                 onView={openPO}
@@ -1475,67 +1488,13 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
                 <tr>
-                  <SortableHeader
-                    label="PO #"
-                    column="po_number"
-                    options={sortOptions('text')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                  />
-                  <SortableHeader
-                    label="Supplier"
-                    column="supplier"
-                    options={sortOptions('text')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                  />
-                  <SortableHeader
-                    label="Date"
-                    column="date"
-                    options={sortOptions('date')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                    className="hidden sm:table-cell"
-                  />
-                  <SortableHeader
-                    label="Expected"
-                    column="expected"
-                    options={sortOptions('date')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                    className="hidden md:table-cell"
-                  />
-                  <SortableHeader
-                    label="Items"
-                    column="items"
-                    options={sortOptions('number')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                    className="hidden lg:table-cell"
-                    align="right"
-                  />
-                  <SortableHeader
-                    label="Total"
-                    column="total"
-                    options={sortOptions('number')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                    align="right"
-                  />
-                  <SortableHeader
-                    label="Status"
-                    column="status"
-                    options={sortOptions('text')}
-                    currentSort={poSortCol}
-                    currentDir={poSortDir}
-                    onSort={handlePoSort}
-                  />
+                  <SortTh col={PO_SORT_COLS[0]} className={SORT_TH} />
+                  <SortTh col={PO_SORT_COLS[1]} className={SORT_TH} />
+                  <SortTh col={PO_SORT_COLS[2]} className={`${SORT_TH} hidden sm:table-cell`} />
+                  <SortTh col={PO_SORT_COLS[3]} className={`${SORT_TH} hidden md:table-cell`} />
+                  <SortTh col={PO_SORT_COLS[4]} align="right" className={`${SORT_TH} hidden lg:table-cell`} />
+                  <SortTh col={PO_SORT_COLS[5]} align="right" className={SORT_TH} />
+                  <SortTh col={PO_SORT_COLS[6]} className={SORT_TH} />
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
                     Actions
                   </th>
@@ -1549,7 +1508,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                     </td>
                   </tr>
                 )}
-                {sortedPOs.map(po => (
+                {pos.map(po => (
                   <tr key={po.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs font-medium">
                       <button
@@ -1591,6 +1550,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                       >
                         {po.status}
                       </span>
+                      {po.lock && <span className="ml-1.5"><DraftLockBadge lock={po.lock} mine={po.lock.mine} /></span>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">

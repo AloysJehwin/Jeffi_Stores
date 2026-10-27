@@ -126,6 +126,7 @@ export default function BrandsTable({
     {
       key: 'name',
       label: 'Brand',
+      sortParam: 'name',
       render: b => (
         <div className="min-w-0">
           <HoverCard
@@ -165,10 +166,11 @@ export default function BrandsTable({
         </div>
       ),
     },
-    { key: 'slug', label: 'Slug', render: b => <span className="font-mono text-xs text-foreground-secondary">{b.slug}</span> },
+    { key: 'slug', label: 'Slug', sortParam: 'slug', render: b => <span className="font-mono text-xs text-foreground-secondary">{b.slug}</span> },
     {
       key: 'website',
       label: 'Website',
+      sortParam: 'website',
       hideBelow: 'md',
       render: b =>
         b.website ? (
@@ -179,7 +181,7 @@ export default function BrandsTable({
           <span className="text-foreground-muted">-</span>
         ),
     },
-    { key: 'status', label: 'Status', render: b => <StatusCell brand={b} /> },
+    { key: 'status', label: 'Status', sortParam: 'status', render: b => <StatusCell brand={b} /> },
   ]
 
   return (

@@ -8,6 +8,7 @@ import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { hasScope } from '@/lib/auth/scopes'
 import { updateBrand } from './actions'
+import { initialDraftLock } from '@/lib/admin/draft-locks'
 
 async function getBrand(id: string) {
   const data = await queryOne('SELECT * FROM brands WHERE id = $1', [id])
@@ -51,6 +52,8 @@ export default async function EditBrandPage({
 
   const backUrl = back && back.startsWith('/admin/brands') ? back : '/admin/brands'
 
+  const initialLock = await initialDraftLock('brand', id)
+
   return (
     <MobileEditBlock>
       <FormPage
@@ -64,6 +67,7 @@ export default async function EditBrandPage({
         }
       >
         <BrandForm
+          initialLock={initialLock}
           brand={brandForForm}
           action={updateBrand.bind(null, id)}
           backUrl={backUrl}

@@ -3,7 +3,8 @@ import { revalidatePath } from 'next/cache'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
-import { publishHomepageDraft, type PublishResult } from '@/lib/catalog/homepage-draft'
+import { homepageLockFrom, publishHomepageDraft, type PublishResult } from '@/lib/catalog/homepage-draft'
+import { draftLockResponse } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,14 +17,17 @@ export async function POST(request: NextRequest) {
 
   let published: PublishResult | null
   try {
-    published = await publishHomepageDraft()
+    published = await publishHomepageDraft(homepageLockFrom(admin, request))
   } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     console.error('[homepage-draft publish]', err)
     return NextResponse.json({ error: 'Publish failed; the live homepage was not changed.' }, { status: 500 })
   }
   if (!published) return NextResponse.json({ error: 'There are no draft changes to publish' }, { status: 409 })
 
   revalidatePath('/')
+  revalidatePath('/business')
   await logAdminAudit({
     adminId: admin.adminId,
     action: 'update',

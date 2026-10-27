@@ -5,6 +5,7 @@ import { currentTenantPlanGate } from '@/lib/auth/plan-gate'
 import { generateImage } from '@/lib/ai/media'
 import { aiMediaErrorResponse } from '@/lib/ai/media-route'
 import { query, queryOne } from '@/lib/shared/db'
+import { actorOf, lockedByOther } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180
@@ -24,6 +25,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const offer = await queryOne<{ id: string }>(`SELECT id FROM product_offers WHERE id = $1`, [id])
     if (!offer) return NextResponse.json({ error: 'Offer not found' }, { status: 404 })
+    const locked = await lockedByOther(actorOf(admin), 'offer', id)
+    if (locked) return locked
 
     const body = await request.json().catch(() => ({}))
     const rawPrompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''

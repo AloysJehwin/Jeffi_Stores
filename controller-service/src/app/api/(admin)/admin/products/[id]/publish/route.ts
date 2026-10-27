@@ -14,6 +14,7 @@ import {
   ProductValidationError,
   storedProductPublishErrors,
 } from '@/lib/catalog/product-validation'
+import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,7 +64,13 @@ export async function POST(req: NextRequest, { params }: Params) {
         )
       }
 
-      await query(`UPDATE products SET is_draft = false, is_active = true, updated_at = NOW() WHERE id = $1`, [id])
+      await withDraftPublish(
+        actorOf(admin),
+        'product',
+        id,
+        db => db.query(`UPDATE products SET is_draft = false, is_active = true, updated_at = NOW() WHERE id = $1`, [id]),
+        { epoch: epochFrom(req) }
+      )
       revalidatePath('/admin/products')
       return NextResponse.json({ success: true, productId: id })
     }
@@ -81,10 +88,12 @@ export async function POST(req: NextRequest, { params }: Params) {
       )
     }
 
-    await publishProductDraft(id, { activate: true })
+    await publishProductDraft(id, { activate: true, actor: actorOf(admin), epoch: epochFrom(req) })
     revalidatePath('/admin/products')
     return NextResponse.json({ success: true, productId: id })
   } catch (err: unknown) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     console.error('[product-publish] publish failed for', id, err)
     const status =
       err instanceof OpenOrdersBlockError || err instanceof UnitChangeBlockedError

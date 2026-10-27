@@ -17,9 +17,12 @@ import {
   slidesConfig,
   SECTION_TYPES,
   SECTION_COPY_DEFAULTS,
+  HOMEPAGE_AUDIENCES,
   HOMEPAGE_SURFACES,
   forSurface,
+  rowAudience,
   rowSurface,
+  type HomepageAudience,
   type HomepageSurface,
   type SectionType,
   type HomepageSection,
@@ -77,6 +80,7 @@ const querySchema = z.object({
   type: z.enum(SECTION_TYPES as [string, ...string[]]),
   config: z.string().max(8000).optional(),
   surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
+  audience: z.enum(HOMEPAGE_AUDIENCES as [string, ...string[]]).optional(),
 })
 
 function parseConfig(raw: string | undefined): Record<string, unknown> {
@@ -187,9 +191,9 @@ async function topBrands(): Promise<PreviewItem[]> {
 }
 
 // The slides the surface would show: its own, or the website's when it has none (as the live model does).
-async function heroItems(surface: HomepageSurface): Promise<PreviewItem[]> {
+async function heroItems(surface: HomepageSurface, audience: HomepageAudience): Promise<PreviewItem[]> {
   const { heroSlides } = await getEditableHomepage()
-  return forSurface(heroSlides, surface)
+  return forSurface(heroSlides.filter(s => rowAudience(s) === audience), surface)
     .filter(s => s.is_active)
     .slice(0, PREVIEW_LIMIT)
     .map(s => ({
@@ -312,7 +316,7 @@ function tileItems(config: Record<string, unknown>, titleKey: string, fallback: 
     }))
 }
 
-type PreviewContext = { surface: HomepageSurface }
+type PreviewContext = { surface: HomepageSurface; audience: HomepageAudience }
 const RESOLVERS: Partial<
   Record<SectionType, (config: Record<string, unknown>, ctx: PreviewContext) => Promise<PreviewResult>>
 > = {
@@ -322,7 +326,7 @@ const RESOLVERS: Partial<
   category_grid: async () => ({ kind: 'categories', items: await mainCategories() }),
   category_showcase: async () => ({ kind: 'categories', items: await showcaseCategories() }),
   brand_carousel: async () => ({ kind: 'brands', items: await topBrands() }),
-  hero: async (_c, ctx) => ({ kind: 'hero', items: await heroItems(ctx.surface) }),
+  hero: async (_c, ctx) => ({ kind: 'hero', items: await heroItems(ctx.surface, ctx.audience) }),
   offer_slider: async c => ({ kind: 'offers', items: await offerItems(c) }),
   about: async c => ({ kind: 'about', items: await aboutItems(c) }),
   countdown_deal: countdownDeal,
@@ -389,6 +393,7 @@ export async function GET(request: NextRequest) {
     type: searchParams.get('type') ?? undefined,
     config: searchParams.get('config') ?? undefined,
     surface: searchParams.get('surface') ?? undefined,
+    audience: searchParams.get('audience') ?? undefined,
   })
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid preview request' }, { status: 400 })
@@ -402,6 +407,7 @@ export async function GET(request: NextRequest) {
   try {
     const { kind, items, note, slides } = await resolver(config, {
       surface: rowSurface({ surface: parsed.data.surface }),
+      audience: rowAudience({ audience: parsed.data.audience }),
     })
     return NextResponse.json({ kind, items, ...(note ? { note } : {}), ...(slides ? { slides } : {}) })
   } catch (err) {

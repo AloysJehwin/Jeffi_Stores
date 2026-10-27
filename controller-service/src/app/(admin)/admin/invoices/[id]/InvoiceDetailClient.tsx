@@ -149,10 +149,12 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         credentials: 'include',
       })
       const json = await res.json()
-      if (!res.ok) {
+      // 409: the amendment draft already exists and is yours; 423: someone else holds it (read-only).
+      if (!res.ok && !((res.status === 409 || res.status === 423) && json.draftId)) {
         toast.error(json.error || 'Failed to create amendment draft')
         return
       }
+      if (res.status === 423) toast.info(json.error)
       router.push(ap(`/admin/invoices/${json.draftId}/view`))
     } catch {
       toast.error('Failed to create amendment draft')

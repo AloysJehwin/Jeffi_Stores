@@ -222,7 +222,34 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, waVars, layout, mediaHosted }
 }
 
+// The store's Site Controls switches (feature_sms_enabled / feature_whatsapp_enabled) have the last word on
+// its own SMS and WhatsApp, whichever service sent them. API customers (space 'api') answer to their API
+// settings instead; a workspace without its own store DB has no switches. An unset switch is on.
+const switchCache = new Map<string, { at: number; off: Set<string> }>()
+async function channelsOff(tenantId: string): Promise<Set<string>> {
+  const hit = switchCache.get(tenantId)
+  if (hit && Date.now() - hit.at < 30_000) return hit.off
+  const found = await poolsForTenant(tenantId).catch(() => null)
+  const store = found?.pools?.tenant
+  const own = !!store && (tenantId === tpl.PLATFORM_TENANT_ID || found!.pool !== db)
+  const rows = own
+    ? await Promise.resolve()
+        .then(() => store!.query<{ key: string; value: string | null }>(`SELECT key, value FROM site_settings WHERE key IN ('feature_sms_enabled','feature_whatsapp_enabled')`))
+        .then(r => r.rows)
+        .catch(() => [])
+    : []
+  const off = new Set(rows.filter(r => r.value && r.value.toLowerCase() !== 'true').map(r => (r.key === 'feature_sms_enabled' ? 'sms' : 'whatsapp')))
+  switchCache.set(tenantId, { at: Date.now(), off })
+  return off
+}
+
+export async function assertChannelOn(tenantId: string, channel: string, space: tpl.Space = 'store') {
+  if (channel !== 'email' && space !== 'api' && (await channelsOff(tenantId)).has(channel))
+    throw new SendError(409, 'channel_disabled', `${channel === 'sms' ? 'SMS' : 'WhatsApp'} is turned off in Site Controls`)
+}
+
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
+  await assertChannelOn(ctx.tenantId, req.channel, ctx.space)
   const { subject, body, providerRef, vars, waVars, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
 

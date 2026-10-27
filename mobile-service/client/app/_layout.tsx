@@ -1,5 +1,5 @@
 import '../global.css'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Stack, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -7,10 +7,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { useColorScheme } from 'nativewind'
-import { useAuthStore } from '../src/stores/authStore'
+import { sessionUsable, useAuthStore } from '../src/stores/authStore'
 import { useCartStore } from '../src/stores/cartStore'
 import { useThemeStore } from '../src/stores/themeStore'
-import { getStoredToken } from '../src/api/client'
+import { getStoredToken, loadAuthPortal } from '../src/api/client'
 import { getMe } from '../src/api/auth'
 import { getCart } from '../src/api/cart'
 import Toast from '../src/ui/Toast'
@@ -20,7 +20,9 @@ import { StoryViewerHost } from '../src/components/home/StoryViewer'
 import { PushBootstrap } from '../src/components/push/PushBootstrap'
 import { PushPermissionSheetHost } from '../src/components/push/PushPermissionSheet'
 import { trackScreen } from '../src/lib/analytics'
-import { ConfirmHost } from '../src/ui'
+import { ConfirmHost, HeaderMenuContext } from '../src/ui'
+import { MenuButton } from '../src/components/layout/MenuButton'
+import { MenuSheetHost } from '../src/components/layout/MenuSheet'
 import { useTokens } from '../src/theme'
 
 const queryClient = new QueryClient({
@@ -43,15 +45,18 @@ function ScreenTracker() {
 }
 
 function AuthRehydrator() {
-  const { setAuth, setLoading } = useAuthStore()
+  const { setAuth, clearAuth, setLoading } = useAuthStore()
 
   useEffect(() => {
     ;(async () => {
       try {
         // Bearer when a token is stored (the backend returns it at sign-in), else the session cookie.
+        const portal = await loadAuthPortal()
+        useAuthStore.setState({ savedPortal: portal })
         const token = await getStoredToken()
         const user = await getMe()
-        await setAuth(user, token ?? '')
+        if (user && sessionUsable(user, portal)) await setAuth(user, token ?? '', portal)
+        else if (portal === 'business') await clearAuth()
       } catch {
       } finally {
         setLoading(false)
@@ -59,6 +64,17 @@ function AuthRehydrator() {
     })()
   }, [])
 
+  return null
+}
+
+// Signing in to the other store, or switching to it, must not show the last account's cart, orders or wishlist.
+function AccountCacheReset() {
+  const account = useAuthStore(s => (s.user ? `${s.portal}:${s.user.id}` : null))
+  const prev = useRef(account)
+  useEffect(() => {
+    if (prev.current && account && prev.current !== account) queryClient.clear()
+    prev.current = account
+  }, [account])
   return null
 }
 
@@ -108,12 +124,14 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthRehydrator />
+          <AccountCacheReset />
           <ScreenTracker />
           <CartRehydrator />
           <ThemeRehydrator />
           <PushBootstrap />
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           {/* The scene background matches the theme, so a push never flashes white in dark mode. */}
+          <HeaderMenuContext.Provider value={MenuButton}>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.surface } }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
@@ -128,6 +146,8 @@ export default function RootLayout() {
             <Stack.Screen name="account/notifications" />
             <Stack.Screen name="notifications" />
           </Stack>
+          </HeaderMenuContext.Provider>
+          <MenuSheetHost />
           {/* One sheet for every "+" and long-press; lives above the stack so toasts still render over it. */}
           <QuickAddSheetHost />
           <StoryViewerHost />

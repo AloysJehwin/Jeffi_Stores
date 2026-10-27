@@ -1,8 +1,45 @@
 import type { PoolClient } from 'pg'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import { randomUUID } from 'crypto'
-import { rowSurface, withDefaults, type HomepageSection, type HomepageSurface } from '@/lib/catalog/homepage-sections'
+import {
+  HOMEPAGE_PAGES,
+  HOMEPAGE_SURFACES,
+  SECTION_META,
+  rowAudience,
+  rowPage,
+  rowSurface,
+  withDefaults,
+  type HomepageAudience,
+  type HomepagePage,
+  type HomepageSection,
+  type HomepageSurface,
+} from '@/lib/catalog/homepage-sections'
 import type { HeroSlide } from '@/lib/catalog/hero-slides'
+import {
+  HOMEPAGE_LOCK_ID,
+  actorOf,
+  announceDraftClosed,
+  announceDraftLock,
+  assertDraftHolder,
+  canDiscard,
+  closeDraftLockTx,
+  epochFrom,
+  type DraftActor,
+} from '@/lib/admin/draft-locks'
+
+/** The editing admin for the draft lock. No actor (system writers, tests) = no lock. */
+export interface HomepageLockOpts {
+  actor?: DraftActor
+  epoch?: number | null
+}
+
+/** Lock options for a route: the signed-in admin and the tab's epoch header. */
+export function homepageLockFrom(
+  admin: { adminId?: string; role?: string; scopes?: string[] },
+  req: { headers: { get(name: string): string | null } }
+): HomepageLockOpts {
+  return { actor: actorOf(admin), epoch: epochFrom(req) }
+}
 
 export type DraftSection = HomepageSection & { created_at: string; updated_at: string }
 export type DraftHeroSlide = HeroSlide
@@ -29,8 +66,12 @@ export interface HomepageDraftSummary {
   updatedBy: string | null
   sections: DraftDiff
   slides: DraftDiff
-  /** The same diffs split by surface, for the Website / Mobile app tabs. */
+  /** The same diffs split by layout, for the Desktop web / Mobile web / App tabs. */
   bySurface: Record<HomepageSurface, { sections: DraftDiff; slides: DraftDiff }>
+  /** The store's, by page then layout (hero slides count toward the homepage). */
+  byPage: Record<HomepagePage, Record<HomepageSurface, { sections: DraftDiff; slides: DraftDiff }>>
+  /** The business homepage's, by layout. */
+  business: Record<HomepageSurface, { sections: DraftDiff; slides: DraftDiff }>
 }
 
 export type PublishCounts = { inserted: number; updated: number; deleted: number }
@@ -40,6 +81,7 @@ interface DraftRow {
   id: string
   display_order: number
   surface?: HomepageSurface | null
+  audience?: HomepageAudience | null
   created_at?: string
   updated_at?: string
 }
@@ -57,6 +99,8 @@ const SECTION_COLUMNS = [
   'starts_at',
   'ends_at',
   'surface',
+  'page',
+  'audience',
 ] as const
 
 const SLIDE_COLUMNS = [
@@ -82,6 +126,7 @@ const SLIDE_COLUMNS = [
   'display_order',
   'is_active',
   'surface',
+  'audience',
 ] as const
 
 // Draft rows copied before a column existed have no key for it; jsonb_populate_recordset gives NULL.
@@ -92,6 +137,8 @@ const NOT_NULL_DEFAULTS: Record<string, string> = {
   filter_in_stock: 'false',
   filter_on_sale: 'false',
   surface: `'web'`,
+  page: `'home'`,
+  audience: `'store'`,
 }
 
 const liveRows = (table: 'homepage_sections' | 'hero_slides') =>
@@ -153,8 +200,11 @@ class Unchanged extends Error {
 }
 
 const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : [])
-// Rows saved before the surface column existed read as web, so diffs and per-surface views agree.
-const asRows = <T extends DraftRow>(value: unknown): T[] => asArray<T>(value).map(r => ({ ...r, surface: rowSurface(r) }))
+// Rows saved before the surface / page / audience columns existed read as web / home / store, so diffs and
+// per-tab views agree.
+const asRows = <T extends DraftRow>(value: unknown): T[] =>
+  asArray<T>(value).map(r => ({ ...r, surface: rowSurface(r), audience: rowAudience(r) }))
+const asSections = (value: unknown): DraftSection[] => asRows<DraftSection>(value).map(r => ({ ...r, page: rowPage(r) }))
 const asUuid = (id: string | null | undefined) => (id && UUID_RE.test(id) ? id : null)
 const isUndefinedTable = (err: unknown) => (err as { code?: string } | null)?.code === '42P01'
 
@@ -227,40 +277,83 @@ export class SurfaceNotEmpty extends Error {
 
 export type CopySurfaceResult = { sections: number; slides: number; replaced: number }
 
+/** The next display_order on one page's layout. */
+export function nextDisplayOrderOn(
+  rows: HomepageSection[],
+  page: HomepagePage,
+  surface: HomepageSurface,
+  audience: HomepageAudience = 'store'
+): number {
+  return nextDisplayOrder(
+    rows.filter(r => rowPage(r) === page && rowSurface(r) === surface && rowAudience(r) === audience)
+  )
+}
+
 /**
- * Copies one surface's layout onto another so it can be edited apart from the source. Rows get fresh
- * ids (publish upserts by id, so reusing them would move the originals) and `created_at` is now, so
- * the copies sort after nothing from before. A source with no saved sections contributes the built-in
- * default layout, which is what that surface is showing. Refuses to overwrite unless `replace`.
+ * Copies one surface's layout of a page onto another so it can be edited apart from the source. Rows
+ * get fresh ids (publish upserts by id, so reusing them would move the originals) and `created_at` is
+ * now, so the copies sort after nothing from before. A store homepage source with no saved sections
+ * contributes the built-in default layout, which is what that surface is showing; hero slides are
+ * the homepage's. `audience` is the target homepage and `fromAudience` the source (the store's, to
+ * start the business homepage from it); types the target can't use are left out. Refuses to
+ * overwrite unless `replace`.
  */
 export function copySurfaceLayout(
   draft: HomepageDraftState,
   from: HomepageSurface,
   to: HomepageSurface,
-  opts: { replace?: boolean; now?: string; newId?: () => string } = {}
+  opts: {
+    page?: HomepagePage
+    audience?: HomepageAudience
+    fromAudience?: HomepageAudience
+    replace?: boolean
+    now?: string
+    newId?: () => string
+  } = {}
 ): CopySurfaceResult {
-  if (from === to) throw new Error('Source and target surface are the same')
+  const audience = opts.audience ?? 'store'
+  const fromAudience = opts.fromAudience ?? audience
+  if (from === to && fromAudience === audience) throw new Error('Source and target surface are the same')
+  const page = opts.page ?? 'home'
+  const home = page === 'home'
   const now = opts.now ?? new Date().toISOString()
   const newId = opts.newId ?? randomUUID
-  const onTarget = (r: { surface?: string | null }) => rowSurface(r) === to
-  const replaced = draft.sections.filter(onTarget).length + draft.heroSlides.filter(onTarget).length
+  const onPage = (r: HomepageSection) => rowPage(r) === page
+  const isTarget = (r: DraftRow) => rowSurface(r) === to && rowAudience(r) === audience
+  const isSource = (r: DraftRow) => rowSurface(r) === from && rowAudience(r) === fromAudience
+  const onTarget = (r: HomepageSection) => onPage(r) && isTarget(r as DraftSection)
+  const slideOnTarget = (r: DraftRow) => home && isTarget(r)
+  const replaced = draft.sections.filter(onTarget).length + draft.heroSlides.filter(slideOnTarget).length
   if (replaced > 0 && !opts.replace) throw new SurfaceNotEmpty(to)
 
-  const sourceSections = sortByDisplayOrder(draft.sections.filter(r => rowSurface(r) === from))
-  const sections: DraftSection[] = withDefaults(sourceSections).map((s, i) => ({
-    ...s,
-    id: newId(),
-    surface: to,
-    display_order: i,
-    created_at: now,
-    updated_at: now,
-  }))
-  const slides: DraftHeroSlide[] = sortByDisplayOrder(draft.heroSlides.filter(r => rowSurface(r) === from)).map(
-    (s, i) => ({ ...s, id: newId(), surface: to, display_order: i, created_at: now, updated_at: now })
-  )
+  const sourceSections = sortByDisplayOrder(draft.sections.filter(r => onPage(r) && isSource(r)))
+  const usable = (s: HomepageSection) => SECTION_META[s.type]?.audiences?.includes(audience) ?? true
+  const sections: DraftSection[] = (home && fromAudience === 'store' ? withDefaults(sourceSections) : sourceSections)
+    .filter(usable)
+    .map((s, i) => ({
+      ...(s as DraftSection),
+      id: newId(),
+      surface: to,
+      page,
+      audience,
+      display_order: i,
+      created_at: now,
+      updated_at: now,
+    }))
+  const slides: DraftHeroSlide[] = home
+    ? sortByDisplayOrder(draft.heroSlides.filter(isSource)).map((s, i) => ({
+        ...s,
+        id: newId(),
+        surface: to,
+        audience,
+        display_order: i,
+        created_at: now,
+        updated_at: now,
+      }))
+    : []
 
   draft.sections = [...draft.sections.filter(r => !onTarget(r)), ...sections]
-  draft.heroSlides = [...draft.heroSlides.filter(r => !onTarget(r)), ...slides]
+  draft.heroSlides = [...draft.heroSlides.filter(r => !slideOnTarget(r)), ...slides]
   return { sections: sections.length, slides: slides.length, replaced }
 }
 
@@ -285,14 +378,14 @@ async function readDraft() {
 
 async function readLive(): Promise<HomepageDraftState> {
   const row = await queryOne<{ sections: unknown; hero_slides: unknown }>(READ_LIVE_SQL)
-  return { sections: asRows(row?.sections), heroSlides: asRows(row?.hero_slides) }
+  return { sections: asSections(row?.sections), heroSlides: asRows(row?.hero_slides) }
 }
 
 export async function getEditableHomepage(): Promise<EditableHomepage> {
   const draft = await readDraft()
   if (!draft) return { ...(await readLive()), draft: null }
   return {
-    sections: sortByDisplayOrder(asRows<DraftSection>(draft.sections)),
+    sections: sortByDisplayOrder(asSections(draft.sections)),
     heroSlides: sortByDisplayOrder(asRows<DraftHeroSlide>(draft.hero_slides)),
     draft: { updatedAt: toIso(draft.updated_at), updatedBy: draft.updated_by_name ?? null },
   }
@@ -303,7 +396,7 @@ async function lockDraft(client: PoolClient, updatedBy: string | null): Promise<
   for (let attempt = 0; attempt < 3; attempt++) {
     await client.query(ENSURE_DRAFT_SQL, [updatedBy])
     const { rows } = await client.query(LOCK_DRAFT_SQL)
-    if (rows[0]) return { sections: asRows(rows[0].sections), heroSlides: asRows(rows[0].hero_slides) }
+    if (rows[0]) return { sections: asSections(rows[0].sections), heroSlides: asRows(rows[0].hero_slides) }
   }
   throw new Error('Homepage draft is unavailable')
 }
@@ -311,21 +404,28 @@ async function lockDraft(client: PoolClient, updatedBy: string | null): Promise<
 /**
  * Runs `mutate` against the locked draft, creating it from the live tables on first edit, and writes
  * both arrays back. A mutate that changes nothing rolls back, so it never leaves a fresh draft behind.
+ * With `lock.actor` the caller must hold the draft lock (DraftLockError otherwise); an unclaimed
+ * draft is claimed, all inside the same transaction.
  */
 export async function withHomepageDraft<T>(
   adminId: string | null,
-  mutate: (draft: HomepageDraftState) => T | Promise<T>
+  mutate: (draft: HomepageDraftState) => T | Promise<T>,
+  lock: HomepageLockOpts = {}
 ): Promise<T> {
   const updatedBy = asUuid(adminId)
+  let held: Awaited<ReturnType<typeof assertDraftHolder>> = null
   try {
-    return await withTransaction(async client => {
+    const out = await withTransaction(async client => {
       const draft = await lockDraft(client, updatedBy)
+      held = await assertDraftHolder(client, lock.actor, 'homepage', HOMEPAGE_LOCK_ID, { epoch: lock.epoch })
       const before = JSON.stringify(draft)
       const result = await mutate(draft)
       if (JSON.stringify(draft) === before) throw new Unchanged(result)
       await client.query(WRITE_DRAFT_SQL, [JSON.stringify(draft.sections), JSON.stringify(draft.heroSlides), updatedBy])
       return result
     })
+    await announceDraftLock(lock.actor, 'homepage', HOMEPAGE_LOCK_ID, held)
+    return out
   } catch (err) {
     if (err instanceof Unchanged) return err.result as T
     throw err
@@ -341,21 +441,44 @@ async function publishRows(client: PoolClient, spec: TableSpec, rows: DraftRow[]
   return { inserted, updated: upserted.rows.length - inserted, deleted: deleted.rowCount ?? 0 }
 }
 
-/** Copies the draft onto the live tables in one transaction and deletes it. Null when there is no draft. */
-export async function publishHomepageDraft(): Promise<PublishResult | null> {
-  return withTransaction(async client => {
+/**
+ * Copies the draft onto the live tables in one transaction and deletes it. Null when there is no draft.
+ * With `lock.actor` the draft lock is asserted and closed in that transaction.
+ */
+export async function publishHomepageDraft(lock: HomepageLockOpts = {}): Promise<PublishResult | null> {
+  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
+  const out = await withTransaction(async client => {
     const { rows } = await client.query(LOCK_DRAFT_SQL)
     if (!rows[0]) return null
+    await assertDraftHolder(client, lock.actor, 'homepage', HOMEPAGE_LOCK_ID, { epoch: lock.epoch })
     const sections = await publishRows(client, SECTIONS, asArray(rows[0].sections))
     const heroSlides = await publishRows(client, SLIDES, asArray(rows[0].hero_slides))
     await client.query(DELETE_DRAFT_SQL)
+    closed = await closeDraftLockTx(client, lock.actor, 'homepage', HOMEPAGE_LOCK_ID, 'published')
     return { sections, heroSlides }
   })
+  await announceDraftClosed(lock.actor, 'homepage', HOMEPAGE_LOCK_ID, closed, 'published')
+  return out
 }
 
-export async function discardHomepageDraft(): Promise<boolean> {
-  const result = await query(DELETE_DRAFT_SQL)
-  return (result.rowCount ?? 0) > 0
+/** With `lock.actor`: the holder or an owner role (audited) discards, and the lock closes with the row. */
+export async function discardHomepageDraft(lock: HomepageLockOpts = {}): Promise<boolean> {
+  const actor = lock.actor
+  if (!actor?.adminId) {
+    const result = await query(DELETE_DRAFT_SQL)
+    return (result.rowCount ?? 0) > 0
+  }
+  const allowed = await canDiscard(actor, 'homepage', HOMEPAGE_LOCK_ID)
+  if (!allowed.ok) throw allowed.error
+  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
+  const discarded = await withTransaction(async client => {
+    const result = await client.query(DELETE_DRAFT_SQL)
+    if (!result.rowCount) return false
+    closed = await closeDraftLockTx(client, actor, 'homepage', HOMEPAGE_LOCK_ID, 'discarded')
+    return true
+  })
+  await announceDraftClosed(actor, 'homepage', HOMEPAGE_LOCK_ID, closed, 'discarded')
+  return discarded
 }
 
 function diffRows(draft: DraftRow[], live: DraftRow[], fields: readonly string[]): DraftDiff {
@@ -392,27 +515,54 @@ function diffState(draft: HomepageDraftState, live: HomepageDraftState) {
   }
 }
 
-const onSurface = (state: HomepageDraftState, surface: HomepageSurface): HomepageDraftState => ({
-  sections: state.sections.filter(s => s.surface === surface),
-  heroSlides: state.heroSlides.filter(s => s.surface === surface),
-})
+const onSurface = (
+  state: HomepageDraftState,
+  surface: HomepageSurface,
+  page?: HomepagePage,
+  audience?: HomepageAudience
+): HomepageDraftState => {
+  const mine = (r: DraftRow) => r.surface === surface && (!audience || rowAudience(r) === audience)
+  return {
+    sections: state.sections.filter(s => mine(s) && (!page || s.page === page)),
+    heroSlides: page && page !== 'home' ? [] : state.heroSlides.filter(mine),
+  }
+}
+
+const perSurface = <T>(fn: (surface: HomepageSurface) => T) =>
+  Object.fromEntries(HOMEPAGE_SURFACES.map(s => [s, fn(s)])) as Record<HomepageSurface, T>
+
+const perPage = <T>(fn: (page: HomepagePage) => T) =>
+  Object.fromEntries(HOMEPAGE_PAGES.map(p => [p, fn(p)])) as Record<HomepagePage, T>
 
 export async function getHomepageDraftSummary(): Promise<HomepageDraftSummary> {
   const draft = await readDraft()
   if (!draft) {
     const none = () => ({ sections: noChanges(), slides: noChanges() })
-    return { hasDraft: false, updatedAt: null, updatedBy: null, ...none(), bySurface: { web: none(), app: none() } }
+    return {
+      hasDraft: false,
+      updatedAt: null,
+      updatedBy: null,
+      ...none(),
+      bySurface: perSurface(none),
+      byPage: perPage(() => perSurface(none)),
+      business: perSurface(none),
+    }
   }
   const live = await readLive()
-  const state: HomepageDraftState = { sections: asRows(draft.sections), heroSlides: asRows(draft.hero_slides) }
+  const state: HomepageDraftState = { sections: asSections(draft.sections), heroSlides: asRows(draft.hero_slides) }
   return {
     hasDraft: true,
     updatedAt: toIso(draft.updated_at),
     updatedBy: draft.updated_by_name ?? null,
     ...diffState(state, live),
-    bySurface: {
-      web: diffState(onSurface(state, 'web'), onSurface(live, 'web')),
-      app: diffState(onSurface(state, 'app'), onSurface(live, 'app')),
-    },
+    bySurface: perSurface(surface => diffState(onSurface(state, surface), onSurface(live, surface))),
+    byPage: perPage(page =>
+      perSurface(surface =>
+        diffState(onSurface(state, surface, page, 'store'), onSurface(live, surface, page, 'store'))
+      )
+    ),
+    business: perSurface(surface =>
+      diffState(onSurface(state, surface, 'home', 'business'), onSurface(live, surface, 'home', 'business'))
+    ),
   }
 }

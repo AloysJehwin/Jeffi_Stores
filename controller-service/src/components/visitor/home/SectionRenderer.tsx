@@ -24,6 +24,10 @@ import ProductSpotlight from './ProductSpotlight'
 import RewardsGame from './RewardsGame'
 import SlidesSection from './SlidesSection'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
+import BusinessProducts from './business/BusinessProducts'
+import BusinessQuotes from './business/BusinessQuotes'
+import BusinessAccount from './business/BusinessAccount'
+import { toBusinessSection } from './business/business-home'
 import {
   sectionLayout,
   sectionLimit,
@@ -34,6 +38,7 @@ import {
   motionHeroSlides,
   rewardsGamePublic,
   safeHref,
+  sectionAspect,
   spotlightConfig,
   storyGroups,
   SECTION_COPY_DEFAULTS,
@@ -96,14 +101,18 @@ export default function SectionRenderer({
   section,
   data,
   rowIndex,
+  portal = 'storefront',
 }: {
   section: HomepageSection
   data: SectionData
   rowIndex: number
+  /** Whose prices and links the product cards use: an approved business on the business homepage. */
+  portal?: 'storefront' | 'business'
 }) {
   const cfg = (section.config ?? {}) as Record<string, unknown>
   const carousel = sectionLayout(section) === 'carousel'
   const extra = data.extras.get(section.id)
+  const aspect = sectionAspect(section)
 
   switch (section.type) {
     case 'hero':
@@ -111,7 +120,7 @@ export default function SectionRenderer({
 
     case 'offer_slider':
       if (data.offers.length === 0) return null
-      return <OfferSlider offers={data.offers} title={section.title} eyebrow={section.eyebrow} />
+      return <OfferSlider offers={data.offers} title={section.title} eyebrow={section.eyebrow} aspect={aspect} />
 
     case 'trust_strip':
       return (
@@ -129,6 +138,7 @@ export default function SectionRenderer({
           title={section.title}
           eyebrow={section.eyebrow}
           carousel={carousel}
+          aspect={aspect}
         />
       )
 
@@ -147,6 +157,7 @@ export default function SectionRenderer({
           title={section.title}
           eyebrow={section.eyebrow}
           carousel={carousel}
+          aspect={aspect}
         />
       )
 
@@ -159,6 +170,7 @@ export default function SectionRenderer({
           title={section.title}
           eyebrow={section.eyebrow}
           countdownEndsAt={typeof cfg.countdownEndsAt === 'string' ? cfg.countdownEndsAt : null}
+          portal={portal}
         />
       )
 
@@ -177,6 +189,8 @@ export default function SectionRenderer({
           viewAllLabel={section.cta_label ?? SECTION_COPY_DEFAULTS.product_row.ctaLabel}
           carousel={carousel}
           badgeFor={newDays ? p => (launchedWithin(p, newDays) ? 'New' : null) : undefined}
+          imageAspect={aspect}
+          portal={portal}
           {...style}
         />
       )
@@ -194,11 +208,12 @@ export default function SectionRenderer({
           video={clip(cfg.video)}
           ctaLabel={section.cta_label}
           ctaUrl={section.cta_url}
+          aspect={aspect}
         />
       )
 
     case 'featured_for_you':
-      return <FeaturedForYou title={section.title} />
+      return <FeaturedForYou title={section.title} variant={portal === 'business' ? 'business' : 'visitor'} />
 
     case 'benefits':
       return (
@@ -256,6 +271,7 @@ export default function SectionRenderer({
           eyebrow={section.eyebrow}
           title={section.title}
           ctaLabel={section.cta_label}
+          aspect={aspect}
         />
       )
     }
@@ -289,6 +305,7 @@ export default function SectionRenderer({
           }))}
           eyebrow={section.eyebrow}
           title={section.title}
+          portal={portal}
         />
       )
     }
@@ -309,6 +326,7 @@ export default function SectionRenderer({
           viewAllLabel={section.cta_label ?? 'View all'}
           carousel={carousel}
           badgeFor={bundle ? p => (p.is_bundle ? 'Bundle' : null) : () => 'Back in stock'}
+          portal={portal}
           {...ROW_STYLES[bundle ? 1 : 2]}
         />
       )
@@ -326,6 +344,7 @@ export default function SectionRenderer({
           title={section.title}
           ctaLabel={section.cta_label}
           ctaUrl={safeHref(section.cta_url)}
+          aspect={aspect}
         />
       )
     }
@@ -355,7 +374,7 @@ export default function SectionRenderer({
     case 'motion_hero': {
       const slides = motionHeroSlides(section)
       if (slides.length === 0) return null
-      return <MotionHero slides={slides} intervalMs={motionHeroIntervalMs(section)} />
+      return <MotionHero slides={slides} intervalMs={motionHeroIntervalMs(section)} aspect={aspect} />
     }
 
     case 'stories': {
@@ -390,6 +409,17 @@ export default function SectionRenderer({
       if (!slides?.slides.length) return null
       return <SlidesSection data={slides} eyebrow={section.eyebrow} title={section.title} />
     }
+
+    // The business's own data; they load on the client through BusinessHomeProvider.
+    case 'business_reorder':
+    case 'business_offers':
+      return <BusinessProducts section={toBusinessSection(section)} />
+
+    case 'business_quotes':
+      return <BusinessQuotes section={toBusinessSection(section)} />
+
+    case 'business_account':
+      return <BusinessAccount section={toBusinessSection(section)} />
 
     default:
       return null

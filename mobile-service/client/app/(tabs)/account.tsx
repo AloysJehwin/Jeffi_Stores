@@ -4,7 +4,8 @@ import { useRouter, type Href } from 'expo-router'
 import { useColorScheme } from 'nativewind'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Bell, FileText, Gift, Heart, ImageOff, LogIn, LogOut, MapPin, Package, Receipt, Repeat, Search, Trash2, User, UserPlus,
+  Bell, Building2, FileText, Gift, Heart, ImageOff, LogIn, LogOut, MapPin, MonitorSmartphone, Package, Receipt, Repeat, Search, Trash2, User,
+  UserPlus,
 } from 'lucide-react-native'
 import { clearSearchHistory, getDashboard, getSearchHistory } from '../../src/api/account'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
@@ -13,7 +14,8 @@ import { accent, useTokens } from '../../src/theme'
 import Gradient from '../../src/components/account/Gradient'
 import BuyAgainRow from '../../src/components/account/BuyAgainRow'
 import { DobNudge, useDobNudge } from '../../src/components/account/ProfileCard'
-import { useAccountNavItems, useAccountUser, useSignOut } from '../../src/components/account/hooks'
+import { StoreSwitch } from '../../src/components/layout/StoreSwitch'
+import { useAccountNavItems, useAccountUser, useBusiness, useSignOut } from '../../src/components/account/hooks'
 import {
   Badge, BodySmall, Button, Card, Chip, ChipGroup, EmptyState, IconButton, ListGroup, ListRow, Screen, ScreenHeader, Section, statusTone, Text,
   Title, type IconComponent,
@@ -46,7 +48,52 @@ const ROWS: Record<string, { icon: IconComponent; route: Href; subtitle?: string
   '/account/addresses': { icon: MapPin, route: '/account/addresses', group: 'account' },
   '/account/rewards': { icon: Gift, route: '/account/rewards', subtitle: 'Points, tiers and coupons', group: 'account' },
   '/account/referrals': { icon: UserPlus, route: '/account/referrals', subtitle: 'Invite friends, earn points', group: 'account' },
-  '/account/quotes': { icon: FileText, route: '/account/quotes', subtitle: 'Your RFQ submissions', group: 'account' },
+  '/account/quotes': { icon: FileText, route: '/account/quotes', subtitle: 'Request and track quotes', group: 'shop' },
+  '/account/sessions': { icon: MonitorSmartphone, route: '/account/sessions', subtitle: 'Where your business account is signed in', group: 'account' },
+}
+
+/** The business portal's company details: read-only, changed through support. */
+function CompanyCard() {
+  const router = useRouter()
+  const t = useTokens()
+  const { profile } = useBusiness()
+  if (!profile) return null
+  const rows = [
+    ['GSTIN', profile.gstNumber],
+    ['Industry', profile.industry],
+    ['Address', profile.businessAddress],
+  ].filter((r): r is [string, string] => !!r[1])
+  return (
+    <Card className="mb-6 gap-3">
+      <View className="flex-row items-center gap-3">
+        <View className="h-10 w-10 items-center justify-center rounded-xl bg-accent-50 dark:bg-accent-900/30">
+          <Building2 size={20} color={t.accent500} />
+        </View>
+        <View className="flex-1">
+          <Text className="font-semibold text-foreground" numberOfLines={2}>
+            {profile.companyName || 'Your company'}
+          </Text>
+          <Text className="text-xs text-foreground-muted">Business account</Text>
+        </View>
+        <Badge label="Approved" tone="success" size="sm" />
+      </View>
+      {rows.map(([label, value]) => (
+        <View key={label} className="flex-row gap-3">
+          <Text className="w-20 text-sm text-foreground-muted">{label}</Text>
+          <Text className="flex-1 text-sm text-foreground" selectable>
+            {value}
+          </Text>
+        </View>
+      ))}
+      <Text className="text-xs text-foreground-muted">
+        To change your company details,{' '}
+        <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.push('/info/support')}>
+          contact support
+        </Text>
+        .
+      </Text>
+    </Card>
+  )
 }
 
 // A top-level page: back goes home.
@@ -88,6 +135,7 @@ export default function AccountScreen() {
   const user = useAccountUser()
   const signOut = useSignOut()
   const navItems = useAccountNavItems()
+  const { isBusiness } = useBusiness()
   const nudge = useDobNudge()
 
   const { data: dashboard } = useQuery({ queryKey: ['account-dashboard', user?.id ?? null], queryFn: getDashboard, enabled: !!user })
@@ -140,7 +188,7 @@ export default function AccountScreen() {
               {user.firstName} {user.lastName}
             </Text>
             <Text className="text-sm text-white/75" numberOfLines={1}>
-              {user.email}
+              {isBusiness && user.companyName ? user.companyName : user.email}
             </Text>
           </View>
           <IconButton icon={LogOut} label="Sign out" variant="overlay" onPress={signOut} />
@@ -164,6 +212,8 @@ export default function AccountScreen() {
       {/* Spacing comes from each block's mb-6 (Section has its own). */}
       <View className="px-4 pt-5">
         {nudge.show ? <DobNudge className="mb-6" onAdd={() => router.push('/account/profile')} onDismiss={nudge.dismiss} /> : null}
+        <StoreSwitch className="mb-6" />
+        {isBusiness ? <CompanyCard /> : null}
 
         <ListGroup title="Shopping" className="mb-6">
           {rows('shop')}
@@ -243,7 +293,8 @@ export default function AccountScreen() {
 
         <ListGroup>
           <ListRow title="Sign Out" icon={LogOut} destructive chevron={false} onPress={signOut} />
-          <ListRow title="Delete account" icon={Trash2} onPress={() => router.push('/account/delete')} />
+          {/* Business accounts are closed through support, as on the web portal. */}
+          {!isBusiness && <ListRow title="Delete account" icon={Trash2} onPress={() => router.push('/account/delete')} />}
         </ListGroup>
       </View>
     </Screen>

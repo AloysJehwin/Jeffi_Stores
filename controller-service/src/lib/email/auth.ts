@@ -56,6 +56,52 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
   }
 }
 
+/** A mobile-number verification code, by email: the fallback when WhatsApp and SMS can't send it. */
+export async function sendPhoneOTPEmail(email: string, otp: string, phone: string, name?: string) {
+  const contactLine = await storeContactLine()
+  const from = await customerMailFromAsync()
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
+  const html = mailShell({
+    brand,
+    kicker: 'Verification Code',
+    title: 'Verify your mobile number',
+    preheader: `Your ${brand} code is ${otp} — valid for 10 minutes. Do not share.`,
+    content: `
+      <p>Hello ${name || 'Customer'},</p>
+      <p>Use this code to verify your mobile number <strong>+91 ${phone}</strong>:</p>
+
+      <div class="code-box">${otp}</div>
+
+      <div class="warning">
+        <strong>This code will expire in 10 minutes.</strong>
+        <br>
+        <small>Please do not share this code with anyone.</small>
+      </div>
+
+      <p>If you didn't ask to verify this number, please ignore this email or contact our support team.</p>
+    `,
+    footerLines: [address, contactLine],
+  })
+
+  try {
+    const info = await sendAuditedMail({
+      from,
+      to: email,
+      subject: `Your mobile verification code - ${brand}`,
+      html,
+      kind: 'otp',
+      templateName: 'otp',
+      redactBody: true,
+      entityType: null,
+      entityId: null,
+    })
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
 export async function sendAdminOTPEmail(email: string, otp: string, name?: string) {
   const from = adminMailFrom()
   const brand = await currentBrandNameAsync()

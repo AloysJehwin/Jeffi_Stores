@@ -12,6 +12,7 @@ import TemplateEditor, {
   type EditorTemplate,
 } from '@/components/admin/messaging-templates/TemplateEditor'
 import { PageHeader, fieldInputCls } from '@/components/admin/kit'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
 const CHANNEL_LABEL: Record<Channel, string> = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' }
@@ -29,15 +30,18 @@ type ListItem = {
   updated_at?: string
 }
 
-function parseChannel(v: string | null): Channel {
-  return (CHANNELS as string[]).includes(v || '') ? (v as Channel) : 'email'
+function parseChannel(v: string | null, shown: Channel[]): Channel {
+  return (shown as string[]).includes(v || '') ? (v as Channel) : 'email'
 }
 
 export default function MessagingTemplatesClient() {
   const router = useRouter()
   const sp = useSearchParams()
 
-  const channel = parseChannel(sp.get('channel'))
+  // Site Controls' switches: an off channel has no tab, and ?channel= for it falls back to email.
+  const on = useMessagingChannels()
+  const shown = CHANNELS.filter(c => c === 'email' || on[c])
+  const channel = parseChannel(sp.get('channel'), shown)
   const slug = sp.get('slug') // deep-link target slug
   const q = sp.get('q') ?? ''
 
@@ -185,13 +189,13 @@ export default function MessagingTemplatesClient() {
       <div className="mb-5">
         <PageHeader
           title="Templates"
-          description="Standard email / SMS / WhatsApp bodies ship with every store. Edit one to customise it for this tenant, or add your own."
+          description={`Standard ${shown.map(c => (c === 'email' ? 'email' : CHANNEL_LABEL[c])).join(' / ')} bodies ship with every store. Edit one to customise it for this tenant, or add your own.`}
         />
       </div>
 
       <div className="mb-5">
         <Tabs
-          tabs={CHANNELS.map(c => ({
+          tabs={shown.map(c => ({
             id: c,
             label: (
               <>
@@ -364,6 +368,7 @@ export default function MessagingTemplatesClient() {
                 isPlatformLibrary={isPlatformLibrary}
                 tenantContext={{ storeName: isPlatformLibrary ? 'The platform' : 'This store' }}
                 canResetToPlatform={!isPlatformLibrary}
+                metaActions={on.whatsapp}
               />
             </>
           )}

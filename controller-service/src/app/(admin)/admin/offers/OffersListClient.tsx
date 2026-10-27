@@ -8,7 +8,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminImage from '@/components/admin/AdminImage'
 import { Plus } from 'lucide-react'
-import { DataTable, StatusBadge, type DataCol } from '@/components/admin/kit'
+import { DataTable, DraftLockBadge, StatusBadge, useListSort, type DataCol } from '@/components/admin/kit'
+import type { DraftLockChip } from '@/lib/client/draft-lock-client'
 
 interface OfferListRow {
   id: string
@@ -18,6 +19,7 @@ interface OfferListRow {
   blurhash: string | null
   is_active: boolean
   product_count: number
+  draft_lock?: DraftLockChip | null
 }
 
 export default function OffersListClient({ canWrite: canWriteProp }: { canWrite: boolean }) {
@@ -28,11 +30,13 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
   const [offers, setOffers] = useState<OfferListRow[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const { sort, dir } = useListSort()
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/product-offers', { credentials: 'include' })
+      const qs = sort ? `?${new URLSearchParams({ sort, dir })}` : ''
+      const res = await fetch(`/api/admin/product-offers${qs}`, { credentials: 'include' })
       if (!res.ok) throw new Error('failed')
       const d = await res.json()
       setOffers(d.offers || [])
@@ -41,7 +45,7 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, sort, dir])
 
   useEffect(() => {
     load()
@@ -78,7 +82,7 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
     {
       key: 'title',
       label: 'Offer',
-      sort: o => (o.title || '').toLowerCase(),
+      sortParam: 'title',
       render: offer => (
         <Link href={ap(`/admin/offers/${offer.id}/view`)} className="flex items-center gap-3 min-w-0 group" onClick={e => e.stopPropagation()}>
           <div className="w-14 h-9 rounded-lg bg-surface-secondary border border-border-default overflow-hidden shrink-0">
@@ -89,15 +93,16 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
             )}
           </div>
           <span className="min-w-0 truncate font-semibold text-foreground group-hover:text-accent-500 transition-colors">{offer.title || 'Untitled offer'}</span>
+          <DraftLockBadge lock={offer.draft_lock} mine={offer.draft_lock?.mine} />
         </Link>
       ),
     },
-    { key: 'slug', label: 'Link', hideBelow: 'lg', render: offer => <span className="font-mono text-xs text-foreground-muted">/products?offer={offer.slug}</span> },
-    { key: 'products', label: 'Products', num: true, sort: o => o.product_count, render: offer => offer.product_count },
+    { key: 'slug', label: 'Link', hideBelow: 'lg', sortParam: 'slug', render: offer => <span className="font-mono text-xs text-foreground-muted">/products?offer={offer.slug}</span> },
+    { key: 'products', label: 'Products', num: true, sortParam: 'products', render: offer => offer.product_count },
     {
       key: 'status',
       label: 'Status',
-      sort: o => (o.is_active ? 1 : 0),
+      sortParam: 'status',
       render: offer => <StatusBadge status={String(offer.is_active)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />,
     },
   ]
@@ -144,6 +149,7 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
                 {offer.product_count} product{offer.product_count === 1 ? '' : 's'}
               </p>
             </div>
+            <DraftLockBadge lock={offer.draft_lock} mine={offer.draft_lock?.mine} />
             <StatusBadge status={String(offer.is_active)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />
           </Link>
         )}

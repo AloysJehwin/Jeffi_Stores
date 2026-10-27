@@ -11,7 +11,7 @@ import Toggle from '@/components/ui/Toggle'
 import AIFillForm from '@/components/admin/AIFillForm'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
-import { Badge, FormFooter } from '@/components/admin/kit'
+import { Badge, DraftLockBanner, FormFooter, LockedFieldset } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
@@ -19,6 +19,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import { fieldInputCls } from '@/components/admin/kit'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
 
 interface Coupon {
   id: string
@@ -67,6 +69,8 @@ interface ReviewFormFormProps {
   discardAction?: () => Promise<void>
   /** Server action to resnapshot the open session after an explicit Save as Draft. */
   resnapshotAction?: () => Promise<void>
+  /** Draft lock state from the server (initialDraftLock), so a non-holder renders read-only. */
+  initialLock?: DraftLockState | null
   defaultValues?: {
     title?: string
     slug?: string
@@ -102,6 +106,7 @@ export default function ReviewFormForm({
   backUrl,
   discardAction,
   resnapshotAction,
+  initialLock,
   defaultValues: d = {},
 }: ReviewFormFormProps) {
   const router = useRouter()
@@ -115,7 +120,8 @@ export default function ReviewFormForm({
   const [customFields, setCustomFields] = useState<CustomField[]>(d.custom_fields || [])
   const [submitting, setSubmitting] = useState(false)
   const { showToast } = useToast()
-  const edit = useEditSession({ resourceType: 'review_form', resourceId: formId ?? null })
+  const lock = useDraftLock({ resourceType: 'review_form', resourceId: formId ?? null, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'review_form', resourceId: formId ?? null, lock })
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutosaveStatus>('idle')
   const [formsHost, setFormsHost] = useState('forms.jeffistores.in')
   useEffect(() => {
@@ -143,9 +149,9 @@ export default function ReviewFormForm({
       setAutoSaveStatus('saving')
       autosaveInFlightRef.current = true
       try {
-        await fetch(`/api/admin/review-forms/${formId}/draft`, {
+        const res = await fetch(`/api/admin/review-forms/${formId}/draft`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', formId) },
           body: JSON.stringify({
             title: v.title.trim(),
             slug: v.slug
@@ -160,6 +166,12 @@ export default function ReviewFormForm({
             custom_fields: v.customFields,
           }),
         })
+        if (res.status === 423) {
+          autosaveBlockedRef.current = true
+          setAutoSaveStatus('locked')
+          lock.markLocked(v)
+          return
+        }
         setAutoSaveStatus('saved')
         setTimeout(() => setAutoSaveStatus('idle'), 2000)
       } catch {
@@ -220,10 +232,11 @@ export default function ReviewFormForm({
         const publish = intent === 'publish'
         const res = await fetch(`/api/admin/review-forms/${formId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', formId) },
           body: JSON.stringify({ ...payload, is_active: publish ? true : false, is_draft: publish ? false : true }),
         })
         if (!res.ok) {
+          if (res.status === 423) lock.markLocked()
           const dd = await res.json()
           showToast(dd.error || 'Failed to save', 'error')
           return
@@ -245,11 +258,15 @@ export default function ReviewFormForm({
           // Save to draft then publish
           await fetch(`/api/admin/review-forms/${formId}/draft`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', formId) },
             body: JSON.stringify(payload),
           })
-          const res = await fetch(`/api/admin/review-forms/${formId}/draft`, { method: 'POST' })
+          const res = await fetch(`/api/admin/review-forms/${formId}/draft`, {
+            method: 'POST',
+            headers: lockHeaders('review_form', formId),
+          })
           if (!res.ok) {
+            if (res.status === 423) lock.markLocked()
             const d = await res.json()
             showToast(d.error || 'Failed to publish', 'error')
             return
@@ -263,10 +280,11 @@ export default function ReviewFormForm({
         // Save draft, resnapshot so Cancel reverts to this save, then return to the list.
         const res = await fetch(`/api/admin/review-forms/${formId}/draft`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', formId) },
           body: JSON.stringify(payload),
         })
         if (!res.ok) {
+          if (res.status === 423) lock.markLocked()
           const d = await res.json()
           showToast(d.error || 'Failed to save draft', 'error')
           return
@@ -282,11 +300,12 @@ export default function ReviewFormForm({
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', formId) },
         body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
+        if (res.status === 423) lock.markLocked()
         const data = await res.json()
         showToast(data.error || 'Failed to save form', 'error')
         return
@@ -354,224 +373,230 @@ export default function ReviewFormForm({
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-      <div className="lg:col-span-2">
-        <AIFillForm
-          fields={[
-            { name: 'title', label: 'Form Title', type: 'text' },
-            { name: 'slug', label: 'URL Slug', type: 'text' },
-            {
-              name: 'template_type',
-              label: 'Template (google_review, product_feedback, or testimonial)',
-              type: 'text',
-            },
-            { name: 'google_review_url', label: 'Google Review URL', type: 'text' },
-            { name: 'description', label: 'Description', type: 'textarea' },
-            { name: 'is_active', label: 'Active', type: 'boolean' },
-          ]}
-          onFill={handleAIFill}
-          scope="review_forms:write"
-          context="Customer review form for this store"
-        />
-      </div>
-      <div className="space-y-5">
-        <div>
-          <label className={labelClass}>Template *</label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {TEMPLATES.map(t => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => setTemplateType(t.value)}
-                className={`flex flex-col gap-1.5 p-3 rounded-xl border-2 text-left transition-colors ${
-                  templateType === t.value
-                    ? 'border-accent-500 bg-accent-500/5'
-                    : 'border-border-default hover:border-accent-500/50'
-                }`}
-              >
-                <span className="text-xl">
-                  <t.Icon className="w-5 h-5" />
-                </span>
-                <span
-                  className={`text-sm font-semibold ${templateType === t.value ? 'text-accent-500' : 'text-foreground'}`}
-                >
-                  {t.label}
-                </span>
-                <span className="text-xs text-foreground-muted leading-snug">{t.description}</span>
-              </button>
-            ))}
-          </div>
+      {lock.loaded && (
+        <div className="lg:col-span-2">
+          <DraftLockBanner lock={lock} scope="review_forms:write" />
         </div>
-
-        <div>
-          <label className={labelClass}>Form Title *</label>
-          <AIEnrichButton
-            fieldLabel="Review form title"
-            value={title}
-            onChange={setTitle}
+      )}
+      <LockedFieldset readOnly={lock.readOnly} className="contents">
+        <div className="lg:col-span-2">
+          <AIFillForm
+            fields={[
+              { name: 'title', label: 'Form Title', type: 'text' },
+              { name: 'slug', label: 'URL Slug', type: 'text' },
+              {
+                name: 'template_type',
+                label: 'Template (google_review, product_feedback, or testimonial)',
+                type: 'text',
+              },
+              { name: 'google_review_url', label: 'Google Review URL', type: 'text' },
+              { name: 'description', label: 'Description', type: 'textarea' },
+              { name: 'is_active', label: 'Active', type: 'boolean' },
+            ]}
+            onFill={handleAIFill}
             scope="review_forms:write"
-            maxLength={255}
-            write
-            context={`Heading of a public ${TEMPLATES.find(t => t.value === templateType)?.label ?? 'review'} form customers fill in.`}
-          >
-            <input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              required
-              className={`${inputClass} pr-8`}
-              placeholder="e.g. Leave Us a Google Review"
-            />
-          </AIEnrichButton>
-        </div>
-
-        <div>
-          <label className={labelClass}>
-            Slug *{' '}
-            <span className="text-foreground-muted font-normal">
-              — {formsHost}/<strong>{slug || 'this-slug'}</strong>
-            </span>
-          </label>
-          <input
-            value={slug}
-            onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-            required
-            className={`${inputClass} font-mono`}
-            placeholder="e.g. google-review"
+            context="Customer review form for this store"
           />
         </div>
-
-        {templateType === 'google_review' && (
+        <div className="space-y-5">
           <div>
-            <label className={labelClass}>Google Review URL *</label>
-            <input
-              value={googleUrl}
-              onChange={e => setGoogleUrl(e.target.value)}
-              type="url"
-              required
-              className={inputClass}
-              placeholder="https://g.page/r/..."
-            />
-            <p className="mt-1 text-xs text-foreground-muted">
-              Customers are sent here first before submitting their screenshot
-            </p>
+            <label className={labelClass}>Template *</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {TEMPLATES.map(t => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setTemplateType(t.value)}
+                  className={`flex flex-col gap-1.5 p-3 rounded-xl border-2 text-left transition-colors ${
+                    templateType === t.value
+                      ? 'border-accent-500 bg-accent-500/5'
+                      : 'border-border-default hover:border-accent-500/50'
+                  }`}
+                >
+                  <span className="text-xl">
+                    <t.Icon className="w-5 h-5" />
+                  </span>
+                  <span
+                    className={`text-sm font-semibold ${templateType === t.value ? 'text-accent-500' : 'text-foreground'}`}
+                  >
+                    {t.label}
+                  </span>
+                  <span className="text-xs text-foreground-muted leading-snug">{t.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        )}
 
-        <AdminSelect label="Reward Coupon" options={couponOptions} value={couponId} onChange={setCouponId} />
-        {coupons.length === 0 && (
-          <p className="text-xs text-amber-600">
-            No active coupons found.{' '}
-            <Link href={ap('/admin/coupons/add')} className="underline">
-              Create one first.
-            </Link>
-          </p>
-        )}
-
-        <div>
-          <label className={labelClass}>Description</label>
-          <AIEnrichButton
-            fieldLabel="Review form description"
-            value={description}
-            onChange={setDescription}
-            scope="review_forms:write"
-            multiline
-            write
-            context={`Intro shown under the title "${title}" on a public ${TEMPLATES.find(t => t.value === templateType)?.label ?? 'review'} form; one or two sentences.`}
-          >
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={2}
-              className={`${inputClass} pr-8`}
-              placeholder="Optional — shown to customer on the form page"
-            />
-          </AIEnrichButton>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active (form accepts submissions)" />
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className={labelClass.replace(' mb-1.5', '')}>Custom Fields</p>
-            <button
-              type="button"
-              onClick={addField}
-              className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+          <div>
+            <label className={labelClass}>Form Title *</label>
+            <AIEnrichButton
+              fieldLabel="Review form title"
+              value={title}
+              onChange={setTitle}
+              scope="review_forms:write"
+              maxLength={255}
+              write
+              context={`Heading of a public ${TEMPLATES.find(t => t.value === templateType)?.label ?? 'review'} form customers fill in.`}
             >
-              + Add Field
-            </button>
+              <input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                required
+                className={`${inputClass} pr-8`}
+                placeholder="e.g. Leave Us a Google Review"
+              />
+            </AIEnrichButton>
           </div>
 
-          {customFields.length === 0 && (
-            <p className="text-xs text-foreground-muted py-3 text-center border border-dashed border-border-default rounded-lg">
-              No custom fields yet — click &quot;Add Field&quot; to add one
+          <div>
+            <label className={labelClass}>
+              Slug *{' '}
+              <span className="text-foreground-muted font-normal">
+                — {formsHost}/<strong>{slug || 'this-slug'}</strong>
+              </span>
+            </label>
+            <input
+              value={slug}
+              onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+              required
+              className={`${inputClass} font-mono`}
+              placeholder="e.g. google-review"
+            />
+          </div>
+
+          {templateType === 'google_review' && (
+            <div>
+              <label className={labelClass}>Google Review URL *</label>
+              <input
+                value={googleUrl}
+                onChange={e => setGoogleUrl(e.target.value)}
+                type="url"
+                required
+                className={inputClass}
+                placeholder="https://g.page/r/..."
+              />
+              <p className="mt-1 text-xs text-foreground-muted">
+                Customers are sent here first before submitting their screenshot
+              </p>
+            </div>
+          )}
+
+          <AdminSelect label="Reward Coupon" options={couponOptions} value={couponId} onChange={setCouponId} />
+          {coupons.length === 0 && (
+            <p className="text-xs text-amber-600">
+              No active coupons found.{' '}
+              <Link href={ap('/admin/coupons/add')} className="underline">
+                Create one first.
+              </Link>
             </p>
           )}
 
-          <div className="space-y-3">
-            {customFields.map((field, idx) => (
-              <div
-                key={field.id}
-                className="flex items-start gap-3 p-3 bg-surface-secondary rounded-lg border border-border-default"
+          <div>
+            <label className={labelClass}>Description</label>
+            <AIEnrichButton
+              fieldLabel="Review form description"
+              value={description}
+              onChange={setDescription}
+              scope="review_forms:write"
+              multiline
+              write
+              context={`Intro shown under the title "${title}" on a public ${TEMPLATES.find(t => t.value === templateType)?.label ?? 'review'} form; one or two sentences.`}
+            >
+              <textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                rows={2}
+                className={`${inputClass} pr-8`}
+                placeholder="Optional — shown to customer on the form page"
+              />
+            </AIEnrichButton>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active (form accepts submissions)" />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className={labelClass.replace(' mb-1.5', '')}>Custom Fields</p>
+              <button
+                type="button"
+                onClick={addField}
+                className="text-xs text-accent-500 hover:text-accent-600 font-medium"
               >
-                <span className="text-xs text-foreground-muted mt-2 shrink-0 w-4">{idx + 1}.</span>
-                <div className="flex-1 flex flex-col sm:flex-row gap-2">
-                  <input
-                    value={field.label}
-                    onChange={e => updateField(field.id, { label: e.target.value })}
-                    placeholder="Field label"
-                    className={`${fieldInputCls} flex-1 basis-0 min-w-0`}
-                  />
-                  <AdminSelect
-                    sm
-                    className="flex-1 basis-0 min-w-0"
-                    value={field.type}
-                    onChange={v => updateField(field.id, { type: v as CustomField['type'] })}
-                    options={FIELD_TYPES}
-                  />
+                + Add Field
+              </button>
+            </div>
+
+            {customFields.length === 0 && (
+              <p className="text-xs text-foreground-muted py-3 text-center border border-dashed border-border-default rounded-lg">
+                No custom fields yet — click &quot;Add Field&quot; to add one
+              </p>
+            )}
+
+            <div className="space-y-3">
+              {customFields.map((field, idx) => (
+                <div
+                  key={field.id}
+                  className="flex items-start gap-3 p-3 bg-surface-secondary rounded-lg border border-border-default"
+                >
+                  <span className="text-xs text-foreground-muted mt-2 shrink-0 w-4">{idx + 1}.</span>
+                  <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                    <input
+                      value={field.label}
+                      onChange={e => updateField(field.id, { label: e.target.value })}
+                      placeholder="Field label"
+                      className={`${fieldInputCls} flex-1 basis-0 min-w-0`}
+                    />
+                    <AdminSelect
+                      sm
+                      className="flex-1 basis-0 min-w-0"
+                      value={field.type}
+                      onChange={v => updateField(field.id, { type: v as CustomField['type'] })}
+                      options={FIELD_TYPES}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5 shrink-0">
+                    <Toggle
+                      checked={field.required}
+                      onChange={v => updateField(field.id, { required: v })}
+                      label="Req"
+                      size="sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeField(field.id)}
+                      className="control-sm control-icon text-red-500 hover:bg-red-500/10"
+                      aria-label="Remove field"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-1.5 shrink-0">
-                  <Toggle
-                    checked={field.required}
-                    onChange={v => updateField(field.id, { required: v })}
-                    label="Req"
-                    size="sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeField(field.id)}
-                    className="control-sm control-icon text-red-500 hover:bg-red-500/10"
-                    aria-label="Remove field"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="sticky top-6">
-        <p className="text-xs font-medium text-foreground-muted uppercase tracking-wide mb-2">Live Preview</p>
-        <FormsPreview
-          title={title}
-          description={description}
-          templateType={templateType}
-          googleReviewUrl={googleUrl}
-          couponId={couponId}
-          customFields={customFields}
-        />
-      </div>
+        <div className="sticky top-6">
+          <p className="text-xs font-medium text-foreground-muted uppercase tracking-wide mb-2">Live Preview</p>
+          <FormsPreview
+            title={title}
+            description={description}
+            templateType={templateType}
+            googleReviewUrl={googleUrl}
+            couponId={couponId}
+            customFields={customFields}
+          />
+        </div>
+      </LockedFieldset>
 
       {/* Shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
       <div className="lg:col-span-2">
         <FormFooter
           sticky
-          autosave={
-            isDraft && autoSaveStatus !== 'idle' ? <AutosaveStatusPill status={autoSaveStatus} /> : null
-          }
+          lock={lock}
+          autosave={isDraft && autoSaveStatus !== 'idle' ? <AutosaveStatusPill status={autoSaveStatus} /> : null}
           draftBadge={isDraft || isCreateDraft ? <Badge tone="amber">Draft pending</Badge> : null}
           discard={isDraft && discardAction ? handleDiscard : undefined}
           cancel={edit.sessionId ? handleCancel : undefined}

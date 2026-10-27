@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { InfiniteFooter, useReveal } from '@/components/admin/kit/infinite'
+import { SortTh, useListSort, type SortCol } from '@/components/admin/kit/list-sort'
 import { TONE_CLS } from '@/components/admin/kit/tones'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -42,6 +43,49 @@ type PickupRequest = {
   raw_response: Record<string, unknown> | null
   pickup_status: 'pending' | 'picked_up' | 'failed'
   created_at: string
+}
+
+const ORDER_COLS: SortCol[] = [
+  { key: 'order', label: 'Order' },
+  { key: 'awb', label: 'AWB' },
+  { key: 'customer', label: 'Customer' },
+  { key: 'destination', label: 'Destination' },
+  { key: 'placed', label: 'Placed', type: 'date' },
+  { key: 'status', label: 'Status' },
+]
+const ORDER_SORT: Record<string, (o: EligibleOrder) => string | number> = {
+  order: o => o.order_number || o.id,
+  awb: o => o.awb_number || '',
+  customer: o => (o.customer_name || '').toLowerCase(),
+  destination: o => [o.city, o.state, o.postal_code].filter(Boolean).join(', ').toLowerCase(),
+  placed: o => new Date(o.created_at).getTime(),
+  status: o => o.status || '',
+}
+const PICKUP_COLS: SortCol[] = [
+  { key: 'pickup_date', label: 'Pickup Date', type: 'date' },
+  { key: 'pickup_id', label: 'Delhivery ID' },
+  { key: 'awbs', label: 'AWBs', type: 'number' },
+  { key: 'created_at', label: 'Requested At', type: 'date' },
+  { key: 'status', label: 'Status' },
+]
+const PICKUP_SORT: Record<string, (r: PickupRequest) => string | number> = {
+  pickup_date: r => new Date(r.pickup_date).getTime(),
+  pickup_id: r => r.pickup_id || '',
+  awbs: r => r.awb_count,
+  created_at: r => new Date(r.created_at).getTime(),
+  status: r => r.pickup_status || 'pending',
+}
+
+/** In-memory sort of a fully loaded list by its header's key; no key keeps the API's order. */
+function sortRows<T>(rows: T[], key: string | null, dir: 'asc' | 'desc', by: Record<string, (r: T) => string | number>): T[] {
+  const f = key && Object.hasOwn(by, key) ? by[key] : null
+  if (!f) return rows
+  const out = [...rows].sort((a, b) => {
+    const x = f(a)
+    const y = f(b)
+    return x < y ? -1 : x > y ? 1 : 0
+  })
+  return dir === 'desc' ? out.reverse() : out
 }
 
 function todayIST(): string {
@@ -393,8 +437,12 @@ export default function DelhiveryPageClient({
   const PAGE_SIZE = 25
   // The endpoint already caps these (100 eligible orders, 20 pickups); the pickup request spans the
   // whole eligible set, so they arrive in one payload and are revealed 25 at a time.
-  const { shown: pagedOrders, control: ordersMore } = useReveal(orders, PAGE_SIZE)
-  const { shown: pagedHistory, control: historyMore } = useReveal(pickupHistory, PAGE_SIZE)
+  const orderSort = useListSort('eligible')
+  const pickupSort = useListSort('pickups')
+  const sortedOrders = useMemo(() => sortRows(orders, orderSort.sort, orderSort.dir, ORDER_SORT), [orders, orderSort.sort, orderSort.dir])
+  const sortedHistory = useMemo(() => sortRows(pickupHistory, pickupSort.sort, pickupSort.dir, PICKUP_SORT), [pickupHistory, pickupSort.sort, pickupSort.dir])
+  const { shown: pagedOrders, control: ordersMore } = useReveal(sortedOrders, PAGE_SIZE, `${orderSort.sort}|${orderSort.dir}`)
+  const { shown: pagedHistory, control: historyMore } = useReveal(sortedHistory, PAGE_SIZE, `${pickupSort.sort}|${pickupSort.dir}`)
 
   const loadData = () => {
     setLoading(true)
@@ -691,12 +739,9 @@ export default function DelhiveryPageClient({
                         className="w-4 h-4 rounded border-border-default accent-accent-500"
                       />
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Order</th>
-                    <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWB</th>
-                    <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Customer</th>
-                    <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Destination</th>
-                    <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Placed</th>
-                    <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Status</th>
+                    {ORDER_COLS.map(c => (
+                      <SortTh key={c.key} ns="eligible" col={c} className="px-4 py-3 font-medium text-foreground-secondary" />
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -816,15 +861,9 @@ export default function DelhiveryPageClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border-default bg-surface-secondary">
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">
-                    Pickup Date
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Delhivery ID</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWBs</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">
-                    Requested At
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Status</th>
+                  {PICKUP_COLS.map(c => (
+                    <SortTh key={c.key} ns="pickups" col={c} className="px-4 py-3 font-medium text-foreground-secondary" />
+                  ))}
                   <th className="px-4 py-3 text-right font-medium text-foreground-secondary">Actions</th>
                 </tr>
               </thead>

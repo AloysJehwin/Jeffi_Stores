@@ -1,4 +1,4 @@
-import { api, BASE_URL } from './client'
+import { api, APP_USER_AGENT, BASE_URL, getAuthPortal } from './client'
 import type { User } from '../types'
 
 export async function sendOtp(email: string): Promise<void> {
@@ -42,13 +42,14 @@ export async function signup(payload: {
   return { token: data.token || '', user: data.user }
 }
 
-export async function getMe(): Promise<User> {
-  const data = await api<{ user: User }>('/api/auth/me')
+/** The signed-in user; a business session reads /api/business/me (approval status, company, discounts). */
+export async function getMe(): Promise<User | null> {
+  const data = await api<{ user: User | null }>(getAuthPortal() === 'business' ? '/api/business/me' : '/api/auth/me')
   return data.user
 }
 
 export async function logout(): Promise<void> {
-  await api('/api/auth/logout', { method: 'POST' }).catch(() => {})
+  await api(getAuthPortal() === 'business' ? '/api/business/logout' : '/api/auth/logout', { method: 'POST' }).catch(() => {})
 }
 
 // ── The web's login/signup flow (channel choice, cooldowns, policy acceptance) ──
@@ -59,7 +60,7 @@ export type OtpChannel = 'email' | 'sms' | 'whatsapp'
 async function authPost<T>(path: string, body: unknown): Promise<{ ok: boolean; status: number; data: T & { error?: string } }> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'User-Agent': APP_USER_AGENT },
     body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
@@ -82,6 +83,7 @@ export function requestOtp(body: {
   phone?: string
   channel: OtpChannel
   isSignup: boolean
+  userType?: 'business'
 }) {
   return authPost<SendOtpResult>('/api/auth/send-otp', body)
 }

@@ -8,7 +8,9 @@ import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
 import AIFillForm from './AIFillForm'
 import { useEditSession } from '@/hooks/useEditSession'
-import { Badge, FormField, FormFooter, FormGrid, FormSection, TextArea, TextInput, NumberInput, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { Badge, DraftLockBanner, FormField, FormFooter, FormGrid, FormSection, LockedFieldset, TextArea, TextInput, NumberInput, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import type { DraftLockState } from '@/lib/client/draft-lock-client'
 
 interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
@@ -19,6 +21,8 @@ interface BrandFormProps {
   hasReturns?: boolean // false = Basic plan, hides return/replacement policy section
   /** Server action to discard the draft (receives FormData with intent=discard). */
   discardAction?: (formData: FormData) => Promise<void>
+  /** Draft lock state from the server (initialDraftLock), so a non-holder renders read-only. */
+  initialLock?: DraftLockState | null
 }
 
 export default function BrandForm({
@@ -29,6 +33,7 @@ export default function BrandForm({
   submitLabel,
   hasReturns = true,
   discardAction,
+  initialLock,
 }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [logoUrl, setLogoUrl] = useState(brand?.logo_url || '')
@@ -42,7 +47,8 @@ export default function BrandForm({
   const formRef = useRef<HTMLFormElement>(null)
   const toast = useActionToast()
   const router = useRouter()
-  const edit = useEditSession({ resourceType: 'brand', resourceId: brand?.id ?? null })
+  const lock = useDraftLock({ resourceType: 'brand', resourceId: brand?.id ?? null, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'brand', resourceId: brand?.id ?? null, lock })
 
   function setInput(name: string, value: string) {
     const el = formRef.current?.elements.namedItem(name) as HTMLInputElement | null
@@ -91,145 +97,145 @@ export default function BrandForm({
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-
-      <FormSection
-        title="Brand"
-        description="Name, slug, website, logo and description."
-      >
-        <AIFillForm
-          fields={[
-            { name: 'name', label: 'Brand Name', type: 'text' },
-            { name: 'slug', label: 'URL Slug', type: 'text' },
-            { name: 'description', label: 'Description', type: 'textarea' },
-            { name: 'website', label: 'Website URL', type: 'text' },
-            { name: 'is_active', label: 'Active', type: 'boolean' },
-            { name: 'return_allowed', label: 'Returns Allowed', type: 'boolean' },
-            { name: 'return_window_days', label: 'Return Window Days', type: 'number' },
-            { name: 'replacement_allowed', label: 'Replacement Allowed', type: 'boolean' },
-            { name: 'replacement_window_days', label: 'Replacement Window Days', type: 'number' },
-          ]}
-          onFill={handleAIFill}
-          scope="brands:write"
-          context="Product brand carried by this store"
-        />
-        <FormGrid>
-          <FormField label="Brand Name" htmlFor="name" required>
-            <TextInput
-              id="name"
-              name="name"
-              required
-              value={brandName}
-              onChange={e => {
-                setBrandName(e.target.value)
-                const slugInput = document.getElementById('slug') as HTMLInputElement
-                if (slugInput && !brand) {
-                  slugInput.value = generateSlug(e.target.value)
-                }
-              }}
-              placeholder="e.g. Stanley, DeWalt"
-            />
-          </FormField>
-
-          <FormField label="Slug" htmlFor="slug" required hint="URL-friendly identifier. Auto-filled from name.">
-            <TextInput id="slug" name="slug" required defaultValue={brand?.slug} placeholder="e.g. stanley, dewalt" />
-          </FormField>
-
-          <FormField label="Website" htmlFor="website">
-            <TextInput type="url" id="website" name="website" defaultValue={brand?.website || ''} placeholder="https://example.com" />
-          </FormField>
-
-          <FormField label="Logo">
-            <ImageUrlInput
-              name="logo_url"
-              value={logoUrl}
-              onChange={setLogoUrl}
-              className={fieldInputCls}
-              placeholder="https://example.com/logo.png or upload"
-              ai={{
-                feature: 'brand_image',
-                size: ['square', 'landscape'],
-                defaultPrompt: brandName
-                  ? `Clean, flat logo mark for the brand ${brandName} on a plain white background`
-                  : undefined,
-                usageRef: brand?.id,
-              }}
-            />
-          </FormField>
-
-          <FormField label="Description" htmlFor="description" span={2}>
-            <AIEnrichButton
-              fieldLabel="Description"
-              value={description}
-              onChange={setDescription}
-              scope="brands:write"
-              context={`Brand: ${brandName}`}
-              multiline
-            >
-              <TextArea
-                id="description"
-                name="description"
-                rows={3}
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                className="pr-8"
-                placeholder="Enter brand description"
-              />
-            </AIEnrichButton>
-          </FormField>
-
-          <div className="md:col-span-2 flex items-center">
-            <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
-            <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
-          </div>
-        </FormGrid>
-      </FormSection>
-
-      {hasReturns && (
-        <FormSection title="Return & Replacement Policy" description="Brand policy takes priority over category policy on the product page.">
+      <DraftLockBanner lock={lock} scope="brands:write" />
+      <LockedFieldset readOnly={lock.readOnly} className="space-y-5">
+        <FormSection title="Brand" description="Name, slug, website, logo and description.">
+          <AIFillForm
+            fields={[
+              { name: 'name', label: 'Brand Name', type: 'text' },
+              { name: 'slug', label: 'URL Slug', type: 'text' },
+              { name: 'description', label: 'Description', type: 'textarea' },
+              { name: 'website', label: 'Website URL', type: 'text' },
+              { name: 'is_active', label: 'Active', type: 'boolean' },
+              { name: 'return_allowed', label: 'Returns Allowed', type: 'boolean' },
+              { name: 'return_window_days', label: 'Return Window Days', type: 'number' },
+              { name: 'replacement_allowed', label: 'Replacement Allowed', type: 'boolean' },
+              { name: 'replacement_window_days', label: 'Replacement Window Days', type: 'number' },
+            ]}
+            onFill={handleAIFill}
+            scope="brands:write"
+            context="Product brand carried by this store"
+          />
           <FormGrid>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
-                <Toggle id="return_allowed" checked={returnAllowed} onChange={setReturnAllowed} label="Returns Allowed" />
-              </div>
-              {returnAllowed && (
-                <FormField label="Return window (days)" htmlFor="return_window_days">
-                  <NumberInput
-                    id="return_window_days"
-                    name="return_window_days"
-                    min={1}
-                    max={90}
-                    value={returnDays}
-                    onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  />
-                </FormField>
-              )}
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
-                <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
-              </div>
-              {replacementAllowed && (
-                <FormField label="Replacement window (days)" htmlFor="replacement_window_days">
-                  <NumberInput
-                    id="replacement_window_days"
-                    name="replacement_window_days"
-                    min={1}
-                    max={90}
-                    value={replacementDays}
-                    onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  />
-                </FormField>
-              )}
+            <FormField label="Brand Name" htmlFor="name" required>
+              <TextInput
+                id="name"
+                name="name"
+                required
+                value={brandName}
+                onChange={e => {
+                  setBrandName(e.target.value)
+                  const slugInput = document.getElementById('slug') as HTMLInputElement
+                  if (slugInput && !brand) {
+                    slugInput.value = generateSlug(e.target.value)
+                  }
+                }}
+                placeholder="e.g. Stanley, DeWalt"
+              />
+            </FormField>
+
+            <FormField label="Slug" htmlFor="slug" required hint="URL-friendly identifier. Auto-filled from name.">
+              <TextInput id="slug" name="slug" required defaultValue={brand?.slug} placeholder="e.g. stanley, dewalt" />
+            </FormField>
+
+            <FormField label="Website" htmlFor="website">
+              <TextInput type="url" id="website" name="website" defaultValue={brand?.website || ''} placeholder="https://example.com" />
+            </FormField>
+
+            <FormField label="Logo">
+              <ImageUrlInput
+                name="logo_url"
+                value={logoUrl}
+                onChange={setLogoUrl}
+                className={fieldInputCls}
+                placeholder="https://example.com/logo.png or upload"
+                ai={{
+                  feature: 'brand_image',
+                  size: ['square', 'landscape'],
+                  defaultPrompt: brandName
+                    ? `Clean, flat logo mark for the brand ${brandName} on a plain white background`
+                    : undefined,
+                  usageRef: brand?.id,
+                }}
+              />
+            </FormField>
+
+            <FormField label="Description" htmlFor="description" span={2}>
+              <AIEnrichButton
+                fieldLabel="Description"
+                value={description}
+                onChange={setDescription}
+                scope="brands:write"
+                context={`Brand: ${brandName}`}
+                multiline
+              >
+                <TextArea
+                  id="description"
+                  name="description"
+                  rows={3}
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  className="pr-8"
+                  placeholder="Enter brand description"
+                />
+              </AIEnrichButton>
+            </FormField>
+
+            <div className="md:col-span-2 flex items-center">
+              <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
+              <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
             </div>
           </FormGrid>
         </FormSection>
-      )}
+
+        {hasReturns && (
+          <FormSection title="Return & Replacement Policy" description="Brand policy takes priority over category policy on the product page.">
+            <FormGrid>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
+                  <Toggle id="return_allowed" checked={returnAllowed} onChange={setReturnAllowed} label="Returns Allowed" />
+                </div>
+                {returnAllowed && (
+                  <FormField label="Return window (days)" htmlFor="return_window_days">
+                    <NumberInput
+                      id="return_window_days"
+                      name="return_window_days"
+                      min={1}
+                      max={90}
+                      value={returnDays}
+                      onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
+                    />
+                  </FormField>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
+                  <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
+                </div>
+                {replacementAllowed && (
+                  <FormField label="Replacement window (days)" htmlFor="replacement_window_days">
+                    <NumberInput
+                      id="replacement_window_days"
+                      name="replacement_window_days"
+                      min={1}
+                      max={90}
+                      value={replacementDays}
+                      onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
+                    />
+                  </FormField>
+                )}
+              </div>
+            </FormGrid>
+          </FormSection>
+        )}
+      </LockedFieldset>
 
       {/* Shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
       <FormFooter
         sticky
+        lock={lock}
         draftBadge={isDraft ? <Badge tone="amber">Draft pending</Badge> : undefined}
         discard={
           isDraft && discardAction

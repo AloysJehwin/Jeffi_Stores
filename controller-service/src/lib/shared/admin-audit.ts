@@ -19,6 +19,12 @@ export type AuditAction =
   | 'send'
   | 'approve'
   | 'reject'
+  | 'lock'
+  | 'unlock'
+  | 'handover'
+  | 'takeover'
+  | 'request_access'
+  | 'discard_override'
 
 export type AuditEntity =
   | 'product'

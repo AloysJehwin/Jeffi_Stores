@@ -11,19 +11,20 @@ const day = (v: string) => new Date(v).toLocaleDateString('en-IN')
 const signTone = (v: number) => (v >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')
 
 const TX_COLS: DataCol<TenantTransaction>[] = [
-  { key: 'order', label: 'Order', render: tx => <span className="font-medium text-foreground">{tx.order_ref || '-'}</span> },
-  { key: 'gross', label: 'Gross', num: true, render: tx => inr(tx.gross_amount) },
-  { key: 'share', label: 'Tenant share', num: true, render: tx => <span className="text-green-600 dark:text-green-400">{inr(tx.tenant_share)}</span> },
-  { key: 'commission', label: 'Commission', num: true, render: tx => <span className="text-accent-600">{inr(tx.platform_commission)}</span> },
-  { key: 'fee', label: 'Gateway fee', num: true, render: tx => <span className="text-foreground-muted">{inr(tx.gateway_fee)}</span> },
-  { key: 'mode', label: 'Mode', render: tx => <span className="text-foreground-secondary">{tx.is_cod ? 'COD' : 'Prepaid'}</span> },
-  { key: 'status', label: 'Status', render: tx => <StatusPill status={tx.status} /> },
-  { key: 'date', label: 'Date', render: tx => <span className="text-foreground-muted">{day(tx.occurred_at)}</span> },
+  { key: 'order', label: 'Order', sort: tx => tx.order_ref || '', render: tx => <span className="font-medium text-foreground">{tx.order_ref || '-'}</span> },
+  { key: 'gross', label: 'Gross', num: true, sort: tx => Number(tx.gross_amount) || 0, render: tx => inr(tx.gross_amount) },
+  { key: 'share', label: 'Tenant share', num: true, sort: tx => Number(tx.tenant_share) || 0, render: tx => <span className="text-green-600 dark:text-green-400">{inr(tx.tenant_share)}</span> },
+  { key: 'commission', label: 'Commission', num: true, sort: tx => Number(tx.platform_commission) || 0, render: tx => <span className="text-accent-600">{inr(tx.platform_commission)}</span> },
+  { key: 'fee', label: 'Gateway fee', num: true, sort: tx => Number(tx.gateway_fee) || 0, render: tx => <span className="text-foreground-muted">{inr(tx.gateway_fee)}</span> },
+  { key: 'mode', label: 'Mode', sort: tx => (tx.is_cod ? 'COD' : 'Prepaid'), render: tx => <span className="text-foreground-secondary">{tx.is_cod ? 'COD' : 'Prepaid'}</span> },
+  { key: 'status', label: 'Status', sort: tx => tx.status, render: tx => <StatusPill status={tx.status} /> },
+  { key: 'date', label: 'Date', sortType: 'date', sort: tx => new Date(tx.occurred_at).getTime(), render: tx => <span className="text-foreground-muted">{day(tx.occurred_at)}</span> },
 ]
 
 export function TransactionsTable({ rows }: { rows: TenantTransaction[] }) {
   return (
     <DataTable
+      sortNs="tx"
       rows={rows}
       cols={TX_COLS}
       rowKey={tx => tx.id}
@@ -47,12 +48,13 @@ export function TransactionsTable({ rows }: { rows: TenantTransaction[] }) {
 
 export function LedgerTable({ rows, labels, balance }: { rows: LedgerEntry[]; labels: Record<string, string>; balance: number }) {
   const cols: DataCol<LedgerEntry>[] = [
-    { key: 'entry', label: 'Entry', render: e => labels[e.entry_type] || e.entry_type },
-    { key: 'note', label: 'Note', render: e => <span className="text-foreground-muted">{e.note || '-'}</span> },
+    { key: 'entry', label: 'Entry', sort: e => labels[e.entry_type] || e.entry_type, render: e => labels[e.entry_type] || e.entry_type },
+    { key: 'note', label: 'Note', sort: e => e.note || '', render: e => <span className="text-foreground-muted">{e.note || '-'}</span> },
     {
       key: 'amount',
       label: 'Amount',
       num: true,
+      sort: e => Number(e.amount),
       render: e => {
         const amt = Number(e.amount)
         return (
@@ -63,11 +65,12 @@ export function LedgerTable({ rows, labels, balance }: { rows: LedgerEntry[]; la
         )
       },
     },
-    { key: 'date', label: 'Date', render: e => <span className="text-foreground-muted">{day(e.occurred_at)}</span> },
+    { key: 'date', label: 'Date', sortType: 'date', sort: e => new Date(e.occurred_at).getTime(), render: e => <span className="text-foreground-muted">{day(e.occurred_at)}</span> },
   ]
   return (
     <div className="space-y-3">
       <DataTable
+        sortNs="ledger"
         rows={rows}
         cols={cols}
         rowKey={e => e.id}

@@ -61,6 +61,8 @@ export const COUPONS_ENTITY: FilterEntity<CouponKey> = {
     }),
   },
   sorts: COUPON_SORTS,
+  defaultSql: 'c.created_at DESC',
+  tiebreak: 'c.id DESC',
   facets: true,
   export: {
     columns: [

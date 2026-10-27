@@ -7,6 +7,7 @@ import { motion, useMotionValue, useMotionValueEvent, type MotionValue } from 'm
 import StoreImage from '@/components/visitor/StoreImage'
 import StoreMedia, { useCanPlayVideo } from '@/components/visitor/media/StoreMedia'
 import { SlideArrows, SlideProgress } from '@/components/visitor/slides/SlideControls'
+import { bannerShape } from '@/components/visitor/slides/PromoCard'
 import { useAutoplay } from '@/components/visitor/slides/useAutoplay'
 import { useSwipe } from '@/components/visitor/slides/useSwipe'
 import {
@@ -26,6 +27,10 @@ const FG_FRAME_CLASS: Record<FgFrame, string> = {
 }
 // Feathers all four edges: two linear masks multiplied.
 const FEATHER = 'transparent, #000 14%, #000 86%, transparent'
+const STAGE =
+  'relative isolate w-full touch-pan-y touch-pinch-zoom select-none overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl'
+// The copy is absolutely placed, so a shaped stage keeps the default height's floor.
+const SHAPED_MIN_H = '20rem'
 const FG_FADE = {
   maskImage: `linear-gradient(to right, ${FEATHER}), linear-gradient(to bottom, ${FEATHER})`,
   WebkitMaskImage: `linear-gradient(to right, ${FEATHER}), linear-gradient(to bottom, ${FEATHER})`,
@@ -37,9 +42,11 @@ interface MotionHeroProps {
   slides: MotionHeroSlide[]
   /** How long a slide stays; also the length of its Ken Burns drift. */
   intervalMs: number
+  /** Banner shape (width / height); unset keeps the viewport-based height. */
+  aspect?: number | null
 }
 
-export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
+export default function MotionHero({ slides, intervalMs, aspect }: MotionHeroProps) {
   const count = slides.length
   const [active, setActive] = useState(0)
 
@@ -76,7 +83,12 @@ export default function MotionHero({ slides, intervalMs }: MotionHeroProps) {
       <section
         aria-roledescription="carousel"
         aria-label="Featured"
-        className="relative isolate h-[clamp(20rem,56svh,36rem)] w-full touch-pan-y touch-pinch-zoom select-none overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl md:h-[clamp(26rem,64vh,46rem)]"
+        className={
+          aspect
+            ? STAGE
+            : 'relative isolate h-[clamp(20rem,56svh,36rem)] w-full touch-pan-y touch-pinch-zoom select-none overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl md:h-[clamp(26rem,64vh,46rem)]'
+        }
+        style={aspect ? bannerShape(aspect, SHAPED_MIN_H) : undefined}
         {...swipe.bind}
         {...bind}
         onPointerMove={onPointerMove}

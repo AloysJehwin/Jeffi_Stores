@@ -6,6 +6,19 @@ export type SectionType =
   | 'why_us' | 'about' | 'business_cta' | 'countdown_deal' | 'testimonials' | 'recently_viewed'
   | 'category_tabs' | 'bundle_spotlight' | 'back_in_stock' | 'blog_teaser' | 'social_strip' | 'value_stats'
   | 'motion_hero' | 'stories' | 'product_spotlight' | 'rewards_game' | 'slides'
+  | 'business_reorder' | 'business_quotes' | 'business_offers' | 'business_account'
+
+/** Which homepage a model is: the store's, or the business one an approved business sees once it's published. */
+export type HomeAudience = 'store' | 'business'
+
+/** Which page a layout belongs to: the homepage, or a listing whose sections sit between its products. */
+export type HomePage = 'home' | 'products' | 'category' | 'brand'
+
+/** After the first `after` products (0 = above them), then every `every` (≥ 4) when set. Ignored on home. */
+export interface SectionPlacement {
+  after: number
+  every: number | null
+}
 
 export interface SectionCopy {
   eyebrow?: string
@@ -33,6 +46,11 @@ export interface HomeSection {
   copy: SectionCopy
   /** Blog and social items may carry an optional `video` beside `imageUrl`. */
   items: Record<string, string>[] | null
+  // Absent from older servers.
+  page?: HomePage
+  placement?: SectionPlacement
+  /** Width / height of the section's cards or banner, or null for the component's own shape. */
+  aspect?: number | null
 }
 
 /** The web's productCardProps, plus the row badge. */
@@ -48,6 +66,8 @@ export interface CardProduct {
   primaryImage: { image_url: string; thumbnail_url?: string; blurhash?: string | null } | null
   brandName: string | null
   categoryName: string | null
+  /** Business prices are per category (useBusiness().discountFor). */
+  categoryId?: string | null
   discountPct: number
   extraDeliveryDays: number
   isDigital: boolean
@@ -256,6 +276,21 @@ export interface RewardGameState {
   lastPlay: RewardGamePlay | null
 }
 
+// extras[section.id] of a business_* section (homepage-sections.ts businessSectionPublic). Its data is the
+// signed-in business's own, from GET /api/business/home.
+export interface BusinessContact {
+  name: string | null
+  phone: string | null
+  email: string | null
+}
+
+export interface BusinessSectionData {
+  visitor: 'hide' | 'signin'
+  limit: number
+  offers?: { source: 'auto' | 'picked'; productIds: string[] }
+  account?: { tiles: ('orders' | 'payments' | 'quotes')[]; contact: BusinessContact | null }
+}
+
 export interface HomeData {
   heroSlides: HeroSlide[]
   offers: ProductOffer[]
@@ -277,6 +312,8 @@ export interface HomeData {
 export interface HomeModel {
   sections: HomeSection[]
   data: HomeData
+  /** What was served; absent from older servers (store). */
+  audience?: HomeAudience
 }
 
 /** Every home section component takes the section and the shared data, like the web's SectionRenderer. */

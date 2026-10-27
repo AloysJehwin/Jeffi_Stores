@@ -1,13 +1,13 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
 import { View, useWindowDimensions } from 'react-native'
-import Animated, { Easing, SlideInDown, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { Image } from 'expo-image'
 import { X } from 'lucide-react-native'
-import { Button, Caption, Divider, IconButton, KeyboardScroll, Text, Title, useEntering, useMotion } from '../../ui'
+import { Button, Caption, Divider, IconButton, KeyboardScroll, Text, Title, useMotion } from '../../ui'
 import Gradient from './Gradient'
 import { GoogleMark } from '../brand/Marks'
 import { listCategories } from '../../api/categories'
@@ -16,12 +16,14 @@ import { useLeaveAuth } from './hooks'
 import { accent } from '../../theme'
 
 // The app's own sign-in frame (not the web card): a brand panel with a drifting mosaic of what the
-// store sells, and a sheet that rises from the bottom with the form. The panel folds up while the
-// keyboard is open so the form keeps the room.
+// store sells, and a sheet below it with the form. The modal presentation is the only entrance, so
+// moving between the sign-in steps doesn't replay one. The panel folds up while the keyboard is open
+// so the form keeps the room.
 
 const TILE = 64
 const GAP = 10
-const COMPACT_PANEL = 56
+// The header row (8 + 44) plus the 24 the sheet overlaps it by (-mt-6), so the close button stays clear.
+const COMPACT_PANEL = 84
 
 export function AuthScreen({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   const close = useLeaveAuth()
@@ -37,7 +39,6 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
 
   const panelStyle = useAnimatedStyle(() => ({ height: openHeight + (compactHeight - openHeight) * folded.value }))
   const fadeStyle = useAnimatedStyle(() => ({ opacity: 1 - folded.value }))
-  const rise = useEntering(SlideInDown.springify().damping(20).stiffness(160))
 
   return (
     <View className="flex-1 bg-accent-600">
@@ -55,7 +56,7 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
         </View>
       </Animated.View>
 
-      <Animated.View entering={rise} className="-mt-6 flex-1 overflow-hidden rounded-t-[28px] bg-surface-elevated">
+      <View className="-mt-6 flex-1 overflow-hidden rounded-t-[28px] bg-surface-elevated">
         <KeyboardScroll
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: insets.bottom + 24 }}
           showsVerticalScrollIndicator={false}
@@ -66,7 +67,7 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
           </View>
           {children}
         </KeyboardScroll>
-      </Animated.View>
+      </View>
     </View>
   )
 }

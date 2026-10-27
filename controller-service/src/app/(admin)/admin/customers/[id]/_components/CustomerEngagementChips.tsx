@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Phone } from 'lucide-react'
 import AdminSupportChat from '@/components/admin/AdminSupportChat'
 import WhatsAppEngagement from '@/components/admin/WhatsAppEngagement'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
 
 interface Props {
   customerId: string
@@ -198,10 +199,11 @@ function WhatsAppChip({
 }
 
 export default function CustomerEngagementChips({ customerId, phone, marketingOptOut, autoOpenChat }: Props) {
+  const { whatsapp } = useMessagingChannels()
   return (
     <div className="grid grid-cols-2 gap-2 mb-5">
       <SupportChatChip customerId={customerId} autoOpen={autoOpenChat} />
-      <WhatsAppChip customerId={customerId} phone={phone} marketingOptOut={marketingOptOut} />
+      {whatsapp && <WhatsAppChip customerId={customerId} phone={phone} marketingOptOut={marketingOptOut} />}
     </div>
   )
 }

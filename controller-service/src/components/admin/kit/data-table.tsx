@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDown, ArrowUp, Search, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import Select from '@/components/ui/Select'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import RowActions, { type RowAction } from '@/components/admin/RowActions'
@@ -10,11 +10,13 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { EmptyState, ErrorState, TableSkeleton, type EmptyStateProps } from './states'
 import { InfiniteFooter, useReveal, useServerPages, type InfiniteControl } from './infinite'
+import { SortArrow, useListSort, type SortType } from './list-sort'
 
 // List tables, infinite scroll (no page buttons). Client mode sorts in memory and reveals
 // pageSize rows at a time, or shows rows an `infinite` source (useInfiniteList) fetched so far.
 // Server mode reads and writes the page's existing query params (?page, ?sort&dir, filters,
-// search); rows of ?page=1..N accumulate client-side (see useServerPages). A server page cannot pass `cols` (functions) across the
+// search); rows of ?page=1..N accumulate client-side (see useServerPages). Both modes keep the
+// sort in ?sort&dir (see list-sort); column titles are the only sort control. A server page cannot pass `cols` (functions) across the
 // client boundary: define the columns in a small client component next to the page.
 
 export interface DataCol<T> {
@@ -23,8 +25,11 @@ export interface DataCol<T> {
   render: (r: T) => ReactNode
   /** Client-mode sort value. */
   sort?: (r: T) => number | string
-  /** Server-mode sort: the ?sort value this column writes. */
+  /** The ?sort value this column writes: required in server mode; client mode defaults to `key`.
+   *  With `infinite`, a column with sortParam is sorted by the API, not in memory. */
   sortParam?: string
+  /** Labels and first-click direction; defaults to number for `num` columns, else text. */
+  sortType?: SortType
   num?: boolean
   /** Hide the column below a breakpoint (the mobile card covers small screens anyway). */
   hideBelow?: 'sm' | 'md' | 'lg' | 'xl'
@@ -83,6 +88,8 @@ export interface DataTableProps<T> {
   empty?: string | EmptyStateProps
   /** Inside a card that already has a border. */
   bare?: boolean
+  /** Client mode: namespaces ?sort when several tables share a page. */
+  sortNs?: string
 }
 
 const HIDE = { sm: 'hidden sm:table-cell', md: 'hidden md:table-cell', lg: 'hidden lg:table-cell', xl: 'hidden xl:table-cell' }
@@ -211,12 +218,11 @@ function BulkButton<T>({ a, rows, done }: { a: BulkAction<T>; rows: T[]; done: (
 }
 
 export function DataTable<T>(props: DataTableProps<T>) {
-  const { rows, cols, rowKey, mode = 'client', pageSize = 25, search, filters, toolbar, selectable, bulkActions, rowActions, onRowClick, mobileCard, mobile, empty, bare, infinite, noun, hide } = props
+  const { rows, cols, rowKey, mode = 'client', pageSize = 25, search, filters, toolbar, selectable, bulkActions, rowActions, onRowClick, mobileCard, mobile, empty, bare, infinite, noun, hide, sortNs } = props
   const server = mode === 'server'
-  const { sp, set } = useQuery()
-
-  const [sortKey, setSortKey] = useState<string | null>(null)
-  const [desc, setDesc] = useState(true)
+  const listSort = useListSort(server ? undefined : sortNs)
+  const sortKey = listSort.sort
+  const desc = listSort.dir === 'desc'
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -227,8 +233,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
       const needle = q.trim().toLowerCase()
       r = r.filter(x => search.match!(x).toLowerCase().includes(needle))
     }
-    const c = cols.find(c => c.key === sortKey)
-    if (c?.sort) {
+    const c = sortKey ? cols.find(c => (c.sortParam ?? c.key) === sortKey) : undefined
+    if (c?.sort && !(infinite && c.sortParam)) {
       r = [...r].sort((a, b) => {
         const x = c.sort!(a)
         const y = c.sort!(b)
@@ -237,7 +243,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
       if (desc) r.reverse()
     }
     return r
-  }, [server, rows, cols, sortKey, desc, q, search])
+  }, [server, rows, cols, sortKey, desc, q, search, infinite])
 
   const sv = useServerPages({ rows: server ? rows : [], page: server ? (props.page ?? 1) : 1, total: server ? (props.total ?? rows.length) : 0, rowKey, pageHref: props.pageHref })
   const reveal = useReveal(shownRows, pageSize, `${q}|${sortKey}|${desc}`)
@@ -249,26 +255,15 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const error = props.error ?? firstPageError
   const loadedRows = server ? sv.rows : rows
 
-  const serverSort = sp.get('sort')
-  const serverDir = sp.get('dir')
-
+  const sortParamOf = (c: DataCol<T>) => (server ? c.sortParam : (c.sortParam ?? (c.sort ? c.key : undefined)))
+  const sortTypeOf = (c: DataCol<T>): SortType => c.sortType ?? (c.num ? 'number' : 'text')
   const onHeader = (c: DataCol<T>) => {
-    if (server) {
-      if (!c.sortParam) return
-      const nextDir = serverSort === c.sortParam && serverDir !== 'asc' ? 'asc' : 'desc'
-      set({ sort: c.sortParam, dir: nextDir })
-      return
-    }
-    if (!c.sort) return
-    if (sortKey === c.key) setDesc(d => !d)
-    else {
-      setSortKey(c.key)
-      setDesc(true)
-    }
+    const key = sortParamOf(c)
+    if (key) listSort.cycle(key, sortTypeOf(c))
   }
-  const sortState = (c: DataCol<T>): 'asc' | 'desc' | null => {
-    if (server) return c.sortParam && serverSort === c.sortParam ? (serverDir === 'asc' ? 'asc' : 'desc') : null
-    return sortKey === c.key ? (desc ? 'desc' : 'asc') : null
+  const sortState = (c: DataCol<T>) => {
+    const key = sortParamOf(c)
+    return key ? listSort.stateOf(key) : null
   }
 
   const keys = visible.map(rowKey)
@@ -340,7 +335,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                   )}
                   {cols.map(c => {
                     const s = sortState(c)
-                    const sortable = server ? !!c.sortParam : !!c.sort
+                    const sortable = !!sortParamOf(c)
                     return (
                       <th
                         key={c.key}
@@ -350,8 +345,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                       >
                         <span className="inline-flex items-center gap-1">
                           {c.label}
-                          {s === 'asc' && <ArrowUp className="h-3 w-3" />}
-                          {s === 'desc' && <ArrowDown className="h-3 w-3" />}
+                          {sortable && <SortArrow state={s} />}
                         </span>
                       </th>
                     )

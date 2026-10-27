@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Pencil } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useHasScope } from '@/contexts/AdminScopesContext'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import { renderTemplate as renderVars, sampleVariableMap } from '@/lib/templates/variables-shared'
 import { renderLayoutPreview, EMAIL_LAYOUT_OPTIONS } from '@/lib/templates/email-layouts'
 import { renderBlocks, type EmailBlock } from '@/lib/templates/blocks'
@@ -13,6 +14,7 @@ import { WhatsAppPreview } from '@/components/admin/campaigns/WhatsAppTemplateEd
 import { PushPreview } from '@/components/admin/campaigns/PushEditor'
 import { campaignSupportsPush, scenarioPushCopy } from '@/lib/campaigns/push-kinds'
 import { CampaignDetailSkeleton, CampaignPageSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
+import { ViewDraftLink } from '@/components/admin/kit/draft-lock'
 import {
   type CampaignRow,
   getChannels,
@@ -72,11 +74,15 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 export default function CampaignViewClient({
   kind,
   hasDraftInitial = false,
+  heldDraft,
 }: {
   kind: string
   hasDraftInitial?: boolean
+  /** Another admin holds the draft: open it read-only instead of starting one. */
+  heldDraft?: { ownerName: string; href: string } | null
 }) {
   const canWrite = useHasScope('campaigns:write')
+  const msg = useMessagingChannels()
   const [c, setC] = useState<ViewCampaign | null>(null)
   const [recentSends, setRecentSends] = useState<RecentSend[]>([])
   const [sendsTotal, setSendsTotal] = useState(0)
@@ -136,10 +142,11 @@ export default function CampaignViewClient({
   const previewDoc = renderVars(renderLayoutPreview(c.template_layout, renderVars(bodySource, vars)), vars)
   // SMS preview: linked library template wins, else the inline template.
   const smsSource = c.sms_template?.trim() || smsLibraryBody || ''
-  const smsEnabled = !!c.parameters?.smsEnabled || !!c.sms_template?.trim()
+  const smsEnabled = msg.sms && (!!c.parameters?.smsEnabled || !!c.sms_template?.trim())
   const smsPreview = smsEnabled && smsSource ? renderVars(smsSource, vars) : ''
   const layoutLabel = EMAIL_LAYOUT_OPTIONS.find(l => l.key === c.template_layout)?.label ?? 'Classic'
-  const waEnabled = campaignSupportsWhatsApp(kind) && !!c.parameters?.whatsappEnabled && !!c.wa_template_slug
+  const waEnabled =
+    msg.whatsapp && campaignSupportsWhatsApp(kind) && !!c.parameters?.whatsappEnabled && !!c.wa_template_slug
   const pushKind = campaignSupportsPush(kind) ? kind : (c.scenario_kind ?? '')
   const pushEnabled = campaignSupportsPush(pushKind) && c.parameters?.pushEnabled === true
   const pushCopy = scenarioPushCopy(pushKind, c.parameters)
@@ -160,7 +167,7 @@ export default function CampaignViewClient({
                   >
                     {c.enabled ? 'Active' : 'Paused'}
                   </span>
-                  {getChannels(kind, c.parameters, c.scenario_kind).map(ch => (
+                  {getChannels(kind, c.parameters, c.scenario_kind, msg).map(ch => (
                     <ChannelChip key={ch} channel={ch} />
                   ))}
                   {hasDraft && (
@@ -171,7 +178,11 @@ export default function CampaignViewClient({
                 </div>
                 {c.description && <p className="text-sm text-foreground-secondary mt-1">{c.description}</p>}
               </div>
-              {canWrite &&
+              {heldDraft ? (
+                <span className="hidden md:inline-flex">
+                  <ViewDraftLink held={heldDraft} compact />
+                </span>
+              ) : canWrite &&
                 (hasDraft ? (
                   <Link
                     href={ap(`/admin/campaigns/${kind}/edit`)}

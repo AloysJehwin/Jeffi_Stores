@@ -9,9 +9,15 @@ import Toggle from '@/components/ui/Toggle'
 import { useCanUseAi } from '@/contexts/AdminScopesContext'
 import type { AiActionScope } from '@/lib/auth/ai-scope'
 import {
+  PLACEMENT_MIN_EVERY,
+  SECTION_ASPECTS,
+  SECTION_META,
+  businessVisitorView,
+  sectionAspectValue,
   sectionLayout,
   sectionLimit,
   sectionCopyDefaults,
+  sectionPlacement,
   type HomepageSection,
   type SectionCopy,
   type SectionType,
@@ -612,5 +618,82 @@ export function LimitField({
       hint={hint}
       onCommit={v => b.saveConfig({ limit: v })}
     />
+  )
+}
+
+const VISITOR_OPTIONS = [
+  { value: 'hide', label: 'Nothing' },
+  { value: 'signin', label: 'A sign-in prompt' },
+]
+
+/** Business sections: what a signed-out visitor sees in the section's place. */
+export function VisitorField({ props }: { props: EditorProps }) {
+  const b = useSectionBinding(props)
+  return (
+    <Select
+      label="Signed-out visitors see"
+      value={businessVisitorView(props.section)}
+      options={VISITOR_OPTIONS}
+      disabled={!props.canWrite}
+      hint="The section needs a business account. A sign-in prompt asks visitors to sign in to their business account."
+      onChange={v => b.saveConfig({ visitor: v })}
+    />
+  )
+}
+
+const ASPECT_LABELS: Record<string, string> = {
+  auto: 'Default',
+  '21:9': '21:9 (ultra wide)',
+  '16:9': '16:9 (wide)',
+  '3:1': '3:1 (strip)',
+  '5:3': '5:3',
+  '4:3': '4:3',
+  '1:1': '1:1 (square)',
+  '4:5': '4:5 (portrait)',
+  '3:4': '3:4 (tall)',
+}
+
+/** Shape of the section's cards or banner on this layout; only for types that declare one. */
+export function AspectField({ props }: { props: EditorProps }) {
+  const b = useSectionBinding(props)
+  const target = SECTION_META[props.section.type].aspect
+  if (!target) return null
+  return (
+    <Select
+      label={`${target} shape`}
+      value={sectionAspectValue(props.section)}
+      options={SECTION_ASPECTS.map(a => ({ value: a, label: ASPECT_LABELS[a] ?? a }))}
+      disabled={!props.canWrite}
+      hint="Default keeps the built-in look. Set it per layout, so desktop, phone browsers and the app can differ."
+      onChange={v => b.saveConfig({ aspect: v === 'auto' ? null : v })}
+    />
+  )
+}
+
+/** Where a listing-page section sits between the products. */
+export function PlacementFields({ props }: { props: EditorProps }) {
+  const b = useSectionBinding(props)
+  const p = sectionPlacement(props.section)
+  const save = (next: { after: number; every: number | null }) =>
+    b.saveConfig({ placement: next.every ? next : { after: next.after } })
+  return (
+    <Grid>
+      <NumberField
+        label="Show after this many products"
+        value={p.after}
+        min={0}
+        disabled={!props.canWrite}
+        hint="0 puts it above the first product. It moves to the end of that row so the grid has no gaps."
+        onCommit={after => save({ ...p, after })}
+      />
+      <NumberField
+        label="Repeat every"
+        value={p.every ?? 0}
+        min={0}
+        disabled={!props.canWrite}
+        hint={`0 shows it once. Otherwise at least ${PLACEMENT_MIN_EVERY} products apart, up to 12 times.`}
+        onCommit={every => save({ ...p, every: every === 0 ? null : Math.max(PLACEMENT_MIN_EVERY, every) })}
+      />
+    </Grid>
   )
 }

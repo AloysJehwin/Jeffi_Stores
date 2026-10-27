@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from '../../next'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
-import { query, queryOne } from '@jeffi/tenancy'
+import { queryOne, withTransaction } from '@jeffi/tenancy'
 import { z } from 'zod'
 import { parseBody } from '../../lib/validate'
+import { acquireLock, announceLock, assertHolder, canDiscard, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
 
 
 /** Load the open receive-draft for this PO. */
@@ -29,7 +30,7 @@ const patchSchema = z
   })
   .partial()
 
-/** Upsert the receive-draft. One open draft per PO. */
+/** Upsert the receive-draft. One open draft per PO, written only by its lock holder. */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
@@ -45,25 +46,38 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const po = await queryOne<{ id: string }>(`SELECT id FROM purchase_orders WHERE id = $1`, [id])
   if (!po) return NextResponse.json({ error: 'PO not found' }, { status: 404 })
 
-  await query(
-    `INSERT INTO po_receive_drafts (po_id, admin_id, line_items, serials)
-       VALUES ($1, $2, COALESCE($3::jsonb, '[]'::jsonb), COALESCE($4::jsonb, '[]'::jsonb))
-     ON CONFLICT (po_id) DO UPDATE
-       SET line_items = COALESCE(EXCLUDED.line_items, po_receive_drafts.line_items),
-           serials = COALESCE(EXCLUDED.serials, po_receive_drafts.serials),
-           admin_id = EXCLUDED.admin_id,
-           updated_at = now()`,
-    [
-      id,
-      admin.adminId,
-      d.line_items !== undefined ? JSON.stringify(d.line_items) : null,
-      d.serials !== undefined ? JSON.stringify(d.serials) : null,
-    ]
-  )
+  // admin_id stays the admin who started the receipt; the lock says who holds it now.
+  try {
+    const lock = await withTransaction(async client => {
+      const r = await client.query<{ inserted: boolean }>(
+        `INSERT INTO po_receive_drafts (po_id, admin_id, line_items, serials)
+           VALUES ($1, $2, COALESCE($3::jsonb, '[]'::jsonb), COALESCE($4::jsonb, '[]'::jsonb))
+         ON CONFLICT (po_id) DO UPDATE
+           SET line_items = COALESCE(EXCLUDED.line_items, po_receive_drafts.line_items),
+               serials = COALESCE(EXCLUDED.serials, po_receive_drafts.serials),
+               updated_at = now()
+         RETURNING (xmax = 0) AS inserted`,
+        [
+          id,
+          admin.adminId,
+          d.line_items !== undefined ? JSON.stringify(d.line_items) : null,
+          d.serials !== undefined ? JSON.stringify(d.serials) : null,
+        ]
+      )
+      return r.rows[0]?.inserted
+        ? acquireLock(client, admin, 'po_receive', id)
+        : assertHolder(client, admin, 'po_receive', id, { epoch: epochFrom(request) })
+    })
+    await announceLock(admin, 'po_receive', id, lock)
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ ok: true })
 }
 
-/** Discard the receive-draft (also used after a successful Post Receipt). */
+/** Discard the receive-draft (Post Receipt already removes it, so a later call is a no-op). */
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
@@ -71,6 +85,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasScope(admin.role, admin.scopes, 'inventory:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  await query(`DELETE FROM po_receive_drafts WHERE po_id = $1`, [id])
+  try {
+    await withTransaction(async client => {
+      const denied = await canDiscard(admin, 'po_receive', id, client)
+      if (denied) throw denied
+      const r = await client.query(`DELETE FROM po_receive_drafts WHERE po_id = $1`, [id])
+      if (r.rowCount) await closeLock(client, admin, 'po_receive', id, 'discarded')
+    })
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    throw err
+  }
   return NextResponse.json({ ok: true })
 }

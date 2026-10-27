@@ -7,7 +7,7 @@ import { ChannelChips } from '../../src/components/account/ChannelChips'
 import { useFeatureFlagsState, useLeaveAuth, useSignOut, useLeaveIfSignedIn } from '../../src/components/account/hooks'
 import { finishSignIn, setPendingGoogle } from '../../src/components/account/authFlow'
 import PhoneVerifyModal from '../../src/components/account/PhoneVerifyModal'
-import { Button, Caption, FieldError, PhoneField, Skeleton, TextButton, TextField } from '../../src/ui'
+import { Button, Caption, FieldError, PhoneField, Skeleton, Text, TextButton, TextField } from '../../src/ui'
 
 // Same flow as controller-service app/(auth)/login/page.tsx (identifier → OTP, Google, not-found → sign-up),
 // laid out the app's way: mobile number first when SMS or WhatsApp is on, email behind one tap.
@@ -174,6 +174,12 @@ export default function LoginScreen() {
           ) : null}
 
           {!!GOOGLE_WEB_CLIENT_ID && <GoogleRow label="Continue with Google" loading={googleLoading} onPress={handleGoogle} />}
+          <Text className="text-center text-sm text-foreground-secondary">
+            Buying for a business?{' '}
+            <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => router.replace('/(auth)/business-login')}>
+              Business sign in
+            </Text>
+          </Text>
           <TermsNote />
         </View>
       )}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import Link from 'next/link'
 import ProductCard from '@/components/visitor/ProductCard'
 import type { CardProps } from '@/lib/catalog/product-card-props'
@@ -19,18 +19,23 @@ interface CategoryTabsProps {
   tabs: CategoryTabData[]
   eyebrow?: string | null
   title?: string | null
+  portal?: 'storefront' | 'business'
 }
 
-export default function CategoryTabs({ tabs, eyebrow, title }: CategoryTabsProps) {
+export default function CategoryTabs({ tabs, eyebrow, title, portal }: CategoryTabsProps) {
   const [active, setActive] = useState(0)
   const current = tabs[Math.min(active, tabs.length - 1)]
+  // Per instance: a listing page can show the same section more than once.
+  const uid = useId()
+  const tabId = (id: string) => `category-tab-${uid}-${id}`
+  const panelId = (id: string) => `category-panel-${uid}-${id}`
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
     e.preventDefault()
     const next = (active + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
     setActive(next)
-    document.getElementById(`category-tab-${tabs[next].id}`)?.focus()
+    document.getElementById(tabId(tabs[next].id))?.focus()
   }
 
   return (
@@ -54,11 +59,11 @@ export default function CategoryTabs({ tabs, eyebrow, title }: CategoryTabsProps
               return (
                 <button
                   key={tab.id}
-                  id={`category-tab-${tab.id}`}
+                  id={tabId(tab.id)}
                   type="button"
                   role="tab"
                   aria-selected={selected}
-                  aria-controls={`category-panel-${tab.id}`}
+                  aria-controls={panelId(tab.id)}
                   tabIndex={selected ? 0 : -1}
                   onClick={() => setActive(i)}
                   className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
@@ -74,10 +79,10 @@ export default function CategoryTabs({ tabs, eyebrow, title }: CategoryTabsProps
           </div>
         </div>
 
-        <div id={`category-panel-${current.id}`} role="tabpanel" aria-labelledby={`category-tab-${current.id}`}>
+        <div id={panelId(current.id)} role="tabpanel" aria-labelledby={tabId(current.id)}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
             {current.products.map(p => (
-              <ProductCard key={p.id} {...p} />
+              <ProductCard key={p.id} {...p} portal={portal} />
             ))}
           </div>
           <div className="text-center mt-7">

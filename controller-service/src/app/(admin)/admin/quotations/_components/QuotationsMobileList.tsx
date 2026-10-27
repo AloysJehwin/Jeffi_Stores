@@ -8,6 +8,7 @@ import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
 import { type Quotation, STATUS_COLORS } from '../QuotationsClient'
 import { badgeCls } from '@/components/admin/kit/tones'
+import { DraftLockBadge } from '@/components/admin/kit/draft-lock'
 
 interface Props {
   quotations: Quotation[]
@@ -126,6 +127,7 @@ export default function QuotationsMobileList({
                   Invoiced
                 </span>
               )}
+              <DraftLockBadge lock={q.lock} mine={q.lock?.mine} />
             </div>
           </MobileListCard>
         </div>
