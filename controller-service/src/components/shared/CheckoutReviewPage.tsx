@@ -1,5 +1,6 @@
 'use client'
 
+import { updateChannelsLabel, useMessagingChannels } from '@/hooks/useStoreFlags'
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -48,6 +49,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
   const isCodSiteEnabled = useStoreConfig().flags.codEnabled
   const gstEnabled = useStoreConfig().flags.gstEnabled
+  const updatesVia = updateChannelsLabel(useMessagingChannels())
   const storeName = useStoreConfig().identity.name
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1517,7 +1519,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                           clipRule="evenodd"
                         />
                       </svg>
-                      Tracked shipment with SMS &amp; email updates
+                      Tracked shipment with {updatesVia} updates
                     </li>
                     <li className="flex items-center gap-2">
                       <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">

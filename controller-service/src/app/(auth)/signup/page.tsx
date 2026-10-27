@@ -1,5 +1,6 @@
 'use client'
 
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -74,18 +75,8 @@ function SignupPage() {
   const isGoogleMode = searchParams.get('google') === '1'
   const rawRedirectTo = searchParams.get('redirect') || '/'
 
-  const [smsEnabled, setSmsEnabled] = useState(process.env.NEXT_PUBLIC_SMS_DISABLED !== 'true')
-  const [whatsappEnabled, setWhatsappEnabled] = useState(process.env.NEXT_PUBLIC_WHATSAPP_DISABLED !== 'true')
-
-  useEffect(() => {
-    fetch('/api/feature-flags')
-      .then(r => r.json())
-      .then(f => {
-        setSmsEnabled(f.smsEnabled ?? true)
-        setWhatsappEnabled(f.whatsappEnabled ?? true)
-      })
-      .catch(() => {})
-  }, [])
+  // Off until Site Controls says otherwise, so a switched-off channel never flashes up.
+  const { sms: smsEnabled, whatsapp: whatsappEnabled } = useMessagingChannels()
 
   // Set when the visitor arrived through a friend's referral link (/r/<code>).
   const [invitedBy, setInvitedBy] = useState<string | null>(null)

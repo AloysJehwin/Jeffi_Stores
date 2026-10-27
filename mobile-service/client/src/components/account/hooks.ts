@@ -10,7 +10,8 @@ import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { FileText, Gift, Heart, MapPin, MonitorSmartphone, Receipt, RefreshCw, ShoppingBag, User, UserPlus } from 'lucide-react-native'
 import type { IconComponent } from '../../ui'
 
-const OFF: FeatureFlags = { smsEnabled: true, whatsappEnabled: true, loyaltyEnabled: false, birthdayEnabled: false, referralEnabled: false }
+// Until the flags arrive (or if they can't), SMS and WhatsApp stay hidden: a switched-off channel never shows.
+const OFF: FeatureFlags = { smsEnabled: false, whatsappEnabled: false, loyaltyEnabled: false, birthdayEnabled: false, referralEnabled: false }
 
 /**
  * Closes the sign-in modal from any of its screens. router.dismissAll() is a POP_TO_TOP on the nearest
@@ -47,7 +48,14 @@ export function useFeatureFlags(): FeatureFlags {
   return useFeatureFlagsState().flags
 }
 
-/** The flags plus whether they have actually arrived: the fallback assumes every OTP channel is on. */
+/** "WhatsApp, SMS & email": the update channels a customer actually gets, for copy. */
+export function useUpdateChannelsLabel(): string {
+  const { smsEnabled, whatsappEnabled } = useFeatureFlags()
+  const list = [whatsappEnabled && 'WhatsApp', smsEnabled && 'SMS', 'email'].filter(Boolean) as string[]
+  return list.length > 1 ? `${list.slice(0, -1).join(', ')} & ${list[list.length - 1]}` : list[0]
+}
+
+/** The flags plus whether they have actually arrived (the fallback keeps SMS and WhatsApp off). */
 export function useFeatureFlagsState(): { flags: FeatureFlags; loaded: boolean } {
   const { data, isPending } = useQuery({ queryKey: ['feature-flags'], queryFn: getFeatureFlags, staleTime: 5 * 60_000 })
   // A failed request still settles, so the form shows with the fallback instead of waiting forever.

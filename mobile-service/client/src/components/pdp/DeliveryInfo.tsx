@@ -5,6 +5,7 @@ import { ArrowLeftRight, Check, CircleCheck, CircleX, ExternalLink, Lock, Refres
 import { Badge, Button, ModalSheet, Overline, Text, TextField, TONES, type IconComponent } from '../../ui'
 import { checkDelivery } from '../../api/pdp'
 import { openHref } from '../../lib/links'
+import { useUpdateChannelsLabel } from '../account/hooks'
 import { primary, status, useTokens } from '../../theme'
 
 // Mirror of the DeliveryInfo perks grid + policy popup and the PincodeChecker in ProductDetailClient.tsx.
@@ -62,6 +63,7 @@ export function DeliveryInfo({
 }: PolicyProps) {
   const router = useRouter()
   const t = useTokens()
+  const updatesVia = useUpdateChannelsLabel()
   const [active, setActive] = useState<Policy | null>(null)
   // The last policy stays in the sheet while it slides away.
   const [shown, setShown] = useState<Policy | null>(null)
@@ -76,7 +78,7 @@ export function DeliveryInfo({
       bullets: [
         'Delivered within 3–7 business days',
         'Same-day dispatch on orders placed before 2 PM',
-        'Tracking link sent via SMS & email after dispatch',
+        `Tracking link sent via ${updatesVia} after dispatch`,
         'Delivery available across India including remote areas',
       ],
       tone: 'blue',
