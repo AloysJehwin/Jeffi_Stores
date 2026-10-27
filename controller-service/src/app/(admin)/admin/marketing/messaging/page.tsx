@@ -16,6 +16,7 @@ import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messagi
 import { getDraftLockMap } from '@/lib/admin/draft-locks'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -71,6 +72,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="mailer" />
           <ListFilters entity="messaging" fields={MESSAGING_FIELDS} search={MESSAGING_SEARCH} noun="Messages" tab="list" exportable />
           <Suspense key={listKey(sp)} fallback={<TableSkeleton rows={8} cols={6} />}>
             <MailerListContent resolvedSearchParams={sp} />

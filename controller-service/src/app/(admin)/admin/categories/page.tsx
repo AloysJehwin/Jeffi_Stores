@@ -21,6 +21,7 @@ import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLin
 import { draftLockChips } from '@/lib/admin/draft-locks'
 import GroupOverview from './_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
+import PageDrafts from '@/components/admin/drafts/PageDrafts'
 
 type SP = { [key: string]: string | undefined }
 
@@ -212,6 +213,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
         </Suspense>
       ) : (
         <>
+          <PageDrafts type="category" />
           <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
             <CategoriesStats q={q} />
           </Suspense>

@@ -1,20 +1,19 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import { ChevronDown, FileClock } from 'lucide-react'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useDraftLock } from '@/hooks/useDraftLock'
-import { useDraftsList, type DraftListItem, type DraftsScope } from '@/hooks/useDraftsList'
+import { useDraftCounts, useDraftsList, type DraftListItem, type DraftsScope } from '@/hooks/useDraftsList'
 import { timeAgo } from '@/lib/client/draft-lock-client'
-import Select from '@/components/ui/Select'
 import { DataTable, DraftLockBadge, HandoverDialog, TakeoverDialog, Tabs, useActionToast, useListSort, type DataCol } from '@/components/admin/kit'
 
-const TABS = [
-  { id: 'mine', label: 'Mine' },
-  { id: 'all', label: 'All locked' },
-  { id: 'unclaimed', label: 'Unclaimed' },
-] as const
+// A list page's own drafts (one draft type), with claim / hand over / take over.
+// Hidden while the type has none; collapsed until opened.
+
+const SORT_NS = 'drafts'
 
 const ghost =
   'control-sm inline-flex items-center border border-border-secondary bg-surface text-xs text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50'
@@ -100,13 +99,43 @@ function RowLockActions({ r, onChanged }: { r: DraftListItem; onChanged: () => v
   )
 }
 
-export default function DraftsClient({ initialScope }: { initialScope: DraftsScope }) {
-  const [scope, setScope] = useState<DraftsScope>(initialScope)
-  const [type, setType] = useState('')
-  const { sort, dir } = useListSort()
-  const list = useDraftsList(scope, type, sort, dir)
-  const refresh = () => void list.refresh()
+/** Drafts of `type` on that type's list page. */
+export default function PageDrafts({ type }: { type: string }) {
+  const { counts, refresh: refreshCounts } = useDraftCounts(type)
+  const [open, setOpen] = useState(false)
+  const [scope, setScope] = useState<DraftsScope>('all')
+  if (!counts || counts.all + counts.unclaimed === 0) return null
+  const tabs = [
+    { id: 'mine' as const, label: `Mine (${counts.mine})` },
+    { id: 'all' as const, label: `All locked (${counts.all})` },
+    { id: 'unclaimed' as const, label: `Unclaimed (${counts.unclaimed})` },
+  ]
+  return (
+    <section className="mb-4 rounded-xl border border-border-default bg-surface-elevated">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="flex w-full items-center gap-2 px-4 py-3 text-left">
+        <FileClock className="h-4 w-4 text-accent-500" />
+        <span className="text-sm font-semibold text-foreground">Drafts in progress</span>
+        <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-xs text-foreground-secondary">{counts.all + counts.unclaimed}</span>
+        {counts.mine > 0 && <span className="text-xs text-accent-500">{counts.mine} yours</span>}
+        <ChevronDown className={`ml-auto h-4 w-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-border-default px-4 py-3">
+          <Tabs tabs={tabs} value={scope} onChange={setScope} />
+          <DraftsTable type={type} scope={scope} onChanged={() => void refreshCounts()} />
+        </div>
+      )}
+    </section>
+  )
+}
 
+function DraftsTable({ type, scope, onChanged }: { type: string; scope: DraftsScope; onChanged: () => void }) {
+  const { sort, dir } = useListSort(SORT_NS)
+  const list = useDraftsList(scope, type, sort, dir)
+  const refresh = () => {
+    void list.refresh()
+    onChanged()
+  }
   const entity = (r: DraftListItem) => (
     <Link href={ap(r.editHref)} className="font-medium text-foreground hover:text-accent-500 hover:underline">
       {r.label}
@@ -114,7 +143,6 @@ export default function DraftsClient({ initialScope }: { initialScope: DraftsSco
   )
   const cols: DataCol<DraftListItem>[] = [
     { key: 'entity', label: 'Draft', sortParam: 'label', render: entity },
-    { key: 'type', label: 'Type', sortParam: 'type', render: r => <span className="text-foreground-secondary">{r.typeLabel}</span> },
     { key: 'owner', label: 'Owner', sortParam: 'owner', render: r => <Owner r={r} /> },
     {
       key: 'started',
@@ -136,8 +164,6 @@ export default function DraftsClient({ initialScope }: { initialScope: DraftsSco
   ]
 
   return (
-    <div className="space-y-4">
-      <Tabs tabs={TABS} value={scope} onChange={setScope} />
       <DataTable<DraftListItem>
         rows={list.rows}
         cols={cols}
@@ -145,25 +171,14 @@ export default function DraftsClient({ initialScope }: { initialScope: DraftsSco
         loading={list.loading}
         infinite={list.infinite}
         noun="drafts"
-        search={{ placeholder: 'Search drafts...', match: r => `${r.label} ${r.typeLabel} ${r.lock?.ownerName ?? ''}` }}
-        toolbar={
-          <div className="w-48">
-            <Select
-              value={type}
-              onChange={setType}
-              aria-label="Draft type"
-              options={[{ value: '', label: 'All types' }, ...list.types]}
-            />
-          </div>
-        }
+        sortNs={SORT_NS}
+        bare
         mobileCard={r => (
           <div className="space-y-2 rounded-xl border border-border-default bg-surface-elevated px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 {entity(r)}
-                <p className="text-[11px] text-foreground-muted">
-                  {r.typeLabel} · active {timeAgo(r.lock?.lastActiveAt ?? r.updatedAt) || '—'}
-                </p>
+                <p className="text-[11px] text-foreground-muted">active {timeAgo(r.lock?.lastActiveAt ?? r.updatedAt) || '—'}</p>
               </div>
               <Owner r={r} />
             </div>
@@ -178,6 +193,5 @@ export default function DraftsClient({ initialScope }: { initialScope: DraftsSco
               : { title: 'No unclaimed drafts.', body: 'A released draft, or one nobody has opened since locks began, shows up here.' }
         }
       />
-    </div>
   )
 }

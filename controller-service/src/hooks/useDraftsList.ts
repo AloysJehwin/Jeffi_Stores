@@ -145,3 +145,39 @@ export function useDraftsList(scope: DraftsScope, type: string, sort?: string | 
   }
   return { rows, types, loading, refresh, infinite }
 }
+
+export type DraftCounts = Record<DraftsScope, number>
+
+/** Drafts of one type per tab, kept current like the list (lock events + poll). */
+export function useDraftCounts(type: string) {
+  const [counts, setCounts] = useState<DraftCounts | null>(null)
+  const refresh = useCallback(async () => {
+    try {
+      const scopes: DraftsScope[] = ['mine', 'all', 'unclaimed']
+      const res = await Promise.all(scopes.map(s => fetchJson<ListResponse>(`/api/admin/draft-locks?scope=${s}&type=${encodeURIComponent(type)}`)))
+      setCounts({ mine: res[0].total ?? 0, all: res[1].total ?? 0, unclaimed: res[2].total ?? 0 })
+    } catch {
+      setCounts(c => c ?? { mine: 0, all: 0, unclaimed: 0 })
+    }
+  }, [type])
+
+  useEffect(() => {
+    void refresh()
+    let t: ReturnType<typeof setTimeout> | null = null
+    const off = subscribeAdminEvents(f => {
+      if (f.kind !== 'lock' || f.type === 'presence') return
+      if (t) clearTimeout(t)
+      t = setTimeout(() => void refresh(), 800)
+    })
+    const poll = setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh()
+    }, POLL_MS)
+    return () => {
+      off()
+      clearInterval(poll)
+      if (t) clearTimeout(t)
+    }
+  }, [refresh])
+
+  return { counts, refresh }
+}
