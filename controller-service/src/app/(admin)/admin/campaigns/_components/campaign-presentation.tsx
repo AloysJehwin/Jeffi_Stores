@@ -47,14 +47,21 @@ const WA_KINDS = [
   'back_in_stock_alert',
 ]
 
+/** `on` is Site Controls' switches (useMessagingChannels): an off channel gets no chip or filter. */
 export function getChannels(
   kind: string,
-  params?: Record<string, unknown> | null,
-  scenarioKind?: string | null
+  params: Record<string, unknown> | null | undefined,
+  scenarioKind: string | null | undefined,
+  on: { whatsapp: boolean }
 ): CampaignChannel[] {
-  const out: CampaignChannel[] = WA_KINDS.includes(kind) ? ['email', 'whatsapp'] : ['email']
+  const out: CampaignChannel[] = on.whatsapp && WA_KINDS.includes(kind) ? ['email', 'whatsapp'] : ['email']
   if (params?.pushEnabled === true && (campaignSupportsPush(kind) || campaignSupportsPush(scenarioKind ?? ''))) out.push('push')
   return out
+}
+
+/** "Also send via SMS/WhatsApp" params of a channel Site Controls has switched off. */
+export function channelParamOff(key: string, on: { sms: boolean; whatsapp: boolean }): boolean {
+  return (key === 'smsEnabled' && !on.sms) || (key === 'whatsappEnabled' && !on.whatsapp)
 }
 
 export function rate(num: number, den: number): string {

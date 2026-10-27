@@ -8,6 +8,7 @@ import { useHasScope } from '@/contexts/AdminScopesContext'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import { type CampaignRow, getChannels, ChannelChip, rate } from './campaign-presentation'
 
 const num = (n: number | string) => Number(n).toLocaleString('en-IN')
@@ -43,6 +44,7 @@ interface Props {
 
 export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNow }: Props) {
   const canWrite = useHasScope('campaigns:write')
+  const msg = useMessagingChannels()
   const [selected, setSelected] = useState<CampaignRow | null>(null)
   const [actionsOpen, setActionsOpen] = useState(false)
 
@@ -94,7 +96,7 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
                 )}
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                {getChannels(c.kind, c.parameters, c.scenario_kind).map(ch => (
+                {getChannels(c.kind, c.parameters, c.scenario_kind, msg).map(ch => (
                   <ChannelChip key={ch} channel={ch} />
                 ))}
                 {c.discount_percent > 0 && (
@@ -139,7 +141,7 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
         {selected && (
           <div className="px-5 py-4 space-y-4">
             <div className="flex items-center gap-1.5 flex-wrap">
-              {getChannels(selected.kind, selected.parameters, selected.scenario_kind).map(ch => (
+              {getChannels(selected.kind, selected.parameters, selected.scenario_kind, msg).map(ch => (
                 <ChannelChip key={ch} channel={ch} />
               ))}
               {selected.discount_percent > 0 && (

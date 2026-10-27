@@ -37,6 +37,8 @@ import { bridgeVars, campaignCanFill } from '@/lib/templates/var-bridge'
 import { Badge, DraftLockBanner, FormFooter, LockedFieldset } from '@/components/admin/kit'
 import { resnapshotCampaignSession } from './edit/actions'
 import { useDraftLock } from '@/hooks/useDraftLock'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
+import { channelParamOff } from '../_components/campaign-presentation'
 import { assertDraftResponse, isDraftLockedError, lockHeaders } from '@/lib/client/draft-lock-client'
 
 interface Campaign {
@@ -103,6 +105,8 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
   // The linked library email as edited (the preview and checks read it instead of the inline fields).
   const [linkedEmail, setLinkedEmail] = useState<EditorTemplate | null>(null)
+  // Site Controls' switches: an off channel's toggle and editors are hidden (saved params untouched).
+  const msg = useMessagingChannels()
   const [form, setForm] = useState<{
     enabled: boolean
     delay_hours: number
@@ -734,7 +738,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               </>
             )}
 
-            {campaignSupportsWhatsApp(kind) && !!form.parameters?.smsEnabled && (
+            {msg.sms && campaignSupportsWhatsApp(kind) && !!form.parameters?.smsEnabled && (
               <div className="mt-4">
                 <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
                   SMS message
@@ -793,7 +797,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               </div>
             )}
 
-            {campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && (
+            {msg.whatsapp && campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && (
               <div className="mt-4">
                 <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-2">
                   WhatsApp message
@@ -874,7 +878,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               />
             </div>
 
-            {campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && form.wa_template_slug && (
+            {msg.whatsapp && campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && form.wa_template_slug && (
               <div className="mt-5">
                 <p className="text-sm font-semibold uppercase tracking-wide text-foreground mb-2">WhatsApp preview</p>
                 <WhatsAppPreview
@@ -935,9 +939,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           {(() => {
             const sk = form.scenario_kind || campaign.kind
             const sc = scenarios.find(s => s.kind === sk)
-            const schema = sc?.param_schema
+            const schema = Object.fromEntries(Object.entries(sc?.param_schema ?? {}).filter(([k]) => !channelParamOff(k, msg)))
             const defaults = sc?.default_parameters || {}
-            if (!schema || Object.keys(schema).length === 0) return null
+            if (Object.keys(schema).length === 0) return null
             return (
               <div className="mt-5 pt-5 border-t border-border-default">
                 <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
