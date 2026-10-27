@@ -41,16 +41,16 @@ export default async function CategoryDetailPage({
   const subcategories = await getSubcategories(category.id)
 
   // The /products listing scoped to this category: its filters and sort, with the category
-  // filter narrowed only to this category's own subcategories. Default order stays newest first.
+  // filter narrowed only to this category's own subcategories. Default order is Featured, like /products.
   const sp: Record<string, string | undefined> = {}
   for (const [k, v] of Object.entries(resolvedSearchParams)) sp[k] = Array.isArray(v) ? v[0] : v
   const ownSubs = new Set(subcategories.flatMap(sub => [String(sub.id), sub.slug]))
   const picked = (sp.category ?? '').split(',').filter(c => ownSubs.has(c))
   const { products, total, page, start, end, gstEnabled, facets, filterOffers } = await buildListingModel(
-    { ...sp, category: picked.length ? picked.join(',') : String(category.id), sort: sp.sort || 'created_at' },
+    { ...sp, category: picked.length ? picked.join(',') : String(category.id) },
     { categoryBanners: false }
   )
-  const filtered = Object.entries(sp).some(([k, v]) => !!v && !['page', 'sort', 'order', 'layout'].includes(k))
+  const filtered = Object.entries(sp).some(([k, v]) => !!v && !['page', 'sort', 'dir', 'order', 'layout'].includes(k))
   const pagedItems = await withListingSections(
     products.map(product => ({ key: String(product.id), node: renderProductItem(product, gstEnabled) })),
     { page: 'category', surface: await getWebSurface(sp.layout), pageNum: page, pageSize: LISTING_PAGE_SIZE, total }

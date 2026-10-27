@@ -2,13 +2,10 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useRef, useEffect, useCallback, useTransition } from 'react'
+// Deep import: the package index pulls zod into the client bundle.
+import { PRODUCT_SORTS, productSortKey } from '@jeffi/api-contracts/src/product-sort'
 
-const SORT_OPTIONS = [
-  { value: 'created_at', label: 'Newest First' },
-  { value: 'name', label: 'Name (A-Z)' },
-  { value: 'base_price', label: 'Price: Low to High' },
-  { value: 'base_price&order=desc', label: 'Price: High to Low' },
-]
+const SORT_OPTIONS = PRODUCT_SORTS.map(o => ({ value: o.id, label: o.label }))
 
 export default function SortDropdown({ basePath = '/products' }: { basePath?: string }) {
   const router = useRouter()
@@ -19,37 +16,26 @@ export default function SortDropdown({ basePath = '/products' }: { basePath?: st
   const containerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
-  const currentSort = searchParams.get('sort') || 'created_at'
-  const currentOrder = searchParams.get('order')
-  const currentValue = currentSort === 'base_price' && currentOrder === 'desc' ? 'base_price&order=desc' : currentSort
-
+  const currentValue = productSortKey(searchParams.get('sort'), searchParams.get('dir') ?? searchParams.get('order'))
   const selectedOption = SORT_OPTIONS.find(o => o.value === currentValue) || SORT_OPTIONS[0]
 
   const handleSelect = useCallback(
     (value: string) => {
+      const opt = PRODUCT_SORTS.find(o => o.id === value) ?? PRODUCT_SORTS[0]
       const params = new URLSearchParams(searchParams.toString())
-
-      if (value.includes('&order=')) {
-        const [sort, order] = value.split('&order=')
-        params.set('sort', sort)
-        params.set('order', order)
-      } else if (value === 'base_price') {
-        params.set('sort', value)
-        params.set('order', 'asc')
-      } else if (value === 'name') {
-        params.set('sort', value)
-        params.set('order', 'asc')
-      } else {
-        params.set('sort', value)
-        params.delete('order')
-      }
-
+      if (opt.sort) params.set('sort', opt.sort)
+      else params.delete('sort')
+      if (opt.dir) params.set('dir', opt.dir)
+      else params.delete('dir')
+      params.delete('order')
+      params.delete('page')
+      const qs = params.toString()
       startTransition(() => {
-        router.replace(basePath + `?${params.toString()}`)
+        router.replace(basePath + (qs ? `?${qs}` : ''))
       })
       setIsOpen(false)
     },
-    [searchParams, router]
+    [searchParams, router, basePath]
   )
 
   useEffect(() => {

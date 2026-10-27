@@ -17,6 +17,8 @@ import CategoryIcon from '@/components/visitor/CategoryIcon'
 import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import ProductCard from '@/components/business/ProductCard'
 import { round2 } from '@/lib/catalog/gst'
+import { positiveInt, productOrderBy, type ProductSortQuery } from '@/lib/catalog/product-sort'
+import SortDropdown from '@/components/visitor/SortDropdown'
 
 const PAGE_SIZE = 24
 
@@ -31,7 +33,7 @@ async function getSubcategories(parentId: string) {
   )
 }
 
-async function getCategoryProducts(categoryId: string, subcategoryIds: string[], page: number) {
+async function getCategoryProducts(categoryId: string, subcategoryIds: string[], page: number, sort: ProductSortQuery) {
   const allCategoryIds = [categoryId, ...subcategoryIds]
   const offset = (page - 1) * PAGE_SIZE
 
@@ -59,9 +61,10 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[],
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.category_id = ANY($1) AND p.is_active = true
-    ORDER BY p.created_at DESC
+    ORDER BY ${productOrderBy(sort, { gstEnabled })}
     LIMIT $2 OFFSET $3
   `,
     [allCategoryIds, PAGE_SIZE, offset]
@@ -88,14 +91,18 @@ export default async function BusinessCategoryDetailPage({
   const hdrs = await headers()
   const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
 
-  const pageParam = typeof resolvedSearchParams.page === 'string' ? resolvedSearchParams.page : '1'
-  const page = Math.max(1, parseInt(pageParam, 10) || 1)
+  const one = (k: string) => {
+    const v = resolvedSearchParams[k]
+    return Array.isArray(v) ? v[0] : v
+  }
+  const page = positiveInt(one('page'), 1)
 
   const subcategories = await getSubcategories(category.id)
   const { products, total, totalPages, gstEnabled } = await getCategoryProducts(
     category.id,
     subcategories.map(sub => sub.id),
-    page
+    page,
+    { sort: one('sort'), dir: one('dir'), order: one('order') }
   )
 
   return (
@@ -151,13 +158,16 @@ export default async function BusinessCategoryDetailPage({
         )}
 
         <div>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <h2 className="text-xl font-bold text-foreground">Products ({total})</h2>
-            {totalPages > 1 && (
-              <p className="text-sm text-foreground-muted">
-                Page {page} of {totalPages}
-              </p>
-            )}
+            <div className="flex items-center gap-3">
+              {totalPages > 1 && (
+                <p className="text-sm text-foreground-muted">
+                  Page {page} of {totalPages}
+                </p>
+              )}
+              {total > 1 && <SortDropdown basePath={bp('/business/categories/' + category.slug, host)} />}
+            </div>
           </div>
 
           {products.length > 0 ? (

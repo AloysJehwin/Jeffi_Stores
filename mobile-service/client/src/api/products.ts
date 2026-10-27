@@ -17,6 +17,8 @@ export interface ProductQuery {
   category?: string
   brand?: string
   sort?: string
+  dir?: string
+  /** Legacy alias of dir. */
   order?: string
   page?: number
   limit?: number
@@ -28,13 +30,14 @@ function productsQs(params: ProductQuery): string {
   if (params.category) qs.set('category', params.category)
   if (params.brand) qs.set('brand', params.brand)
   if (params.sort) qs.set('sort', params.sort)
-  if (params.order) qs.set('order', params.order)
+  if (params.dir) qs.set('dir', params.dir)
+  else if (params.order) qs.set('order', params.order)
   if (params.page) qs.set('page', String(params.page))
   qs.set('limit', String(params.limit ?? 20))
   return qs.toString()
 }
 
-/** GET /api/products: search, one category slug (with its subtree), one brand id, created_at/name/base_price sort. */
+/** GET /api/products: search, one category slug (with its subtree), one brand id, a PRODUCT_SORTS sort (sort + dir). */
 export async function listProducts(params: ProductQuery): Promise<ProductsResponse> {
   return api(`/api/products?${productsQs(params)}`, { token: null })
 }

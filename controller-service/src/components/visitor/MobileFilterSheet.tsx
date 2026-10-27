@@ -1,9 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useTransition } from 'react'
+import { useContext, useState, useEffect, useRef, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { humanizeLabel } from '@/lib/shared/format'
+// Deep import: the package index pulls zod into the client bundle.
+import { PRODUCT_SORTS, productSortKey, type ProductSortId } from '@jeffi/api-contracts/src/product-sort'
+import { ListingViewContext } from './listing/listing-view'
 
 type Category = { id: string; name: string; parent_category_id: string | null }
 type Brand = { id: string; name: string }
@@ -27,13 +30,6 @@ interface FilterFacets {
   specFacets: { key: string; values: FacetValue[] }[]
 }
 
-const SORT_OPTIONS = [
-  { label: 'Default', sort: '', order: '' },
-  { label: 'Newest First', sort: 'created_at', order: 'desc' },
-  { label: 'Name A–Z', sort: 'name', order: 'asc' },
-  { label: 'Price: Low → High', sort: 'price', order: 'asc' },
-  { label: 'Price: High → Low', sort: 'price', order: 'desc' },
-]
 
 function CheckboxFilterSection({
   title,
@@ -137,14 +133,17 @@ export default function MobileFilterSheet({
   const currentCategory = searchParams.get('category') || ''
   const currentBrand = searchParams.get('brand') || ''
   const currentSort = searchParams.get('sort') || ''
-  const currentOrder = searchParams.get('order') || ''
+  const currentSortId = productSortKey(currentSort, searchParams.get('dir') ?? searchParams.get('order'))
+  // The table view sorts by its column titles, so the sheet drops its Sort tab there.
+  const tableView = useContext(ListingViewContext) === 'table'
 
   const [pendingCategories, setPendingCategories] = useState<string[]>(
     currentCategory ? currentCategory.split(',') : []
   )
   const [pendingBrands, setPendingBrands] = useState<string[]>(currentBrand ? currentBrand.split(',') : [])
-  const [pendingSort, setPendingSort] = useState(currentSort)
-  const [pendingOrder, setPendingOrder] = useState(currentOrder)
+  const [pendingSort, setPendingSort] = useState<ProductSortId>(currentSortId)
+  // Untouched, the URL's sort stays as is (group-by-category, a table column sort).
+  const [sortTouched, setSortTouched] = useState(false)
   const [pendingMinPrice, setPendingMinPrice] = useState(searchParams.get('minPrice') || '')
   const [pendingMaxPrice, setPendingMaxPrice] = useState(searchParams.get('maxPrice') || '')
   const [pendingInStock, setPendingInStock] = useState(searchParams.get('inStock') === '1')
@@ -176,11 +175,11 @@ export default function MobileFilterSheet({
 
   useEffect(() => {
     if (open) {
-      setTab(openTab.current)
+      setTab(tableView ? 'filters' : openTab.current)
       setPendingCategories(currentCategory ? currentCategory.split(',') : [])
       setPendingBrands(currentBrand ? currentBrand.split(',') : [])
-      setPendingSort(currentSort)
-      setPendingOrder(currentOrder)
+      setPendingSort(currentSortId)
+      setSortTouched(false)
       setPendingMinPrice(searchParams.get('minPrice') || '')
       setPendingMaxPrice(searchParams.get('maxPrice') || '')
       setPendingInStock(searchParams.get('inStock') === '1')
@@ -244,8 +243,16 @@ export default function MobileFilterSheet({
     const params = new URLSearchParams()
     if (pendingCategories.length) params.set('category', pendingCategories.join(','))
     if (pendingBrands.length) params.set('brand', pendingBrands.join(','))
-    if (pendingSort) params.set('sort', pendingSort)
-    if (pendingOrder) params.set('order', pendingOrder)
+    const sortOpt = PRODUCT_SORTS.find(o => o.id === pendingSort)
+    if (!sortTouched) {
+      for (const k of ['sort', 'dir', 'order']) {
+        const v = searchParams.get(k)
+        if (v) params.set(k, v)
+      }
+    } else if (sortOpt?.sort && sortOpt.dir) {
+      params.set('sort', sortOpt.sort)
+      params.set('dir', sortOpt.dir)
+    }
     if (pendingMinPrice) params.set('minPrice', pendingMinPrice)
     if (pendingMaxPrice) params.set('maxPrice', pendingMaxPrice)
     if (pendingInStock) params.set('inStock', '1')
@@ -275,8 +282,8 @@ export default function MobileFilterSheet({
   function clearAll() {
     setPendingCategories([])
     setPendingBrands([])
-    setPendingSort('')
-    setPendingOrder('')
+    setPendingSort('featured')
+    setSortTouched(true)
     setPendingMinPrice('')
     setPendingMaxPrice('')
     setPendingInStock(false)
@@ -301,10 +308,6 @@ export default function MobileFilterSheet({
   function toggleBrand(id: string) {
     setPendingBrands(prev => (prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]))
   }
-  function selectSort(sort: string, order: string) {
-    setPendingSort(sort)
-    setPendingOrder(order)
-  }
   function toggleExpandCat(id: string) {
     setExpandedCats(prev => ({ ...prev, [id]: !prev[id] }))
   }
@@ -315,7 +318,7 @@ export default function MobileFilterSheet({
   const hasAnyPending =
     pendingCategories.length > 0 ||
     pendingBrands.length > 0 ||
-    !!pendingSort ||
+    pendingSort !== 'featured' ||
     !!pendingMinPrice ||
     !!pendingMaxPrice ||
     pendingInStock ||
@@ -351,7 +354,7 @@ export default function MobileFilterSheet({
         type="button"
         onClick={() => openSheet('sort')}
         aria-haspopup="dialog"
-        className={`lg:hidden shrink-0 flex items-center gap-1.5 px-3 h-11 rounded-lg text-xs font-medium border transition-colors ${currentSort ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+        className={`lg:hidden shrink-0 ${tableView ? 'hidden' : 'flex'} items-center gap-1.5 px-3 h-11 rounded-lg text-xs font-medium border transition-colors ${currentSortId !== 'featured' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h13M3 12h9m-9 5h5m9-9v12m0 0l-3-3m3 3l3-3" />
@@ -406,7 +409,7 @@ export default function MobileFilterSheet({
                 <button
                   type="button"
                   onClick={() => setTab('sort')}
-                  className={`flex-1 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'sort' ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
+                  className={`${tableView ? 'hidden' : ''} flex-1 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'sort' ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
                 >
                   Sort
                 </button>
@@ -853,12 +856,15 @@ export default function MobileFilterSheet({
               </div>
 
               <div className={`overflow-y-auto flex-1 px-5 py-4 space-y-2 ${tab === 'sort' ? '' : 'hidden'}`}>
-                {SORT_OPTIONS.map(opt => {
-                  const isSelected = pendingSort === opt.sort && pendingOrder === opt.order
+                {PRODUCT_SORTS.map(opt => {
+                  const isSelected = pendingSort === opt.id
                   return (
                     <button
-                      key={opt.label}
-                      onClick={() => selectSort(opt.sort, opt.order)}
+                      key={opt.id}
+                      onClick={() => {
+                        setPendingSort(opt.id)
+                        setSortTouched(true)
+                      }}
                       className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}
                     >
                       {opt.label}
