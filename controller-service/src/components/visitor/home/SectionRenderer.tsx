@@ -34,6 +34,7 @@ import {
   motionHeroSlides,
   rewardsGamePublic,
   safeHref,
+  sectionAspect,
   spotlightConfig,
   storyGroups,
   SECTION_COPY_DEFAULTS,
@@ -104,6 +105,7 @@ export default function SectionRenderer({
   const cfg = (section.config ?? {}) as Record<string, unknown>
   const carousel = sectionLayout(section) === 'carousel'
   const extra = data.extras.get(section.id)
+  const aspect = sectionAspect(section)
 
   switch (section.type) {
     case 'hero':
@@ -111,7 +113,7 @@ export default function SectionRenderer({
 
     case 'offer_slider':
       if (data.offers.length === 0) return null
-      return <OfferSlider offers={data.offers} title={section.title} eyebrow={section.eyebrow} />
+      return <OfferSlider offers={data.offers} title={section.title} eyebrow={section.eyebrow} aspect={aspect} />
 
     case 'trust_strip':
       return (
@@ -129,6 +131,7 @@ export default function SectionRenderer({
           title={section.title}
           eyebrow={section.eyebrow}
           carousel={carousel}
+          aspect={aspect}
         />
       )
 
@@ -147,6 +150,7 @@ export default function SectionRenderer({
           title={section.title}
           eyebrow={section.eyebrow}
           carousel={carousel}
+          aspect={aspect}
         />
       )
 
@@ -177,6 +181,7 @@ export default function SectionRenderer({
           viewAllLabel={section.cta_label ?? SECTION_COPY_DEFAULTS.product_row.ctaLabel}
           carousel={carousel}
           badgeFor={newDays ? p => (launchedWithin(p, newDays) ? 'New' : null) : undefined}
+          imageAspect={aspect}
           {...style}
         />
       )
@@ -194,6 +199,7 @@ export default function SectionRenderer({
           video={clip(cfg.video)}
           ctaLabel={section.cta_label}
           ctaUrl={section.cta_url}
+          aspect={aspect}
         />
       )
 
@@ -256,6 +262,7 @@ export default function SectionRenderer({
           eyebrow={section.eyebrow}
           title={section.title}
           ctaLabel={section.cta_label}
+          aspect={aspect}
         />
       )
     }
@@ -326,6 +333,7 @@ export default function SectionRenderer({
           title={section.title}
           ctaLabel={section.cta_label}
           ctaUrl={safeHref(section.cta_url)}
+          aspect={aspect}
         />
       )
     }
@@ -355,7 +363,7 @@ export default function SectionRenderer({
     case 'motion_hero': {
       const slides = motionHeroSlides(section)
       if (slides.length === 0) return null
-      return <MotionHero slides={slides} intervalMs={motionHeroIntervalMs(section)} />
+      return <MotionHero slides={slides} intervalMs={motionHeroIntervalMs(section)} aspect={aspect} />
     }
 
     case 'stories': {

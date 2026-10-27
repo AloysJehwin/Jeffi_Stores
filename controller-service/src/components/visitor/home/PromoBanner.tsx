@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import SlideImage from '@/components/visitor/slides/SlideImage'
 import StoreMedia from '@/components/visitor/media/StoreMedia'
+import { bannerShape } from '@/components/visitor/slides/PromoCard'
 
 const MEDIA = 'absolute inset-0 w-full h-full object-cover object-center'
+const BOX = 'relative rounded-2xl overflow-hidden shadow-xl'
 
 interface PromoBannerProps {
   title?: string | null
@@ -15,6 +17,8 @@ interface PromoBannerProps {
   video?: string | null
   ctaLabel?: string | null
   ctaUrl?: string | null
+  /** Banner shape (width / height); unset keeps the content-sized box. */
+  aspect?: number | null
 }
 
 export default function PromoBanner({
@@ -27,6 +31,7 @@ export default function PromoBanner({
   video,
   ctaLabel,
   ctaUrl,
+  aspect,
 }: PromoBannerProps) {
   const desktopImg = imageUrl ?? imageUrlMobile ?? null
   const mobileImg = imageUrlMobile ?? imageUrl ?? null
@@ -37,7 +42,11 @@ export default function PromoBanner({
   return (
     <section className="py-8 md:py-12 bg-surface">
       <div className="container mx-auto px-4">
-        <div className="relative rounded-2xl overflow-hidden shadow-xl min-h-[14rem] md:min-h-[20rem] bg-[#0d0d0d]">
+        {/* With a shape, clip rather than hide overflow so the box grows to fit its copy instead of cutting it off. */}
+        <div
+          className={aspect ? `${BOX} bg-[#0d0d0d]` : `${BOX} min-h-[14rem] md:min-h-[20rem] bg-[#0d0d0d]`}
+          style={aspect ? { ...bannerShape(aspect), overflow: 'clip' } : undefined}
+        >
           {mobileImg ? (
             <>
               <StoreMedia image={desktopImg} video={video} className={MEDIA}>

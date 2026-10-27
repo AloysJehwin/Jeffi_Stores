@@ -11,7 +11,8 @@ import {
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductCard from '@/components/visitor/ProductCard'
-import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { ListingPagedItems } from '@/components/visitor/listing/listing-sections'
+import { getWebSurface } from '@/lib/catalog/web-surface'
 import { round2 } from '@/lib/catalog/gst'
 
 const PAGE_SIZE = 25
@@ -61,7 +62,7 @@ export default async function BrandDetailPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>
-  searchParams: Promise<{ page?: string }>
+  searchParams: Promise<{ page?: string; layout?: string }>
 }) {
   const { slug } = await params
   const resolvedSearchParams = await searchParams
@@ -74,6 +75,7 @@ export default async function BrandDetailPage({
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const { gstEnabled } = await getFeatureFlags()
   const { products, total } = await getBrandProducts(brand.id, page, gstEnabled)
+  const surface = await getWebSurface(resolvedSearchParams.layout)
 
   return (
     <div className="bg-surface min-h-screen">
@@ -180,13 +182,14 @@ export default async function BrandDetailPage({
                   }
                 })
                 return (
-                  <ServerPagedItems
+                  <ListingPagedItems
                     items={items}
+                    listing={{ page: 'brand', surface, pageNum: page, pageSize: PAGE_SIZE, total }}
                     page={page}
                     total={total}
                     noun="products"
                     wrap="div"
-                    wrapClassName="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
+                    wrapClassName="grid grid-flow-row-dense grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
                   />
                 )
               })()}

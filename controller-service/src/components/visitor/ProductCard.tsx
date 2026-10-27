@@ -36,10 +36,13 @@ interface ProductCardProps {
   badge?: string | null
   isDigital?: boolean
   portal?: 'storefront' | 'business'
+  /** The image box's width / height, in place of 5:3. */
+  imageAspect?: number | null
 }
 
 // Two columns on phones, two or three beside the filters on wider screens.
 const CARD_SIZES = '(min-width: 1280px) 30vw, (min-width: 768px) 40vw, 50vw'
+const IMAGE_BOX = 'border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3'
 
 export default function ProductCard({
   id,
@@ -63,6 +66,7 @@ export default function ProductCard({
   badge,
   isDigital = false,
   portal = 'storefront',
+  imageAspect,
 }: ProductCardProps) {
   const { user } = useAuth()
   const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
@@ -178,7 +182,10 @@ export default function ProductCard({
         style={{ WebkitTouchCallout: 'none', userSelect: 'none' } as React.CSSProperties}
       >
         {/* Image */}
-        <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
+        <div
+          className={imageAspect ? `relative ${IMAGE_BOX}` : `relative aspect-[5/3] ${IMAGE_BOX}`}
+          style={imageAspect ? { aspectRatio: imageAspect } : undefined}
+        >
           {primaryImage ? (
             <>
               <img

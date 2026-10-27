@@ -12,7 +12,11 @@ interface CategoryShowcaseProps {
   title?: string | null
   eyebrow?: string | null
   carousel?: boolean
+  /** Product thumbnail shape (width / height); unset keeps them square. */
+  aspect?: number | null
 }
+
+const THUMB = 'overflow-hidden rounded-lg bg-surface-secondary flex items-center justify-center'
 
 export default function CategoryShowcase({
   items,
@@ -20,6 +24,7 @@ export default function CategoryShowcase({
   title,
   eyebrow,
   carousel = false,
+  aspect,
 }: CategoryShowcaseProps) {
   const cards = items.map((cat: any) => (
     <div
@@ -61,7 +66,10 @@ export default function CategoryShowcase({
               href={`/products/${p.slug}`}
               className="group bg-surface rounded-xl p-2 flex flex-col gap-1.5 hover:bg-surface-secondary transition-colors"
             >
-              <div className="aspect-square overflow-hidden rounded-lg bg-surface-secondary flex items-center justify-center">
+              <div
+                className={aspect ? THUMB : `aspect-square ${THUMB}`}
+                style={aspect ? { aspectRatio: aspect } : undefined}
+              >
                 {img ? (
                   <img
                     {...responsiveImg(img.thumbnail_url || img.image_url, '(min-width: 768px) 160px, 33vw')}

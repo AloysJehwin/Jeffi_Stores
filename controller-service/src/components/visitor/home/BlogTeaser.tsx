@@ -15,6 +15,7 @@ export interface BlogTeaserItem {
 }
 
 const isExternal = (url: string) => /^https?:\/\//i.test(url)
+const IMAGE_BOX = 'relative bg-surface-secondary overflow-hidden'
 
 interface BlogTeaserProps {
   items: BlogTeaserItem[]
@@ -22,9 +23,11 @@ interface BlogTeaserProps {
   title?: string | null
   ctaLabel?: string | null
   ctaUrl?: string | null
+  /** Article image shape (width / height); unset keeps 16:9. */
+  aspect?: number | null
 }
 
-export default function BlogTeaser({ items, eyebrow, title, ctaLabel, ctaUrl }: BlogTeaserProps) {
+export default function BlogTeaser({ items, eyebrow, title, ctaLabel, ctaUrl, aspect }: BlogTeaserProps) {
   return (
     <section className="py-12 md:py-16 bg-surface">
       <div className="container mx-auto px-4">
@@ -52,7 +55,10 @@ export default function BlogTeaser({ items, eyebrow, title, ctaLabel, ctaUrl }: 
               {...(isExternal(item.url) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
               className="group flex flex-col rounded-2xl border border-border-default bg-surface-elevated overflow-hidden hover:shadow-md hover:border-accent-300 transition-all"
             >
-              <div className="relative aspect-[16/9] bg-surface-secondary overflow-hidden">
+              <div
+                className={aspect ? IMAGE_BOX : 'relative aspect-[16/9] bg-surface-secondary overflow-hidden'}
+                style={aspect ? { aspectRatio: aspect } : undefined}
+              >
                 {item.imageUrl || item.video ? (
                   <StoreMedia
                     image={item.imageUrl}
