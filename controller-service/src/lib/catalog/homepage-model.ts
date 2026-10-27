@@ -9,16 +9,20 @@ import {
 import { getHost } from '@/lib/tenancy/get-host'
 import { getStorefrontContent, getFeatureFlags, getStoreIdentity } from '@/lib/catalog/site-controls'
 import {
+  AUDIENCE_COLUMN_SQL,
   SURFACE_COLUMN_SQL,
-  getConfiguredSections,
+  getAudienceSections,
   buildProductRowSql,
   planDataNeeds,
   planProductRows,
 } from '@/lib/catalog/homepage-data'
 import { loadSectionExtras } from '@/lib/catalog/homepage-extras'
+import { getHomepagePlan, planAllowsAudience, planAllowsType } from '@/lib/catalog/homepage-plan'
 import {
+  businessSectionPublic,
   forSurface,
   productRowKey,
+  rowAudience,
   rowPage,
   sectionAspect,
   sectionLimit,
@@ -37,6 +41,7 @@ import {
   storyGroups,
   LEGACY_APP_HIDDEN_TYPES,
   SECTION_TILE_DEFAULTS,
+  type HomepageAudience,
   type HomepagePage,
   type HomepageSection,
   type HomepageSurface,
@@ -72,6 +77,8 @@ export interface SectionData {
 }
 
 export interface HomeModel {
+  /** The homepage served: a business request gets the store's until a business one is published. */
+  audience: HomepageAudience
   sections: HomepageSection[]
   data: SectionData
 }
@@ -104,16 +111,16 @@ async function getMainCategories() {
   `)
 }
 
-async function getHeroSlides(surface: HomepageSurface) {
+async function getHeroSlides(surface: HomepageSurface, audience: HomepageAudience) {
   // Admin-managed hero_slides first; each carries its own copy, image and CTA link. Active is
   // filtered after the surface is picked so an app with only paused slides doesn't borrow the web's.
   const slides = await queryMany<any>(
     `SELECT id, title, subtitle, badge_text, badge_color, image_url, image_url_mobile, blurhash, blurhash_mobile,
             video_url, cta_url, filter_category, filter_brand, filter_grade, filter_material, filter_min_price,
-            filter_max_price, filter_in_stock, filter_on_sale, is_active, ${SURFACE_COLUMN_SQL('h')}
+            filter_max_price, filter_in_stock, filter_on_sale, is_active, ${SURFACE_COLUMN_SQL('h')}, ${AUDIENCE_COLUMN_SQL('h')}
        FROM hero_slides h ORDER BY display_order ASC, created_at ASC`
   )
-  const managed = forSurface(slides, surface).filter(s => s.is_active)
+  const managed = forSurface(slides.filter(s => rowAudience(s) === audience), surface).filter(s => s.is_active)
   if (managed.length > 0) {
     return managed.map(s => ({
       id: s.id,
@@ -242,45 +249,47 @@ async function getCategoryShowcase() {
 export interface PageModelOptions {
   surface?: HomepageSurface
   page?: HomepagePage
+  /** `business` asks for the business homepage; see HomeModel.audience for what is served. */
+  audience?: HomepageAudience
   /** An app build from before per-surface layouts: it gets the website layout minus the types it can't render. */
   legacyClient?: boolean
 }
 
-/** The sections a page shows: its layout for the surface, minus the types the plan doesn't include. */
-export async function getPageSections({
+/**
+ * The sections a page shows and the homepage they come from, minus the types the tenant's plan
+ * doesn't include (the B2B portal's sections and the business homepage itself are Pro+, say).
+ */
+async function resolvePageSections({
   surface = 'web',
   page = 'home',
+  audience = 'store',
   legacyClient = false,
-}: PageModelOptions = {}): Promise<HomepageSection[]> {
-  const allSections = await getConfiguredSections(surface, page)
-  if (allSections.length === 0) return []
-  // The Business CTA promotes the B2B portal, which only exists on plans that sell it (Pro+); the
-  // rewards game issues coupons, a customer-programs feature on the same footing.
-  const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
-  const businessAllowed = allSections.some(s => s.type === 'business_cta')
-    ? (await currentTenantPlanGate('business_customers:read').catch(() => ({ allowed: false }))).allowed
-    : false
-  const programsAllowed = allSections.some(s => s.type === 'rewards_game')
-    ? await (await import('@/lib/loyalty/settings')).customerProgramsAllowed()
-    : false
-  return allSections.filter(
-    s =>
-      (businessAllowed || s.type !== 'business_cta') &&
-      (programsAllowed || s.type !== 'rewards_game') &&
-      !(legacyClient && LEGACY_APP_HIDDEN_TYPES.has(s.type))
-  )
+}: PageModelOptions = {}): Promise<{ audience: HomepageAudience; sections: HomepageSection[] }> {
+  const plan = await getHomepagePlan()
+  const served = await getAudienceSections(surface, page, planAllowsAudience(plan, audience) ? audience : 'store')
+  return {
+    audience: served.audience,
+    sections: served.sections.filter(
+      s => planAllowsType(plan, s.type) && !(legacyClient && LEGACY_APP_HIDDEN_TYPES.has(s.type))
+    ),
+  }
+}
+
+/** The sections a page shows: its layout for the surface, minus the types the plan doesn't include. */
+export async function getPageSections(opts: PageModelOptions = {}): Promise<HomepageSection[]> {
+  return (await resolvePageSections(opts)).sections
 }
 
 /** Everything a page's sections render: the sections plus the data each one needs. */
 export async function buildHomeModel(opts: PageModelOptions = {}): Promise<HomeModel> {
-  const sections = await getPageSections(opts)
-  return { sections, data: await loadSectionData(sections, opts) }
+  const { audience, sections } = await resolvePageSections(opts)
+  return { audience, sections, data: await loadSectionData(sections, { ...opts, audience }) }
 }
 
 /** The data the given sections need, and nothing else. */
 export async function loadSectionData(
   sections: HomepageSection[],
-  { surface = 'web', page = 'home' }: Pick<PageModelOptions, 'surface' | 'page'> = {}
+  { surface = 'web', page = 'home', audience = 'store' }: Pick<PageModelOptions, 'surface' | 'page' | 'audience'> = {}
 ): Promise<SectionData> {
   const storefront = await getStorefrontContent()
   const { gstEnabled } = await getFeatureFlags()
@@ -304,7 +313,7 @@ export async function loadSectionData(
   const [mainCategories, heroSlides, offers, categoryShowcase, topBrands, dealOfTheDay, freeShippingThreshold] =
     await Promise.all([
       needs.mainCategories ? getMainCategories() : Promise.resolve([]),
-      needs.heroSlides ? getHeroSlides(surface) : Promise.resolve([]),
+      needs.heroSlides ? getHeroSlides(surface, audience) : Promise.resolve([]),
       needs.offerSlider
         ? pickedOfferIds.length > 0
           ? listOffersByIds(pickedOfferIds)
@@ -378,6 +387,7 @@ export type HomeSectionJson = HomepageSection & {
  * props: the raw rows carry internal columns (cost_price, supplier_id, storage keys).
  */
 export interface HomeModelJson {
+  audience: HomepageAudience
   sections: HomeSectionJson[]
   data: Omit<SectionData, 'productRows' | 'extras' | 'dealOfTheDay' | 'categoryShowcase'> & {
     productRows: Record<string, HomeCard[]>
@@ -423,7 +433,7 @@ function sectionItems(s: HomepageSection, data: SectionData): Record<string, str
   return rows ?? (SECTION_TILE_DEFAULTS as Partial<Record<SectionType, Record<string, string>[]>>)[s.type] ?? null
 }
 
-export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
+export function toHomeModelJson({ audience, sections, data }: HomeModel): HomeModelJson {
   const cards = (rows: any[], badgeFor?: (row: any) => string | null): HomeCard[] =>
     cardPropsFor(rows, data.gstEnabled).map((c, i) => ({ ...c, badge: badgeFor?.(rows[i]) ?? null }))
   const extras: Record<string, unknown> = {}
@@ -468,6 +478,8 @@ export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
     if (s.type === 'motion_hero') extras[s.id] = { slides: motionHeroSlides(s), intervalMs: motionHeroIntervalMs(s) }
     if (s.type === 'stories') extras[s.id] = { groups: storyGroups(s) }
     if (s.type === 'rewards_game') extras[s.id] = rewardsGamePublic(s)
+    const business = businessSectionPublic(s)
+    if (business) extras[s.id] = business
   }
   const sectionsJson: HomeSectionJson[] = sections.map(s => {
     const d = sectionCopyDefaults(s.type)
@@ -492,6 +504,7 @@ export function toHomeModelJson({ sections, data }: HomeModel): HomeModelJson {
     }
   })
   return {
+    audience,
     sections: sectionsJson,
     data: {
       ...data,

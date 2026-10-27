@@ -1,4 +1,4 @@
-import type { HomepageSurface } from '@/lib/catalog/homepage-sections'
+import type { HomepageAudience, HomepageSurface } from '@/lib/catalog/homepage-sections'
 
 export interface HeroSlide {
   id: string
@@ -26,6 +26,8 @@ export interface HeroSlide {
   is_active: boolean
   /** Absent on rows saved before the column existed; read it through rowSurface(). */
   surface?: HomepageSurface | null
+  /** Absent on rows saved before the column existed; read it through rowAudience(). */
+  audience?: HomepageAudience | null
   created_at: string
   updated_at: string
 }

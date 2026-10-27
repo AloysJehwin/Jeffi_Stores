@@ -4,7 +4,8 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
-import { HOMEPAGE_SURFACES, rowSurface } from '@/lib/catalog/homepage-sections'
+import { HOMEPAGE_AUDIENCES, HOMEPAGE_SURFACES, rowAudience, rowSurface } from '@/lib/catalog/homepage-sections'
+import { getHomepagePlan, homepagePlanRefusal } from '@/lib/catalog/homepage-plan'
 import {
   applyDraftOrder,
   getEditableHomepage,
@@ -47,6 +48,7 @@ const bodySchema = z.object({
   filterOnSale: z.boolean().optional(),
   isActive: z.boolean().optional(),
   surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
+  audience: z.enum(HOMEPAGE_AUDIENCES as [string, ...string[]]).optional(),
 })
 
 // POST /api/admin/hero-slides — create a new slide in the draft (appended to the end).
@@ -62,11 +64,15 @@ export async function POST(request: NextRequest) {
   const d = parsed.data
 
   const surface = rowSurface({ surface: d.surface })
+  const audience = rowAudience({ audience: d.audience })
+  const refused = homepagePlanRefusal(await getHomepagePlan(), { audience })
+  if (refused) return NextResponse.json({ error: refused }, { status: 403 })
   const slide = await withHomepageDraft(admin.adminId, draft => {
     const now = new Date().toISOString()
     const row: DraftHeroSlide = {
       id: randomUUID(),
       surface,
+      audience,
       title: d.title,
       subtitle: d.subtitle ?? null,
       badge_text: d.badgeText ?? null,
@@ -85,7 +91,9 @@ export async function POST(request: NextRequest) {
       filter_max_price: d.filterMaxPrice ?? null,
       filter_in_stock: d.filterInStock ?? false,
       filter_on_sale: d.filterOnSale ?? false,
-      display_order: nextDisplayOrder(draft.heroSlides.filter(s => rowSurface(s) === surface)),
+      display_order: nextDisplayOrder(
+        draft.heroSlides.filter(s => rowSurface(s) === surface && rowAudience(s) === audience)
+      ),
       is_active: d.isActive ?? true,
       created_at: now,
       updated_at: now,

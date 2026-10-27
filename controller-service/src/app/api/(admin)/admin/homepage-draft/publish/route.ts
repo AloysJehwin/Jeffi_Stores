@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
   if (!published) return NextResponse.json({ error: 'There are no draft changes to publish' }, { status: 409 })
 
   revalidatePath('/')
+  revalidatePath('/business')
   await logAdminAudit({
     adminId: admin.adminId,
     action: 'update',
