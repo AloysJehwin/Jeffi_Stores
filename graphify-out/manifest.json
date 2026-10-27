@@ -7230,8 +7230,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/quotations/QuotationsClient.tsx": {
-    "mtime": 1793077243.5215473,
-    "ast_hash": "13bc0584b036e0ca6b30e6b3d74df367",
+    "mtime": 1793088357.1076896,
+    "ast_hash": "5ad5b6a23a9d66487aa95e15a5a98cd5",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/quotations/[id]/QuotationDetailClient.tsx": {
@@ -12080,13 +12080,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/BatchPickerModal.tsx": {
-    "mtime": 1792943291.9993176,
-    "ast_hash": "035d7d10206d69e60d869e431d6a3664",
+    "mtime": 1793088357.1081276,
+    "ast_hash": "b01f7cc1c71b7e52fa275114a1fe1529",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/BatchSerialLabelPicker.tsx": {
-    "mtime": 1792943291.9994643,
-    "ast_hash": "75916ba36f99f37030355acb097b90d9",
+    "mtime": 1793088357.1083498,
+    "ast_hash": "15b8dfd077026ab364215b42b7599f56",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/BatchSerialLabels.tsx": {
@@ -12330,8 +12330,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/ShelvingParts.tsx": {
-    "mtime": 1792943292.0088618,
-    "ast_hash": "f540e8309bb497d8b3dedf94ece7ac52",
+    "mtime": 1793088432.8187501,
+    "ast_hash": "f3d3651d2ffe5521b2bdd2930ea6680f",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/SortableHeader.tsx": {
@@ -12360,8 +12360,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/UnitRulesPanel.tsx": {
-    "mtime": 1792943292.0099285,
-    "ast_hash": "069a58f370472602ce2c7fb08c4d778b",
+    "mtime": 1793088472.1791773,
+    "ast_hash": "0ad1f175a1a7daa51b015a59ce57e268",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/UnitsManager.tsx": {
@@ -12485,8 +12485,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/ecom/tabs/MessagingTab.tsx": {
-    "mtime": 1792943292.0179605,
-    "ast_hash": "8c264b0eddaadde7cc62b1d20b3537fc",
+    "mtime": 1793088370.6559887,
+    "ast_hash": "e93684caf6e5cb8ba8dcbf0b656017f6",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/ecom/tabs/OverviewTab.tsx": {
