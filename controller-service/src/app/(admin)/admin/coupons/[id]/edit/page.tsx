@@ -7,6 +7,7 @@ import CouponEligibleUsersClient from './CouponEligibleUsersClient'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { Badge, Card, FormPage, PageHeader } from '@/components/admin/kit'
 import { updateCoupon } from './actions'
+import { initialDraftLock } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -154,6 +155,8 @@ export default async function EditCouponPage({
   }
   const df = (draftRow?.fields || {}) as any
 
+  const initialLock = await initialDraftLock('coupon', id)
+
   return (
     <MobileEditBlock>
       <FormPage
@@ -167,6 +170,7 @@ export default async function EditCouponPage({
         }
       >
         <CouponForm
+          initialLock={initialLock}
           action={updateCoupon.bind(null, id)}
           couponId={id}
           submitLabel={isDraft ? undefined : 'Save Changes'}

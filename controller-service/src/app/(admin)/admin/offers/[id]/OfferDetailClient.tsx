@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DetailHeader, FormFooter, PageBody, StatusBadge, fieldInputCls } from '@/components/admin/kit'
+import { DetailHeader, DraftLockBanner, FormFooter, LockedFieldset, PageBody, StatusBadge, fieldInputCls } from '@/components/admin/kit'
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
@@ -13,6 +13,8 @@ import DatePicker from '@/components/ui/DatePicker'
 import OfferProductPicker, { type AssignOption } from '@/components/admin/OffersProductPicker'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
 
 function toDateInput(iso: string | null): string {
   if (!iso) return ''
@@ -36,11 +38,13 @@ export default function OfferDetailClient({
   backHref,
   categoryOptions,
   brandOptions,
+  initialLock,
 }: {
   offer: ProductOffer
   backHref: string
   categoryOptions: AssignOption[]
   brandOptions: AssignOption[]
+  initialLock?: DraftLockState | null
 }) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -54,9 +58,11 @@ export default function OfferDetailClient({
   const [publishing, setPublishing] = useState(false)
   const [pickerKey, setPickerKey] = useState(0)
 
+  const lock = useDraftLock({ resourceType: 'offer', resourceId: offer.id, initial: initialLock })
   const edit = useEditSession({
     resourceType: 'offer',
     resourceId: offer.id,
+    lock,
     onCancelled: () => {
       // Reset local state + remount picker so it re-fetches the restored live rows.
       setTitle(offer.title)
@@ -75,10 +81,16 @@ export default function OfferDetailClient({
       try {
         const res = await fetch(`/api/admin/product-offers/${offer.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('offer', offer.id) },
           credentials: 'include',
           body: JSON.stringify(patch),
         })
+        if (res.status === 423) {
+          const body = await res.json().catch(() => ({}))
+          showToast(body.error || 'Someone else is editing this offer', 'error')
+          lock.markLocked(patch)
+          return false
+        }
         if (!res.ok) showToast('Failed to save', 'error')
         return res.ok
       } catch {
@@ -88,7 +100,7 @@ export default function OfferDetailClient({
         setSaving(false)
       }
     },
-    [offer.id, showToast]
+    [offer.id, showToast, lock]
   )
 
   async function commitTitle(value = title) {
@@ -107,8 +119,10 @@ export default function OfferDetailClient({
       const res = await fetch(`/api/admin/product-offers/${offer.id}/publish`, {
         method: 'POST',
         credentials: 'include',
+        headers: lockHeaders('offer', offer.id),
       })
       if (!res.ok) {
+        if (res.status === 423) lock.markLocked()
         const body = await res.json().catch(() => ({}))
         showToast(body.error || 'Failed to publish', 'error')
         return
@@ -132,118 +146,123 @@ export default function OfferDetailClient({
         status={<StatusBadge status={String(isActive)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />}
       />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)] items-start">
-        <div className="space-y-4 min-w-0">
-          <div className="space-y-5 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Offer details</h2>
+      <DraftLockBanner lock={lock} scope="coupons:write" />
+      <LockedFieldset readOnly={lock.readOnly} className="contents">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)] items-start">
+          <div className="space-y-4 min-w-0">
+            <div className="space-y-5 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Offer details</h2>
 
-            <div>
-              <label className="block text-xs font-medium text-foreground-secondary mb-1">Title</label>
-              <AIEnrichButton
-                fieldLabel="Offer title"
-                value={title}
-                onChange={v => {
-                  setTitle(v)
-                  void commitTitle(v)
-                }}
-                scope="coupons:write"
-                maxLength={255}
-                context="Headline of a storefront offer card; keep it short and punchy."
-              >
-                <input
-                  type="text"
+              <div>
+                <label className="block text-xs font-medium text-foreground-secondary mb-1">Title</label>
+                <AIEnrichButton
+                  fieldLabel="Offer title"
                   value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  onBlur={() => commitTitle()}
+                  onChange={v => {
+                    setTitle(v)
+                    void commitTitle(v)
+                  }}
+                  scope="coupons:write"
                   maxLength={255}
+                  context="Headline of a storefront offer card; keep it short and punchy."
+                >
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    onBlur={() => commitTitle()}
+                    maxLength={255}
+                    disabled={!canWrite}
+                    className={`${INPUT_CLASS} pr-8`}
+                  />
+                </AIEnrichButton>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Launch date</label>
+                  <DatePicker
+                    className="w-full"
+                    value={toDateInput(startsAt)}
+                    onChange={d => {
+                      const v = fromDateInput(d, false)
+                      setStartsAt(v)
+                      save({ startsAt: v })
+                    }}
+                    max={toDateInput(endsAt) || undefined}
+                    clearable
+                    placeholder="No date"
+                    disabled={!canWrite}
+                    triggerClassName={INPUT_CLASS}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-secondary mb-1">End date</label>
+                  <DatePicker
+                    className="w-full"
+                    value={toDateInput(endsAt)}
+                    onChange={d => {
+                      const v = fromDateInput(d, true)
+                      setEndsAt(v)
+                      save({ endsAt: v })
+                    }}
+                    min={toDateInput(startsAt) || undefined}
+                    clearable
+                    placeholder="No date"
+                    disabled={!canWrite}
+                    triggerClassName={INPUT_CLASS}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border-default bg-surface px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{isActive ? 'Active' : 'Paused'}</p>
+                  <p className="text-[11px] text-foreground-muted">
+                    {isActive ? 'Live and eligible to show on the homepage.' : 'Hidden everywhere until reactivated.'}
+                  </p>
+                </div>
+                <Toggle
+                  checked={isActive}
                   disabled={!canWrite}
-                  className={`${INPUT_CLASS} pr-8`}
+                  onChange={next => {
+                    setIsActive(next)
+                    save({ isActive: next })
+                  }}
                 />
-              </AIEnrichButton>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Launch date</label>
-                <DatePicker
-                  className="w-full"
-                  value={toDateInput(startsAt)}
-                  onChange={d => {
-                    const v = fromDateInput(d, false)
-                    setStartsAt(v)
-                    save({ startsAt: v })
-                  }}
-                  max={toDateInput(endsAt) || undefined}
-                  clearable
-                  placeholder="No date"
-                  disabled={!canWrite}
-                  triggerClassName={INPUT_CLASS}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">End date</label>
-                <DatePicker
-                  className="w-full"
-                  value={toDateInput(endsAt)}
-                  onChange={d => {
-                    const v = fromDateInput(d, true)
-                    setEndsAt(v)
-                    save({ endsAt: v })
-                  }}
-                  min={toDateInput(startsAt) || undefined}
-                  clearable
-                  placeholder="No date"
-                  disabled={!canWrite}
-                  triggerClassName={INPUT_CLASS}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border border-border-default bg-surface px-3 py-2.5">
-              <div>
-                <p className="text-sm font-medium text-foreground">{isActive ? 'Active' : 'Paused'}</p>
-                <p className="text-[11px] text-foreground-muted">
-                  {isActive ? 'Live and eligible to show on the homepage.' : 'Hidden everywhere until reactivated.'}
-                </p>
-              </div>
-              <Toggle
-                checked={isActive}
-                disabled={!canWrite}
-                onChange={next => {
-                  setIsActive(next)
-                  save({ isActive: next })
-                }}
-              />
+            <div className="rounded-xl border border-border-default bg-surface-elevated p-4">
+              <p className="text-sm text-foreground">
+                Set this offer&apos;s card image, badge and colour in{' '}
+                <Link
+                  href={ap('/admin/settings/homepage')}
+                  className="font-medium text-accent-500 hover:underline"
+                >
+                  Homepage &gt; Offer Slider
+                </Link>
+                .
+              </p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-border-default bg-surface-elevated p-4">
-            <p className="text-sm text-foreground">
-              Set this offer&apos;s card image, badge and colour in{' '}
-              <Link
-                href={ap('/admin/settings/homepage')}
-                className="font-medium text-accent-500 hover:underline"
-              >
-                Homepage &gt; Offer Slider
-              </Link>
-              .
-            </p>
+          <div className="min-w-0 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
+            <OfferProductPicker
+              key={pickerKey}
+              offerId={offer.id}
+              canWrite={canWrite && !lock.readOnly}
+              categoryOptions={categoryOptions}
+              brandOptions={brandOptions}
+            />
           </div>
         </div>
-
-        <div className="min-w-0 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
-          <OfferProductPicker
-            key={pickerKey}
-            offerId={offer.id}
-            canWrite={canWrite}
-            categoryOptions={categoryOptions}
-            brandOptions={brandOptions}
-          />
-        </div>
-      </div>
+      </LockedFieldset>
 
       {canWrite && (
         <FormFooter
+          lock={lock}
+          cancelHref={lock.readOnly ? backHref : undefined}
           autosave={autosaveStatus}
           cancel={async () => {
             await edit.cancel()

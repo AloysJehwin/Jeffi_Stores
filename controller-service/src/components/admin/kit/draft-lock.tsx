@@ -57,9 +57,9 @@ export function DraftLockBadge({ lock, mine }: { lock: Pick<DraftLockView, 'owne
 }
 
 /** Disables every control inside when someone else holds the draft. */
-export function LockedFieldset({ readOnly, children }: { readOnly: boolean; children: ReactNode }) {
+export function LockedFieldset({ readOnly, children, className = '' }: { readOnly: boolean; children: ReactNode; className?: string }) {
   return (
-    <fieldset disabled={readOnly} aria-readonly={readOnly} className="m-0 min-w-0 border-0 p-0">
+    <fieldset disabled={readOnly} aria-readonly={readOnly} className={`m-0 min-w-0 border-0 p-0 ${className}`}>
       {children}
     </fieldset>
   )

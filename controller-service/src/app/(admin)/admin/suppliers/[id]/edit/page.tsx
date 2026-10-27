@@ -3,6 +3,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne } from '@/lib/shared/db'
 import EditSupplierClient from './EditSupplierClient'
+import { initialDraftLock } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,5 +19,5 @@ export default async function EditSupplierPage({ params }: { params: Promise<{ i
     redirect(ap(`/admin/suppliers/${id}/view`, host))
   }
 
-  return <EditSupplierClient id={id} />
+  return <EditSupplierClient id={id} initialLock={await initialDraftLock('supplier', id)} />
 }

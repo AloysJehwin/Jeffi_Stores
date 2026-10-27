@@ -7,6 +7,7 @@ import CategoryForm from '@/components/admin/CategoryForm'
 import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateCategory } from './actions'
+import { initialDraftLock } from '@/lib/admin/draft-locks'
 
 async function getCategory(id: string) {
   const data = await queryOne('SELECT * FROM categories WHERE id = $1', [id])
@@ -48,6 +49,8 @@ export default async function EditCategoryPage({
   const categories = await getAllCategories()
   const backUrl = back && back.startsWith('/admin/categories') ? back : '/admin/categories'
 
+  const initialLock = await initialDraftLock('category', id)
+
   return (
     <MobileEditBlock>
     <FormPage
@@ -61,6 +64,7 @@ export default async function EditCategoryPage({
       }
     >
       <CategoryForm
+        initialLock={initialLock}
         categories={categories || []}
         category={categoryForForm}
         action={updateCategory.bind(null, id)}

@@ -6,6 +6,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { discardReviewFormDraft, resnapshotReviewFormSession } from './actions'
+import { initialDraftLock } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,6 +67,8 @@ export default async function EditReviewFormPage({
   const isDraft = !!draftRow
   const df = (draftRow?.fields || {}) as any
 
+  const initialLock = await initialDraftLock('review_form', id)
+
   return (
     <MobileEditBlock>
       <FormPage
@@ -78,6 +81,7 @@ export default async function EditReviewFormPage({
         }
       >
         <ReviewFormForm
+          initialLock={initialLock}
           isDraft={isDraft}
           isCreateDraft={isCreateDraft}
           coupons={coupons}
