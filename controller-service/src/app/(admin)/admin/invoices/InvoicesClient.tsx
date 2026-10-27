@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowDown, ArrowUp, Check, Download, Plus, X } from 'lucide-react'
+import { AlertTriangle, Check, Download, Plus, X } from 'lucide-react'
 import { INVOICE_ALIASES, INVOICE_FIELDS, INVOICE_SEARCH } from '@jeffi/list-filters/fields'
-import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, Field, Fields, LockedFieldset, TableSkeleton, FormFooter, FormButton, fieldInputCls, InfiniteFooter, ListFilters, fetchJson, useFilterQuery, useInfiniteList, type StatusMap } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, Field, Fields, LockedFieldset, TableSkeleton, FormFooter, FormButton, fieldInputCls, InfiniteFooter, ListFilters, SortTh, fetchJson, useFilterQuery, useInfiniteList, useListSort, type SortCol, type StatusMap } from '@/components/admin/kit'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders } from '@/lib/client/draft-lock-client'
 import { ap } from '@/lib/shared/admin-path'
@@ -27,10 +27,38 @@ import SerialEntryModal, {
   type SerialAssignment,
   SerialPicker,
 } from '@/components/admin/SerialEntryModal'
-import { type SortDir } from '@/components/admin/sortOptions'
 import DatePicker from '@/components/ui/DatePicker'
 import Toggle from '@/components/ui/Toggle'
 import InvoicesMobileList from './_components/InvoicesMobileList'
+
+const DRAFT_SORT_COLS: SortCol[] = [
+  { key: 'order_number', label: 'Order No' },
+  { key: 'customer', label: 'Customer' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'amount', label: 'Amount', type: 'number' },
+  { key: 'stock', label: 'Stock', type: 'number' },
+  { key: 'created', label: 'Created', type: 'date' },
+]
+
+const DRAFT_SORT_VALUE: Record<string, (d: any) => string | number> = {
+  order_number: d => String(d.order_number ?? ''),
+  customer: d => String(d.customer_name ?? '').toLowerCase(),
+  phone: d => String(d.customer_phone ?? ''),
+  amount: d => Number(d.total_amount) || 0,
+  // Lines short or out of stock: the worst drafts lead when sorted high-first.
+  stock: d => Number(d.short_items ?? 0) + Number(d.out_of_stock_items ?? 0),
+  created: d => String(d.created_at ?? ''),
+}
+
+const INVOICE_SORT_COLS: SortCol[] = [
+  { key: 'invoice_number', label: 'Invoice No' },
+  { key: 'customer_name', label: 'Customer' },
+  { key: 'invoice_date', label: 'Date', type: 'date' },
+  { key: 'total_amount', label: 'Amount', type: 'number' },
+  { key: 'payment_status', label: 'Payment' },
+  { key: 'source', label: 'Source' },
+  { key: 'irn_status', label: 'IRN' },
+]
 
 export interface Invoice {
   id: string
@@ -161,15 +189,9 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   // Filters live in the URL (from / to is the invoice date, shared with the Overview period).
   const filters = useFilterQuery(INVOICE_FIELDS, { aliases: INVOICE_ALIASES })
-  const [sortCol, setSortCol] = useState<string | undefined>(undefined)
-  const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
-
-  function handleSort(col: string, dir: SortDir) {
-    setSortCol(col || undefined)
-    setSortDir(col ? dir : undefined)
-    // Refetch from the server so sort applies across ALL rows, not just the current page.
-    // (a useEffect keyed on sortCol/sortDir triggers the page-1 refetch.)
-  }
+  const { sort, dir } = useListSort()
+  // The drafts strip loads every draft, so its headers sort in memory (?drafts.sort).
+  const draftSort = useListSort('drafts')
 
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -245,26 +267,16 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   const [draftBatchItems, setDraftBatchItems] = useState<BatchPickerItem[]>([])
   const [draftSerialItems, setDraftSerialItems] = useState<SerialItem[]>([])
 
-  const INVOICE_SORT_KEYS: Record<string, keyof Invoice> = {
-    invoice_number: 'invoice_number',
-    date: 'invoice_date',
-    customer: 'customer_name',
-    amount: 'total_amount',
-    payment: 'payment_status',
-    source: 'source',
-  }
-
-
-  // Rows are ordered server-side (across all invoices) via sort/dir params; 25 per page.
+  // Rows are ordered server-side (across all invoices) via ?sort&dir; 25 per page.
   const list = useInfiniteList<Invoice>({
-    key: `${filters}|${sortCol}|${sortDir}`,
+    key: `${filters}|${sort}|${dir}`,
     pageSize: 25,
     getKey: i => i.id,
     fetchPage: async (p, signal) => {
       const params = new URLSearchParams(filters)
-      if (sortCol && INVOICE_SORT_KEYS[sortCol]) {
-        params.set('sort', INVOICE_SORT_KEYS[sortCol])
-        params.set('dir', sortDir || 'desc')
+      if (sort) {
+        params.set('sort', sort)
+        params.set('dir', dir)
       }
       params.set('page', String(p))
       const data = await fetchJson(`/api/admin/invoices?${params}`, signal)
@@ -285,6 +297,18 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       setDraftsLoading(false)
     }
   }, [])
+
+  const sortedDrafts = (() => {
+    const col = DRAFT_SORT_COLS.find(c => c.key === draftSort.sort)
+    if (!col) return drafts
+    const val = DRAFT_SORT_VALUE[col.key]
+    const sign = draftSort.dir === 'asc' ? 1 : -1
+    return [...drafts].sort((a, b) => {
+      const x = val(a)
+      const y = val(b)
+      return (x < y ? -1 : x > y ? 1 : 0) * sign
+    })
+  })()
 
   useEffect(() => {
     fetchDrafts()
@@ -1673,15 +1697,14 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-amber-500/30 text-xs text-foreground-muted">
-                        {['Order No', 'Customer', 'Phone', 'Amount', 'Stock', 'Created', 'Actions'].map(h => (
-                          <th key={h} className={`px-4 py-2.5 font-medium ${h === 'Amount' ? 'text-right' : 'text-left'}`}>
-                            {h}
-                          </th>
+                        {DRAFT_SORT_COLS.map(c => (
+                          <SortTh key={c.key} col={c} ns="drafts" align={c.key === 'amount' ? 'right' : 'left'} className="px-4 py-2.5 font-medium" />
                         ))}
+                        <th className="px-4 py-2.5 text-left font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {drafts.map(draft => (
+                      {sortedDrafts.map(draft => (
                         <tr key={draft.id} className="border-b border-amber-500/20 last:border-0 hover:bg-amber-500/5">
                           <td className="px-4 py-3 font-mono text-xs font-medium">
                             <a href={ap(`/admin/orders/${draft.id}/view`)} className="text-foreground hover:text-accent-500 hover:underline">
@@ -1737,7 +1760,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 </div>
 
                 <div className="divide-y divide-amber-500/20 md:hidden">
-                  {drafts.map(draft => (
+                  {sortedDrafts.map(draft => (
                     <div key={draft.id} className="space-y-2 p-4">
                       <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -1802,13 +1825,9 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
-                      <SortTh label="Invoice No" col="invoice_number" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh label="Customer" col="customer" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh label="Date" col="date" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh label="Amount" col="amount" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} num />
-                      <SortTh label="Payment" col="payment" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh label="Source" col="source" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                      <th className="px-3 py-2.5 text-left font-medium">IRN</th>
+                      {INVOICE_SORT_COLS.map(c => (
+                        <SortTh key={c.key} col={c} align={c.type === 'number' ? 'right' : 'left'} className="px-3 py-2.5 font-medium" />
+                      ))}
                       <th className="px-3 py-2.5 text-right font-medium">
                         <span className="sr-only">Actions</span>
                       </th>
@@ -1954,23 +1973,6 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         <InvoiceDetailModal inv={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
       </div>
     </>
-  )
-}
-
-/** Header cell that toggles the server sort for one column (desc first, then asc). */
-function SortTh({ label, col, sortCol, sortDir, onSort, num }: { label: string; col: string; sortCol?: string; sortDir?: SortDir; onSort: (c: string, d: SortDir) => void; num?: boolean }) {
-  const on = sortCol === col
-  return (
-    <th
-      aria-sort={on ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
-      onClick={() => onSort(col, on && sortDir !== 'asc' ? 'asc' : 'desc')}
-      className={`cursor-pointer select-none whitespace-nowrap px-3 py-2.5 font-medium hover:text-foreground ${num ? 'text-right' : 'text-left'}`}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {on && (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-      </span>
-    </th>
   )
 }
 

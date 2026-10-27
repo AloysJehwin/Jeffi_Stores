@@ -41,7 +41,7 @@ const keyOf = (r: DraftListItem) => `${r.resourceType}:${r.resourceId}`
  * One tab of the drafts dashboard (/api/admin/draft-locks). Lock events refresh it in place
  * (debounced, no skeleton); a 30 s poll covers a dropped event stream and viewer counts.
  */
-export function useDraftsList(scope: DraftsScope, type: string) {
+export function useDraftsList(scope: DraftsScope, type: string, sort?: string | null, dir?: string) {
   const [rows, setRows] = useState<DraftListItem[]>([])
   const [total, setTotal] = useState<number | null>(null)
   const [types, setTypes] = useState<DraftTypeOption[]>([])
@@ -55,9 +55,13 @@ export function useDraftsList(scope: DraftsScope, type: string) {
     (page: number) => {
       const qs = new URLSearchParams({ scope, page: String(page) })
       if (type) qs.set('type', type)
+      if (sort) {
+        qs.set('sort', sort)
+        qs.set('dir', dir ?? 'desc')
+      }
       return fetchJson<ListResponse>(`/api/admin/draft-locks?${qs}`)
     },
-    [scope, type]
+    [scope, type, sort, dir]
   )
 
   /** Re-read the loaded pages. `silent` keeps the table on screen. */

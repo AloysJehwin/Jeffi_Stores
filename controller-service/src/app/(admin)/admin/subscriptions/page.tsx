@@ -83,7 +83,7 @@ function SubscriptionsListSection({ sp }: { sp: SP }) {
 
 async function SubscriptionsListContent({ sp }: { sp: SP }) {
   const page = Math.max(1, parseInt(sp.page || '1', 10) || 1)
-  const { items, total, pageSize } = await queryAdminSubscriptions(normalizeQuery(SUBSCRIPTIONS_ENTITY, sp), page)
+  const { items, total, pageSize } = await queryAdminSubscriptions(normalizeQuery(SUBSCRIPTIONS_ENTITY, sp), page, { get: k => sp[k] ?? null })
   return (
     <SubscriptionsTable
       items={items}

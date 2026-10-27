@@ -4,12 +4,15 @@ import { useState } from 'react'
 import {
   InfiniteFooter,
   ListFilters,
+  SortTh,
   PageHeader,
   TONE_CLS,
   fetchJson,
   useActionToast,
   useFilterQuery,
   useInfiniteList,
+  useListSort,
+  type SortCol,
 } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
@@ -45,6 +48,15 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: TONE_CLS.red,
 }
 
+const SORT_COLS: SortCol[] = [
+  { key: 'order', label: 'Order #' },
+  { key: 'customer', label: 'Customer' },
+  { key: 'created_at', label: 'Date', type: 'date' },
+  { key: 'status', label: 'Status' },
+  { key: 'total', label: 'Total', type: 'number' },
+]
+const col = (k: string) => SORT_COLS.find(c => c.key === k)!
+
 function statusLabel(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
@@ -61,15 +73,20 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
   // The list filters live in the URL; from / to are the order date (without them, the last 30 days).
   const filters = useFilterQuery(PACKING_FIELDS)
 
+  const { sort, dir } = useListSort()
   const PAGE_SIZE = 25
   const list = useInfiniteList<Order>({
-    key: filters,
+    key: `${filters}|${sort ?? ''}|${dir}`,
     pageSize: PAGE_SIZE,
     getKey: o => o.id,
     fetchPage: async (page, signal) => {
       const params = new URLSearchParams(filters)
       params.set('page', String(page))
       params.set('pageSize', String(PAGE_SIZE))
+      if (sort) {
+        params.set('sort', sort)
+        params.set('dir', dir)
+      }
       const data = await fetchJson(`/api/admin/packing-slips/list?${params}`, signal)
       return { rows: data.orders || [], total: data.total ?? null }
     },
@@ -210,11 +227,11 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
                         className="rounded border-border-default"
                       />
                     </th>
-                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Order #</th>
-                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Customer</th>
-                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Date</th>
-                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Status</th>
-                    <th className="px-4 py-3 text-right font-semibold text-foreground-secondary">Total</th>
+                    <SortTh col={col('order')} className="px-4 py-3 font-semibold text-foreground-secondary" />
+                    <SortTh col={col('customer')} className="px-4 py-3 font-semibold text-foreground-secondary" />
+                    <SortTh col={col('created_at')} className="px-4 py-3 font-semibold text-foreground-secondary" />
+                    <SortTh col={col('status')} className="px-4 py-3 font-semibold text-foreground-secondary" />
+                    <SortTh col={col('total')} align="right" className="px-4 py-3 font-semibold text-foreground-secondary" />
                     <th className="px-4 py-3 text-center font-semibold text-foreground-secondary">Documents</th>
                   </tr>
                 </thead>

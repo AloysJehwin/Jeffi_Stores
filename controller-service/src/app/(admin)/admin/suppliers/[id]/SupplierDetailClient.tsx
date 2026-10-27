@@ -119,9 +119,9 @@ export default function SupplierDetailClient({
         </Link>
       ),
     },
-    { key: 'date', label: 'Date', sort: r => String(r.order_date ?? ''), render: r => dateCell(r.order_date) },
-    { key: 'expected', label: 'Expected', hideBelow: 'sm', sort: r => String(r.expected_date ?? ''), render: r => dateCell(r.expected_date) },
-    { key: 'status', label: 'Status', render: r => <StatusBadge status={r.status} map={DOC_STATUS} /> },
+    { key: 'date', label: 'Date', sortType: 'date', sort: r => String(r.order_date ?? ''), render: r => dateCell(r.order_date) },
+    { key: 'expected', label: 'Expected', hideBelow: 'sm', sortType: 'date', sort: r => String(r.expected_date ?? ''), render: r => dateCell(r.expected_date) },
+    { key: 'status', label: 'Status', sort: r => String(r.status ?? ''), render: r => <StatusBadge status={r.status} map={DOC_STATUS} /> },
     { key: 'amount', label: 'Amount', num: true, sort: r => parseFloat(r.total_amount || '0'), render: r => money(r.total_amount) },
   ]
 
@@ -139,11 +139,12 @@ export default function SupplierDetailClient({
           <span className="font-mono font-medium text-foreground">{r.expense_number}</span>
         ),
     },
-    { key: 'po', label: 'PO #', hideBelow: 'md', render: r => <span className="font-mono text-xs text-foreground-secondary">{r.po_number || '—'}</span> },
-    { key: 'date', label: 'Date', sort: r => String(r.expense_date ?? ''), render: r => dateCell(r.expense_date) },
+    { key: 'po', label: 'PO #', hideBelow: 'md', sort: r => String(r.po_number ?? ''), render: r => <span className="font-mono text-xs text-foreground-secondary">{r.po_number || '—'}</span> },
+    { key: 'date', label: 'Date', sortType: 'date', sort: r => String(r.expense_date ?? ''), render: r => dateCell(r.expense_date) },
     {
       key: 'due',
       label: 'Due',
+      sortType: 'date',
       sort: r => String(r.due_date ?? ''),
       render: r => (
         <span className={`whitespace-nowrap ${new Date(r.due_date) < new Date() && r.status !== 'paid' ? 'text-red-500 font-medium' : muted}`}>
@@ -151,7 +152,7 @@ export default function SupplierDetailClient({
         </span>
       ),
     },
-    { key: 'status', label: 'Status', render: r => <StatusBadge status={r.status} map={DOC_STATUS} /> },
+    { key: 'status', label: 'Status', sort: r => String(r.status ?? ''), render: r => <StatusBadge status={r.status} map={DOC_STATUS} /> },
     { key: 'amount', label: 'Amount', num: true, sort: r => parseFloat(r.total_amount || '0'), render: r => money(r.total_amount) },
   ]
 
@@ -160,22 +161,23 @@ export default function SupplierDetailClient({
       {r.product_name}
     </Link>
   )
+  const variantSort = (r: any) => String(r.sub_variant_name || r.variant_name || '')
   const variantCell = (r: any) => <span className={muted}>{r.sub_variant_name || r.variant_name || '—'}</span>
   const linkedCols: DataCol<any>[] = [
     { key: 'product', label: 'Product', sort: r => String(r.product_name ?? ''), render: productLink },
-    { key: 'variant', label: 'Variant / Sub-variant', render: variantCell },
+    { key: 'variant', label: 'Variant / Sub-variant', sort: variantSort, render: variantCell },
     { key: 'cost', label: 'Buy Price', num: true, sort: r => parseFloat(r.unit_cost || '0'), render: r => money(r.unit_cost) },
-    { key: 'pref', label: 'Preferred', render: r => <span className={muted}>{r.is_preferred ? '★' : '—'}</span> },
-    { key: 'moq', label: 'MOQ', num: true, hideBelow: 'md', render: r => <span className={muted}>{r.moq ?? '—'}</span> },
-    { key: 'lead', label: 'Lead (days)', num: true, hideBelow: 'md', render: r => <span className={muted}>{r.lead_time_days ?? '—'}</span> },
+    { key: 'pref', label: 'Preferred', sort: r => (r.is_preferred ? 0 : 1), render: r => <span className={muted}>{r.is_preferred ? '★' : '—'}</span> },
+    { key: 'moq', label: 'MOQ', num: true, hideBelow: 'md', sort: r => Number(r.moq ?? 0), render: r => <span className={muted}>{r.moq ?? '—'}</span> },
+    { key: 'lead', label: 'Lead (days)', num: true, hideBelow: 'md', sort: r => Number(r.lead_time_days ?? 0), render: r => <span className={muted}>{r.lead_time_days ?? '—'}</span> },
   ]
   const purchasedCols: DataCol<any>[] = [
     { key: 'product', label: 'Product', sort: r => String(r.product_name ?? ''), render: productLink },
-    { key: 'variant', label: 'Variant', render: variantCell },
+    { key: 'variant', label: 'Variant', sort: variantSort, render: variantCell },
     { key: 'qty', label: 'Total Qty', num: true, sort: r => Number(r.total_qty || 0), render: r => <span className="text-foreground">{Number(r.total_qty || 0)}</span> },
     { key: 'last_cost', label: 'Last Unit Cost', num: true, sort: r => parseFloat(r.last_unit_cost || '0'), render: r => money(r.last_unit_cost) },
-    { key: 'last_order', label: 'Last Ordered', hideBelow: 'md', sort: r => String(r.last_order_date ?? ''), render: r => dateCell(r.last_order_date) },
-    { key: 'pos', label: 'POs', num: true, render: r => <span className={muted}>{r.po_count ?? 0}</span> },
+    { key: 'last_order', label: 'Last Ordered', hideBelow: 'md', sortType: 'date', sort: r => String(r.last_order_date ?? ''), render: r => dateCell(r.last_order_date) },
+    { key: 'pos', label: 'POs', num: true, sort: r => Number(r.po_count ?? 0), render: r => <span className={muted}>{r.po_count ?? 0}</span> },
   ]
 
   const link = (href: string, text: string) => (
@@ -267,13 +269,13 @@ export default function SupplierDetailClient({
 
         {tab === 'pos' && (
           <Card flush>
-            <DataTable rows={pos} cols={poCols} rowKey={r => String(r.id)} empty="No purchase orders found" bare />
+            <DataTable sortNs="pos" rows={pos} cols={poCols} rowKey={r => String(r.id)} empty="No purchase orders found" bare />
           </Card>
         )}
 
         {tab === 'expenses' && (
           <Card flush>
-            <DataTable rows={expenses} cols={expenseCols} rowKey={r => String(r.id)} empty="No bills/expenses found" bare />
+            <DataTable sortNs="bills" rows={expenses} cols={expenseCols} rowKey={r => String(r.id)} empty="No bills/expenses found" bare />
           </Card>
         )}
 
@@ -281,6 +283,7 @@ export default function SupplierDetailClient({
           <div className="space-y-4">
             <Card title="Linked (buy-price list)" flush>
               <DataTable
+                sortNs="linked"
                 rows={linkedProducts}
                 cols={linkedCols}
                 rowKey={r => `${r.product_id}-${r.variant_id || ''}-${r.sub_variant_id || ''}-${linkedProducts.indexOf(r)}`}
@@ -290,6 +293,7 @@ export default function SupplierDetailClient({
             </Card>
             <Card title="Purchased (from POs)" flush>
               <DataTable
+                sortNs="bought"
                 rows={purchasedProducts}
                 cols={purchasedCols}
                 rowKey={r => `${r.product_id}-${r.variant_id || ''}-${purchasedProducts.indexOf(r)}`}

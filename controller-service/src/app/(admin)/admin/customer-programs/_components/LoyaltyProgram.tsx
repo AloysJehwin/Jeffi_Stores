@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { SortTh, type SortCol } from '@/components/admin/kit/list-sort'
 import { getLoyaltyStats, listLoyaltyMembers, type LoyaltyStats } from '@/lib/loyalty/queries'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { TIER_KEYS, TIER_NAMES, tierName } from '@/lib/loyalty/tiers'
@@ -23,14 +24,24 @@ export interface LoyaltyQuery {
   page: number
   tier: string
   search: string
+  sort?: string
+  dir?: string
 }
 
+const COLS: SortCol[] = [
+  { key: 'customer', label: 'Customer' },
+  { key: 'tier', label: 'Tier' },
+  { key: 'points', label: 'Points', type: 'number' },
+  { key: 'lifetime', label: 'Ever earned', type: 'number' },
+  { key: 'updated_at', label: 'Updated', type: 'date' },
+]
+
 export default async function LoyaltyProgram({ host, query }: { host: string; query: LoyaltyQuery }) {
-  const { page, tier, search } = query
+  const { page, tier, search, sort, dir } = query
   const [settings, stats, list, campaign] = await Promise.all([
     getLoyaltySettings(),
     getLoyaltyStats().catch(() => NO_STATS),
-    listLoyaltyMembers({ page, pageSize: PAGE_SIZE, tier, search }).catch(() => ({ members: [], total: 0 })),
+    listLoyaltyMembers({ page, pageSize: PAGE_SIZE, tier, search, sort: new URLSearchParams({ sort: sort ?? '', dir: dir ?? '' }) }).catch(() => ({ members: [], total: 0 })),
     queryOne<{ enabled: boolean }>(`SELECT enabled FROM campaigns WHERE kind = 'loyalty_tier_upgrade'`).catch(
       () => null
     ),
@@ -96,6 +107,8 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
           <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Members</h3>
           <form method="get" action={basePath} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="tab" value="loyalty" />
+            {sort && <input type="hidden" name="sort" value={sort} />}
+            {sort && dir && <input type="hidden" name="dir" value={dir} />}
             <input
               type="search"
               name="search"
@@ -175,11 +188,9 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wide text-foreground-muted">
-                    <th className="px-4 py-3 font-medium">Customer</th>
-                    <th className="px-4 py-3 font-medium">Tier</th>
-                    <th className="px-4 py-3 font-medium text-right">Points</th>
-                    <th className="px-4 py-3 font-medium text-right">Ever earned</th>
-                    <th className="px-4 py-3 font-medium">Updated</th>
+                    {COLS.map(c => (
+                      <SortTh key={c.key} col={c} align={c.type === 'number' ? 'right' : 'left'} className="px-4 py-3 font-medium" />
+                    ))}
                   </tr>
                 </thead>
                 <ServerPagedItems

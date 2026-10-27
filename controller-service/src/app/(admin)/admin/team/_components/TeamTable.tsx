@@ -35,6 +35,7 @@ export default function TeamTable({
     {
       key: 'member',
       label: 'Member',
+      sort: a => name(a).toLowerCase(),
       render: a => (
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-full bg-surface-secondary flex items-center justify-center shrink-0">
@@ -47,10 +48,12 @@ export default function TeamTable({
         </div>
       ),
     },
-    { key: 'role', label: 'Role', render: a => <span className="text-xs text-foreground-secondary capitalize">{a.role.replace('_', ' ')}</span> },
+    { key: 'role', label: 'Role', sort: a => a.role, render: a => <span className="text-xs text-foreground-secondary capitalize">{a.role.replace('_', ' ')}</span> },
     {
       key: 'scopes',
       label: 'Scopes',
+      sortType: 'number',
+      sort: a => (isPlatformOwner(a.role) ? Infinity : (a.scopes || []).length),
       className: 'max-w-[260px]',
       render: a => {
         const scopes: string[] = a.scopes || []
@@ -70,12 +73,17 @@ export default function TeamTable({
         )
       },
     },
-    { key: 'status', label: 'Status', render: a => <StatusBadge status={a.is_active !== false ? 'true' : 'false'} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Inactive', tone: 'muted' } }} /> },
-    { key: 'mfa', label: '2FA', render: a => <span className={badgeCls(a.mfa_enabled ? 'green' : 'amber')}>{a.mfa_enabled ? 'On' : 'Off'}</span> },
-    { key: 'cert', label: 'Certificate', render: a => <StatusBadge status={certStatuses[a.id] ?? 'No Certificate'} map={CERT_STATUS} /> },
+    { key: 'status', label: 'Status', sort: a => (a.is_active !== false ? 0 : 1), render: a => <StatusBadge status={a.is_active !== false ? 'true' : 'false'} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Inactive', tone: 'muted' } }} /> },
+    { key: 'mfa', label: '2FA', sort: a => (a.mfa_enabled ? 0 : 1), render: a => <span className={badgeCls(a.mfa_enabled ? 'green' : 'amber')}>{a.mfa_enabled ? 'On' : 'Off'}</span> },
+    { key: 'cert', label: 'Certificate', sort: a => certStatuses[a.id] ?? 'No Certificate', render: a => <StatusBadge status={certStatuses[a.id] ?? 'No Certificate'} map={CERT_STATUS} /> },
     {
       key: 'expiry',
       label: 'Expiry',
+      sortType: 'date',
+      sort: a => {
+        const cert = (a.certificates as any[])?.[0]
+        return cert && !cert.is_revoked ? new Date(cert.expires_at).getTime() : 0
+      },
       hideBelow: 'xl',
       render: a => {
         const cert = (a.certificates as any[])?.[0]
@@ -85,6 +93,8 @@ export default function TeamTable({
     {
       key: 'login',
       label: 'Last Login',
+      sortType: 'date',
+      sort: a => (a.last_login ? new Date(a.last_login).getTime() : 0),
       hideBelow: 'lg',
       render: a => (
         <span className="text-xs text-foreground-secondary whitespace-nowrap">
@@ -112,7 +122,7 @@ export default function TeamTable({
       rowKey={a => String(a.id)}
       pageSize={Math.max(25, admins.length)}
       empty="No team members yet."
-      mobile={<TeamMobileList admins={admins} currentAdminId={currentAdminId} scopeLabels={scopeLabels} />}
+      mobile={rows => <TeamMobileList admins={rows} currentAdminId={currentAdminId} scopeLabels={scopeLabels} />}
       bare
     />
   )

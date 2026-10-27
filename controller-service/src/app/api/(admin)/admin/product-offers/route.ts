@@ -4,19 +4,20 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, withTransaction } from '@/lib/shared/db'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/shared/validate'
-import { listOffersAdmin, slugifyOffer } from '@/lib/catalog/product-offers'
+import { parseSort } from '@jeffi/list-filters'
+import { OFFER_SORT, listOffersAdmin, slugifyOffer } from '@/lib/catalog/product-offers'
 import { draftLockChips } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/admin/product-offers — list all offers with product counts.
+// GET /api/admin/product-offers — list all offers with product counts (?sort&dir, else display order).
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'coupons:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const offers = await listOffersAdmin()
+  const offers = await listOffersAdmin(parseSort(request.nextUrl.searchParams, OFFER_SORT.sorts))
   const locks = await draftLockChips('offer', offers.map(o => o.id), admin.adminId)
   return NextResponse.json({ offers: offers.map(o => (locks[o.id] ? { ...o, draft_lock: locks[o.id] } : o)) })
 }

@@ -1,3 +1,4 @@
+import { sortClause, type SortDef } from '@jeffi/list-filters'
 import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { listProducts } from './client'
 
@@ -139,6 +140,14 @@ export interface GmcPageParams {
   pageSize: number
   search?: string
   status?: string
+  /** ?sort&dir */
+  sort?: { get(name: string): string | null }
+}
+
+const GMC_SORT: SortDef = {
+  sorts: { offer: 'offer_id', title: 'title', status: 'status', issue: "item_issues->0->>'description'" },
+  defaultSql: "(status = 'disapproved') DESC, (status = 'pending') DESC",
+  tiebreak: 'offer_id',
 }
 
 export async function getGmcStatusPage(params: GmcPageParams): Promise<{ rows: GmcStatusRow[]; total: number }> {
@@ -164,7 +173,7 @@ export async function getGmcStatusPage(params: GmcPageParams): Promise<{ rows: G
   const rows = await queryMany<GmcStatusRow>(
     `SELECT offer_id, title, status, item_group_id, link, price, item_issues, synced_at
        FROM merchant_gmc_status ${whereSql}
-      ORDER BY (status = 'disapproved') DESC, (status = 'pending') DESC, offer_id
+      ${sortClause(params.sort ?? new URLSearchParams(), GMC_SORT)}
       LIMIT $${limitArg} OFFSET $${offsetArg}`,
     [...args, pageSize, (page - 1) * pageSize]
   )

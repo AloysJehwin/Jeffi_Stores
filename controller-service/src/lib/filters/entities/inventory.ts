@@ -31,6 +31,17 @@ const LEDGER_SQL: Record<LedgerKey, FieldSql> = {
   tracked: { kind: 'bool', expr: '(it.batch_id IS NOT NULL OR it.lot_number IS NOT NULL OR it.serial_number IS NOT NULL)' },
 }
 
+// Ledger sorts are per event (the page unit), over getStockLedger's it / p joins.
+export const LEDGER_SORTS: Record<string, string> = {
+  date: 'MAX(it.created_at)',
+  product: 'MIN(p.name)',
+  type: 'MIN(it.transaction_type)',
+  change: 'SUM(it.quantity_change)',
+  balance: 'MAX(it.quantity_after)',
+  reference: 'MIN(it.reference_type)',
+  batch: 'MIN(COALESCE(it.serial_number, it.lot_number))',
+}
+
 export const LEDGER_ENTITY: FilterEntity<LedgerKey> = {
   key: 'inventory.ledger',
   scope: 'inventory:read',
@@ -43,6 +54,7 @@ export const LEDGER_ENTITY: FilterEntity<LedgerKey> = {
   period: 'created',
   aliases: LEDGER_ALIASES,
   search: { build: productSearch('it') },
+  sorts: LEDGER_SORTS,
   facets: true,
   defaultWindowDays: LEDGER_DEFAULT_DAYS,
   export: {
@@ -128,6 +140,19 @@ const VALUATION_SQL: Record<ValuationKey, FieldSql> = {
   tax_class: { kind: 'values', expr: 'p.tax_class' },
 }
 
+// Valuation sorts are per product (the page unit; totals sum its leaves), over the valuation query's `rows`.
+export const VAL_SORTS: Record<string, string> = {
+  product: 'MIN(rows.name)',
+  variant: 'MIN(rows.variant_name)',
+  sku: 'MIN(rows.row_sku)',
+  stock: 'SUM(rows.inventory_quantity)',
+  unit: 'MIN(COALESCE(rows.sell_unit_label, rows.sell_unit))',
+  price: 'MIN(rows.cost_price)',
+  gst: 'MIN(rows.gst_percentage)',
+  value: 'SUM(rows.stock_value)',
+  value_incl: 'SUM(rows.inventory_quantity * rows.selling_price)',
+}
+
 export const VALUATION_ENTITY: FilterEntity<ValuationKey> = {
   key: 'inventory.valuation',
   scope: 'inventory:read',
@@ -139,6 +164,7 @@ export const VALUATION_ENTITY: FilterEntity<ValuationKey> = {
   sql: VALUATION_SQL,
   aliases: VALUATION_ALIASES,
   search: { build: productSearch('p') },
+  sorts: VAL_SORTS,
   facets: true,
   export: {
     columns: [

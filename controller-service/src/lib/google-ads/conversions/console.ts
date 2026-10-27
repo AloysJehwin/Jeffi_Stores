@@ -1,3 +1,4 @@
+import { orderByClause, parseSort, type SortDef } from '@jeffi/list-filters'
 import { query } from '@/lib/shared/db'
 import { getSiteControls } from '@/lib/catalog/site-controls'
 import type { DateRange } from '../queries'
@@ -101,6 +102,23 @@ export interface LogFilter {
   q?: string | null
   page?: number
   pageSize?: number
+  sort?: string | null
+  dir?: string | null
+}
+
+const LOG_SORT: SortDef = {
+  sorts: {
+    created: 'u.created_at',
+    order: 'u.order_number',
+    kind: 'u.kind',
+    value: 'u.value',
+    click: "CASE WHEN u.gclid IS NOT NULL THEN 'gclid' WHEN u.gbraid IS NOT NULL THEN 'gbraid' WHEN u.wbraid IS NOT NULL THEN 'wbraid' END",
+    consent: 'o.ads_consent',
+    status: 'u.status',
+    detail: 'u.error',
+  },
+  defaultSql: 'u.created_at DESC',
+  tiebreak: 'u.id DESC',
 }
 
 export async function listConversionUploads(f: LogFilter, db: Db = defaultDb): Promise<UploadLog> {
@@ -135,7 +153,7 @@ export async function listConversionUploads(f: LogFilter, db: Db = defaultDb): P
          FROM ads_conversion_uploads u LEFT JOIN orders o ON o.id = u.order_id
            LEFT JOIN ads_conversion_requests r ON r.request_id = u.request_id
          ${clause}
-         ORDER BY u.created_at DESC, u.id DESC
+         ${orderByClause(LOG_SORT, parseSort({ get: k => (k === 'sort' ? (f.sort ?? null) : k === 'dir' ? (f.dir ?? null) : null) }, LOG_SORT.sorts))}
          LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
         params
       )

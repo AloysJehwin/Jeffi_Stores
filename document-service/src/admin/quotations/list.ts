@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from '../../next'
 import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne, withTransaction } from '@jeffi/tenancy'
-import { QUOTATIONS_ENTITY, QUOTE_SUBTOTAL_SQL, QUOTE_TOTAL_SQL, buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { QUOTATIONS_ENTITY, QUOTE_SUBTOTAL_SQL, QUOTE_TOTAL_SQL, buildWhere, normalizeQuery, sortClause } from '@jeffi/list-filters'
 import { z } from 'zod'
 import { parseBody, zNonEmpty, zEmail } from '../../lib/validate'
 import {
@@ -42,9 +42,11 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * pageSize
 
     // Whitelisted server-side sort (columns/aliases available in the SELECT below).
-    const sortCol = QUOTATIONS_ENTITY.sorts?.[searchParams.get('sort') || ''] || null
-    const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
-    const orderBy = sortCol ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, created_at DESC` : `ORDER BY created_at DESC`
+    const orderBy = sortClause(searchParams, {
+      sorts: QUOTATIONS_ENTITY.sorts ?? {},
+      defaultSql: 'q.created_at DESC',
+      tiebreak: 'q.created_at DESC, q.id DESC',
+    })
 
     const { where, params, nextIdx: i } = buildWhere(QUOTATIONS_ENTITY, normalizeQuery(QUOTATIONS_ENTITY, searchParams))
 

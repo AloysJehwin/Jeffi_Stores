@@ -3,7 +3,7 @@ import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne, withTransaction } from '@jeffi/tenancy'
 import { round2 } from '../../lib/gst'
-import { PO_OPEN_SQL, PURCHASE_ORDERS_ENTITY, buildWhere, normalizeQuery } from '@jeffi/list-filters'
+import { PO_OPEN_SQL, PURCHASE_ORDERS_ENTITY, buildWhere, normalizeQuery, sortClause } from '@jeffi/list-filters'
 import { z } from 'zod'
 import { parseBody, zUuid, zCurrency } from '../../lib/validate'
 import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom, lockBadges, lockNewDraft } from '../../lib/draft-locks'
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '20') || 20), 200)
     const offset = (page - 1) * limit
 
     const w = buildWhere(PURCHASE_ORDERS_ENTITY, normalizeQuery(PURCHASE_ORDERS_ENTITY, searchParams))
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
        LEFT JOIN purchase_order_items poi ON poi.po_id = po.id
        WHERE ${where}
        GROUP BY po.id, s.id
-       ORDER BY po.created_at DESC
+       ${sortClause(searchParams, { sorts: PURCHASE_ORDERS_ENTITY.sorts ?? {}, defaultSql: 'po.created_at DESC', tiebreak: 'po.id DESC' })}
        LIMIT $${i} OFFSET $${i + 1}`,
       [...params, limit, offset]
     )

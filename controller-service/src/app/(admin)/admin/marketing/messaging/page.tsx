@@ -92,7 +92,7 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
   let migrationPending = false
 
   try {
-    ;({ campaigns, total } = await listCampaigns<Campaign>(q, page, PAGE_SIZE))
+    ;({ campaigns, total } = await listCampaigns<Campaign>(q, page, PAGE_SIZE, { get: k => resolvedSearchParams[k] ?? null }))
   } catch {
     migrationPending = true
   }

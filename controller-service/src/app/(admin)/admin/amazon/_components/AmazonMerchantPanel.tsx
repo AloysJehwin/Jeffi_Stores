@@ -6,7 +6,7 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
 import { groupAmazonSyncErrors } from '@/lib/amazon/sync-errors'
-import { DataTable, ListFilters, fetchJson, useFilterQuery, useInfiniteList, Kpi, StatusBadge, btnGhost, btnPrimary, count, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { DataTable, ListFilters, fetchJson, useFilterQuery, useInfiniteList, useListSort, Kpi, StatusBadge, btnGhost, btnPrimary, count, type DataCol, type StatusMap } from '@/components/admin/kit'
 import { AMAZON_LISTING_FIELDS, AMAZON_LISTING_SEARCH } from '@/lib/filters/fields/amazon-listings'
 
 interface Summary {
@@ -70,6 +70,7 @@ const LISTING_COLS: DataCol<Row>[] = [
   {
     key: 'sku',
     label: 'SKU',
+    sortParam: 'sku',
     render: r => (
       <span className="inline-flex items-center gap-1 font-mono text-xs">
         {r.sku}
@@ -77,9 +78,9 @@ const LISTING_COLS: DataCol<Row>[] = [
       </span>
     ),
   },
-  { key: 'title', label: 'Title', render: r => <span className="block max-w-md truncate">{r.title || '-'}</span> },
-  { key: 'status', label: 'Status', render: r => <StatusBadge status={(r.status || 'unknown').toLowerCase()} map={LISTING_STATUS} /> },
-  { key: 'issue', label: 'Top issue', render: r => <span className="block max-w-xs truncate text-xs text-foreground-secondary">{r.issues?.[0]?.message || (r.status === 'approved' ? '-' : '')}</span> },
+  { key: 'title', label: 'Title', sortParam: 'title', render: r => <span className="block max-w-md truncate">{r.title || '-'}</span> },
+  { key: 'status', label: 'Status', sortParam: 'status', render: r => <StatusBadge status={(r.status || 'unknown').toLowerCase()} map={LISTING_STATUS} /> },
+  { key: 'issue', label: 'Top issue', sortParam: 'issue', render: r => <span className="block max-w-xs truncate text-xs text-foreground-secondary">{r.issues?.[0]?.message || (r.status === 'approved' ? '-' : '')}</span> },
 ]
 
 export default function AmazonMerchantPanel() {
@@ -92,14 +93,19 @@ export default function AmazonMerchantPanel() {
   const [syncRunning, setSyncRunning] = useState(false)
   const { showToast } = useToast()
 
+  const { sort, dir } = useListSort()
   const list = useInfiniteList<Row>({
-    key: filters,
+    key: `${filters}|${sort ?? ''}|${dir}`,
     pageSize: PAGE_SIZE,
     getKey: r => r.sku,
     fetchPage: async (p, signal) => {
       const params = new URLSearchParams(filters)
       params.set('page', String(p))
       params.set('pageSize', String(PAGE_SIZE))
+      if (sort) {
+        params.set('sort', sort)
+        params.set('dir', dir)
+      }
       const data = await fetchJson(`/api/admin/merchant/amazon/listing-status?${params.toString()}`, signal)
       if (p === 1) setSummary(data.summary)
       return { rows: data.rows, total: data.total }

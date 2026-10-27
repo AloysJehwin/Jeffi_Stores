@@ -66,6 +66,20 @@ function clauses(q: FilterQuery, startIdx: number): Clauses {
   }
 }
 
+// Columns of the list query (its joins: categories c, brands b). No sort = the list's rank/featured order.
+export const PRODUCT_SORTS: Record<string, string> = {
+  name: 'p.name',
+  sku: 'p.sku',
+  // products has no `price` column: the effective display price (min active variant price, else base_price).
+  price:
+    '(COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price))',
+  stock: 'p.stock_status',
+  created_at: 'p.created_at',
+  category: 'c.name',
+  brand: 'b.name',
+  status: 'p.is_active',
+}
+
 const ist = (e: string) => `to_char(${e} AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI')`
 
 export const PRODUCTS_ENTITY: FilterEntity = {
@@ -79,6 +93,8 @@ export const PRODUCTS_ENTITY: FilterEntity = {
   fields: [],
   sql: {},
   search: { build: (q, idx) => buildProductSearchClause(q, 'p.name', 'p.sku', 'p.search_vector', idx) },
+  sorts: PRODUCT_SORTS,
+  tiebreak: 'p.id DESC',
   custom: {
     normalize,
     clauses,

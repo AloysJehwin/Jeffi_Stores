@@ -22,6 +22,16 @@ const SQL: Record<SupplierKey, FieldSql> = {
   created: { kind: 'date', expr: 's.created_at' },
 }
 
+export const SUPPLIER_SORTS: Record<string, string> = {
+  name: 's.name',
+  gstin: 's.gstin',
+  contact: 's.contact_name',
+  phone: 's.phone',
+  terms: 's.payment_terms',
+  pos: PO_COUNT,
+  status: 's.is_active',
+}
+
 export const SUPPLIERS_ENTITY: FilterEntity<SupplierKey> = {
   key: 'suppliers',
   scope: 'inventory:read',
@@ -32,6 +42,9 @@ export const SUPPLIERS_ENTITY: FilterEntity<SupplierKey> = {
   sql: SQL,
   period: 'created',
   search: { build: (q, idx) => buildSearchClause(q, ['s.name', 's.gstin', 's.contact_name'], idx) },
+  sorts: SUPPLIER_SORTS,
+  defaultSql: 's.name',
+  tiebreak: 's.id',
   facets: true,
   export: {
     columns: [

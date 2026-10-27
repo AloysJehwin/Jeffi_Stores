@@ -178,6 +178,7 @@ export default function CouponsTable({
       key: 'valid',
       label: 'Valid Until',
       sortParam: 'valid_until',
+      sortType: 'date',
       hideBelow: 'lg',
       render: c =>
         c.valid_until ? (

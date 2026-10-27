@@ -84,8 +84,8 @@ export default async function CustomerProgramsPage({
           <ProgramsOverview />
         </Suspense>
       )}
-      {tab === 'loyalty' && <LoyaltyProgram host={host} query={{ page, tier: params.tier || '', search }} />}
-      {tab === 'referrals' && <ReferralProgram host={host} query={{ page, status: params.status || '', search }} />}
+      {tab === 'loyalty' && <LoyaltyProgram host={host} query={{ page, tier: params.tier || '', search, sort: params.sort, dir: params.dir }} />}
+      {tab === 'referrals' && <ReferralProgram host={host} query={{ page, status: params.status || '', search, sort: params.sort, dir: params.dir }} />}
       {tab === 'birthday' && <BirthdayProgram host={host} />}
     </PageBody>
   )

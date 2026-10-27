@@ -25,6 +25,7 @@ import {
 import { Section, Empty, Table } from './ReportViews'
 import { DataTable } from '@/components/admin/kit/data-table'
 import { fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { useListSort } from '@/components/admin/kit/list-sort'
 
 // Server-side purchase conversions: where they upload, Google's view of the account, and the queue.
 
@@ -455,17 +456,19 @@ function RequestsTable({ requests, error }: { requests: DataManagerRequest[] | n
         rowKey={r => r.requestId}
         empty="Nothing sent through the Data Manager API yet."
         cols={[
-          { key: 'sent', label: 'Sent', render: r => when(r.createdAt) },
-          { key: 'kind', label: 'Kind', render: r => (r.kind === 'purchase' ? 'Purchases' : 'Adjustments') },
-          { key: 'events', label: 'Events', num: true, render: r => count(r.events) },
+          { key: 'sent', label: 'Sent', render: r => when(r.createdAt), sort: r => new Date(r.createdAt).getTime(), sortType: 'date' },
+          { key: 'kind', label: 'Kind', render: r => (r.kind === 'purchase' ? 'Purchases' : 'Adjustments'), sort: r => r.kind },
+          { key: 'events', label: 'Events', num: true, render: r => count(r.events), sort: r => r.events },
           {
             key: 'status',
             label: 'Google',
+            sort: r => r.status,
             render: r => <Badge tone={REQUEST_LABEL[r.status]?.tone ?? 'muted'}>{REQUEST_LABEL[r.status]?.text ?? humanize(r.status)}</Badge>,
           },
           {
             key: 'detail',
             label: 'Detail',
+            sort: r => r.errors.length + r.warnings.length + r.fieldWarnings.length,
             render: r => (
               <span className="text-xs">
                 {r.errors.length > 0 && <span className="block text-red-600 dark:text-red-400">Rejected: {reasons(r.errors)}</span>}
@@ -482,7 +485,7 @@ function RequestsTable({ requests, error }: { requests: DataManagerRequest[] | n
               </span>
             ),
           },
-          { key: 'id', label: 'Request id', render: r => <span className="font-mono text-[11px] text-foreground-muted">{r.requestId}</span> },
+          { key: 'id', label: 'Request id', sort: r => r.requestId, render: r => <span className="font-mono text-[11px] text-foreground-muted">{r.requestId}</span> },
         ]}
       />
     </div>
@@ -564,15 +567,16 @@ function ActionsTable({
             ),
             sort: a => a.name,
           },
-          { key: 'type', label: 'Type', render: a => humanize(a.type) },
-          { key: 'category', label: 'Category', render: a => humanize(a.category) },
-          { key: 'counting', label: 'Counting', render: a => humanize(a.countingType) },
+          { key: 'type', label: 'Type', render: a => humanize(a.type), sort: a => a.type ?? '' },
+          { key: 'category', label: 'Category', render: a => humanize(a.category), sort: a => a.category ?? '' },
+          { key: 'counting', label: 'Counting', render: a => humanize(a.countingType), sort: a => a.countingType ?? '' },
           {
             key: 'primary',
             label: 'Goal',
+            sort: a => (a.primaryForGoal == null ? 2 : a.primaryForGoal ? 0 : 1),
             render: a => (a.primaryForGoal == null ? '-' : a.primaryForGoal ? <Badge tone="green">Primary</Badge> : <Badge>Secondary</Badge>),
           },
-          { key: 'status', label: 'Status', render: a => <Badge tone={a.status === 'ENABLED' ? 'green' : 'muted'}>{humanize(a.status)}</Badge> },
+          { key: 'status', label: 'Status', sort: a => a.status ?? '', render: a => <Badge tone={a.status === 'ENABLED' ? 'green' : 'muted'}>{humanize(a.status)}</Badge> },
           {
             key: 'use',
             label: '',
@@ -656,13 +660,18 @@ function UploadLogSection({
   onRetry: (ids?: number[]) => void
 }) {
   const [status, setStatus] = useState<UploadStatus | ''>('')
+  const logSort = useListSort('uploads')
   const list = useInfiniteList<UploadRow>({
-    key: `${status}|${reloadKey}`,
+    key: `${status}|${reloadKey}|${logSort.sort ?? ''}|${logSort.dir}`,
     pageSize: 25,
     getKey: r => r.id,
     fetchPage: async (page, signal) => {
       const qs = new URLSearchParams({ page: String(page) })
       if (status) qs.set('status', status)
+      if (logSort.sort) {
+        qs.set('sort', logSort.sort)
+        qs.set('dir', logSort.dir)
+      }
       const j = await fetchJson<UploadLog>(`/api/admin/google-ads/conversions?${qs}`, signal)
       return { rows: j.rows, total: j.total }
     },
@@ -700,29 +709,33 @@ function UploadLogSection({
         <>
           <DataTable<UploadRow>
             bare
+            sortNs="uploads"
             rows={list.rows}
             infinite={list}
             noun="uploads"
             rowKey={r => String(r.id)}
             empty="Nothing queued yet. Orders from Google Ads clicks appear here once paid (COD: once delivered)."
             cols={[
-              { key: 'created', label: 'Queued', render: r => when(r.created_at) },
-              { key: 'order', label: 'Order', render: r => r.order_number },
+              { key: 'created', label: 'Queued', sortParam: 'created', sortType: 'date', render: r => when(r.created_at) },
+              { key: 'order', label: 'Order', sortParam: 'order', render: r => r.order_number },
               {
                 key: 'kind',
                 label: 'Kind',
+                sortParam: 'kind',
                 render: r => `${KIND_LABEL[r.kind] ?? r.kind}${r.kind === 'restatement' ? ` #${r.version}` : ''}`,
               },
-              { key: 'value', label: 'Value', num: true, render: r => (r.kind === 'retraction' ? '-' : money(r.value, r.currency_code || currency, 2)) },
-              { key: 'click', label: 'Click', render: r => r.click ?? '-' },
+              { key: 'value', label: 'Value', num: true, sortParam: 'value', render: r => (r.kind === 'retraction' ? '-' : money(r.value, r.currency_code || currency, 2)) },
+              { key: 'click', label: 'Click', sortParam: 'click', render: r => r.click ?? '-' },
               {
                 key: 'consent',
                 label: 'Ads consent',
+                sortParam: 'consent',
                 render: r => (r.ads_consent == null ? '-' : r.ads_consent ? 'Yes' : 'No'),
               },
               {
                 key: 'status',
                 label: 'Status',
+                sortParam: 'status',
                 render: r => (
                   <span className="whitespace-nowrap">
                     <Badge tone={STATUS_TONE[r.status]}>{humanize(r.status)}</Badge>
@@ -733,6 +746,7 @@ function UploadLogSection({
               {
                 key: 'detail',
                 label: 'Detail',
+                sortParam: 'detail',
                 render: r => (
                   <span className={`text-xs ${r.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted'}`}>
                     {r.error ||

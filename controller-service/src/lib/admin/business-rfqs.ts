@@ -1,4 +1,4 @@
-import { buildWhere, filterScope, type FilterQuery } from '@jeffi/list-filters'
+import { buildWhere, filterScope, sortClause, type FilterQuery, type SortDef } from '@jeffi/list-filters'
 import { queryCount, queryMany } from '@/lib/shared/db'
 import { RFQ_ENTITY, RFQ_ITEMS_SQL } from '@/lib/filters/entities/business-rfqs'
 
@@ -21,7 +21,20 @@ const FROM = `FROM business_rfqs r
   JOIN users u ON u.id = r.user_id
   LEFT JOIN business_profiles bp ON bp.user_id = r.user_id`
 
-export async function listBusinessRfqs(q: FilterQuery, page: number, pageSize: number) {
+const SORT: SortDef = {
+  sorts: {
+    rfq: 'r.rfq_number',
+    company: 'bp.company_name',
+    contact: "concat_ws(' ', u.first_name, u.last_name)",
+    items: RFQ_ITEMS_SQL,
+    status: 'r.status',
+    created_at: 'r.created_at',
+  },
+  defaultSql: 'r.created_at DESC',
+  tiebreak: 'r.id DESC',
+}
+
+export async function listBusinessRfqs(q: FilterQuery, page: number, pageSize: number, sort?: { get(name: string): string | null }) {
   const w = buildWhere(RFQ_ENTITY, q)
   const [rows, total] = await Promise.all([
     queryMany<RfqRow>(
@@ -30,7 +43,7 @@ export async function listBusinessRfqs(q: FilterQuery, page: number, pageSize: n
               bp.company_name, u.first_name, u.last_name, u.email
        ${FROM}
        ${w.where}
-       ORDER BY r.created_at DESC, r.id DESC
+       ${sortClause(sort ?? new URLSearchParams(), SORT)}
        LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
       [...w.params, pageSize, (Math.max(1, page) - 1) * pageSize]
     ),

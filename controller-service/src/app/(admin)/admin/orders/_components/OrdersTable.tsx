@@ -119,6 +119,7 @@ export default function OrdersTable({ orders, total, page, pageSize, backUrl, pa
       key: 'date',
       label: 'Date',
       sortParam: 'date',
+      sortType: 'date',
       render: o => (
         <div className="whitespace-nowrap">
           <div className="text-sm text-foreground">{new Date(o.created_at).toLocaleDateString('en-IN')}</div>
@@ -129,6 +130,8 @@ export default function OrdersTable({ orders, total, page, pageSize, backUrl, pa
     {
       key: 'edd',
       label: 'EDD',
+      sortParam: 'edd',
+      sortType: 'date',
       hideBelow: 'lg',
       render: o =>
         o.estimated_delivery_date ? (

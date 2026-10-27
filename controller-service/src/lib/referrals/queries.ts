@@ -1,3 +1,4 @@
+import { sortClause, type SortDef } from '@jeffi/list-filters'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import type { Paginated } from '@/lib/loyalty/queries'
 import type { ReferralSettings } from './settings'
@@ -111,11 +112,25 @@ export interface AdminReferralRow {
 
 const STATUSES: ReferralStatus[] = ['joined', 'rewarded', 'reversed', 'capped', 'rejected']
 
+const SIGNUP_SORT: SortDef = {
+  sorts: {
+    referrer: "COALESCE(NULLIF(concat_ws(' ', r.first_name, r.last_name), ''), r.email)",
+    friend: "COALESCE(NULLIF(concat_ws(' ', f.first_name, f.last_name), ''), f.email)",
+    status: 's.status',
+    points: 's.points',
+    signed_up_at: 's.signed_up_at',
+  },
+  defaultSql: 's.signed_up_at DESC',
+  tiebreak: 's.id DESC',
+}
+
 export async function listReferralSignups(opts: {
   page: number
   pageSize: number
   status?: string | null
   search?: string | null
+  /** ?sort&dir */
+  sort?: { get(name: string): string | null }
 }): Promise<{ rows: AdminReferralRow[]; total: number }> {
   const status = opts.status && (STATUSES as string[]).includes(opts.status) ? opts.status : null
   const search = opts.search?.trim() ? `%${opts.search.trim()}%` : null
@@ -148,7 +163,7 @@ export async function listReferralSignups(opts: {
               r.id::text AS r_id, r.first_name AS r_first, r.last_name AS r_last, r.email AS r_email,
               f.id::text AS f_id, f.first_name AS f_first, f.last_name AS f_last, f.email AS f_email
        ${where}
-       ORDER BY s.signed_up_at DESC, s.id DESC
+       ${sortClause(opts.sort ?? new URLSearchParams(), SIGNUP_SORT)}
        LIMIT $3 OFFSET $4`,
       [status, search, opts.pageSize, (opts.page - 1) * opts.pageSize]
     ),
