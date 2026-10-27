@@ -4,7 +4,8 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { parseBody } from '@/lib/shared/validate'
 import { HOMEPAGE_SURFACES, type HomepageSurface } from '@/lib/catalog/homepage-sections'
-import { copySurfaceLayout, SurfaceNotEmpty, withHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { copySurfaceLayout, homepageLockFrom, SurfaceNotEmpty, withHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { draftLockResponse } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,11 +32,15 @@ export async function POST(request: NextRequest) {
   if (from === to) return NextResponse.json({ error: 'Pick two different layouts' }, { status: 400 })
 
   try {
-    const copied = await withHomepageDraft(admin.adminId, draft =>
-      copySurfaceLayout(draft, from as HomepageSurface, to as HomepageSurface, { replace })
+    const copied = await withHomepageDraft(
+      admin.adminId,
+      draft => copySurfaceLayout(draft, from as HomepageSurface, to as HomepageSurface, { replace }),
+      homepageLockFrom(admin, request)
     )
     return NextResponse.json({ copied })
   } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     if (err instanceof SurfaceNotEmpty) {
       return NextResponse.json({ error: 'That layout already has its own sections or slides', code: 'not_empty' }, { status: 409 })
     }

@@ -9,10 +9,12 @@ import {
   applyDraftOrder,
   endsBeforeStart,
   getEditableHomepage,
+  homepageLockFrom,
   nextDisplayOrder,
   withHomepageDraft,
   type DraftSection,
 } from '@/lib/catalog/homepage-draft'
+import { lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,7 +81,8 @@ export async function POST(request: NextRequest) {
     }
     draft.sections.push(row)
     return row
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (section instanceof NextResponse) return section
 
   return NextResponse.json({ section })
 }
@@ -92,9 +95,10 @@ export async function PATCH(request: NextRequest) {
   const order: string[] = Array.isArray(body?.order) ? body.order : []
   if (order.length === 0) return NextResponse.json({ error: 'order[] required' }, { status: 400 })
 
-  await withHomepageDraft(admin.adminId, draft => {
+  const saved = await withHomepageDraft(admin.adminId, draft => {
     draft.sections = applyDraftOrder(draft.sections, order)
-  })
+  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  if (saved instanceof NextResponse) return saved
 
   return NextResponse.json({ success: true })
 }

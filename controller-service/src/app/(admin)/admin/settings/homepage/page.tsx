@@ -7,6 +7,8 @@ import { getHost } from '@/lib/tenancy/get-host'
 import HeroSlideManager from '@/components/admin/HeroSlideManager'
 import HomepageSectionManager from '@/components/admin/homepage/HomepageSectionManager'
 import HomepageFormFooter from '@/components/admin/homepage/HomepageFormFooter'
+import { HomepageLockBanner, HomepageLockProvider } from '@/components/admin/homepage/HomepageLock'
+import { HOMEPAGE_LOCK_ID, initialDraftLock } from '@/lib/admin/draft-locks'
 import { getStorefrontContent, getStoreIdentity } from '@/lib/catalog/site-controls'
 import { defaultAboutCopy, resolveAboutStats, rowSurface, type HomepageSurface } from '@/lib/catalog/homepage-sections'
 import { getEditableHomepage, getHomepageDraftSummary, type DraftDiff } from '@/lib/catalog/homepage-draft'
@@ -113,10 +115,11 @@ export default async function HomepagePage({ searchParams }: { searchParams: Pro
     redirect(ap('/admin/settings', host))
   }
 
-  const [hero, editable, draftSummary] = await Promise.all([
+  const [hero, editable, draftSummary, initialLock] = await Promise.all([
     loadHeroData(),
     getEditableHomepage(),
     getHomepageDraftSummary(),
+    initialDraftLock('homepage', HOMEPAGE_LOCK_ID),
   ])
   const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
   const draftPending = draftSummary.hasDraft && (changed(draftSummary.sections) || changed(draftSummary.slides))
@@ -132,47 +135,50 @@ export default async function HomepagePage({ searchParams }: { searchParams: Pro
   // Mirror the other migrated entities: header carries only title + description + badges;
   // one shared FormFooter at the bottom owns Cancel / Save as Draft / Publish / Discard.
   return (
-    <div className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5">
-      <PageHeader
-        title="Homepage"
-        description={SURFACE_COPY[surface].description}
-        badges={draftPending ? <Badge tone="amber">Draft pending</Badge> : null}
-      />
+    <HomepageLockProvider lockId={HOMEPAGE_LOCK_ID} initial={initialLock}>
+      <div className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5">
+        <PageHeader
+          title="Homepage"
+          description={SURFACE_COPY[surface].description}
+          badges={draftPending ? <Badge tone="amber">Draft pending</Badge> : null}
+        />
 
-      <TabLinks
-        value={surface}
-        scroll={false}
-        tabs={[
-          { id: 'web', label: SURFACE_COPY.web.tab, href: base, count: pendingOn('web') },
-          { id: 'app', label: SURFACE_COPY.app.tab, href: `${base}?surface=app`, count: pendingOn('app') },
-        ]}
-      />
+        <TabLinks
+          value={surface}
+          scroll={false}
+          tabs={[
+            { id: 'web', label: SURFACE_COPY.web.tab, href: base, count: pendingOn('web') },
+            { id: 'app', label: SURFACE_COPY.app.tab, href: `${base}?surface=app`, count: pendingOn('app') },
+          ]}
+        />
 
-      {/* Keyed by surface: both managers seed their state from props once. */}
-      <HomepageSectionManager
-        key={surface}
-        surface={surface}
-        initial={sections}
-        options={sectionOptions}
-        heroEditor={
-          <HeroSlideManager
-            key={`hero-editor-${surface}`}
-            surface={surface}
-            initialSlides={heroSlides}
-            categoryOptions={hero.categoryOptions}
-            brandOptions={hero.brandOptions}
-            gradeOptions={hero.gradeOptions}
-            materialOptions={hero.materialOptions}
-          />
-        }
-      />
+        <HomepageLockBanner />
 
-      <HomepageFormFooter
-        adminId={adminId}
-        initialSummary={draftSummary}
-        resnapshotAction={resnapshotHomepageSession}
-        cancelHref={ap('/admin/settings', host)}
-      />
-    </div>
+        {/* Keyed by surface: both managers seed their state from props once. */}
+        <HomepageSectionManager
+          key={surface}
+          surface={surface}
+          initial={sections}
+          options={sectionOptions}
+          heroEditor={
+            <HeroSlideManager
+              key={`hero-editor-${surface}`}
+              surface={surface}
+              initialSlides={heroSlides}
+              categoryOptions={hero.categoryOptions}
+              brandOptions={hero.brandOptions}
+              gradeOptions={hero.gradeOptions}
+              materialOptions={hero.materialOptions}
+            />
+          }
+        />
+
+        <HomepageFormFooter
+          initialSummary={draftSummary}
+          resnapshotAction={resnapshotHomepageSession}
+          cancelHref={ap('/admin/settings', host)}
+        />
+      </div>
+    </HomepageLockProvider>
   )
 }

@@ -33,6 +33,13 @@ export function draftLockResponse(err: unknown): NextResponse | null {
   return NextResponse.json(err.body(), { status: 423 })
 }
 
+/** For `.catch(lockedOr)`: a lock error becomes its 423 response, anything else rethrows. */
+export function lockedOr(err: unknown): NextResponse {
+  const locked = draftLockResponse(err)
+  if (locked) return locked
+  throw err
+}
+
 const EVENT_FOR: Record<NonNullable<LockResult['change']>, LockEventType> = {
   acquired: 'acquired',
   released: 'released',

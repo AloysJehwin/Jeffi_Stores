@@ -19,6 +19,8 @@ import SectionConfigFields from './SectionConfigFields'
 import SectionPreview from './SectionPreview'
 import OfferSliderControl from './OfferSliderControl'
 import { notifyHomepageDraftChanged } from './draft-events'
+import { useHomepageLock } from './HomepageLock'
+import { LockedFieldset } from '@/components/admin/kit'
 import type { SectionOptions } from './editors/fields'
 
 /** Persist a partial config merge onto a section, updating local state and the API. */
@@ -43,7 +45,9 @@ export default function HomepageSectionManager({
   alwaysExpanded = false,
 }: Props) {
   const { showToast, showConfirm } = useToast()
-  const canWrite = useCanWrite('settings:write')
+  const homepage = useHomepageLock()
+  // Read-only while another admin holds the homepage draft.
+  const canWrite = useCanWrite('settings:write') && !homepage.readOnly
   const [sections, setSections] = useState(initial)
   const [picking, setPicking] = useState(false)
   const [addedId, setAddedId] = useState<string | null>(null)
@@ -67,10 +71,14 @@ export default function HomepageSectionManager({
     try {
       const res = await fetch('/api/admin/homepage-draft/copy', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...homepage.headers() },
         credentials: 'include',
         body: JSON.stringify({ from: 'web', to: surface }),
       })
+      if (await homepage.locked(res)) {
+        setCopying(false)
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         showToast(data.error || 'Failed to copy the website layout', 'error')
@@ -89,10 +97,11 @@ export default function HomepageSectionManager({
   async function patch(id: string, body: Record<string, unknown>) {
     const res = await fetch(`/api/admin/homepage-sections/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...homepage.headers() },
       credentials: 'include',
       body: JSON.stringify(body),
     })
+    if (await homepage.locked(res)) return
     showToast(res.ok ? 'Saved to draft' : 'Failed to save', res.ok ? 'success' : 'error')
     if (res.ok) notifyHomepageDraftChanged()
   }
@@ -111,12 +120,12 @@ export default function HomepageSectionManager({
     setPicking(false)
     const res = await fetch('/api/admin/homepage-sections', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...homepage.headers() },
       credentials: 'include',
       body: JSON.stringify({ type, surface }),
     })
     if (!res.ok) {
-      showToast('Failed to add section', 'error')
+      if (!(await homepage.locked(res))) showToast('Failed to add section', 'error')
       return
     }
     const { section } = await res.json()
@@ -132,9 +141,9 @@ export default function HomepageSectionManager({
       message: `"${section.title || SECTION_META[section.type].label}" will be removed from the draft. It stays live until you publish.`,
     })
     if (!ok) return
-    const res = await fetch(`/api/admin/homepage-sections/${section.id}`, { method: 'DELETE', credentials: 'include' })
+    const res = await fetch(`/api/admin/homepage-sections/${section.id}`, { method: 'DELETE', credentials: 'include', headers: homepage.headers() })
     if (!res.ok) {
-      showToast('Failed to remove', 'error')
+      if (!(await homepage.locked(res))) showToast('Failed to remove', 'error')
       return
     }
     setSections(prev => prev.filter(s => s.id !== section.id))
@@ -154,13 +163,13 @@ export default function HomepageSectionManager({
     setSections(reordered)
     const res = await fetch('/api/admin/homepage-sections', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...homepage.headers() },
       credentials: 'include',
       body: JSON.stringify({ order: reordered.map(s => s.id) }),
     })
     if (!res.ok) {
       setSections(previous)
-      showToast('Failed to reorder', 'error')
+      if (!(await homepage.locked(res))) showToast('Failed to reorder', 'error')
       return
     }
     notifyHomepageDraftChanged()
@@ -356,13 +365,15 @@ function SectionRow({
       <div className={open ? 'px-3 pb-3 pt-1 space-y-3 border-t border-border-default' : 'hidden'}>
         {open && <SectionPreview section={section} />}
         {extra}
-        <SectionConfigFields
-          section={section}
-          canWrite={canWrite}
-          options={options}
-          onChange={onChange}
-          onSave={onSave}
-        />
+        <LockedFieldset readOnly={!canWrite}>
+          <SectionConfigFields
+            section={section}
+            canWrite={canWrite}
+            options={options}
+            onChange={onChange}
+            onSave={onSave}
+          />
+        </LockedFieldset>
         {canWrite && (
           <button
             type="button"
