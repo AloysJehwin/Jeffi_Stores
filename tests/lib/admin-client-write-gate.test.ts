@@ -67,6 +67,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/app/(admin)/admin/service-accounts/_components/ServiceAccountsMobileList.tsx',
   // Read-only document/label exports (GET/PDF); no record mutation to gate.
   'controller-service/src/app/(admin)/admin/packing-slips/PackingSlipsClient.tsx',
+  'controller-service/src/app/(admin)/admin/packing-slips/_components/order-documents.tsx',
   'controller-service/src/app/(admin)/admin/labels/LabelsClient.tsx',
   'controller-service/src/components/admin/BatchSerialLabelPicker.tsx',
   'controller-service/src/app/(admin)/admin/products/_components/ProductLabelModal.tsx',

@@ -12,7 +12,7 @@ import {
   useInfiniteList,
 } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
-import { useHasScope } from '@/contexts/AdminScopesContext'
+import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { PACKING_DEFAULT_DAYS, PACKING_FIELDS, PACKING_SEARCH } from '@/lib/filters/fields/packing-slips'
 import PackingSlipsMobileList from './_components/PackingSlipsMobileList'
 import {
@@ -56,6 +56,7 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
   const [busy, setBusy] = useState<string | null>(null)
   const toast = useActionToast()
   const canOrders = useHasScope('orders:read')
+  const canBulk = useCanWrite('packing_slips')
   const [docSet, setDocSet] = useDocumentSet(canOrders)
   // The list filters live in the URL; from / to are the order date (without them, the last 30 days).
   const filters = useFilterQuery(PACKING_FIELDS)
@@ -162,7 +163,7 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             <DocumentSetPicker value={docSet} onChange={setDocSet} canOrders={canOrders} />
-            {selectedIds.size > 0 && (
+            {canBulk && selectedIds.size > 0 && (
               <button
                 onClick={downloadBulk}
                 disabled={downloading}
