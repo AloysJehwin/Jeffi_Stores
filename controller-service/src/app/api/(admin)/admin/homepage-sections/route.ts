@@ -4,13 +4,23 @@ import { authenticateAdmin, type AdminJWTPayload } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
-import { HOMEPAGE_SURFACES, SECTION_TYPES, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
+import {
+  HOMEPAGE_PAGES,
+  HOMEPAGE_SURFACES,
+  PLACEMENT_DEFAULT_AFTER,
+  SECTION_META,
+  SECTION_TYPES,
+  rowPage,
+  rowSurface,
+  sectionTypesFor,
+  type SectionType,
+} from '@/lib/catalog/homepage-sections'
 import {
   applyDraftOrder,
   endsBeforeStart,
   getEditableHomepage,
   homepageLockFrom,
-  nextDisplayOrder,
+  nextDisplayOrderOn,
   withHomepageDraft,
   type DraftSection,
 } from '@/lib/catalog/homepage-draft'
@@ -46,6 +56,7 @@ const bodySchema = z.object({
   startsAt: z.string().datetime().nullish(),
   endsAt: z.string().datetime().nullish(),
   surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
+  page: z.enum(HOMEPAGE_PAGES as [string, ...string[]]).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -60,19 +71,30 @@ export async function POST(request: NextRequest) {
   }
 
   const surface = rowSurface({ surface: d.surface })
+  const page = rowPage({ page: d.page })
+  const type = d.type as SectionType
+  if (!sectionTypesFor(surface, page).includes(type)) {
+    return NextResponse.json({ error: `${SECTION_META[type].label} can't go on this page` }, { status: 400 })
+  }
+  // Listing sections sit between the products; start them after the first few rows.
+  const config =
+    page === 'home' || d.config?.placement
+      ? (d.config ?? {})
+      : { ...d.config, placement: { after: PLACEMENT_DEFAULT_AFTER } }
   const section = await withHomepageDraft(admin.adminId, draft => {
     const now = new Date().toISOString()
     const row: DraftSection = {
       id: randomUUID(),
-      type: d.type as SectionType,
+      type,
       surface,
+      page,
       title: d.title ?? null,
       subtitle: d.subtitle ?? null,
       eyebrow: d.eyebrow ?? null,
       cta_label: d.ctaLabel ?? null,
       cta_url: d.ctaUrl ?? null,
-      config: d.config ?? {},
-      display_order: nextDisplayOrder(draft.sections.filter(s => rowSurface(s) === surface)),
+      config,
+      display_order: nextDisplayOrderOn(draft.sections, page, surface),
       is_active: d.isActive ?? true,
       starts_at: d.startsAt ?? null,
       ends_at: d.endsAt ?? null,

@@ -1037,7 +1037,15 @@ ALTER TABLE ONLY public.homepage_sections
 --
 
 ALTER TABLE ONLY public.homepage_sections
-    ADD CONSTRAINT homepage_sections_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'app'::text])));
+    ADD CONSTRAINT homepage_sections_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'web_mobile'::text, 'app'::text])));
+
+
+--
+-- Name: homepage_sections homepage_sections_page_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.homepage_sections
+    ADD CONSTRAINT homepage_sections_page_check CHECK ((page IS NOT NULL AND (page)::text = ANY (ARRAY['home'::text, 'products'::text, 'category'::text, 'brand'::text])));
 
 
 --
@@ -1045,7 +1053,7 @@ ALTER TABLE ONLY public.homepage_sections
 --
 
 ALTER TABLE ONLY public.hero_slides
-    ADD CONSTRAINT hero_slides_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'app'::text])));
+    ADD CONSTRAINT hero_slides_surface_check CHECK ((surface IS NOT NULL AND (surface)::text = ANY (ARRAY['web'::text, 'web_mobile'::text, 'app'::text])));
 
 
 

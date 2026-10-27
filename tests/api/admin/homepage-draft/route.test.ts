@@ -85,13 +85,15 @@ describe('authorization', () => {
 describe('GET /api/admin/homepage-draft', () => {
   it('reports nothing pending when there is no draft', async () => {
     const none = { added: 0, removed: 0, edited: 0, reordered: false }
+    const layouts = { web: { sections: none, slides: none }, web_mobile: { sections: none, slides: none }, app: { sections: none, slides: none } }
     expect(await (await GET(req('GET'))).json()).toEqual({
       hasDraft: false,
       updatedAt: null,
       updatedBy: null,
       sections: none,
       slides: none,
-      bySurface: { web: { sections: none, slides: none }, app: { sections: none, slides: none } },
+      bySurface: layouts,
+      byPage: { home: layouts, products: layouts, category: layouts, brand: layouts },
     })
   })
 

@@ -79,10 +79,18 @@ export type ProductSource = 'featured' | 'new_arrivals' | 'best_sellers' | 'on_s
 
 export type SectionLayout = 'grid' | 'carousel'
 
-/** The website and the mobile app each have their own homepage layout (sections and hero slides). */
-export type HomepageSurface = 'web' | 'app'
+/**
+ * Desktop web, phone browsers and the app each have their own layout (sections and hero slides).
+ * `web` is the desktop website; phone browsers and the app fall back to it until they have rows.
+ */
+export type HomepageSurface = 'web' | 'web_mobile' | 'app'
 
-export const HOMEPAGE_SURFACES: HomepageSurface[] = ['web', 'app']
+export const HOMEPAGE_SURFACES: HomepageSurface[] = ['web', 'web_mobile', 'app']
+
+/** The page a section is on: the homepage, or between products on a listing (every category shares one, as does every brand). */
+export type HomepagePage = 'home' | 'products' | 'category' | 'brand'
+
+export const HOMEPAGE_PAGES: HomepagePage[] = ['home', 'products', 'category', 'brand']
 
 export interface HomepageSection {
   id: string
@@ -99,15 +107,24 @@ export interface HomepageSection {
   ends_at: string | null
   /** Absent on rows saved before the column existed; read it through rowSurface(). */
   surface?: HomepageSurface | null
+  /** Absent on rows saved before the column existed; read it through rowPage(). */
+  page?: HomepagePage | null
 }
 
 export function rowSurface(row: { surface?: string | null }): HomepageSurface {
-  return row.surface === 'app' ? 'app' : 'web'
+  return row.surface === 'app' || row.surface === 'web_mobile' ? row.surface : 'web'
 }
 
+export function rowPage(row: { page?: string | null }): HomepagePage {
+  return HOMEPAGE_PAGES.includes(row.page as HomepagePage) ? (row.page as HomepagePage) : 'home'
+}
+
+export const isListingPage = (page: HomepagePage) => page !== 'home'
+
 /**
- * The rows that belong to a surface. The app mirrors the website until it has a layout of its own
- * (any app row, active or not), so a store that never opens the Mobile app tab keeps one layout.
+ * The rows that belong to a surface. Phone browsers and the app mirror the desktop website until
+ * they have a layout of their own (any row of theirs, active or not), so a store that never opens
+ * those tabs keeps one layout. Pass the rows of one page.
  */
 export function forSurface<T extends { surface?: string | null }>(rows: T[], surface: HomepageSurface): T[] {
   const own = rows.filter(r => rowSurface(r) === surface)
@@ -120,19 +137,71 @@ export interface SectionMeta {
   description: string
   /** A singleton may only appear once on the page. */
   singleton?: boolean
-  /** Surfaces that can use the type; absent means both. */
+  /** Surfaces that can use the type; absent means all. Phone browsers count as the website. */
   surfaces?: HomepageSurface[]
+  /** Pages that can use the type; absent means all. */
+  pages?: HomepagePage[]
   /** Types this one cannot share a layout with (two auto-advancing heroes, say). */
   excludes?: SectionType[]
+  /** The admin can set the shape of what this names ("Banner", "Card image"); `auto` keeps the component's own. */
+  aspect?: string
 }
 
-/** The types the picker offers on a surface. */
-export function sectionTypesFor(surface: HomepageSurface): SectionType[] {
+/** The types the picker offers on a surface and page. */
+export function sectionTypesFor(surface: HomepageSurface, page: HomepagePage = 'home'): SectionType[] {
+  const asSurface = surface === 'web_mobile' ? 'web' : surface
   return SECTION_TYPES.filter(t => {
-    const only = SECTION_META[t].surfaces
-    return !only || only.includes(surface)
+    const { surfaces, pages } = SECTION_META[t]
+    return (!surfaces || surfaces.includes(asSurface)) && (!pages || pages.includes(page))
   })
 }
+
+/** Where a listing-page section sits: after the Nth product, and again every M products. */
+export interface SectionPlacement {
+  after: number
+  every: number | null
+}
+
+export const PLACEMENT_DEFAULT_AFTER = 12
+export const PLACEMENT_MIN_EVERY = 4
+const PLACEMENT_MAX_REPEATS = 12
+
+export function sectionPlacement(section: Pick<HomepageSection, 'config'>): SectionPlacement {
+  const p = (section.config?.placement ?? {}) as { after?: unknown; every?: unknown }
+  const after = Number(p.after)
+  const every = Number(p.every)
+  return {
+    after: p.after != null && Number.isInteger(after) && after >= 0 && after <= 1000 ? after : PLACEMENT_DEFAULT_AFTER,
+    every: Number.isInteger(every) && every >= PLACEMENT_MIN_EVERY ? every : null,
+  }
+}
+
+/** The product counts a section follows, within `total`: a section never trails the last product. */
+export function placementPositions(p: SectionPlacement, total: number, max = PLACEMENT_MAX_REPEATS): number[] {
+  const out: number[] = []
+  for (let at = p.after; at < total && out.length < (p.every ? max : 1); at += p.every ?? total) out.push(at)
+  return out
+}
+
+export const SECTION_ASPECTS = ['auto', '21:9', '16:9', '3:1', '5:3', '4:3', '1:1', '4:5', '3:4'] as const
+export type SectionAspect = (typeof SECTION_ASPECTS)[number]
+
+export const aspectRatioOf = (aspect: SectionAspect): number | null => {
+  if (aspect === 'auto') return null
+  const [w, h] = aspect.split(':').map(Number)
+  return w / h
+}
+
+export function sectionAspectValue(section: Pick<HomepageSection, 'type' | 'config'>): SectionAspect {
+  const value = section.config?.aspect as SectionAspect | undefined
+  return SECTION_META[section.type]?.aspect && value && SECTION_ASPECTS.includes(value) ? value : 'auto'
+}
+
+/** The section's chosen shape as width / height, or null for the component's own look. */
+export const sectionAspect = (section: Pick<HomepageSection, 'type' | 'config'>): number | null =>
+  aspectRatioOf(sectionAspectValue(section))
+
+const HOME_ONLY: HomepagePage[] = ['home']
 
 export const SECTION_META: Record<SectionType, SectionMeta> = {
   hero: {
@@ -140,19 +209,37 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     description: 'Full-width rotating banner at the top of the page.',
     singleton: true,
     excludes: ['motion_hero'],
+    pages: HOME_ONLY,
   },
   offer_slider: {
     label: 'Offer slider',
     description: 'Centered offer cards with left and right peek, each linking to its filtered products.',
     singleton: true,
+    aspect: 'Offer cards',
   },
   trust_strip: { label: 'Trust strip', description: 'Row of delivery, returns and payment reassurances.' },
-  category_grid: { label: 'Shop by category', description: 'Grid or carousel of top-level categories.' },
+  category_grid: {
+    label: 'Shop by category',
+    description: 'Grid or carousel of top-level categories.',
+    aspect: 'Category tiles',
+  },
   brand_carousel: { label: 'Shop by brand', description: 'Grid or carousel of brands you stock.' },
-  product_row: { label: 'Product row', description: 'Featured, new arrivals, best sellers, on sale, or one category.' },
-  category_showcase: { label: 'Category showcase', description: 'Large category cards with product thumbnails.' },
+  product_row: {
+    label: 'Product row',
+    description: 'Featured, new arrivals, best sellers, on sale, or one category.',
+    aspect: 'Product images',
+  },
+  category_showcase: {
+    label: 'Category showcase',
+    description: 'Large category cards with product thumbnails.',
+    aspect: 'Product thumbnails',
+  },
   deal_of_the_day: { label: 'Deal of the day', description: 'A small set of highlighted offers.' },
-  promo_banner: { label: 'Promo banner', description: 'Seasonal or sale banner. Supports a start and end date.' },
+  promo_banner: {
+    label: 'Promo banner',
+    description: 'Seasonal or sale banner. Supports a start and end date.',
+    aspect: 'Banner',
+  },
   featured_for_you: {
     label: 'Featured for you',
     description: 'Personalised picks. Hidden for signed-out visitors.',
@@ -160,11 +247,12 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
   },
   benefits: { label: 'Benefits', description: 'Why-shop-with-us tiles.' },
   why_us: { label: 'Why us', description: 'Three larger cards explaining what sets the store apart.', singleton: true },
-  about: { label: 'About', description: 'Store story with stats.', singleton: true },
+  about: { label: 'About', description: 'Store story with stats.', singleton: true, pages: HOME_ONLY },
   business_cta: { label: 'Business CTA', description: 'Banner promoting the B2B/bulk experience.', singleton: true },
   countdown_deal: {
     label: 'Countdown deal',
     description: 'One product in a full-width banner with a live countdown. Hides itself when the timer ends.',
+    aspect: 'Product image',
   },
   testimonials: {
     label: 'Testimonials',
@@ -175,6 +263,7 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     label: 'Recently viewed',
     description: "Each visitor's own recently viewed products. Hidden until they have viewed enough.",
     singleton: true,
+    pages: ['home', 'category', 'brand'],
   },
   category_tabs: {
     label: 'Category tabs',
@@ -193,6 +282,7 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     label: 'Guides and articles',
     description: 'Cards linking to your guides, articles or blog posts.',
     singleton: true,
+    aspect: 'Article images',
   },
   social_strip: {
     label: 'Social strip',
@@ -209,20 +299,24 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     description: 'Layered slides with a foreground image that drifts over the background and a headline that reveals itself.',
     singleton: true,
     excludes: ['hero'],
+    aspect: 'Banner',
   },
   stories: {
     label: 'Stories',
     description: 'A row of tappable rings that open full-screen image stories with a Shop button.',
     singleton: true,
+    pages: HOME_ONLY,
   },
   product_spotlight: {
     label: 'Product spotlight',
     description: 'One product, large, with callouts that appear as the visitor scrolls past.',
+    pages: HOME_ONLY,
   },
   rewards_game: {
     label: 'Rewards game',
     description: 'A spin-the-wheel or scratch card that gives signed-in customers a coupon.',
     singleton: true,
+    pages: HOME_ONLY,
   },
   slides: {
     label: 'Slides',
