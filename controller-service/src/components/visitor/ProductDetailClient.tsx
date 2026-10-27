@@ -1,5 +1,6 @@
 'use client'
 
+import { updateChannelsLabel, useMessagingChannels } from '@/hooks/useStoreFlags'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
@@ -179,6 +180,7 @@ const DeliveryInfo = ({
   isCodAllowed,
   freeShippingThreshold = 500,
 }: PolicyProps) => {
+  const updatesVia = updateChannelsLabel(useMessagingChannels())
   const [activePolicy, setActivePolicy] = useState<null | {
     label: string
     sub: string
@@ -212,7 +214,7 @@ const DeliveryInfo = ({
       bullets: [
         'Delivered within 3–7 business days',
         'Same-day dispatch on orders placed before 2 PM',
-        'Tracking link sent via SMS & email after dispatch',
+        `Tracking link sent via ${updatesVia} after dispatch`,
         'Delivery available across India including remote areas',
       ],
       color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',

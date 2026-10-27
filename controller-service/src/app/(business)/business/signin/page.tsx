@@ -9,6 +9,7 @@ import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import { bp } from '@/lib/shared/business-path'
 import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
 
 export default function BusinessSignInWrapper() {
   return (
@@ -43,6 +44,12 @@ function BusinessSignInPage() {
   const [loginPhone, setLoginPhone] = useState('')
   const [selectedChannel, setSelectedChannel] = useState<'email' | 'sms' | 'whatsapp'>('email')
   const [channel, setChannel] = useState<'email' | 'sms' | 'whatsapp'>('email')
+  // SMS / WhatsApp only while their Site Controls switch is on.
+  const channelsOn = useMessagingChannels()
+  useEffect(() => {
+    if ((selectedChannel === 'sms' && !channelsOn.sms) || (selectedChannel === 'whatsapp' && !channelsOn.whatsapp))
+      setSelectedChannel('email')
+  }, [selectedChannel, channelsOn.sms, channelsOn.whatsapp])
   const [otp, setOtp] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -396,7 +403,7 @@ function BusinessSignInPage() {
       ),
       label: 'Business WhatsApp',
     },
-  ] as const
+  ].filter(o => o.id === 'email' || (o.id === 'sms' ? channelsOn.sms : channelsOn.whatsapp))
 
   const googleBusy = googleLoading || (leaving && via.current === 'google')
   const formBusy = isLoading || (leaving && via.current === 'form')
@@ -515,6 +522,7 @@ function BusinessSignInPage() {
                 </div>
 
                 {/* Inline channel selector */}
+                {channelOptions.length > 1 && (
                 <div>
                   <p className="text-sm font-medium text-foreground-secondary mb-1.5">Send OTP via</p>
                   <div className="flex gap-2">
@@ -535,6 +543,7 @@ function BusinessSignInPage() {
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* Conditional phone input */}
                 {(selectedChannel === 'sms' || selectedChannel === 'whatsapp') && (
@@ -646,7 +655,7 @@ function BusinessSignInPage() {
                     }}
                     className="text-foreground-secondary hover:text-foreground"
                   >
-                    Change Channel
+                    {channelOptions.length > 1 ? 'Change Channel' : 'Change email'}
                   </button>
                 </div>
                 {requiresPolicy && (

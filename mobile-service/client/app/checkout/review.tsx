@@ -26,7 +26,7 @@ import { listAddresses } from '../../src/api/addresses'
 import { cancelOrder } from '../../src/api/orders'
 import { api } from '../../src/api/client'
 import { useAuthStore } from '../../src/stores/authStore'
-import { useBusiness } from '../../src/components/account/hooks'
+import { useBusiness, useUpdateChannelsLabel } from '../../src/components/account/hooks'
 import { businessDiscountPreview } from '../../src/api/business'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { invalidateEddCache } from '../../src/lib/edd'
@@ -47,9 +47,9 @@ interface ShippingQuote {
 }
 
 const HEADING = 'font-display text-xl font-extrabold text-foreground'
-const PROMISES = [
+const promises = (updatesVia: string) => [
   'Orders placed before 5 PM are dispatched the same day',
-  'Tracked shipment with SMS & email updates',
+  `Tracked shipment with ${updatesVia} updates`,
   'Secure packaging to ensure safe delivery',
 ]
 
@@ -115,6 +115,7 @@ function ReviewLoading() {
 
 export default function CheckoutReviewScreen() {
   const router = useRouter()
+  const updatesVia = useUpdateChannelsLabel()
   const qc = useQueryClient()
   const t = useTokens()
   const params = useLocalSearchParams<{ intent?: string; couponCode?: string; addressId?: string }>()
@@ -558,7 +559,7 @@ export default function CheckoutReviewScreen() {
                 <View className="flex-1">
                   <Text accessibilityRole="header" className="mb-2 font-display text-base font-extrabold text-foreground">Our Delivery Promise</Text>
                   <View className="gap-1.5">
-                    {PROMISES.map(p => (
+                    {promises(updatesVia).map(p => (
                       <View key={p} className="flex-row items-center gap-2">
                         <Check size={16} color={status.success} strokeWidth={3} />
                         <Text className="flex-1 text-sm text-foreground-secondary">{p}</Text>

@@ -11,6 +11,7 @@ import { CATEGORY_META } from '../../src/components/push/categories'
 import { usePushPermission } from '../../src/hooks/useNotifications'
 import { getDeviceOffersOptIn, isBlocked, OFFERS_OPT_IN_KEY, setDeviceOffersOptIn, type PushPermission } from '../../src/lib/push'
 import { useAuthStore } from '../../src/stores/authStore'
+import { useFeatureFlags } from '../../src/components/account/hooks'
 import { openPushPrompt } from '../../src/stores/pushPromptStore'
 import {
   Button, ListGroup, ListRow, ListSkeleton, Notice, Screen, Switch, Text, TextButton, toast, type IconComponent,
@@ -98,6 +99,9 @@ export default function NotificationSettingsScreen() {
   const userId = useAuthStore(s => s.user?.id ?? null)
   const authLoading = useAuthStore(s => s.isLoading)
   const { data: permission } = usePushPermission()
+  // SMS / WhatsApp rows only while their Site Controls switch is on.
+  const flags = useFeatureFlags()
+  const channels = CHANNELS.filter(ch => (ch.id === 'sms' ? flags.smsEnabled : ch.id === 'whatsapp' ? flags.whatsappEnabled : true))
   const key = ['notification-preferences', userId]
   const prefs = useQuery({ queryKey: key, queryFn: getNotificationPreferences, enabled: !!userId })
   // A server reply only replaces the cache once no other save is in flight, so quick toggles don't flicker.
@@ -150,7 +154,7 @@ export default function NotificationSettingsScreen() {
                 <Notice className="mb-4">You unsubscribed from marketing messages, so offers and price alerts are off.</Notice>
               ) : null}
               <ListGroup title={meta.label}>
-                {CHANNELS.map(ch => (
+                {channels.map(ch => (
                   <ListRow
                     key={ch.id}
                     title={ch.label}
