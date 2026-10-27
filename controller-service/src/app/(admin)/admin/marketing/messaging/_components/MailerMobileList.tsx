@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Eye, Send, Trash2 } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
@@ -65,6 +66,7 @@ function formatDate(c: Campaign): string {
 export default function MailerMobileList({ campaigns, templateLabels, statusStyles, currentListUrl, host, locks = {}, meId = null }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
+  const { showToast } = useToast()
   const canWrite = useCanWrite('campaigns:write')
 
   const [selected, setSelected] = useState<Campaign | null>(null)
@@ -83,11 +85,12 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
     if (busy) return
     setBusy(true)
     try {
-      await fetch(`/api/admin/marketing/messaging/${c.id}/send`, {
+      const res = await fetch(`/api/admin/mailer/${c.id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dispatchNow: true }),
       })
+      if (!res.ok) return showToast((await res.json().catch(() => ({}))).error || 'Could not send this message', 'error')
       setSelected(null)
       router.refresh()
     } finally {
@@ -106,7 +109,8 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
     if (!ok || busy) return
     setBusy(true)
     try {
-      await fetch(`/api/admin/marketing/messaging/${c.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/admin/mailer/${c.id}`, { method: 'DELETE' })
+      if (!res.ok) return showToast((await res.json().catch(() => ({}))).error || 'Could not delete this message', 'error')
       setSelected(null)
       router.refresh()
     } finally {
