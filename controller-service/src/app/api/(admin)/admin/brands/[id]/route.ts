@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
+import { recordDirectRevision } from '@/lib/admin/entity-revisions'
+import { brandContentOf } from '@/lib/catalog/brand-draft'
 
 const patchSchema = z
   .object({
@@ -74,7 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
 
-  const existingBrand = await queryOne<any>('SELECT is_active FROM brands WHERE id = $1', [id])
+  const existingBrand = await queryOne<any>('SELECT * FROM brands WHERE id = $1', [id])
 
   await query(
     `UPDATE brands SET
@@ -103,6 +105,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   revalidatePath('/admin/brands')
 
   const updated = await queryOne<any>('SELECT * FROM brands WHERE id = $1', [id])
+  // Drafts open on this brand see who changed what when they publish.
+  if (existingBrand && updated)
+    await recordDirectRevision({ type: 'brand', id, before: brandContentOf(existingBrand), after: brandContentOf(updated), actorAdminId: admin.adminId })
 
   return NextResponse.json(updated)
 }

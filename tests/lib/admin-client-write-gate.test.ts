@@ -78,6 +78,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // passes canUseScenarioFill (useCanWrite('templates') / server-derived canEdit), and
   // the applyFill callback lives in the parent editor. Same pattern as BatchPickerModal.
   'controller-service/src/components/admin/messaging-templates/ScenarioFillDialog.tsx',
+  // Draft merge dialog: opens only from a publish the caller already gated (draft editors, DraftRowActions).
+  'controller-service/src/components/admin/drafts/MergeDialog.tsx',
   // Mutation lives in the parent form; this is a field editor feeding onChange.
   'controller-service/src/components/admin/LineItemsSection.tsx',
   // Image-URL field feeding onChange; its upload POST is a CDN asset write the server gates on the

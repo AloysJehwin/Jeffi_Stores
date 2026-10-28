@@ -79,25 +79,27 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
 async function BrandPendingDrafts() {
   const host = await getHost()
   const [pendingDrafts, createDrafts] = await Promise.all([
-    // Edit-drafts: unpublished CHANGES staged against a live brand (brand_drafts).
-    queryMany<{ brand_id: string; name: string; updated_at: string }>(
-      `SELECT bd.brand_id, b.name, bd.updated_at
+    // Edit-drafts: one row per draft (several admins can each hold one of the same brand).
+    // A new brand edited through a draft before its first publish is listed here too.
+    queryMany<{ id: string; brand_id: string; name: string; title: string | null; author: string | null; is_new: boolean; updated_at: string }>(
+      `SELECT bd.id, bd.brand_id, COALESCE(NULLIF(bd.fields->>'name', ''), b.name) AS name, bd.title, b.is_draft AS is_new, bd.updated_at,
+              COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS author
        FROM brand_drafts bd
-       JOIN brands b ON b.id = bd.brand_id AND b.is_draft = false
+       JOIN brands b ON b.id = bd.brand_id
+       LEFT JOIN admins ad ON ad.id = bd.author_admin_id LEFT JOIN users u ON u.id = ad.user_id
        ORDER BY bd.updated_at DESC
        LIMIT 200`
     ),
-    // Create-drafts: brand-new brands never published to the live list (is_draft = true).
-    // A new brand edited before its first publish also has a brand_drafts row — list it once.
-    queryMany<{ id: string; name: string; created_at: string; staged: boolean }>(
-      `SELECT b.id, COALESCE(bd.fields->>'name', b.name) AS name, b.created_at, bd.brand_id IS NOT NULL AS staged
-       FROM brands b LEFT JOIN brand_drafts bd ON bd.brand_id = b.id
-       WHERE b.is_draft = true ORDER BY b.created_at DESC LIMIT 200`
+    // Create-drafts: brand-new brands never published to the live list (is_draft = true), edited in place.
+    queryMany<{ id: string; name: string; created_at: string }>(
+      `SELECT b.id, b.name, b.created_at FROM brands b
+       WHERE b.is_draft = true AND NOT EXISTS (SELECT 1 FROM brand_drafts bd WHERE bd.brand_id = b.id)
+       ORDER BY b.created_at DESC LIMIT 200`
     ),
   ])
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
   if (!pendingDraftsCount) return null
-  const locks = await draftLockChips('brand', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.brand_id)])
+  const locks = await draftLockChips('brand', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.id)])
 
   return (
         <details open className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
@@ -126,9 +128,9 @@ async function BrandPendingDrafts() {
                   subtitle="New brand — not yet published"
                   updatedAt={d.created_at}
                   editHref={ap(`/admin/brands/${d.id}/edit`, host)}
-                  publishPath={d.staged ? `/api/admin/brands/${d.id}/publish` : `/api/admin/brands/${d.id}`}
-                  publishMethod={d.staged ? undefined : 'PATCH'}
-                  publishBody={d.staged ? undefined : { is_draft: false, is_active: true }}
+                  publishPath={`/api/admin/brands/${d.id}`}
+                  publishMethod="PATCH"
+                  publishBody={{ is_draft: false, is_active: true }}
                   publishConfirm={`Publish "${d.name}" to the live brand list?`}
                   discardPath={`/api/brands/${d.id}`}
                   discardConfirm={`Delete the draft brand "${d.name}"? This cannot be undone.`}
@@ -138,15 +140,17 @@ async function BrandPendingDrafts() {
               ))}
               {pendingDrafts.map(d => (
                 <DraftRowActions
-                  key={d.brand_id}
+                  key={d.id}
                   entityId={d.brand_id}
-                  name={d.name}
+                  name={d.title ? `${d.name} · ${d.title}` : d.name}
+                  subtitle={[d.is_new ? 'New brand — not yet published' : null, d.author ? `Draft by ${d.author}` : null].filter(Boolean).join(' · ') || null}
                   updatedAt={d.updated_at}
-                  editHref={ap(`/admin/brands/${d.brand_id}/edit`, host)}
-                  publishPath={`/api/admin/brands/${d.brand_id}/publish`}
-                  discardPath={`/api/admin/brands/${d.brand_id}/draft`}
+                  editHref={ap(`/admin/brands/${d.brand_id}/edit?draft=${d.id}`, host)}
+                  publishPath={`/api/admin/brands/${d.brand_id}/publish?draft=${d.id}`}
+                  publishConfirm={d.is_new ? `Publish "${d.name}" to the live brand list?` : undefined}
+                  discardPath={`/api/admin/brands/${d.brand_id}/draft?draft=${d.id}`}
                   entityLabel="brand"
-                  lock={locks[d.brand_id]}
+                  lock={locks[d.id]}
                 />
               ))}
             </div>

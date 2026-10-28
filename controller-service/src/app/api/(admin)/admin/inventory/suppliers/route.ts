@@ -6,7 +6,8 @@ import { queryMany, queryOne, query } from '@/lib/shared/db'
 import { buildWhere, normalizeQuery, sortClause } from '@jeffi/list-filters'
 import { SUPPLIERS_ENTITY, SUPPLIER_SORTS } from '@/lib/filters/entities/suppliers'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
-import { draftLockChips } from '@/lib/admin/draft-locks'
+import { entityDraftChips } from '@/lib/admin/draft-entity-chips'
+import { supplierDrafts } from '@/lib/admin/supplier-drafts'
 
 const PostSchema = z.object({
   name: zNonEmpty,
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
        LIMIT $${w.nextIdx} OFFSET $${w.nextIdx + 1}`,
       [...w.params, limit, offset]
     )
-    const locks = await draftLockChips('supplier', (rows || []).map(r => r.id), admin.adminId)
+    const locks = await entityDraftChips(supplierDrafts, (rows || []).map(r => r.id), admin.adminId)
 
     return NextResponse.json({ suppliers: (rows || []).map(r => (locks[r.id] ? { ...r, draft_lock: locks[r.id] } : r)), total, page, limit })
   } catch (err: any) {

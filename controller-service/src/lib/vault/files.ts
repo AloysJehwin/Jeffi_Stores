@@ -234,6 +234,8 @@ export interface CompleteInput {
   sessionId: string
   downloadable?: boolean
   uploadedBy?: string | null
+  /** Upload made while editing a product draft: the file stays private to it until publish. */
+  draftId?: string | null
 }
 
 export interface ProductFileRow {
@@ -250,6 +252,8 @@ export interface ProductFileRow {
   size_bytes: string
   display_order: number
   created_at: string
+  /** Set on files uploaded in a draft and not yet published. */
+  draft_id?: string | null
 }
 
 async function abortSession(id: string, key?: string): Promise<void> {
@@ -322,11 +326,11 @@ export async function completeUpload(input: CompleteInput): Promise<ProductFileR
     const res = await client.query<ProductFileRow>(
       `INSERT INTO product_files
          (product_id, kind, status, downloadable, storage_driver, storage_key,
-          display_name, original_name, mime_type, size_bytes, uploaded_by, display_order)
+          display_name, original_name, mime_type, size_bytes, uploaded_by, display_order, draft_id)
        VALUES ($1, $2, 'ready', $3, $4, $5, $6, $7, $8, $9, $10,
-         COALESCE((SELECT MAX(display_order) + 1 FROM product_files WHERE product_id = $1), 0))
+         COALESCE((SELECT MAX(display_order) + 1 FROM product_files WHERE product_id = $1), 0), $11)
        RETURNING id, product_id, kind, status, downloadable, storage_driver, storage_key,
-                 display_name, original_name, mime_type, size_bytes, display_order, created_at`,
+                 display_name, original_name, mime_type, size_bytes, display_order, created_at, draft_id`,
       [
         session.product_id,
         sniffed,
@@ -338,6 +342,7 @@ export async function completeUpload(input: CompleteInput): Promise<ProductFileR
         session.mime_type,
         actualSize,
         input.uploadedBy ?? null,
+        input.draftId ?? null,
       ]
     )
     return res.rows[0]
@@ -356,35 +361,114 @@ function promotedKey(stagingKey: string): string {
   return `vault/${stagingKey.slice('vault-staging/'.length)}`
 }
 
-export async function listFiles(productId: string): Promise<ProductFileRow[]> {
-  return queryMany<ProductFileRow>(
-    `SELECT id, product_id, kind, status, downloadable, storage_driver, storage_key,
-            display_name, original_name, mime_type, size_bytes, display_order, created_at
-       FROM product_files WHERE product_id = $1 ORDER BY display_order ASC, created_at ASC`,
-    [productId]
+/** A draft's pending changes to live files, kept in product_drafts.fields._files until publish. */
+export interface DraftFileOps {
+  removed?: string[]
+  downloadable?: Record<string, boolean>
+}
+
+async function draftFileOps(draftId: string): Promise<DraftFileOps> {
+  const r = await queryOne<{ ops: DraftFileOps | null }>(`SELECT fields->'_files' AS ops FROM product_drafts WHERE id = $1`, [draftId])
+  return r?.ops ?? {}
+}
+
+async function saveDraftFileOps(draftId: string, ops: DraftFileOps): Promise<void> {
+  await queryOne(
+    `UPDATE product_drafts SET fields = jsonb_set(fields, '{_files}', $2::jsonb, true), updated_at = now() WHERE id = $1`,
+    [draftId, JSON.stringify(ops)]
   )
 }
 
-export async function setDownloadable(productId: string, fileId: string, downloadable: boolean): Promise<boolean> {
+/** Live files; with a draft, as that draft will publish them (its uploads in, its removals out). */
+export async function listFiles(productId: string, draftId?: string | null): Promise<ProductFileRow[]> {
+  const rows = await queryMany<ProductFileRow>(
+    `SELECT id, product_id, kind, status, downloadable, storage_driver, storage_key,
+            display_name, original_name, mime_type, size_bytes, display_order, created_at, draft_id
+       FROM product_files WHERE product_id = $1 AND (draft_id IS NULL OR draft_id = $2::uuid)
+      ORDER BY display_order ASC, created_at ASC`,
+    [productId, draftId ?? null]
+  )
+  if (!draftId) return rows
+  const ops = await draftFileOps(draftId)
+  const removed = new Set(ops.removed ?? [])
+  return rows
+    .filter(r => !removed.has(r.id))
+    .map(r => (ops.downloadable && r.id in ops.downloadable ? { ...r, downloadable: ops.downloadable[r.id] } : r))
+}
+
+export async function setDownloadable(productId: string, fileId: string, downloadable: boolean, draftId?: string | null): Promise<boolean> {
+  if (draftId) {
+    const staged = await queryOne<{ id: string }>(
+      `UPDATE product_files SET downloadable=$3, updated_at=now() WHERE id=$1 AND product_id=$2 AND draft_id=$4 RETURNING id`,
+      [fileId, productId, downloadable, draftId]
+    )
+    if (staged) return true
+    const live = await queryOne<{ id: string }>(`SELECT id FROM product_files WHERE id=$1 AND product_id=$2 AND draft_id IS NULL`, [fileId, productId])
+    if (!live) return false
+    const ops = await draftFileOps(draftId)
+    await saveDraftFileOps(draftId, { ...ops, downloadable: { ...(ops.downloadable ?? {}), [fileId]: downloadable } })
+    return true
+  }
   const row = await queryOne<{ id: string }>(
     `UPDATE product_files SET downloadable=$3, updated_at=now()
-      WHERE id=$1 AND product_id=$2 RETURNING id`,
+      WHERE id=$1 AND product_id=$2 AND draft_id IS NULL RETURNING id`,
     [fileId, productId, downloadable]
   )
   return !!row
 }
 
-/** Drop the row, remove the object, decrement usage. */
-export async function deleteFile(productId: string, fileId: string): Promise<boolean> {
+/** Drop the row, remove the object, decrement usage. In a draft, a live file is only marked for removal. */
+export async function deleteFile(productId: string, fileId: string, draftId?: string | null): Promise<boolean> {
+  if (draftId) {
+    const live = await queryOne<{ id: string }>(`SELECT id FROM product_files WHERE id=$1 AND product_id=$2 AND draft_id IS NULL`, [fileId, productId])
+    if (live) {
+      const ops = await draftFileOps(draftId)
+      await saveDraftFileOps(draftId, { ...ops, removed: [...new Set([...(ops.removed ?? []), fileId])] })
+      return true
+    }
+  }
   // DELETE...RETURNING first so concurrent deletes can't double-decrement usage.
   const row = await queryOne<{ storage_key: string; size_bytes: string }>(
-    `DELETE FROM product_files WHERE id=$1 AND product_id=$2 RETURNING storage_key, size_bytes`,
-    [fileId, productId]
+    `DELETE FROM product_files WHERE id=$1 AND product_id=$2 AND draft_id IS NOT DISTINCT FROM $3::uuid RETURNING storage_key, size_bytes`,
+    [fileId, productId, draftId ?? null]
   )
   if (!row) return false
   await getStorageDriver().delete(row.storage_key).catch(() => {})
   await bumpUsage(-Number(row.size_bytes), -1)
   return true
+}
+
+/** Inside the publish transaction: apply the draft's toggles and removals. Returns the removed objects to release after commit. */
+export async function applyDraftFileOpsTx(
+  client: { query: (t: string, p?: unknown[]) => Promise<{ rows: any[] }> },
+  productId: string,
+  ops: DraftFileOps | null | undefined
+): Promise<{ storage_key: string; size_bytes: string }[]> {
+  for (const [id, on] of Object.entries(ops?.downloadable ?? {}))
+    await client.query(`UPDATE product_files SET downloadable=$3, updated_at=now() WHERE id=$1 AND product_id=$2`, [id, productId, on])
+  if (!ops?.removed?.length) return []
+  const r = await client.query(
+    `DELETE FROM product_files WHERE id = ANY($1::uuid[]) AND product_id = $2 AND draft_id IS NULL RETURNING storage_key, size_bytes`,
+    [ops.removed, productId]
+  )
+  return r.rows
+}
+
+/** After commit: delete the objects of removed files and give back their quota. */
+export async function releaseFileObjects(rows: { storage_key: string; size_bytes: string }[]): Promise<void> {
+  for (const row of rows) {
+    await getStorageDriver().delete(row.storage_key).catch(() => {})
+    await bumpUsage(-Number(row.size_bytes), -1).catch(err => console.error('[vault] usage release failed', err))
+  }
+}
+
+/** A discarded draft's uploads never went live: remove them. */
+export async function discardDraftFiles(draftId: string): Promise<void> {
+  const rows = await queryMany<{ storage_key: string; size_bytes: string }>(
+    `DELETE FROM product_files WHERE draft_id = $1 RETURNING storage_key, size_bytes`,
+    [draftId]
+  )
+  await releaseFileObjects(rows)
 }
 
 /** First n bytes of a stored object: straight off disk for the local driver, else a ranged signed GET. */

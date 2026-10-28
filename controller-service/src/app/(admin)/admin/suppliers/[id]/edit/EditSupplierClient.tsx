@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
@@ -18,6 +18,8 @@ import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { resnapshotSupplierSession } from './actions'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { assertDraftResponse, lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
+import type { MergeConflict } from '@/lib/admin/draft-merge'
+import MergeDialog from '@/components/admin/drafts/MergeDialog'
 
 
 const emptyForm = {
@@ -75,21 +77,37 @@ function mergeDraft(live: SupplierForm, df: Record<string, any>): SupplierForm {
   }
 }
 
-export default function EditSupplierClient({ id, initialLock }: { id: string; initialLock?: DraftLockState | null }) {
+export default function EditSupplierClient({
+  id,
+  draftId,
+  draftTitle,
+  initialLock,
+  notice,
+}: {
+  id: string
+  /** The draft being edited: its id is the lock and session key. */
+  draftId: string
+  draftTitle?: string | null
+  initialLock?: DraftLockState | null
+  /** Server-rendered "live changed since you started" banner. */
+  notice?: ReactNode
+}) {
   const router = useRouter()
   const [form, setForm] = useState<SupplierForm>(emptyForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [hasDraft, setHasDraft] = useState(false)
+  const [conflicts, setConflicts] = useState<MergeConflict[] | null>(null)
   const toast = useActionToast()
   const setError = (text: string) => text && toast.error(text)
   const [loadError, setLoadError] = useState('')
   const listHref = ap('/admin/suppliers?tab=suppliers&active=true')
   const viewHref = ap(`/admin/suppliers/${id}/view`)
   const [ifscLookup, setIfscLookup] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
-  const lock = useDraftLock({ resourceType: 'supplier', resourceId: id ?? null, initial: initialLock })
-  const edit = useEditSession({ resourceType: 'supplier', resourceId: id ?? null, lock })
+  const lock = useDraftLock({ resourceType: 'supplier', resourceId: draftId, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'supplier', resourceId: draftId, lock })
+  const publishPath = `/api/admin/suppliers/${id}/publish?draft=${draftId}`
   const readOnlyRef = useRef(lock.readOnly)
   readOnlyRef.current = lock.readOnly
 
@@ -107,8 +125,8 @@ export default function EditSupplierClient({ id, initialLock }: { id: string; in
         const r = await fetch(`/api/admin/suppliers/${id}/draft`, {
           method: 'PATCH',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json', ...lockHeaders('supplier', id) },
-          body: JSON.stringify(value),
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('supplier', draftId) },
+          body: JSON.stringify({ draftId, fields: value }),
           signal,
         })
         await assertDraftResponse(r)
@@ -128,7 +146,7 @@ export default function EditSupplierClient({ id, initialLock }: { id: string; in
     try {
       const [supplierJson, draftJson] = await Promise.all([
         fetch(`/api/admin/suppliers/${id}`).then(r => r.json()),
-        fetch(`/api/admin/suppliers/${id}/draft`, { credentials: 'include' }).then(r => r.json()),
+        fetch(`/api/admin/suppliers/${id}/draft?draft=${draftId}`, { credentials: 'include' }).then(r => r.json()),
       ])
       const s = supplierJson.supplier
       if (!s) {
@@ -151,30 +169,13 @@ export default function EditSupplierClient({ id, initialLock }: { id: string; in
     }
   }
 
-  // Load live + draft, then ensure the draft row exists (idempotent — never wipes if already there).
+  // Load live + draft (the draft exists: the edit page only renders for one).
   useEffect(() => {
-    void hydrate().then(async () => {
+    void hydrate().then(() => {
       didHydrateRef.current = true
-      // Keep the on-mount PATCH so a direct /edit visit still works; the server's PATCH is a
-      // replace, so only touch it when no draft was fetched (otherwise it would wipe fields).
-      try {
-        const r = await fetch(`/api/admin/suppliers/${id}/draft`, { credentials: 'include' })
-        const j = await r.json().catch(() => ({}))
-        if (!j?.draft_fields && !readOnlyRef.current) {
-          await fetch(`/api/admin/suppliers/${id}/draft`, {
-            method: 'PATCH',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json', ...lockHeaders('supplier', id) },
-            body: JSON.stringify({}),
-          })
-          setHasDraft(true)
-        }
-      } catch {
-        // Non-fatal — autosave will create the row on first edit.
-      }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, draftId])
 
   // Trigger autosave on form change after the initial hydrate.
   useEffect(() => {
@@ -209,7 +210,7 @@ export default function EditSupplierClient({ id, initialLock }: { id: string; in
       await autosave.flush(form)
       setHasDraft(true)
       // Resnapshot so a later Cancel reverts to this saved draft, not the pre-session state.
-      await resnapshotSupplierSession(id)
+      await resnapshotSupplierSession(draftId)
       router.push(listHref)
     } catch (e: any) {
       setError(e?.message || 'Failed to save draft')
@@ -226,16 +227,21 @@ export default function EditSupplierClient({ id, initialLock }: { id: string; in
     setPublishing(true)
     try {
       await autosave.flush(form)
-      const res = await fetch(`/api/admin/suppliers/${id}/draft`, {
+      const res = await fetch(publishPath, {
         method: 'POST',
         credentials: 'include',
-        headers: lockHeaders('supplier', id),
+        headers: lockHeaders('supplier', draftId),
       })
       if (!res.ok) {
         if (res.status === 423) lock.markLocked()
         const j = await res.json().catch(() => ({}))
-        setError(j.error || 'Failed to publish')
         setPublishing(false)
+        // Someone published overlapping edits since this draft started: pick per field.
+        if (res.status === 409 && j.code === 'DRAFT_CONFLICT') {
+          setConflicts(j.conflicts ?? [])
+          return
+        }
+        setError(j.error || 'Failed to publish')
         return
       }
       // Draft row is deleted on publish — close the open session, redirect to the list.
@@ -251,7 +257,7 @@ export default function EditSupplierClient({ id, initialLock }: { id: string; in
     autosaveBlockedRef.current = true
     for (let i = 0; i < 100 && inFlightRef.current; i++) await new Promise(r => setTimeout(r, 100))
     try {
-      const r = await fetch(`/api/admin/suppliers/${id}/draft`, { method: 'DELETE', credentials: 'include' })
+      const r = await fetch(`/api/admin/suppliers/${id}/draft?draft=${draftId}`, { method: 'DELETE', credentials: 'include' })
       if (!r.ok) {
         if (r.status === 423) lock.markLocked()
         const j = await r.json().catch(() => ({}))
@@ -306,7 +312,7 @@ export default function EditSupplierClient({ id, initialLock }: { id: string; in
           header={
             <PageHeader
               back={{ href: listHref, label: 'Suppliers' }}
-              title={hasDraft ? 'Edit Draft' : 'Edit Supplier'}
+              title={hasDraft ? (draftTitle ? `Edit Draft · ${draftTitle}` : 'Edit Draft') : 'Edit Supplier'}
               description={hasDraft ? 'Changes are saved to the draft only' : 'Update supplier information'}
               badges={hasDraft ? <Badge tone="amber">Draft pending</Badge> : undefined}
             />
@@ -344,6 +350,7 @@ export default function EditSupplierClient({ id, initialLock }: { id: string; in
             </FormFooter>
           }
         >
+          {notice}
           <DraftLockBanner lock={lock} scope="inventory:write" />
           <LockedFieldset readOnly={lock.readOnly} className="space-y-5">
             <FormSection title="Basic Information">
@@ -428,6 +435,19 @@ export default function EditSupplierClient({ id, initialLock }: { id: string; in
           </LockedFieldset>
         </FormPage>
       </form>
+      {conflicts && (
+        <MergeDialog
+          open
+          conflicts={conflicts}
+          publishPath={publishPath}
+          onClose={() => setConflicts(null)}
+          onDone={async () => {
+            setConflicts(null)
+            await edit.save().catch(() => undefined)
+            router.push(listHref)
+          }}
+        />
+      )}
     </MobileEditBlock>
   )
 }

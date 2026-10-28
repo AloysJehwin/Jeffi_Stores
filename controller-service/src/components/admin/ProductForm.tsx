@@ -45,6 +45,8 @@ import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
+import MergeDialog from '@/components/admin/drafts/MergeDialog'
+import type { MergeConflict } from '@/lib/admin/draft-merge'
 
 interface Category {
   id: string
@@ -176,9 +178,13 @@ type BsEntry = {
 interface ProductFormProps {
   categories: Category[]
   brands: Brand[]
-  action: (formData: FormData) => Promise<{ error?: string; details?: string[]; ok?: true; redirectTo?: string } | void>
+  action: (
+    formData: FormData
+  ) => Promise<{ error?: string; details?: string[]; ok?: true; redirectTo?: string; conflicts?: MergeConflict[] } | void>
   product?: any
   productId?: string
+  /** The draft being edited: its id keys the lock, the editor session and every draft endpoint. */
+  draftId?: string | null
   backUrl?: string
   perishableBatchTotal?: number
   serializedStockTotal?: number
@@ -457,6 +463,7 @@ export default function ProductForm({
   action,
   product,
   productId,
+  draftId = null,
   backUrl,
   perishableBatchTotal = 0,
   serializedStockTotal = 0,
@@ -473,6 +480,7 @@ export default function ProductForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorDetails, setErrorDetails] = useState<string[]>([])
+  const [mergeConflicts, setMergeConflicts] = useState<MergeConflict[] | null>(null)
   const topErrorRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
   const { showToast } = useToast()
@@ -796,8 +804,11 @@ export default function ProductForm({
   const pendingLocalRef = useRef(false)
   const userEditedRef = useRef(false)
   const [serverSaveStatus, setServerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'locked'>('idle')
-  const lock = useDraftLock({ resourceType: 'product', resourceId: productId ?? null, initial: initialLock })
-  const edit = useEditSession({ resourceType: 'product', resourceId: productId ?? null, lock })
+  // The lock and editor session belong to the draft being edited (a create-draft: the product).
+  const lockKey = draftId ?? productId ?? null
+  const withDraft = (url: string) => (draftId ? `${url}${url.includes('?') ? '&' : '?'}draft=${draftId}` : url)
+  const lock = useDraftLock({ resourceType: 'product', resourceId: lockKey, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'product', resourceId: lockKey, lock })
   const readOnlyRef = useRef(lock.readOnly)
   readOnlyRef.current = lock.readOnly
 
@@ -1153,9 +1164,9 @@ export default function ProductForm({
     // collides with a real product column on merge/publish.
     fields._bsEntries = bsEntries
     try {
-      const r = await fetch(`/api/admin/products/${productId}/draft`, {
+      const r = await fetch(withDraft(`/api/admin/products/${productId}/draft`), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...lockHeaders('product', productId) },
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('product', lockKey) },
         body: JSON.stringify({
           fields,
           imageOrder,
@@ -1536,7 +1547,7 @@ export default function ProductForm({
     if (!ok) return
     autosaveBlockedRef.current = true
     for (let i = 0; i < 100 && serverSaveInFlight.current; i++) await new Promise(r => setTimeout(r, 100))
-    const r = await fetch(`/api/admin/products/${productId}/draft`, { method: 'DELETE' })
+    const r = await fetch(withDraft(`/api/admin/products/${productId}/draft`), { method: 'DELETE' })
     if (!r.ok) {
       if (r.status === 423) lock.markLocked()
       autosaveBlockedRef.current = false
@@ -1757,7 +1768,7 @@ export default function ProductForm({
   // param (it has no [variantId] path segment).
   function variantImagesUrl(vid: string): string {
     return isDraft
-      ? `/api/admin/products/${productId}/draft/variant-images?variant_id=${vid}`
+      ? withDraft(`/api/admin/products/${productId}/draft/variant-images?variant_id=${vid}`)
       : `/api/admin/products/${productId}/variants/${vid}/images`
   }
 
@@ -1777,7 +1788,7 @@ export default function ProductForm({
       }
       const svEndpoint =
         isDraft && productId
-          ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+          ? withDraft(`/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`)
           : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
       const res = await fetch(svEndpoint, { credentials: 'include' })
       if (res.ok) {
@@ -1938,7 +1949,7 @@ export default function ProductForm({
     setProductGalleryOpen(true)
   }, [])
 
-  const draftImagesUrl = productId ? `/api/admin/products/${productId}/draft/images` : ''
+  const draftImagesUrl = productId ? withDraft(`/api/admin/products/${productId}/draft/images`) : ''
 
   useEffect(() => {
     if (!useDraftImages) return
@@ -2075,7 +2086,7 @@ export default function ProductForm({
     const draft = subVariantDrafts[variantId]
     if (!draft?.name) return
     const svUrl = isDraft
-      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      ? withDraft(`/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`)
       : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
     const res = await fetch(svUrl, {
       method: 'POST',
@@ -2114,7 +2125,7 @@ export default function ProductForm({
     if (!productId) return
     if (variantId.startsWith('temp-')) return
     const svUrl = isDraft
-      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      ? withDraft(`/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`)
       : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
     const res = await fetch(svUrl, {
       method: 'DELETE',
@@ -2155,7 +2166,7 @@ export default function ProductForm({
     const ed = subVariantEditDraft
     if (!ed || !productId) return
     const url = isDraft
-      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      ? withDraft(`/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`)
       : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
     const num = (x: string) => (x ? parseFloat(x) : null)
     const payload = {
@@ -2589,7 +2600,14 @@ export default function ProductForm({
       // The action returns { ok, redirectTo } instead of redirecting, so stock assignment runs
       // reliably after a successful publish and before we navigate away.
       formData.set('_no_redirect', '1')
+      if (draftId) formData.set('_draft_id', draftId)
       const result = await action(formData)
+      // Someone published overlapping edits since this draft started: pick per field, then publish.
+      if (result && typeof result === 'object' && result.conflicts?.length) {
+        setMergeConflicts(result.conflicts)
+        setIsSubmitting(false)
+        return
+      }
       if (result && typeof result === 'object' && 'error' in result && result.error) {
         reportError(result.error, result.details || [])
         setIsSubmitting(false)
@@ -2623,6 +2641,19 @@ export default function ProductForm({
       reportError(err?.message || 'Failed to save product. Please try again.')
       setIsSubmitting(false)
     }
+  }
+
+  // The merge dialog published the draft: the same wrap-up as a direct publish.
+  async function finishMergedPublish() {
+    setMergeConflicts(null)
+    localStorage.removeItem(draftKey)
+    savedRef.current = true
+    dirtyRef.current = false
+    initialSnapshotRef.current = null
+    autosaveBlockedRef.current = true
+    if (showBootstrap && productId) await assignBootstrapStock(productId)
+    showToast('Product published', 'success')
+    router.push(ap(`/admin/products/${productId}`))
   }
 
   // Publish succeeded; assign the captured existing stock. Failures are shown now (toast) and
@@ -3194,6 +3225,7 @@ export default function ProductForm({
             setVariantUnitInfo(m => ({ ...m, [variantPopupId]: info }))
           }}
           isDraft={isDraft}
+          draftId={draftId}
           roleNote={
             popupVariant?.sub_variant_type_on
               ? 'Used by any sub-variant that has no unit of its own.'
@@ -3443,6 +3475,7 @@ export default function ProductForm({
                             subVariantId={sv.id}
                             basePrice={sv.price}
                             isDraft={isDraft}
+                            draftId={draftId}
                           />
                         </div>
                       )}
@@ -3482,6 +3515,15 @@ export default function ProductForm({
 
   return (
     <>
+      {mergeConflicts && productId && draftId && (
+        <MergeDialog
+          open
+          conflicts={mergeConflicts}
+          publishPath={`/api/admin/products/${productId}/publish?draft=${draftId}`}
+          onClose={() => setMergeConflicts(null)}
+          onDone={() => void finishMergedPublish()}
+        />
+      )}
       <Dialog
         open={confirmUnperishable}
         onClose={() => setConfirmUnperishable(false)}
@@ -5112,7 +5154,7 @@ export default function ProductForm({
                         />
                       </div>
                       {productId ? (
-                        <DigitalFilesPanel productId={productId} />
+                        <DigitalFilesPanel productId={productId} draftId={isDraft ? draftId : null} />
                       ) : (
                         <p className="sm:col-span-2 text-xs text-foreground-muted">
                           Save the product first, then upload files in the Digital Files panel. Buyers open them in the
@@ -6136,7 +6178,7 @@ export default function ProductForm({
                   configured here apply to <strong>every variant</strong> by default — open a variant to override
                   per-variant. For bulk discounts, attach a tiered_price rule to the unit instead of overriding the price.
                 </p>
-                <UnitsManager productId={productId} basePrice={basePrice} isDraft={isDraft} />
+                <UnitsManager productId={productId} basePrice={basePrice} isDraft={isDraft} draftId={draftId} />
               </div>
             )}
           </div>

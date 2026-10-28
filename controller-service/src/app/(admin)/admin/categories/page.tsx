@@ -70,10 +70,12 @@ async function CategoryPendingDrafts() {
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'categories:write')
   const [pendingDrafts, createDrafts] = await Promise.all([
-    queryMany<{ category_id: string; name: string; updated_at: string }>(
-      `SELECT cd.category_id, c.name, cd.updated_at
+    queryMany<{ id: string; category_id: string; name: string; title: string | null; author: string | null; updated_at: string }>(
+      `SELECT cd.id, cd.category_id, c.name, cd.title, cd.updated_at,
+              COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS author
        FROM category_drafts cd
        JOIN categories c ON c.id = cd.category_id
+       LEFT JOIN admins ad ON ad.id = cd.author_admin_id LEFT JOIN users u ON u.id = ad.user_id
        ORDER BY cd.updated_at DESC
        LIMIT 200`
     ),
@@ -83,7 +85,7 @@ async function CategoryPendingDrafts() {
   ])
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
   if (!pendingDraftsCount) return null
-  const locks = await draftLockChips('category', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.category_id)])
+  const locks = await draftLockChips('category', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.id)])
 
   return (
         <details open className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
@@ -133,20 +135,21 @@ async function CategoryPendingDrafts() {
               {pendingDrafts.map(d =>
                 canWrite ? (
                   <DraftRowActions
-                    key={d.category_id}
+                    key={d.id}
                     entityId={d.category_id}
-                    name={d.name}
+                    name={d.title ? `${d.name} · ${d.title}` : d.name}
+                    subtitle={d.author ? `Draft by ${d.author}` : null}
                     updatedAt={d.updated_at}
-                    editHref={ap(`/admin/categories/${d.category_id}/edit`, host)}
-                    publishPath={`/api/admin/categories/${d.category_id}/publish`}
-                    discardPath={`/api/admin/categories/${d.category_id}/draft`}
+                    editHref={ap(`/admin/categories/${d.category_id}/edit?draft=${d.id}`, host)}
+                    publishPath={`/api/admin/categories/${d.category_id}/publish?draft=${d.id}`}
+                    discardPath={`/api/admin/categories/${d.category_id}/draft?draft=${d.id}`}
                     entityLabel="category"
-                    lock={locks[d.category_id]}
+                    lock={locks[d.id]}
                   />
                 ) : (
-                  <div key={d.category_id} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
-                    <DraftLockBadge lock={locks[d.category_id]} mine={locks[d.category_id]?.mine} />
+                  <div key={d.id} className="px-4 py-2.5 flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground truncate">{d.title ? `${d.name} · ${d.title}` : d.name}</p>
+                    <DraftLockBadge lock={locks[d.id]} mine={locks[d.id]?.mine} />
                   </div>
                 )
               )}

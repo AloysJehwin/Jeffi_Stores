@@ -2364,6 +2364,7 @@ CREATE INDEX idx_subscriptions_user ON public.subscriptions USING btree (user_id
 --
 
 CREATE INDEX idx_product_files_product ON public.product_files USING btree (product_id, display_order);
+CREATE INDEX idx_product_files_draft ON public.product_files USING btree (draft_id) WHERE (draft_id IS NOT NULL);
 
 CREATE INDEX idx_vault_entitlements_user ON public.vault_entitlements USING btree (user_id, status);
 CREATE INDEX idx_vault_entitlements_product ON public.vault_entitlements USING btree (product_id);
@@ -2495,3 +2496,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_prompt_presets_scope_scenario ON public.
     COALESCE(feature, ''::text),
     scenario
 );
+
+
+-- Several drafts per entity (docs/plans/MULTI_DRAFT_PLAN.md): the old key is a plain index.
+CREATE INDEX IF NOT EXISTS idx_brand_drafts_brand ON public.brand_drafts USING btree (brand_id);
+CREATE INDEX IF NOT EXISTS idx_category_drafts_category ON public.category_drafts USING btree (category_id);
+CREATE INDEX IF NOT EXISTS idx_product_drafts_product ON public.product_drafts USING btree (product_id);
+CREATE INDEX IF NOT EXISTS idx_supplier_drafts_supplier ON public.supplier_drafts USING btree (supplier_id);
+CREATE INDEX IF NOT EXISTS idx_coupon_drafts_coupon ON public.coupon_drafts USING btree (coupon_id);
+CREATE INDEX IF NOT EXISTS idx_review_form_drafts_form ON public.review_form_drafts USING btree (form_id);
+CREATE INDEX IF NOT EXISTS idx_offer_drafts_offer ON public.offer_drafts USING btree (offer_id);
+CREATE INDEX IF NOT EXISTS idx_entity_revisions_resource ON public.entity_revisions USING btree (resource_type, resource_id, revision DESC);

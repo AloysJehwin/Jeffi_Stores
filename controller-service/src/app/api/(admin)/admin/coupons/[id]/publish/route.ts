@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne } from '@/lib/shared/db'
-import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
+import { actorOf, draftLockResponse, epochFrom } from '@/lib/admin/draft-locks'
+import { draftConflictResponse, getDraftRow } from '@/lib/admin/draft-branches'
+import { couponDrafts, publishCouponDraft } from '@/lib/catalog/coupon-draft'
 
 export const dynamic = 'force-dynamic'
 interface Params {
   params: Promise<{ id: string }>
 }
 
-// POST — publish draft to live
+// POST ?draft=<id> { resolutions? } — merge the draft into live; 409 lists overlapping edits.
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
@@ -17,59 +18,19 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'coupons:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const draft = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
-    `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`,
-    [id]
-  )
-  if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
+  const body = await req.json().catch(() => ({}))
+  const draftId = req.nextUrl.searchParams.get('draft') ?? body?.draftId
+  if (!draftId) return NextResponse.json({ error: 'Missing draft' }, { status: 400 })
+  const row = await getDraftRow(couponDrafts, draftId)
+  if (!row || row.coupon_id !== id) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 
-  const f = draft.fields as any
-  // Edit-draft publish: apply the drafted changes to the existing live coupon (COALESCE keeps
-  // unset fields). A create-draft (never published) goes live and active.
   try {
-    await withDraftPublish(
-      actorOf(admin),
-      'coupon',
-      id,
-      async db => {
-        await db.query(
-          `UPDATE coupons SET
-           code = COALESCE($2, code),
-           description = $3,
-           discount_type = COALESCE($4, discount_type),
-           discount_value = COALESCE($5::numeric, discount_value),
-           min_purchase_amount = $6::numeric,
-           max_discount_amount = $7::numeric,
-           usage_limit = $8::integer,
-           usage_limit_per_user = $9::integer,
-           valid_from = $10::timestamptz,
-           valid_until = $11::timestamptz,
-           is_active = CASE WHEN is_draft THEN true ELSE COALESCE($12::boolean, is_active) END,
-           is_draft = false
-         WHERE id = $1`,
-          [
-            id,
-            f.code || null,
-            f.description ?? null,
-            f.discount_type || null,
-            f.discount_value != null ? f.discount_value : null,
-            f.min_purchase_amount ?? null,
-            f.max_discount_amount ?? null,
-            f.usage_limit ?? null,
-            f.usage_limit_per_user ?? null,
-            f.valid_from || null,
-            f.valid_until || null,
-            f.is_active != null ? f.is_active : null,
-          ]
-        )
-        await db.query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
-      },
-      { epoch: epochFrom(req) }
-    )
-  } catch (err) {
-    const locked = draftLockResponse(err)
-    if (locked) return locked
-    throw err
+    const r = await publishCouponDraft(draftId, { actor: actorOf(admin), resolutions: body?.resolutions, epoch: epochFrom(req) })
+    return NextResponse.json({ success: true, couponId: id, revision: r.revision })
+  } catch (err: unknown) {
+    const handled = draftLockResponse(err) ?? draftConflictResponse(err)
+    if (handled) return handled
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: msg || 'Failed to publish' }, { status: 500 })
   }
-  return NextResponse.json({ success: true })
 }

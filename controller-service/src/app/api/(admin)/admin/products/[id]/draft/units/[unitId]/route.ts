@@ -4,22 +4,24 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query, queryMany } from '@/lib/shared/db'
 import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/catalog/selling-unit'
 import { actorOf, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
+import { productDraftIdFor } from '@/lib/catalog/product-draft-id'
 
 // Write the units column under the draft lock: a 423 response when someone else holds the draft.
 async function saveUnits(
   req: NextRequest,
   admin: { adminId?: string; role?: string; scopes?: string[] },
-  id: string,
+  draftId: string | null,
   units: unknown[]
 ): Promise<NextResponse | null> {
+  if (!draftId) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   try {
     await withDraftWrite(
       actorOf(admin),
       'product',
-      id,
+      draftId,
       db =>
-        db.query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-          id,
+        db.query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+          draftId,
           JSON.stringify(units),
         ]),
       { epoch: epochFrom(req), assertAfter: true }
@@ -38,8 +40,9 @@ interface Params {
   params: Promise<{ id: string; unitId: string }>
 }
 
-async function getDraftUnits(productId: string): Promise<any[]> {
-  const row = await queryOne<{ units: any[] }>(`SELECT units FROM product_drafts WHERE product_id = $1`, [productId])
+async function getDraftUnits(draftId: string | null): Promise<any[]> {
+  if (!draftId) return []
+  const row = await queryOne<{ units: any[] }>(`SELECT units FROM product_drafts WHERE id = $1`, [draftId])
   return Array.isArray(row?.units) ? row!.units : []
 }
 
@@ -63,7 +66,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const units = await getDraftUnits(id)
+  const draftId = await productDraftIdFor(req, id, admin.adminId)
+  const units = await getDraftUnits(draftId)
   const body = await req.json().catch(() => null)
   if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   const override = body.override === true
@@ -118,7 +122,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     // Unit not in draft yet — add it with this id
     updated = [...units, { ...patch, id: unitId }]
   }
-  const locked = await saveUnits(req, admin, id, updated)
+  const locked = await saveUnits(req, admin, draftId, updated)
   if (locked) return locked
   return NextResponse.json({ success: true, unit: updated.find((u: any) => u.id === unitId) })
 }
@@ -131,13 +135,14 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const draftId = await productDraftIdFor(req, id, admin.adminId)
 
   // Get scope from query params (needed when unit came from live fallback and has no draft entry)
   const variantId = req.nextUrl.searchParams.get('variant_id')
   const subVariantId = req.nextUrl.searchParams.get('sub_variant_id')
   const override = req.nextUrl.searchParams.get('override') === 'true'
 
-  const units = await getDraftUnits(id)
+  const units = await getDraftUnits(draftId)
   const deleted = units.find((u: any) => u.id === unitId)
   const filtered = units.filter((u: any) => u.id !== unitId)
 
@@ -172,7 +177,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     sub_variant_id: clearedSubVariantId,
   })
 
-  const locked = await saveUnits(req, admin, id, filtered)
+  const locked = await saveUnits(req, admin, draftId, filtered)
   if (locked) return locked
   return NextResponse.json({ success: true })
 }

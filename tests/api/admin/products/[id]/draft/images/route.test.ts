@@ -24,6 +24,9 @@ vi.mock('@/lib/shared/s3', () => ({
   UploadValidationError: class UploadValidationError extends Error {},
 }))
 
+// Routes address one draft of the product (?draft=); these tests use a fixed one.
+vi.mock('@/lib/catalog/product-draft-id', () => ({ productDraftIdFor: vi.fn(async () => 'draft-1') }))
+
 import { GET, POST, DELETE, PATCH } from '@/app/api/(admin)/admin/products/[id]/draft/images/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'

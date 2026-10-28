@@ -143,10 +143,13 @@ async function ProductPendingDrafts() {
   const canWrite = hasScope(role, scopes, 'products:write')
   const [pendingDrafts, createDrafts] = await Promise.all([
     // Edit-drafts: unpublished CHANGES staged against a live product (product_drafts).
-    queryMany<{ product_id: string; name: string; sku: string; updated_at: string }>(
-      `SELECT pd.product_id, p.name, p.sku, pd.updated_at
+    // One row per draft: several admins can each have one open on a product.
+    queryMany<{ id: string; product_id: string; name: string; sku: string; title: string | null; author: string | null; updated_at: string }>(
+      `SELECT pd.id, pd.product_id, p.name, p.sku, pd.title, pd.updated_at,
+              COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS author
        FROM product_drafts pd
        JOIN products p ON p.id = pd.product_id
+       LEFT JOIN admins ad ON ad.id = pd.author_admin_id LEFT JOIN users u ON u.id = ad.user_id
        WHERE p.is_draft = false
        ORDER BY pd.updated_at DESC
        LIMIT 200`
@@ -158,7 +161,7 @@ async function ProductPendingDrafts() {
   ])
 
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
-  const locks = await draftLockChips('product', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.product_id)])
+  const locks = await draftLockChips('product', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.id)])
   if (!pendingDraftsCount) return null
   return (
             <details open className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
@@ -207,31 +210,33 @@ async function ProductPendingDrafts() {
                       </div>
                     )
                   )}
-                  {pendingDrafts.map(d =>
-                    canWrite ? (
+                  {pendingDrafts.map(d => {
+                    const name = d.title ? `${d.name} · ${d.title}` : d.name
+                    const sub = [d.sku, d.author ? `draft by ${d.author}` : null].filter(Boolean).join(' — ')
+                    return canWrite ? (
                       <DraftRowActions
-                        key={d.product_id}
+                        key={d.id}
                         entityId={d.product_id}
-                        name={d.name}
-                        subtitle={d.sku}
+                        name={name}
+                        subtitle={sub}
                         updatedAt={d.updated_at}
-                        editHref={ap(`/admin/products/${d.product_id}/edit`, host)}
-                        publishPath={`/api/admin/products/${d.product_id}/publish`}
-                        discardPath={`/api/admin/products/${d.product_id}/draft`}
+                        editHref={ap(`/admin/products/${d.product_id}/edit?draft=${d.id}`, host)}
+                        publishPath={`/api/admin/products/${d.product_id}/publish?draft=${d.id}`}
+                        discardPath={`/api/admin/products/${d.product_id}/draft?draft=${d.id}`}
                         entityLabel="product"
-                        lock={locks[d.product_id]}
+                        lock={locks[d.id]}
                       />
                     ) : (
-                      <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
-                        <p className="min-w-0 text-sm font-medium text-foreground truncate">{d.name}</p>
+                      <div key={d.id} className="px-4 py-2.5 flex items-center gap-2">
+                        <p className="min-w-0 text-sm font-medium text-foreground truncate">{name}</p>
                         <p className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
                           {d.sku}
                           {d.sku && <CopySku sku={d.sku} />}
                         </p>
-                        <DraftLockBadge lock={locks[d.product_id]} mine={locks[d.product_id]?.mine} />
+                        <DraftLockBadge lock={locks[d.id]} mine={locks[d.id]?.mine} />
                       </div>
                     )
-                  )}
+                  })}
                 </div>
               </div>
             </details>

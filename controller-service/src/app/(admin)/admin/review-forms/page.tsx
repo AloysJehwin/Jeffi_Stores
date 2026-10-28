@@ -111,11 +111,13 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
 
 async function ReviewFormsDraftsBanner({ host }: { host: string }) {
   const [pendingDrafts, createDrafts] = await Promise.all([
-    // Edit-drafts: unpublished CHANGES staged against a live form (review_form_drafts).
-    queryMany<{ form_id: string; name: string; updated_at: string }>(
-      `SELECT rfd.form_id, rf.title AS name, rfd.updated_at
+    // Edit-drafts: one row per draft (several admins can each hold one of the same form).
+    queryMany<{ id: string; form_id: string; name: string; title: string | null; author: string | null; updated_at: string }>(
+      `SELECT rfd.id, rfd.form_id, rf.title AS name, rfd.title, rfd.updated_at,
+              COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS author
        FROM review_form_drafts rfd
        JOIN review_forms rf ON rf.id = rfd.form_id
+       LEFT JOIN admins ad ON ad.id = rfd.author_admin_id LEFT JOIN users u ON u.id = ad.user_id
        ORDER BY rfd.updated_at DESC
        LIMIT 200`
     ),
@@ -127,7 +129,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
 
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
   if (pendingDraftsCount === 0) return null
-  const locks = await draftLockChips('review_form', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.form_id)])
+  const locks = await draftLockChips('review_form', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.id)])
 
   return (
     <details open className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
@@ -168,15 +170,16 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
           ))}
           {pendingDrafts.map(d => (
             <DraftRowActions
-              key={d.form_id}
+              key={d.id}
               entityId={d.form_id}
-              name={d.name}
+              name={d.title ? `${d.name} · ${d.title}` : d.name}
+              subtitle={d.author ? `Draft by ${d.author}` : null}
               updatedAt={d.updated_at}
-              editHref={ap(`/admin/review-forms/${d.form_id}/edit`, host)}
-              publishPath={`/api/admin/review-forms/${d.form_id}/publish`}
-              discardPath={`/api/admin/review-forms/${d.form_id}/draft`}
+              editHref={ap(`/admin/review-forms/${d.form_id}/edit?draft=${d.id}`, host)}
+              publishPath={`/api/admin/review-forms/${d.form_id}/publish?draft=${d.id}`}
+              discardPath={`/api/admin/review-forms/${d.form_id}/draft?draft=${d.id}`}
               entityLabel="review form"
-              lock={locks[d.form_id]}
+              lock={locks[d.id]}
             />
           ))}
         </div>
