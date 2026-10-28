@@ -69,7 +69,6 @@ interface Props {
   start?: number
   end?: number
   filterSlot?: React.ReactNode
-  promoSlot?: React.ReactNode
   portal?: 'storefront' | 'business'
   // When provided, grid-view + non-grouped renders ServerPagedItems so pages 2..N
   // accumulate client-side instead of needing a page-number pager. Each item is a
@@ -324,16 +323,12 @@ function TableRow({
 // How often to inject a category banner row (every N cards). A multiple of both grid widths (2 and 3)
 // so the rows between full-width inserts are always complete.
 const BANNER_EVERY = 12
-// A multiple of both grid widths (2 and 3 columns) and ahead of the first category banner row,
-// so the full-width promo never leaves a hole in the row above it.
-const PROMO_AFTER = 6
 
 export default function ProductGrid({
   products,
   gstEnabled,
   categoryBanners = [],
   filterSlot,
-  promoSlot,
   portal = 'storefront',
   pagedItems,
   page,
@@ -535,7 +530,6 @@ export default function ProductGrid({
                   const specs = [product.grade, product.material, product.finish, product.compliance_standard].filter(
                     Boolean
                   ) as string[]
-                  const showPromo = !grouped && idx === PROMO_AFTER && promoSlot != null
                   const showBanner = !grouped && idx > 0 && idx % BANNER_EVERY === 0 && categoryBanners.length > 0
                   const bannerSlot = Math.floor(idx / BANNER_EVERY)
                   // Rotate which 4 categories we show in each banner row
@@ -547,7 +541,6 @@ export default function ProductGrid({
 
                   return (
                     <Fragment key={product.id}>
-                      {showPromo && <div className="col-span-full">{promoSlot}</div>}
                       {showBanner && rotatedBanners.length > 0 && (
                         <CategoryBannerRow
                           banners={rotatedBanners}
