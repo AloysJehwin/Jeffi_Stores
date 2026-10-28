@@ -179,6 +179,9 @@ export interface SectionMeta {
   excludes?: SectionType[]
   /** The admin can set the shape of what this names ("Banner", "Card image"); `auto` keeps the component's own. */
   aspect?: string
+  /** A full-width banner a tall shape narrows: the admin picks what fills the row beside it (sectionSides);
+   *  `slides` can also show the neighbouring slides there. */
+  sides?: 'banner' | 'slides'
 }
 
 /** The types the picker offers on a surface, page and homepage. */
@@ -243,6 +246,22 @@ export function sectionAspectValue(section: Pick<HomepageSection, 'type' | 'conf
 export const sectionAspect = (section: Pick<HomepageSection, 'type' | 'config'>): number | null =>
   aspectRatioOf(sectionAspectValue(section))
 
+/** Beside a banner narrower than its row: nothing, a soft shadow, its picture blurred, or the previous and next slides. */
+export const SECTION_SIDES = ['plain', 'shadow', 'glow', 'peek'] as const
+export type SectionSides = (typeof SECTION_SIDES)[number]
+
+/** The choices a type offers; `peek` needs slides. */
+export function sideOptions(type: SectionType): SectionSides[] {
+  const kind = SECTION_META[type]?.sides
+  if (!kind) return []
+  return kind === 'slides' ? [...SECTION_SIDES] : SECTION_SIDES.filter(v => v !== 'peek')
+}
+
+export function sectionSides(section: Pick<HomepageSection, 'type' | 'config'>): SectionSides {
+  const value = section.config?.sides as SectionSides | undefined
+  return value && sideOptions(section.type).includes(value) ? value : 'plain'
+}
+
 const HOME_ONLY: HomepagePage[] = ['home']
 const STORE_ONLY: HomepageAudience[] = ['store']
 const BUSINESS_ONLY: HomepageAudience[] = ['business']
@@ -263,6 +282,7 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     description: 'Centered offer cards with left and right peek, each linking to its filtered products.',
     singleton: true,
     aspect: 'Offer cards',
+    sides: 'banner',
   },
   trust_strip: { label: 'Trust strip', description: 'Row of delivery, returns and payment reassurances.' },
   category_grid: {
@@ -286,6 +306,7 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     label: 'Promo banner',
     description: 'Seasonal or sale banner. Supports a start and end date.',
     aspect: 'Banner',
+    sides: 'banner',
   },
   featured_for_you: {
     label: 'Featured for you',
@@ -353,6 +374,7 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     singleton: true,
     excludes: ['hero'],
     aspect: 'Banner',
+    sides: 'slides',
   },
   stories: {
     label: 'Stories',

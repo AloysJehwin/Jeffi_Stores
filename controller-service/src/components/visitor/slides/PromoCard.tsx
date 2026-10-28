@@ -9,11 +9,11 @@ export const CARD_IMAGE =
 export const BANNER_IMAGE =
   'absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out motion-safe:group-hover:scale-[1.03]'
 
-/** A full-width banner in the admin's shape: capped so a tall one never fills the screen, floored so its text fits. */
-export const bannerShape = (aspectRatio: number, minHeight?: string): CSSProperties => ({
+/** A full-width banner in the admin's shape (with the `shape-box` class): a tall one narrows, centred, rather than fill the screen. */
+export const bannerShape = (aspectRatio: number): CSSProperties => ({
   aspectRatio,
-  maxHeight: 'min(80vh, 640px)',
-  minHeight,
+  maxWidth: `calc(min(80vh, 640px) * ${aspectRatio})`,
+  marginInline: 'auto',
 })
 
 export interface PromoMediaProps {
@@ -122,23 +122,23 @@ export function PromoCard({ surface = 'bg-[#0d0d0d]', ...p }: PromoFaceProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 via-45% to-transparent" />
       )}
 
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-start p-5 md:p-6">
+      <div className="shape-short-tight absolute inset-x-0 bottom-0 flex flex-col items-start p-5 md:p-6">
         {p.badge && (
           <span
-            className={`mb-3 text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full ${p.badgeClass || 'bg-primary-500'}`}
+            className={`shape-tiny-hide mb-3 text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full ${p.badgeClass || 'bg-primary-500'}`}
           >
             {p.badge}
           </span>
         )}
         {p.eyebrow && (
-          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/70">{p.eyebrow}</p>
+          <p className="shape-short-hide mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/70">{p.eyebrow}</p>
         )}
-        <h3 className="line-clamp-3 text-[clamp(1.25rem,1rem+1vw,1.75rem)] font-black leading-[1.1] tracking-tight text-white">
+        <h3 className="shape-short-title line-clamp-3 text-[clamp(1.25rem,1rem+1vw,1.75rem)] font-black leading-[1.1] tracking-tight text-white">
           {p.title}
         </h3>
-        {p.sub && <p className="mt-1.5 line-clamp-2 text-sm leading-snug text-white/75">{p.sub}</p>}
+        {p.sub && <p className="shape-short-hide mt-1.5 line-clamp-2 text-sm leading-snug text-white/75">{p.sub}</p>}
         {p.footer}
-        {p.ctaLabel && <CtaPill label={p.ctaLabel} className="mt-4" />}
+        {p.ctaLabel && <CtaPill label={p.ctaLabel} className="shape-shorter-hide mt-4" />}
       </div>
       {p.action && <div className="absolute bottom-5 right-5 z-20 md:bottom-6 md:right-6">{p.action}</div>}
     </Face>
@@ -156,8 +156,8 @@ export function PromoBanner({
   return (
     <Face href={p.href} label={p.label} tabIndex={p.tabIndex} action={p.action} className="group block rounded-2xl">
       <div
-        className={`relative w-full overflow-hidden rounded-2xl ${surface} ${aspectRatio ? '' : BANNER_H} shadow-2xl`}
-        style={aspectRatio ? bannerShape(aspectRatio, '14rem') : undefined}
+        className={`relative w-full overflow-hidden rounded-2xl ${surface} ${aspectRatio ? 'shape-box' : BANNER_H} shadow-2xl`}
+        style={aspectRatio ? bannerShape(aspectRatio) : undefined}
       >
         {p.backdrop}
         {p.backdrop && (
@@ -167,25 +167,25 @@ export function PromoBanner({
           </>
         )}
 
-        <div className="absolute inset-x-0 bottom-0 pointer-events-none p-6 sm:p-10 lg:p-14">
+        <div className="shape-short-tight absolute inset-x-0 bottom-0 pointer-events-none p-6 sm:p-10 lg:p-14">
           {p.badge && (
             <span
-              className={`inline-block text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full mb-3 ${p.badgeClass || 'bg-primary-500'}`}
+              className={`shape-tiny-hide inline-block text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full mb-3 ${p.badgeClass || 'bg-primary-500'}`}
             >
               {p.badge}
             </span>
           )}
           {p.eyebrow && (
-            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.25em] text-white/70 sm:text-xs">
+            <p className="shape-short-hide mb-2 text-[10px] font-black uppercase tracking-[0.25em] text-white/70 sm:text-xs">
               {p.eyebrow}
             </p>
           )}
-          <h3 className="max-w-2xl font-black text-white leading-[1.05] tracking-tight text-[clamp(1.75rem,4.4vw,3.75rem)]">
+          <h3 className="shape-short-title max-w-2xl font-black text-white leading-[1.05] tracking-tight text-[clamp(1.75rem,4.4vw,3.75rem)]">
             {p.title}
           </h3>
-          {p.sub && <p className="mt-2 max-w-md leading-relaxed text-white/80 text-sm sm:text-base">{p.sub}</p>}
+          {p.sub && <p className="shape-short-hide mt-2 max-w-md leading-relaxed text-white/80 text-sm sm:text-base">{p.sub}</p>}
           {p.footer}
-          {p.ctaLabel && <CtaPill label={p.ctaLabel} className="mt-4 sm:px-5 sm:py-2.5" />}
+          {p.ctaLabel && <CtaPill label={p.ctaLabel} className="shape-shorter-hide mt-4 sm:px-5 sm:py-2.5" />}
         </div>
         {p.action && (
           <div className="absolute bottom-6 right-6 z-20 sm:bottom-10 sm:right-10 lg:bottom-14 lg:right-14">

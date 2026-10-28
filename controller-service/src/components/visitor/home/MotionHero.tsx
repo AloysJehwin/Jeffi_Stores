@@ -8,6 +8,7 @@ import StoreImage from '@/components/visitor/StoreImage'
 import StoreMedia, { useCanPlayVideo } from '@/components/visitor/media/StoreMedia'
 import { SlideArrows, SlideProgress } from '@/components/visitor/slides/SlideControls'
 import { bannerShape } from '@/components/visitor/slides/PromoCard'
+import BannerSides from '@/components/visitor/home/BannerSides'
 import { useAutoplay } from '@/components/visitor/slides/useAutoplay'
 import { useSwipe } from '@/components/visitor/slides/useSwipe'
 import {
@@ -18,7 +19,7 @@ import {
   riseVariants,
   usePointerParallax,
 } from '@/components/visitor/slides/slide-motion'
-import type { FgFrame, MotionHeroSlide } from '@/lib/catalog/homepage-sections'
+import type { FgFrame, MotionHeroSlide, SectionSides } from '@/lib/catalog/homepage-sections'
 
 const FG_FRAME_CLASS: Record<FgFrame, string> = {
   rounded: 'rounded-2xl md:rounded-3xl shadow-2xl shadow-black/60 ring-1 ring-white/15',
@@ -29,8 +30,6 @@ const FG_FRAME_CLASS: Record<FgFrame, string> = {
 const FEATHER = 'transparent, #000 14%, #000 86%, transparent'
 const STAGE =
   'relative isolate w-full touch-pan-y touch-pinch-zoom select-none overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl'
-// The copy is absolutely placed, so a shaped stage keeps the default height's floor.
-const SHAPED_MIN_H = '20rem'
 const FG_FADE = {
   maskImage: `linear-gradient(to right, ${FEATHER}), linear-gradient(to bottom, ${FEATHER})`,
   WebkitMaskImage: `linear-gradient(to right, ${FEATHER}), linear-gradient(to bottom, ${FEATHER})`,
@@ -44,9 +43,11 @@ interface MotionHeroProps {
   intervalMs: number
   /** Banner shape (width / height); unset keeps the viewport-based height. */
   aspect?: number | null
+  /** Beside the banner when its shape narrows it. */
+  sides?: SectionSides
 }
 
-export default function MotionHero({ slides, intervalMs, aspect }: MotionHeroProps) {
+export default function MotionHero({ slides, intervalMs, aspect, sides = 'plain' }: MotionHeroProps) {
   const count = slides.length
   const [active, setActive] = useState(0)
 
@@ -80,52 +81,60 @@ export default function MotionHero({ slides, intervalMs, aspect }: MotionHeroPro
   // A rounded card with the same inset as the business card (BusinessCta), not full bleed.
   return (
     <div className="px-3 pt-3 sm:px-6 md:px-8 md:pt-6">
-      <section
-        aria-roledescription="carousel"
-        aria-label="Featured"
-        className={
-          aspect
-            ? STAGE
-            : 'relative isolate h-[clamp(20rem,56svh,36rem)] w-full touch-pan-y touch-pinch-zoom select-none overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl md:h-[clamp(26rem,64vh,46rem)]'
-        }
-        style={aspect ? bannerShape(aspect, SHAPED_MIN_H) : undefined}
-        {...swipe.bind}
-        {...bind}
-        onPointerMove={onPointerMove}
-        onPointerLeave={onPointerLeave}
-        onKeyDown={e => {
-          if (e.key === 'ArrowRight') go(active + 1)
-          else if (e.key === 'ArrowLeft') go(active - 1)
-        }}
+      <BannerSides
+        sides={aspect ? sides : 'plain'}
+        image={slides[active].bgImage}
+        aspect={aspect}
+        prev={count > 1 ? { image: slides[(active - 1 + count) % count].bgImage, label: 'Previous slide', onSelect: () => go(active - 1) } : undefined}
+        next={count > 1 ? { image: slides[(active + 1) % count].bgImage, label: 'Next slide', onSelect: () => go(active + 1) } : undefined}
       >
-        {slides.map((slide, i) => (
-          <Slide
-            key={i}
-            slide={slide}
-            index={i}
-            count={count}
-            active={i === active}
-            reduced={reduced}
-            progress={progress}
-            fgX={parallax.x}
-            fgY={parallax.y}
-          />
-        ))}
-
-        {count > 1 && (
-          <>
-            <SlideArrows onPrev={() => go(active - 1)} onNext={() => go(active + 1)} />
-            <SlideProgress
+        <section
+          aria-roledescription="carousel"
+          aria-label="Featured"
+          className={
+            aspect
+              ? `${STAGE} shape-box`
+              : 'relative isolate h-[clamp(20rem,56svh,36rem)] w-full touch-pan-y touch-pinch-zoom select-none overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl md:h-[clamp(26rem,64vh,46rem)]'
+          }
+          style={aspect ? bannerShape(aspect) : undefined}
+          {...swipe.bind}
+          {...bind}
+          onPointerMove={onPointerMove}
+          onPointerLeave={onPointerLeave}
+          onKeyDown={e => {
+            if (e.key === 'ArrowRight') go(active + 1)
+            else if (e.key === 'ArrowLeft') go(active - 1)
+          }}
+        >
+          {slides.map((slide, i) => (
+            <Slide
+              key={i}
+              slide={slide}
+              index={i}
               count={count}
-              index={active}
+              active={i === active}
+              reduced={reduced}
               progress={progress}
-              onSelect={go}
-              label={i => `Go to slide ${i + 1}: ${slides[i].headline}`}
-              className="absolute inset-x-0 bottom-0 z-30 flex gap-1.5 px-5 pb-5 sm:px-8 md:px-12 lg:px-16"
+              fgX={parallax.x}
+              fgY={parallax.y}
             />
-          </>
-        )}
-      </section>
+          ))}
+
+          {count > 1 && (
+            <>
+              <SlideArrows onPrev={() => go(active - 1)} onNext={() => go(active + 1)} />
+              <SlideProgress
+                count={count}
+                index={active}
+                progress={progress}
+                onSelect={go}
+                label={i => `Go to slide ${i + 1}: ${slides[i].headline}`}
+                className="absolute inset-x-0 bottom-0 z-30 flex gap-1.5 px-5 pb-5 sm:px-8 md:px-12 lg:px-16"
+              />
+            </>
+          )}
+        </section>
+      </BannerSides>
     </div>
   )
 }
@@ -204,28 +213,28 @@ function Slide({ slide, index, count, active, reduced, progress, fgX, fgY }: Sli
       )}
 
       <motion.div
-        className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-start gap-3 px-5 pb-14 pt-24 sm:px-8 md:inset-y-0 md:right-auto md:w-[58%] md:max-w-3xl md:justify-center md:px-12 md:pb-0 md:pt-0 lg:px-16"
+        className="shape-short-tight shape-above-dots absolute inset-x-0 bottom-0 z-20 flex flex-col items-start gap-3 px-5 pb-14 pt-24 sm:px-8 md:inset-y-0 md:right-auto md:w-[58%] md:max-w-3xl md:justify-center md:px-12 md:pb-0 md:pt-0 lg:px-16"
         initial="hidden"
         animate={active ? 'show' : 'hidden'}
       >
         {slide.eyebrow && (
           <motion.p
             variants={riseVariants(reduced, 0)}
-            className="text-[10px] font-black uppercase tracking-[0.25em] text-white/70 sm:text-xs"
+            className="shape-short-hide text-[10px] font-black uppercase tracking-[0.25em] text-white/70 sm:text-xs"
           >
             {slide.eyebrow}
           </motion.p>
         )}
         <motion.h1
           variants={headlineVariants(reduced)}
-          className="text-[clamp(2rem,6vw,4.5rem)] font-black leading-[0.95] tracking-tight"
+          className="shape-short-title text-[clamp(2rem,6vw,4.5rem)] font-black leading-[0.95] tracking-tight"
         >
           <RevealWords text={slide.headline} reduced={reduced} />
         </motion.h1>
         {slide.sub && (
           <motion.p
             variants={riseVariants(reduced, 0.55)}
-            className="max-w-md text-sm leading-relaxed text-white/75 sm:text-base md:text-lg"
+            className="shape-short-hide max-w-md text-sm leading-relaxed text-white/75 sm:text-base md:text-lg"
           >
             {slide.sub}
           </motion.p>
@@ -235,7 +244,7 @@ function Slide({ slide, index, count, active, reduced, progress, fgX, fgY }: Sli
             <Link
               href={slide.url}
               tabIndex={active ? 0 : -1}
-              className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-gray-900 shadow-lg transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              className="shape-short-cta inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-gray-900 shadow-lg transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
             >
               {slide.ctaLabel ?? 'Shop now'}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />

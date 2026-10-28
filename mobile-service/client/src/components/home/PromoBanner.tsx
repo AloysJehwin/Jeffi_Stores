@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { ChevronRight } from 'lucide-react-native'
 import FeedMedia from './FeedMedia'
 import { absUrl, openHref } from '../../lib/links'
+import { SHAPE_COMPACT_H, shapeBox } from '../../lib/shape'
 import { primary, status } from '../../theme'
 import type { SectionProps } from '../../types/home'
 
@@ -27,14 +28,18 @@ export default function PromoBanner({ section }: SectionProps) {
 
   if (!title && !subtitle && !eyebrow && !mobileImg && !video && !showCta) return null
   const src = absUrl(mobileImg)
-  const titleSize = Math.min(48, Math.max(24, width * 0.04)) // text-[clamp(1.5rem,4vw,3rem)]
-  // An admin-set shape inside px-4, kept on screen; the copy can still grow it.
-  const shape = section.aspect ? { minHeight: Math.min((width - 32) / section.aspect, height * 0.8), justifyContent: 'center' as const } : undefined
+  // An admin-set shape inside px-4: exact, and narrowed rather than taller than 80% of the screen.
+  const box = section.aspect ? shapeBox(width - 32, section.aspect, height * 0.8) : null
+  const compact = !!box && box.height < SHAPE_COMPACT_H
+  const titleSize = Math.min(48, Math.max(24, width * 0.04), box ? box.height * 0.16 : 48) // text-[clamp(1.5rem,4vw,3rem)]
 
   return (
     <View className="bg-surface px-4 py-8">
-      <View style={shadow} className={`rounded-panel ${elevationClass('overlay')}`}>
-        <View className={`${shape ? '' : 'min-h-[14rem] '}overflow-hidden rounded-panel bg-black`} style={shape}>
+      <View style={[shadow, box && { width: box.width, alignSelf: 'center' }]} className={`rounded-panel ${elevationClass('overlay')}`}>
+        <View
+          className={`${box ? '' : 'min-h-[14rem] '}overflow-hidden rounded-panel bg-black`}
+          style={box ? { height: box.height, justifyContent: 'center' } : undefined}
+        >
           {mobileImg || video ? (
             <>
               <FeedMedia image={src} video={video} blurhash={blurhash} style={FILL} />
@@ -45,8 +50,8 @@ export default function PromoBanner({ section }: SectionProps) {
             <Gradient stops={[[0, primary[600]], [1, primary[800]]]} />
           )}
 
-          <View className="gap-3 px-6 py-10" style={{ maxWidth: '90%' }}>
-            {eyebrow ? (
+          <View className={compact ? 'gap-2 px-6 py-4' : 'gap-3 px-6 py-10'} style={{ maxWidth: '90%' }}>
+            {eyebrow && !compact ? (
               <Overline className="text-white/70" style={{ letterSpacing: 2 }}>
                 {eyebrow}
               </Overline>
@@ -56,7 +61,7 @@ export default function PromoBanner({ section }: SectionProps) {
                 {title}
               </Text>
             ) : null}
-            {subtitle ? <Text className="text-sm leading-relaxed text-white/60">{subtitle}</Text> : null}
+            {subtitle && !compact ? <Text className="text-sm leading-relaxed text-white/60">{subtitle}</Text> : null}
             {showCta ? (
               <Button
                 label={ctaLabel}
