@@ -23,7 +23,7 @@ const LIST_KEYS = listParamNames(PO_FIELDS, { aliases: PO_ALIASES }).filter(k =>
 const TABS: { id: Tab; label: React.ReactNode }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'orders', label: 'Purchase orders' },
-  { id: 'drafts', label: <DraftsTabLabel type="po_new" /> },
+  { id: 'drafts', label: <DraftsTabLabel type="po_new,purchase_order,po_receive" /> },
 ]
 
 export default function PurchaseOrdersClient() {
@@ -59,7 +59,7 @@ export default function PurchaseOrdersClient() {
         {tab === 'overview' ? (
           <PurchaseOrdersOverview />
         ) : tab === 'drafts' ? (
-          <PageDrafts type="po_new">
+          <PageDrafts type="po_new,purchase_order,po_receive">
             <PurchaseOrderDrafts />
           </PageDrafts>
         ) : (
