@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeHomepageDraftDb, sectionRow, slideRow } from '../../../helpers/homepage-draft-db'
+import { draftHeaders, makeHomepageDraftDb, sectionRow, slideRow } from '../../../helpers/homepage-draft-db'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
@@ -32,7 +32,7 @@ const req = (body: unknown) =>
   new NextRequest('http://localhost/api/admin/homepage-draft/copy', {
     method: 'POST',
     body: JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...draftHeaders },
   })
 
 beforeEach(() => {
@@ -40,6 +40,7 @@ beforeEach(() => {
   vi.mocked(authenticateAdmin).mockResolvedValue(admin as any)
   vi.mocked(hasScope).mockReturnValue(true)
   fake.reset({ sections: [sectionRow(A, 0), sectionRow(B, 1, { type: 'trust_strip' })], heroSlides: [slideRow(S, 0)] })
+  fake.startDraft()
 })
 
 describe('POST /api/admin/homepage-draft/copy', () => {
@@ -50,7 +51,7 @@ describe('POST /api/admin/homepage-draft/copy', () => {
     expect((await POST(req({ to: 'app' }))).status).toBe(403)
     expect((await POST(req({ to: 'print' }))).status).toBe(400)
     expect((await POST(req({ from: 'app', to: 'app' }))).status).toBe(400)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
   })
 
   it('copies the website rows onto the app surface in the draft with new ids, leaving live alone', async () => {

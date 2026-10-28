@@ -20,8 +20,8 @@ export type DraftResourceType =
   | 'po_receive'
   | 'cash_sale'
 
-/** The homepage draft is a singleton row; its lock uses the nil uuid. */
-export const HOMEPAGE_LOCK_ID = '00000000-0000-0000-0000-000000000000'
+/** The homepage is one entity with no row of its own; its drafts and revisions use the nil uuid. */
+export const HOMEPAGE_ENTITY_ID = '00000000-0000-0000-0000-000000000000'
 
 export interface DraftResourceDef {
   label: string
@@ -102,11 +102,12 @@ export const DRAFT_RESOURCES: Record<DraftResourceType, DraftResourceDef> = {
     label: 'Homepage',
     writeScope: 'settings:write',
     readScope: 'settings:read',
-    existsSql: `SELECT 1 FROM homepage_drafts WHERE id = true`,
-    listSql: `SELECT '${HOMEPAGE_LOCK_ID}'::uuid AS id, updated_at FROM homepage_drafts WHERE id = true`,
-    labelSql: `SELECT '${HOMEPAGE_LOCK_ID}'::uuid AS id, 'Homepage'::text AS label, NULL::text AS ref`,
-    hintSql: `SELECT updated_by AS admin_id FROM homepage_drafts WHERE id = true`,
-    editHref: () => `/admin/settings/homepage`,
+    existsSql: `SELECT 1 FROM homepage_draft_branches WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM homepage_draft_branches`,
+    labelSql: `SELECT id, ('Homepage' || COALESCE(' · ' || NULLIF(title, ''), ''))::text AS label, NULL::text AS ref
+                 FROM homepage_draft_branches WHERE id = ANY($1::uuid[])`,
+    hintSql: `SELECT author_admin_id AS admin_id FROM homepage_draft_branches WHERE id = $1`,
+    editHref: id => `/admin/settings/homepage?draft=${id}`,
   },
   mailer: {
     label: 'Message',

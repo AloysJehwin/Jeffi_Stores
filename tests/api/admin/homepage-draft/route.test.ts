@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeHomepageDraftDb, sectionRow, slideRow } from '../../../helpers/homepage-draft-db'
+import { DRAFT_ID, makeHomepageDraftDb, sectionRow, slideRow } from '../../../helpers/homepage-draft-db'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
@@ -37,11 +37,12 @@ const N = 'cccccccc-0000-4000-8000-000000000004'
 const S1 = 'dddddddd-0000-4000-8000-000000000001'
 const S2 = 'dddddddd-0000-4000-8000-000000000002'
 
-const req = (method: string) => new NextRequest('http://localhost/api/admin/homepage-draft', { method })
+const req = (method: string, draft: string | null = DRAFT_ID) =>
+  new NextRequest(`http://localhost/api/admin/homepage-draft${draft ? `?draft=${draft}` : ''}`, { method })
 
 // B removed, C edited and moved first, N added; slide S1 gets a new image.
 function seedDraft() {
-  fake.state.draft = {
+  fake.startDraft({
     sections: [
       sectionRow(C, 0, { title: 'Edited' }),
       sectionRow(A, 1),
@@ -50,7 +51,7 @@ function seedDraft() {
     hero_slides: [slideRow(S1, 0, { image_url: 'https://cdn.example.com/new.png' }), slideRow(S2, 1)],
     updated_by: ADMIN_ID,
     updated_at: new Date(Date.now() - 5 * 60_000).toISOString(),
-  }
+  })
   fake.state.adminNames[ADMIN_ID] = 'Aloys Jehwin'
 }
 
@@ -88,6 +89,7 @@ describe('GET /api/admin/homepage-draft', () => {
     const layouts = { web: { sections: none, slides: none }, web_mobile: { sections: none, slides: none }, app: { sections: none, slides: none } }
     expect(await (await GET(req('GET'))).json()).toEqual({
       hasDraft: false,
+      title: null,
       updatedAt: null,
       updatedBy: null,
       sections: none,
@@ -128,30 +130,28 @@ describe('DELETE /api/admin/homepage-draft', () => {
     expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled()
   })
 
-  it('is a no-op without a draft', async () => {
+  it('is a no-op for a draft that is already gone', async () => {
     expect(await (await DELETE(req('DELETE'))).json()).toEqual({ success: true, discarded: false })
     expect(vi.mocked(logAdminAudit)).not.toHaveBeenCalled()
+  })
+
+  it('400s without a draft id', async () => {
+    expect((await DELETE(req('DELETE', null))).status).toBe(400)
   })
 })
 
 describe('POST /api/admin/homepage-draft/publish', () => {
-  it('409s when there is no draft', async () => {
-    const res = await PUBLISH(req('POST'))
-    expect(res.status).toBe(409)
+  it('400s without a draft id and 404s for a draft that is gone', async () => {
+    expect((await PUBLISH(req('POST', null))).status).toBe(400)
+    expect((await PUBLISH(req('POST'))).status).toBe(404)
     expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled()
   })
 
-  it('copies the draft onto live, deletes it and revalidates the homepage', async () => {
+  it('merges the draft into live, deletes it and revalidates the homepage', async () => {
     seedDraft()
     const res = await PUBLISH(req('POST'))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({
-      success: true,
-      published: {
-        sections: { inserted: 1, updated: 2, deleted: 1 },
-        heroSlides: { inserted: 0, updated: 1, deleted: 0 },
-      },
-    })
+    expect(await res.json()).toEqual({ success: true, published: { entityId: '00000000-0000-0000-0000-000000000000', revision: 1 } })
     expect(fake.state.draft).toBeNull()
     expect(fake.state.live.sections.map(s => s.id).sort()).toEqual([A, C, N].sort())
     expect(fake.state.live.sections.find(s => s.id === C)).toMatchObject({ title: 'Edited', display_order: 0 })

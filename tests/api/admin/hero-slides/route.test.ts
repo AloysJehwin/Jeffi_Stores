@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeHomepageDraftDb, slideRow } from '../../../helpers/homepage-draft-db'
+import { draftHeaders, makeHomepageDraftDb, slideRow } from '../../../helpers/homepage-draft-db'
 
 vi.mock('@/lib/auth/jwt', () => {
   const authenticateAdmin = vi.fn()
@@ -46,20 +46,20 @@ function req(method: string, body?: unknown) {
   return new NextRequest('http://localhost/api/admin/hero-slides', {
     method,
     body: body !== undefined ? JSON.stringify(body) : undefined,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...draftHeaders },
   })
 }
 function badReq(method: string) {
   return new NextRequest('http://localhost/api/admin/hero-slides', {
     method,
     body: 'not-json{',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...draftHeaders },
   })
 }
 function uploadReq(fields: Record<string, string | File>) {
   const form = new FormData()
   for (const [k, v] of Object.entries(fields)) form.append(k, v)
-  return new NextRequest('http://localhost/api/admin/hero-slides/x/image', { method: 'POST', body: form })
+  return new NextRequest('http://localhost/api/admin/hero-slides/x/image', { method: 'POST', body: form, headers: draftHeaders })
 }
 const png = () => new File(['png-bytes'], 'banner.png', { type: 'image/png' })
 
@@ -72,6 +72,7 @@ beforeEach(() => {
   vi.mocked(hasScope).mockReturnValue(true)
   mockUpload.mockResolvedValue({ url: 'https://cdn.example.com/gallery/new.png', blurhash: 'LEHV6nWB2yk8' })
   fake.reset({ heroSlides: [slideRow(S1, 0), slideRow(S2, 1)] })
+  fake.startDraft()
 })
 
 afterEach(() => {
@@ -98,7 +99,7 @@ describe('authorization', () => {
     expect((await PATCH_ONE(req('PATCH', { title: 'x' }), paramsFor(S1))).status).toBe(403)
     expect((await DELETE(req('DELETE'), paramsFor(S1))).status).toBe(403)
     expect((await UPLOAD(uploadReq({ file: png() }), paramsFor(S1))).status).toBe(403)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
   })
 })
 
@@ -118,7 +119,7 @@ describe('GET /api/admin/hero-slides', () => {
 describe('POST /api/admin/hero-slides', () => {
   it('400 validation failure (missing title)', async () => {
     expect((await POST(req('POST', {}))).status).toBe(400)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
   })
 
   it('creates the slide in the draft with the table defaults', async () => {
@@ -192,6 +193,7 @@ describe('POST /api/admin/hero-slides', () => {
 
   it('starts at display order 0 when there are no slides', async () => {
     fake.reset()
+    fake.startDraft()
     const { slide } = await (await POST(req('POST', { title: 'First' }))).json()
     expect(slide.display_order).toBe(0)
   })
@@ -234,7 +236,7 @@ describe('PATCH/DELETE /api/admin/hero-slides/[id]', () => {
   it('404s a slide that is not in the draft and leaves no draft behind', async () => {
     const res = await PATCH_ONE(req('PATCH', { title: 'x' }), paramsFor(MISSING))
     expect(res.status).toBe(404)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
   })
 
   it('removes the slide from the draft and keeps it live', async () => {

@@ -1019,14 +1019,11 @@ ALTER TABLE ONLY public.ads_alerts
 
 
 --
--- Name: homepage_drafts homepage_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: homepage_draft_branches homepage_draft_branches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.homepage_drafts
-    ADD CONSTRAINT homepage_drafts_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY public.homepage_drafts
-    ADD CONSTRAINT homepage_drafts_singleton CHECK (id);
+ALTER TABLE ONLY public.homepage_draft_branches
+    ADD CONSTRAINT homepage_draft_branches_pkey PRIMARY KEY (id);
 
 
 --

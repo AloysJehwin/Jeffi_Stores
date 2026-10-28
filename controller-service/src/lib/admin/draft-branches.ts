@@ -36,6 +36,10 @@ export interface DraftAdapter {
   lockLive(db: DraftDb, entityId: string): Promise<void>
   /** Write merged content to live, inside the publish transaction. */
   apply(db: DraftDb, entityId: string, merged: Content, live: Content, actor: DraftActor): Promise<void>
+  /** Settles a conflict without asking (e.g. list positions), or null to ask the publisher. */
+  autoResolve?(c: MergeConflict): Resolution | null
+  /** Brings a stored base into the shape live() returns (bases saved before a column existed). */
+  normalizeBase?(base: Content): Content
 }
 
 export interface DraftSummary {
@@ -171,10 +175,20 @@ export async function mergeAndPublish(
     if (!live) throw new DraftNotFoundError(entityId)
     const mine = a.toContent(row)
     // Drafts from before branches have no base: treat live as the base (their edits win, as before).
-    const base = (row.base as Content | null) ?? live
+    const base = row.base ? (a.normalizeBase?.(row.base as Content) ?? (row.base as Content)) : live
     const shape = [mine, base]
     const liveP = project(live, shape)
-    const r = threeWayMerge(project(base, shape), mine, liveP, { arrayKeys: a.arrayKeys, labels: a.labels, resolutions: opts.resolutions })
+    const merge = (resolutions?: Record<string, Resolution>) =>
+      threeWayMerge(project(base, shape), mine, liveP, { arrayKeys: a.arrayKeys, labels: a.labels, resolutions })
+    let r = merge(opts.resolutions)
+    if (r.conflicts.length && a.autoResolve) {
+      const auto: Record<string, Resolution> = {}
+      for (const c of r.conflicts) {
+        const pick = a.autoResolve(c)
+        if (pick) auto[c.path] = pick
+      }
+      if (Object.keys(auto).length) r = merge({ ...auto, ...opts.resolutions })
+    }
     if (r.conflicts.length) {
       const revs = await revisionsSince(db, a.type, entityId, row.base_revision ?? 0)
       for (const c of r.conflicts) {
