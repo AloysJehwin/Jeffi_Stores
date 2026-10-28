@@ -18,6 +18,9 @@ export type UnitType = 'token_1k_in' | 'token_1k_out' | 'image' | 'video_second'
 export interface UsageUnits {
   type: UnitType
   qty: number
+  /** Price this unit from another provider/model's row (a post-step such as background removal). */
+  provider?: string
+  model?: string
 }
 
 export interface UsageInput {
@@ -93,7 +96,7 @@ async function unitPrice(capability: Capability, provider: string, model: string
 async function priceUnits(capability: Capability, provider: string, model: string, units: UsageUnits[]): Promise<number> {
   let total = 0
   for (const u of units) {
-    const p = await unitPrice(capability, provider, model, u.type)
+    const p = await unitPrice(capability, u.provider ?? provider, u.model ?? model, u.type)
     total += p.price_inr * (u.qty || 0)
   }
   return Math.round(total * 10000) / 10000

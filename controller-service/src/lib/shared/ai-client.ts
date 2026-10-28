@@ -8,8 +8,10 @@ import { directChat, directEmbed, directVision, ollamaDirectUrl } from './ai-dir
 export interface AiChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string
-  tool_calls?: Array<{ function: { name: string; arguments: Record<string, unknown> } }>
+  tool_calls?: Array<{ id?: string; function: { name: string; arguments: Record<string, unknown> } }>
   tool_call_id?: string
+  /** Provider-native assistant content echoed from AiChatResponse.providerState (Claude tool loops). */
+  providerState?: { provider: 'anthropic'; content: unknown[] }
 }
 
 export interface AiToolDef {
@@ -22,8 +24,8 @@ export interface AiChatRequest {
   temperature?: number
   maxTokens?: number
   jsonMode?: boolean
-  modelHint?: 'sql' | 'copy' | 'agent' | 'fast' | 'enrich' | 'email'
-  forceProvider?: 'openai' | 'ollama'
+  modelHint?: 'sql' | 'copy' | 'agent' | 'fast' | 'enrich' | 'email' | 'deep'
+  forceProvider?: 'openai' | 'ollama' | 'anthropic'
   tools?: AiToolDef[]
   noCache?: boolean
   /** Cache partition. Defaults to the current tenant; background jobs must pass it explicitly. */
@@ -35,21 +37,38 @@ export interface AiChatRequest {
 }
 
 export interface AiToolCall {
+  id?: string
   name: string
   arguments: Record<string, unknown>
+}
+
+export interface AiChatUsage {
+  promptTokens?: number
+  completionTokens?: number
+  costInr?: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  /** Input tokens weighted to the uncached input price; tenant billing uses this. */
+  billedPromptTokens?: number
 }
 
 export interface AiChatResponse {
   content: string
   toolCalls?: AiToolCall[]
-  provider: 'openai' | 'ollama'
+  provider: 'openai' | 'ollama' | 'anthropic'
   model: string
   latencyMs: number
   fallbackUsed: boolean
   cache?: 'kv' | 'semantic' | null
   /** Gateway usage block (ai-platform/gateway). May be absent until stream A lands; treat as zero. */
-  usage?: { promptTokens?: number; completionTokens?: number; costInr?: number }
+  usage?: AiChatUsage
+  /** Echo on the next request's assistant message so Claude tool loops replay unchanged. */
+  providerState?: { provider: 'anthropic'; content: unknown[] }
+  stopReason?: string
 }
+
+/** Streaming chat events (aiChatStream). */
+export type AiChatStreamEvent = { type: 'text'; text: string } | { type: 'tool_call'; id?: string; name: string }
 
 export class AiClientError extends Error {
   constructor(
@@ -173,30 +192,155 @@ async function runDirect<T>(op: string, direct: (timeoutMs: number) => Promise<T
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function currentTenant(): Promise<string | null> {
+  try {
+    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+    return (await resolveTenantId()) ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Per-request gateway context: cache partition, the store's provider order and its Claude identity. */
+async function gatewayContext(cacheNamespace: string | undefined) {
+  const ns = cacheNamespace ?? (await currentTenant()) ?? 'platform'
+  // Policy and identity follow the store the work is for: a tenant-id namespace, the flagship for
+  // 'platform', else (undefined) the tenant in the current request scope.
+  const store = UUID_RE.test(ns) ? ns : ns === 'platform' ? null : undefined
+  const policy = await import('@/lib/providers/policy')
+  const [routing, anthropicIdentity] = await Promise.all([
+    Promise.resolve()
+      .then(() => policy.getAiRouting(store))
+      .catch(() => ({}) as { text?: string[] }),
+    Promise.resolve()
+      .then(() => policy.getAnthropicIdentity(store))
+      .catch(() => null),
+  ])
+  return { cacheNamespace: ns, providers: routing.text, anthropicIdentity: anthropicIdentity ?? undefined }
+}
+
 export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
-  const cacheNamespace =
-    req.cacheNamespace ??
-    (await (async () => {
-      try {
-        const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
-        return (await resolveTenantId()) ?? 'platform'
-      } catch {
-        return 'platform'
-      }
-    })())
   const res = await withFallback(
     'chat',
-    async () => {
-      const { getAiRouting } = await import('@/lib/providers/policy')
-      const providers = (await getAiRouting().catch(() => ({}) as { text?: string[] })).text
-      return gatewayPost('/v1/chat', { ...req, cacheNamespace, providers }, '', true) as Promise<AiChatResponse>
-    },
+    async () => gatewayPost('/v1/chat', { ...req, ...(await gatewayContext(req.cacheNamespace)) }, '', true) as Promise<AiChatResponse>,
     ms => directChat(req, ms),
   )
   if (req.billing !== false) {
     void logChatUsage(req, res).catch(err => console.warn('[ai-client] usage log failed:', (err as Error).message))
   }
   return res
+}
+
+/**
+ * Streaming variant of aiChat: text deltas and tool-call starts arrive through onEvent while the
+ * model runs; resolves with the same final response. Usage is recorded once, at the end. When the
+ * gateway stream fails before any output, falls back to aiChat (which itself falls back to Ollama).
+ */
+export async function aiChatStream(
+  req: AiChatRequest,
+  opts: { onEvent?: (e: AiChatStreamEvent) => void; signal?: AbortSignal } = {}
+): Promise<AiChatResponse> {
+  let emitted = false
+  let res: AiChatResponse | null = null
+  if (await gatewayReachable()) {
+    try {
+      res = await gatewayStream(req, e => {
+        emitted = true
+        opts.onEvent?.(e)
+      }, opts.signal)
+    } catch (err) {
+      if (emitted || opts.signal?.aborted) throw err
+      console.error(`[ai-client] gateway stream failed (${(err as Error).message.slice(0, 300)}); retrying without streaming`)
+    }
+  }
+  if (!res) {
+    const r = await aiChat(req)
+    if (r.toolCalls?.length) for (const tc of r.toolCalls) opts.onEvent?.({ type: 'tool_call', id: tc.id, name: tc.name })
+    if (r.content) opts.onEvent?.({ type: 'text', text: r.content })
+    return r
+  }
+  if (req.billing !== false) {
+    void logChatUsage(req, res).catch(err => console.warn('[ai-client] usage log failed:', (err as Error).message))
+  }
+  return res
+}
+
+async function gatewayStream(req: AiChatRequest, onEvent: (e: AiChatStreamEvent) => void, signal?: AbortSignal): Promise<AiChatResponse> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), GATEWAY_TIMEOUT_MS)
+  const onAbort = () => ctrl.abort()
+  signal?.addEventListener('abort', onAbort)
+  try {
+    const body = { ...req, ...(await gatewayContext(req.cacheNamespace)) }
+    const res = await fetch(`${GATEWAY_URL}/v1/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: ctrl.signal,
+      body: JSON.stringify(body),
+    })
+    lastContactAt = Date.now()
+    if (!res.ok || !res.body) {
+      const detail = await res.text().catch(() => '')
+      throw new GatewayFailure(`AI gateway stream HTTP ${res.status}: ${detail}`, res.status >= 500)
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (value) buf += decoder.decode(value, { stream: true })
+      let nl: number
+      while ((nl = buf.indexOf('\n')) >= 0 || (done && buf.trim())) {
+        const line = (nl >= 0 ? buf.slice(0, nl) : buf).trim()
+        buf = nl >= 0 ? buf.slice(nl + 1) : ''
+        if (!line) continue
+        const e = JSON.parse(line)
+        if (e.type === 'done') return e.response as AiChatResponse
+        if (e.type === 'error') throw new AiClientError(`AI gateway: ${e.error}`, 'gateway')
+        onEvent(e as AiChatStreamEvent)
+      }
+      if (done) break
+    }
+    throw new AiClientError('AI gateway stream ended without a result', 'gateway')
+  } finally {
+    clearTimeout(t)
+    signal?.removeEventListener('abort', onAbort)
+  }
+}
+
+let providersCache: {
+  at: number
+  text: { name: string; configured: boolean; keyFallback?: boolean }[]
+  defaults: string[]
+} | null = null
+
+/** The text provider the next chat will most likely run on ('anthropic' or 'razer'). */
+export async function activeTextProvider(cacheNamespace?: string): Promise<'anthropic' | 'razer'> {
+  try {
+    if (!providersCache || Date.now() - providersCache.at > 60_000) {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), GATEWAY_CONNECT_TIMEOUT_MS)
+      try {
+        const r = await fetch(`${GATEWAY_URL}/v1/providers`, { signal: ctrl.signal })
+        const d = await r.json()
+        providersCache = { at: Date.now(), text: d.text ?? [], defaults: d.defaults?.text ?? [] }
+      } finally {
+        clearTimeout(t)
+      }
+    }
+    const ctx = await gatewayContext(cacheNamespace)
+    const order = ctx.providers?.length ? ctx.providers : providersCache.defaults
+    // Claude serves this store only with its workload identity, or via the gateway's dev key.
+    const usable = (p: string) =>
+      providersCache!.text.some(
+        t => t.name === p && t.configured && (p !== 'anthropic' || !!ctx.anthropicIdentity || !!t.keyFallback)
+      )
+    return order.find(usable) === 'anthropic' ? 'anthropic' : 'razer'
+  } catch {
+    return 'razer'
+  }
 }
 
 /** Fire-and-forget: record and charge for a completed chat call. Text charging runs AFTER the
@@ -206,8 +350,10 @@ async function logChatUsage(req: AiChatRequest, res: AiChatResponse): Promise<vo
   const { recordUsage } = await import('@/lib/ai/billing')
   const pt = Number(res.usage?.promptTokens ?? 0)
   const ct = Number(res.usage?.completionTokens ?? 0)
+  // Claude prompts bill cache-weighted (reads/writes scaled to the input price).
+  const billedIn = Number(res.usage?.billedPromptTokens ?? pt)
   const units = [
-    { type: 'token_1k_in' as const, qty: pt / 1000 },
+    { type: 'token_1k_in' as const, qty: billedIn / 1000 },
     { type: 'token_1k_out' as const, qty: ct / 1000 },
   ]
   const costInr = Number(res.usage?.costInr ?? 0)
@@ -279,16 +425,29 @@ export interface AiVisionResult {
   pages?: number
   error?: string
   hint?: string
+  provider?: string
+  usage?: AiChatUsage
   /** True when served by direct Ollama because the gateway was down. */
   fallbackUsed?: boolean
 }
 
-/** Vision/OCR via the gateway. `images` are base64 (no data: prefix). Never throws. */
-export async function aiVision(images: string[], prompt: string, model?: string): Promise<AiVisionResult> {
+/** Vision/OCR via the gateway. `images` are base64 (no data: prefix). Never throws. Usage is
+ *  recorded under capability 'vision' (Claude by tokens, OCR/Ollama per call). */
+export async function aiVision(
+  images: string[],
+  prompt: string,
+  model?: string,
+  opts: { feature?: string; billing?: boolean; cacheNamespace?: string } = {}
+): Promise<AiVisionResult> {
+  const started = Date.now()
+  let r: AiVisionResult
   try {
-    return await withFallback(
+    r = await withFallback(
       'vision',
-      () => gatewayPost('/v1/vision', { images, prompt, model }, 'vision ', false) as Promise<AiVisionResult>,
+      async () => {
+        const { cacheNamespace, anthropicIdentity } = await gatewayContext(opts.cacheNamespace)
+        return gatewayPost('/v1/vision', { images, prompt, model, cacheNamespace, anthropicIdentity }, 'vision ', false) as Promise<AiVisionResult>
+      },
       ms => directVision(images, prompt, model, ms),
     )
   } catch (err) {
@@ -298,5 +457,33 @@ export async function aiVision(images: string[], prompt: string, model?: string)
       model: model || '',
       error: err instanceof Error ? err.message : 'vision request failed',
     }
+  }
+  if (r.ok && opts.billing !== false) void logVisionUsage(r, opts.feature ?? 'vision', Date.now() - started)
+  return r
+}
+
+async function logVisionUsage(r: AiVisionResult, feature: string, latencyMs: number): Promise<void> {
+  try {
+    const { recordUsage, AiWalletError } = await import('@/lib/ai/billing')
+    const claude = r.provider === 'anthropic'
+    const units = claude
+      ? [
+          { type: 'token_1k_in' as const, qty: Number(r.usage?.billedPromptTokens ?? r.usage?.promptTokens ?? 0) / 1000 },
+          { type: 'token_1k_out' as const, qty: Number(r.usage?.completionTokens ?? 0) / 1000 },
+        ]
+      : [{ type: 'call' as const, qty: 1 }]
+    await recordUsage({
+      feature,
+      capability: 'vision',
+      provider: claude ? 'anthropic' : 'ollama',
+      model: r.model || '',
+      units,
+      costInr: Number(r.usage?.costInr ?? 0),
+      latencyMs,
+    }).catch(err => {
+      if (!(err instanceof AiWalletError)) throw err
+    })
+  } catch (err) {
+    console.warn('[ai-client] vision usage log failed:', (err as Error).message)
   }
 }

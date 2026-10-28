@@ -14,17 +14,19 @@ import { AI_FEATURE_SCOPES } from '@/lib/ai/scope-map'
 const Query = z.object({
   feature: z.enum([...AI_IMAGE_FEATURES, ...AI_VIDEO_FEATURES]),
   quality: z.enum(['draft', 'standard', 'premium']).default('standard'),
+  transparent: z.enum(['1', '0']).optional(),
 })
 
 // The provider the gateway prefers for a quality hint (plan: draft -> razer, premium -> google).
 const PREFERRED: Record<string, string | null> = { draft: 'razer', standard: null, premium: 'google' }
 
-// GET /api/admin/ai/price?feature=&quality=: per-unit price shown before generating
-// (per image, or per second of video). The flagship is never charged, so it quotes 0.
+// GET /api/admin/ai/price?feature=&quality=[&transparent=1]: per-unit price shown before generating
+// (per image, or per second of video; transparent adds the cutout step). The flagship is never charged, so it quotes 0.
 export async function GET(request: NextRequest) {
   const q = Query.safeParse({
     feature: request.nextUrl.searchParams.get('feature') ?? undefined,
     quality: request.nextUrl.searchParams.get('quality') ?? undefined,
+    transparent: request.nextUrl.searchParams.get('transparent') ?? undefined,
   })
   if (!q.success) return NextResponse.json({ error: q.error.issues[0]?.message || 'Invalid query' }, { status: 400 })
   const { feature, quality } = q.data
@@ -65,5 +67,18 @@ export async function GET(request: NextRequest) {
   // Highest-priced row of the preferred provider, else the wildcard row, else the highest: an
   // estimate that does not undershoot; the charge is trued up to the provider that served it.
   const row = (preferred && rows.find(r => r.provider === preferred)) || rows.find(r => r.model === '*') || rows[0]
-  return NextResponse.json({ priceInr: Number(row.price_inr), unitType, provider: row.provider, charged: true })
+  const cutout = capability === 'image' && q.data.transparent === '1' ? await cutoutPrice() : 0
+  return NextResponse.json({ priceInr: Number(row.price_inr) + cutout, unitType, provider: row.provider, charged: true })
+}
+
+// Background removal is billed per image as the image/replicate 'call' row (see lib/ai/media.ts).
+async function cutoutPrice(): Promise<number> {
+  const r = await controlPlanePool()
+    .query<{ price_inr: string }>(
+      `SELECT price_inr FROM ai_price_list
+        WHERE active = true AND capability = 'image' AND unit_type = 'call' AND provider = 'replicate'
+        ORDER BY (model = '*') DESC, price_inr DESC LIMIT 1`
+    )
+    .catch(() => null)
+  return Number(r?.rows[0]?.price_inr ?? 0)
 }

@@ -7,8 +7,10 @@
 //   wan-video/wan-2.2-i2v-fast — NO aspect_ratio field (output aspect comes from the input image);
 //                                 resolution in {'480p','720p'}.
 // We default resolution to '720p' for both; num_frames clamps to the model's floor (81).
+// Background removal (transparent images): REPLICATE_BG_REMOVAL_MODEL, default bria/remove-background
+// (RMBG 2.0, takes `image`, returns a PNG URL). An `owner/name:version` id runs a pinned community model.
 
-import type { ImageGenInput, ImageGenOutput, MediaProvider, VideoGenInput, VideoPoll, VideoStart } from './types'
+import type { BackgroundRemover, GeneratedImage, ImageGenInput, ImageGenOutput, MediaProvider, VideoGenInput, VideoPoll, VideoStart } from './types'
 import { ProviderError, fetchBytes, fetchJson, loadImage, nearestAspect, toImage } from './types'
 
 const BASE = 'https://api.replicate.com/v1'
@@ -19,6 +21,7 @@ const IMAGE_MODELS: Record<string, string> = {
 }
 const VIDEO_T2V = 'wan-video/wan-2.2-t2v-fast'
 const VIDEO_I2V = 'wan-video/wan-2.2-i2v-fast'
+export const DEFAULT_BG_REMOVAL_MODEL = 'bria/remove-background'
 
 interface PredictionResponse {
   id?: string
@@ -30,14 +33,27 @@ interface PredictionResponse {
 
 const FLUX_ASPECTS = ['1:1', '16:9', '21:9', '3:2', '2:3', '4:5', '5:4', '3:4', '4:3', '9:16', '9:21']
 
-export class ReplicateProvider implements MediaProvider {
+export class ReplicateProvider implements MediaProvider, BackgroundRemover {
   readonly name = 'replicate' as const
   constructor(
     private readonly token = process.env.REPLICATE_API_TOKEN || '',
     private readonly timeoutMs = Number(process.env.REPLICATE_TIMEOUT_MS) || 180_000,
+    private readonly bgModel = process.env.REPLICATE_BG_REMOVAL_MODEL || DEFAULT_BG_REMOVAL_MODEL,
   ) {}
 
   configured(): boolean { return !!this.token }
+
+  cutoutModel(): string { return this.bgModel }
+
+  async removeBackground(img: GeneratedImage): Promise<GeneratedImage> {
+    this.assert()
+    const pred = await this.create(this.bgModel, { image: `data:${img.mime};base64,${img.bytes.toString('base64')}` })
+    const done = await this.waitUntilDone(pred)
+    const url = urlList(done.output)[0]
+    if (!url) throw new ProviderError('replicate', 'background removal returned no image')
+    const { bytes, mime } = await fetchBytes('replicate', url, { timeoutMs: 60_000 })
+    return toImage(bytes, mime.startsWith('image/') ? mime : 'image/png', { width: img.width, height: img.height })
+  }
 
   async generateImage(req: ImageGenInput): Promise<ImageGenOutput> {
     this.assert()
@@ -115,10 +131,11 @@ export class ReplicateProvider implements MediaProvider {
   }
 
   private async create(model: string, input: Record<string, unknown>): Promise<PredictionResponse> {
-    return fetchJson<PredictionResponse>('replicate', `${BASE}/models/${model}/predictions`, {
+    const [name, version] = model.split(':')
+    return fetchJson<PredictionResponse>('replicate', version ? `${BASE}/predictions` : `${BASE}/models/${name}/predictions`, {
       method: 'POST',
       headers: this.headers(),
-      body: JSON.stringify({ input }),
+      body: JSON.stringify(version ? { version, input } : { input }),
       timeoutMs: 30_000,
     })
   }

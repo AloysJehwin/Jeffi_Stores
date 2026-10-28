@@ -8,6 +8,9 @@ import PresetChipRow from './PresetChipRow'
 import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import Select from '@/components/ui/Select'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import { aiFieldScope } from '@/lib/auth/ai-scope'
+import { aiFeatureLabel } from '@/lib/ai/feature-labels'
 import { ap } from '@/lib/shared/admin-path'
 import { AI_VIDEO_DURATIONS, type AiVideoAspect, type AiVideoFeature } from '@/lib/ai/media-features'
 
@@ -82,6 +85,7 @@ export default function AiVideoButton({
       {open && (
         <VideoDialog
           feature={feature}
+          area={area}
           defaultPrompt={defaultPrompt}
           defaultImageUrl={referenceImageUrl ?? defaultImageUrl}
           defaultAspect={defaultAspect}
@@ -96,6 +100,7 @@ export default function AiVideoButton({
 
 function VideoDialog({
   feature,
+  area,
   defaultPrompt,
   defaultImageUrl,
   defaultAspect,
@@ -104,6 +109,7 @@ function VideoDialog({
   onClose,
 }: {
   feature: AiVideoFeature
+  area: string
   defaultPrompt?: string
   defaultImageUrl?: string
   defaultAspect: AiVideoAspect
@@ -270,12 +276,24 @@ function VideoDialog({
           <PresetChipRow kind="video" feature={feature} onPick={(next: string) => setPrompt(next)} />
           <div>
             <label className="mb-1 block text-xs font-medium text-foreground-secondary">Describe the shot</label>
-            <textarea
+            <AIEnrichButton
+              fieldLabel="Video prompt"
               value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-border-default bg-surface-primary px-3 py-2 text-sm"
-            />
+              onChange={setPrompt}
+              scope={aiFieldScope(area)}
+              format="video_prompt"
+              context={[`Video for: ${aiFeatureLabel(feature)}`, `Aspect ${aspect}, ${durationSec} seconds`, imageUrl.trim() && 'Animates a starting image', defaultPrompt && defaultPrompt !== prompt && `Original idea: ${defaultPrompt}`].filter(Boolean).join('. ')}
+              maxLength={2000}
+              write
+              multiline
+            >
+              <textarea
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-border-default bg-surface-primary px-3 py-2 pr-16 text-sm"
+              />
+            </AIEnrichButton>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-foreground-secondary">From this image (optional)</label>

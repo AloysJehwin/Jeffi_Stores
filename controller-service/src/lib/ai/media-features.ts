@@ -30,6 +30,10 @@ export const PNG_IMAGE_FEATURES: readonly string[] = [
   'product_image',
 ] satisfies readonly AiImageFeature[]
 
+// Channels that flatten alpha onto an opaque fill (Google/Meta ad assets, WhatsApp headers): no
+// transparent-background option for these.
+export const OPAQUE_IMAGE_FEATURES: readonly string[] = ['ads_image', 'meta_ads_image', 'template_image'] satisfies readonly AiImageFeature[]
+
 export const AI_VIDEO_FEATURES = ['social_video', 'homepage_video', 'offer_video', 'template_video'] as const
 export type AiVideoFeature = (typeof AI_VIDEO_FEATURES)[number]
 

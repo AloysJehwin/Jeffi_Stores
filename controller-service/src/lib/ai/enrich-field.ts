@@ -2,11 +2,12 @@ import { aiChat } from '@/lib/shared/ai-client'
 import { parseAiJson } from '@/lib/auth/ai-scope'
 import { BUILTIN_TEMPLATE_VARIABLES, type TemplateVariableDef } from '@/lib/templates/variables-shared'
 
-// "Enrich with AI" for one form field. Format-aware (plain · subject · label · sms · whatsapp · html),
-// keeps every merge variable in place, and can write from scratch when the field is empty.
+// "Enrich with AI" for one form field. Format-aware (plain · subject · label · sms · whatsapp · html,
+// plus image/video generation prompts), keeps every merge variable in place, and can write from
+// scratch when the field is empty.
 
-export type EnrichFormat = 'plain' | 'subject' | 'label' | 'sms' | 'whatsapp' | 'html'
-export const ENRICH_FORMATS: EnrichFormat[] = ['plain', 'subject', 'label', 'sms', 'whatsapp', 'html']
+export type EnrichFormat = 'plain' | 'subject' | 'label' | 'sms' | 'whatsapp' | 'html' | 'image_prompt' | 'video_prompt'
+export const ENRICH_FORMATS: EnrichFormat[] = ['plain', 'subject', 'label', 'sms', 'whatsapp', 'html', 'image_prompt', 'video_prompt']
 
 export interface EnrichInput {
   store: string // store descriptor for the prompt
@@ -30,12 +31,31 @@ const FORMAT_RULES: Record<EnrichFormat, string> = {
   sms: 'An SMS: plain text, GSM-7 characters only (no emoji, no smart quotes), ideally under 160 characters; keep any URL or {short_url} token.',
   whatsapp: 'A WhatsApp template body (Meta reviews it): plain text, *bold* _italic_ allowed, under 1024 characters, no URLs in the body, numbered slots {{1}} {{2}}… must all remain in order; {{brand_name}} is the store name and stays on the closing line; friendly but not spammy; no promotional ALL CAPS.',
   html: 'An email body fragment: valid HTML with inline styles only (no <html>/<head>/<body>/<style>), keep all existing links, images and the call-to-action button markup; paragraphs as <p>, headings as <h2>; do not set text colours or fonts.',
+  image_prompt: 'A prompt for an AI image generator: one paragraph of plain descriptive text (no lists, no quotes, no preamble), roughly 40–120 words. Keep the user\'s subject and intent; spell out the subject and its key details, composition and framing, setting/background, lighting, mood and colour palette, visual style (e.g. product photography, flat illustration), and camera/lens or angle where it suits a photo. No text, words, logos or watermarks in the image unless the user asked for them.',
+  video_prompt: 'A prompt for an AI video generator (a short 4–8 second clip): one paragraph of plain descriptive text (no lists, no quotes, no preamble), roughly 40–100 words. Keep the user\'s subject and intent; describe the subject, the setting, the one main motion or action, camera movement (e.g. slow push-in, orbit, static), lighting, mood and visual style. No on-screen text or logos unless the user asked for them.',
 }
+
+const MEDIA_FORMATS = new Set<EnrichFormat>(['image_prompt', 'video_prompt'])
 
 const PLACEMENT = `WHERE VARIABLES BELONG: a first-name token only in the greeting; {couponCode}/{discountPercent} only inside {#if couponCode}…{/if}; store name/contact tokens in sign-offs and contact lines; date tokens as plain text.`
 
+function buildMediaPromptMessages(i: EnrichInput, format: EnrichFormat) {
+  const empty = !i.value.trim()
+  const system = `You write prompts for generative ${format === 'video_prompt' ? 'video' : 'image'} models for ${i.store}.
+${empty ? 'Write a prompt from the context given.' : 'Rewrite the rough idea into a detailed, production-ready prompt. Do not change what is being depicted.'}
+FORMAT — ${FORMAT_RULES[format]}${i.maxLength ? ` Hard limit: ${i.maxLength} characters.` : ''}
+Do not invent product facts, brand names or claims that are not in the idea or context.
+Return ONLY JSON: {"result":"<prompt>"} — no explanation, no markdown fences.`
+  const user = [
+    i.context ? `Context: ${i.context}` : null,
+    empty ? 'Idea: (empty — write one that suits the context)' : `Idea: ${i.value}`,
+  ].filter(Boolean).join('\n')
+  return [{ role: 'system' as const, content: system }, { role: 'user' as const, content: user }]
+}
+
 export function buildEnrichMessages(i: EnrichInput) {
   const format = i.format ?? 'plain'
+  if (MEDIA_FORMATS.has(format)) return buildMediaPromptMessages(i, format)
   const defs = (i.builtins ?? BUILTIN_TEMPLATE_VARIABLES).filter(d => !i.broadcast || d.group !== 'order')
   const extra = (i.variables ?? []).filter(k => /^[a-zA-Z][a-zA-Z0-9_]{0,40}$/.test(k) && !defs.some(d => d.key === k)).slice(0, 40)
   const vars = [
