@@ -81,12 +81,14 @@ export const parseTextOrder = (raw: unknown) => parseRequestedProviders(raw, TEX
 export const parseImageOrder = (raw: unknown) => parseRequestedProviders(raw, IMAGE_PROVIDER_SET, 'image')
 export const parseVideoOrder = (raw: unknown) => parseRequestedProviders(raw, VIDEO_PROVIDER_SET, 'video')
 
-/** Text routing: forceProvider wins; else the requested order, else the gateway default. */
+/** Text routing: the requested order (the store's Site Controls), else the gateway default. A forced
+ *  provider only picks within a requested order, so a provider the store switched off never runs. */
 export function textRoute(req: { forceProvider?: string; providers?: unknown }): TextProviderName[] {
   const order = parseTextOrder(req.providers)
-  if (req.forceProvider === 'ollama') return ['razer']
-  if (req.forceProvider === 'anthropic') return ['anthropic', 'razer']
-  return req.forceProvider ? TEXT_PROVIDER_ORDER : order ?? TEXT_PROVIDER_ORDER
+  const within = (route: TextProviderName[]) => (order ? route.filter(p => order.includes(p)) : route)
+  if (req.forceProvider === 'ollama') return within(['razer'])
+  if (req.forceProvider === 'anthropic') return within(['anthropic', 'razer'])
+  return order ?? TEXT_PROVIDER_ORDER
 }
 
 /** Image routing order: pinned provider first, then the requested order (or configured) with quality bias. */
