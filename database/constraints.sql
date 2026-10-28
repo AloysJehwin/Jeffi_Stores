@@ -331,6 +331,17 @@ ALTER TABLE ONLY public.business_rfqs
     ADD CONSTRAINT business_rfqs_pkey PRIMARY KEY (id);
 
 
+--
+-- Name: rfq_reply_drafts rfq_reply_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rfq_reply_drafts
+    ADD CONSTRAINT rfq_reply_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.rfq_reply_drafts
+    ADD CONSTRAINT rfq_reply_drafts_counter_prices_check CHECK ((jsonb_typeof(counter_prices) = 'object'::text));
+
+
 
 --
 -- Name: business_rfqs business_rfqs_rfq_number_key; Type: CONSTRAINT; Schema: public; Owner: -

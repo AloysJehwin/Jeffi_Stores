@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { queryOne, queryMany, query } from '@/lib/shared/db'
+import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'
+import { clearReplyDraft } from '@/lib/admin/rfq-reply-drafts'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -56,6 +57,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (['pending', 'reviewed'].includes(rfq.status)) {
       await query(`UPDATE business_rfqs SET status = 'negotiating' WHERE id = $1`, [id])
     }
+
+    // The reply is sent: the admin's draft of it is done with.
+    await withTransaction(c => clearReplyDraft(c, admin, id, 'sent')).catch(err => console.error('[rfq] reply draft cleanup failed', err))
 
     return NextResponse.json({ message: msg })
   } catch (err: any) {

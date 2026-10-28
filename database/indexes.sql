@@ -1811,6 +1811,13 @@ CREATE INDEX idx_reviews_user_id ON public.product_reviews USING btree (user_id)
 CREATE INDEX idx_rfq_messages_rfq_id ON public.rfq_messages USING btree (rfq_id);
 
 
+--
+-- Name: idx_rfq_reply_drafts_rfq_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_rfq_reply_drafts_rfq_admin ON public.rfq_reply_drafts USING btree (rfq_id, admin_id);
+
+
 
 --
 -- Name: idx_scenario_audit_admin; Type: INDEX; Schema: public; Owner: -

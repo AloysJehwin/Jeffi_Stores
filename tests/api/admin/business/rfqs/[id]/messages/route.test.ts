@@ -13,6 +13,7 @@ vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
+  withTransaction: vi.fn(async (fn: (c: unknown) => unknown) => fn({ query: async () => ({ rows: [] }) })),
 }))
 
 // ---------------------------------------------------------------------------

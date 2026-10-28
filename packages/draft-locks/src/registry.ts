@@ -21,6 +21,7 @@ export type DraftResourceType =
   | 'cash_sale'
   | 'scenario'
   | 'google_ads_campaign'
+  | 'rfq_reply'
 
 /** The homepage is one entity with no row of its own; its drafts and revisions use the nil uuid. */
 export const HOMEPAGE_ENTITY_ID = '00000000-0000-0000-0000-000000000000'
@@ -203,6 +204,17 @@ export const DRAFT_RESOURCES: Record<DraftResourceType, DraftResourceDef> = {
                  FROM ads_campaign_drafts WHERE id = ANY($1::uuid[])`,
     hintSql: `SELECT admin_id FROM ads_campaign_drafts WHERE id = $1`,
     editHref: id => `/admin/google-ads?tab=drafts&draft=${id}`,
+  },
+  rfq_reply: {
+    label: 'RFQ reply',
+    writeScope: 'business_rfqs:write',
+    readScope: 'business_rfqs:read',
+    existsSql: `SELECT 1 FROM rfq_reply_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM rfq_reply_drafts`,
+    labelSql: `SELECT d.id, ('Reply · ' || r.rfq_number)::text AS label, d.rfq_id::text AS ref
+                 FROM rfq_reply_drafts d JOIN business_rfqs r ON r.id = d.rfq_id WHERE d.id = ANY($1::uuid[])`,
+    hintSql: `SELECT admin_id FROM rfq_reply_drafts WHERE id = $1`,
+    editHref: (id, ref) => `/admin/business/rfqs/${ref ?? ''}`,
   },
 }
 
