@@ -499,6 +499,17 @@ ALTER TABLE ONLY public.custom_scenarios
     ADD CONSTRAINT custom_scenarios_pkey PRIMARY KEY (kind);
 
 
+--
+-- Name: scenario_drafts scenario_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scenario_drafts
+    ADD CONSTRAINT scenario_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.scenario_drafts
+    ADD CONSTRAINT scenario_drafts_fields_check CHECK ((jsonb_typeof(fields) = 'object'::text));
+
+
 
 --
 -- Name: customer_activity_log customer_activity_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -

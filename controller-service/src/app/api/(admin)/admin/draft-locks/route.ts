@@ -10,16 +10,17 @@ export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 50
 const db = { query: (t: string, p?: unknown[]) => query(t, p as any[]) }
 
-/** Drafts dashboard: ?scope=mine|all|unclaimed&type=&page=&sort=&dir=, limited to the types the caller can read. */
+/** Drafts dashboard: ?scope=mine|all|unclaimed&type=a[,b]&page=&sort=&dir=, limited to the types the caller can read. */
 export async function GET(req: NextRequest) {
   const admin = await authenticateAdmin(req, { passive: true })
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const sp = req.nextUrl.searchParams
   const scope = sp.get('scope') === 'all' ? 'all' : sp.get('scope') === 'unclaimed' ? 'unclaimed' : 'mine'
-  const want = sp.get('type')
+  // One type or a comma list (a section whose Drafts tab covers several editors).
+  const want = (sp.get('type') ?? '').split(',').filter(Boolean)
+  if (want.some(t => !isDraftResourceType(t))) return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
   const readable = DRAFT_RESOURCE_TYPES.filter(t => hasScope(admin.role, admin.scopes, DRAFT_RESOURCES[t].readScope))
-  const types = readable.filter(t => !want || want === t)
-  if (want && !isDraftResourceType(want)) return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  const types = readable.filter(t => !want.length || want.includes(t))
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10) || 1)
   const sortKey = sp.get('sort')
   const sort = isDraftListSort(sortKey) ? { key: sortKey, dir: normalizeDir(sp.get('dir')) } : undefined

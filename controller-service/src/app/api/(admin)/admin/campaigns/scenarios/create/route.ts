@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
+import { actorOf, closeDraftLockTx } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ function slugify(s: string): string {
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
+  if (!hasScope(admin.role, admin.scopes, 'campaigns:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
   const dryRunCount = typeof body.dry_run_count === 'number' ? body.dry_run_count : null
   const parameters = body.parameters && typeof body.parameters === 'object' ? body.parameters : {}
   const kind = typeof body.kind === 'string' && body.kind.trim() ? slugify(body.kind) : slugify(name)
+  const draftId = typeof body.draft_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.draft_id) ? body.draft_id : null
 
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
   if (!kind) return NextResponse.json({ error: 'kind is required' }, { status: 400 })
@@ -83,6 +85,11 @@ export async function POST(req: NextRequest) {
           JSON.stringify(parameters),
         ]
       )
+      // The wizard's draft is done with once the scenario exists.
+      if (draftId) {
+        const r = await client.query(`DELETE FROM scenario_drafts WHERE id = $1`, [draftId])
+        if (r.rowCount) await closeDraftLockTx(client, actorOf(admin), 'scenario', draftId, 'published')
+      }
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to save scenario' }, { status: 500 })

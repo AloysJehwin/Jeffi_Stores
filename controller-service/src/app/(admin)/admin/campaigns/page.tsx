@@ -7,6 +7,7 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import CampaignsListClient from './CampaignsListClient'
 import ScenariosListClient from './scenarios/ScenariosListClient'
 import CampaignsOverview from './_components/CampaignsOverview'
+import ScenarioDrafts from './_components/ScenarioDrafts'
 import { PageBody, PageHeader, TabAction, TabLinks } from '@/components/admin/kit'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
@@ -29,7 +30,7 @@ export default async function CampaignsPage({
     { id: 'overview' as const, label: 'Overview', href: period.size ? `${base}?${period}` : base },
     { id: 'list' as const, label: 'Campaigns', href: `${base}?tab=list` },
     { id: 'scenarios' as const, label: 'Scenarios', href: `${base}?tab=scenarios` },
-    { id: 'drafts' as const, label: <DraftsTabLabel type="campaign" />, href: `${base}?tab=drafts` },
+    { id: 'drafts' as const, label: <DraftsTabLabel type="campaign,scenario" />, href: `${base}?tab=drafts` },
   ]
   return (
     <PageBody>
@@ -58,7 +59,8 @@ export default async function CampaignsPage({
       ) : tab === 'scenarios' ? (
         <ScenariosListClient />
       ) : tab === 'drafts' ? (
-        <PageDrafts type="campaign">
+        <PageDrafts type="campaign,scenario">
+          <ScenarioDrafts />
           <CampaignsListClient draftsOnly />
         </PageDrafts>
       ) : (
