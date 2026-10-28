@@ -5,7 +5,6 @@ import { useActionToast } from '@/components/admin/kit/toast'
 import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Megaphone } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
-import { useConfirm } from '@/contexts/ConfirmContext'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
@@ -74,7 +73,7 @@ export default function CampaignWizard({
   onCreated: () => void
 }) {
   const canAi = useCanUseAi('google_ads_campaigns')
-  const confirm = useConfirm()
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [b, setB] = useState<WizardBootstrap | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [d, setD] = useState<Draft | null>(null)
@@ -198,14 +197,12 @@ export default function CampaignWizard({
   async function discardDraft() {
     const id = draftIdRef.current
     if (!id) return
-    const ok = await confirm({
-      title: 'Discard campaign draft',
-      message: 'Throw away this unfinished campaign? Nothing has been created in Google Ads.',
-      confirmLabel: 'Discard',
-      cancelLabel: 'Keep',
-      variant: 'danger',
-    })
-    if (!ok) return
+    // Second click confirms; nothing has been created in Google Ads yet.
+    if (!confirmDiscard) {
+      setConfirmDiscard(true)
+      setTimeout(() => setConfirmDiscard(false), 4000)
+      return
+    }
     const res = await fetch(`${DRAFTS}/${id}`, { method: 'DELETE', credentials: 'include' })
     const j = await res.json().catch(() => ({}))
     if (!res.ok) return toast.error(j.error || 'Could not discard the draft')
@@ -293,8 +290,8 @@ export default function CampaignWizard({
     <>
       {draftId && autosave.status !== 'idle' && <AutosaveStatusPill status={autosave.status} />}
       {draftId && !result?.done && (lock.canDiscard || !readOnly) && (
-        <button type="button" className={btnGhost} onClick={discardDraft}>
-          Discard draft
+        <button type="button" className={confirmDiscard ? `${btnGhost} !border-red-500/40 !text-red-600` : btnGhost} onClick={discardDraft}>
+          {confirmDiscard ? 'Discard this draft?' : 'Discard draft'}
         </button>
       )}
       {d && !result?.done && !readOnly && (
