@@ -3,8 +3,7 @@ import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL } from '@/
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
 import { buildProductFilterClauses, getFilterFacets, type FilterFacets } from '@/lib/catalog/product-filters'
-import { getOfferBySlug, listActiveOffers, listFilterOffers } from '@/lib/catalog/product-offers'
-import { pickPromoOffer, type ProductOffer, type PromoOffer } from '@/lib/catalog/product-offers-shared'
+import { getOfferBySlug, listFilterOffers } from '@/lib/catalog/product-offers'
 import { cardPropsFor, type CardProps } from '@/lib/catalog/product-card-props'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { round2 } from '@/lib/catalog/gst'
@@ -212,7 +211,6 @@ export interface ListingModel {
   facets: FilterFacets
   /** Live offers holding products, plus the selected one if it has ended or emptied. */
   filterOffers: { slug: string; title: string }[]
-  promoOffer: ProductOffer | null
 }
 
 export async function buildListingModel(
@@ -261,16 +259,11 @@ export async function buildListingModel(
   }
   const facets = await getFilterFacets(facetBaseConditions, facetBaseParams)
 
-  const [liveOffers, activeOffer, activeOffers] = await Promise.all([
+  // Offers shown between the products come from the admin's listing sections (Settings → Homepage).
+  const [liveOffers, activeOffer] = await Promise.all([
     listFilterOffers(),
     resolvedSearchParams.offer ? getOfferBySlug(String(resolvedSearchParams.offer)) : Promise.resolve(null),
-    listActiveOffers(),
   ])
-  const promoOffer = pickPromoOffer(activeOffers, {
-    page,
-    activeSlug: resolvedSearchParams.offer ?? null,
-    eligibleSlugs: new Set(liveOffers.map(o => o.slug)),
-  })
   // A selected offer that has ended or emptied stays listed so the shopper can see and clear it.
   const filterOffers =
     activeOffer && !liveOffers.some(o => o.slug === activeOffer.slug)
@@ -293,7 +286,6 @@ export async function buildListingModel(
     categoryBanners: categoryBanners as any[],
     facets,
     filterOffers,
-    promoOffer,
   }
 }
 
@@ -328,7 +320,6 @@ export interface ListingModelJson {
   }[]
   facets: FilterFacets
   offers: { slug: string; title: string }[]
-  promoOffer: PromoOffer | null
 }
 
 /** The listing model as JSON for the app: products reduced to card props (never raw rows), the rest as plain data. */
@@ -396,19 +387,5 @@ export function toListingModelJson(m: ListingModel): ListingModelJson {
     })),
     facets: m.facets,
     offers: m.filterOffers.map(o => ({ slug: o.slug, title: o.title })),
-    promoOffer: m.promoOffer
-      ? {
-          slug: m.promoOffer.slug,
-          title: m.promoOffer.title,
-          subtitle: m.promoOffer.subtitle,
-          badge_text: m.promoOffer.badge_text,
-          badge_color: m.promoOffer.badge_color,
-          image_url: m.promoOffer.image_url,
-          image_url_mobile: m.promoOffer.image_url_mobile,
-          blurhash: m.promoOffer.blurhash,
-          blurhash_mobile: m.promoOffer.blurhash_mobile,
-          cta_label: m.promoOffer.cta_label,
-        }
-      : null,
   }
 }

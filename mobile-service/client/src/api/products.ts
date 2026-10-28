@@ -1,6 +1,6 @@
 import { api } from './client'
 import type { Product } from '../types'
-import type { CardProduct, ProductOffer } from '../types/home'
+import type { CardProduct } from '../types/home'
 
 /** A raw /api/products row: p.* plus categories, brands, product_images and the variant aggregates. */
 export type ProductRow = Product & Record<string, any>
@@ -77,12 +77,6 @@ export interface ListingFacets {
   specFacets: { key: string; values: ListingFacetValue[] }[]
 }
 
-/** The listing's promo slot (product-offers-shared PromoOffer). */
-export type PromoOffer = Pick<
-  ProductOffer,
-  'slug' | 'title' | 'subtitle' | 'badge_text' | 'badge_color' | 'image_url' | 'image_url_mobile' | 'blurhash' | 'blurhash_mobile' | 'cta_label'
->
-
 export interface ListingPage {
   products: ListingCard[]
   total: number
@@ -100,7 +94,6 @@ export interface ListingModel extends ListingPage {
   brands: { id: string; name: string }[]
   facets: ListingFacets
   offers: { slug: string; title: string }[]
-  promoOffer: PromoOffer | null
 }
 
 /**
