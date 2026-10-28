@@ -1,10 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Megaphone } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
+import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
+import { DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
+import { assertDraftResponse, lockHeaders } from '@/lib/client/draft-lock-client'
 import type { WizardBootstrap } from '@/lib/google-ads/manage-data'
 import { FEED_TYPES, IMAGE_AD_TYPES, specProblems } from '@/lib/google-ads/campaign-spec'
 import { postJson, errorText } from './ManageContext'
@@ -16,29 +22,59 @@ import { ImageAdEditor, type CampaignOptions } from './wizard/StepImageAd'
 import ExtensionsEditor, { SuggestionsLoading, emptyExtDraft, fetchExtDraft, type ExtDraft } from './wizard/ExtensionsEditor'
 
 // New campaign wizard: Search, Standard Shopping, Performance Max, Demand Gen or Display. "Check with Google" sends the
-// whole campaign with validateOnly; "Create" validates again and creates it (paused by default).
+// whole campaign with validateOnly; "Create" validates again and creates it (paused by default). Past the first step
+// (or on Save as Draft) the wizard autosaves to a draft that the Drafts tab lists and ?draft= reopens.
 
 const STEPS = ['Campaign', 'Targeting', 'Ads', 'Assets', 'Review'] as const
+const DRAFTS = '/api/admin/google-ads/campaign-drafts'
 
 interface Problem {
   message: string
   where?: string
 }
 
-export function NewCampaignButton({ onCreated }: { onCreated: () => void }) {
+/** `resume`: a draft to reopen (from the Drafts tab); `onResumeClosed` clears it. */
+export function NewCampaignButton({
+  onCreated,
+  resume,
+  onResumeClosed,
+}: {
+  onCreated: () => void
+  resume?: string | null
+  onResumeClosed?: () => void
+}) {
   const canManage = useCanWrite('google_ads_campaigns')
   const [open, setOpen] = useState(false)
   if (!canManage) return null
   return (
     <>
       <IconButton icon={Megaphone} label="New campaign" variant="accent" onClick={() => setOpen(true)} />
-      {open && <CampaignWizard onClose={() => setOpen(false)} onCreated={onCreated} />}
+      {(open || resume) && (
+        <CampaignWizard
+          key={resume ?? 'new'}
+          draftId={resume ?? null}
+          onClose={() => {
+            setOpen(false)
+            if (resume) onResumeClosed?.()
+          }}
+          onCreated={onCreated}
+        />
+      )}
     </>
   )
 }
 
-export default function CampaignWizard({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+export default function CampaignWizard({
+  draftId: initialDraftId,
+  onClose,
+  onCreated,
+}: {
+  draftId?: string | null
+  onClose: () => void
+  onCreated: () => void
+}) {
   const canAi = useCanUseAi('google_ads_campaigns')
+  const confirm = useConfirm()
   const [b, setB] = useState<WizardBootstrap | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [d, setD] = useState<Draft | null>(null)
@@ -55,16 +91,128 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
     if (r) toast.result(r)
   }
 
+  const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null)
+  const draftIdRef = useRef(draftId)
+  draftIdRef.current = draftId
+  const skipSaveRef = useRef(true)
+  const doneRef = useRef(false)
+  const creatingRef = useRef<Promise<string | null> | null>(null)
+  const draftBody = () => ({ title: d?.name.trim() || null, fields: { draft: d, ext, step } })
+
+  const lock = useDraftLock({ resourceType: 'google_ads_campaign', resourceId: draftId })
+  const autosave = useAutosaveDraft<ReturnType<typeof draftBody>>({
+    save: async (body, signal) => {
+      const id = draftIdRef.current
+      if (!id) return
+      const res = await fetch(`${DRAFTS}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('google_ads_campaign', id) },
+        credentials: 'include',
+        signal,
+        body: JSON.stringify(body),
+      })
+      await assertDraftResponse(res, 'Could not save the campaign draft')
+    },
+    enabled: () => !!draftIdRef.current && !doneRef.current && !lock.readOnly,
+    onLocked: (_err, unsaved) => lock.markLocked(unsaved),
+  })
+
   useEffect(() => {
-    fetch('/api/admin/google-ads/manage', { credentials: 'include' })
-      .then(async r => {
+    ;(async () => {
+      try {
+        const r = await fetch('/api/admin/google-ads/manage', { credentials: 'include' })
         const data = await r.json().catch(() => ({}))
         if (!r.ok) throw new Error(data.error || 'Could not load store data')
+        let saved: { draft?: Partial<Draft>; ext?: ExtDraft | null; step?: number } | null = null
+        if (initialDraftId) {
+          const dr = await fetch(`${DRAFTS}/${initialDraftId}`, { credentials: 'include' })
+          const j = await dr.json().catch(() => ({}))
+          if (!dr.ok) throw new Error(j.error || 'Could not open the campaign draft')
+          saved = j.draft?.fields ?? {}
+        }
+        skipSaveRef.current = true
         setB(data)
-        setD(newDraft(data))
-      })
-      .catch(e => setLoadError(e.message))
+        // New fields added to the wizard since the draft was saved keep their defaults.
+        setD({ ...newDraft(data), ...(saved?.draft ?? {}) })
+        if (saved?.ext) setExt(saved.ext)
+        if (typeof saved?.step === 'number') setStep(Math.min(STEPS.length - 1, Math.max(0, saved.step)))
+      } catch (e) {
+        setLoadError((e as Error).message)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function ensureDraft(): Promise<string | null> {
+    if (draftIdRef.current) return draftIdRef.current
+    creatingRef.current ??= (async () => {
+      const res = await fetch(DRAFTS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(draftBody()),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.id) {
+        toast.error(j.error || 'Could not save the campaign draft')
+        return null
+      }
+      skipSaveRef.current = true
+      setDraftId(j.id)
+      return j.id as string
+    })().finally(() => {
+      creatingRef.current = null
+    })
+    return creatingRef.current
+  }
+
+  const triggerRef = useRef(autosave.trigger)
+  triggerRef.current = autosave.trigger
+  useEffect(() => {
+    if (!d || doneRef.current) return
+    if (skipSaveRef.current) {
+      skipSaveRef.current = false
+      return
+    }
+    // Past the first step the wizard is worth keeping.
+    if (!draftIdRef.current) {
+      if (step > 0) void ensureDraft()
+      return
+    }
+    triggerRef.current(draftBody())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d, ext, step])
+
+  async function saveAsDraft() {
+    try {
+      if (draftIdRef.current) await autosave.flush(draftBody())
+      else if (!(await ensureDraft())) return
+    } catch {
+      return toast.error('Could not save the campaign draft')
+    }
+    doneRef.current = true
+    toast.success('Draft saved: it is on the Drafts tab')
+    onClose()
+  }
+
+  async function discardDraft() {
+    const id = draftIdRef.current
+    if (!id) return
+    const ok = await confirm({
+      title: 'Discard campaign draft',
+      message: 'Throw away this unfinished campaign? Nothing has been created in Google Ads.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep',
+      variant: 'danger',
+    })
+    if (!ok) return
+    const res = await fetch(`${DRAFTS}/${id}`, { method: 'DELETE', credentials: 'include' })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) return toast.error(j.error || 'Could not discard the draft')
+    doneRef.current = true
+    toast.success('Campaign draft discarded')
+    onClose()
+  }
 
   // Asset suggestions load once, when the Assets step is first opened.
   useEffect(() => {
@@ -112,8 +260,10 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
     if (!spec) return
     setBusy(preview ? 'preview' : 'create')
     setResult(null)
-    const { ok, data } = await postJson('/api/admin/google-ads/manage/campaigns', { spec, preview })
+    if (!preview) doneRef.current = true
+    const { ok, data } = await postJson('/api/admin/google-ads/manage/campaigns', { spec, preview, draft_id: draftIdRef.current })
     setBusy(null)
+    if (!ok) doneRef.current = false
     if (!ok) return setResult({ ok: false, text: errorText(data, 'Google Ads rejected the campaign'), problems: data.problems })
     if (preview) {
       const total = Object.values(data.operations ?? {}).reduce((s: number, v: any) => s + Number(v), 0)
@@ -138,8 +288,20 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
             : 'Products & assets'
       : STEPS[i]
 
+  const readOnly = !!draftId && lock.readOnly
   const footer = (
     <>
+      {draftId && autosave.status !== 'idle' && <AutosaveStatusPill status={autosave.status} />}
+      {draftId && !result?.done && (lock.canDiscard || !readOnly) && (
+        <button type="button" className={btnGhost} onClick={discardDraft}>
+          Discard draft
+        </button>
+      )}
+      {d && !result?.done && !readOnly && (
+        <button type="button" className={btnGhost} onClick={saveAsDraft}>
+          Save as Draft
+        </button>
+      )}
       {step > 0 && (
         <button type="button" className={btnGhost} onClick={() => setStep(s => s - 1)}>
           <ChevronLeft className="w-4 h-4" /> Back
@@ -152,10 +314,10 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
       )}
       {step === STEPS.length - 1 && !result?.done && (
         <>
-          <button type="button" className={btnGhost} disabled={!!busy || problems.length > 0 || linkBlocked} onClick={() => send(true)}>
+          <button type="button" className={btnGhost} disabled={readOnly || !!busy || problems.length > 0 || linkBlocked} onClick={() => send(true)}>
             {busy === 'preview' && <Loader2 className="w-4 h-4 animate-spin" />} Check with Google
           </button>
-          <button type="button" className={btnPrimary} disabled={!!busy || problems.length > 0 || linkBlocked} onClick={() => send(false)}>
+          <button type="button" className={btnPrimary} disabled={readOnly || !!busy || problems.length > 0 || linkBlocked} onClick={() => send(false)}>
             {busy === 'create' && <Loader2 className="w-4 h-4 animate-spin" />} Create campaign
           </button>
         </>
@@ -169,15 +331,17 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
   )
 
   return (
-    <Modal title="New Google Ads campaign" onClose={onClose} footer={footer} wide>
+    <Modal title={draftId ? `New Google Ads campaign${d?.name.trim() ? ` · ${d.name.trim()}` : ''} (draft)` : 'New Google Ads campaign'} onClose={onClose} footer={footer} wide>
       {loadError && <p className="text-sm text-red-500">{loadError}</p>}
+      {draftId && <DraftLockBanner lock={lock} scope="google_ads_campaigns:write" />}
       {!loadError && (!b || !d) && (
         <p className="text-sm text-foreground-muted flex items-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading your store data...
         </p>
       )}
       {b && d && (
-        <>
+        <LockedFieldset readOnly={readOnly}>
+          <div className="space-y-4">
           <ol className="flex flex-wrap gap-1 text-xs">
             {STEPS.map((_, i) => (
               <li key={i}>
@@ -277,7 +441,8 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
               </ul>
             </div>
           )}
-        </>
+          </div>
+        </LockedFieldset>
       )}
     </Modal>
   )

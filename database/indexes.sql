@@ -1018,6 +1018,13 @@ CREATE INDEX idx_ads_experiments_base_campaign ON public.ads_experiments USING b
 
 
 --
+-- Name: idx_ads_campaign_drafts_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_campaign_drafts_admin ON public.ads_campaign_drafts USING btree (admin_id, updated_at DESC);
+
+
+--
 -- Name: idx_ads_change_events_time; Type: INDEX; Schema: public; Owner: -
 --
 
