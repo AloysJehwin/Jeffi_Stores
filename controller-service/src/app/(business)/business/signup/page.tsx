@@ -252,7 +252,7 @@ function BusinessSignUpPage() {
     }
     via.current = 'google'
     setGoogleLoading(true)
-    const result = returned ?? (await openGoogleOAuthPopup({ clientId, returnTo: '/business/signup' }))
+    const result = returned ?? (await openGoogleOAuthPopup({ clientId, returnTo: bp('/business/signup') }))
     if (!result.accessToken) {
       if (result.error && result.error !== 'popup_closed') setError(result.error)
       setGoogleLoading(false)
@@ -286,7 +286,7 @@ function BusinessSignUpPage() {
         go(bp('/business/pending'))
         return
       }
-      go(bp('/business/dashboard'))
+      go(bp('/business'), 'hard')
     } catch (err: any) {
       setError(err.message)
     } finally {

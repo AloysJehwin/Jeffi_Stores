@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/auth/jwt'
+import { verifyBusinessToken } from '@/lib/auth/jwt'
 import { bp } from '@/lib/shared/business-path'
 import BusinessPublicHeader from '@/components/business/PublicHeader'
 
@@ -11,9 +11,9 @@ export async function getBusinessAuthState(): Promise<BusinessAuthState> {
   const token = (await cookies()).get('business_sid')?.value
   let authState: BusinessAuthState = 'guest'
   if (token) {
-    const payload = await verifyToken(token).catch(() => null)
-    if (payload?.isBusiness) {
-      const status = (payload.approvalStatus as string | undefined) || 'approved'
+    const payload = await verifyBusinessToken(token).catch(() => null)
+    if (payload) {
+      const status = payload.approvalStatus
       if (status === 'approved') authState = 'approved'
       else if (status === 'pending') authState = 'pending'
       else if (status === 'rejected') authState = 'rejected'
