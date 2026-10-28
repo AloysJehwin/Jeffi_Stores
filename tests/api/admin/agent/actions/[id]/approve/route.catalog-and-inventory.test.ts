@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({
+  hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
@@ -123,7 +126,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   // ── unknown action kind ─────────────────────────────────────────────────
 
-  it('returns 500 for unknown action kind', async () => {
+  it('refuses an unknown action kind', async () => {
     mockQueryOne.mockResolvedValueOnce({
       id: ACTION_ID,
       admin_id: ADMIN.adminId,
@@ -134,8 +137,8 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     } as any)
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
-    expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/Unknown action kind/)
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/can't run/)
   })
 
   // ── send_mailer_broadcast ───────────────────────────────────────────────
@@ -325,18 +328,13 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       },
       status: 'proposed',
     } as any)
-    mockWithTransaction.mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi
-          .fn()
-          .mockResolvedValueOnce({ rows: [{ max_seq: null }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'qt-1', quote_number: 'QT/25-26/JAN/1', view_token: 'tok-1' }] })
-          .mockResolvedValue({ rows: [], rowCount: 1 }),
-      }
-      return fn(client)
-    })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => ({ quotation: { id: 'qt-1', quote_number: 'QT/25-26/JAN/1', total_amount: '59.00', view_token: 'tok-1' } }) })
+    vi.stubGlobal('fetch', fetchMock)
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    vi.unstubAllGlobals()
     expect(res.status).toBe(200)
+    expect(new URL(fetchMock.mock.calls[0][0]).pathname).toBe('/api/admin/quotations')
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST')
     expect((await res.json()).result.quoteNumber).toBe('QT/25-26/JAN/1')
   })
 

@@ -16,8 +16,9 @@ import {
   Wrench,
   AlertTriangle,
 } from 'lucide-react'
-import AdminAgentMessage from '../AdminAgentMessage'
+import AdminAgentMessage, { AdminAgentUserMessage, internalMessageLabel } from '../AdminAgentMessage'
 import AdminAgentBlocks from '../AdminAgentBlocks'
+import ProposedActionCard, { splitProposalBlocks } from './ProposedActionCard'
 import type { AdminAgentChat, ChatTurn, TimelineItem, ToolStep } from '@/hooks/useAdminAgentChat'
 
 // Chat transcript + composer (+ optional history sidebar) shared by AdminAgentModal and
@@ -80,7 +81,7 @@ export default function AgentChatPanel({ chat, variant, showHistory, onConversat
                 }`}
               >
                 <p className="font-medium text-foreground truncate">
-                  {c.title || c.preview?.slice(0, 60) || 'Untitled chat'}
+                  {internalMessageLabel(c.title) || c.title || internalMessageLabel(c.preview) || c.preview?.slice(0, 60) || 'Untitled chat'}
                 </p>
                 <p className="text-[10px] text-foreground-muted">
                   {new Date(c.last_message_at).toLocaleString()} · {c.message_count} msg
@@ -120,7 +121,7 @@ function TurnView({
     return (
       <div className="flex justify-end">
         <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-accent-500 text-white">
-          <p className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">{turn.content}</p>
+          <AdminAgentUserMessage text={turn.content} />
         </div>
       </div>
     )
@@ -129,11 +130,13 @@ function TurnView({
   // While streaming, hide a <ui_blocks> payload the model is still writing.
   const text = turn.streaming ? turn.content.replace(/<ui_blocks>[\s\S]*?(<\/ui_blocks>|$)/g, '') : turn.content
   const waiting = turn.streaming && !text && !turn.timeline?.length
-  const wrap = approveWrapper ?? ((n: ReactNode) => n)
+  const { rest: blocks, byAction } = splitProposalBlocks(turn.uiBlocks, turn.proposedActions)
+  // Cards (documents, resolvers, proposals) get the full width on a narrow panel.
+  const rich = !!(turn.uiBlocks?.length || turn.proposedActions?.length)
 
   return (
     <div className="group">
-      <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-surface-secondary text-foreground">
+      <div className={`${rich ? 'max-w-full sm:max-w-[85%]' : 'max-w-[85%]'} rounded-lg px-3 py-2 text-sm bg-surface-secondary text-foreground`}>
         {turn.timeline && turn.timeline.length > 0 && (
           <ToolTimeline items={turn.timeline} live={!!turn.streaming} />
         )}
@@ -150,10 +153,10 @@ function TurnView({
         {!text && turn.streaming && !!turn.timeline?.length && (
           <span className="inline-block w-1.5 h-4 mt-1 bg-foreground-muted animate-pulse align-middle" aria-hidden="true" />
         )}
-        {turn.uiBlocks && turn.uiBlocks.length > 0 && (
+        {blocks.length > 0 && (
           <div className={text ? 'mt-3' : 'mt-1'}>
             <AdminAgentBlocks
-              blocks={turn.uiBlocks}
+              blocks={blocks}
               pickerResolved={turn.pickerResolved}
               onPickOption={(kind, option) => chat.pick(turn.id, kind, option)}
               onSendMessage={msg => {
@@ -204,49 +207,15 @@ function TurnView({
           </div>
         )}
         {turn.proposedActions && turn.proposedActions.length > 0 && (
-          <div className="mt-3 space-y-2">
+          <div className={`${text || blocks.length ? 'mt-3' : 'mt-1'} space-y-2`}>
             {turn.proposedActions.map(action => (
-              <div key={action.id} className="rounded-lg border-2 border-amber-500/40 bg-amber-500/5 p-3">
-                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">
-                  Pending approval — {action.kind}
-                </p>
-                <p className="text-xs text-foreground mb-3">{action.confirmation}</p>
-                {action.status === 'proposed' &&
-                  wrap(
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => chat.decideAction(turn.id, action.id, 'approve')}
-                        className="flex-1 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1"
-                      >
-                        <CheckCircle className="w-3.5 h-3.5" /> Approve
-                      </button>
-                      <button
-                        onClick={() => chat.decideAction(turn.id, action.id, 'reject')}
-                        className="flex-1 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default"
-                      >
-                        <XCircle className="w-3.5 h-3.5" /> Reject
-                      </button>
-                    </div>
-                  )}
-                {action.status === 'approving' && (
-                  <p className="text-xs text-foreground-muted flex items-center gap-1.5">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Executing
-                  </p>
-                )}
-                {action.status === 'approved' && (
-                  <p className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1.5">
-                    <CheckCircle className="w-3 h-3" /> Executed
-                  </p>
-                )}
-                {action.status === 'rejected' && (
-                  <p className="text-xs text-foreground-muted flex items-center gap-1.5">
-                    <XCircle className="w-3 h-3" /> Rejected
-                  </p>
-                )}
-                {action.status === 'failed' && (
-                  <p className="text-xs text-red-500 [overflow-wrap:anywhere]">Failed: {action.error || 'unknown'}</p>
-                )}
-              </div>
+              <ProposedActionCard
+                key={action.id}
+                action={action}
+                blocks={byAction[action.id]}
+                onDecide={decision => chat.decideAction(turn.id, action.id, decision)}
+                approveWrapper={approveWrapper}
+              />
             ))}
           </div>
         )}

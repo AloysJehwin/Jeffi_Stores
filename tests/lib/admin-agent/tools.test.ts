@@ -649,10 +649,82 @@ describe('admin-agent/tools', () => {
     })
 
     it('proposes shipping with AWB number', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'o1', order_number: 'ORD-001', status: 'confirmed' })
+      mockQueryOne.mockResolvedValueOnce({ id: 'o1', order_number: 'ORD-001', status: 'processing' })
       const result = await tool().handler({ orderNumber: 'ORD-001', awbNumber: 'DEL123456' })
       expect((result as any).proposed).toBe(true)
       expect((result as any).payload.awbNumber).toBe('DEL123456')
+      expect((result as any).ui_blocks[0]).toMatchObject({
+        type: 'change_summary',
+        subject: { label: 'Order ORD-001', href: '/admin/orders/o1/view' },
+        changes: [{ field: 'Order status', from: 'processing', to: 'shipped' }],
+      })
+    })
+
+    it('refuses to skip processing (same rules as the order endpoint)', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'o1', order_number: 'ORD-001', status: 'confirmed' })
+      const result = (await tool().handler({ orderNumber: 'ORD-001' })) as any
+      expect(result.ok).toBe(false)
+      expect(result.summary).toMatch(/Cannot transition order from 'confirmed' to 'shipped'.*processing/)
+    })
+  })
+
+  describe('order status and payment proposals', () => {
+    const OWNER = { adminId: 'a1', role: 'super_admin', scopes: ['orders:write'] }
+    const ADMIN = { adminId: 'a2', role: 'admin', scopes: ['orders:write'] }
+    const order = (over: Record<string, unknown> = {}) => ({
+      id: 'o1',
+      order_number: 'ORD-9',
+      status: 'confirmed',
+      payment_status: 'paid',
+      total_amount: '1200.00',
+      source: 'online',
+      customer_email: 'c@x.com',
+      ...over,
+    })
+
+    it('lists the allowed next statuses for a move outside the flow', async () => {
+      mockQueryOne.mockResolvedValueOnce(order())
+      const r = (await getTool('propose_update_order_status')!.handler({ orderId: 'o1', newStatus: 'delivered' }, ADMIN)) as any
+      expect(r.ok).toBe(false)
+      expect(r.summary).toMatch(/can move to: processing, cancel_requested, cancelled/)
+      expect(r.summary).toMatch(/can't override/)
+    })
+
+    it('refuses an override from a non-owner', async () => {
+      mockQueryOne.mockResolvedValueOnce(order())
+      const r = (await getTool('propose_update_order_status')!.handler(
+        { orderId: 'o1', newStatus: 'delivered', override: true, overrideReason: 'Delivered by hand yesterday' },
+        ADMIN
+      )) as any
+      expect(r.ok).toBe(false)
+      expect(r.summary).toMatch(/can't override/)
+    })
+
+    it('lets an owner override with a reason', async () => {
+      mockQueryOne.mockResolvedValueOnce(order())
+      const r = (await getTool('propose_update_order_status')!.handler(
+        { orderId: 'o1', newStatus: 'delivered', override: true, overrideReason: 'Delivered by hand yesterday' },
+        OWNER
+      )) as any
+      expect(r.proposed).toBe(true)
+      expect(r.payload).toMatchObject({ newStatus: 'delivered', override: true, overrideReason: 'Delivered by hand yesterday' })
+      expect(r.ui_blocks[0].requires).toMatch(/super admin/)
+      expect(r.ui_blocks[0].warnings[0]).toMatch(/Override/)
+    })
+
+    it('never sets refunded as a plain payment change', async () => {
+      mockQueryOne.mockResolvedValueOnce(order())
+      const r = (await getTool('propose_set_payment_status')!.handler({ orderId: 'o1', paymentStatus: 'refunded' }, OWNER)) as any
+      expect(r.ok).toBe(false)
+      expect(r.hint).toMatch(/propose_refund_order/)
+    })
+
+    it('proposes a normal payment move', async () => {
+      mockQueryOne.mockResolvedValueOnce(order({ payment_status: 'unpaid' }))
+      const r = (await getTool('propose_set_payment_status')!.handler({ orderId: 'o1', paymentStatus: 'paid' }, ADMIN)) as any
+      expect(r.proposed).toBe(true)
+      expect(r.kind).toBe('set_payment_status')
+      expect(r.ui_blocks[0].changes).toEqual([{ field: 'Payment status', from: 'unpaid', to: 'paid', tone: 'success' }])
     })
   })
 
@@ -939,10 +1011,22 @@ describe('admin-agent/tools', () => {
       const result = await tool().handler({
         path: '/api/admin/orders/o1',
         method: 'PATCH',
-        body: JSON.stringify({ status: 'shipped' }),
+        body: JSON.stringify({ notes: 'Call before delivery' }),
       })
       expect((result as any).proposed).toBe(true)
       expect((result as any).kind).toBe('call_admin_api')
+    })
+
+    it('refuses order status, payment and refund writes (dedicated tools)', async () => {
+      await expect(
+        tool().handler({ path: '/api/admin/orders/o1', method: 'PATCH', body: JSON.stringify({ status: 'shipped' }) })
+      ).rejects.toThrow(/propose_update_order_status/)
+      await expect(
+        tool().handler({ path: '/api/admin/orders/o1/payment-status', method: 'PATCH', body: '{"payment_status":"refunded"}' })
+      ).rejects.toThrow(/propose_set_payment_status/)
+      await expect(tool().handler({ path: '/api/admin/orders/o1/adjustments/a1/refund', method: 'POST' })).rejects.toThrow(
+        /propose_refund_order/
+      )
     })
 
     it('proposes mutation for DELETE request', async () => {

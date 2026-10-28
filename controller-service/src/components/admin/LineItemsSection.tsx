@@ -458,14 +458,16 @@ export default function LineItemsSection({
         items.map(it => {
           const found = results.find(r => r.it.id === it.id)
           if (!found || !found.units.length) return it
-          const u = found.units[0]
+          // Keep the unit the line was saved in; only lines without one take the default.
+          const saved = (it.selected_unit_key || it.buy_unit || '').toLowerCase()
+          const u = found.units.find(x => x.unit.toLowerCase() === saved) ?? found.units[0]
           const normalizedQty =
             u.dimension === 'count' ? String(Math.round(parseFloat(String(it.quantity)) || 1)) : String(it.quantity)
           return {
             ...it,
             available_units: found.units,
-            selected_unit_key: it.selected_unit_key || u.unit,
-            buy_unit: it.buy_unit || u.unit,
+            selected_unit_key: u.unit,
+            buy_unit: u.unit,
             buy_mode: u.dimension === 'count' ? 'count' : u.dimension,
             sell_unit_factor: u.factor,
             sell_unit_dimension: u.dimension,

@@ -10,6 +10,7 @@ import { computeRefundableAmount, externalRefundCeiling, recordExternalRefund, r
 import { RAZORPAY_ONLY_METHODS, externalRefundLabel, parseExternalRefund } from '@/lib/payments/external-refund'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -36,7 +37,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const body = await request.json().catch(() => ({}))
-    if (body?.external) return await refundExternally(order, body, admin.adminId)
+    // Why the refund was made; kept in the admin audit log (the admin agent always sends one).
+    const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 500) : ''
+    if (body?.external) return await refundExternally(order, body, admin.adminId, reason)
 
     if (order.status !== 'cancelled' && order.status !== 'returned') {
       return NextResponse.json(
@@ -138,6 +141,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       actorId: admin.adminId,
       summary: `Refund issued for #${order.order_number} (₹${totalRefunded.toFixed(0)}${refundIds.length > 1 ? `, ${refundIds.length} payments` : ''})`,
       metadata: { refundIds },
+      reason,
     })
 
     return NextResponse.json({ success: true, refundIds, totalRefunded })
@@ -150,7 +154,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 // The refund already reached the customer another way (a Razorpay dispute or dashboard refund, bank
 // transfer, cash…): record it and settle the order without calling Razorpay. Any paid order qualifies,
 // so a chargeback on a delivered order can be recorded too.
-async function refundExternally(order: any, body: any, adminId: string) {
+async function refundExternally(order: any, body: any, adminId: string, reason: string) {
   const refund = parseExternalRefund(body.external)
   if (typeof refund === 'string') return NextResponse.json({ error: refund }, { status: 400 })
   if (order.payment_status !== 'paid' && order.payment_status !== 'cod_collected') {
@@ -204,6 +208,7 @@ async function refundExternally(order: any, body: any, adminId: string) {
     actorId: adminId,
     summary: `Refund of ₹${amount.toFixed(0)} recorded for #${order.order_number} (${how}${refund.reference ? ` · ${refund.reference}` : ''})`,
     metadata: { external: refund },
+    reason,
   })
 
   return NextResponse.json({ success: true, totalRefunded: amount, external: refund })
@@ -211,7 +216,15 @@ async function refundExternally(order: any, body: any, adminId: string) {
 
 async function markOrderRefunded(
   order: any,
-  opts: { amount: number; revoke: boolean; notify: boolean; actorId: string; summary: string; metadata: Record<string, unknown> }
+  opts: {
+    amount: number
+    revoke: boolean
+    notify: boolean
+    actorId: string
+    summary: string
+    metadata: Record<string, unknown>
+    reason?: string
+  }
 ) {
   const orderId = order.id
   // A cancelled order is refunded in full, so every digital line loses vault access. A returned
@@ -221,6 +234,15 @@ async function markOrderRefunded(
     if (opts.revoke) await revokeOrderEntitlements(client, { orderId, reason: 'refund' })
   })
   await queueAdsConversion(orderId, order)
+  await logAdminAudit({
+    adminId: opts.actorId,
+    action: 'update',
+    entityType: 'order',
+    entityId: orderId,
+    summary: opts.summary,
+    diff: { payment_status: { from: order.payment_status, to: 'refunded' } },
+    metadata: { amount: opts.amount, ...opts.metadata, ...(opts.reason ? { reason: opts.reason } : {}) },
+  }).catch(() => {})
 
   const user = order.users
   const userEmail = user?.email || order.customer_email

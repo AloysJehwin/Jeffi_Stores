@@ -8,6 +8,8 @@ import { CATALOG_TOOLS } from './catalog'
 import { CUSTOMER_OPS_TOOLS } from './customer-ops'
 import { OPERATIONS_TOOLS } from './operations'
 import { GOOGLE_ADS_TOOLS } from './google-ads'
+import { ORDER_TOOLS } from './orders'
+import { dedicatedOrderTool, type AgentActor } from '../permissions'
 import { ok, err } from '../tool-envelope'
 import { appPath, repoRoot } from '@/lib/shared/paths'
 
@@ -49,7 +51,8 @@ export interface ToolDef {
   description: string
   inputSchema: ToolInputSchema
   mutating: boolean
-  handler: (input: Record<string, unknown>) => Promise<unknown>
+  /** `actor` is the admin chatting; tools that depend on the role (overrides) read it. */
+  handler: (input: Record<string, unknown>, actor?: AgentActor) => Promise<unknown>
 }
 
 export const TOOLS: ToolDef[] = [
@@ -487,38 +490,6 @@ export const TOOLS: ToolDef[] = [
         kind: 'toggle_campaign_enabled',
         payload: { campaignKind, enabled: target, campaignName: c.name },
         confirmation: `${target ? 'Enable' : 'Disable'} campaign "${c.name}"?`,
-      }
-    },
-  },
-  {
-    name: 'mark_order_shipped',
-    description: 'Propose marking an order as shipped. Optionally include AWB number. Admin must approve.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        orderNumber: { type: 'string' },
-        awbNumber: { type: 'string', description: 'Optional Delhivery AWB' },
-      },
-      required: ['orderNumber'],
-    },
-    mutating: true,
-    handler: async ({ orderNumber, awbNumber }) => {
-      const o = await queryOne<{ id: string; order_number: string; status: string }>(
-        `SELECT id::text, order_number, status FROM orders WHERE order_number = $1 LIMIT 1`,
-        [orderNumber]
-      )
-      if (!o) throw new Error(`Unknown order: ${orderNumber}`)
-      if (o.status === 'shipped' || o.status === 'delivered') {
-        return { proposed: false, info: `Order ${o.order_number} is already ${o.status}.` }
-      }
-      if (o.status === 'granted') {
-        return { proposed: false, info: `Order ${o.order_number} is a digital order (access granted); it never ships.` }
-      }
-      return {
-        proposed: true,
-        kind: 'mark_order_shipped',
-        payload: { orderId: o.id, orderNumber: o.order_number, awbNumber: awbNumber || null },
-        confirmation: `Mark order ${o.order_number} as shipped${awbNumber ? ` with AWB ${awbNumber}` : ''}?`,
       }
     },
   },
@@ -1120,7 +1091,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'call_admin_api',
     description:
-      "Call any /api/admin/* endpoint as the current admin. GET/HEAD requests run immediately and return the response. POST/PUT/PATCH/DELETE requests are PROPOSED — they queue an admin_agent_action that the admin must approve before the call fires. Use this when an existing dedicated tool does not cover the user's ask. Path must start with /api/admin/. Forbidden subpaths: /api/admin/agent/*, /api/admin/team*, /api/admin/admins*, /api/admin/auth*. Body cap 16KB.",
+      "Call any /api/admin/* endpoint as the current admin. GET/HEAD requests run immediately and return the response. POST/PUT/PATCH/DELETE requests are PROPOSED — they queue an admin_agent_action that the admin must approve before the call fires. Use this when an existing dedicated tool does not cover the user's ask. Path must start with /api/admin/. Forbidden subpaths: /api/admin/agent/*, /api/admin/team*, /api/admin/admins*, /api/admin/auth*. Order status, payment, refund and cancel writes are refused: use propose_update_order_status, propose_set_payment_status, propose_mark_invoice_paid, propose_refund_order or propose_cancel_order. Body cap 16KB.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -1162,6 +1133,10 @@ export const TOOLS: ToolDef[] = [
       if (rawPath.includes('..') || rawPath.includes('://')) {
         throw new Error('Path is malformed')
       }
+      const dedicated = dedicatedOrderTool(method, rawPath, bodyStr || null)
+      if (dedicated) {
+        throw new Error(`Order status, payment, refund and cancel changes go through ${dedicated}, which applies the order rules. Use that tool instead.`)
+      }
       if (bodyStr.length > 16 * 1024) throw new Error('Body too large (max 16KB)')
       if (bodyStr) {
         try {
@@ -1192,6 +1167,7 @@ export const TOOLS: ToolDef[] = [
       }
     },
   },
+  ...ORDER_TOOLS,
   ...SALES_TOOLS,
   ...MARKETING_TOOLS,
   ...CATALOG_TOOLS,

@@ -12,6 +12,9 @@ import {
   type AiChatResponse,
 } from '@/lib/shared/ai-client'
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
+import { autoQuotationItems } from '@/lib/admin-agent/tools/sales'
+import { normUnit } from '@/lib/catalog/selling-unit'
+import { toolAllowed, describeActorCapabilities, type AgentActor } from '@/lib/admin-agent/permissions'
 import { findSimilar } from '@/lib/shared/rag'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import crypto from 'crypto'
@@ -110,9 +113,12 @@ function selectToolNames(userMessage: string): Set<string> {
   return selected
 }
 
-function buildToolsDef(userMessage?: string): AiToolDef[] {
+const allowedTool = (name: string, actor: AgentActor) => (toolAllowed(name, actor) ? getTool(name) : undefined)
+
+// Only the tools the admin's role and scopes allow are offered at all.
+function buildToolsDef(actor: AgentActor, userMessage?: string): AiToolDef[] {
   const allow = userMessage ? selectToolNames(userMessage) : null
-  return TOOLS.filter(t => !allow || allow.has(t.name)).map(t => ({
+  return TOOLS.filter(t => toolAllowed(t.name, actor) && (!allow || allow.has(t.name))).map(t => ({
     type: 'function' as const,
     function: {
       name: t.name,
@@ -212,6 +218,7 @@ STEP 3 — If all lines are matched: call propose_create_quotation with the prod
          If some are ambiguous: show the resolver block and ask the admin to confirm those lines first.
          If some are unmatched: show the resolver block and tell the admin which items were not found.
 NEVER call search_products for items in a quotation request. NEVER call match_quotation_items more than once per turn.
+${QUOTATION_UNIT_RULES}
 
 Marketing emails:
 - "send featured products email" or "product announcement" → estimate_email_audience then propose_product_announcement_email. Single-address test: audience="test_only", testEmail=<address>. intro = ONE plain sentence. NO markdown.
@@ -222,6 +229,11 @@ Marketing emails:
 Currency: INR (₹). Dates: Asia/Kolkata.`
 }
 
+const QUOTATION_UNIT_RULES = `- Quantities are in selling units. A product can sell in units such as box (10 pcs) or pack (100 pcs); match_quotation_items lists each line's units with factor = pieces per unit. Pass the unit the customer wrote as "unit" on each line; a bare number means pieces.
+- propose_create_quotation needs, per line: the exact variantId (and subVariantId when the variant has sub-variants), quantity in the chosen buyUnit, and buyUnit when the line has units. 50 pcs of a 10-pc box is quantity 5, buyUnit "box". If the pieces don't divide into whole units, or the customer didn't say which variant, ask; never round silently.
+- Leave unitPrice and discountPct out unless the admin gives a price or discount: the tool prices like the quotation editor (MRP with the catalog discount, GST-inclusive per piece). "Extra 5% off" is extraDiscountPct; a custom price per piece is unitPrice.
+- The tool fills the customer's name, phone, GSTIN and saved address from their account. Pass consignee fields only to override them; it reports anything still missing for finalising.`
+
 const QUOTATION_TRIGGER_RE = /\b(prepare|create|make|generate|draft)\b.{0,20}\b(quotation|quote|rfq)\b/i
 const BATCH_SIZE = 8
 
@@ -231,9 +243,9 @@ const LIST_PREFIX_RE = /^\s*\d+[\.\)]?\s+/
 // Trailing qty+unit at end of line: "2 nos", "1 no.", "12 pkt", "50mtr each" etc.
 // Must be preceded by whitespace so "48mm" doesn't match as qty=48 unit=mm
 const TRAILING_QTY_RE =
-  /\s+(\d+)\s*(?:no\.?s?|nos?\.?|pcs?\.?|pc\.?|units?|boxes?|box\.?|pkts?\.?|packets?|sets?|mtr\.?|m\.?|each|ea\.?)?\s*$/i
+  /\s+(\d+)\s*(no\.?s?|nos?\.?|pcs?\.?|pc\.?|units?|boxes?|box\.?|pkts?\.?|packets?|sets?|mtr\.?|m\.?|each|ea\.?)?\s*$/i
 
-function parseItemLine(raw: string): { requestedText: string; qty: number } | null {
+function parseItemLine(raw: string): { requestedText: string; qty: number; unit?: string } | null {
   if (!LIST_PREFIX_RE.test(raw)) return null
   let line = raw.replace(LIST_PREFIX_RE, '').trim()
 
@@ -244,18 +256,18 @@ function parseItemLine(raw: string): { requestedText: string; qty: number } | nu
   const text = line.slice(0, qm.index).trim()
 
   if (!text || qty <= 0 || qty > 9999) return null
-  return { requestedText: text, qty }
+  return { requestedText: text, qty, ...(qm[2] ? { unit: normUnit(qm[2]) } : {}) }
 }
 
 function parseQuotationRequest(
   message: string
-): { customerEmail: string; lines: Array<{ requestedText: string; qty: number }> } | null {
+): { customerEmail: string; lines: Array<{ requestedText: string; qty: number; unit?: string }> } | null {
   if (!QUOTATION_TRIGGER_RE.test(message)) return null
 
   const emailRe = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
   const customerEmail = emailRe.exec(message)?.[0] ?? ''
 
-  const lines: Array<{ requestedText: string; qty: number }> = []
+  const lines: Array<{ requestedText: string; qty: number; unit?: string }> = []
   for (const raw of message.split('\n')) {
     const parsed = parseItemLine(raw)
     if (parsed) lines.push(parsed)
@@ -403,8 +415,9 @@ ${STOCK_RULES}
 ## Quotations
 When the admin asks to prepare a quotation or gives a list of items:
 1. Call match_quotation_items once with all items in one JSON array in "lines". Do not call search_products for quotation items and do not loop per item.
-2. If every line matched, call propose_create_quotation with the matched productIds. If some are ambiguous or unmatched, the resolver block is shown automatically: tell the admin which lines need a choice or were not found.
+2. If every line matched, call propose_create_quotation with the matched products. If some are ambiguous or unmatched, the resolver block is shown automatically: tell the admin which lines need a choice or were not found.
 Never call match_quotation_items more than once per turn.
+${QUOTATION_UNIT_RULES}
 
 ## Marketing emails
 - "Send featured products" / product announcement: estimate_email_audience, then propose_product_announcement_email. For a single test address use audience="test_only" with testEmail. intro is one plain sentence, no markdown.
@@ -475,7 +488,7 @@ async function ragContext(userMessage: string, tenantId: string | null): Promise
 }
 
 interface TurnContext {
-  admin: { adminId: string }
+  admin: AgentActor
   conversationId: string
   userMessage: string
   req: NextRequest
@@ -508,7 +521,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const ctx: TurnContext = { admin, conversationId, userMessage, req }
+  const ctx: TurnContext = { admin: { adminId: admin.adminId, role: admin.role, scopes: admin.scopes }, conversationId, userMessage, req }
   if (!(req.headers.get('accept') || '').includes('text/event-stream')) {
     const out = await runTurn(ctx, null, req.signal)
     return NextResponse.json(out.body, { status: out.status })
@@ -557,6 +570,7 @@ export async function POST(req: NextRequest) {
 
 async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal | undefined): Promise<TurnResult> {
   const { admin, conversationId, userMessage, req } = ctx
+  const actor: AgentActor = { adminId: admin.adminId, role: admin.role, scopes: admin.scopes }
   const send: Emit = emit ?? (() => {})
   const done = (body: Record<string, unknown>): TurnResult => ({ status: 200, body })
 
@@ -589,10 +603,10 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
       const emailRe = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
       const customerEmail = priorMessages.map(m => emailRe.exec(m.content)?.[0]).filter(Boolean)[0] ?? ''
 
-      const proposeTool = getTool('propose_create_quotation')
+      const proposeTool = allowedTool('propose_create_quotation', actor)
       if (!proposeTool || !customerEmail || items.length === 0) {
         const reason = !proposeTool
-          ? 'tool not found'
+          ? `your role (${actor.role}) can't create quotations`
           : !customerEmail
             ? 'customer email not found in conversation history'
             : skippedItems.length > 0
@@ -615,7 +629,7 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
         })
       }
 
-      const proposeOut = (await proposeTool.handler({ customerEmail, items: JSON.stringify(items) })) as any
+      const proposeOut = (await proposeTool.handler({ customerEmail, items: JSON.stringify(items) }, actor)) as any
       const toolCallRecords: ToolCallRecord[] = [
         {
           tool: 'propose_create_quotation',
@@ -678,7 +692,7 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
       const finalText =
         proposeOut?.proposed === true
           ? `Quotation ready — review the proposal below.${skippedNote}`
-          : proposeOut?.summary || 'Could not create quotation.'
+          : [proposeOut?.summary || 'Could not create quotation.', proposeOut?.hint].filter(Boolean).join(' ')
       await query(
         `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
          VALUES ($1, $2, 'assistant', $3, $4::jsonb, $5::jsonb, $6::jsonb, '[]'::jsonb)`,
@@ -710,14 +724,14 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
   const parsedQuotation = parseQuotationRequest(userMessage)
   if (parsedQuotation && parsedQuotation.lines.length > 0) {
     const { customerEmail, lines } = parsedQuotation
-    const matchTool = getTool('match_quotation_items')
+    const matchTool = allowedTool('match_quotation_items', actor)
     if (matchTool) {
       try {
         // Run in batches to avoid embedding query bloat
         const allLines: any[] = []
         for (let i = 0; i < lines.length; i += BATCH_SIZE) {
           const batch = lines.slice(i, i + BATCH_SIZE)
-          const batchOut = (await matchTool.handler({ lines: JSON.stringify(batch) })) as any
+          const batchOut = (await matchTool.handler({ lines: JSON.stringify(batch) }, actor)) as any
           if (batchOut?.ok && Array.isArray(batchOut.data?.lines)) {
             allLines.push(...batchOut.data.lines)
           } else {
@@ -749,13 +763,13 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
           let finalText = ''
 
           // All matched — auto-propose
-          if (counts.ambiguous === 0 && counts.unmatched === 0 && counts.matched > 0 && customerEmail) {
-            const proposeTool = getTool('propose_create_quotation')
+          // All matched with no variant or unit left to choose — auto-propose
+          const autoItems = customerEmail ? autoQuotationItems(allLines) : null
+          if (autoItems) {
+            const proposeTool = allowedTool('propose_create_quotation', actor)
             if (proposeTool) {
-              const items = allLines
-                .filter((l: any) => l.status === 'matched' && l.candidates[0])
-                .map((l: any) => ({ productId: l.candidates[0].productId, quantity: l.qty }))
-              const proposeOut = (await proposeTool.handler({ customerEmail, items: JSON.stringify(items) })) as any
+              const items = autoItems
+              const proposeOut = (await proposeTool.handler({ customerEmail, items: JSON.stringify(items) }, actor)) as any
               toolCallRecords.push({
                 tool: 'propose_create_quotation',
                 input: { customerEmail, items: JSON.stringify(items) },
@@ -788,7 +802,9 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
               '. ' +
               (counts.ambiguous > 0
                 ? 'Select the correct product for ambiguous items above.'
-                : 'Some items could not be matched to catalog products.')
+                : counts.unmatched > 0
+                  ? 'Some items could not be matched to catalog products.'
+                  : 'Pick the variant and selling unit for each item above, then confirm.')
           }
 
           await query(
@@ -843,19 +859,25 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
   if (claude) {
     const { currentBrandNameAsync } = await import('@/lib/catalog/brand')
     // Stable system prompt (cached across turns); per-turn RAG rides on the latest user message.
-    messages.push({ role: 'system', content: buildClaudeSystemPrompt(await currentBrandNameAsync()) })
+    messages.push({
+      role: 'system',
+      content: `${buildClaudeSystemPrompt(await currentBrandNameAsync())}\n\n## Who you are working for\n${describeActorCapabilities(actor)}`,
+    })
     messages.push(...claudeHistory(history))
     const rag = await ragContext(userMessage, tenantId)
     const lastUser = [...messages].reverse().find(m => m.role === 'user')
     if (rag && lastUser) lastUser.content += `\n\n<store_context>\n${rag}\n</store_context>`
   } else {
-    messages.push({ role: 'system', content: await buildSystemPromptWithDynamic(userMessage) })
+    messages.push({
+      role: 'system',
+      content: `${await buildSystemPromptWithDynamic(userMessage)}\n\n## WHO YOU ARE WORKING FOR\n${describeActorCapabilities(actor)}`,
+    })
     for (const h of history) {
       if (h.role === 'user' || h.role === 'assistant') messages.push({ role: h.role, content: h.content })
     }
   }
 
-  let toolsDef = claude ? [...buildToolsDef(), RENDER_UI_TOOL] : buildToolsDef(userMessage)
+  let toolsDef = claude ? [...buildToolsDef(actor), RENDER_UI_TOOL] : buildToolsDef(actor, userMessage)
   let maxIterations = claude ? CLAUDE_MAX_ITERATIONS : MAX_ITERATIONS
   const toolCallRecords: ToolCallRecord[] = []
   const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
@@ -923,7 +945,7 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
       // The gateway failed over to Ollama: fall back to the gated tool set and short loop.
       if (claude && r.provider !== 'anthropic') {
         claude = false
-        toolsDef = buildToolsDef(userMessage)
+        toolsDef = buildToolsDef(actor, userMessage)
         maxIterations = Math.min(maxIterations, iter + MAX_ITERATIONS)
       }
 
@@ -973,15 +995,15 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
         }
 
         const tool = getTool(tc.name)
-        if (!tool) {
-          const err = `Unknown tool: ${tc.name}`
+        if (!tool || !toolAllowed(tc.name, actor)) {
+          const err = tool ? `${tc.name} is not available to your role (${actor.role})` : `Unknown tool: ${tc.name}`
           record({ tool: tc.name, input: parsed, output: err, isError: true })
           toolMessage(tc.id, err)
           continue
         }
 
         try {
-          const out = await tool.handler(parsed)
+          const out = await tool.handler(parsed, actor)
 
           if (out && typeof out === 'object' && (out as any).marker === '__call_admin_api_immediate__') {
             const o = out as any
@@ -1036,21 +1058,11 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
             toolMessage(tc.id, clip(out, outChars()))
 
             // Deterministic quotation advance: if match_quotation_items resolved all lines, auto-call propose_create_quotation
-            if (
-              tc.name === 'match_quotation_items' &&
-              out &&
-              typeof out === 'object' &&
-              (out as any).ok === true &&
-              (out as any).data?.counts?.ambiguous === 0 &&
-              (out as any).data?.counts?.unmatched === 0 &&
-              (out as any).data?.counts?.matched > 0
-            ) {
-              const resolvedLines: Array<{ status: string; qty: number; candidates: Array<{ productId: string }> }> = (
-                out as any
-              ).data.lines
-              const items = resolvedLines
-                .filter(l => l.status === 'matched' && l.candidates[0])
-                .map(l => ({ productId: l.candidates[0].productId, quantity: l.qty }))
+            const items =
+              tc.name === 'match_quotation_items' && (out as any)?.ok === true && Array.isArray((out as any).data?.lines)
+                ? autoQuotationItems((out as any).data.lines)
+                : null
+            if (items) {
 
               // Extract customer email from any user message in this conversation
               const emailRe = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
@@ -1060,14 +1072,17 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
                   .map(m => emailRe.exec(m.content)?.[0])
                   .filter(Boolean)[0] ?? ''
 
-              const proposeTool = getTool('propose_create_quotation')
-              if (proposeTool && customerEmail && items.length > 0) {
+              const proposeTool = allowedTool('propose_create_quotation', actor)
+              if (proposeTool && customerEmail) {
                 const autoStarted = Date.now()
                 try {
-                  const proposeOut = await proposeTool.handler({
-                    customerEmail,
-                    items: JSON.stringify(items),
-                  })
+                  const proposeOut = await proposeTool.handler(
+                    {
+                      customerEmail,
+                      items: JSON.stringify(items),
+                    },
+                    actor
+                  )
                   toolCallRecords.push({
                     id: `${tc.id}_propose`,
                     tool: 'propose_create_quotation',

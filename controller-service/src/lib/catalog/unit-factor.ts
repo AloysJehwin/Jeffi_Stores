@@ -1,4 +1,5 @@
 import { queryMany } from '@/lib/shared/db'
+import type { SellingUnit } from './selling-unit'
 
 export interface UnitLineRef {
   productId?: string | null
@@ -51,4 +52,92 @@ export async function sellingUnitsFor(input: UnitLineRef[]): Promise<{ unit: str
     const f = Number(row?.factor)
     return { unit: row?.unit ?? null, factor: row && (row.dimension ?? 'count') === 'count' && f > 0 ? f : 1 }
   })
+}
+
+interface ChainRow {
+  variant_id: string | null
+  sub_variant_id: string | null
+  unit: string
+  is_base: boolean
+}
+
+/**
+ * Every unit a document line can be sold in, from a product's product_units rows: sub-variant, then variant,
+ * then product, one per unit name with the most specific scope winning. The default (is_base of the most
+ * specific scope that has units) comes first and is the only one flagged is_base.
+ */
+export function resolveUnitChain<T extends ChainRow>(
+  rows: T[],
+  variantId?: string | null,
+  subVariantId?: string | null
+): (T & { is_base: boolean })[] {
+  const depth = (r: ChainRow) => (r.sub_variant_id ? 0 : r.variant_id ? 1 : 2)
+  const inScope = rows.filter(r =>
+    r.sub_variant_id ? r.sub_variant_id === subVariantId : r.variant_id ? r.variant_id === variantId : true
+  )
+  inScope.sort((a, b) => depth(a) - depth(b) || Number(b.is_base) - Number(a.is_base) || a.unit.localeCompare(b.unit))
+  const seen = new Set<string>()
+  const units = inScope.filter(r => !seen.has(r.unit.toLowerCase()) && seen.add(r.unit.toLowerCase()))
+  const def = units.find(u => u.is_base && depth(u) === depth(units[0] ?? u)) ?? units.find(u => u.is_base)
+  const ordered = def ? [def, ...units.filter(u => u !== def)] : units
+  return ordered.map(u => ({ ...u, is_base: u === def }))
+}
+
+export interface LineUnit {
+  unit: string
+  label: string
+  /** Pieces per unit (count units); measured units keep their factor but don't multiply quantities. */
+  factor: number
+  dimension: string
+  minQty: number
+  maxQty: number | null
+  qtyStep: number
+  isDefault: boolean
+}
+
+/** resolveUnitChain for many lines in one query, shaped for agents and APIs. */
+export async function unitChainsFor(
+  lines: { productId: string; variantId?: string | null; subVariantId?: string | null }[]
+): Promise<LineUnit[][]> {
+  const productIds = [...new Set(lines.map(l => l.productId).filter(Boolean))]
+  if (!productIds.length) return lines.map(() => [])
+  const rows = await queryMany<{
+    product_id: string
+    variant_id: string | null
+    sub_variant_id: string | null
+    unit: string
+    display_label: string | null
+    factor: string
+    dimension: string | null
+    is_base: boolean
+    min_qty: string
+    max_qty: string | null
+    qty_step: string
+  }>(
+    `SELECT product_id::text, variant_id::text, sub_variant_id::text, unit, display_label, factor::text,
+            dimension, is_base, min_qty::text, max_qty::text, qty_step::text
+       FROM product_units WHERE product_id = ANY($1::uuid[])`,
+    [productIds]
+  )
+  return lines.map(l =>
+    resolveUnitChain(
+      rows.filter(r => r.product_id === l.productId),
+      l.variantId,
+      l.subVariantId
+    ).map(r => ({
+      unit: r.unit,
+      label: r.display_label || r.unit,
+      factor: Number(r.factor) || 1,
+      dimension: r.dimension || 'count',
+      minQty: Number(r.min_qty) || 0,
+      maxQty: r.max_qty == null ? null : Number(r.max_qty),
+      qtyStep: Number(r.qty_step) || 1,
+      isDefault: r.is_base,
+    }))
+  )
+}
+
+/** A LineUnit in the shape selling-unit.ts validates and converts. */
+export function asSellingUnit(u: LineUnit): SellingUnit {
+  return { unit: u.unit, factor: u.factor, dimension: u.dimension, qty_step: u.qtyStep, min_qty: u.minQty, max_qty: u.maxQty }
 }

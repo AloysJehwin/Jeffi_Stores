@@ -8,12 +8,18 @@ import type { UiBlock } from '@/components/admin/AdminAgentBlocks'
 // /api/admin/agent/chat over SSE: text deltas, tool steps, ui blocks and actions stream in,
 // then a 'done' event carries the persisted turn.
 
+export type ActionStatus = 'proposed' | 'approving' | 'approved' | 'rejected' | 'failed'
+
 export interface ProposedAction {
   id: string
   kind: string
   payload: Record<string, unknown>
   confirmation: string
-  status: 'proposed' | 'approving' | 'approved' | 'rejected' | 'failed'
+  status: ActionStatus
+  /** Preview blocks carried by the action itself (document, change_summary…). */
+  blocks?: UiBlock[]
+  /** The decision in flight while status is 'approving'. */
+  decision?: 'approve' | 'reject'
   result?: unknown
   error?: string
 }
@@ -86,6 +92,14 @@ export interface ConversationListItem {
 }
 
 const uid = () => crypto.randomUUID()
+
+const STATUSES: ActionStatus[] = ['proposed', 'approving', 'approved', 'rejected', 'failed']
+
+function toAction(a: any, fallback: ActionStatus): ProposedAction {
+  const blocks = a.blocks ?? a.ui_blocks ?? a.uiBlocks
+  const status = a.status === 'executed' ? 'approved' : STATUSES.includes(a.status) ? a.status : fallback
+  return { ...a, blocks: Array.isArray(blocks) && blocks.length ? blocks : undefined, status }
+}
 
 function timelineFrom(calls: ToolCall[] | undefined): TimelineItem[] {
   return (calls || []).map((c, i) => ({
@@ -229,7 +243,7 @@ export function useAdminAgentChat() {
         timeline: m.tool_calls?.length ? timelineFrom(m.tool_calls) : undefined,
         uiBlocks: m.ui_blocks?.length ? m.ui_blocks : undefined,
         proposedActions: m.proposed_actions?.length
-          ? m.proposed_actions.map((a: any) => ({ ...a, status: a.status ?? 'approved' }))
+          ? m.proposed_actions.map((a: any) => toAction(a, 'approved'))
           : undefined,
         pickers: m.pickers?.length ? m.pickers : undefined,
         pickerResolved: m.pickers?.length ? true : undefined,
@@ -317,7 +331,7 @@ export function useAdminAgentChat() {
           case 'proposed_action':
             patchTurn(assistantId, t => ({
               ...t,
-              proposedActions: [...(t.proposedActions || []), { ...data, status: 'proposed' }],
+              proposedActions: [...(t.proposedActions || []), toAction({ ...data, status: 'proposed' }, 'proposed')],
             }))
             break
           case 'picker':
@@ -349,7 +363,12 @@ export function useAdminAgentChat() {
                 usage: data.usage,
                 toolCalls: calls,
                 timeline,
-                proposedActions: (data.proposedActions || []).map((a: any) => ({ ...a, status: 'proposed' as const })),
+                // Keep a decision the admin already made on a streamed card.
+                proposedActions: (data.proposedActions || []).map((a: any) => {
+                  const seen = t.proposedActions?.find(x => x.id === a.id)
+                  const next = toAction({ ...a, status: 'proposed' }, 'proposed')
+                  return seen && seen.status !== 'proposed' ? { ...next, ...seen, blocks: next.blocks ?? seen.blocks } : next
+                }),
                 pickers: data.pickers || [],
                 uiBlocks: data.uiBlocks || [],
               }
@@ -437,7 +456,7 @@ export function useAdminAgentChat() {
         ...t,
         proposedActions: t.proposedActions?.map(a => (a.id !== actionId ? a : { ...a, ...patch })),
       }))
-    setStatus({ status: 'approving' })
+    setStatus({ status: 'approving', decision })
     try {
       const res = await fetch(`/api/admin/agent/actions/${actionId}/${decision}`, {
         method: 'POST',

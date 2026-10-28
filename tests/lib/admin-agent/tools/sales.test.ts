@@ -26,8 +26,12 @@ vi.mock('@/lib/admin-agent/vision', () => ({
 vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
 }))
+vi.mock('@/lib/catalog/site-controls', () => ({
+  getFeatureFlags: vi.fn(),
+}))
 
-import { SALES_TOOLS } from '@/lib/admin-agent/tools/sales'
+import { SALES_TOOLS, autoQuotationItems } from '@/lib/admin-agent/tools/sales'
+import * as siteControls from '@/lib/catalog/site-controls'
 import * as db from '@/lib/shared/db'
 import * as rag from '@/lib/shared/rag'
 import * as vision from '@/lib/admin-agent/vision'
@@ -600,271 +604,148 @@ describe('propose_create_quotation', () => {
     ).rejects.toThrow('items: provide 1-50 lines')
   })
 
-  it('throws when any item is missing productId', async () => {
-    await expect(
-      getTool('propose_create_quotation').handler({
-        customerEmail: 'a@b.com',
-        items: '[{"quantity":1}]',
-      })
-    ).rejects.toThrow('every item needs a productId')
+  const grain = (over: Record<string, unknown> = {}) => ({
+    idx: 1,
+    product_id: PRODUCT_ID,
+    variant_id: null,
+    sub_variant_id: null,
+    name: 'Bolt',
+    variant_name: null,
+    sub_variant_name: null,
+    sku: 'B',
+    price: 118,
+    mrp: 0,
+    discount_pct: 0,
+    gst_percentage: 18,
+    hsn_code: null,
+    is_active: true,
+    has_variants: false,
+    has_subs: false,
+    stock_status: 'In Stock',
+    ...over,
+  })
+  const box = { product_id: PRODUCT_ID, variant_id: null, sub_variant_id: null, unit: 'box', display_label: null, factor: '10', dimension: 'count', is_base: true, min_qty: '1', max_qty: null, qty_step: '1' }
+
+  function setup(grains: any[], units: any[] = [], customer: any = null) {
+    vi.mocked(siteControls.getFeatureFlags).mockResolvedValue({ gstEnabled: true } as any)
+    mockQueryMany.mockImplementation(async (sql: string) =>
+      sql.includes('unnest(') ? grains : sql.includes('FROM product_units') ? units : []
+    )
+    mockQueryOne.mockResolvedValueOnce(customer)
+  }
+  const propose = (items: unknown[], extra: Record<string, unknown> = {}) =>
+    getTool('propose_create_quotation').handler({ customerEmail: 'a@b.com', items: JSON.stringify(items), ...extra }) as Promise<any>
+
+  it('refuses an item without a productId', async () => {
+    const r = await propose([{ quantity: 1 }])
+    expect(r.ok).toBe(false)
+    expect(r.summary).toMatch(/productId/)
   })
 
-  it('throws when product not found (products returned < unique ids)', async () => {
-    mockQueryMany.mockResolvedValueOnce([]) // no products found
-    mockQueryOne.mockResolvedValueOnce(null)
-    await expect(
-      getTool('propose_create_quotation').handler({
-        customerEmail: 'a@b.com',
-        items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 1 }]),
-      })
-    ).rejects.toThrow(/Only 0 of 1/)
+  it('refuses a product that is not found or inactive', async () => {
+    setup([])
+    expect((await propose([{ productId: PRODUCT_ID, quantity: 1 }])).summary).toMatch(/not found or inactive/)
   })
 
-  it('throws when quantity is <= 0', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt',
-        sku: 'B',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce(null)
-    await expect(
-      getTool('propose_create_quotation').handler({
-        customerEmail: 'a@b.com',
-        items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 0 }]),
-      })
-    ).rejects.toThrow('Invalid quantity')
+  it.each([0, -1, 'lots'])('refuses quantity %s', async qty => {
+    setup([grain()])
+    expect((await propose([{ productId: PRODUCT_ID, quantity: qty }])).summary).toMatch(/greater than zero/)
   })
 
-  it('throws when quantity is negative', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt',
-        sku: 'B',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce(null)
-    await expect(
-      getTool('propose_create_quotation').handler({
-        customerEmail: 'a@b.com',
-        items: JSON.stringify([{ productId: PRODUCT_ID, quantity: -1 }]),
-      })
-    ).rejects.toThrow('Invalid quantity')
+  it('needs a variant for products with variants', async () => {
+    setup([grain({ has_variants: true })])
+    expect((await propose([{ productId: PRODUCT_ID, quantity: 1 }])).summary).toMatch(/has variants/)
   })
 
-  it('throws when quantity is NaN (string)', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt',
-        sku: 'B',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce(null)
-    await expect(
-      getTool('propose_create_quotation').handler({
-        customerEmail: 'a@b.com',
-        items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 'lots' }]),
-      })
-    ).rejects.toThrow('Invalid quantity')
+  it('proposes with the customer details the editor fills', async () => {
+    setup([grain()], [], { user_id: null, first_name: 'John', last_name: 'Doe', phone: '+91 98765 43210', gst_number: '29abcde1234f1z5' })
+    const r = await propose([{ productId: PRODUCT_ID, quantity: 2 }])
+    expect(r.proposed).toBe(true)
+    expect(r.kind).toBe('create_quotation')
+    expect(r.payload.consignee_name).toBe('John Doe')
+    expect(r.payload.consignee_phone).toBe('9876543210')
+    expect(r.payload.consignee_gstin).toBe('29abcde1234f1z5')
+    expect(r.payload.items[0]).toMatchObject({ rate: 100, discount_pct: 0, unit: 'PCS', buy_unit: null })
+    expect(r.ui_blocks[0].type).toBe('document')
   })
 
-  it('returns proposal with proposed:true and kind on happy path', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt M20',
-        sku: 'BOLT-M20',
-        gst_percentage: '18',
-        hsn_code: '7318',
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce({ first_name: 'John', last_name: 'Doe' })
-    const result = (await getTool('propose_create_quotation').handler({
-      customerEmail: 'john@example.com',
-      items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 2 }]),
-    })) as any
-    expect(result.proposed).toBe(true)
-    expect(result.kind).toBe('create_quotation')
-    expect(result.payload.items).toHaveLength(1)
-    expect(result.payload.consignee_email).toBe('john@example.com')
-    expect(result.payload.consignee_name).toBe('John Doe')
+  it('anchors on MRP with the catalog discount', async () => {
+    setup([grain({ mrp: 236, discount_pct: 50 })])
+    const r = await propose([{ productId: PRODUCT_ID, quantity: 1 }])
+    expect(r.payload.items[0]).toMatchObject({ rate: 200, discount_pct: 50 })
+    expect(r.payload.total).toBe(118)
   })
 
-  it('uses unitPrice from item when provided and > 0', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt',
-        sku: 'B',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce(null)
-    const result = (await getTool('propose_create_quotation').handler({
-      customerEmail: 'anon@example.com',
-      items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 1, unitPrice: 150 }]),
-    })) as any
-    expect(result.payload.items[0].rate).toBe(150)
+  it('stacks an extra discount on the catalog one', async () => {
+    setup([grain({ mrp: 236, discount_pct: 50 })])
+    const r = await propose([{ productId: PRODUCT_ID, quantity: 1, extraDiscountPct: 10 }])
+    expect(r.payload.items[0].discount_pct).toBe(55)
   })
 
-  it('falls back to product price when unitPrice is 0', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt',
-        sku: 'B',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce(null)
-    const result = (await getTool('propose_create_quotation').handler({
-      customerEmail: 'anon@example.com',
-      items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 1, unitPrice: 0 }]),
-    })) as any
-    expect(result.payload.items[0].rate).toBe(100) // falls back to product price
+  it('takes a custom price per piece incl. GST', async () => {
+    setup([grain({ mrp: 236, discount_pct: 50 })])
+    const r = await propose([{ productId: PRODUCT_ID, quantity: 1, unitPrice: 177 }])
+    expect(r.payload.items[0]).toMatchObject({ rate: 150, discount_pct: 0 })
   })
 
-  it('uses email as consigneeName when user not found', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt',
-        sku: 'B',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce(null) // no user record
-    const result = (await getTool('propose_create_quotation').handler({
+  it('needs the selling unit and counts quantity in it', async () => {
+    setup([grain()], [box])
+    expect((await propose([{ productId: PRODUCT_ID, quantity: 50 }])).summary).toMatch(/sells in box \(10 pcs\)/)
+    setup([grain()], [box])
+    const r = await propose([{ productId: PRODUCT_ID, quantity: 5, buyUnit: 'boxes' }])
+    expect(r.payload.items[0]).toMatchObject({ quantity: 5, buy_unit: 'box', unit: 'BOX', sell_unit_factor: 10 })
+    expect(r.ui_blocks[0].lines[0].baseQty).toBe('= 50 pcs')
+    expect(r.payload.total).toBe(5900)
+  })
+
+  it('uses the email prefix as name when the user is unknown', async () => {
+    setup([grain()])
+    const r = await getTool('propose_create_quotation').handler({
       customerEmail: 'unknown@shop.com',
       items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 3 }]),
-    })) as any
-    expect(result.payload.consignee_name).toBe('unknown')
+    }) as any
+    expect(r.payload.consignee_name).toBe('unknown')
   })
 
-  it('includes notes in payload when provided', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt',
-        sku: 'B',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce({ first_name: 'Alice', last_name: null })
-    const result = (await getTool('propose_create_quotation').handler({
-      customerEmail: 'alice@example.com',
-      items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 1 }]),
-      notes: 'Urgent delivery needed',
-    })) as any
-    expect(result.payload.notes).toBe('Urgent delivery needed')
+  it('carries notes, or null', async () => {
+    setup([grain()])
+    expect((await propose([{ productId: PRODUCT_ID, quantity: 1 }], { notes: 'Urgent' })).payload.notes).toBe('Urgent')
+    setup([grain()])
+    expect((await propose([{ productId: PRODUCT_ID, quantity: 1 }])).payload.notes).toBeNull()
   })
 
-  it('sets notes to null when not provided', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt',
-        sku: 'B',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce(null)
-    const result = (await getTool('propose_create_quotation').handler({
-      customerEmail: 'anon@example.com',
-      items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 1 }]),
-    })) as any
-    expect(result.payload.notes).toBeNull()
-  })
-
-  it('calculates GST totals correctly', async () => {
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt',
-        sku: 'B',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-    ])
-    mockQueryOne.mockResolvedValueOnce(null)
-    const result = (await getTool('propose_create_quotation').handler({
-      customerEmail: 'a@b.com',
-      items: JSON.stringify([{ productId: PRODUCT_ID, quantity: 10, unitPrice: 100 }]),
-    })) as any
-    // subtotal=1000, cgst=1000*18/200=90, sgst=90, total=1180
-    expect(result.payload.subtotal).toBe(1000)
-    expect(result.payload.cgst).toBe(90)
-    expect(result.payload.sgst).toBe(90)
-    expect(result.payload.total).toBe(1180)
-  })
-
-  it('uses plural "lines" in confirmation text when more than one item', async () => {
+  it('uses plural "lines" in the confirmation for several items', async () => {
     const PRODUCT_ID2 = '550e8400-e29b-41d4-a716-446655440002'
-    mockQueryMany.mockResolvedValueOnce([
-      {
-        id: PRODUCT_ID,
-        name: 'Bolt M20',
-        sku: 'B1',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '100',
-        base_price: '100',
-      },
-      {
-        id: PRODUCT_ID2,
-        name: 'Washer M20',
-        sku: 'W1',
-        gst_percentage: '18',
-        hsn_code: null,
-        price: '20',
-        base_price: '20',
-      },
+    setup([grain(), grain({ idx: 2, product_id: PRODUCT_ID2, name: 'Washer' })])
+    const r = await propose([
+      { productId: PRODUCT_ID, quantity: 1 },
+      { productId: PRODUCT_ID2, quantity: 5 },
     ])
-    mockQueryOne.mockResolvedValueOnce(null)
-    const result = (await getTool('propose_create_quotation').handler({
-      customerEmail: 'multi@example.com',
-      items: JSON.stringify([
-        { productId: PRODUCT_ID, quantity: 1, unitPrice: 100 },
-        { productId: PRODUCT_ID2, quantity: 5, unitPrice: 20 },
-      ]),
-    })) as any
-    expect(result.proposed).toBe(true)
-    expect(result.payload.items).toHaveLength(2)
-    expect(result.confirmation).toMatch(/2 lines/i)
+    expect(r.payload.items).toHaveLength(2)
+    expect(r.confirmation).toMatch(/2 lines/i)
+  })
+})
+
+describe('autoQuotationItems', () => {
+  const unit = (u: string, factor: number, isDefault = false) =>
+    ({ unit: u, label: u, factor, dimension: 'count', minQty: 1, maxQty: null, qtyStep: 1, isDefault })
+  const line = (qty: number, requestedUnit: string | null, units: any[], variants?: any[]) => ({
+    status: 'matched',
+    qty,
+    requestedUnit,
+    candidates: [{ productId: 'p1', units, variants }],
+  })
+
+  it('converts pieces into whole default units and keeps named units', () => {
+    expect(autoQuotationItems([line(50, null, [unit('box', 10, true)])])).toEqual([
+      { productId: 'p1', variantId: undefined, quantity: 5, buyUnit: 'box' },
+    ])
+    expect(autoQuotationItems([line(2, 'Boxes', [unit('box', 10, true), unit('pack', 100)])])?.[0]).toMatchObject({ quantity: 2, buyUnit: 'box' })
+  })
+
+  it('leaves the line to the admin when pieces do not divide or a variant must be chosen', () => {
+    expect(autoQuotationItems([line(55, 'pcs', [unit('box', 10, true)])])).toBeNull()
+    expect(autoQuotationItems([line(1, null, [], [{ id: 'v1' }, { id: 'v2' }])])).toBeNull()
   })
 })
 
@@ -1002,451 +883,6 @@ describe('propose_send_quotation_email', () => {
     const result = (await getTool('propose_send_quotation_email').handler({ quoteNumber: 'QT-005' })) as any
     expect(result.proposed).toBe(true)
     expect(result.payload.quoteNumber).toBe('QT-005')
-  })
-})
-
-// ── propose_mark_invoice_paid ─────────────────────────────────────────────────
-
-describe('propose_mark_invoice_paid', () => {
-  beforeEach(() => vi.resetAllMocks())
-
-  it('throws when neither invoiceId nor invoiceNumber provided', async () => {
-    await expect(getTool('propose_mark_invoice_paid').handler({ paymentMode: 'cash' })).rejects.toThrow(
-      'Provide invoiceId or invoiceNumber'
-    )
-  })
-
-  it('throws for unrecognised paymentMode', async () => {
-    await expect(
-      getTool('propose_mark_invoice_paid').handler({
-        invoiceId: 'inv1',
-        paymentMode: 'bitcoin',
-      })
-    ).rejects.toThrow('paymentMode must be one of')
-  })
-
-  it('throws when paidAt does not match YYYY-MM-DD', async () => {
-    await expect(
-      getTool('propose_mark_invoice_paid').handler({
-        invoiceId: 'inv1',
-        paymentMode: 'cash',
-        paidAt: '15-01-2024',
-      })
-    ).rejects.toThrow('paidAt must be YYYY-MM-DD')
-  })
-
-  it('throws when paidAt is a plain string without dashes', async () => {
-    await expect(
-      getTool('propose_mark_invoice_paid').handler({
-        invoiceId: 'inv1',
-        paymentMode: 'upi',
-        paidAt: 'today',
-      })
-    ).rejects.toThrow('paidAt must be YYYY-MM-DD')
-  })
-
-  it('throws when invoice not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null)
-    await expect(
-      getTool('propose_mark_invoice_paid').handler({
-        invoiceId: 'bad',
-        paymentMode: 'cash',
-      })
-    ).rejects.toThrow('Invoice not found')
-  })
-
-  it('returns { proposed: false } when invoice is already paid', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'inv1',
-      order_number: 'ORD-001',
-      invoice_number: 'INV-001',
-      total_amount: '500',
-      payment_status: 'paid',
-      customer_name: 'Alice',
-    })
-    const result = (await getTool('propose_mark_invoice_paid').handler({
-      invoiceId: 'inv1',
-      paymentMode: 'cash',
-    })) as any
-    expect(result.proposed).toBe(false)
-    expect(result.info).toMatch(/already paid/i)
-  })
-
-  it('returns { proposed: false } when invoice is refunded', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'inv1',
-      order_number: 'ORD-001',
-      invoice_number: 'INV-001',
-      total_amount: '500',
-      payment_status: 'refunded',
-      customer_name: 'Alice',
-    })
-    const result = (await getTool('propose_mark_invoice_paid').handler({
-      invoiceId: 'inv1',
-      paymentMode: 'upi',
-    })) as any
-    expect(result.proposed).toBe(false)
-    expect(result.info).toMatch(/refunded/i)
-  })
-
-  it('returns proposal with proposed:true for unpaid invoice', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'inv1',
-      order_number: 'ORD-001',
-      invoice_number: 'INV-001',
-      total_amount: '1500',
-      payment_status: 'unpaid',
-      customer_name: 'Alice',
-    })
-    const result = (await getTool('propose_mark_invoice_paid').handler({
-      invoiceId: 'inv1',
-      paymentMode: 'upi',
-      paidAt: '2024-03-15',
-    })) as any
-    expect(result.proposed).toBe(true)
-    expect(result.kind).toBe('mark_invoice_paid')
-    expect(result.payload.paymentMode).toBe('upi')
-    expect(result.payload.paidAt).toBe('2024-03-15')
-  })
-
-  it('sets paidAt to null when not provided', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'inv1',
-      order_number: 'ORD-001',
-      invoice_number: 'INV-001',
-      total_amount: '500',
-      payment_status: 'unpaid',
-      customer_name: null,
-    })
-    const result = (await getTool('propose_mark_invoice_paid').handler({
-      invoiceNumber: 'INV-001',
-      paymentMode: 'cash',
-    })) as any
-    expect(result.payload.paidAt).toBeNull()
-    expect(result.payload.customerName).toBe('') // null → ''
-  })
-
-  it('looks up by invoiceNumber instead of invoiceId', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'inv2',
-      order_number: 'ORD-002',
-      invoice_number: 'INV-002',
-      total_amount: '2000',
-      payment_status: 'partial',
-      customer_name: 'Bob',
-    })
-    const result = (await getTool('propose_mark_invoice_paid').handler({
-      invoiceNumber: 'INV-002',
-      paymentMode: 'bank_transfer',
-    })) as any
-    expect(result.proposed).toBe(true)
-    expect(result.payload.invoiceNumber).toBe('INV-002')
-  })
-
-  it('accepts all valid PAYMENT_MODES', async () => {
-    for (const mode of ['cash', 'card', 'upi', 'bank_transfer', 'cheque', 'razorpay', 'credit']) {
-      mockQueryOne.mockResolvedValueOnce({
-        id: 'inv1',
-        order_number: 'ORD-001',
-        invoice_number: 'INV-001',
-        total_amount: '100',
-        payment_status: 'unpaid',
-        customer_name: null,
-      })
-      const result = (await getTool('propose_mark_invoice_paid').handler({
-        invoiceId: 'inv1',
-        paymentMode: mode,
-      })) as any
-      expect(result.proposed).toBe(true)
-    }
-  })
-
-  it('normalises paymentMode to lowercase', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'inv1',
-      order_number: 'ORD-001',
-      invoice_number: 'INV-001',
-      total_amount: '100',
-      payment_status: 'unpaid',
-      customer_name: null,
-    })
-    const result = (await getTool('propose_mark_invoice_paid').handler({
-      invoiceId: 'inv1',
-      paymentMode: 'UPI',
-    })) as any
-    expect(result.payload.paymentMode).toBe('upi')
-  })
-})
-
-// ── propose_update_order_status ───────────────────────────────────────────────
-
-describe('propose_update_order_status', () => {
-  beforeEach(() => vi.resetAllMocks())
-
-  it('throws when neither orderId nor orderNumber provided', async () => {
-    await expect(getTool('propose_update_order_status').handler({ newStatus: 'shipped' })).rejects.toThrow(
-      'Provide orderId or orderNumber'
-    )
-  })
-
-  it('throws for unrecognised newStatus', async () => {
-    await expect(
-      getTool('propose_update_order_status').handler({
-        orderId: 'o1',
-        newStatus: 'unknown_status',
-      })
-    ).rejects.toThrow('newStatus must be one of')
-  })
-
-  it('throws when awbNumber is longer than 64 chars', async () => {
-    await expect(
-      getTool('propose_update_order_status').handler({
-        orderId: 'o1',
-        newStatus: 'shipped',
-        awbNumber: 'A'.repeat(65),
-      })
-    ).rejects.toThrow('awbNumber too long')
-  })
-
-  it('accepts awbNumber exactly 64 chars', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'confirmed',
-      payment_status: 'paid',
-      customer_name: 'Alice',
-      total_amount: '1000',
-      awb_number: null,
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'shipped',
-      awbNumber: 'A'.repeat(64),
-    })) as any
-    expect(result.proposed).toBe(true)
-  })
-
-  it('refuses to move a granted or all-digital order through shipping states', async () => {
-    const base = {
-      id: 'o1',
-      order_number: 'ORD-D',
-      payment_status: 'paid',
-      customer_name: 'A',
-      total_amount: '100',
-      awb_number: null,
-    }
-    mockQueryOne.mockResolvedValueOnce({ ...base, status: 'granted', all_digital: true })
-    const r1 = (await getTool('propose_update_order_status').handler({ orderId: 'o1', newStatus: 'shipped' })) as any
-    expect(r1.proposed).toBe(false)
-    expect(r1.info).toMatch(/digital/)
-
-    mockQueryOne.mockResolvedValueOnce({ ...base, status: 'pending', all_digital: true })
-    const r2 = (await getTool('propose_update_order_status').handler({ orderId: 'o1', newStatus: 'processing' })) as any
-    expect(r2.proposed).toBe(false)
-  })
-
-  it('throws when order not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null)
-    await expect(
-      getTool('propose_update_order_status').handler({
-        orderId: 'bad',
-        newStatus: 'shipped',
-      })
-    ).rejects.toThrow('Order not found')
-  })
-
-  it('returns { proposed: false } when order already has that status', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'shipped',
-      payment_status: 'paid',
-      customer_name: 'Alice',
-      total_amount: '1000',
-      awb_number: null,
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'shipped',
-    })) as any
-    expect(result.proposed).toBe(false)
-    expect(result.info).toMatch(/already in status/i)
-  })
-
-  it('sets isRegression:true and adds warn callout for backwards transition', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'shipped',
-      payment_status: 'paid',
-      customer_name: 'Alice',
-      total_amount: '1000',
-      awb_number: 'AWB123',
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'confirmed',
-    })) as any
-    expect(result.proposed).toBe(true)
-    expect(result.payload.isRegression).toBe(true)
-    const warnBlock = result.ui_blocks.find((b: any) => b.type === 'callout' && b.tone === 'warn')
-    expect(warnBlock).toBeDefined()
-    expect(warnBlock.title).toMatch(/regression/i)
-  })
-
-  it('does NOT flag cancelled as regression regardless of fromIdx', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'shipped',
-      payment_status: 'paid',
-      customer_name: 'Alice',
-      total_amount: '1000',
-      awb_number: null,
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'cancelled',
-    })) as any
-    expect(result.proposed).toBe(true)
-    expect(result.payload.isRegression).toBe(false)
-    const warnBlock = result.ui_blocks.find((b: any) => b.type === 'callout' && b.tone === 'warn')
-    expect(warnBlock).toBeUndefined()
-  })
-
-  it('adds info callout when shipping without any AWB number', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'confirmed',
-      payment_status: 'paid',
-      customer_name: 'Alice',
-      total_amount: '1000',
-      awb_number: null,
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'shipped',
-    })) as any
-    expect(result.proposed).toBe(true)
-    const infoBlock = result.ui_blocks.find((b: any) => b.type === 'callout' && b.tone === 'info')
-    expect(infoBlock).toBeDefined()
-  })
-
-  it('does NOT add info callout when shipping with a new awbNumber', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'processing',
-      payment_status: 'paid',
-      customer_name: 'Alice',
-      total_amount: '1000',
-      awb_number: null,
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'shipped',
-      awbNumber: 'AWB-12345',
-    })) as any
-    expect(result.proposed).toBe(true)
-    expect(result.payload.awbNumber).toBe('AWB-12345')
-    const infoBlock = result.ui_blocks.find((b: any) => b.type === 'callout' && b.tone === 'info')
-    expect(infoBlock).toBeUndefined()
-  })
-
-  it('does NOT add info callout when existing awb_number is already set', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'confirmed',
-      payment_status: 'paid',
-      customer_name: 'Alice',
-      total_amount: '1000',
-      awb_number: 'EXISTING-AWB',
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'shipped',
-    })) as any
-    expect(result.proposed).toBe(true)
-    const infoBlock = result.ui_blocks.find((b: any) => b.type === 'callout' && b.tone === 'info')
-    expect(infoBlock).toBeUndefined()
-  })
-
-  it('includes fromStatus and newStatus in payload', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'pending',
-      payment_status: 'unpaid',
-      customer_name: null,
-      total_amount: '500',
-      awb_number: null,
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'confirmed',
-    })) as any
-    expect(result.payload.fromStatus).toBe('pending')
-    expect(result.payload.newStatus).toBe('confirmed')
-    expect(result.payload.isRegression).toBe(false)
-  })
-
-  it('looks up by orderNumber when orderId not provided', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o5',
-      order_number: 'ORD-005',
-      status: 'processing',
-      payment_status: 'paid',
-      customer_name: 'Carol',
-      total_amount: '3000',
-      awb_number: null,
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderNumber: 'ORD-005',
-      newStatus: 'shipped',
-      awbNumber: 'AWB-99',
-    })) as any
-    expect(result.proposed).toBe(true)
-    expect(result.payload.orderNumber).toBe('ORD-005')
-  })
-
-  it('normalises newStatus to lowercase', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'pending',
-      payment_status: 'unpaid',
-      customer_name: null,
-      total_amount: '100',
-      awb_number: null,
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'CONFIRMED',
-    })) as any
-    expect(result.payload.newStatus).toBe('confirmed')
-  })
-
-  it('includes existing AWB in kv_pairs when present and no new AWB provided', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      id: 'o1',
-      order_number: 'ORD-001',
-      status: 'processing',
-      payment_status: 'paid',
-      customer_name: 'Dave',
-      total_amount: '800',
-      awb_number: 'OLD-AWB',
-    })
-    const result = (await getTool('propose_update_order_status').handler({
-      orderId: 'o1',
-      newStatus: 'shipped',
-    })) as any
-    expect(result.proposed).toBe(true)
-    const kvBlock = result.ui_blocks.find((b: any) => b.type === 'kv_pairs')
-    const existingAwbPair = kvBlock?.pairs.find((p: any) => p.key === 'Existing AWB')
-    expect(existingAwbPair).toBeDefined()
-    expect(existingAwbPair.value).toBe('OLD-AWB')
   })
 })
 
