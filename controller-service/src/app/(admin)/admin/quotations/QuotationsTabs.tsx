@@ -33,24 +33,36 @@ export default function QuotationsTabs({ canWrite }: { canWrite: boolean }) {
     router.replace(ap(`/admin/quotations?${p}`), { scroll: false })
   }
 
+  // The editor renders alone, whichever tab opened it.
+  if (editing)
+    return (
+      <TabActionsHost>
+        <QuotationsClient canWrite={canWrite} section={tab === 'drafts' ? 'drafts' : 'list'} />
+      </TabActionsHost>
+    )
+
   return (
     <TabActionsHost>
       <div className="space-y-5">
-        {!editing && (
-          <>
-            <PageHeader title="Quotations" description="Create and manage B2B quotations" />
-            <Tabs
-              tabs={[
-                { id: 'overview', label: 'Overview' },
-                { id: 'list', label: 'Quotations' },
-                { id: 'drafts', label: <DraftsTabLabel type="quotation" /> },
-              ]}
-              value={tab}
-              onChange={go}
-            />
-          </>
+        <PageHeader title="Quotations" description="Create and manage B2B quotations" />
+        <Tabs
+          tabs={[
+            { id: 'overview', label: 'Overview' },
+            { id: 'list', label: 'Quotations' },
+            { id: 'drafts', label: <DraftsTabLabel type="quotation" /> },
+          ]}
+          value={tab}
+          onChange={go}
+        />
+        {tab === 'overview' ? (
+          <QuotationsOverview />
+        ) : tab === 'drafts' ? (
+          <PageDrafts type="quotation">
+            <QuotationsClient canWrite={canWrite} section="drafts" />
+          </PageDrafts>
+        ) : (
+          <QuotationsClient canWrite={canWrite} />
         )}
-        {tab === 'overview' ? <QuotationsOverview /> : tab === 'drafts' ? <PageDrafts type="quotation" /> : <QuotationsClient canWrite={canWrite} />}
       </div>
     </TabActionsHost>
   )

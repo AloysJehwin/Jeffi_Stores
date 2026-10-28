@@ -216,7 +216,8 @@ describe('PATCH /api/admin/quotations/[id]', () => {
     const res = await PATCH(makePatchReq({ items: [{ description: '', quantity: 0, rate: 5 }] }), PARAMS)
     expect(res.status).toBe(400)
     const body = await res.json()
-    expect(body.fields['items.0.description']).toBeDefined()
+    // A draft may keep a blank name; an impossible quantity is still refused.
+    expect(body.fields['items.0.description']).toBeUndefined()
     expect(body.fields['items.0.quantity']).toBeDefined()
     expect(withTransaction).not.toHaveBeenCalled()
   })
