@@ -8,7 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { FileText, ExternalLink, Plus, X } from 'lucide-react'
-import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, ListFilters, PageHeader, SortTh, TableSkeleton, badgeCls, fetchJson, useActionToast, useFilterQuery, useInfiniteList, useListSort, type SortCol, type StatusMap } from '@/components/admin/kit'
+import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, ListFilters, SortTh, TableSkeleton, badgeCls, fetchJson, useActionToast, useFilterQuery, useInfiniteList, useListSort, type SortCol, type StatusMap } from '@/components/admin/kit'
 import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
 import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 import HoverCard from '@/components/ui/HoverCard'
@@ -60,7 +60,7 @@ interface Receipt {
   total: number
 }
 
-type View = 'list' | 'new' | 'receipt'
+export type View = 'list' | 'new' | 'receipt'
 
 const PAYMENT_MODES = [
   { value: 'cash', label: 'Cash' },
@@ -110,12 +110,16 @@ function calcTotals(items: LineItem[]) {
   return { subtotal: round2(subtotal), tax: round2(totalTax) }
 }
 
-export default function CashSaleClient() {
+// onViewChange lets the tabs wrapper drop the page title and tabs while a sale / receipt is open.
+export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: View) => void } = {}) {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const canWrite = useCanWrite('invoices')
   const searchParams = useSearchParams()
   const [view, setView] = useState<View>('list')
+  useEffect(() => {
+    onViewChange?.(view)
+  }, [view, onViewChange])
 
   const [selectedSale, setSelectedSale] = useState<CashSale | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
@@ -777,21 +781,18 @@ export default function CashSaleClient() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between mb-2">
-        <PageHeader title="Cash Sales" description="Walk-in sales — no customer details" />
-        {canWrite && (
-          <TabActionsPortal>
-            <TabAction
-              onClick={() => {
-                resetForm()
-                setView('new')
-              }}
-              icon={<Plus className="w-4 h-4" />}
-              label="New Cash Sale"
-            />
-          </TabActionsPortal>
-        )}
-      </div>
+      {canWrite && (
+        <TabActionsPortal>
+          <TabAction
+            onClick={() => {
+              resetForm()
+              setView('new')
+            }}
+            icon={<Plus className="w-4 h-4" />}
+            label="New Cash Sale"
+          />
+        </TabActionsPortal>
+      )}
 
       <ListFilters
         entity="cash_sale"
