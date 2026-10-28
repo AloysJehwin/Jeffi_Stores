@@ -662,7 +662,7 @@ export default function NewScenarioClient({ initialDraftId }: { initialDraftId?:
         )}
         <RequireWrite scope="campaigns:write">
           {step !== 'describe' && (
-            <RequireAi scope="mailer:write">
+            <RequireAi scope="campaigns:write">
               <FormButton type="button" variant="secondary" onClick={generate} pending={generating} pendingLabel="Regenerating…">
                 Regenerate SQL
               </FormButton>
@@ -675,7 +675,7 @@ export default function NewScenarioClient({ initialDraftId }: { initialDraftId?:
           )}
           {step === 'describe' ? (
             <RequireAi
-              scope="mailer:write"
+              scope="campaigns:write"
               fallback={<span className="text-xs text-foreground-muted">AI tools are not available for your plan or role.</span>}
             >
               <FormButton type="button" onClick={generate} disabled={!aiPrompt.trim()} pending={generating} pendingLabel="Generating…">

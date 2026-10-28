@@ -83,7 +83,7 @@ Example for an audience-only scenario (no products): omit product_sql entirely o
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const denied = aiDenial(admin.role, admin.scopes, 'mailer:write')
+  const denied = aiDenial(admin.role, admin.scopes, 'campaigns:write')
   if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
   const body = await req.json().catch(() => ({}))
