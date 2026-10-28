@@ -14,6 +14,7 @@ import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-v
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { ap } from '@/lib/shared/admin-path'
+import { FormButton, FormFooter } from '@/components/admin/kit/form'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
 interface CouponOption {
@@ -402,25 +403,19 @@ export default function NewCampaignClient() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 pt-1">
+          <FormFooter cancelHref={ap('/admin/campaigns')}>
             <RequireWrite scope="campaigns:write">
-              <button
+              <FormButton
                 type="button"
                 onClick={create}
-                disabled={creating || !form.name.trim() || !form.kind.trim()}
-                className="px-5 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                disabled={!form.name.trim() || !form.kind.trim()}
+                pending={creating}
+                pendingLabel="Creating…"
               >
-                {creating ? 'Creating…' : 'Save as Draft'}
-              </button>
+                Save as Draft
+              </FormButton>
             </RequireWrite>
-            <button
-              type="button"
-              onClick={() => router.push(ap('/admin/campaigns'))}
-              className="px-5 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
-            >
-              Cancel
-            </button>
-          </div>
+          </FormFooter>
         </div>
 
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">

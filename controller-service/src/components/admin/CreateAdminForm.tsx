@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ADMIN_SCOPES } from '@/lib/auth/scopes'
 import ScopeGrid from '@/components/admin/ScopeGrid'
+import { FormFooter } from '@/components/admin/kit/form'
 
 export default function CreateAdminForm({
   onCreated,
@@ -300,22 +301,13 @@ export default function CreateAdminForm({
         />
       </div>
 
-      <div className="flex gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-accent-500 hover:bg-accent-600 disabled:bg-gray-400 text-white px-6 h-control rounded-lg font-semibold text-sm transition-colors"
-        >
-          {loading ? 'Creating...' : 'Create Admin & Generate Certificate'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsOpen(false)}
-          className="bg-surface-secondary hover:bg-border-default text-foreground-secondary px-6 h-control rounded-lg font-semibold text-sm transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
+      <FormFooter
+        sticky={false}
+        onCancel={() => setIsOpen(false)}
+        submitLabel="Create Admin & Generate Certificate"
+        pending={loading}
+        pendingLabel="Creating..."
+      />
     </form>
   )
 }

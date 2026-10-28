@@ -28,7 +28,7 @@ import { Card, Field, Fields } from '@/components/admin/kit/layout'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
 import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, STATUS_BADGE } from '@/components/admin/purchasing/shared'
-import { FormFooter } from '@/components/admin/kit/form'
+import { FormButton, FormFooter } from '@/components/admin/kit/form'
 import { DraftLockBadge, DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders } from '@/lib/client/draft-lock-client'
@@ -728,7 +728,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
         <DetailHeader
           title={`Receive Goods — ${receiveMode.po.po_number}`}
           subtitle={`Supplier: ${receiveMode.po.supplier_name}`}
-          secondary={[{ key: 'back', label: 'Back', icon: ChevronLeft, onClick: cancelReceive }]}
           actions={
           <button
             type="button"
@@ -762,19 +761,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             <p className="text-sm text-foreground flex-1">
               Restored your unsaved progress for this PO. Your entries auto-save as you go.
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  localStorage.removeItem(`po_receive_draft:${receiveMode.po.id}`)
-                } catch {}
-                setDraftRestored(false)
-                openReceive(receiveMode.po.id)
-              }}
-              className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline shrink-0"
-            >
-              Discard draft
-            </button>
           </div>
         )}
         <LockedFieldset readOnly={receiveLock.readOnly} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
@@ -1112,24 +1098,24 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
         <FormFooter
           lock={receiveLock}
           cancel={cancelReceive}
-          cancelLabel="Cancel"
+          discard={
+            draftRestored
+              ? () => {
+                  try {
+                    localStorage.removeItem(`po_receive_draft:${receiveMode.po.id}`)
+                  } catch {}
+                  setDraftRestored(false)
+                  openReceive(receiveMode.po.id)
+                }
+              : undefined
+          }
         >
-          <button
-            type="button"
-            className="control-md inline-flex items-center border border-border-secondary bg-surface text-foreground-secondary hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={saveDraftAndExit}
-            disabled={receiveSaving}
-          >
+          <FormButton type="button" variant="secondary" onClick={saveDraftAndExit} disabled={receiveSaving}>
             Save as Draft
-          </button>
-          <button
-            type="button"
-            className="control-md inline-flex items-center border border-accent-500 bg-accent-500 text-white font-medium hover:bg-accent-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={submitReceive}
-            disabled={receiveSaving}
-          >
-            {receiveSaving ? 'Saving...' : 'Confirm Receipt'}
-          </button>
+          </FormButton>
+          <FormButton type="button" onClick={submitReceive} pending={receiveSaving} pendingLabel="Saving...">
+            Confirm Receipt
+          </FormButton>
         </FormFooter>
       </div>
     )

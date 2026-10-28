@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertTriangle, Bell, Mail, MessageSquare, MessageCircle, Sparkles, Loader2, Pencil, Save } from 'lucide-react'
+import { Bell, Mail, MessageSquare, MessageCircle, Sparkles, Loader2, Pencil } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import DateTimePicker from '@/components/ui/DateTimePicker'
@@ -20,12 +20,11 @@ import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { useToast } from '@/contexts/ToastContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
-import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
-import { BackLink, DraftLockBanner, FormFooter, LockedFieldset, fieldInputCls } from '@/components/admin/kit'
+import { BackLink, DraftLockBanner, FormButton, FormFooter, LockedFieldset, fieldInputCls } from '@/components/admin/kit'
 import { assertDraftResponse, isDraftLockedError, lockHeaders } from '@/lib/client/draft-lock-client'
 
 type Channel = 'email' | 'sms' | 'whatsapp'
@@ -98,10 +97,6 @@ const humanize = (v: string) =>
 
 const inputClass = fieldInputCls
 const labelClass = 'block text-xs font-medium text-foreground-secondary mb-1.5'
-const btnSecondary =
-  'px-5 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm disabled:opacity-50'
-const btnPrimary =
-  'px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50'
 
 interface ReviewFormOption {
   id: string
@@ -550,7 +545,8 @@ export default function NewMessagePage() {
     }
   }
 
-  async function handleSubmit(sendNow: boolean) {
+  // draftOnly: save and leave without scheduling (Save as Draft before the last step).
+  async function handleSubmit(sendNow: boolean, draftOnly = false) {
     setSubmitting(true)
     setError('')
     try {
@@ -584,7 +580,7 @@ export default function NewMessagePage() {
         if (!createRes.ok) throw new Error((await createRes.json()).error || 'Failed to create message')
         id = (await createRes.json()).id
       }
-      if (sendNow || scheduledAt) {
+      if (!draftOnly && (sendNow || scheduledAt)) {
         // Only the draft's holder may send it (423 otherwise).
         const sent = await fetch(`/api/admin/mailer/${id}/send`, {
           method: 'POST',
@@ -595,6 +591,8 @@ export default function NewMessagePage() {
         await assertDraftResponse(sent, 'Failed to send message')
       }
       localStorage.removeItem(DRAFT_STORAGE_KEY)
+      // Done editing: close the session so Cancel no longer reverts it.
+      if (edit.sessionId) await edit.save().catch(() => false)
       router.push(ap('/admin/marketing/messaging'))
     } catch (err) {
       if (isDraftLockedError(err)) lock.markLocked()
@@ -614,34 +612,6 @@ export default function NewMessagePage() {
   return (
     <MobileEditBlock>
       <div className="p-4 sm:p-6">
-        {showRestoreBanner && (
-          <div className="mb-4 flex items-center justify-between gap-4 px-4 py-3 bg-amber-500/5 border border-amber-500/40 rounded-lg">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                You have an unsaved draft — want to continue where you left off?
-              </span>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <button
-                onClick={() => {
-                  const id = localStorage.getItem(DRAFT_STORAGE_KEY)
-                  if (id) void restoreDraftFromId(id)
-                }}
-                className="px-3 h-control-sm text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-md transition-colors"
-              >
-                Restore
-              </button>
-              <button
-                onClick={discardDraft}
-                className="px-3 h-control-sm text-xs font-semibold bg-surface border border-amber-500/40 dark:border-amber-600 text-amber-700 dark:text-amber-400 rounded-md transition-colors"
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="flex flex-wrap items-end gap-3 mb-6">
           <div className="flex-1 min-w-0 space-y-1.5">
             <BackLink href={ap('/admin/marketing/messaging')} label="Messaging" />
@@ -650,19 +620,6 @@ export default function NewMessagePage() {
               Step {step} of 3 · {['Channels & templates', 'Content', 'Audience & schedule'][step - 1]}
             </p>
           </div>
-          {draftId && edit.sessionId && (
-            <EditorToolbar
-              autosaveStatus={saveState as AutosaveStatus}
-              sessionStatus={edit.status}
-              onSave={async () => {
-                if (await edit.save()) router.push(ap('/admin/marketing/messaging'))
-              }}
-              onCancel={edit.cancel}
-              cancelHref={ap('/admin/marketing/messaging')}
-              saveLabel="Save draft"
-              readOnly={lock.readOnly}
-            />
-          )}
         </div>
 
         <DraftLockBanner lock={lock} scope="mailer:write" className="mb-4" />
@@ -735,9 +692,6 @@ export default function NewMessagePage() {
               )
             })}
 
-            <button type="button" onClick={() => setStep(2)} disabled={!step1Ready} className={btnPrimary}>
-              Continue
-            </button>
           </LockedFieldset>
         )}
 
@@ -948,24 +902,6 @@ export default function NewMessagePage() {
                 />
               )}
 
-              <div className="flex items-center gap-3 pt-2">
-                <button type="button" onClick={() => setStep(1)} className={btnSecondary}>
-                  Back
-                </button>
-                <RequireWrite scope="mailer:write">
-                  <button
-                    type="button"
-                    onClick={triggerAutoSave}
-                    disabled={saveState === 'saving'}
-                    className={`${btnSecondary} flex items-center gap-1.5`}
-                  >
-                    <Save className="w-3.5 h-3.5" /> Save draft
-                  </button>
-                </RequireWrite>
-                <button type="button" onClick={() => setStep(3)} disabled={!ready} className={btnPrimary}>
-                  Continue
-                </button>
-              </div>
             </LockedFieldset>
 
             <div className="sticky top-6">
@@ -1143,35 +1079,12 @@ export default function NewMessagePage() {
                   end, and nobody gets more than 2 offer pushes a day across messages and campaigns.
                 </p>
               )}
-              <div className="flex flex-wrap gap-3 pt-2">
-                <button type="button" onClick={() => setStep(2)} className={btnSecondary}>
-                  Back
-                </button>
-                <RequireWrite scope="mailer:write">
-                  <button
-                    type="button"
-                    onClick={() => handleSubmit(false)}
-                    disabled={submitting}
-                    className={btnSecondary}
-                  >
-                    {submitting ? '…' : scheduledAt ? 'Schedule' : 'Save as draft'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSubmit(true)}
-                    disabled={submitting || !!scheduledAt || !ready}
-                    className={btnPrimary}
-                  >
-                    {submitting ? 'Queuing…' : 'Send now'}
-                  </button>
-                </RequireWrite>
-                {scheduledAt && (
-                  <p className="text-xs text-foreground-muted self-center">
-                    Sending at{' '}
-                    {new Date(scheduledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                  </p>
-                )}
-              </div>
+              {scheduledAt && (
+                <p className="text-xs text-foreground-muted">
+                  Sending at{' '}
+                  {new Date(scheduledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                </p>
+              )}
             </LockedFieldset>
 
             <div className="sticky top-6">
@@ -1242,9 +1155,63 @@ export default function NewMessagePage() {
           </div>
         )}
 
-        {lock.readOnly && (
-          <FormFooter lock={lock} cancelHref={ap('/admin/marketing/messaging')} discard={discardLockedDraft} />
-        )}
+        {/* The composer's only action bar: every step's Back / Save as Draft / Continue / Send. */}
+        <FormFooter
+          lock={lock}
+          autosave={draftId ? (saveState as AutosaveStatus) : undefined}
+          banner={showRestoreBanner ? 'You have an unsaved message from before.' : undefined}
+          restore={
+            showRestoreBanner
+              ? () => {
+                  const id = localStorage.getItem(DRAFT_STORAGE_KEY)
+                  if (id) void restoreDraftFromId(id)
+                }
+              : undefined
+          }
+          secondary={
+            showRestoreBanner ? (
+              <button type="button" onClick={discardDraft} className="text-xs font-medium text-foreground-muted hover:text-foreground">
+                Dismiss
+              </button>
+            ) : undefined
+          }
+          discard={lock.readOnly ? discardLockedDraft : undefined}
+          cancel={
+            edit.sessionId
+              ? async () => {
+                  if (await edit.cancel()) router.push(ap('/admin/marketing/messaging'))
+                }
+              : undefined
+          }
+          cancelHref={ap('/admin/marketing/messaging')}
+        >
+          {step > 1 && (
+            <FormButton type="button" variant="secondary" onClick={() => setStep(step - 1)}>
+              Back
+            </FormButton>
+          )}
+          <RequireWrite scope="mailer:write">
+            {step < 3 ? (
+              <>
+                <FormButton type="button" variant="secondary" onClick={() => handleSubmit(false, true)} disabled={submitting}>
+                  {submitting ? 'Saving…' : 'Save as Draft'}
+                </FormButton>
+                <FormButton type="button" onClick={() => setStep(step + 1)} disabled={step === 1 ? !step1Ready : !ready}>
+                  Continue
+                </FormButton>
+              </>
+            ) : (
+              <>
+                <FormButton type="button" variant="secondary" onClick={() => handleSubmit(false)} disabled={submitting}>
+                  {submitting ? '…' : scheduledAt ? 'Schedule' : 'Save as Draft'}
+                </FormButton>
+                <FormButton type="button" onClick={() => handleSubmit(true)} disabled={submitting || !!scheduledAt || !ready}>
+                  {submitting ? 'Queuing…' : 'Send now'}
+                </FormButton>
+              </>
+            )}
+          </RequireWrite>
+        </FormFooter>
       </div>
     </MobileEditBlock>
   )
