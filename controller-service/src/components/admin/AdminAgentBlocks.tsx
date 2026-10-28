@@ -45,7 +45,18 @@ function fmtPriceOrAsk(input: unknown): string {
   return fmtINR(n)
 }
 
-function fmtStock(input: unknown): { label: string; tone: 'ok' | 'low' | 'out' | 'unknown' } {
+type StockTone = 'ok' | 'low' | 'out' | 'unknown'
+
+// Stock status (what the store sells on) and units on hand are separate; show the status, units beside it.
+function fmtStockStatus(p: { stock_status?: string | null; inventory_qty?: unknown; stock?: unknown }): { label: string; tone: StockTone } {
+  if (!p.stock_status) return fmtStock(p.stock ?? p.inventory_qty)
+  const qty = parseNumber(p.inventory_qty)
+  const units = qty == null ? '' : ` · ${qty} on hand`
+  const tone: StockTone = p.stock_status === 'Out of Stock' ? 'out' : p.stock_status === 'Low Stock' ? 'low' : 'ok'
+  return { label: `${p.stock_status}${units}`, tone }
+}
+
+function fmtStock(input: unknown): { label: string; tone: StockTone } {
   const n = parseNumber(input)
   if (n == null) return { label: 'Stock —', tone: 'unknown' }
   if (n <= 0) return { label: 'Out of stock', tone: 'out' }
@@ -85,6 +96,9 @@ interface ProductGridBlock extends BaseBlock {
     sku?: string
     price?: string | number
     image_url?: string | null
+    stock_status?: string | null
+    inventory_qty?: number | string | null
+    /** Older saved chats: units on hand under the old name. */
     stock?: number | string
     subtitle?: string
   }[]
@@ -274,7 +288,7 @@ function renderBlock(
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {b.products.map(p => {
-            const stockInfo = fmtStock(p.stock)
+            const stockInfo = fmtStockStatus(p)
             return (
               <Link
                 key={p.id}
