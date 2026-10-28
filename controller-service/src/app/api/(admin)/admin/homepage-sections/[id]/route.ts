@@ -3,8 +3,7 @@ import { authenticateAdmin, type AdminJWTPayload } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
-import { applyDraftPatch, endsBeforeStart, homepageLockFrom, withHomepageDraft, type DraftSection } from '@/lib/catalog/homepage-draft'
-import { lockedOr } from '@/lib/admin/draft-locks'
+import { applyDraftPatch, endsBeforeStart, homepageLockFrom, withHomepageDraft, type DraftSection, homepageDraftIdFrom, homepageDraftOr, noHomepageDraft } from '@/lib/catalog/homepage-draft'
 import { getHomepagePlan, homepagePlanRefusal } from '@/lib/catalog/homepage-plan'
 import { rowAudience } from '@/lib/catalog/homepage-sections'
 
@@ -64,7 +63,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
   const plan = await getHomepagePlan()
-  const outcome = await withHomepageDraft<PatchOutcome>(admin.adminId, draft => {
+  const draftId = homepageDraftIdFrom(request)
+  if (!draftId) return noHomepageDraft()
+  const outcome = await withHomepageDraft<PatchOutcome>(draftId, admin.adminId, draft => {
     const section = draft.sections.find(s => s.id === id)
     if (!section) return { error: 'Not found', status: 404 }
     // Removing is still allowed, so a plan change never strands a section.
@@ -76,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     applyDraftPatch(section, updates)
     return { section }
-  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
   if (outcome instanceof NextResponse) return outcome
   if ('error' in outcome) return NextResponse.json({ error: outcome.error }, { status: outcome.status })
 
@@ -88,9 +89,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (admin instanceof NextResponse) return admin
   const { id } = await params
 
-  const saved = await withHomepageDraft(admin.adminId, draft => {
+  const draftId = homepageDraftIdFrom(request)
+  if (!draftId) return noHomepageDraft()
+  const saved = await withHomepageDraft(draftId, admin.adminId, draft => {
     draft.sections = draft.sections.filter(s => s.id !== id)
-  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
   if (saved instanceof NextResponse) return saved
   return NextResponse.json({ success: true })
 }

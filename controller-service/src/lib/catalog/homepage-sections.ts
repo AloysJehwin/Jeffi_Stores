@@ -103,6 +103,9 @@ export type HomepageSurface = 'web' | 'web_mobile' | 'app'
 
 export const HOMEPAGE_SURFACES: HomepageSurface[] = ['web', 'web_mobile', 'app']
 
+/** Which homepage draft an editor write targets (also accepted as `?draft=`). */
+export const HOMEPAGE_DRAFT_HEADER = 'x-homepage-draft'
+
 /** The page a section is on: the homepage, or between products on a listing (every category shares one, as does every brand). */
 export type HomepagePage = 'home' | 'products' | 'category' | 'brand'
 

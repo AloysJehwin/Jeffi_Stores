@@ -26,8 +26,10 @@ import {
   nextDisplayOrderOn,
   withHomepageDraft,
   type DraftSection,
+  homepageDraftIdFrom,
+  homepageDraftOr,
+  noHomepageDraft,
 } from '@/lib/catalog/homepage-draft'
-import { lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +45,7 @@ async function guard(request: NextRequest): Promise<AdminJWTPayload | NextRespon
 export async function GET(request: NextRequest) {
   const admin = await guard(request)
   if (admin instanceof NextResponse) return admin
-  const { sections } = await getEditableHomepage()
+  const { sections } = await getEditableHomepage(homepageDraftIdFrom(request))
   return NextResponse.json({ sections })
 }
 
@@ -91,7 +93,9 @@ export async function POST(request: NextRequest) {
     page === 'home' || d.config?.placement
       ? (d.config ?? {})
       : { ...d.config, placement: { after: PLACEMENT_DEFAULT_AFTER } }
-  const section = await withHomepageDraft(admin.adminId, draft => {
+  const draftId = homepageDraftIdFrom(request)
+  if (!draftId) return noHomepageDraft()
+  const section = await withHomepageDraft(draftId, admin.adminId, draft => {
     const now = new Date().toISOString()
     const row: DraftSection = {
       id: randomUUID(),
@@ -114,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
     draft.sections.push(row)
     return row
-  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
   if (section instanceof NextResponse) return section
 
   return NextResponse.json({ section })
@@ -128,9 +132,11 @@ export async function PATCH(request: NextRequest) {
   const order: string[] = Array.isArray(body?.order) ? body.order : []
   if (order.length === 0) return NextResponse.json({ error: 'order[] required' }, { status: 400 })
 
-  const saved = await withHomepageDraft(admin.adminId, draft => {
+  const draftId = homepageDraftIdFrom(request)
+  if (!draftId) return noHomepageDraft()
+  const saved = await withHomepageDraft(draftId, admin.adminId, draft => {
     draft.sections = applyDraftOrder(draft.sections, order)
-  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
   if (saved instanceof NextResponse) return saved
 
   return NextResponse.json({ success: true })

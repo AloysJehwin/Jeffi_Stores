@@ -5,24 +5,26 @@ import { useToast } from '@/contexts/ToastContext'
 import { useDraftLock, type UseDraftLockResult } from '@/hooks/useDraftLock'
 import { lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
 import { DraftLockBanner } from '@/components/admin/kit'
+import { HOMEPAGE_DRAFT_HEADER } from '@/lib/catalog/homepage-sections'
 
-// The homepage draft is a singleton with one lock, shared by the section manager, the hero
-// editor and the footer. The lock fetches stay in useDraftLock.
+// The homepage draft being edited (each draft has its own lock), shared by the section manager,
+// the hero editor and the footer. No draft = the live homepage, read-only. The lock fetches stay
+// in useDraftLock.
 
-const Ctx = createContext<{ lock: UseDraftLockResult; lockId: string } | null>(null)
+const Ctx = createContext<{ lock: UseDraftLockResult; lockId: string | null } | null>(null)
 
-export function HomepageLockProvider({ lockId, initial, children }: { lockId: string; initial?: DraftLockState | null; children: ReactNode }) {
-  const lock = useDraftLock({ resourceType: 'homepage', resourceId: lockId, initial })
-  const value = useMemo(() => ({ lock, lockId }), [lock, lockId])
+export function HomepageLockProvider({ draftId, initial, children }: { draftId: string | null; initial?: DraftLockState | null; children: ReactNode }) {
+  const lock = useDraftLock({ resourceType: 'homepage', resourceId: draftId, initial })
+  const value = useMemo(() => ({ lock, lockId: draftId }), [lock, draftId])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 export interface HomepageLock {
   lock: UseDraftLockResult | null
   lockId: string | null
-  /** Someone else holds the draft. */
+  /** No draft open, or someone else holds it. */
   readOnly: boolean
-  /** Epoch header for every draft write. */
+  /** Draft id + epoch headers for every draft write. */
   headers: () => Record<string, string>
   /** On a 423: toast, drop to read-only and return true. */
   locked: (res: Response) => Promise<boolean>
@@ -33,7 +35,10 @@ export function useHomepageLock(): HomepageLock {
   const { showToast } = useToast()
   const lock = ctx?.lock ?? null
   const lockId = ctx?.lockId ?? null
-  const headers = useCallback(() => (lockId ? lockHeaders('homepage', lockId) : {}), [lockId])
+  const headers = useCallback(
+    (): Record<string, string> => (lockId ? { ...lockHeaders('homepage', lockId), [HOMEPAGE_DRAFT_HEADER]: lockId } : {}),
+    [lockId]
+  )
   const locked = useCallback(
     async (res: Response) => {
       if (res.status !== 423) return false
@@ -44,11 +49,12 @@ export function useHomepageLock(): HomepageLock {
     },
     [lock, showToast]
   )
-  return useMemo(() => ({ lock, lockId, readOnly: !!lock?.readOnly, headers, locked }), [lock, lockId, headers, locked])
+  const readOnly = !!ctx && (!lockId || !!lock?.readOnly)
+  return useMemo(() => ({ lock, lockId, readOnly, headers, locked }), [lock, lockId, readOnly, headers, locked])
 }
 
 /** Who holds the homepage draft, who is looking, and the lock actions. */
 export function HomepageLockBanner() {
   const ctx = useContext(Ctx)
-  return ctx ? <DraftLockBanner lock={ctx.lock} scope="settings:write" /> : null
+  return ctx?.lockId ? <DraftLockBanner lock={ctx.lock} scope="settings:write" /> : null
 }

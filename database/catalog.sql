@@ -739,12 +739,18 @@ CREATE TABLE public.homepage_sections (
 
 
 --
--- Name: homepage_drafts; Type: TABLE; Schema: public; Owner: -
--- Single-row unpublished copy of homepage_sections + hero_slides; Publish copies it to the live tables.
+-- Name: homepage_draft_branches; Type: TABLE; Schema: public; Owner: -
+-- Unpublished copies of homepage_sections + hero_slides, several at once. Publish merges one into
+-- the live tables (three-way, per row id) against `base`, the live it started from.
 --
 
-CREATE TABLE public.homepage_drafts (
-    id boolean DEFAULT true NOT NULL,
+CREATE TABLE public.homepage_draft_branches (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    homepage_id uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid NOT NULL,
+    author_admin_id uuid,
+    title character varying(120),
+    base jsonb,
+    base_revision integer DEFAULT 0 NOT NULL,
     sections jsonb DEFAULT '[]'::jsonb NOT NULL,
     hero_slides jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_by uuid,

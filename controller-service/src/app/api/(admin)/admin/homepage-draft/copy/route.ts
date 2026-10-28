@@ -12,8 +12,7 @@ import {
   type HomepageSurface,
 } from '@/lib/catalog/homepage-sections'
 import { getHomepagePlan, homepagePlanRefusal } from '@/lib/catalog/homepage-plan'
-import { copySurfaceLayout, homepageLockFrom, SurfaceNotEmpty, withHomepageDraft } from '@/lib/catalog/homepage-draft'
-import { draftLockResponse } from '@/lib/admin/draft-locks'
+import { copySurfaceLayout, homepageLockFrom, SurfaceNotEmpty, withHomepageDraft, homepageDraftIdFrom, homepageDraftOr, noHomepageDraft } from '@/lib/catalog/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,7 +51,10 @@ export async function POST(request: NextRequest) {
   if (refused) return NextResponse.json({ error: refused }, { status: 403 })
 
   try {
+    const draftId = homepageDraftIdFrom(request)
+    if (!draftId) return noHomepageDraft()
     const copied = await withHomepageDraft(
+      draftId,
       admin.adminId,
       draft =>
         copySurfaceLayout(draft, from as HomepageSurface, to as HomepageSurface, {
@@ -65,11 +67,9 @@ export async function POST(request: NextRequest) {
     )
     return NextResponse.json({ copied })
   } catch (err) {
-    const locked = draftLockResponse(err)
-    if (locked) return locked
     if (err instanceof SurfaceNotEmpty) {
       return NextResponse.json({ error: 'That layout already has its own sections or slides', code: 'not_empty' }, { status: 409 })
     }
-    throw err
+    return homepageDraftOr(err)
   }
 }

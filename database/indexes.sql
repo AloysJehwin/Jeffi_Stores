@@ -2511,6 +2511,7 @@ CREATE INDEX IF NOT EXISTS idx_category_drafts_category ON public.category_draft
 CREATE INDEX IF NOT EXISTS idx_product_drafts_product ON public.product_drafts USING btree (product_id);
 CREATE INDEX IF NOT EXISTS idx_supplier_drafts_supplier ON public.supplier_drafts USING btree (supplier_id);
 CREATE INDEX IF NOT EXISTS idx_coupon_drafts_coupon ON public.coupon_drafts USING btree (coupon_id);
+CREATE INDEX IF NOT EXISTS idx_homepage_draft_branches_updated ON public.homepage_draft_branches USING btree (updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_review_form_drafts_form ON public.review_form_drafts USING btree (form_id);
 CREATE INDEX IF NOT EXISTS idx_offer_drafts_offer ON public.offer_drafts USING btree (offer_id);
 CREATE INDEX IF NOT EXISTS idx_entity_revisions_resource ON public.entity_revisions USING btree (resource_type, resource_id, revision DESC);

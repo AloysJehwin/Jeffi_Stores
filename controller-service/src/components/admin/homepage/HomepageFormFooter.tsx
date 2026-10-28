@@ -9,6 +9,8 @@ import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { Badge, FormButton, FormFooter } from '@/components/admin/kit'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import type { DraftDiff, HomepageDraftSummary } from '@/lib/catalog/homepage-draft'
+import type { MergeConflict } from '@/lib/admin/draft-merge'
+import MergeDialog from '@/components/admin/drafts/MergeDialog'
 import { HOMEPAGE_DRAFT_CHANGED } from './draft-events'
 import { useHomepageLock } from './HomepageLock'
 
@@ -25,19 +27,20 @@ function touchedSurfaces(summary: HomepageDraftSummary): string {
 }
 
 interface Props {
+  draftId: string
   initialSummary: HomepageDraftSummary
   cancelHref: string
-  /** Server action that resnapshots the admin's open homepage session so Cancel reverts to A2. */
-  resnapshotAction: () => Promise<void>
+  /** The live homepage view, where publish and discard land. */
+  liveHref: string
+  /** Server action that resnapshots the admin's open session on the draft so Cancel reverts to A2. */
+  resnapshotAction: (draftId: string) => Promise<void>
 }
 
-// One shared bottom bar for the homepage editor. Replaces HomepageDraftBar (top
-// sticky) and HomepageEditorToolbar (header-right). Every section/slide change
-// autosaves to homepage_drafts via the sections API; this bar surfaces the
-// autosave status pill, Draft pending badge, Discard draft, Cancel (rolls draft
-// back to session snapshot), Save as Draft (resnapshots so Cancel reverts here)
-// and Update & Publish.
-export default function HomepageFormFooter({ initialSummary, cancelHref, resnapshotAction }: Props) {
+// The homepage editor's only action bar. Every section/slide change autosaves to the open draft
+// via the sections API; this bar shows the autosave pill and Draft pending badge, and owns Discard,
+// Cancel (rolls the draft back to the session snapshot), Save as Draft (resnapshots so Cancel
+// reverts here) and Publish (merges the draft into live; overlapping edits open the merge dialog).
+export default function HomepageFormFooter({ draftId, initialSummary, cancelHref, liveHref, resnapshotAction }: Props) {
   const router = useRouter()
   const { showToast, showConfirm } = useToast()
   // The session opens only for the lock holder (or on an unclaimed draft, which claims it).
@@ -46,15 +49,17 @@ export default function HomepageFormFooter({ initialSummary, cancelHref, resnaps
   const [summary, setSummary] = useState(initialSummary)
   const [autosave, setAutosave] = useState<AutosaveStatus>('idle')
   const [busy, setBusy] = useState<'publish' | 'discard' | 'draft' | null>(null)
+  const [conflicts, setConflicts] = useState<MergeConflict[] | null>(null)
+  const publishPath = `/api/admin/homepage-draft/publish?draft=${draftId}`
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autosaveBlockedRef = useRef(false)
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/homepage-draft', { credentials: 'include', cache: 'no-store' })
+      const res = await fetch(`/api/admin/homepage-draft?draft=${draftId}`, { credentials: 'include', cache: 'no-store' })
       if (res.ok) setSummary(await res.json())
     } catch {}
-  }, [])
+  }, [draftId])
 
   // Each successful section/slide write dispatches HOMEPAGE_DRAFT_CHANGED. Reflect
   // that as a brief "Saved" flash and refresh the diff summary. Autosave itself
@@ -79,8 +84,8 @@ export default function HomepageFormFooter({ initialSummary, cancelHref, resnaps
 
   async function handleDiscard() {
     const ok = await showConfirm({
-      title: 'Discard the draft?',
-      message: 'All unpublished homepage changes will be thrown away. The live homepage stays as it is.',
+      title: 'Discard this draft?',
+      message: 'Its unpublished homepage changes will be thrown away. The live homepage and other drafts stay as they are.',
       confirmText: 'Discard',
       type: 'danger',
     })
@@ -97,7 +102,8 @@ export default function HomepageFormFooter({ initialSummary, cancelHref, resnaps
       }
       // Close the session now that the draft is gone — no snapshot to roll back to.
       if (edit.sessionId) await edit.save()
-      window.location.reload()
+      router.push(liveHref)
+      router.refresh()
     } catch {
       autosaveBlockedRef.current = false
       showToast('Failed to discard the draft', 'error')
@@ -105,10 +111,18 @@ export default function HomepageFormFooter({ initialSummary, cancelHref, resnaps
     }
   }
 
+  async function published() {
+    // The draft is merged and gone: close the session and show the live homepage.
+    if (edit.sessionId) await edit.save()
+    showToast('Published - the homepage is live', 'success')
+    router.push(liveHref)
+    router.refresh()
+  }
+
   async function handlePublish() {
     const ok = await showConfirm({
-      title: 'Publish the homepage?',
-      message: `Every draft change goes live at once${touched ? ` on the ${touched}` : ''}.`,
+      title: 'Publish this draft?',
+      message: `Its changes go live at once${touched ? ` on the ${touched}` : ''}. Changes others published meanwhile are kept.`,
       confirmText: 'Publish',
       type: 'info',
     })
@@ -116,10 +130,11 @@ export default function HomepageFormFooter({ initialSummary, cancelHref, resnaps
     autosaveBlockedRef.current = true
     setBusy('publish')
     try {
-      const res = await fetch('/api/admin/homepage-draft/publish', {
+      const res = await fetch(publishPath, {
         method: 'POST',
         credentials: 'include',
-        headers: homepage.headers(),
+        headers: { 'Content-Type': 'application/json', ...homepage.headers() },
+        body: '{}',
       })
       if (await homepage.locked(res)) {
         autosaveBlockedRef.current = false
@@ -127,22 +142,19 @@ export default function HomepageFormFooter({ initialSummary, cancelHref, resnaps
         return
       }
       const data = await res.json().catch(() => ({}))
+      if (res.status === 409 && data.code === 'DRAFT_CONFLICT') {
+        autosaveBlockedRef.current = false
+        setBusy(null)
+        setConflicts(data.conflicts ?? [])
+        return
+      }
       if (!res.ok) {
         autosaveBlockedRef.current = false
         showToast(data.error || 'Publish failed', 'error')
         setBusy(null)
         return
       }
-      // Stay on the editor: close this session and start a new one so Cancel reverts to the published state.
-      if (edit.sessionId) await edit.save()
-      await edit.reopen()
-      // Publish closed the lock and reopening took it again: pick up the new epoch before the next write.
-      await homepage.lock?.refresh()
-      await refresh()
-      autosaveBlockedRef.current = false
-      setBusy(null)
-      showToast('Published - the homepage is live', 'success')
-      router.refresh()
+      await published()
     } catch {
       autosaveBlockedRef.current = false
       showToast('Publish failed', 'error')
@@ -155,7 +167,7 @@ export default function HomepageFormFooter({ initialSummary, cancelHref, resnaps
     try {
       // The draft row is already live via section/slide autosaves. Resnapshot the
       // open session so Cancel reverts to this exact state (A2), not A1.
-      await resnapshotAction()
+      await resnapshotAction(draftId)
       showToast('Draft saved - Cancel will revert to this point', 'success')
     } catch {
       showToast('Failed to save draft', 'error')
@@ -176,6 +188,19 @@ export default function HomepageFormFooter({ initialSummary, cancelHref, resnaps
   }
 
   return (
+    <>
+    {conflicts && (
+      <MergeDialog
+        open
+        conflicts={conflicts}
+        publishPath={publishPath}
+        onClose={() => setConflicts(null)}
+        onDone={() => {
+          setConflicts(null)
+          void published()
+        }}
+      />
+    )}
     <FormFooter
       sticky
       lock={homepage.lock}
@@ -195,9 +220,10 @@ export default function HomepageFormFooter({ initialSummary, cancelHref, resnaps
           {busy === 'draft' ? 'Saving...' : 'Save as Draft'}
         </FormButton>
         <FormButton type="button" disabled={busy !== null || !pending} onClick={handlePublish}>
-          {busy === 'publish' ? 'Publishing...' : 'Update & Publish'}
+          {busy === 'publish' ? 'Publishing...' : 'Publish'}
         </FormButton>
       </RequireWrite>
     </FormFooter>
+    </>
   )
 }

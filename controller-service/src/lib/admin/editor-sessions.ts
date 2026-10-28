@@ -155,9 +155,9 @@ export async function snapshotResource(
       }
     }
     case 'homepage': {
-      // Singleton draft (homepage_drafts.id = true); resourceId is HOMEPAGE_LOCK_ID.
       const row = await queryOne<{ sections: unknown; hero_slides: unknown; updated_at: string }>(
-        `SELECT sections, hero_slides, updated_at FROM homepage_drafts WHERE id = true`
+        `SELECT sections, hero_slides, updated_at FROM homepage_draft_branches WHERE id = $1`,
+        [resourceId]
       )
       if (!row) return { snapshot: { kind: 'none' }, updatedAt: null }
       return {
@@ -377,23 +377,19 @@ export async function restoreSnapshot(
       return
     }
     case 'homepage': {
-      // Singleton: upsert the draft row back to the snapshot shape, or delete it if there was none.
+      // Put the draft back to the snapshot, or drop it if there was none.
       const kind = (snapshot as { kind?: string }).kind
       if (kind === 'edit') {
         const sections = (snapshot as { sections: unknown }).sections
         const heroSlides = (snapshot as { hero_slides: unknown }).hero_slides
         await client.query(
-          `INSERT INTO homepage_drafts (id, sections, hero_slides, updated_by, updated_at)
-             VALUES (true, $1::jsonb, $2::jsonb, $3::uuid, now())
-           ON CONFLICT (id) DO UPDATE
-             SET sections = EXCLUDED.sections,
-                 hero_slides = EXCLUDED.hero_slides,
-                 updated_by = EXCLUDED.updated_by,
-                 updated_at = now()`,
-          [JSON.stringify(sections ?? []), JSON.stringify(heroSlides ?? []), adminId ?? resourceId]
+          `UPDATE homepage_draft_branches
+              SET sections = $1::jsonb, hero_slides = $2::jsonb, updated_by = $3::uuid, updated_at = now()
+            WHERE id = $4`,
+          [JSON.stringify(sections ?? []), JSON.stringify(heroSlides ?? []), adminId ?? null, resourceId]
         )
       } else {
-        await client.query(`DELETE FROM homepage_drafts WHERE id = true`)
+        await client.query(`DELETE FROM homepage_draft_branches WHERE id = $1`, [resourceId])
       }
       return
     }

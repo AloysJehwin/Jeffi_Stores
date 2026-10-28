@@ -15,7 +15,7 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import type { DraftLockChip } from '@/lib/client/draft-lock-client'
 import { publishLockEvent, type LockEventType } from './draft-lock-events'
 
-export { HOMEPAGE_LOCK_ID, DRAFT_RESOURCES, isDraftResourceType, isDraftLockError } from '@jeffi/draft-locks'
+export { HOMEPAGE_ENTITY_ID, DRAFT_RESOURCES, isDraftResourceType, isDraftLockError } from '@jeffi/draft-locks'
 export type { DraftLock, DraftResourceType } from '@jeffi/draft-locks'
 export type { DraftLockChip } from '@/lib/client/draft-lock-client'
 
