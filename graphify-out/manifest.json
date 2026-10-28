@@ -905,8 +905,8 @@
     "semantic_hash": ""
   },
   "tests/lib/ai-client.test.ts": {
-    "mtime": 1792943293.4475815,
-    "ast_hash": "8c8fccb00ffb7724446f96beb32b9a34",
+    "mtime": 1793213879.8335464,
+    "ast_hash": "87a00a007d5fef23be2c727dd6f5236b",
     "semantic_hash": ""
   },
   "tests/lib/ai-feedback.test.ts": {
@@ -2330,8 +2330,8 @@
     "semantic_hash": ""
   },
   "ai-platform/gateway/src/server.ts": {
-    "mtime": 1793176120.315014,
-    "ast_hash": "e26f1bda4fbc7ea7837a87a68622bd7d",
+    "mtime": 1793213184.3084579,
+    "ast_hash": "d19c5ef4b81d88f714c4273f39b43bbc",
     "semantic_hash": ""
   },
   "ai-platform/gateway/tsconfig.json": {
@@ -2370,8 +2370,8 @@
     "semantic_hash": ""
   },
   "ai-platform/sdk/types.ts": {
-    "mtime": 1793176120.310064,
-    "ast_hash": "9a90a10d6be8c662934418120ba69d38",
+    "mtime": 1793213184.309362,
+    "ast_hash": "0eb67f1286965386524f14819fdf78f6",
     "semantic_hash": ""
   },
   ".claude/plans/issues-draft.md": {
@@ -14890,8 +14890,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/ai-client.ts": {
-    "mtime": 1793176120.427611,
-    "ast_hash": "68229128f17275529ae8870924a2d3b8",
+    "mtime": 1793213901.6712863,
+    "ast_hash": "ae018908d1eb2bf1836ab17b65224903",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/ai-direct-ollama.ts": {
@@ -19090,8 +19090,8 @@
     "semantic_hash": ""
   },
   "ai-platform/gateway/src/media.ts": {
-    "mtime": 1793175101.3653638,
-    "ast_hash": "90c6039251fcd37f4c9e0ff7b5a78e91",
+    "mtime": 1793213184.3074133,
+    "ast_hash": "40c77db06f4074e47825e5b4f4f09d36",
     "semantic_hash": ""
   },
   "ai-platform/gateway/src/pricing.ts": {
