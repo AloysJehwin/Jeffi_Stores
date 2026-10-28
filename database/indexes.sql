@@ -455,6 +455,13 @@ CREATE UNIQUE INDEX reward_game_plays_game_user_period_key ON public.reward_game
 CREATE INDEX idx_custom_scenarios_enabled ON public.custom_scenarios USING btree (enabled) WHERE (enabled = true);
 
 
+--
+-- Name: idx_scenario_drafts_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_scenario_drafts_admin ON public.scenario_drafts USING btree (admin_id, updated_at DESC);
+
+
 
 --
 -- Name: idx_customer_activity_kind; Type: INDEX; Schema: public; Owner: -

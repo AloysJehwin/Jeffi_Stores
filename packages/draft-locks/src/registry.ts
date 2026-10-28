@@ -19,6 +19,7 @@ export type DraftResourceType =
   | 'po_new'
   | 'po_receive'
   | 'cash_sale'
+  | 'scenario'
 
 /** The homepage is one entity with no row of its own; its drafts and revisions use the nil uuid. */
 export const HOMEPAGE_ENTITY_ID = '00000000-0000-0000-0000-000000000000'
@@ -179,6 +180,17 @@ export const DRAFT_RESOURCES: Record<DraftResourceType, DraftResourceDef> = {
                  FROM cash_sale_drafts WHERE id = ANY($1::uuid[])`,
     hintSql: `SELECT admin_id FROM cash_sale_drafts WHERE id = $1`,
     editHref: id => `/admin/cash-sale?draft=${id}`,
+  },
+  scenario: {
+    label: 'Scenario',
+    writeScope: 'campaigns:write',
+    readScope: 'campaigns:read',
+    existsSql: `SELECT 1 FROM scenario_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM scenario_drafts`,
+    labelSql: `SELECT id, ('New scenario · ' || COALESCE(NULLIF(title, ''), NULLIF(fields->>'name', ''), 'untitled'))::text AS label, NULL::text AS ref
+                 FROM scenario_drafts WHERE id = ANY($1::uuid[])`,
+    hintSql: `SELECT admin_id FROM scenario_drafts WHERE id = $1`,
+    editHref: id => `/admin/campaigns/scenarios/new?draft=${id}`,
   },
 }
 

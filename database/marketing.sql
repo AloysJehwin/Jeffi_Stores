@@ -238,6 +238,20 @@ CREATE TABLE public.custom_scenarios (
 
 
 --
+-- Name: scenario_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.scenario_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid NOT NULL,
+    title character varying(128),
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: template_variables; Type: TABLE; Schema: public; Owner: -
 --
 

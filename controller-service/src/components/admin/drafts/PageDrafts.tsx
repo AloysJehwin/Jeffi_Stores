@@ -10,7 +10,7 @@ import { useDraftCounts, useDraftsList, type DraftListItem, type DraftsScope } f
 import { timeAgo } from '@/lib/client/draft-lock-client'
 import { DataTable, DraftLockBadge, HandoverDialog, TakeoverDialog, Tabs, useActionToast, useListSort, type DataCol } from '@/components/admin/kit'
 
-// A list page's Drafts tab (one draft type), with claim / hand over / take over / request.
+// A list page's Drafts tab (one draft type, or a comma list with a Type column), with claim / hand over / take over / request.
 
 const SORT_NS = 'drafts'
 
@@ -148,6 +148,9 @@ function DraftsTable({ type, scope, onChanged }: { type: string; scope: DraftsSc
   )
   const cols: DataCol<DraftListItem>[] = [
     { key: 'entity', label: 'Draft', sortParam: 'label', render: entity },
+    ...(type.includes(',')
+      ? [{ key: 'type', label: 'Type', hideBelow: 'md' as const, render: (r: DraftListItem) => <span className="text-foreground-secondary">{r.typeLabel}</span> }]
+      : []),
     { key: 'owner', label: 'Owner', sortParam: 'owner', render: r => <Owner r={r} /> },
     {
       key: 'started',
