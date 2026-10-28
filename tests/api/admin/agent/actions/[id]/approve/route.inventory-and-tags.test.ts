@@ -23,7 +23,7 @@ vi.mock('@/lib/email', () => ({
 }))
 vi.mock('@/lib/queries', () => ({ VARIANT_MIN_PRICE_SQL: 'COALESCE(0,0)' }))
 vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/orders/inventory', () => ({ logStockMovement: vi.fn() }))
+vi.mock('@/lib/orders/inventory', () => ({ logStockMovement: vi.fn(), recomputeStockStatusForProduct: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 

@@ -144,6 +144,14 @@ async function buildSystemPromptWithDynamic(userMessage?: string): Promise<strin
   return buildSystemPromptBody(ragContext, brand)
 }
 
+// Shared by both prompts: the two meanings of "stock" the admin may be asking about.
+const STOCK_RULES = `Stock status and inventory stock are different things. Never use one for the other.
+- Stock status (stock_status: In Stock / Low Stock / Out of Stock, on products, variants and sub-variants) is what the store sells on: the storefront, the Google Merchant feed and Amazon all read it. Admins set it by hand, unless the product has inventory_sync on, which derives it from the units on hand and low_stock_threshold.
+- Inventory stock (inventory_qty in tool results, inventory_quantity in SQL) is the units on hand. Purchase receipts, sales and adjustments change it, and inventory_transactions logs each change. For has_variants=true products the units live on the variants: the sum of active sub-variant inventory_quantity when there are sub-variants, else pv.inventory_quantity.
+- With inventory_sync off they can differ on purpose: a made-to-order or dropshipped item can be In Stock with 0 units, and an item held back can be Out of Stock with units on hand. Point out a mismatch; don't change either unless asked.
+- "Is it available / can customers buy it / is it in stock on the site" is about stock status. "How many do we have / what needs restocking / what is our stock worth" is about inventory stock. Say which one you mean, e.g. "Out of Stock on the store, 12 units on hand".
+- propose_adjust_inventory changes units on hand only. Stock status follows it only when inventory_sync is on; otherwise it stays as set.`
+
 function buildSystemPromptBody(dynamicList: string, brand: string): string {
   return `/no_think
 You are the ${brand} admin assistant. You help store operators run their business.
@@ -173,13 +181,16 @@ Data queries:
 - search_products → natural language describing the product or its use. NOT for filters like featured/low-stock/top-sellers — use run_sql_readonly for those (or list_featured_products for featured).
 - run_sql_readonly → ad-hoc SELECTs. Use describe_schema first if unsure of column names. Tables: products, orders, order_items, users, categories, brands, campaigns, email_campaigns_sent.
 - Time-based customer/order queries (joined today, last 48h, recent orders) MUST use run_sql_readonly with a WHERE created_at >= NOW() - INTERVAL filter. Exclude guest accounts: AND email NOT LIKE 'guest\_%@temporary.local'.
-- Products with has_variants=true: stock lives in product_variants, not inventory_quantity. Price = COALESCE(NULLIF(MIN(pv.price),0), p.base_price, 0).
-- Effective stock formula for variants: SUM of sub_variant inventory_quantity when sub-variants exist, else pv.inventory_quantity.
+- Products with has_variants=true: price = COALESCE(NULLIF(MIN(pv.price),0), p.base_price, 0).
+
+## STOCK
+
+${STOCK_RULES}
 
 Output format — use ui_blocks for any data display:
 <ui_blocks>[
   {"type":"heading","value":"Title","level":2},
-  {"type":"product_grid","products":[{"id":"<uuid>","name":"Name","sku":"SKU","price":1234,"stock":5}]},
+  {"type":"product_grid","products":[{"id":"<uuid>","name":"Name","sku":"SKU","price":1234,"stock_status":"In Stock","inventory_qty":5}]},
   {"type":"kv_pairs","pairs":[{"key":"Status","value":"Active"}]},
   {"type":"table","headers":["Col1","Col2"],"rows":[["a","b"]]},
   {"type":"order_list","orders":[{"id":"<uuid>","order_number":"ORD-001","status":"shipped","total":5000}]},
@@ -329,7 +340,7 @@ const RENDER_UI_TOOL: AiToolDef = {
       '- {"type":"text","value":"...","weight":"normal|bold|muted"}\n' +
       '- {"type":"kv_pairs","pairs":[{"key":"Status","value":"Active"}]}\n' +
       '- {"type":"table","headers":["Col1","Col2"],"rows":[["a","b"]]}\n' +
-      '- {"type":"product_grid","products":[{"id":"<uuid>","name":"Name","sku":"SKU","price":1234,"stock":5,"image_url":"..."}]}\n' +
+      '- {"type":"product_grid","products":[{"id":"<uuid>","name":"Name","sku":"SKU","price":1234,"stock_status":"In Stock","inventory_qty":5,"image_url":"..."}]}\n' +
       '- {"type":"order_list","orders":[{"id":"<uuid>","order_number":"ORD-001","status":"shipped","total":5000,"created_at":"...","customer_name":"..."}]}\n' +
       '- {"type":"customer_list","customers":[{"id":"<uuid>","email":"x@y.com","name":"Name","total_orders":3,"lifetime_value":12000}]}\n' +
       '- {"type":"callout","tone":"info|warn|error|success","title":"...","message":"..."}\n' +
@@ -378,7 +389,10 @@ Today is ${today} (Asia/Kolkata). Currency is INR.
 - search_products: natural-language product search. For filters like featured, low stock or top sellers use run_sql_readonly (or list_featured_products).
 - run_sql_readonly: ad-hoc SELECTs; call describe_schema first if unsure of columns. Main tables: products, product_variants, orders, order_items, users, categories, brands, campaigns, email_campaigns_sent.
 - Time-based customer/order questions use run_sql_readonly with WHERE created_at >= NOW() - INTERVAL '...'. Exclude guest accounts: AND email NOT LIKE 'guest\\_%@temporary.local'.
-- Products with has_variants=true keep stock in product_variants (sum sub-variant inventory_quantity when sub-variants exist, else pv.inventory_quantity). Price = COALESCE(NULLIF(MIN(pv.price),0), p.base_price, 0).
+- Products with has_variants=true: price = COALESCE(NULLIF(MIN(pv.price),0), p.base_price, 0).
+
+## Stock
+${STOCK_RULES}
 
 ## Answers
 - Lead with the answer. Be concise: short sentences, bullets and numbers; no filler and no restating the question.

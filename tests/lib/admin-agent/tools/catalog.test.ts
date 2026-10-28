@@ -260,7 +260,7 @@ describe('admin-agent/tools/catalog', () => {
       const blocks = (result as any).ui_blocks as any[]
       const errBlock = blocks.find((b: any) => b.tone === 'error')
       expect(errBlock).toBeDefined()
-      expect(errBlock.title).toContain('Negative stock')
+      expect(errBlock.title).toContain('Negative inventory')
     })
 
     // Line 448: p.has_variants — variants info callout
@@ -471,8 +471,8 @@ describe('admin-agent/tools/catalog', () => {
 
     it('includes out-of-stock count in summary when some are out of stock', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'p1', name: 'Widget A', stock: 5 },
-        { id: 'p2', name: 'Widget B', stock: 0 },
+        { id: 'p1', name: 'Widget A', stock_status: 'In Stock', inventory_qty: 5 },
+        { id: 'p2', name: 'Widget B', stock_status: 'Out of Stock', inventory_qty: 0 },
       ])
       const result = (await getTool('list_featured_products').handler({})) as any
       expect(result.ok).toBe(true)

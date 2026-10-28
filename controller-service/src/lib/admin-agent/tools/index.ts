@@ -56,7 +56,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'search_products',
     description:
-      'Semantic product search over the catalog. Use for "find me X" / "products like Y" queries. Returns ranked candidates with current price + stock.',
+      'Semantic product search over the catalog. Use for "find me X" / "products like Y" queries. Returns ranked candidates with current price, stock_status (what the store sells on) and inventory_qty (units on hand).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -94,7 +94,7 @@ export const TOOLS: ToolDef[] = [
       const rows = await queryMany(
         `SELECT p.id::text, p.name, p.slug, p.sku,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)::float AS price,
-                ${EFFECTIVE_STOCK_SQL}::int AS stock,
+                p.stock_status, ${EFFECTIVE_STOCK_SQL}::int AS inventory_qty,
                 b.name AS brand, c.name AS category
          FROM products p LEFT JOIN brands b ON b.id = p.brand_id LEFT JOIN categories c ON c.id = p.category_id
          WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
@@ -119,7 +119,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'get_product',
-    description: 'Fetch full product details by id or slug.',
+    description:
+      'Fetch full product details by id or slug, including stock_status (what the store sells on), inventory_qty (units on hand) and inventory_sync (whether the status follows the units).',
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string' }, slug: { type: 'string' } },
@@ -131,7 +132,8 @@ export const TOOLS: ToolDef[] = [
         `SELECT p.id::text, p.name, p.slug, p.sku, p.short_description, p.description,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)::text AS price,
                 p.mrp::text AS mrp, p.gst_percentage,
-                (${EFFECTIVE_STOCK_SQL})::int AS stock, p.is_active, p.has_variants, p.hsn_code,
+                p.stock_status, (${EFFECTIVE_STOCK_SQL})::int AS inventory_qty, p.inventory_sync, p.low_stock_threshold,
+                p.is_active, p.has_variants, p.hsn_code,
                 b.name AS brand, c.name AS category
          FROM products p LEFT JOIN brands b ON b.id = p.brand_id LEFT JOIN categories c ON c.id = p.category_id
          WHERE p.id = $1::uuid OR p.slug = $2 LIMIT 1`,
@@ -142,7 +144,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'get_product_variants',
-    description: 'List variants for a product.',
+    description: 'List variants for a product, each with stock_status (what the store sells on) and inventory_qty (units on hand).',
     inputSchema: {
       type: 'object',
       properties: { productId: { type: 'string' } },
@@ -152,7 +154,7 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ productId }) => {
       const rows = await queryMany(
         `SELECT id::text, variant_name, sku, price::text, mrp::text,
-                stock_status, inventory_quantity, is_active
+                stock_status, inventory_quantity AS inventory_qty, is_active
          FROM product_variants WHERE product_id = $1::uuid ORDER BY variant_name`,
         [productId]
       )
@@ -189,7 +191,7 @@ export const TOOLS: ToolDef[] = [
       const out = await queryMany(
         `SELECT p.id::text, p.name, p.slug, p.sku,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.inventory_quantity AS stock
+                p.stock_status, ${EFFECTIVE_STOCK_SQL}::int AS inventory_qty
          FROM products p WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
         [ids]
       )
@@ -362,7 +364,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'get_low_stock_products',
     description:
-      'Products with effective stock at or below a threshold, sorted by 30-day sales volume descending. Handles variant products correctly.',
+      'Products whose units on hand (inventory_qty, rolled up over variants) are at or below a threshold, sorted by 30-day sales volume descending. For restocking. This filters on inventory, not stock status; each row also carries stock_status.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -376,7 +378,7 @@ export const TOOLS: ToolDef[] = [
       const t = clamp(typeof threshold === 'number' ? threshold : 10, 0, 1000)
       const rows = await queryMany(
         `SELECT p.id::text, p.name, p.sku,
-                (${EFFECTIVE_STOCK_SQL}) AS stock,
+                p.stock_status, (${EFFECTIVE_STOCK_SQL}) AS inventory_qty,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
                 b.name AS brand,
                 COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at >= NOW() - INTERVAL '30 days' AND o.payment_status = 'paid'), 0)::int AS sold_30d
@@ -385,7 +387,7 @@ export const TOOLS: ToolDef[] = [
          LEFT JOIN order_items oi ON oi.product_id = p.id
          LEFT JOIN orders o ON o.id = oi.order_id
          WHERE p.is_active = TRUE AND (${EFFECTIVE_STOCK_SQL}) <= $1
-         GROUP BY p.id, p.name, p.sku, p.base_price, p.inventory_quantity, p.has_variants, b.name
+         GROUP BY p.id, p.name, p.sku, p.base_price, p.inventory_quantity, p.has_variants, p.stock_status, b.name
          ORDER BY sold_30d DESC, (${EFFECTIVE_STOCK_SQL}) ASC LIMIT $2`,
         [t, lim]
       )
@@ -744,7 +746,7 @@ export const TOOLS: ToolDef[] = [
       const rows = await queryMany(
         `SELECT p.id::text, p.name, p.slug, p.sku,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.short_description, p.inventory_quantity AS stock,
+                p.short_description, p.stock_status, ${EFFECTIVE_STOCK_SQL}::int AS inventory_qty,
                 b.name AS brand, c.name AS category, p.created_at
            FROM products p
            LEFT JOIN brands b ON b.id = p.brand_id
