@@ -378,6 +378,21 @@ ALTER TABLE ONLY public.cash_sale_items
 
 
 --
+-- Name: cash_sale_drafts cash_sale_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cash_sale_drafts
+    ADD CONSTRAINT cash_sale_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.cash_sale_drafts
+    ADD CONSTRAINT cash_sale_drafts_payment_mode_check CHECK (((payment_mode)::text = ANY ((ARRAY['cash'::character varying, 'upi'::character varying, 'upi_qr'::character varying])::text[])));
+
+ALTER TABLE ONLY public.cash_sale_drafts
+    ADD CONSTRAINT cash_sale_drafts_items_check CHECK ((jsonb_typeof(items) = 'array'::text));
+
+
+
+--
 -- Name: cash_sales cash_sales_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 

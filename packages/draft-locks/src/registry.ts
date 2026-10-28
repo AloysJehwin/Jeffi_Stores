@@ -18,6 +18,7 @@ export type DraftResourceType =
   | 'purchase_order'
   | 'po_new'
   | 'po_receive'
+  | 'cash_sale'
 
 /** The homepage draft is a singleton row; its lock uses the nil uuid. */
 export const HOMEPAGE_LOCK_ID = '00000000-0000-0000-0000-000000000000'
@@ -166,6 +167,17 @@ export const DRAFT_RESOURCES: Record<DraftResourceType, DraftResourceDef> = {
     labelSql: `SELECT id, ('Receive ' || po_number)::text AS label, NULL::text AS ref FROM purchase_orders WHERE id = ANY($1::uuid[])`,
     hintSql: `SELECT admin_id FROM po_receive_drafts WHERE po_id = $1`,
     editHref: id => `/admin/purchase-orders?po=${id}`,
+  },
+  cash_sale: {
+    label: 'Held bill',
+    writeScope: 'invoices:write',
+    readScope: 'invoices:read',
+    existsSql: `SELECT 1 FROM cash_sale_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM cash_sale_drafts`,
+    labelSql: `SELECT id, (COALESCE(NULLIF(label, ''), 'Held bill') || ' · ' || jsonb_array_length(items) || ' item(s)')::text AS label, NULL::text AS ref
+                 FROM cash_sale_drafts WHERE id = ANY($1::uuid[])`,
+    hintSql: `SELECT admin_id FROM cash_sale_drafts WHERE id = $1`,
+    editHref: id => `/admin/cash-sale?draft=${id}`,
   },
 }
 
