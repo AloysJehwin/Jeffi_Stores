@@ -1,16 +1,21 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { productLabel, variantLabel } from '@/lib/catalog/product-label'
 import { round2 } from '@/lib/catalog/gst'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { FileText, ExternalLink, Plus, X } from 'lucide-react'
 import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, ListFilters, SortTh, TableSkeleton, badgeCls, fetchJson, useActionToast, useFilterQuery, useInfiniteList, useListSort, type SortCol, type StatusMap } from '@/components/admin/kit'
 import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
-import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem } from '@/components/admin/LineItemsSection'
+import LineItemsSection, { newLineItem, fetchSeedLineItem, isBlankLine, validateDraftLines, type LineItem } from '@/components/admin/LineItemsSection'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
+import { DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
+import { assertDraftResponse, lockHeaders } from '@/lib/client/draft-lock-client'
+import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import HoverCard from '@/components/ui/HoverCard'
 import RowActions from '@/components/admin/RowActions'
 import { ap } from '@/lib/shared/admin-path'
@@ -116,6 +121,7 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
   const confirm = useConfirm()
   const canWrite = useCanWrite('invoices')
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [view, setView] = useState<View>('list')
   useEffect(() => {
     onViewChange?.(view)
@@ -169,6 +175,196 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
       return next.length === prev.length ? prev : next
     })
   }, [items])
+
+  // A held bill: parked (no invoice number, no stock change) until Complete Sale.
+  const [heldId, setHeldId] = useState<string | null>(null)
+  const heldIdRef = useRef<string | null>(null)
+  heldIdRef.current = heldId
+  const [billLabel, setBillLabel] = useState('')
+  const [holding, setHolding] = useState(false)
+  // Hydrating writes nothing; completing stops autosave so it can't touch the removed bill.
+  const skipSaveRef = useRef(false)
+  const completingRef = useRef(false)
+
+  function billBody() {
+    return {
+      label: billLabel.trim() || null,
+      payment_mode: paymentMode as 'cash' | 'upi' | 'upi_qr',
+      notes: notes || null,
+      items: items.filter(it => !isBlankLine(it)),
+      assignments: { batches: batchAssignments, batch_labels: assignedBatchLabels, serials: serialAssignments },
+      total_estimate: calcTotals(items).subtotal,
+    }
+  }
+
+  const lock = useDraftLock({ resourceType: 'cash_sale', resourceId: heldId })
+  const autosave = useAutosaveDraft<ReturnType<typeof billBody>>({
+    save: async (body, signal) => {
+      const id = heldIdRef.current
+      if (!id) return
+      const res = await fetch(`/api/admin/invoices/cash-sale/drafts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('cash_sale', id) },
+        credentials: 'include',
+        signal,
+        body: JSON.stringify(body),
+      })
+      await assertDraftResponse(res, 'Could not save the held bill')
+    },
+    enabled: () => !!heldIdRef.current && !completingRef.current && !lock.readOnly,
+    onLocked: (_err, unsaved) => lock.markLocked(unsaved),
+  })
+  const triggerRef = useRef(autosave.trigger)
+  triggerRef.current = autosave.trigger
+  useEffect(() => {
+    if (!heldId || view !== 'new') return
+    if (skipSaveRef.current) {
+      skipSaveRef.current = false
+      return
+    }
+    triggerRef.current(billBody())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, paymentMode, notes, billLabel, batchAssignments, assignedBatchLabels, serialAssignments])
+
+  // Resuming claims the bill so other cashiers see it being rung up.
+  useEffect(() => {
+    if (heldId && lock.loaded && lock.claimable && !lock.isMine) void lock.claim()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heldId, lock.loaded, lock.claimable])
+
+  // ?draft=<id> resumes a held bill with today's stock levels.
+  useEffect(() => {
+    const id = searchParams.get('draft')
+    if (!id || id === heldIdRef.current) return
+    let cancelled = false
+    ;(async () => {
+      const res = await fetch(`/api/admin/invoices/cash-sale/drafts/${id}`, { credentials: 'include' })
+      const j = await res.json().catch(() => ({}))
+      if (cancelled) return
+      if (!res.ok || !j.draft) {
+        showToast(j.error || 'Could not open the held bill', 'error')
+        router.replace(ap('/admin/cash-sale?tab=drafts'))
+        return
+      }
+      const d = j.draft
+      const lines: LineItem[] = Array.isArray(d.items) && d.items.length ? d.items : [newLineItem()]
+      skipSaveRef.current = true
+      completingRef.current = false
+      setItems(lines)
+      setPaymentMode(d.payment_mode || 'cash')
+      setNotes(d.notes || '')
+      setBillLabel(d.label || '')
+      setBatchAssignments(d.assignments?.batches || {})
+      setAssignedBatchLabels(d.assignments?.batch_labels || {})
+      setSerialAssignments(d.assignments?.serials || [])
+      setHeldId(id)
+      setView('new')
+      const fresh = await Promise.all(
+        lines.map(it =>
+          it.product_id && !it.sub_variant_id ? fetchSeedLineItem(it.product_id, it.variant_id).then(seed => [it.id, seed] as const) : null
+        )
+      )
+      if (cancelled) return
+      const stock = new Map(fresh.filter(f => f?.[1]).map(f => [f![0], f![1]!.inventory_quantity]))
+      if (stock.size) {
+        skipSaveRef.current = true
+        setItems(prev => prev.map(it => (stock.has(it.id) ? { ...it, inventory_quantity: stock.get(it.id) ?? it.inventory_quantity } : it)))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  // Back to the parked pile: unlocked, so any cashier can pick it up.
+  async function parkBill(id: string) {
+    await fetch(`/api/admin/draft-locks/cash_sale/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ action: 'release' }),
+    }).catch(() => {})
+  }
+
+  function leaveEditor(tab?: 'drafts') {
+    resetForm()
+    setHeldId(null)
+    setBillLabel('')
+    setView('list')
+    router.replace(ap(`/admin/cash-sale${tab ? `?tab=${tab}` : ''}`), { scroll: false })
+  }
+
+  async function holdBill() {
+    const body = billBody()
+    if (!body.items.length) return setFormError('Add an item before holding the bill')
+    const issue = validateDraftLines(items)
+    if (issue) return setFormError(issue)
+    setHolding(true)
+    try {
+      const id = heldIdRef.current
+      const park = !!id && lock.isMine
+      if (id) await autosave.flush(body)
+      else {
+        const res = await fetch('/api/admin/invoices/cash-sale/drafts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(j.error || 'Could not hold the bill')
+      }
+      showToast('Bill held — resume it from Held bills', 'success')
+      leaveEditor('drafts')
+      if (park) await parkBill(id!)
+    } catch (err: any) {
+      setFormError(err.message || 'Could not hold the bill')
+    } finally {
+      setHolding(false)
+    }
+  }
+
+  async function discardBill() {
+    const id = heldIdRef.current
+    if (!id) return
+    const ok = await confirm({
+      title: 'Discard held bill',
+      message: 'Discard this held bill? Its items are not sold and nothing changes in stock.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep',
+      variant: 'danger',
+    })
+    if (!ok) return
+    completingRef.current = true
+    const res = await fetch(`/api/admin/invoices/cash-sale/drafts/${id}`, { method: 'DELETE', credentials: 'include' })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      completingRef.current = false
+      return setFormError(j.error || 'Could not discard the bill')
+    }
+    showToast('Held bill discarded', 'success')
+    leaveEditor('drafts')
+  }
+
+  async function backFromEditor() {
+    const id = heldIdRef.current
+    if (!id) {
+      resetForm()
+      setView('list')
+      return
+    }
+    const park = !lock.readOnly && lock.isMine
+    if (!lock.readOnly) {
+      try {
+        await autosave.flush(billBody())
+      } catch {
+        /* the held copy keeps its last save */
+      }
+    }
+    leaveEditor('drafts')
+    if (park) await parkBill(id)
+  }
 
   // Ordered server-side across all sales via ?sort&dir; 25 per page.
   const list = useInfiniteList<CashSale>({
@@ -369,6 +565,8 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
     }
     setFormError('')
     setSubmitting(true)
+    const draftId = heldIdRef.current
+    completingRef.current = true
     try {
       const res = await fetch('/api/admin/invoices/cash-sale', {
         method: 'POST',
@@ -397,10 +595,13 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
             batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
           ),
           serial_assignments: serialAssignments,
+          ...(draftId ? { draft_id: draftId } : {}),
         }),
       })
       const data = await res.json()
       if (!res.ok) {
+        completingRef.current = false
+        if (res.status === 423) lock.markLocked()
         setFormError(data.error || 'Failed to create cash sale')
         return
       }
@@ -418,9 +619,15 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
       })
       showToast(data.invoiceNumber ? `Receipt ${data.invoiceNumber} created` : 'Cash sale recorded', 'success')
       resetForm()
+      if (draftId) {
+        setHeldId(null)
+        setBillLabel('')
+        router.replace(ap('/admin/cash-sale'), { scroll: false })
+      }
       setView('receipt')
       fetchSales()
     } catch (err: any) {
+      completingRef.current = false
       setFormError(err.message || 'Failed')
     } finally {
       setSubmitting(false)
@@ -639,26 +846,26 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
         )}
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              resetForm()
-              setView('list')
-            }}
-            aria-label="Back to sales list"
-            title="Back to sales list"
+            onClick={backFromEditor}
+            aria-label={heldId ? 'Back to held bills' : 'Back to sales list'}
+            title={heldId ? 'Back to held bills' : 'Back to sales list'}
             className="p-2 text-foreground-secondary hover:text-foreground transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">New Cash Sale</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl font-bold text-foreground">{heldId ? `Held bill${billLabel.trim() ? ` · ${billLabel.trim()}` : ''}` : 'New Cash Sale'}</h1>
             <p className="text-foreground-secondary text-xs mt-0.5">Walk-in sale — no customer details required</p>
           </div>
+          {heldId && <AutosaveStatusPill status={autosave.status} />}
         </div>
+        {heldId && <DraftLockBanner lock={lock} scope="invoices:write" />}
 
 
         <form onSubmit={handleSubmit}>
+          <LockedFieldset readOnly={lock.readOnly}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2 space-y-4">
               <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
@@ -762,18 +969,48 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
                     <span className="text-xs text-foreground-muted">Walk-in Customer</span>
                   </div>
                   {canWrite && (
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
-                    >
-                      {submitting ? 'Processing…' : 'Complete Sale'}
-                    </button>
+                    <>
+                      <input
+                        value={billLabel}
+                        onChange={e => setBillLabel(e.target.value)}
+                        maxLength={80}
+                        aria-label="Bill name"
+                        placeholder="Name this bill (optional)"
+                        className={inputCls + ' mb-3'}
+                      />
+                      <button
+                        type="submit"
+                        disabled={submitting || holding}
+                        className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
+                      >
+                        {submitting ? 'Processing…' : 'Complete Sale'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={holdBill}
+                        disabled={submitting || holding}
+                        title="Park this bill without an invoice number or a stock change"
+                        className="mt-2 w-full rounded-xl border border-border-default py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-surface-secondary disabled:opacity-50"
+                      >
+                        {holding ? 'Holding…' : 'Hold Bill'}
+                      </button>
+                      {heldId && (
+                        <button
+                          type="button"
+                          onClick={discardBill}
+                          disabled={submitting || holding}
+                          className="mt-2 w-full py-1.5 text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                        >
+                          Discard bill
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
             </div>
           </div>
+          </LockedFieldset>
         </form>
       </div>
     )

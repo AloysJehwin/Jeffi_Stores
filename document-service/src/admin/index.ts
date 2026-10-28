@@ -10,6 +10,8 @@ import * as detail from './invoices/detail'
 import * as amendment from './invoices/amendment-draft'
 import * as resend from './invoices/resend-email'
 import * as cashSale from './invoices/cash-sale'
+import * as cashSaleDrafts from './invoices/cash-sale-drafts'
+import * as cashSaleDraft from './invoices/cash-sale-draft'
 import * as einvoice from './invoices/einvoice'
 import * as orderInvoice from './invoices/order-invoice'
 import * as system from './invoices/system'
@@ -40,6 +42,11 @@ export async function adminRoutes(app: FastifyInstance) {
   mount(app, 'POST', '/admin/invoices/drafts/:id/publish', publish.POST)
   mount(app, 'POST', '/admin/invoices/drafts/:id/finalize', finalize.POST)
   mount(app, 'POST', '/admin/invoices/cash-sale', cashSale.POST)
+  mount(app, 'GET', '/admin/invoices/cash-sale/drafts', cashSaleDrafts.GET)
+  mount(app, 'POST', '/admin/invoices/cash-sale/drafts', cashSaleDrafts.POST)
+  mount(app, 'GET', '/admin/invoices/cash-sale/drafts/:id', cashSaleDraft.GET)
+  mount(app, 'PATCH', '/admin/invoices/cash-sale/drafts/:id', cashSaleDraft.PATCH)
+  mount(app, 'DELETE', '/admin/invoices/cash-sale/drafts/:id', cashSaleDraft.DELETE)
   mount(app, 'PATCH', '/admin/invoices/:id', edit.PATCH)
   mount(app, 'GET', '/admin/invoices/:id/detail', detail.GET)
   mount(app, 'POST', '/admin/invoices/:id/amendment-draft', amendment.POST)

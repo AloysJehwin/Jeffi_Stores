@@ -38,6 +38,7 @@ const WRITE_SCOPE: Record<DraftResourceType, string> = {
   purchase_order: 'inventory:write',
   po_new: 'inventory:write',
   po_receive: 'inventory:write',
+  cash_sale: 'invoices:write',
 }
 
 const db = { query: (t: string, p?: unknown[]) => query(t, p as any[]) }

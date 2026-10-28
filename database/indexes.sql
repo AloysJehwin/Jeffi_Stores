@@ -369,6 +369,13 @@ CREATE INDEX idx_cash_sale_items_sale_id ON public.cash_sale_items USING btree (
 
 
 --
+-- Name: idx_cash_sale_drafts_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_cash_sale_drafts_admin ON public.cash_sale_drafts USING btree (admin_id, updated_at DESC);
+
+
+--
 -- Name: idx_cash_sales_invoice_date; Type: INDEX; Schema: public; Owner: -
 --
 

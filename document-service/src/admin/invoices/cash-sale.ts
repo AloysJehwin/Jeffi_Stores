@@ -14,6 +14,7 @@ import { findDigitalProductIds } from '../../lib/digital-guard'
 import { lineItemFromMrpIncl, lineItemExGst } from '../../lib/pricing'
 import { deductStockForLines, InsufficientStockError, type LineItem } from '../../lib/inventory-deduct'
 import { invoiceLineSchema } from '../../lib/invoice-line-items'
+import { announceLock, assertHolder, closeLock, draftLockResponse } from '../../lib/draft-locks'
 import { z } from 'zod'
 import { parseBody } from '../../lib/validate'
 
@@ -24,7 +25,11 @@ const cashSaleSchema = z.object({
   items: z.array(invoiceLineSchema).min(1, 'Add at least one line item'),
   paymentMode: z.string().nullish(),
   notes: z.string().nullish(),
+  // Completing a held bill: it is removed in the sale transaction, so it can't be completed twice.
+  draft_id: z.guid().nullish(),
 })
+
+class HeldBillGoneError extends Error {}
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,7 +54,7 @@ export async function POST(request: NextRequest) {
     const parsed = parseBody(cashSaleSchema, body, 'POST /api/admin/invoices/cash-sale')
     if (!parsed.ok) return parsed.response
 
-    const { paymentMode: rawPaymentMode, notes, items } = parsed.data
+    const { paymentMode: rawPaymentMode, notes, items, draft_id: draftId } = parsed.data
     const paymentMode = rawPaymentMode ?? 'cash'
 
     if (!VALID_PAYMENT_MODES.includes(paymentMode)) {
@@ -178,7 +183,14 @@ export async function POST(request: NextRequest) {
     const taxAmount = round2(totalCgst + totalSgst + totalIgst)
     const totalAmount = round2(subtotal)
 
+    let lockRes: Awaited<ReturnType<typeof assertHolder>> = null
     const result = await withTransaction(async client => {
+      if (draftId) {
+        lockRes = await assertHolder(client, admin, 'cash_sale', draftId)
+        const gone = await client.query(`DELETE FROM cash_sale_drafts WHERE id = $1`, [draftId])
+        if (!gone.rowCount) throw new HeldBillGoneError('This bill was already completed or discarded')
+        await closeLock(client, admin, 'cash_sale', draftId, 'finalized')
+      }
       const ts = Date.now()
       const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
       const saleNumber = `CS-${ts}-${rand}`
@@ -298,6 +310,7 @@ export async function POST(request: NextRequest) {
 
       return { invoiceNumber, saleId, saleNumber }
     })
+    if (draftId) await announceLock(admin, 'cash_sale', draftId, lockRes)
 
     return NextResponse.json({
       success: true,
@@ -308,6 +321,9 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     if (err instanceof InsufficientStockError)
       return NextResponse.json({ error: err.message, code: err.code }, { status: 409 })
+    if (err instanceof HeldBillGoneError) return NextResponse.json({ error: err.message }, { status: 409 })
+    const locked = draftLockResponse(err)
+    if (locked) return locked
     console.error('[admin/invoices/cash-sale] failed', err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
