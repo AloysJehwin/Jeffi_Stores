@@ -207,16 +207,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const [scanSerials, setScanSerials] = useState(true)
   const [draftRestored, setDraftRestored] = useState(false)
-  const [poDrafts, setPoDrafts] = useState<
-    { id: string; supplier_name: string | null; line_count: number; updated_at: string }[]
-  >([])
-
-  useEffect(() => {
-    fetch('/api/admin/inventory/po/draft', { credentials: 'include' })
-      .then(r => (r.ok ? r.json() : { drafts: [] }))
-      .then(j => setPoDrafts(j.drafts || []))
-      .catch(() => setPoDrafts([]))
-  }, [])
   // Refs to every serial input, keyed "itemIdx:slotIdx", so Enter/scan can advance focus.
   const serialInputRefs = React.useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -1434,28 +1424,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
         tab="orders"
         exportable
       />
-
-      {poDrafts.length > 0 && (
-        <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-              {poDrafts.length} draft{poDrafts.length === 1 ? '' : 's'} in progress — resume where you left off:
-            </span>
-            <div className="flex items-center gap-2 flex-wrap">
-              {poDrafts.slice(0, 5).map(d => (
-                <Link
-                  key={d.id}
-                  href={ap(`/admin/purchase-orders/new?draftId=${d.id}`)}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-amber-500/40 bg-surface text-xs text-foreground hover:bg-surface-secondary transition"
-                >
-                  <span className="font-medium">{d.supplier_name || 'No supplier'}</span>
-                  <span className="text-foreground-muted">· {d.line_count} line{d.line_count === 1 ? '' : 's'}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">

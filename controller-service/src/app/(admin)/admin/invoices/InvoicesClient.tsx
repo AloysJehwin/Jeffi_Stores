@@ -118,7 +118,8 @@ export const SOURCE_STATUS: StatusMap = {
 export const PAYMENT_COLORS: Record<string, string> = Object.fromEntries(Object.entries(PAYMENT_STATUS).map(([k, v]) => [k, badgeCls(v.tone)]))
 export const SOURCE_COLORS: Record<string, string> = Object.fromEntries(Object.entries(SOURCE_STATUS).map(([k, v]) => [k, badgeCls(v.tone)]))
 
-export default function InvoicesClient({ canWrite = false }: { canWrite?: boolean }) {
+// section 'drafts' (the Drafts tab) shows only the draft invoices awaiting finalization; 'list' the invoices.
+export default function InvoicesClient({ canWrite = false, section = 'list' }: { canWrite?: boolean; section?: 'list' | 'drafts' }) {
   const { showToast } = useToast()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -273,6 +274,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
     pageSize: 25,
     getKey: i => i.id,
     fetchPage: async (p, signal) => {
+      if (section === 'drafts') return { rows: [], total: 0 }
       const params = new URLSearchParams(filters)
       if (sort) {
         params.set('sort', sort)
@@ -311,8 +313,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   })()
 
   useEffect(() => {
-    fetchDrafts()
-  }, [fetchDrafts])
+    if (section === 'drafts') fetchDrafts()
+  }, [fetchDrafts, section])
 
   // Autosave draft every 30s when editing an existing draft
   useEffect(() => {
@@ -1661,24 +1663,28 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         />
       )}
       <div className="space-y-5">
-        <PageHeader title="Invoices" description="All online and offline invoices" />
         {canWrite && (
           <TabActionsPortal>
             <TabAction onClick={() => navigateView('create')} icon={<Plus className="w-4 h-4" />} label="New Offline Invoice" />
           </TabActionsPortal>
         )}
 
-        <ListFilters
-          entity="invoices"
-          fields={INVOICE_FIELDS}
-          aliases={INVOICE_ALIASES}
-          search={INVOICE_SEARCH}
-          noun="Invoices"
-          tab="list"
-          exportable
-        />
+        {section === 'list' && (
+          <ListFilters
+            entity="invoices"
+            fields={INVOICE_FIELDS}
+            aliases={INVOICE_ALIASES}
+            search={INVOICE_SEARCH}
+            noun="Invoices"
+            tab="list"
+            exportable
+          />
+        )}
 
-        {(draftsLoading || drafts.length > 0) && (
+        {section === 'drafts' && !draftsLoading && drafts.length === 0 && (
+          <EmptyState title="No draft invoices." body="Invoices saved as drafts wait here until they are finalized." />
+        )}
+        {section === 'drafts' && (draftsLoading || drafts.length > 0) && (
           <section className="overflow-hidden rounded-xl border border-amber-500/40 bg-amber-500/5">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/30 px-4 py-3">
               <div className="flex items-center gap-2">
@@ -1814,7 +1820,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           </section>
         )}
 
-        {loading ? (
+        {section === 'list' && (loading ? (
           <TableSkeleton rows={8} cols={8} />
         ) : invoices.length === 0 ? (
           <EmptyState title="No invoices found." body="Try a different search or clear the filters." />
@@ -1968,8 +1974,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
 
             <InvoicesMobileList invoices={invoices} canWrite={canWrite} sendingEmailId={sendingEmailId} cancellingId={cancellingId} onSendEmail={sendInvoiceEmail} onCancel={cancelInvoice} />
           </>
-        )}
-        <InfiniteFooter shown={invoices.length} control={list} noun="invoices" />
+        ))}
+        {section === 'list' && <InfiniteFooter shown={invoices.length} control={list} noun="invoices" />}
         <InvoiceDetailModal inv={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
       </div>
     </>

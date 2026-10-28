@@ -32,12 +32,6 @@ export default function QuotationsOverview() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Quotations</h1>
-        <p className="text-sm text-foreground-muted mt-0.5">
-          Quotes sent, accepted and converted to invoices, and the open pipeline
-        </p>
-      </div>
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       <ListFilters
         entity="quotations"

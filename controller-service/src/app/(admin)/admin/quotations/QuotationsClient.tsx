@@ -820,7 +820,6 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   if (view === 'list') {
     return (
       <div className="space-y-5">
-        <PageHeader title="Quotations" description="Create and manage B2B quotations" />
         {canWrite && (
           <TabActionsPortal>
             <TabAction onClick={newQuotation} icon={<Plus className="w-4 h-4" />} label="New Quotation" />

@@ -98,10 +98,10 @@ function RowLockActions({ r, onChanged }: { r: DraftListItem; onChanged: () => v
   )
 }
 
-/** Tab label for a list page's Drafts tab, with a live count. */
-export function DraftsTabLabel({ type, label = 'Drafts' }: { type: string; label?: string }) {
+/** Tab label for a list page's Drafts tab, with a live count. `count` replaces it when the tab lists more than edit-drafts. */
+export function DraftsTabLabel({ type, label = 'Drafts', count }: { type: string; label?: string; count?: number }) {
   const { counts } = useDraftCounts(type)
-  const n = counts ? counts.all + counts.unclaimed : 0
+  const n = count ?? (counts ? counts.all + counts.unclaimed : 0)
   return (
     <span className="inline-flex items-center gap-1.5">
       {label}
