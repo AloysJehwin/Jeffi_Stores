@@ -7,10 +7,15 @@ import PresetChipRow from './PresetChipRow'
 import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import Select from '@/components/ui/Select'
+import Toggle from '@/components/ui/Toggle'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { ap } from '@/lib/shared/admin-path'
+import { aiFieldScope } from '@/lib/auth/ai-scope'
+import { aiFeatureLabel } from '@/lib/ai/feature-labels'
 import {
   AI_QUALITIES,
   AI_SIZE_PRESETS,
+  OPAQUE_IMAGE_FEATURES,
   type AiImageFeature,
   type AiQuality,
   type AiSizePreset,
@@ -83,6 +88,7 @@ export default function AiMediaButton(props: Props) {
 
 function AiMediaDialog({
   feature,
+  scope,
   defaultPrompt = '',
   sizes,
   referenceImageUrl,
@@ -97,6 +103,8 @@ function AiMediaDialog({
   const [sizeKey, setSizeKey] = useState(sizes[0]?.key ?? 'square')
   const [quality, setQuality] = useState<AiQuality>('standard')
   const [n, setN] = useState(1)
+  const [transparent, setTransparent] = useState(false)
+  const [resultsCutout, setResultsCutout] = useState(false)
   const [busy, setBusy] = useState(false)
   const [results, setResults] = useState<{ url: string; width: number; height: number; blurhash?: string | null; galleryId?: string; productImageId?: string }[] | null>(null)
   const [pricePerUnit, setPricePerUnit] = useState<number | null>(null)
@@ -105,12 +113,14 @@ function AiMediaDialog({
   const [walletNotice, setWalletNotice] = useState<{ balanceInr: number; neededInr: number } | null>(null)
 
   const size = sizes.find(s => s.key === sizeKey) ?? sizes[0]
+  const canCutout = !OPAQUE_IMAGE_FEATURES.includes(feature)
+  const cutout = canCutout && transparent
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const url = `/api/admin/ai/price?feature=${feature}&quality=${quality}`
+        const url = `/api/admin/ai/price?feature=${feature}&quality=${quality}${cutout ? '&transparent=1' : ''}`
         const r = await fetch(url, { credentials: 'include' })
         const j = await r.json().catch(() => ({}))
         if (!cancelled) setPricePerUnit(typeof j.priceInr === 'number' ? j.priceInr : null)
@@ -121,7 +131,7 @@ function AiMediaDialog({
     return () => {
       cancelled = true
     }
-  }, [feature, quality])
+  }, [feature, quality, cutout])
 
   const totalPrice = useMemo(() => (pricePerUnit == null ? null : pricePerUnit * n), [pricePerUnit, n])
 
@@ -145,6 +155,7 @@ function AiMediaDialog({
           height: size?.height,
           n,
           quality,
+          ...(cutout ? { transparent: true } : {}),
           referenceImageUrl,
           attachToProductId,
           saveToGallery,
@@ -158,6 +169,7 @@ function AiMediaDialog({
       }
       if (!res.ok) throw new Error(j.error || 'Image generation failed')
       setResults(j.images || [])
+      setResultsCutout(cutout)
       setCharged(typeof j.priceInr === 'number' ? j.priceInr : null)
     } catch (e) {
       setError((e as Error).message || 'Image generation failed')
@@ -199,13 +211,25 @@ function AiMediaDialog({
           <PresetChipRow kind="image" feature={feature} onPick={(next: string) => setPrompt(next)} />
           <div>
             <label className="mb-1 block text-xs font-medium text-foreground-secondary">What to draw</label>
-            <textarea
+            <AIEnrichButton
+              fieldLabel="Image prompt"
               value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-border-default bg-surface-primary px-3 py-2 text-sm"
-              placeholder="A clean studio shot of ..."
-            />
+              onChange={setPrompt}
+              scope={aiFieldScope(scope ?? SCOPE_BY_FEATURE[feature])}
+              format="image_prompt"
+              context={[`Image for: ${aiFeatureLabel(feature)}`, size && `Size: ${size.label}`, cutout && 'The subject will be cut out onto a transparent background', defaultPrompt && defaultPrompt !== prompt && `Original idea: ${defaultPrompt}`].filter(Boolean).join('. ')}
+              maxLength={2000}
+              write
+              multiline
+            >
+              <textarea
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-border-default bg-surface-primary px-3 py-2 pr-16 text-sm"
+                placeholder="A clean studio shot of ..."
+              />
+            </AIEnrichButton>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
@@ -221,6 +245,12 @@ function AiMediaDialog({
               <Select className="w-full" aria-label="Variants" value={n} onChange={setN} options={[1, 2, 3, 4].map(v => ({ value: v, label: String(v) }))} />
             </div>
           </div>
+          {canCutout && (
+            <div>
+              <Toggle size="sm" checked={transparent} onChange={setTransparent} label="Transparent background" />
+              {transparent && <p className="mt-1 text-xs text-foreground-muted">The subject is cut out and saved as a PNG; adds a small charge per image.</p>}
+            </div>
+          )}
           {totalPrice != null && !results && (
             <p className="text-xs text-foreground-muted" data-testid="ai-price">
               {totalPrice > 0 ? `About ₹${totalPrice.toFixed(2)} for ${n} image${n > 1 ? 's' : ''}, charged to your wallet.` : 'No charge.'}
@@ -247,7 +277,11 @@ function AiMediaDialog({
                     <img
                       src={img.url}
                       alt=""
-                      style={img.width && img.height ? { aspectRatio: `${img.width} / ${img.height}` } : undefined}
+                      style={{
+                        ...(img.width && img.height ? { aspectRatio: `${img.width} / ${img.height}` } : {}),
+                        // Checkerboard so a cut-out shows its transparency.
+                        ...(resultsCutout ? { backgroundImage: 'repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%)', backgroundSize: '16px 16px' } : {}),
+                      }}
                       className={`${img.width && img.height ? '' : 'aspect-square '}w-full bg-surface-secondary object-contain`}
                     />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-sm font-semibold text-white opacity-0 group-hover:opacity-100">

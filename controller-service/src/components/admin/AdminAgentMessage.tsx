@@ -12,7 +12,8 @@ const ENTITY_ROUTES: Record<string, (id: string) => string> = {
 }
 
 const ENTITY_RE = /\[\[(product|order|customer|campaign):([^|\]]+)\|([^\]]+)\]\]/g
-const BOLD_RE = /\*\*([^*]+)\*\*/g
+// Bold, italic and inline code, in one pass so their markers never nest wrongly.
+const EMPH_RE = /`([^`\n]+)`|\*\*([^*]+)\*\*|(?<![\w*])\*([^*\s][^*\n]*?)\*(?![\w*])|(?<![\w_])_([^_\s][^_\n]*?)_(?![\w_])/g
 const IMAGE_MD_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
 const LINK_MD_RE = /(?<!\!)\[([^\]]+)\]\(([^)\s]+)\)/g
 
@@ -74,6 +75,18 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     }
     if (t.kind === 'link') {
       const isExternal = /^https?:\/\//i.test(t.href)
+      if (!isExternal && t.href.startsWith('/')) {
+        out.push(
+          <Link
+            key={`${keyPrefix}-a${idx++}`}
+            href={t.href.startsWith('/admin') ? ap(t.href) : t.href}
+            className="text-accent-600 dark:text-accent-400 underline decoration-dotted underline-offset-2 hover:decoration-solid"
+          >
+            {t.label}
+          </Link>
+        )
+        continue
+      }
       out.push(
         <a
           key={`${keyPrefix}-a${idx++}`}
@@ -100,7 +113,7 @@ function renderInlineText(text: string, keyPrefix: string): ReactNode[] {
   ENTITY_RE.lastIndex = 0
   while ((match = ENTITY_RE.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      out.push(...renderBold(text.slice(lastIndex, match.index), `${keyPrefix}-t${i++}`))
+      out.push(...renderEmphasis(text.slice(lastIndex, match.index), `${keyPrefix}-t${i++}`))
     }
     const [, kind, id, label] = match
     const builder = ENTITY_ROUTES[kind]
@@ -121,25 +134,34 @@ function renderInlineText(text: string, keyPrefix: string): ReactNode[] {
     lastIndex = match.index + match[0].length
   }
   if (lastIndex < text.length) {
-    out.push(...renderBold(text.slice(lastIndex), `${keyPrefix}-tail${i++}`))
+    out.push(...renderEmphasis(text.slice(lastIndex), `${keyPrefix}-tail${i++}`))
   }
   return out
 }
 
-function renderBold(text: string, keyPrefix: string): ReactNode[] {
+function renderEmphasis(text: string, keyPrefix: string): ReactNode[] {
   const out: ReactNode[] = []
   let lastIndex = 0
   let match: RegExpExecArray | null
   let i = 0
-  BOLD_RE.lastIndex = 0
-  while ((match = BOLD_RE.exec(text)) !== null) {
+  EMPH_RE.lastIndex = 0
+  while ((match = EMPH_RE.exec(text)) !== null) {
     if (match.index > lastIndex)
       out.push(<Fragment key={`${keyPrefix}-${i++}`}>{text.slice(lastIndex, match.index)}</Fragment>)
-    out.push(
-      <strong key={`${keyPrefix}-b${i++}`} className="font-semibold">
-        {match[1]}
-      </strong>
-    )
+    const [, code, bold, star, under] = match
+    if (code !== undefined)
+      out.push(
+        <code key={`${keyPrefix}-c${i++}`} className="px-1 py-0.5 rounded bg-surface text-[0.85em] font-mono">
+          {code}
+        </code>
+      )
+    else if (bold !== undefined)
+      out.push(
+        <strong key={`${keyPrefix}-b${i++}`} className="font-semibold">
+          {bold}
+        </strong>
+      )
+    else out.push(<em key={`${keyPrefix}-i${i++}`}>{star ?? under}</em>)
     lastIndex = match.index + match[0].length
   }
   if (lastIndex < text.length) out.push(<Fragment key={`${keyPrefix}-${i++}`}>{text.slice(lastIndex)}</Fragment>)
@@ -147,7 +169,7 @@ function renderBold(text: string, keyPrefix: string): ReactNode[] {
 }
 
 interface Block {
-  type: 'p' | 'h1' | 'h2' | 'h3' | 'ul' | 'ol' | 'table' | 'code'
+  type: 'p' | 'h1' | 'h2' | 'h3' | 'ul' | 'ol' | 'table' | 'code' | 'quote' | 'hr'
   content: string[]
   cells?: string[][]
 }
@@ -160,6 +182,25 @@ function parseBlocks(src: string): Block[] {
     const line = lines[i]
     if (!line.trim()) {
       i++
+      continue
+    }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      blocks.push({ type: 'hr', content: [] })
+      i++
+      continue
+    }
+    if (/^#{4,6} /.test(line)) {
+      blocks.push({ type: 'h3', content: [line.replace(/^#{4,6} /, '')] })
+      i++
+      continue
+    }
+    if (line.startsWith('> ') || line === '>') {
+      const buf: string[] = []
+      while (i < lines.length && (lines[i].startsWith('> ') || lines[i] === '>')) {
+        buf.push(lines[i].replace(/^>\s?/, ''))
+        i++
+      }
+      blocks.push({ type: 'quote', content: buf })
       continue
     }
     if (line.startsWith('### ')) {
@@ -234,13 +275,21 @@ function parseBlocks(src: string): Block[] {
   return blocks
 }
 
-export default function AdminAgentMessage({ text }: { text: string }) {
+export default function AdminAgentMessage({ text, cursor }: { text: string; cursor?: boolean }) {
   const blocks = parseBlocks(text)
   return (
     <div className="space-y-2 text-sm leading-relaxed break-words">
       {blocks.map((b, idx) => {
         const k = `b${idx}`
         switch (b.type) {
+          case 'hr':
+            return <hr key={k} className="border-border-default" />
+          case 'quote':
+            return (
+              <blockquote key={k} className="border-l-2 border-border-default pl-3 text-foreground-muted whitespace-pre-wrap">
+                {renderInline(b.content.join('\n'), k)}
+              </blockquote>
+            )
           case 'h1':
             return (
               <h3 key={k} className="text-base font-bold mt-2">
@@ -319,6 +368,9 @@ export default function AdminAgentMessage({ text }: { text: string }) {
             )
         }
       })}
+      {cursor && (
+        <span className="inline-block w-1.5 h-4 -mt-1 bg-foreground-muted animate-pulse align-middle" aria-hidden="true" />
+      )}
     </div>
   )
 }

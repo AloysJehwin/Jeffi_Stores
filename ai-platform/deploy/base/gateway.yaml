@@ -1,3 +1,12 @@
+# Gateway pod identity: its projected token is the OIDC subject token the Anthropic SDK exchanges
+# (workload identity federation) for per-store, workspace-scoped access tokens.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ai-gateway
+  namespace: ai-platform
+automountServiceAccountToken: false
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,6 +21,7 @@ spec:
     metadata:
       labels: { app: ai-gateway }
     spec:
+      serviceAccountName: ai-gateway
       containers:
         - name: gateway
           image: jeffi/ai-gateway:latest
@@ -33,9 +43,24 @@ spec:
             httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 15
             periodSeconds: 20
+          # ANTHROPIC_IDENTITY_TOKEN_FILE (config.yaml) points at this mount.
+          volumeMounts:
+            - name: anthropic-identity
+              mountPath: /var/run/secrets/anthropic
+              readOnly: true
           resources:
             requests: { cpu: "200m", memory: 256Mi }
             limits: { cpu: "1", memory: 512Mi }
+      volumes:
+        - name: anthropic-identity
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  # Keep in step with ANTHROPIC_FEDERATION_AUDIENCE in config.yaml.
+                  # TODO: confirm the audience the Anthropic federation rule expects.
+                  audience: https://api.anthropic.com
+                  expirationSeconds: 3600
 ---
 apiVersion: v1
 kind: Service

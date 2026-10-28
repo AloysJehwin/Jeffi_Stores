@@ -11,7 +11,8 @@ export function modelForHint(hint: AiChatRequest['modelHint']): string {
   const fast = process.env.OLLAMA_FAST_MODEL || process.env.OLLAMA_EMAIL_MODEL || 'gemma3:4b'
   switch (hint) {
     case 'sql': return process.env.OLLAMA_SQL_MODEL || 'gemma4:12b'
-    case 'agent': return process.env.OLLAMA_AGENT_MODEL || 'qwen2.5:7b'
+    case 'agent':
+    case 'deep': return process.env.OLLAMA_AGENT_MODEL || 'qwen2.5:7b'
     case 'fast': return fast
     case 'email': return process.env.OLLAMA_EMAIL_MODEL || fast
     case 'enrich': return process.env.OLLAMA_ENRICH_MODEL || fast
@@ -48,7 +49,7 @@ export async function directChat(req: AiChatRequest, timeoutMs: number): Promise
   const model = modelForHint(req.modelHint)
   const data = await post('/api/chat', {
     model,
-    messages: req.messages,
+    messages: req.messages.map(({ providerState: _s, ...m }) => m),
     tools: req.tools,
     stream: false,
     think: false,

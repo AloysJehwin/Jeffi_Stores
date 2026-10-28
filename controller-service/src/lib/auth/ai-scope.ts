@@ -21,9 +21,17 @@ export const AI_ACTION_SCOPES = [
   'social:write',
   'merchant_sync:write',
   'meta_ads_campaigns:write',
+  'google_ads_campaigns:write',
+  'templates:write',
 ] as const
 
 export type AiActionScope = (typeof AI_ACTION_SCOPES)[number]
+
+/** The AI field scope for an admin area ('social' -> 'social:write'); settings for areas not listed. */
+export function aiFieldScope(area: string): AiActionScope {
+  const s = `${area}:write`
+  return (AI_ACTION_SCOPES as readonly string[]).includes(s) ? (s as AiActionScope) : 'settings:write'
+}
 
 /** Returns the scope to check, or null when the requested one is not an allowed AI scope. */
 export function resolveAiScope(requested: unknown, fallback: AiActionScope = 'products:write'): AiActionScope | null {

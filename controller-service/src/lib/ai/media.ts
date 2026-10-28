@@ -2,7 +2,7 @@
 // lib/ai/billing (preauthorize before, settle with the gateway's usage after) and persisted
 // to the store's S3 bucket (gateway URLs are temporary). Contract: docs/plans/AI_MEDIA_PLATFORM_PLAN.md.
 import { getAiRouting, getProviderPolicy } from '@/lib/providers/policy'
-import { preauthorize, settle, AiWalletError } from './billing'
+import { preauthorize, settle, AiWalletError, type UsageUnits } from './billing'
 import { aiGatewayUrl } from '@/lib/shared/ai-client'
 import { uploadGalleryImage, putObjectBuffer, getS3Url, currentBucket } from '@/lib/shared/s3'
 import { query, queryOne } from '@/lib/shared/db'
@@ -27,6 +27,7 @@ interface GatewayImageResponse {
   provider: AiProvider
   model: string
   usage: { units: number; unitType: 'image'; costInr: number }
+  backgroundRemoval?: { provider: 'replicate'; model: string; costInr: number }
   latencyMs: number
   cache?: 'kv' | null
 }
@@ -68,6 +69,8 @@ export interface GenerateImageOpts {
   provider?: AiProvider
   referenceImageUrl?: string
   seed?: number
+  /** Cut the subject out (Replicate post-step); stored as PNG and charged an extra cutout unit per image. */
+  transparent?: boolean
   feature: string
   ref?: string
   actor?: string | null
@@ -200,7 +203,7 @@ async function fetchBytes(url: string): Promise<Buffer> {
 
 async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: number, model: string): Promise<GeneratedImage> {
   const bytes = await fetchBytes(img.url)
-  const png = !!opts.attachToProductId || PNG_IMAGE_FEATURES.includes(opts.feature)
+  const png = !!opts.transparent || !!opts.attachToProductId || PNG_IMAGE_FEATURES.includes(opts.feature)
   const up = await uploadGalleryImage(bytes, `ai-${opts.feature}-${Date.now()}-${idx}`, { format: png ? 'png' : 'webp' })
   const out: GeneratedImage = {
     url: up.url,
@@ -256,6 +259,13 @@ async function recordProvider(usageId: string, provider: string, model: string):
   await query(`UPDATE ai_usage SET provider = $2, model = $3 WHERE id = $1`, [usageId, provider, model]).catch(() => {})
 }
 
+// The cutout is priced from the image/replicate 'call' row whichever provider drew the image.
+function imageUnits(qty: number, cutoutModel?: string): UsageUnits[] {
+  const units: UsageUnits[] = [{ type: 'image', qty }]
+  if (cutoutModel) units.push({ type: 'call', qty, provider: 'replicate', model: cutoutModel })
+  return units
+}
+
 export async function generateImage(opts: GenerateImageOpts): Promise<GenerateImageResult> {
   const n = Math.min(4, Math.max(1, opts.n ?? 1))
   const { usageId, priceInr } = await preauthorize({
@@ -263,7 +273,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
     capability: 'image',
     provider: opts.provider ?? 'auto',
     model: 'auto',
-    estimateUnits: [{ type: 'image', qty: n }],
+    estimateUnits: imageUnits(n, opts.transparent ? '*' : undefined),
     ref: opts.ref,
     actor: opts.actor ?? null,
   })
@@ -284,6 +294,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
         providers: policy?.aiImageProviders.length ? policy.aiImageProviders : undefined,
         referenceImageUrl: opts.referenceImageUrl,
         seed: opts.seed,
+        transparent: opts.transparent || undefined,
         namespace: await namespace(),
       }),
     })
@@ -301,7 +312,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
     throw err instanceof AiMediaError ? err : new AiMediaError(`Could not save the generated image: ${(err as Error).message}`)
   }
   await settle(usageId, {
-    units: [{ type: 'image', qty: gw.usage?.units ?? gw.images.length }],
+    units: imageUnits(gw.usage?.units ?? gw.images.length, gw.backgroundRemoval?.model),
     costInr: gw.usage?.costInr ?? 0,
     latencyMs: gw.latencyMs ?? Date.now() - started,
     cache: gw.cache ?? null,

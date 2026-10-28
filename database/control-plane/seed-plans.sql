@@ -583,13 +583,24 @@ ON CONFLICT DO NOTHING;
 
 -- AI price list (ai_price_list). cost_inr = platform cost per unit, price_inr = tenant wallet
 -- charge per unit (gateway costs at ~Rs 85/USD, prices with a margin). Razer rows carry a non-zero
--- compute price so local inference is still charged.
+-- compute price so local inference is still charged. Anthropic token rows are at Rs 84/USD list
+-- (input tokens billed cache-weighted by the gateway) with the 3x text margin.
 -- Rows insert once (ON CONFLICT DO NOTHING): the platform admin edits them at /admin/ecom/ai-pricing.
 INSERT INTO public.ai_price_list (capability, provider, model, unit_type, cost_inr, price_inr) VALUES
   ('text',  'ollama',    '*',                              'token_1k_in',   0.0200,  0.0600),
   ('text',  'ollama',    '*',                              'token_1k_out',  0.0200,  0.0600),
   ('text',  'google',    '*',                              'token_1k_in',   0.0300,  0.0900),
   ('text',  'google',    '*',                              'token_1k_out',  0.1200,  0.3600),
+  ('text',  'anthropic', 'claude-sonnet-5-5',              'token_1k_in',   0.1680,  0.5040),
+  ('text',  'anthropic', 'claude-sonnet-5-5',              'token_1k_out',  0.8400,  2.5200),
+  ('text',  'anthropic', 'claude-haiku-5-5',               'token_1k_in',   0.0084,  0.0252),
+  ('text',  'anthropic', 'claude-haiku-5-5',               'token_1k_out',  0.0420,  0.1260),
+  ('text',  'anthropic', 'claude-opus-5-5',                'token_1k_in',   0.3360,  1.0080),
+  ('text',  'anthropic', 'claude-opus-5-5',                'token_1k_out',  1.6800,  5.0400),
+  ('text',  'anthropic', '*',                              'token_1k_in',   0.1680,  0.5040),
+  ('text',  'anthropic', '*',                              'token_1k_out',  0.8400,  2.5200),
+  ('vision','anthropic', '*',                              'token_1k_in',   0.1680,  0.5040),
+  ('vision','anthropic', '*',                              'token_1k_out',  0.8400,  2.5200),
   ('embed', 'ollama',    '*',                              'token_1k_in',   0.0050,  0.0150),
   ('vision','ollama',    '*',                              'call',          0.0500,  0.2000),
   ('image', 'razer',     '*',                              'image',         0.3000,  2.0000),
@@ -599,6 +610,8 @@ INSERT INTO public.ai_price_list (capability, provider, model, unit_type, cost_i
   ('image', 'replicate', 'black-forest-labs/flux-schnell', 'image',         0.2600,  2.0000),
   ('image', 'replicate', 'black-forest-labs/flux-dev',     'image',         2.1300,  4.0000),
   ('image', 'replicate', '*',                              'image',         3.4000,  6.0000),
+  -- Background removal for transparent images, per image cut out (bria/remove-background ~$0.018).
+  ('image', 'replicate', '*',                              'call',          1.5100,  3.0000),
   ('video', 'google',    'veo-3.1-fast-generate-preview',  'video_second',  8.5000, 15.0000),
   ('video', 'google',    'veo-3.0-generate-001',           'video_second', 34.0000, 50.0000),
   ('video', 'google',    '*',                              'video_second',  8.5000, 15.0000),
