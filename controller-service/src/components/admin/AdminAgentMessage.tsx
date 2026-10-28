@@ -2,7 +2,10 @@
 
 import Link from 'next/link'
 import { Fragment, ReactNode } from 'react'
+import { CheckCircle2 } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
+import { fmtQty } from './agent/format'
+import type { QuotationConfirmItem } from './agent/QuotationResolver'
 
 const ENTITY_ROUTES: Record<string, (id: string) => string> = {
   product: id => `/admin/products/${id}`,
@@ -348,7 +351,7 @@ export default function AdminAgentMessage({ text, cursor }: { text: string; curs
                   </thead>
                   <tbody>
                     {b.cells!.slice(1).map((row, ri) => (
-                      <tr key={ri} className="border-b border-border-default/50">
+                      <tr key={ri} className="border-b border-border-default">
                         {row.map((c, ci) => (
                           <td key={ci} className="py-1.5 px-2 align-top">
                             {renderInline(c, `${k}-${ri}-${ci}`)}
@@ -370,6 +373,59 @@ export default function AdminAgentMessage({ text, cursor }: { text: string; curs
       })}
       {cursor && (
         <span className="inline-block w-1.5 h-4 -mt-1 bg-foreground-muted animate-pulse align-middle" aria-hidden="true" />
+      )}
+    </div>
+  )
+}
+
+// Control messages the UI sends on the admin's behalf; shown as what they mean, not raw text.
+const QUOTATION_CONFIRM = '__quotation_confirm__'
+
+export function parseQuotationConfirm(text: string): Partial<QuotationConfirmItem>[] | null {
+  if (!text.startsWith(QUOTATION_CONFIRM)) return null
+  try {
+    const items = JSON.parse(text.slice(QUOTATION_CONFIRM.length))
+    return Array.isArray(items) ? items.filter(i => i && typeof i === 'object') : []
+  } catch {
+    return []
+  }
+}
+
+/** One-line stand-in for a control message (chat list previews); null for ordinary text. */
+export function internalMessageLabel(text: string | null | undefined): string | null {
+  const items = text ? parseQuotationConfirm(text) : null
+  if (!items) return null
+  const n = items.filter(i => !i.skipped).length
+  return `Confirmed ${n} item${n === 1 ? '' : 's'} for the quotation`
+}
+
+/** A user bubble's content: plain text, or a readable summary of a control message. */
+export function AdminAgentUserMessage({ text }: { text: string }) {
+  const items = parseQuotationConfirm(text)
+  if (!items) return <p className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">{text}</p>
+  const skipped = items.filter(i => i.skipped).length
+  return (
+    <div className="space-y-1.5">
+      <p className="flex items-center gap-1.5 font-medium">
+        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+        <span>
+          {internalMessageLabel(text)}
+          {skipped > 0 && <span className="font-normal opacity-80"> · {skipped} skipped</span>}
+        </span>
+      </p>
+      {items.length > 0 && (
+        <ul className="space-y-0.5 border-t border-white/20 pt-1.5 text-xs">
+          {items.map((it, i) => (
+            <li key={i} className="flex items-baseline justify-between gap-3">
+              <span className={`min-w-0 [overflow-wrap:anywhere] ${it.skipped ? 'line-through opacity-70' : ''}`}>
+                {it.requestedText || `Item ${i + 1}`}
+              </span>
+              <span className="shrink-0 tabular-nums opacity-90">
+                {it.skipped ? 'skipped' : `→ ${fmtQty(it.quantity)} ${it.buyUnit || 'pcs'}`}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )

@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({
+  hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
@@ -136,9 +139,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQueryOne.mockResolvedValueOnce(action('does_not_exist', {}))
     const res = await POST(makeReq(), params)
     const body = await res.json()
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(403)
     expect(body.ok).toBe(false)
-    expect(body.error).toMatch(/unknown action kind/i)
+    expect(body.error).toMatch(/can't run/i)
   })
 
   // ── send_test_email ───────────────────────────────────────────────────────
@@ -182,20 +185,18 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── mark_order_shipped ────────────────────────────────────────────────────
 
   it('mark_order_shipped success', async () => {
-    primeAction(action('mark_order_shipped', { orderId: 'o1', awbNumber: 'AWB1' }), {
-      id: 'o1',
-      order_number: 'ORD-1',
-      status: 'shipped',
-      awb_number: 'AWB1',
-    })
+    primeAction(action('mark_order_shipped', { orderId: 'o1', awbNumber: 'AWB1' }))
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('mark_order_shipped not found', async () => {
-    primeAction(action('mark_order_shipped', { orderId: 'o1', awbNumber: null }), null)
+    primeAction(action('mark_order_shipped', { orderId: 'o1', awbNumber: null }))
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: 'Order not found' }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
+    expect((await res.json()).error).toBe('Order not found')
   })
 
   // ── send_order_delay_email ────────────────────────────────────────────────
@@ -438,22 +439,14 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
         ],
       })
     )
-    mockWithTx.mockImplementation(async (fn: any) =>
-      fn({
-        query: vi
-          .fn()
-          .mockResolvedValueOnce({ rows: [{ max_seq: '4' }] }) // seq
-          .mockResolvedValueOnce({ rows: [{ id: 'q1', quote_number: 'QT/26-27/JAN/5', view_token: 'tok' }] }) // insert quotation
-          .mockResolvedValue({ rows: [] }), // items
-      })
-    )
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => ({ quotation: { id: 'q1', quote_number: 'QT/26-27/JAN/5', total_amount: '236.00', view_token: 'tok' } }) }) as any
     const res = await POST(makeReq(), params)
     const body = await res.json()
     expect(res.status).toBe(200)
     expect(body.result.quotationId).toBe('q1')
   })
 
-  it('create_quotation transaction error', async () => {
+  it('create_quotation endpoint error', async () => {
     mockQueryOne.mockResolvedValueOnce(
       action('create_quotation', {
         consignee_email: 'c@b.com',
@@ -480,7 +473,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
         ],
       })
     )
-    mockWithTx.mockRejectedValue(new Error('tx failed'))
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: 'tx failed' }) }) as any
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/tx failed/i)

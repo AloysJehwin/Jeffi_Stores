@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query, resolveRequestTenant } from '@/lib/shared/db'
 import { restoreOrderStock } from '@/lib/orders/order-stock'
 import { cancelInvoicePaymentArtifacts } from '@/lib/payments/razorpay'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,10 +30,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     await restoreOrderStock(id)
 
+    // Money already collected or refunded keeps its status, so a paid invoice shows "Refund pending"
+    // and can go through the refund flow; an unpaid one is voided.
     await query(
-      `UPDATE orders SET status = 'cancelled', payment_status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+      `UPDATE orders SET status = 'cancelled',
+              payment_status = CASE WHEN payment_status IN ('paid', 'cod_collected', 'refunded') THEN payment_status ELSE 'cancelled' END,
+              updated_at = NOW()
+        WHERE id = $1`,
       [id]
     )
+    await logAdminAudit({
+      adminId: admin.adminId,
+      action: 'update',
+      entityType: 'order',
+      entityId: id,
+      summary: `Invoice ${order.order_number} cancelled`,
+      diff: { status: { from: order.status, to: 'cancelled' } },
+      metadata: { source: 'offline', payment_status: order.payment_status },
+      request,
+    }).catch(() => {})
 
     // Void the open payment artifacts so a buyer can no longer pay a cancelled invoice. Best-effort:
     // never fails the cancel, and marks the payment link cancelled locally when the gateway confirms.

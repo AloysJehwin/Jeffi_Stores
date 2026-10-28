@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({
+  hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
@@ -609,17 +612,17 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── mark_invoice_paid not found ─────────────────────────────────────────
 
   it('returns 500 when mark_invoice_paid invoice not found', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({
-        id: ACTION_ID,
-        admin_id: ADMIN.adminId,
-        conversation_id: 'conv-1',
-        kind: 'mark_invoice_paid',
-        payload: { orderId: 'bad', paymentMode: 'upi', paidAt: null },
-        status: 'proposed',
-      } as any)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'mark_invoice_paid',
+      payload: { orderId: 'bad', paymentMode: 'upi', paidAt: null },
+      status: 'proposed',
+    } as any)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: 'Order not found' }) }))
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    vi.unstubAllGlobals()
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/not found|already paid/)
   })

@@ -7,7 +7,15 @@ import {
   updateCampaignTemplate,
   sendMailerBroadcast,
 } from './messaging'
-import { markOrderShipped, callAdminApi, markInvoicePaid, updateOrderStatus } from './orders'
+import {
+  markOrderShipped,
+  callAdminApi,
+  markInvoicePaid,
+  updateOrderStatus,
+  setPaymentStatus,
+  cancelOrder,
+  refundOrder,
+} from './orders'
 import { createQuotation, sendQuotationEmail } from './quotations'
 import {
   createCoupon,
@@ -42,6 +50,9 @@ const HANDLERS: Record<string, ActionHandler> = {
   send_quotation_email: sendQuotationEmail,
   mark_invoice_paid: markInvoicePaid,
   update_order_status: updateOrderStatus,
+  set_payment_status: setPaymentStatus,
+  cancel_order: cancelOrder,
+  refund_order: refundOrder,
   create_coupon: createCoupon,
   update_campaign_template: updateCampaignTemplate,
   send_mailer_broadcast: sendMailerBroadcast,
@@ -69,5 +80,10 @@ const HANDLERS: Record<string, ActionHandler> = {
 export async function executeAction(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
   const handler = HANDLERS[action.kind]
   if (!handler) return { result: null, error: `Unknown action kind: ${action.kind}` }
-  return handler(action, cookieHeader)
+  // A throw (network, DB) still settles the action as failed instead of leaving it 'approved'.
+  try {
+    return await handler(action, cookieHeader)
+  } catch (err: any) {
+    return { result: null, error: String(err?.message || 'Action failed') }
+  }
 }
