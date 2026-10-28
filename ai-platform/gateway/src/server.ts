@@ -178,15 +178,18 @@ async function chatRazer(req: AiChatRequest, emit?: Emit): Promise<AiChatRespons
   return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false, cache: null, usage }
 }
 
-/** Claude first when it leads the default text order; PaddleOCR/Ollama otherwise or on failure. */
+/** Claude first when it leads the text order; PaddleOCR/Ollama otherwise or on failure, only while the order has razer. */
 async function handleVision(body: VisionRequest): Promise<VisionResponse> {
-  if (TEXT_PROVIDER_ORDER[0] === 'anthropic' && anthropicAvailable(body) && !body.model) {
+  const route = textRoute(body)
+  if (route[0] === 'anthropic' && anthropicAvailable(body) && !body.model) {
     try {
       return await anthropicVision(body)
     } catch (err) {
+      if (!route.includes('razer')) throw err
       console.warn(`[ai-gateway] Claude vision failed, falling back: ${(err as Error).message.slice(0, 300)}`)
     }
   }
+  if (!route.includes('razer')) throw new NotConfiguredError('no vision provider in the requested order is available')
   return runJob<VisionResponse>({ kind: 'vision', payload: body })
 }
 

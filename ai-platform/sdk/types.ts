@@ -231,6 +231,8 @@ export interface VisionRequest {
   model?: string
   cacheNamespace?: string
   anthropicIdentity?: AnthropicIdentity
+  /** The store's text order (Site Controls): Claude reads images when it leads; OCR/Ollama only when razer is in it. */
+  providers?: TextProviderName[]
 }
 
 export interface VisionResponse {

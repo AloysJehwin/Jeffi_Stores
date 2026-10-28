@@ -11,6 +11,7 @@ vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
 
 import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider, __resetAiClientState } from '@/lib/shared/ai-client'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { getAiRouting } from '@/lib/providers/policy'
 
 const GATEWAY_REPLY = {
   content: 'Hello world',
@@ -184,7 +185,7 @@ describe('aiVision (gateway client)', () => {
   })
 })
 
-describe('direct Ollama fallback (OLLAMA_BASE_URL set)', () => {
+describe('direct Ollama fallback (OLLAMA_BASE_URL set, Razer in Site Controls)', () => {
   const OLLAMA = 'http://ollama.test:11434'
   type Handler = (url: string, init?: any) => any
   let gateway: Handler
@@ -196,6 +197,7 @@ describe('direct Ollama fallback (OLLAMA_BASE_URL set)', () => {
 
   beforeEach(() => {
     vi.stubEnv('OLLAMA_BASE_URL', OLLAMA)
+    vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic', 'razer'] })
     vi.stubEnv('OLLAMA_FAST_MODEL', 'fast-model')
     vi.stubEnv('OLLAMA_SQL_MODEL', 'sql-model')
     errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -209,6 +211,7 @@ describe('direct Ollama fallback (OLLAMA_BASE_URL set)', () => {
   })
   afterEach(() => {
     vi.unstubAllEnvs()
+    vi.mocked(getAiRouting).mockResolvedValue({})
     errSpy.mockRestore()
   })
 
@@ -248,6 +251,16 @@ describe('direct Ollama fallback (OLLAMA_BASE_URL set)', () => {
     expect(calls('/v1/chat')).toHaveLength(0)
     await aiChat({ messages: [{ role: 'user', content: 'again' }] })
     expect(calls('/healthz')).toHaveLength(1)
+  })
+
+  it('never goes to Ollama when Site Controls leaves Razer out', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic'] })
+    gateway = () => status(503, '{"error":"no text provider in the requested order is available"}')
+    const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
+    expect(err).toBeInstanceOf(AiClientError)
+    expect(err.message).toMatch(/Razer is off in Site Controls/)
+    expect((await aiVision(['x'], 'read')).ok).toBe(false)
+    expect(calls(OLLAMA)).toHaveLength(0)
   })
 
   it('does NOT fall back on a 4xx', async () => {

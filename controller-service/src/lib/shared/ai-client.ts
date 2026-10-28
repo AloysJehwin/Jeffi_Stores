@@ -163,21 +163,31 @@ async function gatewayPost(path: string, body: unknown, label: string, withBody:
   }
 }
 
-async function withFallback<T>(op: string, gateway: () => Promise<T>, direct: (timeoutMs: number) => Promise<T>): Promise<T> {
+type Direct<T> = (timeoutMs: number) => Promise<T>
+
+/** Direct Ollama only when Site Controls lists Razer for this store; no built-in fallback. */
+function directFor<T>(providers: string[] | undefined, direct: Direct<T>): Direct<T> | 'razer-off' | null {
+  return providers?.includes('razer') ? direct : providers?.length ? 'razer-off' : null
+}
+
+async function withFallback<T>(op: string, gateway: () => Promise<T>, direct: Direct<T> | 'razer-off' | null): Promise<T> {
   const start = Date.now()
-  const canFallback = !!ollamaDirectUrl()
-  if (canFallback && !(await gatewayReachable())) {
+  const fallback = ollamaDirectUrl() && typeof direct === 'function' ? direct : null
+  if (fallback && !(await gatewayReachable())) {
     console.error(`[ai-client] gateway ${GATEWAY_URL} unreachable; ${op} via direct Ollama`)
-    return runDirect(op, direct, DIRECT_TIMEOUT_MS)
+    return runDirect(op, fallback, DIRECT_TIMEOUT_MS)
   }
   try {
     return await gateway()
   } catch (err) {
-    if (!canFallback || !(err instanceof GatewayFailure) || !err.retryable) throw err
+    if (direct === 'razer-off' && err instanceof GatewayFailure && err.retryable) {
+      throw new AiClientError(`AI unavailable (${err.message}); Razer is off in Site Controls → Providers, so nothing else can answer`, 'gateway', err)
+    }
+    if (!fallback || !(err instanceof GatewayFailure) || !err.retryable) throw err
     console.error(`[ai-client] gateway ${op} failed (${err.message.slice(0, 300)}); falling back to direct Ollama`)
     // One overall budget, so a slow gateway plus a fallback cannot double the caller's wait.
     const remaining = GATEWAY_TIMEOUT_MS + 20_000 - (Date.now() - start)
-    return runDirect(op, direct, Math.min(DIRECT_TIMEOUT_MS, Math.max(MIN_DIRECT_MS, remaining)), err)
+    return runDirect(op, fallback, Math.min(DIRECT_TIMEOUT_MS, Math.max(MIN_DIRECT_MS, remaining)), err)
   }
 }
 
@@ -222,10 +232,11 @@ async function gatewayContext(cacheNamespace: string | undefined) {
 }
 
 export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
+  const ctx = await gatewayContext(req.cacheNamespace)
   const res = await withFallback(
     'chat',
-    async () => gatewayPost('/v1/chat', { ...req, ...(await gatewayContext(req.cacheNamespace)) }, '', true) as Promise<AiChatResponse>,
-    ms => directChat(req, ms),
+    () => gatewayPost('/v1/chat', { ...req, ...ctx }, '', true) as Promise<AiChatResponse>,
+    directFor(ctx.providers, ms => directChat(req, ms)),
   )
   if (req.billing !== false) {
     void logChatUsage(req, res).catch(err => console.warn('[ai-client] usage log failed:', (err as Error).message))
@@ -236,7 +247,7 @@ export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
 /**
  * Streaming variant of aiChat: text deltas and tool-call starts arrive through onEvent while the
  * model runs; resolves with the same final response. Usage is recorded once, at the end. When the
- * gateway stream fails before any output, falls back to aiChat (which itself falls back to Ollama).
+ * gateway stream fails before any output, falls back to aiChat (Ollama only when Site Controls lists Razer).
  */
 export async function aiChatStream(
   req: AiChatRequest,
@@ -442,13 +453,11 @@ export async function aiVision(
   const started = Date.now()
   let r: AiVisionResult
   try {
+    const ctx = await gatewayContext(opts.cacheNamespace)
     r = await withFallback(
       'vision',
-      async () => {
-        const { cacheNamespace, anthropicIdentity } = await gatewayContext(opts.cacheNamespace)
-        return gatewayPost('/v1/vision', { images, prompt, model, cacheNamespace, anthropicIdentity }, 'vision ', false) as Promise<AiVisionResult>
-      },
-      ms => directVision(images, prompt, model, ms),
+      () => gatewayPost('/v1/vision', { images, prompt, model, ...ctx }, 'vision ', false) as Promise<AiVisionResult>,
+      directFor(ctx.providers, ms => directVision(images, prompt, model, ms)),
     )
   } catch (err) {
     return {
