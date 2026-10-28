@@ -61,7 +61,7 @@ export async function listEntitlements(userId: string): Promise<EntitledProduct[
     LEFT JOIN brands b ON b.id = p.brand_id
     CROSS JOIN LATERAL (
       SELECT COALESCE(array_agg(DISTINCT pf.kind), '{}') AS kinds, COUNT(*)::int AS file_count
-        FROM product_files pf WHERE pf.product_id = e.product_id AND pf.status = 'ready'
+        FROM product_files pf WHERE pf.product_id = e.product_id AND pf.status = 'ready' AND pf.draft_id IS NULL
     ) f
     WHERE e.user_id = $1 AND e.${ACTIVE}
     ORDER BY e.product_id, e.granted_at DESC
@@ -100,7 +100,7 @@ export async function ownedFilesForProduct(userId: string, productId: string): P
     `SELECT id, product_id, kind, status, downloadable, storage_key, display_name, original_name,
             mime_type, size_bytes, page_count, duration_seconds, display_order
        FROM product_files
-      WHERE product_id = $1 AND status = 'ready'
+      WHERE product_id = $1 AND status = 'ready' AND draft_id IS NULL
       ORDER BY display_order, created_at`,
     [productId]
   )
@@ -122,7 +122,7 @@ export async function ownedFileById(userId: string, fileId: string): Promise<Own
   const file = await queryOne<OwnedFile>(
     `SELECT id, product_id, kind, status, downloadable, storage_key, display_name, original_name,
             mime_type, size_bytes, page_count, duration_seconds, display_order
-       FROM product_files WHERE id = $1 AND status = 'ready'`,
+       FROM product_files WHERE id = $1 AND status = 'ready' AND draft_id IS NULL`,
     [fileId]
   )
   if (!file) return null

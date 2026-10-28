@@ -82,12 +82,13 @@ describe('POST /api/admin/products/[id]/publish — create-draft', () => {
 
 describe('POST /api/admin/products/[id]/publish — edit-draft', () => {
   beforeEach(() => {
-    vi.mocked(queryOne).mockResolvedValue({ product_id: ID } as any)
+    // The admin's open draft of the product (drafts have their own id).
+    vi.mocked(queryOne).mockResolvedValue({ id: 'd1', product_id: ID } as any)
   })
 
   it('publishes and activates', async () => {
     expect((await call()).status).toBe(200)
-    expect(publishProductDraft).toHaveBeenCalledWith(ID, expect.objectContaining({ activate: true }))
+    expect(publishProductDraft).toHaveBeenCalledWith(ID, expect.objectContaining({ activate: true, draftId: 'd1' }))
   })
 
   it('maps fixable problems to 400 and unit blocks to 409', async () => {

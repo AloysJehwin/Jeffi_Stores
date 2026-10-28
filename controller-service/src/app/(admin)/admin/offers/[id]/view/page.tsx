@@ -6,7 +6,12 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { getOfferById } from '@/lib/catalog/product-offers'
 import type { AssignOption } from '@/components/admin/OffersProductPicker'
 import OfferDetailClient from '../OfferDetailClient'
-import { initialDraftLock } from '@/lib/admin/draft-locks'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { draftsForView } from '@/lib/admin/draft-branches'
+import { offerDrafts } from '@/lib/admin/offer-drafts'
+import EntityDrafts from '@/components/admin/drafts/EntityDrafts'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { startOfferDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,15 +76,29 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
   const offer = await getOfferById(id)
   if (!offer) notFound()
 
-  // Someone else's draft renders read-only from the first paint, with their name in the banner.
-  const [host, options, initialLock] = await Promise.all([getHost(), loadAssignOptions(), initialDraftLock('offer', id)])
+  // Read-only here: Edit opens the admin's own draft (or starts one); the open drafts are listed below.
+  const me = (await getAdminSession())?.adminId ?? null
+  const [host, options, drafts] = await Promise.all([getHost(), loadAssignOptions(), draftsForView(offerDrafts, id, me)])
+  const back = '/admin/offers?tab=offers'
+  const start = startOfferDraft.bind(null, id)
   return (
     <OfferDetailClient
       offer={offer}
-      backHref={ap('/admin/offers?tab=offers', host)}
+      backHref={ap(back, host)}
       categoryOptions={options.categories}
       brandOptions={options.brands}
-      initialLock={initialLock}
+      draftCount={drafts.length}
+      actions={
+        <RequireWrite scope="coupons">
+          <form action={start}>
+            <input type="hidden" name="_back" value={back} />
+            <button type="submit" className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600">
+              {drafts.some(d => d.authorId === me) ? 'Edit my draft' : 'Edit'}
+            </button>
+          </form>
+        </RequireWrite>
+      }
+      notices={drafts.length > 0 && <EntityDrafts drafts={drafts} start={start} back={back} me={me} noun="offer" />}
     />
   )
 }

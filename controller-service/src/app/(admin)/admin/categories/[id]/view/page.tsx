@@ -1,12 +1,14 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Info } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import CopySku from '@/components/ui/CopySku'
-import { ACTIVE_STATUS, Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ViewDraftLink } from '@/components/admin/kit'
-import { heldDraftForView } from '@/lib/admin/draft-locks'
+import { ACTIVE_STATUS, Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge } from '@/components/admin/kit'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { draftsForView } from '@/lib/admin/draft-branches'
+import { categoryDrafts } from '@/lib/catalog/category-draft'
+import EntityDrafts from '@/components/admin/drafts/EntityDrafts'
 import { startCategoryDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -61,9 +63,10 @@ export default async function CategoryViewPage({
   const category = await queryOne<Category>('SELECT * FROM categories WHERE id = $1', [id])
   if (!category) notFound()
 
-  const [hasDraft, held, parent, subcategories, products, counts] = await Promise.all([
-    queryOne<{ category_id: string }>('SELECT category_id FROM category_drafts WHERE category_id = $1', [id]),
-    heldDraftForView('category', id, `/admin/categories/${id}/edit`, backUrl),
+  const session = await getAdminSession()
+  const me = session?.adminId ?? null
+  const [drafts, parent, subcategories, products, counts] = await Promise.all([
+    draftsForView(categoryDrafts, id, me),
     category.parent_category_id
       ? queryOne<{
           id: string
@@ -88,6 +91,7 @@ export default async function CategoryViewPage({
     queryOne<{ total: string }>('SELECT COUNT(*)::text AS total FROM products WHERE category_id = $1', [id]),
   ])
 
+  const myDraft = drafts.find(d => d.authorId === me)
   const totalProducts = parseInt(counts?.total || '0', 10)
   const isInherited = !!category.parent_category_id && category.return_allowed == null
 
@@ -110,49 +114,22 @@ export default async function CategoryViewPage({
             <>
               <StatusBadge status={String(category.is_active)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Inactive', tone: 'red' } }} />
               <Badge tone="blue">{category.parent_category_id ? 'Subcategory' : 'Main'}</Badge>
-              {hasDraft && <Badge tone="amber">Draft pending</Badge>}
+              {drafts.length > 0 && <Badge tone="amber">{drafts.length === 1 ? 'Draft pending' : `${drafts.length} drafts`}</Badge>}
             </>
           }
           subtitle={category.description || undefined}
           identifiers={[{ label: 'Created', value: created }]}
           actions={
-            held ? (
-              <ViewDraftLink held={held} />
-            ) : hasDraft ? (
-              <Link
-                href={ap(`/admin/categories/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
-                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-              >
-                Edit Draft
-              </Link>
-            ) : (
-              <form action={startCategoryDraft.bind(null, id)}>
-                <input type="hidden" name="_back" value={backUrl} />
-                <button
-                  type="submit"
-                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-                >
-                  Edit
-                </button>
-              </form>
-            )
+            <form action={startCategoryDraft.bind(null, id)}>
+              <input type="hidden" name="_back" value={backUrl} />
+              <button type="submit" className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600">
+                {myDraft ? 'Edit my draft' : 'Edit'}
+              </button>
+            </form>
           }
         />
       }
-      notices={
-        hasDraft && (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
-            <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground">
-              {held ? (
-                <>This category has unpublished draft changes by {held.ownerName}. You can view them read-only.</>
-              ) : (
-                <>This category has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to review and publish them.</>
-              )}
-            </p>
-          </div>
-        )
-      }
+      notices={drafts.length > 0 && <EntityDrafts drafts={drafts} start={startCategoryDraft.bind(null, id)} back={backUrl} me={me} noun="category" />}
       kpis={
         <KpiGrid>
           <Kpi label="Total products" value={totalProducts.toLocaleString('en-IN')} />

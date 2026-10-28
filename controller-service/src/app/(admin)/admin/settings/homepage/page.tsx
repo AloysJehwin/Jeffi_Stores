@@ -10,7 +10,12 @@ import HeroSlideManager from '@/components/admin/HeroSlideManager'
 import HomepageSectionManager from '@/components/admin/homepage/HomepageSectionManager'
 import HomepageFormFooter from '@/components/admin/homepage/HomepageFormFooter'
 import { HomepageLockBanner, HomepageLockProvider } from '@/components/admin/homepage/HomepageLock'
-import { HOMEPAGE_LOCK_ID, initialDraftLock } from '@/lib/admin/draft-locks'
+import EntityDrafts from '@/components/admin/drafts/EntityDrafts'
+import DraftBehindBanner from '@/components/admin/drafts/DraftBehindBanner'
+import MergeOnLoad from '@/components/admin/drafts/MergeOnLoad'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
+import { HOMEPAGE_ENTITY_ID, initialDraftLock } from '@/lib/admin/draft-locks'
+import { draftBehind, draftsForView } from '@/lib/admin/draft-branches'
 import { getStorefrontContent, getStoreIdentity } from '@/lib/catalog/site-controls'
 import {
   HOMEPAGE_AUDIENCES,
@@ -27,10 +32,10 @@ import {
   type SectionType,
 } from '@/lib/catalog/homepage-sections'
 import { getHomepagePlan, planName } from '@/lib/catalog/homepage-plan'
-import { getEditableHomepage, getHomepageDraftSummary, type DraftDiff } from '@/lib/catalog/homepage-draft'
+import { getEditableHomepage, getHomepageDraftSummary, homepageDrafts, type DraftDiff } from '@/lib/catalog/homepage-draft'
 import type { SectionOptions } from '@/components/admin/homepage/editors/fields'
 import { Badge, PageHeader, TabLinks } from '@/components/admin/kit'
-import { resnapshotHomepageSession } from './actions'
+import { resnapshotHomepageSession, startHomepageDraft } from './actions'
 
 const PAGE_COPY: Record<HomepagePage, { tab: string; description: string }> = {
   home: {
@@ -145,7 +150,7 @@ async function loadSectionOptions(
 export default async function HomepagePage({
   searchParams,
 }: {
-  searchParams: Promise<{ surface?: string; page?: string; audience?: string }>
+  searchParams: Promise<{ surface?: string; page?: string; audience?: string; draft?: string; view?: string; merge?: string }>
 }) {
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
@@ -160,13 +165,22 @@ export default async function HomepagePage({
     redirect(ap('/admin/settings', host))
   }
 
-  const [hero, editable, draftSummary, initialLock, plan] = await Promise.all([
+  // ?draft=<id> edits that draft; without one the live homepage shows read-only.
+  const askedDraft = params.draft && /^[0-9a-f-]{36}$/i.test(params.draft) ? params.draft : null
+  const [hero, editable, draftSummary, plan, drafts] = await Promise.all([
     loadHeroData(),
-    getEditableHomepage(),
-    getHomepageDraftSummary(),
-    initialDraftLock('homepage', HOMEPAGE_LOCK_ID),
+    getEditableHomepage(askedDraft),
+    getHomepageDraftSummary(askedDraft),
     getHomepagePlan(),
+    draftsForView(homepageDrafts, HOMEPAGE_ENTITY_ID, adminId),
   ])
+  const draftId = editable.draft?.id ?? null
+  const draftGone = !!askedDraft && !draftId
+  const [initialLock, behind] = draftId
+    ? await Promise.all([initialDraftLock('homepage', draftId), draftBehind(homepageDrafts, draftId)])
+    : [null, null]
+  const showDrafts = params.view === 'drafts'
+  const myDraft = drafts.find(d => d.authorId === adminId)
   // The business homepage has no listing pages, and falls back to the store's without the plan.
   const audience: HomepageAudience = params.audience === 'business' && plan.business ? 'business' : 'store'
   const business = audience === 'business'
@@ -195,8 +209,16 @@ export default async function HomepagePage({
     if (a === 'business') q.set('audience', a)
     else if (p !== 'home') q.set('page', p)
     if (s !== 'web') q.set('surface', s)
+    if (draftId) q.set('draft', draftId)
     return q.size ? `${base}?${q}` : base
   }
+  const tabFields = (
+    <>
+      {business && <input type="hidden" name="audience" value="business" />}
+      {!business && page !== 'home' && <input type="hidden" name="page" value={page} />}
+      {surface !== 'web' && <input type="hidden" name="surface" value={surface} />}
+    </>
+  )
   // Pending-change counts per tab come from the server render; the footer keeps the live total.
   const pendingOf = (d: { sections: DraftDiff; slides: DraftDiff }) =>
     draftSummary.hasDraft
@@ -214,13 +236,88 @@ export default async function HomepagePage({
   // Mirror the other migrated entities: header carries only title + description + badges;
   // one shared FormFooter at the bottom owns Cancel / Save as Draft / Publish / Discard.
   return (
-    <HomepageLockProvider lockId={HOMEPAGE_LOCK_ID} initial={initialLock}>
+    <HomepageLockProvider draftId={draftId} initial={initialLock}>
       <div className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5">
         <PageHeader
-          title="Homepage"
+          title={draftId ? `Homepage · ${editable.draft?.title || 'Draft'}` : 'Homepage'}
           description={business ? BUSINESS_DESCRIPTION : PAGE_COPY[page].description}
-          badges={draftPending ? <Badge tone="amber">Draft pending</Badge> : null}
+          badges={
+            draftId ? (
+              draftPending ? <Badge tone="amber">Draft pending</Badge> : <Badge tone="muted">Draft · no changes yet</Badge>
+            ) : drafts.length ? (
+              <Badge tone="amber">{drafts.length === 1 ? '1 open draft' : `${drafts.length} open drafts`}</Badge>
+            ) : null
+          }
         />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={draftId ? `${base}?draft=${draftId}` : base}
+            scroll={false}
+            className={`control-sm inline-flex items-center rounded-md text-xs font-medium ${showDrafts ? 'text-foreground-muted hover:text-foreground' : 'bg-surface-secondary text-foreground'}`}
+          >
+            {draftId ? 'Editor' : 'Live homepage'}
+          </Link>
+          <Link
+            href={`${base}?view=drafts`}
+            scroll={false}
+            className={`control-sm inline-flex items-center rounded-md text-xs font-medium ${showDrafts ? 'bg-surface-secondary text-foreground' : 'text-foreground-muted hover:text-foreground'}`}
+          >
+            <DraftsTabLabel type="homepage" />
+          </Link>
+        </div>
+
+        {showDrafts ? (
+          <PageDrafts type="homepage">
+            <EntityDrafts drafts={drafts} start={startHomepageDraft} back={base} me={adminId} noun="homepage" />
+          </PageDrafts>
+        ) : (
+          <>
+        {draftGone && (
+          <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-foreground">
+            That draft was published or discarded. You are looking at the live homepage.
+          </p>
+        )}
+        {!draftId && (
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">You are looking at the live homepage</p>
+              <p className="text-xs text-foreground-muted">
+                Edits go into a draft and reach the store only when you publish. Several admins can each work on their own draft.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <form action={startHomepageDraft} className="flex items-center gap-2">
+                {tabFields}
+                <input type="hidden" name="_new" value="1" />
+                <input name="_title" maxLength={120} placeholder="Draft name (optional)" className="control-sm w-44 rounded-md border border-border-secondary bg-surface px-2 text-xs" />
+                <button type="submit" className="control-sm inline-flex items-center border border-border-secondary bg-surface text-xs text-foreground-secondary hover:bg-surface-secondary">
+                  New draft
+                </button>
+              </form>
+              {myDraft && (
+                <form action={startHomepageDraft}>
+                  {tabFields}
+                  <input type="hidden" name="_draft" value={myDraft.id} />
+                  <button type="submit" className="control-sm inline-flex items-center bg-accent-500 text-xs font-semibold text-white hover:bg-accent-600">
+                    Continue my draft
+                  </button>
+                </form>
+              )}
+            </div>
+          </section>
+        )}
+        {!draftId && drafts.length > 0 && (
+          <EntityDrafts drafts={drafts} start={startHomepageDraft} back={base} me={adminId} noun="homepage" />
+        )}
+        {draftId && params.merge === '1' && (
+          <MergeOnLoad
+            publishPath={`/api/admin/homepage-draft/publish?draft=${draftId}`}
+            doneHref={base}
+            closeHref={hrefFor(page, surface)}
+          />
+        )}
+        {draftId && <DraftBehindBanner info={behind} siblings={drafts.length - 1} noun="homepage" />}
 
         <div
           role="tablist"
@@ -324,11 +421,17 @@ export default async function HomepagePage({
           }
         />
 
-        <HomepageFormFooter
-          initialSummary={draftSummary}
-          resnapshotAction={resnapshotHomepageSession}
-          cancelHref={ap('/admin/settings', host)}
-        />
+        {draftId && (
+          <HomepageFormFooter
+            draftId={draftId}
+            initialSummary={draftSummary}
+            resnapshotAction={resnapshotHomepageSession}
+            cancelHref={base}
+            liveHref={base}
+          />
+        )}
+          </>
+        )}
       </div>
     </HomepageLockProvider>
   )

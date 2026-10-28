@@ -1,12 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
+import { useDraftLock } from '@/hooks/useDraftLock'
+import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
+import { DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
+import { FormButton, FormFooter } from '@/components/admin/kit/form'
+import { assertDraftResponse, lockHeaders } from '@/lib/client/draft-lock-client'
+import type { ScenarioDraftFields } from '@/lib/campaigns/scenario-drafts'
 
 interface Validation {
   ok: boolean
@@ -18,6 +25,17 @@ interface Validation {
 
 type Step = 'describe' | 'review_sql' | 'dry_run' | 'save'
 
+interface DryRun {
+  count: number
+  sample: string[]
+  productCount: number | null
+  productSample: Array<{ name: string; price: number | null; image_url: string | null }>
+  elapsedMs: number | null
+}
+
+const DRAFTS = '/api/admin/campaigns/scenarios/drafts'
+const LIST = '/admin/campaigns/scenarios'
+
 function slugify(s: string): string {
   return s
     .toLowerCase()
@@ -26,9 +44,10 @@ function slugify(s: string): string {
     .slice(0, 64)
 }
 
-export default function NewScenarioClient() {
+export default function NewScenarioClient({ initialDraftId }: { initialDraftId?: string | null }) {
   const router = useRouter()
   const { showToast } = useToast()
+  const confirm = useConfirm()
 
   const [step, setStep] = useState<Step>('describe')
   const [aiPrompt, setAiPrompt] = useState('')
@@ -52,6 +71,167 @@ export default function NewScenarioClient() {
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [dryRunning, setDryRunning] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // The wizard's draft: created after the first generation (or Save as Draft), then autosaved.
+  const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null)
+  const draftIdRef = useRef(draftId)
+  draftIdRef.current = draftId
+  const [loaded, setLoaded] = useState(!initialDraftId)
+  const skipSaveRef = useRef(true)
+  const creatingRef = useRef<Promise<string | null> | null>(null)
+  const doneRef = useRef(false)
+  // The draft this component already holds in state (the URL catching up must not reload it).
+  const hydratedRef = useRef<string | null>(null)
+
+  const fields = (): ScenarioDraftFields => ({
+    step,
+    aiPrompt,
+    sql,
+    productSql,
+    explanation,
+    validation,
+    productValidation,
+    dryRun:
+      dryRunCount === null
+        ? null
+        : { count: dryRunCount, sample: dryRunSample, productCount: dryRunProductCount, productSample: dryRunProductSample, elapsedMs: dryRunElapsedMs },
+    name,
+    kind,
+    description,
+  })
+  const draftBody = () => ({ title: name.trim() || null, fields: fields() })
+
+  const lock = useDraftLock({ resourceType: 'scenario', resourceId: draftId })
+  const autosave = useAutosaveDraft<ReturnType<typeof draftBody>>({
+    save: async (body, signal) => {
+      const id = draftIdRef.current
+      if (!id) return
+      const res = await fetch(`${DRAFTS}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('scenario', id) },
+        credentials: 'include',
+        signal,
+        body: JSON.stringify(body),
+      })
+      await assertDraftResponse(res, 'Could not save the scenario draft')
+    },
+    enabled: () => !!draftIdRef.current && !doneRef.current && !lock.readOnly,
+    onLocked: (_err, unsaved) => lock.markLocked(unsaved),
+  })
+
+  async function ensureDraft(): Promise<string | null> {
+    if (draftIdRef.current) return draftIdRef.current
+    creatingRef.current ??= (async () => {
+      const res = await fetch(DRAFTS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(draftBody()),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.id) {
+        showToast(j.error || 'Could not save the scenario draft', 'error')
+        return null
+      }
+      skipSaveRef.current = true
+      hydratedRef.current = j.id
+      setDraftId(j.id)
+      router.replace(ap(`/admin/campaigns/scenarios/new?draft=${j.id}`), { scroll: false })
+      return j.id as string
+    })().finally(() => {
+      creatingRef.current = null
+    })
+    return creatingRef.current
+  }
+
+  // ?draft=<id>: pick the wizard up where it was left.
+  useEffect(() => {
+    if (!initialDraftId || initialDraftId === hydratedRef.current) return
+    hydratedRef.current = initialDraftId
+    let cancelled = false
+    ;(async () => {
+      const res = await fetch(`${DRAFTS}/${initialDraftId}`, { credentials: 'include' })
+      const j = await res.json().catch(() => ({}))
+      if (cancelled) return
+      if (!res.ok || !j.draft) {
+        showToast(j.error || 'Could not open the scenario draft', 'error')
+        router.replace(ap('/admin/campaigns?tab=drafts'))
+        return
+      }
+      const f: ScenarioDraftFields = j.draft.fields || {}
+      const dr = (f.dryRun ?? null) as DryRun | null
+      skipSaveRef.current = true
+      setAiPrompt(f.aiPrompt || '')
+      setSql(f.sql || '')
+      setProductSql(f.productSql || '')
+      setExplanation(f.explanation || '')
+      setValidation((f.validation as Validation) ?? null)
+      setProductValidation((f.productValidation as Validation) ?? null)
+      setDryRunCount(dr ? dr.count : null)
+      setDryRunSample(dr?.sample ?? [])
+      setDryRunProductCount(dr?.productCount ?? null)
+      setDryRunProductSample(dr?.productSample ?? [])
+      setDryRunElapsedMs(dr?.elapsedMs ?? null)
+      setName(f.name || '')
+      setKind(f.kind || '')
+      setDescription(f.description || '')
+      setStep(f.step && (f.step !== 'describe' || !f.sql) ? f.step : f.sql ? 'review_sql' : 'describe')
+      setDraftId(initialDraftId)
+      setLoaded(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDraftId])
+
+  const triggerRef = useRef(autosave.trigger)
+  triggerRef.current = autosave.trigger
+  useEffect(() => {
+    if (!loaded || doneRef.current) return
+    if (skipSaveRef.current) {
+      skipSaveRef.current = false
+      return
+    }
+    // The generated SQL is worth keeping: the first generation starts the draft.
+    if (!draftIdRef.current) {
+      if (sql) void ensureDraft()
+      return
+    }
+    triggerRef.current(draftBody())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, step, aiPrompt, sql, productSql, explanation, validation, productValidation, dryRunCount, dryRunSample, name, kind, description])
+
+  async function saveAsDraft() {
+    try {
+      if (draftIdRef.current) await autosave.flush(draftBody())
+      else if (!(await ensureDraft())) return
+    } catch {
+      return showToast('Could not save the scenario draft', 'error')
+    }
+    doneRef.current = true
+    showToast('Draft saved', 'success')
+    router.push(ap('/admin/campaigns?tab=drafts'))
+  }
+
+  async function discardDraft() {
+    const id = draftIdRef.current
+    if (!id) return
+    const ok = await confirm({
+      title: 'Discard scenario draft',
+      message: 'Throw away this unfinished scenario? The generated SQL and dry run are lost.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep',
+      variant: 'danger',
+    })
+    if (!ok) return
+    const res = await fetch(`${DRAFTS}/${id}`, { method: 'DELETE', credentials: 'include' })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) return showToast(j.error || 'Could not discard the draft', 'error')
+    doneRef.current = true
+    showToast('Scenario draft discarded', 'success')
+    router.push(ap(LIST))
+  }
 
   async function generate() {
     if (!aiPrompt.trim()) return
@@ -122,6 +302,7 @@ export default function NewScenarioClient() {
       return
     }
     setSaving(true)
+    doneRef.current = true
     try {
       const finalKind = kind.trim() ? slugify(kind) : slugify(name)
       const res = await fetch('/api/admin/campaigns/scenarios/create', {
@@ -136,15 +317,17 @@ export default function NewScenarioClient() {
           generated_sql: sql,
           product_sql: productSql || null,
           dry_run_count: dryRunCount,
+          draft_id: draftIdRef.current,
         }),
       })
       const data = await res.json()
       if (!res.ok) {
+        doneRef.current = false
         showToast(data.error || 'Failed to save', 'error')
         return
       }
       showToast(`Scenario "${data.kind}" created (paused). Enable it from the list to activate.`, 'success')
-      router.push(ap('/admin/campaigns/scenarios'))
+      router.push(ap(LIST))
     } finally {
       setSaving(false)
     }
@@ -153,18 +336,24 @@ export default function NewScenarioClient() {
   const validationOk = validation?.ok === true
   const stepIndex: Record<Step, number> = { describe: 0, review_sql: 1, dry_run: 2, save: 3 }
 
+  const backStep = step === 'save' || step === 'dry_run' ? 'review_sql' : step === 'review_sql' ? 'describe' : null
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm">
         <Link
-          href={ap('/admin/campaigns/scenarios')}
+          href={ap(LIST)}
           className="text-foreground-muted hover:text-foreground transition-colors"
         >
           Scenarios
         </Link>
         <span className="text-foreground-muted">/</span>
-        <span className="text-foreground font-medium">New scenario</span>
+        <span className="text-foreground font-medium">{draftId ? `New scenario${name.trim() ? ` · ${name.trim()}` : ''} (draft)` : 'New scenario'}</span>
       </div>
+      {draftId && <DraftLockBanner lock={lock} scope="campaigns:write" />}
+
+      <LockedFieldset readOnly={lock.readOnly}>
+      <div className="space-y-5">
 
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
         <div className="flex items-center gap-2 mb-1">
@@ -220,53 +409,17 @@ export default function NewScenarioClient() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <RequireWrite scope="campaigns:write">
-              <RequireAi
-                scope="mailer:write"
-                fallback={
-                  <span className="text-xs text-foreground-muted">
-                    AI tools are not available for your plan or role.
-                  </span>
-                }
-              >
-                <button
-                  type="button"
-                  onClick={generate}
-                  disabled={generating || !aiPrompt.trim()}
-                  className="px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {generating ? 'Generating…' : 'Generate SQL with AI'}
-                </button>
-              </RequireAi>
-            </RequireWrite>
-            <Link
-              href={ap('/admin/campaigns/scenarios')}
-              className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
-            >
-              Cancel
-            </Link>
-            {generateError && <span className="text-xs text-red-600 dark:text-red-400">{generateError}</span>}
-          </div>
+          {generateError && <p className="text-xs text-red-600 dark:text-red-400">{generateError}</p>}
         </div>
       )}
 
       {(step === 'review_sql' || step === 'dry_run' || step === 'save') && (
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Review the generated SQL</h2>
-              <p className="text-sm text-foreground-secondary mt-1">
-                Make sure it does what you expect before running a dry-run.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setStep('describe')}
-              className="text-xs text-foreground-muted hover:text-foreground transition-colors"
-            >
-              ← Back to description
-            </button>
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Review the generated SQL</h2>
+            <p className="text-sm text-foreground-secondary mt-1">
+              Make sure it does what you expect before running a dry-run.
+            </p>
           </div>
 
           <div className="p-3 bg-surface-secondary rounded-lg border-l-2 border-accent-500">
@@ -361,29 +514,7 @@ export default function NewScenarioClient() {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
-            <RequireWrite scope="campaigns:write">
-              <button
-                type="button"
-                onClick={dryRun}
-                disabled={dryRunning || !validationOk}
-                className="px-4 h-control bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-              >
-                {dryRunning ? 'Running…' : dryRunCount !== null ? 'Re-run dry run' : 'Run dry run'}
-              </button>
-              <RequireAi scope="mailer:write">
-                <button
-                  type="button"
-                  onClick={generate}
-                  disabled={generating}
-                  className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
-                >
-                  {generating ? 'Regenerating…' : 'Regenerate SQL'}
-                </button>
-              </RequireAi>
-            </RequireWrite>
-            {generateError && <span className="text-xs text-red-600 dark:text-red-400">{generateError}</span>}
-          </div>
+          {generateError && <p className="text-xs text-red-600 dark:text-red-400">{generateError}</p>}
 
           {dryRunCount !== null && (
             <div className="mt-2 p-4 bg-surface-secondary rounded-lg border border-border-default">
@@ -508,25 +639,65 @@ export default function NewScenarioClient() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <RequireWrite scope="campaigns:write">
-                  <button
-                    type="button"
-                    onClick={save}
-                    disabled={saving || !name.trim()}
-                    className="px-5 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    {saving ? 'Saving…' : 'Save scenario (paused)'}
-                  </button>
-                </RequireWrite>
-                <span className="text-[10px] text-foreground-muted">
-                  Saved scenarios are paused until you enable them on the list page.
-                </span>
-              </div>
+              <p className="text-[10px] text-foreground-muted">
+                Saved scenarios are paused until you enable them on the list page.
+              </p>
             </div>
           )}
         </div>
       )}
+      </div>
+      </LockedFieldset>
+
+      <FormFooter
+        lock={draftId ? lock : null}
+        autosave={draftId ? autosave.status : undefined}
+        discard={draftId ? discardDraft : undefined}
+        cancelHref={ap(LIST)}
+      >
+        {backStep && (
+          <FormButton type="button" variant="secondary" onClick={() => setStep(backStep)}>
+            Back
+          </FormButton>
+        )}
+        <RequireWrite scope="campaigns:write">
+          {step !== 'describe' && (
+            <RequireAi scope="campaigns:write">
+              <FormButton type="button" variant="secondary" onClick={generate} pending={generating} pendingLabel="Regenerating…">
+                Regenerate SQL
+              </FormButton>
+            </RequireAi>
+          )}
+          {(aiPrompt.trim() || draftId) && (
+            <FormButton type="button" variant="secondary" onClick={saveAsDraft} disabled={saving}>
+              Save as Draft
+            </FormButton>
+          )}
+          {step === 'describe' ? (
+            <RequireAi
+              scope="campaigns:write"
+              fallback={<span className="text-xs text-foreground-muted">AI tools are not available for your plan or role.</span>}
+            >
+              <FormButton type="button" onClick={generate} disabled={!aiPrompt.trim()} pending={generating} pendingLabel="Generating…">
+                Generate SQL with AI
+              </FormButton>
+            </RequireAi>
+          ) : step === 'save' && dryRunCount !== null ? (
+            <>
+              <FormButton type="button" variant="secondary" onClick={dryRun} pending={dryRunning} pendingLabel="Running…">
+                Re-run dry run
+              </FormButton>
+              <FormButton type="button" onClick={save} disabled={!name.trim()} pending={saving} pendingLabel="Saving…">
+                Save scenario (paused)
+              </FormButton>
+            </>
+          ) : (
+            <FormButton type="button" onClick={dryRun} disabled={!validationOk} pending={dryRunning} pendingLabel="Running…">
+              {dryRunCount !== null ? 'Re-run dry run' : 'Run dry run'}
+            </FormButton>
+          )}
+        </RequireWrite>
+      </FormFooter>
     </div>
   )
 }

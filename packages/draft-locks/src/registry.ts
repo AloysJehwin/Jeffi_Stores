@@ -18,9 +18,13 @@ export type DraftResourceType =
   | 'purchase_order'
   | 'po_new'
   | 'po_receive'
+  | 'cash_sale'
+  | 'scenario'
+  | 'google_ads_campaign'
+  | 'rfq_reply'
 
-/** The homepage draft is a singleton row; its lock uses the nil uuid. */
-export const HOMEPAGE_LOCK_ID = '00000000-0000-0000-0000-000000000000'
+/** The homepage is one entity with no row of its own; its drafts and revisions use the nil uuid. */
+export const HOMEPAGE_ENTITY_ID = '00000000-0000-0000-0000-000000000000'
 
 export interface DraftResourceDef {
   label: string
@@ -33,13 +37,25 @@ export interface DraftResourceDef {
   editHref: (id: string, ref?: string | null) => string
 }
 
+// Edit drafts are branches (their own id, several per entity); a never-published entity
+// (is_draft) is its own create-draft, locked by the entity id. `ref` carries the entity id.
+const branchSql = (draftTable: string, key: string, entity: string, nameCol: string) => ({
+  labelSql: `SELECT d.id, (e.${nameCol} || COALESCE(' · ' || NULLIF(d.title, ''), ''))::text AS label, d.${key}::text AS ref
+               FROM ${draftTable} d JOIN ${entity} e ON e.id = d.${key} WHERE d.id = ANY($1::uuid[])`,
+  hintSql: `SELECT author_admin_id AS admin_id FROM ${draftTable} WHERE id = $1`,
+})
+const branchHref = (path: string) => (id: string, ref?: string | null) =>
+  ref && ref !== id ? `/admin/${path}/${ref}/edit?draft=${id}` : `/admin/${path}/${id}/edit`
+
 const catalogDraft = (draftTable: string, key: string, entity: string, nameCol: string, path: string, writeScope: string) => ({
-  existsSql: `SELECT 1 FROM ${draftTable} WHERE ${key} = $1 UNION ALL SELECT 1 FROM ${entity} WHERE id = $1 AND is_draft LIMIT 1`,
-  listSql: `SELECT ${key} AS id, updated_at FROM ${draftTable}
+  existsSql: `SELECT 1 FROM ${draftTable} WHERE id = $1 UNION ALL SELECT 1 FROM ${entity} WHERE id = $1 AND is_draft LIMIT 1`,
+  listSql: `SELECT id, updated_at FROM ${draftTable}
             UNION SELECT id, created_at FROM ${entity} WHERE is_draft
               AND NOT EXISTS (SELECT 1 FROM ${draftTable} d WHERE d.${key} = ${entity}.id)`,
-  labelSql: `SELECT id, ${nameCol}::text AS label, NULL::text AS ref FROM ${entity} WHERE id = ANY($1::uuid[])`,
-  editHref: (id: string) => `/admin/${path}/${id}/edit`,
+  labelSql: `${branchSql(draftTable, key, entity, nameCol).labelSql}
+             UNION ALL SELECT id, ${nameCol}::text AS label, id::text AS ref FROM ${entity} WHERE id = ANY($1::uuid[])`,
+  hintSql: branchSql(draftTable, key, entity, nameCol).hintSql,
+  editHref: branchHref(path),
   writeScope,
   readScope: writeScope.replace(':write', ':read'),
 })
@@ -60,19 +76,19 @@ export const DRAFT_RESOURCES: Record<DraftResourceType, DraftResourceDef> = {
     label: 'Supplier',
     writeScope: 'inventory:write',
     readScope: 'inventory:read',
-    existsSql: `SELECT 1 FROM supplier_drafts WHERE supplier_id = $1`,
-    listSql: `SELECT supplier_id AS id, updated_at FROM supplier_drafts`,
-    labelSql: `SELECT id, name::text AS label, NULL::text AS ref FROM suppliers WHERE id = ANY($1::uuid[])`,
-    editHref: id => `/admin/suppliers/${id}/edit`,
+    existsSql: `SELECT 1 FROM supplier_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM supplier_drafts`,
+    ...branchSql('supplier_drafts', 'supplier_id', 'suppliers', 'name'),
+    editHref: branchHref('suppliers'),
   },
   offer: {
     label: 'Offer',
     writeScope: 'coupons:write',
     readScope: 'coupons:read',
-    existsSql: `SELECT 1 FROM offer_drafts WHERE offer_id = $1`,
-    listSql: `SELECT offer_id AS id, updated_at FROM offer_drafts`,
-    labelSql: `SELECT id, title::text AS label, NULL::text AS ref FROM product_offers WHERE id = ANY($1::uuid[])`,
-    editHref: id => `/admin/offers/${id}/edit`,
+    existsSql: `SELECT 1 FROM offer_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM offer_drafts`,
+    ...branchSql('offer_drafts', 'offer_id', 'product_offers', 'title'),
+    editHref: branchHref('offers'),
   },
   campaign: {
     label: 'Campaign',
@@ -89,11 +105,12 @@ export const DRAFT_RESOURCES: Record<DraftResourceType, DraftResourceDef> = {
     label: 'Homepage',
     writeScope: 'settings:write',
     readScope: 'settings:read',
-    existsSql: `SELECT 1 FROM homepage_drafts WHERE id = true`,
-    listSql: `SELECT '${HOMEPAGE_LOCK_ID}'::uuid AS id, updated_at FROM homepage_drafts WHERE id = true`,
-    labelSql: `SELECT '${HOMEPAGE_LOCK_ID}'::uuid AS id, 'Homepage'::text AS label, NULL::text AS ref`,
-    hintSql: `SELECT updated_by AS admin_id FROM homepage_drafts WHERE id = true`,
-    editHref: () => `/admin/settings/homepage`,
+    existsSql: `SELECT 1 FROM homepage_draft_branches WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM homepage_draft_branches`,
+    labelSql: `SELECT id, ('Homepage' || COALESCE(' · ' || NULLIF(title, ''), ''))::text AS label, NULL::text AS ref
+                 FROM homepage_draft_branches WHERE id = ANY($1::uuid[])`,
+    hintSql: `SELECT author_admin_id AS admin_id FROM homepage_draft_branches WHERE id = $1`,
+    editHref: id => `/admin/settings/homepage?draft=${id}`,
   },
   mailer: {
     label: 'Message',
@@ -154,6 +171,50 @@ export const DRAFT_RESOURCES: Record<DraftResourceType, DraftResourceDef> = {
     labelSql: `SELECT id, ('Receive ' || po_number)::text AS label, NULL::text AS ref FROM purchase_orders WHERE id = ANY($1::uuid[])`,
     hintSql: `SELECT admin_id FROM po_receive_drafts WHERE po_id = $1`,
     editHref: id => `/admin/purchase-orders?po=${id}`,
+  },
+  cash_sale: {
+    label: 'Held bill',
+    writeScope: 'invoices:write',
+    readScope: 'invoices:read',
+    existsSql: `SELECT 1 FROM cash_sale_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM cash_sale_drafts`,
+    labelSql: `SELECT id, (COALESCE(NULLIF(label, ''), 'Held bill') || ' · ' || jsonb_array_length(items) || ' item(s)')::text AS label, NULL::text AS ref
+                 FROM cash_sale_drafts WHERE id = ANY($1::uuid[])`,
+    hintSql: `SELECT admin_id FROM cash_sale_drafts WHERE id = $1`,
+    editHref: id => `/admin/cash-sale?draft=${id}`,
+  },
+  scenario: {
+    label: 'Scenario',
+    writeScope: 'campaigns:write',
+    readScope: 'campaigns:read',
+    existsSql: `SELECT 1 FROM scenario_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM scenario_drafts`,
+    labelSql: `SELECT id, ('New scenario · ' || COALESCE(NULLIF(title, ''), NULLIF(fields->>'name', ''), 'untitled'))::text AS label, NULL::text AS ref
+                 FROM scenario_drafts WHERE id = ANY($1::uuid[])`,
+    hintSql: `SELECT admin_id FROM scenario_drafts WHERE id = $1`,
+    editHref: id => `/admin/campaigns/scenarios/new?draft=${id}`,
+  },
+  google_ads_campaign: {
+    label: 'Google Ads campaign',
+    writeScope: 'google_ads_campaigns:write',
+    readScope: 'google_ads:read',
+    existsSql: `SELECT 1 FROM ads_campaign_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM ads_campaign_drafts`,
+    labelSql: `SELECT id, ('New campaign · ' || COALESCE(NULLIF(title, ''), NULLIF(fields->'draft'->>'name', ''), 'untitled'))::text AS label, NULL::text AS ref
+                 FROM ads_campaign_drafts WHERE id = ANY($1::uuid[])`,
+    hintSql: `SELECT admin_id FROM ads_campaign_drafts WHERE id = $1`,
+    editHref: id => `/admin/google-ads?tab=drafts&draft=${id}`,
+  },
+  rfq_reply: {
+    label: 'RFQ reply',
+    writeScope: 'business_rfqs:write',
+    readScope: 'business_rfqs:read',
+    existsSql: `SELECT 1 FROM rfq_reply_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM rfq_reply_drafts`,
+    labelSql: `SELECT d.id, ('Reply · ' || r.rfq_number)::text AS label, d.rfq_id::text AS ref
+                 FROM rfq_reply_drafts d JOIN business_rfqs r ON r.id = d.rfq_id WHERE d.id = ANY($1::uuid[])`,
+    hintSql: `SELECT admin_id FROM rfq_reply_drafts WHERE id = $1`,
+    editHref: (id, ref) => `/admin/business/rfqs/${ref ?? ''}`,
   },
 }
 

@@ -3,8 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
-import { applyDraftPatch, homepageLockFrom, withHomepageDraft } from '@/lib/catalog/homepage-draft'
-import { lockedOr } from '@/lib/admin/draft-locks'
+import { applyDraftPatch, homepageLockFrom, withHomepageDraft, homepageDraftIdFrom, homepageDraftOr, noHomepageDraft } from '@/lib/catalog/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,11 +73,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
-  const slide = await withHomepageDraft(admin.adminId, draft => {
+  const draftId = homepageDraftIdFrom(request)
+  if (!draftId) return noHomepageDraft()
+  const slide = await withHomepageDraft(draftId, admin.adminId, draft => {
     const row = draft.heroSlides.find(s => s.id === id)
     if (row) applyDraftPatch(row, updates)
     return row ?? null
-  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
   if (slide instanceof NextResponse) return slide
   if (!slide) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
   return NextResponse.json({ slide })
@@ -92,9 +93,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasScope(admin.role, admin.scopes, 'settings:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const saved = await withHomepageDraft(admin.adminId, draft => {
+  const draftId = homepageDraftIdFrom(request)
+  if (!draftId) return noHomepageDraft()
+  const saved = await withHomepageDraft(draftId, admin.adminId, draft => {
     draft.heroSlides = draft.heroSlides.filter(s => s.id !== id)
-  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
   if (saved instanceof NextResponse) return saved
   return NextResponse.json({ success: true })
 }

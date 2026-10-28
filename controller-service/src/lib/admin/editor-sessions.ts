@@ -56,7 +56,7 @@ export async function snapshotResource(
     }
     case 'review_form': {
       const draft = await queryOne<{ fields: unknown; updated_at: string }>(
-        `SELECT fields, updated_at FROM review_form_drafts WHERE form_id = $1`,
+        `SELECT fields, updated_at FROM review_form_drafts WHERE id = $1`,
         [resourceId]
       )
       if (draft) return { snapshot: { kind: 'edit', fields: draft.fields }, updatedAt: draft.updated_at }
@@ -73,7 +73,7 @@ export async function snapshotResource(
       // The whole draft: variants, sub-variants, images, units and variant images change in a session too.
       const draft = await queryOne<Record<string, unknown> & { updated_at: string }>(
         `SELECT fields, variants, sub_variants, images, units, variant_images, updated_at
-           FROM product_drafts WHERE product_id = $1`,
+           FROM product_drafts WHERE id = $1`,
         [resourceId]
       )
       if (draft) {
@@ -86,9 +86,8 @@ export async function snapshotResource(
     case 'brand':
     case 'coupon': {
       const table = DRAFT_TABLE[resourceType]
-      const key = DRAFT_KEY[resourceType]
       const draft = await queryOne<{ fields: unknown; updated_at: string }>(
-        `SELECT fields, updated_at FROM ${table} WHERE ${key} = $1`,
+        `SELECT fields, updated_at FROM ${table} WHERE id = $1`,
         [resourceId]
       )
       if (draft) return { snapshot: { kind: 'edit', fields: draft.fields }, updatedAt: draft.updated_at }
@@ -104,7 +103,7 @@ export async function snapshotResource(
     }
     case 'supplier': {
       const row = await queryOne<Record<string, unknown>>(
-        `SELECT * FROM supplier_drafts WHERE supplier_id = $1`,
+        `SELECT * FROM supplier_drafts WHERE id = $1`,
         [resourceId]
       )
       if (!row) return null
@@ -112,7 +111,7 @@ export async function snapshotResource(
     }
     case 'offer': {
       const draft = await queryOne<{ fields: unknown; products: unknown; updated_at: string }>(
-        `SELECT fields, products, updated_at FROM offer_drafts WHERE offer_id = $1`,
+        `SELECT fields, products, updated_at FROM offer_drafts WHERE id = $1`,
         [resourceId]
       )
       if (draft) {
@@ -156,9 +155,9 @@ export async function snapshotResource(
       }
     }
     case 'homepage': {
-      // Singleton draft (homepage_drafts.id = true); resourceId is HOMEPAGE_LOCK_ID.
       const row = await queryOne<{ sections: unknown; hero_slides: unknown; updated_at: string }>(
-        `SELECT sections, hero_slides, updated_at FROM homepage_drafts WHERE id = true`
+        `SELECT sections, hero_slides, updated_at FROM homepage_draft_branches WHERE id = $1`,
+        [resourceId]
       )
       if (!row) return { snapshot: { kind: 'none' }, updatedAt: null }
       return {
@@ -174,13 +173,6 @@ const DRAFT_TABLE: Record<string, string> = {
   category: 'category_drafts',
   brand: 'brand_drafts',
   coupon: 'coupon_drafts',
-}
-
-const DRAFT_KEY: Record<string, string> = {
-  product: 'product_id',
-  category: 'category_id',
-  brand: 'brand_id',
-  coupon: 'coupon_id',
 }
 
 /**
@@ -227,7 +219,7 @@ export async function restoreSnapshot(
       const fields = (snapshot as { fields: Record<string, unknown> }).fields
       if (kind === 'edit') {
         await client.query(
-          `UPDATE review_form_drafts SET fields = $1::jsonb, updated_at = now() WHERE form_id = $2`,
+          `UPDATE review_form_drafts SET fields = $1::jsonb, updated_at = now() WHERE id = $2`,
           [JSON.stringify(fields), resourceId]
         )
       } else {
@@ -255,7 +247,7 @@ export async function restoreSnapshot(
     }
     case 'product': {
       if ((snapshot as { kind?: string }).kind !== 'edit') {
-        await client.query(`DELETE FROM product_drafts WHERE product_id = $1`, [resourceId])
+        await client.query(`DELETE FROM product_drafts WHERE id = $1`, [resourceId])
         return
       }
       // Older snapshots carry only fields; restore whichever columns were captured.
@@ -265,7 +257,7 @@ export async function restoreSnapshot(
       if (cols.length === 0) return
       await client.query(
         `UPDATE product_drafts SET ${cols.map((c, i) => `${c} = $${i + 1}::jsonb`).join(', ')}, updated_at = now()
-          WHERE product_id = $${cols.length + 1}`,
+          WHERE id = $${cols.length + 1}`,
         [...cols.map(c => JSON.stringify((snapshot as Record<string, unknown>)[c])), resourceId]
       )
       return
@@ -274,16 +266,16 @@ export async function restoreSnapshot(
     case 'brand':
     case 'coupon': {
       const table = DRAFT_TABLE[resourceType]
-      const key = DRAFT_KEY[resourceType]
       const kind = (snapshot as { kind?: string }).kind
       const fields = (snapshot as { fields: Record<string, unknown> }).fields
       if (kind === 'edit') {
         await client.query(
-          `UPDATE ${table} SET fields = $1::jsonb, updated_at = now() WHERE ${key} = $2`,
+          `UPDATE ${table} SET fields = $1::jsonb, updated_at = now() WHERE id = $2`,
           [JSON.stringify(fields), resourceId]
         )
       } else {
-        await client.query(`DELETE FROM ${table} WHERE ${key} = $1`, [resourceId])
+        // Only the session's own draft: siblings belong to other admins.
+        await client.query(`DELETE FROM ${table} WHERE id = $1`, [resourceId])
       }
       return
     }
@@ -304,7 +296,7 @@ export async function restoreSnapshot(
       // supplier_drafts has heterogeneous columns; restore by DELETE+INSERT of the snapshot row.
       const cols = Object.keys(snapshot).filter(c => c !== 'updated_at')
       const vals = cols.map(c => (snapshot as Record<string, unknown>)[c])
-      await client.query(`DELETE FROM supplier_drafts WHERE supplier_id = $1`, [resourceId])
+      await client.query(`DELETE FROM supplier_drafts WHERE id = $1`, [resourceId])
       const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ')
       await client.query(
         `INSERT INTO supplier_drafts (${cols.join(', ')}) VALUES (${placeholders})`,
@@ -319,11 +311,11 @@ export async function restoreSnapshot(
         const products = (snapshot as { products: unknown }).products
         await client.query(
           `UPDATE offer_drafts SET fields = $1::jsonb, products = $2::jsonb, updated_at = now()
-           WHERE offer_id = $3`,
+           WHERE id = $3`,
           [JSON.stringify(fields), JSON.stringify(products), resourceId]
         )
       } else {
-        await client.query(`DELETE FROM offer_drafts WHERE offer_id = $1`, [resourceId])
+        await client.query(`DELETE FROM offer_drafts WHERE id = $1`, [resourceId])
       }
       return
     }
@@ -385,23 +377,19 @@ export async function restoreSnapshot(
       return
     }
     case 'homepage': {
-      // Singleton: upsert the draft row back to the snapshot shape, or delete it if there was none.
+      // Put the draft back to the snapshot, or drop it if there was none.
       const kind = (snapshot as { kind?: string }).kind
       if (kind === 'edit') {
         const sections = (snapshot as { sections: unknown }).sections
         const heroSlides = (snapshot as { hero_slides: unknown }).hero_slides
         await client.query(
-          `INSERT INTO homepage_drafts (id, sections, hero_slides, updated_by, updated_at)
-             VALUES (true, $1::jsonb, $2::jsonb, $3::uuid, now())
-           ON CONFLICT (id) DO UPDATE
-             SET sections = EXCLUDED.sections,
-                 hero_slides = EXCLUDED.hero_slides,
-                 updated_by = EXCLUDED.updated_by,
-                 updated_at = now()`,
-          [JSON.stringify(sections ?? []), JSON.stringify(heroSlides ?? []), adminId ?? resourceId]
+          `UPDATE homepage_draft_branches
+              SET sections = $1::jsonb, hero_slides = $2::jsonb, updated_by = $3::uuid, updated_at = now()
+            WHERE id = $4`,
+          [JSON.stringify(sections ?? []), JSON.stringify(heroSlides ?? []), adminId ?? null, resourceId]
         )
       } else {
-        await client.query(`DELETE FROM homepage_drafts WHERE id = true`)
+        await client.query(`DELETE FROM homepage_draft_branches WHERE id = $1`, [resourceId])
       }
       return
     }

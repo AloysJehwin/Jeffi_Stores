@@ -1,32 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, withTransaction } from '@/lib/shared/db'
+import { queryOne } from '@/lib/shared/db'
 import { findOpenSession, saveSession } from '@/lib/admin/editor-sessions'
-import {
-  actorOf,
-  announceDraftClosed,
-  assertDraftHolder,
-  closeDraftLockTx,
-  draftLockResponse,
-  epochFrom,
-} from '@/lib/admin/draft-locks'
+import { actorOf, draftLockResponse, epochFrom } from '@/lib/admin/draft-locks'
+import { draftConflictResponse, getDraftRow } from '@/lib/admin/draft-branches'
+import { offerDrafts, publishOfferDraft } from '@/lib/admin/offer-drafts'
 
 export const dynamic = 'force-dynamic'
 
-const EDITABLE_COLUMNS = [
-  'title',
-  'slug',
-  'subtitle',
-  'badge_text',
-  'badge_color',
-  'cta_label',
-  'starts_at',
-  'ends_at',
-  'is_active',
-  'display_order',
-] as const
-
+// POST ?draft=<id> { resolutions? } — merge the draft into live; 409 lists overlapping edits.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
@@ -35,59 +18,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const offer = await queryOne<{ id: string }>(`SELECT id FROM product_offers WHERE id = $1`, [id])
-  if (!offer) return NextResponse.json({ error: 'Offer not found' }, { status: 404 })
+  const body = await request.json().catch(() => ({}))
+  const draftId = request.nextUrl.searchParams.get('draft') ?? body?.draftId
+  if (!draftId) return NextResponse.json({ error: 'Missing draft' }, { status: 400 })
+  const draft = await getDraftRow(offerDrafts, draftId)
+  if (!draft || draft.offer_id !== id) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 
-  const session = await findOpenSession(admin.adminId, 'offer', id)
-  if (!session) {
-    return NextResponse.json({ error: 'No open edit session' }, { status: 400 })
-  }
-
-  const draft = await queryOne<{ fields: Record<string, unknown> | null; products: string[] | null }>(
-    `SELECT fields, products FROM offer_drafts WHERE offer_id = $1`,
-    [id]
-  )
-
-  const actor = actorOf(admin)
-  let closed = null
+  let revision: number | null = null
   try {
-    await withTransaction(async client => {
-      await assertDraftHolder(client, actor, 'offer', id, { epoch: epochFrom(request) })
-      if (draft?.fields) {
-        const touched = EDITABLE_COLUMNS.filter(c => c in (draft.fields as object))
-        if (touched.length > 0) {
-          const sets = touched.map((c, i) => `${c} = $${i + 1}`)
-          const vals = touched.map(c => (draft.fields as Record<string, unknown>)[c])
-          vals.push(id)
-          await client.query(
-            `UPDATE product_offers SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${touched.length + 1}`,
-            vals
-          )
-        }
-      }
-      if (draft?.products) {
-        await client.query(`DELETE FROM product_offer_items WHERE offer_id = $1`, [id])
-        if (draft.products.length > 0) {
-          await client.query(
-            `INSERT INTO product_offer_items (offer_id, product_id)
-             SELECT $1, pid FROM unnest($2::uuid[]) AS pid
-           ON CONFLICT DO NOTHING`,
-            [id, draft.products]
-          )
-        }
-      }
-      await client.query(`DELETE FROM offer_drafts WHERE offer_id = $1`, [id])
-      closed = await closeDraftLockTx(client, actor, 'offer', id, 'published')
-    })
+    revision = (await publishOfferDraft(draftId, { actor: actorOf(admin), resolutions: body?.resolutions, epoch: epochFrom(request) })).revision
   } catch (err) {
-    const locked = draftLockResponse(err)
-    if (locked) return locked
+    const handled = draftLockResponse(err) ?? draftConflictResponse(err)
+    if (handled) return handled
     throw err
   }
-  await announceDraftClosed(actor, 'offer', id, closed, 'published')
 
-  await saveSession(session.id, admin.adminId)
+  // The draft is gone: close the editor's session as saved.
+  const session = await findOpenSession(admin.adminId, 'offer', draftId)
+  if (session) await saveSession(session.id, admin.adminId)
 
   const row = await queryOne(`SELECT * FROM product_offers WHERE id = $1`, [id])
-  return NextResponse.json({ offer: row })
+  return NextResponse.json({ offer: row, revision })
 }

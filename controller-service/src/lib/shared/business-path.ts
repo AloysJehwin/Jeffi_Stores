@@ -1,20 +1,34 @@
 /**
- * On business.jeffistores.in the app is served at the root, so pages live at
- * /signin, /signup, /products, etc. — not at /business/signin etc.
- * This helper strips the /business prefix when running on the subdomain.
+ * On a business host (business.<root>, and a tenant's {slug}.business.<root>) the app is served
+ * at the root, so pages live at /signin, /products, etc. — not at /business/signin.
+ * This helper strips the /business prefix there.
  *
- * In server components use getHost() to read the correct public hostname:
+ * In server components pass the request host (client components read window.location):
  *   import { getHost } from '@/lib/tenancy/get-host'
- *   const host = await getHost()
- *   bp('/business/products', host)
+ *   bp('/business/products', await getHost())
  */
+
+/** Same hosts appFromHost() calls 'business'; also matches *.localhost in dev. */
+export function isBusinessHost(host: string): boolean {
+  return /^business[.-]|\.business\./.test(host.toLowerCase())
+}
 
 export function bp(path: string, host?: string): string {
   const h = host ?? (typeof window !== 'undefined' ? window.location.hostname : '')
-  if (h.startsWith('business.')) {
-    return path.replace(/^\/business/, '') || '/'
+  if (isBusinessHost(h)) {
+    const rest = path.replace(/^\/business(?=\/|\?|$)/, '')
+    return rest.startsWith('/') ? rest : `/${rest}`
   }
   return path
+}
+
+/**
+ * Where to go after signing in: a path on this site from ?callbackUrl= / ?redirect=, mapped to
+ * this host's portal paths. Anything else (absolute or protocol-relative URLs) falls back.
+ */
+export function businessReturnPath(target: string | null | undefined, fallback = '/business'): string {
+  const safe = target && target.startsWith('/') && !target.startsWith('//') && !target.startsWith('/\\')
+  return bp(safe ? target : fallback)
 }
 
 /**

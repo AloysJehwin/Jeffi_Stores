@@ -22,7 +22,7 @@ type AiCosts = {
   top_refs: { ref: string; feature: string; calls: number; cost_inr: number; price_inr: number }[]
 }
 
-const PROVIDER_LABEL: Record<string, string> = { ollama: 'Razer (Ollama)', razer: 'Razer (SD)', google: 'Google', replicate: 'Replicate', openai: 'OpenAI' }
+const PROVIDER_LABEL: Record<string, string> = { anthropic: 'Anthropic (Claude)', ollama: 'Razer (Ollama)', razer: 'Razer (SD)', google: 'Google', replicate: 'Replicate', openai: 'OpenAI' }
 const CAP_COLOR: Record<string, string> = {
   text: 'rgb(59 130 246)',
   embed: 'rgb(100 116 139)',

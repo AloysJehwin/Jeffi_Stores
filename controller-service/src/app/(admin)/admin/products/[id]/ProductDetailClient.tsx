@@ -762,11 +762,14 @@ export default function ProductDetailClient({
   id,
   hasInventory = true,
   heldDraft,
+  draftsPanel,
 }: {
   id: string
   hasInventory?: boolean
   /** Another admin holds the draft: open it read-only instead of starting one. */
   heldDraft?: { ownerName: string; href: string } | null
+  /** Open drafts of this product (server-rendered EntityDrafts). */
+  draftsPanel?: React.ReactNode
 }) {
   const [product, setProduct] = useState<any>(null)
   const canWriteProducts = useCanWrite('products')
@@ -945,6 +948,7 @@ export default function ProductDetailClient({
           </>
         }
       />
+      {draftsPanel}
       {showDraftModal && (
         <DraftConfirmModal
           productId={p.id}

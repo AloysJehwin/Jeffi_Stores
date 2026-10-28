@@ -21,14 +21,13 @@ import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLin
 import { draftLockChips } from '@/lib/admin/draft-locks'
 import GroupOverview from './_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
-import PageDrafts from '@/components/admin/drafts/PageDrafts'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
 type SP = { [key: string]: string | undefined }
 
 /** KPIs over every category the filters match. */
 async function CategoriesStats({ q }: { q: FilterQuery }) {
-  const [host, summary, categories, misassignedRows, pendingDrafts, createDrafts] = await Promise.all([
-    getHost(),
+  const [summary, categories, misassignedRows] = await Promise.all([
     getCategoriesSummary(q),
     // Every live category: the misassigned banner moves products into any of them.
     getFilteredCategories({}),
@@ -40,29 +39,12 @@ async function CategoriesStats({ q }: { q: FilterQuery }) {
          AND EXISTS (SELECT 1 FROM categories sub WHERE sub.parent_category_id = p.category_id)
        ORDER BY c.name, p.name`
     ),
-    queryMany<{ category_id: string; name: string; updated_at: string }>(
-      `SELECT cd.category_id, c.name, cd.updated_at
-       FROM category_drafts cd
-       JOIN categories c ON c.id = cd.category_id
-       ORDER BY cd.updated_at DESC
-       LIMIT 20`
-    ),
-    queryMany<{ id: string; name: string; created_at: string }>(
-      `SELECT id, name, created_at FROM categories WHERE is_draft = true ORDER BY created_at DESC LIMIT 20`
-    ),
   ])
-
-  const h = await headers()
-  const role = h.get('x-user-role') || ''
-  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
-  const canWrite = hasScope(role, scopes, 'categories:write')
 
   const allCategories = categories || []
   const mainCategoriesCount = summary.main
   const totalCategories = summary.total
   const subCategoriesCount = totalCategories - mainCategoriesCount
-  const pendingDraftsCount = pendingDrafts.length + createDrafts.length
-  const locks = await draftLockChips('category', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.category_id)])
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -72,8 +54,41 @@ async function CategoriesStats({ q }: { q: FilterQuery }) {
         <Kpi label="Subcategories" value={subCategoriesCount.toLocaleString('en-IN')} />
       </KpiGrid>
 
-      {pendingDraftsCount > 0 && (
-        <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+
+      {misassignedRows.length > 0 && (
+        <MisassignedProductsBanner products={misassignedRows} categories={allCategories} />
+      )}
+    </div>
+  )
+}
+
+// Publish / discard rows for the Drafts tab.
+async function CategoryPendingDrafts() {
+  const host = await getHost()
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'categories:write')
+  const [pendingDrafts, createDrafts] = await Promise.all([
+    queryMany<{ id: string; category_id: string; name: string; title: string | null; author: string | null; updated_at: string }>(
+      `SELECT cd.id, cd.category_id, c.name, cd.title, cd.updated_at,
+              COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS author
+       FROM category_drafts cd
+       JOIN categories c ON c.id = cd.category_id
+       LEFT JOIN admins ad ON ad.id = cd.author_admin_id LEFT JOIN users u ON u.id = ad.user_id
+       ORDER BY cd.updated_at DESC
+       LIMIT 200`
+    ),
+    queryMany<{ id: string; name: string; created_at: string }>(
+      `SELECT id, name, created_at FROM categories WHERE is_draft = true ORDER BY created_at DESC LIMIT 200`
+    ),
+  ])
+  const pendingDraftsCount = pendingDrafts.length + createDrafts.length
+  if (!pendingDraftsCount) return null
+  const locks = await draftLockChips('category', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.id)])
+
+  return (
+        <details open className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
           <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
             <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
               <svg
@@ -84,7 +99,7 @@ async function CategoriesStats({ q }: { q: FilterQuery }) {
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              Pending Drafts ({pendingDraftsCount})
+              Ready to publish ({pendingDraftsCount})
             </span>
             <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
           </summary>
@@ -120,32 +135,27 @@ async function CategoriesStats({ q }: { q: FilterQuery }) {
               {pendingDrafts.map(d =>
                 canWrite ? (
                   <DraftRowActions
-                    key={d.category_id}
+                    key={d.id}
                     entityId={d.category_id}
-                    name={d.name}
+                    name={d.title ? `${d.name} · ${d.title}` : d.name}
+                    subtitle={d.author ? `Draft by ${d.author}` : null}
                     updatedAt={d.updated_at}
-                    editHref={ap(`/admin/categories/${d.category_id}/edit`, host)}
-                    publishPath={`/api/admin/categories/${d.category_id}/publish`}
-                    discardPath={`/api/admin/categories/${d.category_id}/draft`}
+                    editHref={ap(`/admin/categories/${d.category_id}/edit?draft=${d.id}`, host)}
+                    publishPath={`/api/admin/categories/${d.category_id}/publish?draft=${d.id}`}
+                    discardPath={`/api/admin/categories/${d.category_id}/draft?draft=${d.id}`}
                     entityLabel="category"
-                    lock={locks[d.category_id]}
+                    lock={locks[d.id]}
                   />
                 ) : (
-                  <div key={d.category_id} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
-                    <DraftLockBadge lock={locks[d.category_id]} mine={locks[d.category_id]?.mine} />
+                  <div key={d.id} className="px-4 py-2.5 flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground truncate">{d.title ? `${d.name} · ${d.title}` : d.name}</p>
+                    <DraftLockBadge lock={locks[d.id]} mine={locks[d.id]?.mine} />
                   </div>
                 )
               )}
             </div>
           </div>
         </details>
-      )}
-
-      {misassignedRows.length > 0 && (
-        <MisassignedProductsBanner products={misassignedRows} categories={allCategories} />
-      )}
-    </div>
   )
 }
 
@@ -178,7 +188,7 @@ async function CategoriesListContent({ resolvedSearchParams }: { resolvedSearchP
 export default async function CategoriesPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams
   const host = await getHost()
-  const tab = isListUrl(sp, CATEGORY_FIELDS, { aliases: CATEGORY_ALIASES }) ? 'list' : 'overview'
+  const tab = sp.tab === 'drafts' ? 'drafts' : isListUrl(sp, CATEGORY_FIELDS, { aliases: CATEGORY_ALIASES }) ? 'list' : 'overview'
   const href = (t: string) => ap(tabHref('/admin/categories', t, sp, CATEGORY_FIELDS, { aliases: CATEGORY_ALIASES }), host)
   const q = normalizeQuery(CATEGORIES_ENTITY, sp)
   return (
@@ -190,6 +200,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
           tabs={[
             { id: 'overview', label: 'Overview', href: href('overview') },
             { id: 'list', label: 'Categories', href: href('list') },
+            { id: 'drafts', label: <DraftsTabLabel type="category" />, href: href('drafts') },
           ]}
           value={tab}
           scroll={false}
@@ -211,9 +222,14 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
         <Suspense fallback={null}>
           <GroupOverview dim="category" />
         </Suspense>
+      ) : tab === 'drafts' ? (
+        <PageDrafts type="category">
+          <Suspense fallback={null}>
+            <CategoryPendingDrafts />
+          </Suspense>
+        </PageDrafts>
       ) : (
         <>
-          <PageDrafts type="category" />
           <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
             <CategoriesStats q={q} />
           </Suspense>

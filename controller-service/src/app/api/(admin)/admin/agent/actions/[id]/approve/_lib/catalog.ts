@@ -1,5 +1,5 @@
 import { queryOne, getClient } from '@/lib/shared/db'
-import { logStockMovement } from '@/lib/orders/inventory'
+import { logStockMovement, recomputeStockStatusForProduct } from '@/lib/orders/inventory'
 import type { AgentAction, ActionResult } from './shared'
 
 export async function createCoupon(action: AgentAction): Promise<ActionResult> {
@@ -171,6 +171,8 @@ export async function adjustInventory(action: AgentAction): Promise<ActionResult
       referenceId: productId,
       notes: `Agent adjustment: ${reason}`,
     })
+    // Stock status follows the units only for inventory_sync products; a no-op otherwise.
+    await recomputeStockStatusForProduct(client, productId)
     await client.query('COMMIT')
     return { result: { productId, previous: current, delta, current: computed }, error: null }
   } catch (e: any) {

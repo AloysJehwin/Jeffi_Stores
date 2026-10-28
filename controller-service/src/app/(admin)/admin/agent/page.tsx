@@ -1,69 +1,13 @@
 'use client'
 
-import { useRef, useState, useEffect, Suspense } from 'react'
-import {
-  Bot,
-  Send,
-  MessageSquare,
-  Slash,
-  LayoutGrid,
-  BarChart3,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Plus,
-  History,
-  Paperclip,
-  X,
-} from 'lucide-react'
-import { useToast } from '@/contexts/ToastContext'
-import AdminAgentMessage from '@/components/admin/AdminAgentMessage'
-import AdminAgentBlocks, { type UiBlock } from '@/components/admin/AdminAgentBlocks'
+import { useEffect, useState, Suspense } from 'react'
+import { Bot, MessageSquare, Slash, LayoutGrid, BarChart3, Plus, History } from 'lucide-react'
+import AgentChatPanel from '@/components/admin/agent/AgentChatPanel'
+import { useAdminAgentChat } from '@/hooks/useAdminAgentChat'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { Tabs } from '@/components/admin/channels/ui'
 import AgentOverview from './_components/AgentOverview'
 import { PageHeader } from '@/components/admin/kit/layout'
-
-interface ProposedAction {
-  id: string
-  kind: string
-  payload: Record<string, unknown>
-  confirmation: string
-  status: 'proposed' | 'approving' | 'approved' | 'rejected' | 'failed'
-  result?: unknown
-  error?: string
-}
-
-interface ToolCall {
-  tool: string
-  input: Record<string, unknown>
-  output: unknown
-  isError?: boolean
-}
-
-interface PickerOption {
-  id: string
-  label: string
-  sublabel?: string
-}
-
-interface Picker {
-  choice_kind: string
-  options: PickerOption[]
-  note?: string
-}
-
-interface ChatTurn {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  model?: string
-  toolCalls?: ToolCall[]
-  proposedActions?: ProposedAction[]
-  pickers?: Picker[]
-  pickerResolved?: boolean
-  uiBlocks?: UiBlock[]
-}
 
 const SLASH_COMMANDS = [
   {
@@ -730,256 +674,21 @@ const TOOL_GROUPS: ToolGroup[] = [
   },
 ]
 
-interface ConversationListItem {
-  id: string
-  title: string | null
-  preview: string | null
-  last_message_at: string
-  message_count: number
-}
-
 type Tab = 'chat' | 'slash' | 'tools' | 'overview'
 
 export default function AdminAgentPage() {
-  const { showToast } = useToast()
-  const inputRef = useRef<HTMLTextAreaElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
+  const chat = useAdminAgentChat()
   const [tab, setTab] = useState<Tab>('chat')
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [conversationId, setConversationId] = useState<string | null>(null)
-  const [turns, setTurns] = useState<ChatTurn[]>([])
   const [showHistory, setShowHistory] = useState(false)
-  const [conversations, setConversations] = useState<ConversationListItem[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [attachmentId, setAttachmentId] = useState<string | null>(null)
 
   useEffect(() => {
-    inputRef.current?.focus()
-    loadConversations()
+    chat.loadConversations()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [turns, loading])
-
-  function clearAttachment() {
-    setPendingFile(null)
-    setAttachmentId(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    if (f.size > 5 * 1024 * 1024) {
-      showToast('File too large (max 5MB)', 'error')
-      e.target.value = ''
-      return
-    }
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-    if (!allowed.includes(f.type)) {
-      showToast('Only JPG, PNG, WEBP, or PDF files are supported', 'error')
-      e.target.value = ''
-      return
-    }
-    setPendingFile(f)
-    setAttachmentId(null)
-  }
-
-  async function uploadPendingFile(): Promise<string | null> {
-    if (!pendingFile) return null
-    if (attachmentId) return attachmentId
-    setUploading(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', pendingFile)
-      const res = await fetch('/api/admin/agent/upload', { method: 'POST', credentials: 'include', body: fd })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        showToast(data.error || 'Upload failed', 'error')
-        return null
-      }
-      setAttachmentId(data.attachment_id)
-      return data.attachment_id as string
-    } catch (e: any) {
-      showToast(e?.message || 'Upload failed', 'error')
-      return null
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  async function loadConversations() {
-    setLoadingHistory(true)
-    try {
-      const res = await fetch('/api/admin/agent/conversations?limit=30', { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setConversations(data.items || [])
-      }
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
-
-  async function loadConversation(id: string) {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/admin/agent/conversations/${id}/messages`, { credentials: 'include' })
-      if (!res.ok) {
-        showToast('Failed to load conversation', 'error')
-        return
-      }
-      const data = await res.json()
-      const restored: ChatTurn[] = (data.messages || []).map((m: any) => ({
-        id: m.id || crypto.randomUUID(),
-        role: m.role,
-        content: m.content,
-        toolCalls: m.tool_calls?.length ? m.tool_calls : undefined,
-        uiBlocks: m.ui_blocks?.length ? m.ui_blocks : undefined,
-        proposedActions: m.proposed_actions?.length
-          ? m.proposed_actions.map((a: any) => ({ ...a, status: a.status ?? 'approved' }))
-          : undefined,
-        pickers: m.pickers?.length ? m.pickers : undefined,
-        pickerResolved: m.pickers?.length ? true : undefined,
-      }))
-      setTurns(restored)
-      setConversationId(id)
-      setShowHistory(false)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   function newChat() {
-    setTurns([])
-    setConversationId(null)
-    setInput('')
+    chat.reset()
     setShowHistory(false)
-    setTimeout(() => inputRef.current?.focus(), 50)
-  }
-
-  async function sendMessage(text: string) {
-    const trimmed = text.trim()
-    const hasFile = !!pendingFile
-    if ((!trimmed && !hasFile) || loading) return
-
-    let attId = attachmentId
-    if (hasFile && !attId) {
-      attId = await uploadPendingFile()
-      if (!attId) return
-    }
-
-    const fileNote = pendingFile
-      ? ` [attachment_id=${attId} filename="${pendingFile.name}" mime=${pendingFile.type}]`
-      : ''
-    const finalUserText =
-      (trimmed ||
-        (hasFile
-          ? `Process the attached ${pendingFile?.type.startsWith('image/') ? 'image' : 'PDF'} as a quotation request.`
-          : '')) + fileNote
-    const displayContent = trimmed || `📎 ${pendingFile?.name || 'attachment'}`
-
-    setTurns(t => [...t, { id: crypto.randomUUID(), role: 'user', content: displayContent }])
-    setInput('')
-    clearAttachment()
-    setLoading(true)
-    try {
-      const res = await fetch('/api/admin/agent/chat', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId, message: finalUserText }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        showToast(data.error || 'Agent error', 'error')
-        setTurns(t => [
-          ...t,
-          { id: crypto.randomUUID(), role: 'assistant', content: `Error: ${data.error || 'unknown'}` },
-        ])
-        return
-      }
-      if (data.conversationId) setConversationId(data.conversationId)
-      setTurns(t => [
-        ...t,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.message,
-          model: data.model || undefined,
-          toolCalls: data.toolCalls,
-          proposedActions: (data.proposedActions || []).map((a: any) => ({ ...a, status: 'proposed' as const })),
-          pickers: data.pickers || [],
-          uiBlocks: data.uiBlocks || [],
-        },
-      ])
-    } catch (err: any) {
-      showToast(err?.message || 'Network error', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function decideAction(turnId: string, actionId: string, decision: 'approve' | 'reject') {
-    setTurns(prev =>
-      prev.map(t =>
-        t.id !== turnId
-          ? t
-          : {
-              ...t,
-              proposedActions: t.proposedActions?.map(a => (a.id !== actionId ? a : { ...a, status: 'approving' })),
-            }
-      )
-    )
-    try {
-      const res = await fetch(`/api/admin/agent/actions/${actionId}/${decision}`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      const data = await res.json()
-      const newStatus: ProposedAction['status'] = !res.ok ? 'failed' : decision === 'reject' ? 'rejected' : 'approved'
-      setTurns(prev =>
-        prev.map(t =>
-          t.id !== turnId
-            ? t
-            : {
-                ...t,
-                proposedActions: t.proposedActions?.map(a =>
-                  a.id !== actionId ? a : { ...a, status: newStatus, result: data.result, error: data.error }
-                ),
-              }
-        )
-      )
-      if (!res.ok) showToast(data.error || 'Action failed', 'error')
-      else showToast(decision === 'approve' ? 'Action executed' : 'Action rejected', 'success')
-    } catch (err: any) {
-      setTurns(prev =>
-        prev.map(t =>
-          t.id !== turnId
-            ? t
-            : {
-                ...t,
-                proposedActions: t.proposedActions?.map(a =>
-                  a.id !== actionId ? a : { ...a, status: 'failed', error: err?.message }
-                ),
-              }
-        )
-      )
-      showToast(err?.message || 'Network error', 'error')
-    }
-  }
-
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage(input)
-    }
   }
 
   return (
@@ -1029,272 +738,26 @@ export default function AdminAgentPage() {
         />
       </div>
 
-      {/* Chat tab */}
       {tab === 'chat' && (
-        <div className="flex flex-1 min-h-0">
-          {/* History sidebar */}
-          {showHistory && (
-            <aside className="flex w-full md:w-56 lg:w-64 md:border-r border-border-default bg-surface-secondary/50 flex-col shrink-0">
-              <div className="px-3 py-2 border-b border-border-default flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Chat history</p>
-                <button
-                  onClick={loadConversations}
-                  disabled={loadingHistory}
-                  className="text-[10px] text-foreground-muted hover:text-foreground"
-                >
-                  {loadingHistory ? '...' : 'refresh'}
-                </button>
+        <AgentChatPanel
+          chat={chat}
+          variant="page"
+          showHistory={showHistory}
+          onConversationPicked={() => setShowHistory(false)}
+          approveWrapper={node => <RequireWrite scope="agent:write">{node}</RequireWrite>}
+          empty={
+            <div className="text-center py-16">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-500 to-secondary-500 flex items-center justify-center mx-auto mb-4">
+                <Bot className="w-7 h-7 text-white" />
               </div>
-              <div className="overflow-y-auto flex-1 p-2 space-y-1">
-                {conversations.length === 0 && !loadingHistory && (
-                  <p className="text-[11px] text-foreground-muted p-2">No past conversations.</p>
-                )}
-                {conversations.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => loadConversation(c.id)}
-                    className={`w-full text-left px-2 py-2.5 md:py-1.5 rounded transition-colors text-sm md:text-xs ${
-                      c.id === conversationId
-                        ? 'bg-accent-500/10 border border-accent-500/30'
-                        : 'hover:bg-surface-secondary'
-                    }`}
-                  >
-                    <p className="font-medium text-foreground truncate">
-                      {c.title || c.preview?.slice(0, 60) || 'Untitled chat'}
-                    </p>
-                    <p className="text-[10px] text-foreground-muted">
-                      {new Date(c.last_message_at).toLocaleString()} · {c.message_count} msg
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </aside>
-          )}
-
-          {/* Main chat area; on phones the open history panel takes its place */}
-          <div className={`${showHistory ? 'hidden md:flex' : 'flex'} flex-1 flex-col min-w-0`}>
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3 min-h-0">
-              {turns.length === 0 && !loading && (
-                <div className="text-center py-16">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-500 to-secondary-500 flex items-center justify-center mx-auto mb-4">
-                    <Bot className="w-7 h-7 text-white" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground mb-1">How can I help?</p>
-                  <p className="text-xs text-foreground-muted max-w-sm mx-auto">
-                    Ask me anything about the store. I can search products, look up orders, summarise customers, propose
-                    actions for your approval.
-                  </p>
-                </div>
-              )}
-              {turns.map(turn => (
-                <div key={turn.id} className={turn.role === 'user' ? 'flex justify-end' : ''}>
-                  <div
-                    className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                      turn.role === 'user' ? 'bg-accent-500 text-white' : 'bg-surface-secondary text-foreground'
-                    }`}
-                  >
-                    {turn.role === 'user' ? (
-                      <p className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">{turn.content}</p>
-                    ) : (
-                      <>
-                        {turn.content && <AdminAgentMessage text={turn.content} />}
-                        {turn.uiBlocks && turn.uiBlocks.length > 0 && (
-                          <div className={turn.content ? 'mt-3' : ''}>
-                            <AdminAgentBlocks
-                              blocks={turn.uiBlocks}
-                              pickerResolved={turn.pickerResolved}
-                              onPickOption={(kind, option) => {
-                                setTurns(prev => prev.map(t => (t.id !== turn.id ? t : { ...t, pickerResolved: true })))
-                                sendMessage(`Use ${kind} id ${option.id} (${option.label}) for the previous request.`)
-                              }}
-                              onSendMessage={msg => {
-                                setTurns(prev => prev.map(t => (t.id !== turn.id ? t : { ...t, pickerResolved: true })))
-                                sendMessage(msg)
-                              }}
-                            />
-                          </div>
-                        )}
-                        {turn.model && (
-                          <p className="mt-1.5 text-[10px] text-foreground-muted opacity-60">{turn.model}</p>
-                        )}
-                      </>
-                    )}
-                    {turn.toolCalls && turn.toolCalls.length > 0 && (
-                      <details className="mt-2 text-[10px] opacity-70">
-                        <summary className="cursor-pointer">
-                          {turn.toolCalls.length} tool call{turn.toolCalls.length === 1 ? '' : 's'}
-                        </summary>
-                        <ul className="mt-1 space-y-0.5">
-                          {turn.toolCalls.map((tc, i) => (
-                            <li key={i} className="font-mono [overflow-wrap:anywhere]">
-                              {tc.isError ? '[err] ' : '[ok] '}
-                              {tc.tool}({Object.keys(tc.input).join(',')})
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    )}
-                    {turn.pickers && turn.pickers.length > 0 && !turn.pickerResolved && (
-                      <div className="mt-3 space-y-2">
-                        {turn.pickers.map((picker, pi) => (
-                          <div
-                            key={pi}
-                            className="rounded-lg border border-accent-500/40 bg-accent-500/5 p-3"
-                          >
-                            <p className="text-xs font-semibold text-foreground mb-2">
-                              Pick a {picker.choice_kind}
-                              {picker.note ? ` — ${picker.note}` : ''}
-                            </p>
-                            <div className="space-y-1">
-                              {picker.options.map(opt => (
-                                <button
-                                  key={opt.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setTurns(prev =>
-                                      prev.map(t => (t.id !== turn.id ? t : { ...t, pickerResolved: true }))
-                                    )
-                                    sendMessage(
-                                      `Use ${picker.choice_kind} id ${opt.id} (${opt.label}) for the previous request.`
-                                    )
-                                  }}
-                                  className="w-full text-left px-3 py-1.5 rounded-md hover:bg-accent-500/10 transition-colors"
-                                >
-                                  <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                                  {opt.sublabel && <p className="text-[11px] text-foreground-muted">{opt.sublabel}</p>}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {turn.proposedActions && turn.proposedActions.length > 0 && (
-                      <div className="mt-3 space-y-2">
-                        {turn.proposedActions.map(action => (
-                          <div
-                            key={action.id}
-                            className="rounded-lg border-2 border-amber-500/40 bg-amber-500/5 p-3"
-                          >
-                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">
-                              Pending approval — {action.kind}
-                            </p>
-                            <p className="text-xs text-foreground mb-3">{action.confirmation}</p>
-                            {action.status === 'proposed' && (
-                              <RequireWrite scope="agent:write">
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => decideAction(turn.id, action.id, 'approve')}
-                                    className="flex-1 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1"
-                                  >
-                                    <CheckCircle className="w-3.5 h-3.5" /> Approve
-                                  </button>
-                                  <button
-                                    onClick={() => decideAction(turn.id, action.id, 'reject')}
-                                    className="flex-1 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default"
-                                  >
-                                    <XCircle className="w-3.5 h-3.5" /> Reject
-                                  </button>
-                                </div>
-                              </RequireWrite>
-                            )}
-                            {action.status === 'approving' && (
-                              <p className="text-xs text-foreground-muted flex items-center gap-1.5">
-                                <Loader2 className="w-3 h-3 animate-spin" /> Executing
-                              </p>
-                            )}
-                            {action.status === 'approved' && (
-                              <p className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1.5">
-                                <CheckCircle className="w-3 h-3" /> Executed
-                              </p>
-                            )}
-                            {action.status === 'rejected' && (
-                              <p className="text-xs text-foreground-muted flex items-center gap-1.5">
-                                <XCircle className="w-3 h-3" /> Rejected
-                              </p>
-                            )}
-                            {action.status === 'failed' && (
-                              <p className="text-xs text-red-500 [overflow-wrap:anywhere]">
-                                Failed: {action.error || 'unknown'}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {loading && (
-                <div className="animate-pulse space-y-1">
-                  <div className="max-w-[85%] rounded-lg px-3 py-2 bg-surface-secondary space-y-2">
-                    <div className="h-3 w-48 max-w-full bg-surface-elevated rounded" style={{ animationDelay: '0ms' }} />
-                    <div className="h-3 w-64 max-w-full bg-surface-elevated rounded" style={{ animationDelay: '50ms' }} />
-                    <div className="h-3 w-40 bg-surface-elevated rounded" style={{ animationDelay: '100ms' }} />
-                  </div>
-                </div>
-              )}
+              <p className="text-sm font-medium text-foreground mb-1">How can I help?</p>
+              <p className="text-xs text-foreground-muted max-w-sm mx-auto">
+                Ask me anything about the store. I can search products, look up orders, summarise customers, propose
+                actions for your approval.
+              </p>
             </div>
-
-            {/* Input bar */}
-            <div className="border-t border-border-default p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex flex-col gap-2 shrink-0">
-              {pendingFile && (
-                <div className="flex items-center gap-2 px-2 py-1.5 bg-surface-secondary rounded-lg text-xs">
-                  <Paperclip className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
-                  <span className="truncate flex-1 text-foreground">{pendingFile.name}</span>
-                  <span className="text-[10px] text-foreground-muted shrink-0">
-                    {(pendingFile.size / 1024).toFixed(0)} KB
-                  </span>
-                  {uploading && <Loader2 className="w-3 h-3 animate-spin text-foreground-muted" />}
-                  {attachmentId && <CheckCircle className="w-3 h-3 text-green-600" />}
-                  <button
-                    type="button"
-                    onClick={clearAttachment}
-                    className="p-0.5 text-foreground-muted hover:text-foreground"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-              <div className="flex items-end gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
-                  onChange={onPickFile}
-                  className="hidden"
-                />
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={onKeyDown}
-                  rows={1}
-                  maxLength={2000}
-                  disabled={loading}
-                  placeholder={pendingFile ? 'Add an instruction (optional) and send' : 'Ask anything about the store'}
-                  className="flex-1 px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading || uploading}
-                  className="w-8 h-8 flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-secondary rounded-lg disabled:opacity-50 shrink-0"
-                  title="Attach file"
-                >
-                  <Paperclip className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => sendMessage(input)}
-                  disabled={loading || uploading || (!pendingFile && input.trim().length < 2)}
-                  className="w-8 h-8 flex items-center justify-center bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 shrink-0"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          }
+        />
       )}
 
       {/* Slash tab */}
@@ -1306,7 +769,7 @@ export default function AdminAgentPage() {
               key={cmd.command}
               onClick={() => {
                 setTab('chat')
-                sendMessage(cmd.example)
+                chat.sendMessage(cmd.example)
               }}
               className="w-full text-left px-3 py-2.5 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
             >
@@ -1346,7 +809,7 @@ export default function AdminAgentPage() {
                     key={t.name}
                     onClick={() => {
                       setTab('chat')
-                      sendMessage(t.prompt)
+                      chat.sendMessage(t.prompt)
                     }}
                     className="text-left px-3 py-2.5 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors group"
                   >

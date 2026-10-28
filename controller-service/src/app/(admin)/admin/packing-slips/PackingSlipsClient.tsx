@@ -5,7 +5,6 @@ import {
   InfiniteFooter,
   ListFilters,
   SortTh,
-  PageHeader,
   TONE_CLS,
   fetchJson,
   useActionToast,
@@ -61,7 +60,8 @@ function statusLabel(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode }) {
+// header: the page title and tab bar, from the tabs wrapper.
+export default function PackingSlipsClient({ header }: { header?: React.ReactNode }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [downloading, setDownloading] = useState(false)
   // `${orderId}:${doc|'set'}` while that row's download is being built.
@@ -149,11 +149,7 @@ export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode })
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mb-5">
-        <PageHeader title="Packing Slips" description="Packing slips, shipping labels and invoices for each order" />
-      </div>
-
-      {tabs}
+      {header}
 
       <div className="mb-6 space-y-2">
         <ListFilters entity="packing_slips" fields={PACKING_FIELDS} search={PACKING_SEARCH} noun="Orders" tab="slips" exportable />

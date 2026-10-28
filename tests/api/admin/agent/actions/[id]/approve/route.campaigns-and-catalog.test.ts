@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({
+  hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
@@ -21,7 +24,7 @@ vi.mock('@/lib/email', () => ({
 }))
 vi.mock('@/lib/queries', () => ({ VARIANT_MIN_PRICE_SQL: 'COALESCE(0,0)' }))
 vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/orders/inventory', () => ({ logStockMovement: vi.fn() }))
+vi.mock('@/lib/orders/inventory', () => ({ logStockMovement: vi.fn(), recomputeStockStatusForProduct: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 

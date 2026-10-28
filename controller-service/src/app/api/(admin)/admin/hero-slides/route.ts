@@ -13,8 +13,10 @@ import {
   nextDisplayOrder,
   withHomepageDraft,
   type DraftHeroSlide,
+  homepageDraftIdFrom,
+  homepageDraftOr,
+  noHomepageDraft,
 } from '@/lib/catalog/homepage-draft'
-import { lockedOr } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +27,7 @@ export async function GET(request: NextRequest) {
   if (!hasScope(admin.role, admin.scopes, 'settings:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const { heroSlides } = await getEditableHomepage()
+  const { heroSlides } = await getEditableHomepage(homepageDraftIdFrom(request))
   return NextResponse.json({ slides: heroSlides })
 }
 
@@ -67,7 +69,9 @@ export async function POST(request: NextRequest) {
   const audience = rowAudience({ audience: d.audience })
   const refused = homepagePlanRefusal(await getHomepagePlan(), { audience })
   if (refused) return NextResponse.json({ error: refused }, { status: 403 })
-  const slide = await withHomepageDraft(admin.adminId, draft => {
+  const draftId = homepageDraftIdFrom(request)
+  if (!draftId) return noHomepageDraft()
+  const slide = await withHomepageDraft(draftId, admin.adminId, draft => {
     const now = new Date().toISOString()
     const row: DraftHeroSlide = {
       id: randomUUID(),
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
     draft.heroSlides.push(row)
     return row
-  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
   if (slide instanceof NextResponse) return slide
 
   return NextResponse.json({ slide })
@@ -117,9 +121,11 @@ export async function PATCH(request: NextRequest) {
   const order: string[] = Array.isArray(body?.order) ? body.order : []
   if (order.length === 0) return NextResponse.json({ error: 'order[] required' }, { status: 400 })
 
-  const saved = await withHomepageDraft(admin.adminId, draft => {
+  const draftId = homepageDraftIdFrom(request)
+  if (!draftId) return noHomepageDraft()
+  const saved = await withHomepageDraft(draftId, admin.adminId, draft => {
     draft.heroSlides = applyDraftOrder(draft.heroSlides, order)
-  }, homepageLockFrom(admin, request)).catch(lockedOr)
+  }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
   if (saved instanceof NextResponse) return saved
   return NextResponse.json({ success: true })
 }

@@ -5,7 +5,8 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
 import { query, queryOne } from '@/lib/shared/db'
-import { publishCategoryDraft } from '@/lib/catalog/category-draft'
+import { categoryDrafts, publishCategoryDraft } from '@/lib/catalog/category-draft'
+import { DraftConflictError, discardDraftRow, getDraftRow, saveDraftContent } from '@/lib/admin/draft-branches'
 import { suggestIcon } from '@/lib/shared/icon-suggest'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
@@ -14,19 +15,22 @@ import { closeAfter, guardDraftAction } from '@/lib/admin/draft-locks'
 // Keep the admin's open editor session's snapshot in step with the draft just saved.
 // After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
 // pre-session snapshot (A1). Never fails the enclosing save on error.
-async function resnapshotCategorySession(categoryId: string) {
+async function resnapshotCategorySession(lockId: string) {
   try {
     const session = await getAdminSession()
     if (!session) return
-    const open = await findOpenSession(session.adminId, 'category', categoryId)
+    const open = await findOpenSession(session.adminId, 'category', lockId)
     if (!open) return
     await resnapshotSession(open.id, session.adminId)
   } catch (err) {
-    console.error('[category-edit] resnapshotSession failed for', categoryId, err)
+    console.error('[category-edit] resnapshotSession failed for', lockId, err)
   }
 }
 
-export async function updateCategory(categoryId: string, formData: FormData) {
+const poolDb = { query: (t: string, p?: unknown[]) => query(t, p) } as any
+
+/** draftId is the draft being edited (null for a create-draft category, edited in place). */
+export async function updateCategory(categoryId: string, draftId: string | null, formData: FormData) {
   const name = formData.get('name') as string
   const description = (formData.get('description') as string) || null
   const parentCategoryId = (formData.get('parent_id') as string) || null
@@ -52,11 +56,10 @@ export async function updateCategory(categoryId: string, formData: FormData) {
   const iconName = manualIcon || (await suggestIcon(name))
   const intent = formData.get('intent') as string | null
 
-  const draftRow = await queryOne<{ category_id: string }>(
-    `SELECT category_id FROM category_drafts WHERE category_id = $1`,
-    [categoryId]
-  )
-  const hasDraft = !!draftRow
+  const draftRow = draftId ? await getDraftRow(categoryDrafts, draftId) : null
+  const hasDraft = !!draftRow && draftRow.category_id === categoryId
+  const lockId = hasDraft ? draftId! : categoryId
+  const editPath = `/admin/categories/${categoryId}/edit${hasDraft ? `?draft=${draftId}` : ''}`
 
   const draftFields = {
     name,
@@ -77,7 +80,7 @@ export async function updateCategory(categoryId: string, formData: FormData) {
   }
 
   const host = await getHost()
-  const actor = await guardDraftAction('category', categoryId, `/admin/categories/${categoryId}/edit`, intent)
+  const actor = await guardDraftAction('category', lockId, editPath, intent)
 
   // Create-draft category (is_draft = true, no category_drafts row): edit the row in place.
   // Save keeps it a draft; Publish flips is_draft = false + is_active.
@@ -115,47 +118,33 @@ export async function updateCategory(categoryId: string, formData: FormData) {
     redirect(ap('/admin/categories', host))
   }
 
-  if (hasDraft || intent === 'draft') {
-    if (intent === 'discard') {
-      await query(`DELETE FROM category_drafts WHERE category_id = $1`, [categoryId])
-      await closeAfter(actor, 'category', categoryId, 'discarded')
-      revalidatePath(`/admin/categories/${categoryId}/edit`)
-      redirect(ap(`/admin/categories/${categoryId}/edit`, host))
-    }
+  if (!hasDraft) redirect(ap(`/admin/categories/${categoryId}`, host))
 
-    // Save to draft
-    await query(
-      `INSERT INTO category_drafts (category_id, fields, updated_at)
-       VALUES ($1, $2::jsonb, NOW())
-       ON CONFLICT (category_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
-      [categoryId, JSON.stringify(draftFields)]
-    )
-
-    if (intent === 'publish') {
-      await publishCategoryDraft(categoryId, { actor })
-      revalidatePath('/admin/categories')
-      revalidatePath(`/admin/categories/${categoryId}/edit`)
-      redirect(ap(`/admin/categories`, host))
-    }
-
-    // Save as Draft resnapshots so Cancel reverts to this just-saved state.
-    await resnapshotCategorySession(categoryId)
-    revalidatePath(`/admin/categories/${categoryId}/edit`)
+  if (intent === 'discard') {
+    await discardDraftRow(categoryDrafts, lockId)
+    await closeAfter(actor, 'category', lockId, 'discarded')
     revalidatePath('/admin/categories')
-    const back = formData.get('_back') as string | null
-    redirect(ap(back && back.startsWith('/admin/categories') ? back : '/admin/categories', host))
+    redirect(ap(`/admin/categories/${categoryId}`, host))
   }
 
-  // Unreachable: no draft means the edit page redirected before rendering the form.
-  // Defensive fallback — write to the draft only, never mutate the live category.
-  // (The is_active → products/subcategories cascade lives in publishCategoryDraft.)
-  await query(
-    `INSERT INTO category_drafts (category_id, fields, updated_at)
-     VALUES ($1, $2::jsonb, NOW())
-     ON CONFLICT (category_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
-    [categoryId, JSON.stringify(draftFields)]
-  )
-  await resnapshotCategorySession(categoryId)
-  revalidatePath(`/admin/categories/${categoryId}/edit`)
-  redirect(ap(`/admin/categories/${categoryId}/edit`, host))
+  await saveDraftContent(categoryDrafts, poolDb, lockId, draftFields)
+
+  if (intent === 'publish') {
+    try {
+      await publishCategoryDraft(lockId, { actor })
+    } catch (err) {
+      // Someone published overlapping edits since this draft started: resolve them in the merge dialog.
+      if (err instanceof DraftConflictError) redirect(ap(`${editPath}&merge=1`, host))
+      throw err
+    }
+    revalidatePath('/admin/categories')
+    redirect(ap(`/admin/categories`, host))
+  }
+
+  // Save as Draft resnapshots so Cancel reverts to this just-saved state.
+  await resnapshotCategorySession(lockId)
+  revalidatePath(editPath)
+  revalidatePath('/admin/categories')
+  const back = formData.get('_back') as string | null
+  redirect(ap(back && back.startsWith('/admin/categories') ? back : '/admin/categories', host))
 }

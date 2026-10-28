@@ -46,13 +46,14 @@ export async function applyLiveSubVariantPrices(productId: string, entries: SubV
 }
 
 /** Draft edit: stage on product_drafts.sub_variants (seeding a variant's live set first, like the sub-variant API). */
-export async function applyDraftSubVariantPrices(productId: string, entries: SubVariantPriceEntry[]) {
+export async function applyDraftSubVariantPrices(draftId: string, entries: SubVariantPriceEntry[]) {
   if (entries.length === 0) return
-  const row = await queryOne<{ sub_variants: any[] | null }>(
-    `SELECT sub_variants FROM product_drafts WHERE product_id = $1`,
-    [productId]
+  const row = await queryOne<{ sub_variants: any[] | null; product_id: string }>(
+    `SELECT sub_variants, product_id FROM product_drafts WHERE id = $1`,
+    [draftId]
   )
   if (!row) return
+  const productId = row.product_id
   let all: any[] = Array.isArray(row.sub_variants) ? row.sub_variants : []
   let changed = false
   for (const e of entries) {
@@ -84,8 +85,8 @@ export async function applyDraftSubVariantPrices(productId: string, entries: Sub
     changed = true
   }
   if (!changed) return
-  await query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-    productId,
+  await query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+    draftId,
     JSON.stringify(all),
   ])
 }

@@ -11,6 +11,25 @@
  * quantity — which the serialized-product flow relies on (1 serial = 1 qty_step).
  */
 
+const UNIT_SYNONYMS: Record<string, string[]> = {
+  pc: ['pc', 'pcs', 'piece', 'pieces', 'no', 'nos', 'unit', 'units', 'each', 'ea', 'qty'],
+  box: ['box', 'boxes', 'bx'],
+  pack: ['pack', 'packs', 'pkt', 'pkts', 'packet', 'packets'],
+  m: ['m', 'mtr', 'mtrs', 'meter', 'meters', 'metre', 'metres'],
+  set: ['set', 'sets'],
+  pair: ['pair', 'pairs'],
+  roll: ['roll', 'rolls'],
+  dozen: ['dozen', 'dozens', 'dz'],
+  kg: ['kg', 'kgs'],
+}
+const UNIT_WORD = new Map(Object.entries(UNIT_SYNONYMS).flatMap(([k, ws]) => ws.map(w => [w, k] as const)))
+
+/** Canonical unit word as customers write it: "Boxes" → box, "nos" → pc. */
+export function normUnit(w: unknown): string {
+  const s = String(w ?? '').trim().toLowerCase().replace(/\.$/, '')
+  return UNIT_WORD.get(s) ?? s
+}
+
 export interface SellingUnit {
   unit: string
   factor: number

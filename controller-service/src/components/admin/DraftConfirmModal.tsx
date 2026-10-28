@@ -90,10 +90,9 @@ export default function DraftConfirmModal({
         setError(data.error || 'Failed to create draft')
         return
       }
-      // Draft created — reload the same edit page (original record id); it will detect the draft
-      router.push(
-        `${apPrefix}/admin/${entity}/${productId}/edit${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
-      )
+      // Draft created (or your existing one) — open it; without an id the edit page finds your draft.
+      const qs = new URLSearchParams({ ...(backUrl ? { back: backUrl } : {}), ...(data.draftId ? { draft: data.draftId } : {}) }).toString()
+      router.push(`${apPrefix}/admin/${entity}/${productId}/edit${qs ? `?${qs}` : ''}`)
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {

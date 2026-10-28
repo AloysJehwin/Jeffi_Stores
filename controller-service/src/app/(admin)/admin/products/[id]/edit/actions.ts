@@ -35,19 +35,21 @@ import {
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
 import { actionActor, closeAfter, draftActionError } from '@/lib/admin/draft-locks'
+import { DraftConflictError } from '@/lib/admin/draft-branches'
+import type { MergeConflict } from '@/lib/admin/draft-merge'
 
 // Keep the admin's open editor session's snapshot in step with the draft just saved.
 // After a Save-as-Draft, Cancel should revert to the just-saved draft (A2), not the
 // pre-session snapshot (A1). Never fails the enclosing save on error.
-async function resnapshotProductSession(productId: string) {
+async function resnapshotProductSession(lockId: string) {
   try {
     const session = await getAdminSession()
     if (!session) return
-    const open = await findOpenSession(session.adminId, 'product', productId)
+    const open = await findOpenSession(session.adminId, 'product', lockId)
     if (!open) return
     await resnapshotSession(open.id, session.adminId)
   } catch (err) {
-    console.error('[product-edit] resnapshotSession failed for', productId, err)
+    console.error('[product-edit] resnapshotSession failed for', lockId, err)
   }
 }
 
@@ -185,7 +187,9 @@ const intOrNull = (v: unknown): number | null => {
   return n == null ? null : Math.round(n)
 }
 
-type ProductActionResult = { error?: string; details?: string[]; ok?: true; redirectTo?: string } | void
+type ProductActionResult =
+  | { error?: string; details?: string[]; ok?: true; redirectTo?: string; conflicts?: MergeConflict[]; draftId?: string }
+  | void
 
 export async function updateProduct(productId: string, formData: FormData): Promise<ProductActionResult> {
   const denied = await productsWriteError()
@@ -193,7 +197,14 @@ export async function updateProduct(productId: string, formData: FormData): Prom
 
   const intent = formData.get('intent') as string | null
   const isPublish = intent === 'publish'
-  const lockError = await draftActionError('product', productId, intent)
+  // The draft being edited (several can be open on one product); without one, the newest.
+  const draftRow = await queryOne<{ id: string; product_id: string; fields: Record<string, unknown> }>(
+    `SELECT id, product_id, fields FROM product_drafts WHERE product_id = $1 AND ($2::uuid IS NULL OR id = $2::uuid)
+      ORDER BY updated_at DESC LIMIT 1`,
+    [productId, ((formData.get('_draft_id') as string) || '').trim() || null]
+  )
+  const lockId = draftRow?.id ?? productId
+  const lockError = await draftActionError('product', lockId, intent)
   if (lockError) return { error: lockError }
   const actor = (await actionActor()) ?? undefined
   const noRedirect = formData.get('_no_redirect') === '1'
@@ -318,10 +329,9 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     let draftSubs: any[] = []
     let liveSubs: any[] = []
     if (hasVariants && sellableVariants.some(subsOn)) {
-      const draftSubRow = await queryOne<{ sub_variants: any[] | null }>(
-        'SELECT sub_variants FROM product_drafts WHERE product_id = $1',
-        [productId]
-      )
+      const draftSubRow = draftRow
+        ? await queryOne<{ sub_variants: any[] | null }>('SELECT sub_variants FROM product_drafts WHERE id = $1', [draftRow.id])
+        : null
       draftSubs = Array.isArray(draftSubRow?.sub_variants) ? draftSubRow!.sub_variants : []
       liveSubs = await queryMany<any>(
         'SELECT variant_id, sub_variant_name, weight_grams, length_cm, breadth_cm, height_cm, package_type FROM product_sub_variants WHERE product_id = $1 AND is_active = true',
@@ -448,9 +458,10 @@ export async function updateProduct(productId: string, formData: FormData): Prom
   const listDest = back && back.startsWith('/admin/products') ? back : '/admin/products'
   const stayDest = () => {
     const popupVariantId = formData.get('popup_variant_id') as string | null
+    const d = draftRow ? `draft=${draftRow.id}` : ''
     return popupVariantId
-      ? `/admin/products/${productId}/edit?popup=${encodeURIComponent(popupVariantId)}`
-      : `/admin/products/${productId}/edit`
+      ? `/admin/products/${productId}/edit?popup=${encodeURIComponent(popupVariantId)}${d ? `&${d}` : ''}`
+      : `/admin/products/${productId}/edit${d ? `?${d}` : ''}`
   }
   const finish = (dest: string): ProductActionResult => {
     const url = ap(dest, host)
@@ -471,10 +482,6 @@ export async function updateProduct(productId: string, formData: FormData): Prom
   }
 
   try {
-    const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown> }>(
-      `SELECT product_id, fields FROM product_drafts WHERE product_id = $1`,
-      [productId]
-    )
     const hasDraft = !!draftRow
     const live = await queryOne<{ sku: string | null; is_draft: boolean }>(
       'SELECT sku, is_draft FROM products WHERE id = $1',
@@ -616,32 +623,25 @@ export async function updateProduct(productId: string, formData: FormData): Prom
       }
 
       await query(
-        `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, updated_at)
-         VALUES (
-           $1, $2::jsonb,
-           COALESCE($3::jsonb, (SELECT variants FROM product_drafts WHERE product_id = $1)),
-           COALESCE((SELECT json_agg(to_jsonb(i) - 'id' ORDER BY i.display_order) FROM product_images i WHERE i.product_id = $1)::jsonb, '[]'::jsonb),
-           COALESCE((SELECT sub_variants FROM product_drafts WHERE product_id = $1), '[]'::jsonb),
-           COALESCE((SELECT units FROM product_drafts WHERE product_id = $1), (SELECT json_agg(to_jsonb(u) - 'id') FROM product_units u WHERE u.product_id = $1)::jsonb, '[]'::jsonb),
-           NOW()
-         )
-         ON CONFLICT (product_id) DO UPDATE SET
-           fields = EXCLUDED.fields,
-           variants = COALESCE(EXCLUDED.variants, product_drafts.variants),
-           images = product_drafts.images,
-           sub_variants = product_drafts.sub_variants,
-           units = product_drafts.units,
-           updated_at = NOW()`,
-        [productId, JSON.stringify(draftFields), draftVariants ? JSON.stringify(draftVariants) : null]
+        // Images, sub-variants and units have their own draft endpoints; _files (staged digital files) is kept.
+        `UPDATE product_drafts SET
+           fields = $2::jsonb || jsonb_strip_nulls(jsonb_build_object('_files', fields->'_files')),
+           variants = COALESCE($3::jsonb, variants),
+           updated_at = NOW()
+         WHERE id = $1`,
+        [draftRow!.id, JSON.stringify(draftFields), draftVariants ? JSON.stringify(draftVariants) : null]
       )
-      await applyDraftSubVariantPrices(productId, subVariantPrices)
+      await applyDraftSubVariantPrices(draftRow!.id, subVariantPrices)
       revalidatePath(`/admin/products/${productId}/edit`)
 
       // Publish: draft fields just saved — call publishProductDraft directly (no HTTP roundtrip)
       if (isPublish) {
         try {
-          await publishProductDraft(productId, { activate: true, actor })
+          await publishProductDraft(productId, { activate: true, actor, draftId: draftRow!.id })
         } catch (err: any) {
+          // Someone published overlapping edits since this draft started: the form opens the merge dialog.
+          if (err instanceof DraftConflictError)
+            return { error: 'Live changed while you edited', conflicts: err.conflicts, draftId: draftRow!.id }
           console.error('[product-edit] publishProductDraft failed for', productId, err)
           return { error: `Draft saved, but publishing failed: ${productErrorMessage(err, 'unknown error')}` }
         }
@@ -650,7 +650,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         return finish(`/admin/products/${productId}`)
       }
       // Save-as-Draft (incl. draft-stay from variant popup): resnapshot so Cancel reverts to this save.
-      await resnapshotProductSession(productId)
+      await resnapshotProductSession(draftRow!.id)
       return finish(intent === 'draft-stay' ? stayDest() : listDest)
     }
 

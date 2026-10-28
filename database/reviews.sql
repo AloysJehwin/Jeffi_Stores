@@ -45,11 +45,16 @@ CREATE TABLE public.product_views (
 --
 
 CREATE TABLE public.review_form_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    author_admin_id uuid,
+    title character varying(120),
+    base jsonb,
+    base_revision integer DEFAULT 0 NOT NULL,
     form_id uuid NOT NULL,
     fields jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT review_form_drafts_pkey PRIMARY KEY (form_id)
+    CONSTRAINT review_form_drafts_pkey PRIMARY KEY (id)
 );
 
 

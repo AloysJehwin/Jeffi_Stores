@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -12,7 +12,6 @@ import { DataTable, type DataCol } from '@/components/admin/kit/data-table'
 import { DetailSkeleton, ErrorState } from '@/components/admin/kit/states'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
-import { ViewDraftLink } from '@/components/admin/kit/draft-lock'
 import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
 
 const formatINR = (n: number) => formatINRBase(n, 0)
@@ -38,15 +37,18 @@ const dateCell = (v: unknown) => <span className={`${muted} whitespace-nowrap`}>
 
 export default function SupplierDetailClient({
   id,
-  hasDraft = false,
+  draftCount = 0,
+  myDraft = false,
   startDraftAction,
-  heldDraft,
+  draftsNotice,
 }: {
   id: string
-  hasDraft?: boolean
+  draftCount?: number
+  /** The viewer has a draft of their own: Edit reopens it. */
+  myDraft?: boolean
   startDraftAction?: (formData: FormData) => void | Promise<void>
-  /** Another admin holds the draft: open it read-only instead of starting one. */
-  heldDraft?: { ownerName: string; href: string } | null
+  /** The open drafts list (EntityDrafts), rendered under the header. */
+  draftsNotice?: ReactNode
 }) {
   const canFinancial = useHasScope('financial:read')
   const canInventoryWrite = useHasScope('inventory:write')
@@ -195,35 +197,26 @@ export default function SupplierDetailClient({
         status={
           <>
             {!s.is_active && <span className={badgeCls('muted')}>Inactive</span>}
-            {hasDraft && <span className={badgeCls('amber')}>Draft pending</span>}
+            {draftCount > 0 && <span className={badgeCls('amber')}>{draftCount === 1 ? 'Draft pending' : `${draftCount} drafts`}</span>}
           </>
         }
         identifiers={s.gstin ? [{ label: 'GSTIN', value: s.gstin, copy: true }] : undefined}
         secondary={[{ key: 'all', label: 'All Suppliers', href: listHref }]}
         actions={
-          heldDraft ? (
-            <ViewDraftLink held={heldDraft} />
-          ) : canInventoryWrite ? (
-            hasDraft ? (
-              <Link
-                href={ap(`/admin/suppliers/${id}/edit`)}
+          canInventoryWrite && startDraftAction ? (
+            <form action={startDraftAction}>
+              <button
+                type="submit"
                 className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
               >
-                Edit Draft
-              </Link>
-            ) : startDraftAction ? (
-              <form action={startDraftAction}>
-                <button
-                  type="submit"
-                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-                >
-                  Edit
-                </button>
-              </form>
-            ) : null
+                {myDraft ? 'Edit my draft' : 'Edit'}
+              </button>
+            </form>
           ) : null
         }
       />
+
+      {draftsNotice}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
         <Card title="Contact">

@@ -17,6 +17,7 @@ import LineItemsSection, {
   type LineItem as LILineItem,
   isBlankLine,
   validateLineItems,
+  validateDraftLines,
   lineItemPayload,
   apiErrorMessage,
   insufficientMessage,
@@ -118,7 +119,8 @@ export const SOURCE_STATUS: StatusMap = {
 export const PAYMENT_COLORS: Record<string, string> = Object.fromEntries(Object.entries(PAYMENT_STATUS).map(([k, v]) => [k, badgeCls(v.tone)]))
 export const SOURCE_COLORS: Record<string, string> = Object.fromEntries(Object.entries(SOURCE_STATUS).map(([k, v]) => [k, badgeCls(v.tone)]))
 
-export default function InvoicesClient({ canWrite = false }: { canWrite?: boolean }) {
+// section 'drafts' (the Drafts tab) shows only the draft invoices awaiting finalization; 'list' the invoices.
+export default function InvoicesClient({ canWrite = false, section = 'list' }: { canWrite?: boolean; section?: 'list' | 'drafts' }) {
   const { showToast } = useToast()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -239,6 +241,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   const [finalizingId, setFinalizingId] = useState<string | null>(null)
   const [publishingId, setPublishingId] = useState<string | null>(null)
   const [editIsDraft, setEditIsDraft] = useState(false)
+  // An amendment draft (AMD-…) is published onto its original, never finalized as a new invoice.
+  const [editIsAmendment, setEditIsAmendment] = useState(false)
   // A draft invoice belongs to the admin editing it; everyone else sees it read-only.
   const lock = useDraftLock({ resourceType: 'invoice', resourceId: view === 'edit' && editIsDraft ? editId : null })
 
@@ -273,6 +277,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
     pageSize: 25,
     getKey: i => i.id,
     fetchPage: async (p, signal) => {
+      if (section === 'drafts') return { rows: [], total: 0 }
       const params = new URLSearchParams(filters)
       if (sort) {
         params.set('sort', sort)
@@ -311,8 +316,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   })()
 
   useEffect(() => {
-    fetchDrafts()
-  }, [fetchDrafts])
+    if (section === 'drafts') fetchDrafts()
+  }, [fetchDrafts, section])
 
   // Autosave draft every 30s when editing an existing draft
   useEffect(() => {
@@ -504,6 +509,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
     setFormError('')
     setEditId(null)
     setEditIsDraft(false)
+    setEditIsAmendment(false)
     setCustSearch('')
     setCustResults([])
     setShowCustDrop(false)
@@ -605,6 +611,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
 
       setFormError('')
       setEditIsDraft(inv.status === 'draft')
+      setEditIsAmendment(inv.status === 'draft' && (!!order.draft_of_id || String(order.order_number || '').startsWith('AMD-')))
       navigateView('edit', inv.id)
     } catch {
       showToast('Failed to load invoice for editing', 'error')
@@ -642,16 +649,42 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
     }
   }
 
-  // Save new invoice as draft without finalizing
-  async function handleSaveDraft() {
-    if (!customerName.trim()) {
-      setFormError('Customer name is required')
-      return
+  // What a draft stores. Half-filled lines (custom ones included) are kept; finalizing checks them.
+  function draftBody() {
+    return {
+      customerName,
+      customerPhone,
+      customerEmail,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postalCode,
+      buyerGstin,
+      paymentMode,
+      invoiceDate,
+      notes,
+      items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
     }
-    const draftLineError = items.some(it => !isBlankLine(it)) ? validateLineItems(items) : null
-    if (draftLineError) {
-      setFormError(draftLineError)
-      showToast(draftLineError, 'error')
+  }
+
+  function draftCheck(): string | null {
+    if (!customerName.trim()) return 'Customer name is required'
+    return validateDraftLines(items)
+  }
+
+  function goToDrafts() {
+    setViewState('list')
+    editIdRef.current = null
+    router.replace(ap('/admin/invoices?tab=drafts'), { scroll: false })
+  }
+
+  // Save a new invoice as a draft without finalizing
+  async function handleSaveDraft() {
+    const problem = draftCheck()
+    if (problem) {
+      setFormError(problem)
+      showToast(problem, 'error')
       return
     }
     setFormError('')
@@ -661,21 +694,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerName,
-          customerPhone,
-          customerEmail,
-          addressLine1,
-          addressLine2,
-          city,
-          state,
-          postalCode,
-          buyerGstin,
-          paymentMode,
-          notes,
-          saveAsDraft: true,
-          items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
-        }),
+        body: JSON.stringify({ ...draftBody(), saveAsDraft: true }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -686,10 +705,89 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       }
       showToast('Invoice saved as draft', 'success')
       resetForm()
-      navigateView('list')
-      fetchDrafts()
+      goToDrafts()
     } catch (err: any) {
       setFormError(err.message || 'Failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  /** PATCH the open draft. Returns false (with the error shown) when it didn't save. */
+  async function saveOpenDraft(): Promise<boolean> {
+    if (!editId) return false
+    const res = await fetch(`/api/admin/invoices/drafts/${editId}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
+      body: JSON.stringify(draftBody()),
+    })
+    if (res.status === 423) {
+      lock.markLocked(draftBody())
+      return false
+    }
+    if (!res.ok) {
+      const msg = apiErrorMessage(res, await res.json().catch(() => ({})), 'Failed to save draft')
+      setFormError(msg)
+      showToast(msg, 'error')
+      return false
+    }
+    return true
+  }
+
+  // Explicit "Save as Draft" while editing a draft
+  async function handleSaveDraftEdit() {
+    const problem = draftCheck()
+    if (problem) {
+      setFormError(problem)
+      showToast(problem, 'error')
+      return
+    }
+    setFormError('')
+    setSubmitting(true)
+    try {
+      if (!(await saveOpenDraft())) return
+      showToast('Draft saved', 'success')
+      resetForm()
+      goToDrafts()
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to save draft')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Amendment drafts are published onto the original invoice
+  async function handlePublishAmendmentEdit() {
+    if (!editId) return
+    const lineError = validateLineItems(items)
+    if (lineError) {
+      setFormError(lineError)
+      showToast(lineError, 'error')
+      return
+    }
+    setFormError('')
+    setSubmitting(true)
+    try {
+      if (!(await saveOpenDraft())) return
+      const res = await fetch(`/api/admin/invoices/drafts/${editId}/publish`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: lockHeaders('invoice', editId),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const msg = apiErrorMessage(res, data, 'Failed to publish amendment')
+        setFormError(msg)
+        showToast(msg, 'error')
+        return
+      }
+      showToast('Amendment published', 'success')
+      resetForm()
+      navigateView('list')
+      fetchInvoices()
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to publish amendment')
     } finally {
       setSubmitting(false)
     }
@@ -698,8 +796,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   // Autosave existing draft — debounced
   async function autoSaveDraft() {
     if (!editId || !editIsDraft || lock.readOnly || autoSaveInFlight.current) return
-    // Wait for complete lines; the explicit Save/Finalize buttons report problems.
-    if (validateLineItems(items)) return
+    // Half-filled lines save too; only impossible values wait for the operator.
+    if (draftCheck()) return
     autoSaveInFlight.current = true
     setAutoSaveStatus('saving')
     try {
@@ -707,25 +805,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
-        body: JSON.stringify({
-          customerName,
-          customerPhone,
-          customerEmail,
-          addressLine1,
-          addressLine2,
-          city,
-          state,
-          postalCode,
-          buyerGstin,
-          paymentMode,
-          invoiceDate,
-          notes,
-          items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
-        }),
+        body: JSON.stringify(draftBody()),
       })
       if (res.status === 423) {
         setAutoSaveStatus('idle')
-        lock.markLocked({ customerName, customerPhone, notes, items: items.filter(it => !isBlankLine(it)).map(lineItemPayload) })
+        lock.markLocked(draftBody())
         return
       }
       setAutoSaveStatus(res.ok ? 'saved' : 'error')
@@ -1181,7 +1265,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
             </div>
           )}
 
-          <form onSubmit={isEdit ? handleEdit : handleCreate} className="space-y-4">
+          <form onSubmit={isEdit ? (editIsDraft ? e => e.preventDefault() : handleEdit) : handleCreate} className="space-y-4">
             <LockedFieldset readOnly={lock.readOnly} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Col 1 — Invoice Details */}
               <div className="bg-surface-elevated border border-border-default rounded-xl p-5 flex flex-col gap-3">
@@ -1588,23 +1672,35 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 ) : undefined
               }
             >
-              <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:items-center md:gap-2">
-                {!isEdit && canWrite && (
-                  <FormButton type="button" variant="secondary" disabled={submitting} onClick={handleSaveDraft} className="w-full md:w-auto">
-                    {submitting ? 'Saving…' : 'Save as Draft'}
-                  </FormButton>
-                )}
-                {isEdit && editIsDraft && canWrite && (
-                  <FormButton type="button" disabled={submitting} onClick={handleFinalizeEdit} className="w-full bg-amber-500 hover:bg-amber-600 md:w-auto">
-                    {submitting ? 'Finalizing…' : 'Save & Finalize'}
-                  </FormButton>
-                )}
-                {canWrite && (
-                  <FormButton disabled={submitting} className="col-span-2 w-full md:col-span-1 md:w-auto">
-                    {submitting ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : 'Create Invoice'}
-                  </FormButton>
-                )}
-              </div>
+              {canWrite && (
+                <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:items-center md:gap-2">
+                  {(!isEdit || editIsDraft) && (
+                    <FormButton
+                      type="button"
+                      variant="secondary"
+                      disabled={submitting}
+                      onClick={isEdit ? handleSaveDraftEdit : handleSaveDraft}
+                      className="w-full md:w-auto"
+                    >
+                      {submitting ? 'Saving…' : 'Save as Draft'}
+                    </FormButton>
+                  )}
+                  {isEdit && editIsDraft ? (
+                    <FormButton
+                      type="button"
+                      disabled={submitting}
+                      onClick={editIsAmendment ? handlePublishAmendmentEdit : handleFinalizeEdit}
+                      className="w-full md:w-auto"
+                    >
+                      {editIsAmendment ? (submitting ? 'Publishing…' : 'Publish Amendment') : submitting ? 'Finalizing…' : 'Save & Finalize'}
+                    </FormButton>
+                  ) : (
+                    <FormButton disabled={submitting} className={`w-full md:w-auto ${isEdit ? 'col-span-2 md:col-span-1' : ''}`}>
+                      {submitting ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : 'Create Invoice'}
+                    </FormButton>
+                  )}
+                </div>
+              )}
             </FormFooter>
           </form>
         </div>
@@ -1661,24 +1757,28 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         />
       )}
       <div className="space-y-5">
-        <PageHeader title="Invoices" description="All online and offline invoices" />
         {canWrite && (
           <TabActionsPortal>
             <TabAction onClick={() => navigateView('create')} icon={<Plus className="w-4 h-4" />} label="New Offline Invoice" />
           </TabActionsPortal>
         )}
 
-        <ListFilters
-          entity="invoices"
-          fields={INVOICE_FIELDS}
-          aliases={INVOICE_ALIASES}
-          search={INVOICE_SEARCH}
-          noun="Invoices"
-          tab="list"
-          exportable
-        />
+        {section === 'list' && (
+          <ListFilters
+            entity="invoices"
+            fields={INVOICE_FIELDS}
+            aliases={INVOICE_ALIASES}
+            search={INVOICE_SEARCH}
+            noun="Invoices"
+            tab="list"
+            exportable
+          />
+        )}
 
-        {(draftsLoading || drafts.length > 0) && (
+        {section === 'drafts' && !draftsLoading && drafts.length === 0 && (
+          <EmptyState title="No draft invoices." body="Invoices saved as drafts wait here until they are finalized." />
+        )}
+        {section === 'drafts' && (draftsLoading || drafts.length > 0) && (
           <section className="overflow-hidden rounded-xl border border-amber-500/40 bg-amber-500/5">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/30 px-4 py-3">
               <div className="flex items-center gap-2">
@@ -1814,7 +1914,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           </section>
         )}
 
-        {loading ? (
+        {section === 'list' && (loading ? (
           <TableSkeleton rows={8} cols={8} />
         ) : invoices.length === 0 ? (
           <EmptyState title="No invoices found." body="Try a different search or clear the filters." />
@@ -1968,8 +2068,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
 
             <InvoicesMobileList invoices={invoices} canWrite={canWrite} sendingEmailId={sendingEmailId} cancellingId={cancellingId} onSendEmail={sendInvoiceEmail} onCancel={cancelInvoice} />
           </>
-        )}
-        <InfiniteFooter shown={invoices.length} control={list} noun="invoices" />
+        ))}
+        {section === 'list' && <InfiniteFooter shown={invoices.length} control={list} noun="invoices" />}
         <InvoiceDetailModal inv={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
       </div>
     </>

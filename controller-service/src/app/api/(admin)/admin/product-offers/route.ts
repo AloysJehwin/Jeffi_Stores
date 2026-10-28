@@ -6,7 +6,8 @@ import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { parseSort } from '@jeffi/list-filters'
 import { OFFER_SORT, listOffersAdmin, slugifyOffer } from '@/lib/catalog/product-offers'
-import { draftLockChips } from '@/lib/admin/draft-locks'
+import { entityDraftChips } from '@/lib/admin/draft-entity-chips'
+import { offerDrafts } from '@/lib/admin/offer-drafts'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const offers = await listOffersAdmin(parseSort(request.nextUrl.searchParams, OFFER_SORT.sorts))
-  const locks = await draftLockChips('offer', offers.map(o => o.id), admin.adminId)
+  const locks = await entityDraftChips(offerDrafts, offers.map(o => o.id), admin.adminId)
   return NextResponse.json({ offers: offers.map(o => (locks[o.id] ? { ...o, draft_lock: locks[o.id] } : o)) })
 }
 

@@ -18,6 +18,7 @@ import {
   type PreviewItem,
   type SlidesData,
 } from '@/lib/catalog/homepage-sections'
+import { useHomepageLock } from './HomepageLock'
 
 type PreviewKind =
   | 'products'
@@ -157,6 +158,8 @@ export default function SectionPreview({ section }: { section: HomepageSection }
   const [error, setError] = useState(false)
   const configKey = JSON.stringify(previewConfig(section))
   const perBusiness = BUSINESS_SECTION_TYPES.has(section.type)
+  // The hero preview shows this draft's slides.
+  const draftId = useHomepageLock().lockId
 
   useEffect(() => {
     if (perBusiness) return
@@ -173,6 +176,7 @@ export default function SectionPreview({ section }: { section: HomepageSection }
           surface: rowSurface(section),
           audience: rowAudience(section),
         })
+        if (draftId) params.set('draft', draftId)
         const res = await fetch(`/api/admin/homepage/preview?${params.toString()}`, {
           credentials: 'include',
           signal: controller.signal,
@@ -192,7 +196,7 @@ export default function SectionPreview({ section }: { section: HomepageSection }
       controller.abort()
       clearTimeout(timer)
     }
-  }, [section.type, configKey, section.surface, section.audience, perBusiness])
+  }, [section.type, configKey, section.surface, section.audience, perBusiness, draftId])
 
   const hero = section.type === 'hero' || section.type === 'motion_hero'
 

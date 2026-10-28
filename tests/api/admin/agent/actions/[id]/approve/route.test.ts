@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({
+  hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
@@ -199,9 +202,8 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── mark_order_shipped ─────────────────────────────────────────────────
 
   it('executes mark_order_shipped without awb', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(proposed('mark_order_shipped', { orderId: 'o1' }) as any)
-      .mockResolvedValueOnce({ id: 'o1', order_number: 'ORD-1', status: 'shipped', awb_number: null } as any)
+    mockQueryOne.mockResolvedValueOnce(proposed('mark_order_shipped', { orderId: 'o1' }) as any)
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
     expect((await res.json()).result.status).toBe('shipped')
@@ -330,7 +332,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('executes call_admin_api successfully', async () => {
     mockQueryOne.mockResolvedValueOnce(
-      proposed('call_admin_api', { method: 'POST', path: '/api/admin/orders/refund', body: '{"id":"1"}' }) as any
+      proposed('call_admin_api', { method: 'POST', path: '/api/admin/products', body: '{"id":"1"}' }) as any
     )
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -346,7 +348,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('call_admin_api returns error when upstream not ok', async () => {
     mockQueryOne.mockResolvedValueOnce(
-      proposed('call_admin_api', { method: 'POST', path: '/api/admin/orders/refund', body: null }) as any
+      proposed('call_admin_api', { method: 'POST', path: '/api/admin/products', body: null }) as any
     )
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -398,69 +400,60 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── mark_invoice_paid ──────────────────────────────────────────────────
 
   it('returns 500 when invoice not found', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(proposed('mark_invoice_paid', { orderId: 'o1', paymentMode: 'cash', paidAt: null }) as any)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce(proposed('mark_invoice_paid', { orderId: 'o1', paymentMode: 'cash', paidAt: null }) as any)
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: 'Order not found' }) }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/Invoice not found/)
+    expect((await res.json()).error).toMatch(/Order not found/)
   })
 
   // ── update_order_status branches ──────────────────────────────────────
 
-  it('sets shipped_at and awb when update_order_status → shipped', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(
-        proposed('update_order_status', { orderId: 'o1', newStatus: 'shipped', awbNumber: 'AWB99' }) as any
-      )
-      .mockResolvedValueOnce({ id: 'o1', order_number: 'ORD-1', status: 'shipped', awb_number: 'AWB99' } as any)
+  it('update_order_status → shipped saves the AWB then moves the status', async () => {
+    mockQueryOne.mockResolvedValueOnce(
+      proposed('update_order_status', { orderId: 'o1', newStatus: 'shipped', awbNumber: 'AWB99' }) as any
+    )
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) })
+    global.fetch = fetchMock as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
     expect((await res.json()).result.awb_number).toBe('AWB99')
+    expect(fetchMock.mock.calls.map(c => [c[1].method, new URL(c[0]).pathname])).toEqual([
+      ['PATCH', '/api/admin/orders/o1'],
+      ['PATCH', '/api/orders/o1'],
+    ])
   })
 
-  it('sets delivered_at when update_order_status → delivered', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(
-        proposed('update_order_status', { orderId: 'o1', newStatus: 'delivered', awbNumber: null }) as any
-      )
-      .mockResolvedValueOnce({ id: 'o1', order_number: 'ORD-1', status: 'delivered', awb_number: null } as any)
+  it('update_order_status → cancelled carries the payment status and no AWB call', async () => {
+    mockQueryOne.mockResolvedValueOnce(
+      proposed('update_order_status', { orderId: 'o1', newStatus: 'cancelled', paymentStatus: 'pending', awbNumber: null }) as any
+    )
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) })
+    global.fetch = fetchMock as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
-    expect((await res.json()).result.status).toBe('delivered')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ status: 'cancelled', payment_status: 'pending' })
   })
 
-  it('sets cancelled_at when update_order_status → cancelled', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(
-        proposed('update_order_status', { orderId: 'o1', newStatus: 'cancelled', awbNumber: null }) as any
-      )
-      .mockResolvedValueOnce({ id: 'o1', order_number: 'ORD-1', status: 'cancelled', awb_number: null } as any)
-    const res = await POST(makeReq(), params())
-    expect(res.status).toBe(200)
-    expect((await res.json()).result.status).toBe('cancelled')
-  })
-
-  it('returns 500 when update_order_status target not found', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(
-        proposed('update_order_status', { orderId: 'missing', newStatus: 'confirmed', awbNumber: null }) as any
-      )
-      .mockResolvedValueOnce(null)
+  it('returns the endpoint error when update_order_status target not found', async () => {
+    mockQueryOne.mockResolvedValueOnce(
+      proposed('update_order_status', { orderId: 'missing', newStatus: 'confirmed', awbNumber: null }) as any
+    )
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: 'Order not found' }) }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/^Order not found or not eligible/)
+    expect((await res.json()).error).toBe('Order not found')
   })
 
-  it('update_order_status never touches a granted order and needs a physical line for shipping states', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(
-        proposed('update_order_status', { orderId: 'o-dig', newStatus: 'shipped', awbNumber: null }) as any
-      )
-      .mockResolvedValueOnce(null)
-    await POST(makeReq(), params())
-    const sql = String(mockQueryOne.mock.calls.find(c => String(c[0]).startsWith('UPDATE orders SET'))![0])
-    expect(sql).toContain(`status <> 'granted'`)
-    expect(sql).toContain('oi.is_digital IS NOT TRUE')
+  it('update_order_status never writes orders directly', async () => {
+    mockQueryOne.mockResolvedValueOnce(
+      proposed('update_order_status', { orderId: 'o-dig', newStatus: 'shipped', awbNumber: null }) as any
+    )
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: "Orders with status 'granted' cannot be modified" }) }) as any
+    const res = await POST(makeReq(), params())
+    expect(res.status).toBe(500)
+    expect(mockQueryOne.mock.calls.some(c => String(c[0]).startsWith('UPDATE orders'))).toBe(false)
+    expect(mockQuery.mock.calls.some(c => String(c[0]).startsWith('UPDATE orders'))).toBe(false)
   })
 })

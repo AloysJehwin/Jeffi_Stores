@@ -1,22 +1,122 @@
-import { queryOne } from '@/lib/shared/db'
-import type { AgentAction, ActionResult } from './shared'
+import { dedicatedOrderTool } from '@/lib/admin-agent/permissions'
+import { callInternalApi, type AgentAction, type ActionResult } from './shared'
 
-// Digital lines are never shipped; an all-digital order has no shipping states.
-const HAS_PHYSICAL_LINE = `EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = orders.id AND oi.is_digital IS NOT TRUE)`
+// Order, payment, refund and cancel actions run through the same endpoints as the admin UI, with
+// the approving admin's session, so those endpoints' scope/role checks, rules and side effects apply.
 
-export async function markOrderShipped(action: AgentAction): Promise<ActionResult> {
-  const { orderId, awbNumber } = action.payload
-  const updated = await queryOne(
-    `UPDATE orders
-       SET status = 'shipped', shipped_at = COALESCE(shipped_at, NOW()),
-           awb_number = COALESCE($2, awb_number), updated_at = NOW()
-       WHERE id = $1::uuid AND status NOT IN ('shipped','delivered','granted','cancelled')
-         AND ${HAS_PHYSICAL_LINE}
-       RETURNING id::text, order_number, status, awb_number`,
-    [orderId, awbNumber || null]
-  )
-  if (!updated) return { result: null, error: 'Order not found, already shipped/delivered/cancelled, or digital-only' }
-  return { result: updated, error: null }
+const failure = (r: { status: number; data: any }) =>
+  (r.data && typeof r.data === 'object' && r.data.error) ||
+  (typeof r.data === 'string' && r.data.trim()) ||
+  `Request failed (${r.status})`
+
+async function patchOrderStatus(
+  cookieHeader: string,
+  p: {
+    orderId: string
+    orderNumber?: string
+    newStatus?: string | null
+    paymentStatus?: string | null
+    awbNumber?: string | null
+    override?: boolean
+    overrideReason?: string | null
+  }
+): Promise<ActionResult> {
+  if (!p?.orderId) return { result: null, error: 'orderId missing' }
+  // The AWB first, so the shipped notification carries the tracking number.
+  if (p.awbNumber && p.newStatus === 'shipped') {
+    const a = await callInternalApi(cookieHeader, 'PATCH', `/api/admin/orders/${encodeURIComponent(p.orderId)}`, {
+      awb_number: p.awbNumber,
+    })
+    if (!a.ok) return { result: null, error: `Could not save the AWB: ${failure(a)}` }
+  }
+  const body: Record<string, unknown> = {}
+  if (p.newStatus) body.status = p.newStatus
+  if (p.paymentStatus) body.payment_status = p.paymentStatus
+  if (p.override) {
+    body.override = true
+    body.override_reason = p.overrideReason
+  }
+  const r = await callInternalApi(cookieHeader, 'PATCH', `/api/orders/${encodeURIComponent(p.orderId)}`, body)
+  if (!r.ok) return { result: null, error: failure(r) }
+  return {
+    result: {
+      id: p.orderId,
+      order_number: p.orderNumber ?? null,
+      ...(p.newStatus ? { status: p.newStatus } : {}),
+      ...(p.paymentStatus ? { payment_status: p.paymentStatus } : {}),
+      ...(p.awbNumber ? { awb_number: p.awbNumber } : {}),
+      ...(p.override ? { override: true } : {}),
+    },
+    error: null,
+  }
+}
+
+export async function updateOrderStatus(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
+  return patchOrderStatus(cookieHeader, action.payload)
+}
+
+export async function markOrderShipped(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
+  return patchOrderStatus(cookieHeader, { ...action.payload, newStatus: 'shipped', paymentStatus: null, override: false })
+}
+
+export async function setPaymentStatus(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
+  if (!action.payload?.paymentStatus) return { result: null, error: 'paymentStatus missing' }
+  return patchOrderStatus(cookieHeader, { ...action.payload, newStatus: null, awbNumber: null })
+}
+
+export async function cancelOrder(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
+  const p = action.payload ?? {}
+  if (!p.orderId) return { result: null, error: 'orderId missing' }
+  if (p.source === 'offline') {
+    const r = await callInternalApi(cookieHeader, 'POST', `/api/admin/orders/${encodeURIComponent(p.orderId)}/cancel`)
+    if (!r.ok) return { result: null, error: failure(r) }
+    return { result: { id: p.orderId, order_number: p.orderNumber ?? null, status: 'cancelled', ...r.data }, error: null }
+  }
+  return patchOrderStatus(cookieHeader, { ...p, newStatus: 'cancelled', paymentStatus: null })
+}
+
+// Receivables "Mark paid": the payment-status route.
+export async function markInvoicePaid(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
+  const { orderId, invoiceNumber, paymentMode, paidAt } = action.payload as {
+    orderId: string
+    invoiceNumber?: string
+    paymentMode: string
+    paidAt: string | null
+  }
+  if (!orderId) return { result: null, error: 'orderId missing' }
+  const on = paidAt || new Date().toISOString().slice(0, 10)
+  const r = await callInternalApi(cookieHeader, 'PATCH', `/api/admin/orders/${encodeURIComponent(orderId)}/payment-status`, {
+    payment_status: 'paid',
+    payment_mode: paymentMode,
+    note: `Marked paid via ${paymentMode} on ${on} (admin agent)`,
+  })
+  if (!r.ok) return { result: null, error: failure(r) }
+  return { result: { id: orderId, invoice_number: invoiceNumber ?? null, payment_status: 'paid', paymentMode }, error: null }
+}
+
+// Order refunds: /api/orders/[id]/refund. Refunds owed for approved changes: the adjustment refund route.
+export async function refundOrder(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
+  const p = action.payload ?? {}
+  if (!p.orderId || !p.method) return { result: null, error: 'orderId and method are required' }
+  const external = p.method === 'razorpay' ? null : { method: p.method, reference: p.reference ?? '', note: [p.reason, p.notes].filter(Boolean).join(' — ') }
+  const orderPath = encodeURIComponent(p.orderId)
+  const r = p.adjustmentId
+    ? await callInternalApi(
+        cookieHeader,
+        'POST',
+        `/api/admin/orders/${orderPath}/adjustments/${encodeURIComponent(p.adjustmentId)}/refund${p.legacy ? '?legacy=1' : ''}`,
+        external ? { external } : {}
+      )
+    : await callInternalApi(
+        cookieHeader,
+        'POST',
+        `/api/orders/${orderPath}/refund`,
+        external
+          ? { external, amount: p.amount, notify: p.notify !== false, reason: p.reason }
+          : { reason: p.reason }
+      )
+  if (!r.ok) return { result: null, error: failure(r) }
+  return { result: { id: p.orderId, order_number: p.orderNumber ?? null, method: p.method, ...r.data }, error: null }
 }
 
 export async function callAdminApi(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
@@ -27,6 +127,10 @@ export async function callAdminApi(action: AgentAction, cookieHeader: string): P
   }
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     return { result: null, error: 'Method not permitted at execution time' }
+  }
+  const dedicated = dedicatedOrderTool(method, path, body)
+  if (dedicated) {
+    return { result: null, error: `Order changes go through ${dedicated}, not the generic admin API. Ask the agent to use that tool.` }
   }
   const origin = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
   const url = new URL(path, origin).toString()
@@ -49,68 +153,4 @@ export async function callAdminApi(action: AgentAction, cookieHeader: string): P
   } catch (err: any) {
     return { result: null, error: String(err?.message || 'API call failed') }
   }
-}
-
-export async function markInvoicePaid(action: AgentAction): Promise<ActionResult> {
-  const { orderId, paymentMode, paidAt } = action.payload as {
-    orderId: string
-    paymentMode: string
-    paidAt: string | null
-  }
-  const updated = await queryOne<{
-    id: string
-    invoice_number: string
-    payment_status: string
-    invoice_date: string | null
-  }>(
-    `UPDATE orders
-        SET payment_status = 'paid',
-            invoice_date = COALESCE($2::date, invoice_date),
-            notes = COALESCE(notes, '') ||
-                    CASE WHEN COALESCE(notes, '') = '' THEN '' ELSE E'\n' END ||
-                    'Marked paid via ' || $3 || ' on ' || COALESCE($2::text, CURRENT_DATE::text),
-            updated_at = NOW()
-      WHERE id = $1::uuid AND invoice_number IS NOT NULL
-        AND payment_status NOT IN ('paid','refunded')
-      RETURNING id::text, invoice_number, payment_status, invoice_date`,
-    [orderId, paidAt || null, paymentMode]
-  )
-  if (!updated) return { result: null, error: 'Invoice not found, already paid, or refunded' }
-  return { result: { ...updated, paymentMode }, error: null }
-}
-
-export async function updateOrderStatus(action: AgentAction): Promise<ActionResult> {
-  const { orderId, newStatus, awbNumber } = action.payload as {
-    orderId: string
-    newStatus: string
-    awbNumber: string | null
-  }
-  const ALLOWED = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
-  if (!ALLOWED.includes(newStatus)) return { result: null, error: 'Invalid status' }
-  const tsCol =
-    newStatus === 'confirmed'
-      ? 'confirmed_at'
-      : newStatus === 'shipped'
-        ? 'shipped_at'
-        : newStatus === 'delivered'
-          ? 'delivered_at'
-          : newStatus === 'cancelled'
-            ? 'cancelled_at'
-            : null
-  const setParts = [`status = $2`, `updated_at = NOW()`]
-  const params: any[] = [orderId, newStatus]
-  if (tsCol) setParts.push(`${tsCol} = COALESCE(${tsCol}, NOW())`)
-  if (newStatus === 'shipped' && awbNumber) {
-    params.push(awbNumber)
-    setParts.push(`awb_number = COALESCE(awb_number, $${params.length})`)
-  }
-  // Granted (digital) orders are settled by the payment/refund flows, never by the agent.
-  const guards = [`status <> 'granted'`]
-  if (newStatus !== 'cancelled' && newStatus !== 'pending') guards.push(HAS_PHYSICAL_LINE)
-  const updated = await queryOne(
-    `UPDATE orders SET ${setParts.join(', ')} WHERE id = $1::uuid AND ${guards.join(' AND ')} RETURNING id::text, order_number, status, awb_number`,
-    params
-  )
-  if (!updated) return { result: null, error: 'Order not found or not eligible (digital orders have no shipping states)' }
-  return { result: updated, error: null }
 }

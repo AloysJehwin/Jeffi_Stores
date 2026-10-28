@@ -23,6 +23,8 @@ interface BrandFormProps {
   discardAction?: (formData: FormData) => Promise<void>
   /** Draft lock state from the server (initialDraftLock), so a non-holder renders read-only. */
   initialLock?: DraftLockState | null
+  /** The draft being edited (its lock id); the brand id for a create-draft. */
+  lockId?: string | null
 }
 
 export default function BrandForm({
@@ -34,6 +36,7 @@ export default function BrandForm({
   hasReturns = true,
   discardAction,
   initialLock,
+  lockId,
 }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [logoUrl, setLogoUrl] = useState(brand?.logo_url || '')
@@ -47,8 +50,9 @@ export default function BrandForm({
   const formRef = useRef<HTMLFormElement>(null)
   const toast = useActionToast()
   const router = useRouter()
-  const lock = useDraftLock({ resourceType: 'brand', resourceId: brand?.id ?? null, initial: initialLock })
-  const edit = useEditSession({ resourceType: 'brand', resourceId: brand?.id ?? null, lock })
+  const lockKey = lockId ?? brand?.id ?? null
+  const lock = useDraftLock({ resourceType: 'brand', resourceId: lockKey, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'brand', resourceId: lockKey, lock })
 
   function setInput(name: string, value: string) {
     const el = formRef.current?.elements.namedItem(name) as HTMLInputElement | null

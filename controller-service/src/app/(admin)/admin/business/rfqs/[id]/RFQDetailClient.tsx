@@ -10,6 +10,9 @@ import { Card, DetailHeader, DetailSkeleton, Dialog, EmptyState, EntityPage, Fie
 import { RFQ_STATUS, fmtDay } from '../../_status'
 import { round2 } from '@/lib/catalog/gst'
 import { fmtQty } from '@/lib/shared/number-display'
+import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
+import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
+import { assertDraftResponse } from '@/lib/client/draft-lock-client'
 
 interface RFQMessage {
   id: string
@@ -147,6 +150,47 @@ export default function RFQDetailClient({ id }: { id: string }) {
   const [sendingReply, setSendingReply] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
 
+  // The reply being written is kept as this admin's draft until it is sent.
+  const [hasReplyDraft, setHasReplyDraft] = useState(false)
+  const draftLoadedRef = useRef(false)
+  const skipDraftSaveRef = useRef(true)
+  const replyDraft = useAutosaveDraft<{ message: string; counter_prices: Record<string, string>; show_counter: boolean }>({
+    save: async (body, signal) => {
+      const res = await fetch(`/api/admin/business/rfqs/${id}/reply-draft`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        signal,
+        body: JSON.stringify(body),
+      })
+      await assertDraftResponse(res, 'Could not save the reply draft')
+      setHasReplyDraft(true)
+    },
+    enabled: () => draftLoadedRef.current && canWrite,
+  })
+  const draftTriggerRef = useRef(replyDraft.trigger)
+  draftTriggerRef.current = replyDraft.trigger
+  useEffect(() => {
+    if (!draftLoadedRef.current) return
+    if (skipDraftSaveRef.current) {
+      skipDraftSaveRef.current = false
+      return
+    }
+    const typed = replyText.trim() || Object.values(counterInputs).some(v => v?.trim())
+    if (!typed && !hasReplyDraft) return
+    draftTriggerRef.current({ message: replyText, counter_prices: counterInputs, show_counter: showCounterForm })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replyText, counterInputs, showCounterForm])
+
+  async function discardReplyDraft() {
+    skipDraftSaveRef.current = true
+    setReplyText('')
+    setCounterInputs({})
+    setShowCounterForm(false)
+    setHasReplyDraft(false)
+    await fetch(`/api/admin/business/rfqs/${id}/reply-draft`, { method: 'DELETE', credentials: 'include' }).catch(() => {})
+  }
+
   useEffect(() => {
     fetch(`/api/admin/business/rfqs/${id}`, { credentials: 'include' })
       .then(r => r.json())
@@ -164,6 +208,22 @@ export default function RFQDetailClient({ id }: { id: string }) {
       .then(m => setMessages(m.messages || []))
       .catch(() => {
         /* messages table may not exist yet */
+      })
+
+    fetch(`/api/admin/business/rfqs/${id}/reply-draft`, { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : { draft: null }))
+      .then(({ draft }) => {
+        if (draft) {
+          setReplyText(draft.message || '')
+          setCounterInputs(draft.counter_prices || {})
+          setShowCounterForm(!!draft.show_counter)
+          setHasReplyDraft(true)
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        skipDraftSaveRef.current = true
+        draftLoadedRef.current = true
       })
   }, [id])
 
@@ -229,6 +289,9 @@ export default function RFQDetailClient({ id }: { id: string }) {
     })
     const data = await res.json()
     if (res.ok) {
+      // Sending removed the draft on the server.
+      skipDraftSaveRef.current = true
+      setHasReplyDraft(false)
       setMessages(prev => [...prev, data.message])
       setReplyText('')
       setCounterInputs({})
@@ -360,10 +423,22 @@ export default function RFQDetailClient({ id }: { id: string }) {
     </button>
   )
   const sendButton = (label: string) => (
-    <button onClick={handleSendReply} disabled={sendingReply || !replyText.trim()} className="control-md w-full bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50">
-      {sendingReply && spinner}
-      {label}
-    </button>
+    <div className="space-y-2">
+      {(hasReplyDraft || replyDraft.status !== 'idle') && (
+        <div className="flex items-center justify-between gap-2 text-xs text-foreground-muted">
+          {replyDraft.status !== 'idle' ? <AutosaveStatusPill status={replyDraft.status} /> : <span>Draft reply saved</span>}
+          {hasReplyDraft && (
+            <button type="button" onClick={discardReplyDraft} className="font-medium hover:text-foreground hover:underline">
+              Discard draft
+            </button>
+          )}
+        </div>
+      )}
+      <button onClick={handleSendReply} disabled={sendingReply || !replyText.trim()} className="control-md w-full bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50">
+        {sendingReply && spinner}
+        {label}
+      </button>
+    </div>
   )
 
   return (

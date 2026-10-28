@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { BusinessAccountNavBar } from '@/components/business/AccountSidebar'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import { bp } from '@/lib/shared/business-path'
+import { humanizeLabel } from '@/lib/shared/format'
 import { documentHostForHost, type DocumentApp } from '@/lib/tenancy/forms-host'
 
 // Quote/invoice pages live on this store's own document host (quotation-{slug}. on a tenant).
@@ -40,6 +41,7 @@ const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   reviewed: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   negotiating: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  offer_accepted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   converted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 }
@@ -201,6 +203,7 @@ export default function MyQuotesPage() {
                   pending: 'Awaiting review by our team',
                   reviewed: 'Under review — quotation being prepared',
                   negotiating: 'Negotiating — check messages for updates',
+                  offer_accepted: 'Offer accepted — quotation on its way',
                   converted: 'Quotation issued',
                   rejected: 'Not accepted — contact support for details',
                 }
@@ -223,7 +226,7 @@ export default function MyQuotesPage() {
                           <span
                             className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}
                           >
-                            {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
+                            {humanizeLabel(rfq.status)}
                           </span>
                           {rfq.order_id && rfq.payment_status && (
                             <span

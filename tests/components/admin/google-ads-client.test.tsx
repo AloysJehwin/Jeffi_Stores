@@ -72,8 +72,11 @@ describe('GoogleAdsClient', () => {
   })
 
   it('loads the overview for a connected account', async () => {
-    fetchMock.mockResolvedValue(
-      new Response(
+    // The Drafts tab label reads its count from /api/admin/draft-locks; everything else is the report.
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).startsWith('/api/admin/draft-locks')
+        ? new Response(JSON.stringify({ items: [], total: 0 }))
+        : new Response(
         JSON.stringify({
           data: {
             account: null,
@@ -102,12 +105,13 @@ describe('GoogleAdsClient', () => {
     )
     expect(await screen.findByText('True ROAS')).toBeTruthy()
     expect(screen.getByText('4.50x')).toBeTruthy()
-    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/api\/admin\/google-ads\/report\?tab=overview&from=\d{4}-\d{2}-\d{2}&to=/)
+    const reportCall = fetchMock.mock.calls.map(c => String(c[0])).find(u => u.includes('/google-ads/report'))
+    expect(reportCall).toMatch(/\/api\/admin\/google-ads\/report\?tab=overview&from=\d{4}-\d{2}-\d{2}&to=/)
     expect(screen.getByText(/Acme 123-456-7890/)).toBeTruthy()
   })
 
   it('never offers Disconnect for the platform service account', async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ data: {} })))
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ data: {} })))
     render(
       <GoogleAdsClient initialStatus={{ ...base, flagship: true, connected: true, connectedVia: 'platform', customerId: '1112223333' }} currency="INR" hasData />
     )

@@ -8,7 +8,8 @@ import { getFeatureFlags } from '../../lib/site-controls'
 import { z } from 'zod'
 import { parseBody } from '../../lib/validate'
 import {
-  quotationLineSchema,
+  draftQuotationLineSchema,
+  incompleteLineError,
   quotationLineRow,
   quotationTotals,
   insertQuotationItem,
@@ -40,7 +41,7 @@ const patchQuotationSchema = z
     buyer_pincode: zText,
     buyer_email: z.string().email('Enter a valid email').or(z.literal('')).nullish(),
     notes: zText,
-    items: z.array(quotationLineSchema).optional(),
+    items: z.array(draftQuotationLineSchema).optional(),
   })
   .superRefine((b, ctx) => {
     if (b.status === 'final' && b.items && b.items.length === 0)
@@ -120,12 +121,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const parsed = parseBody(patchQuotationSchema, await request.json(), `PATCH /api/admin/quotations/${id}`)
     if (!parsed.ok) return parsed.response
-    const { items, ...fields } = parsed.data as Record<string, any> & { items?: z.infer<typeof quotationLineSchema>[] }
+    const { items, ...fields } = parsed.data as Record<string, any> & { items?: z.infer<typeof draftQuotationLineSchema>[] }
     if (existing.converted_order_id && Array.isArray(items))
       return NextResponse.json(
         { error: 'This quotation was already converted to an invoice — its line items can no longer change' },
         { status: 409 }
       )
+    // A draft may hold half-filled lines; a final quotation's lines must be complete.
+    if ((fields.status ?? existing.status) !== 'draft' && (Array.isArray(items) || existing.status === 'draft')) {
+      const lines = Array.isArray(items)
+        ? items.map(i => ({ product_id: i.product_id, name: i.description, rate: i.rate }))
+        : await queryMany<any>(
+            `SELECT product_id, description AS name, rate FROM quotation_items WHERE quotation_id = $1 ORDER BY position`,
+            [id]
+          )
+      const incomplete = incompleteLineError(lines)
+      if (incomplete) return NextResponse.json({ error: incomplete }, { status: 400 })
+    }
 
     let totals = {
       subtotal: existing.subtotal,

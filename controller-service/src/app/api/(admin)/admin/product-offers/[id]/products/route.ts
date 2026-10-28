@@ -4,18 +4,22 @@ import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/shared/validate'
-import { findOpenSession } from '@/lib/admin/editor-sessions'
-import { ensureOfferDraft, ensureOfferDraftTx } from '@/lib/admin/offer-drafts'
-import { actorOf, draftLockResponse, epochFrom, lockedByOther, withDraftWrite } from '@/lib/admin/draft-locks'
+import { actorOf, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
-async function draftProductIds(offerId: string): Promise<string[] | null> {
-  const row = await queryOne<{ products: string[] | null }>(`SELECT products FROM offer_drafts WHERE offer_id = $1`, [
+// ?draft=<id> reads and writes that draft's product list; without it, the live membership.
+const draftOf = (request: NextRequest) => request.nextUrl.searchParams.get('draft')
+
+async function draftProductIds(offerId: string, draftId: string): Promise<string[] | null> {
+  const row = await queryOne<{ products: string[] | null }>(`SELECT products FROM offer_drafts WHERE id = $1 AND offer_id = $2`, [
+    draftId,
     offerId,
   ])
-  return (row?.products ?? null) as string[] | null
+  return row ? ((row.products ?? []) as string[]) : null
 }
+
+class NoDraftError extends Error {}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -39,10 +43,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ items: rows.map(r => ({ id: r.id, label: r.name, sublabel: r.sku })) })
   }
 
-  const session = await findOpenSession(admin.adminId, 'offer', id)
-  if (session) {
-    await ensureOfferDraft(id)
-    const ids = (await draftProductIds(id)) ?? []
+  const draftId = draftOf(request)
+  if (draftId) {
+    const ids = await draftProductIds(id, draftId)
+    if (!ids) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     if (ids.length === 0) return NextResponse.json({ products: [] })
     const products = await queryMany(
       `SELECT p.id, p.name, p.sku, p.image_url
@@ -82,31 +86,31 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const productIds = Array.from(new Set(parsed.data.productIds))
 
   const actor = actorOf(admin)
-  const session = await findOpenSession(admin.adminId, 'offer', id)
-  if (session) {
+  const draftId = draftOf(request)
+  if (draftId) {
     try {
       await withDraftWrite(
         actor,
         'offer',
-        id,
+        draftId,
         async db => {
-          await ensureOfferDraftTx(db, id)
-          await db.query(`UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE offer_id = $2`, [
+          const r = await db.query(`UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE id = $2 AND offer_id = $3`, [
             JSON.stringify(productIds),
+            draftId,
             id,
           ])
+          if (!r.rowCount) throw new NoDraftError()
         },
         { epoch: epochFrom(request), ensure: true }
       )
     } catch (err) {
+      if (err instanceof NoDraftError) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
       const locked = draftLockResponse(err)
       if (locked) return locked
       throw err
     }
     return NextResponse.json({ success: true, count: productIds.length, draft: true })
   }
-  const denied = await lockedByOther(actor, 'offer', id)
-  if (denied) return denied
 
   await withTransaction(async client => {
     await client.query(`DELETE FROM product_offer_items WHERE offer_id = $1`, [id])
@@ -161,24 +165,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const matchedIds = matched.map(m => m.id)
 
   const actor = actorOf(admin)
-  const session = await findOpenSession(admin.adminId, 'offer', id)
-  if (session) {
+  const draftId = draftOf(request)
+  if (draftId) {
     try {
       const out = await withDraftWrite(
         actor,
         'offer',
-        id,
+        draftId,
         async db => {
-          await ensureOfferDraftTx(db, id)
-          const cur = await db.query(`SELECT products FROM offer_drafts WHERE offer_id = $1 FOR UPDATE`, [id])
-          const current = ((cur.rows[0]?.products ?? null) as string[] | null) ?? []
+          const cur = await db.query(`SELECT products FROM offer_drafts WHERE id = $1 AND offer_id = $2 FOR UPDATE`, [draftId, id])
+          if (!cur.rows[0]) throw new NoDraftError()
+          const current = ((cur.rows[0].products ?? null) as string[] | null) ?? []
           const next =
             action === 'add'
               ? Array.from(new Set([...current, ...matchedIds]))
               : current.filter(pid => !matchedIds.includes(pid))
-          await db.query(`UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE offer_id = $2`, [
+          await db.query(`UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE id = $2`, [
             JSON.stringify(next),
-            id,
+            draftId,
           ])
           return { changed: Math.abs(next.length - current.length), total: next.length }
         },
@@ -186,13 +190,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
       return NextResponse.json({ ...out, draft: true })
     } catch (err) {
+      if (err instanceof NoDraftError) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
       const locked = draftLockResponse(err)
       if (locked) return locked
       throw err
     }
   }
-  const denied = await lockedByOther(actor, 'offer', id)
-  if (denied) return denied
 
   await withTransaction(async client => {
     if (action === 'add') {

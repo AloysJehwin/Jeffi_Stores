@@ -343,17 +343,26 @@ async function handle(request: NextRequest) {
 
   if (hostApp === 'business') {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
+    // Pages here have no /business prefix; a prefixed link (server-rendered, or from an email)
+    // would otherwise be rewritten to /business/business/… and 404.
+    const unprefixed = pathname.replace(/^\/business(?=\/|$)/, '') || '/'
+    const portalPath = unprefixed === '/login' ? '/signin' : unprefixed
+    if (portalPath !== pathname) {
+      return NextResponse.redirect(buildRedirectUrl(request, portalPath + request.nextUrl.search), 308)
+    }
     // Public pages on the subdomain (paths are /signin, /signup, /pending — no /business/ prefix)
     const PUBLIC_BUSINESS_SUBDOMAIN = ['/signin', '/signup', '/pending']
     const isPublicSubdomain = pathname === '/' || PUBLIC_BUSINESS_SUBDOMAIN.some(p => pathname.startsWith(p))
     if (!isPublicSubdomain) {
+      const signinUrl = buildRedirectUrl(request, '/signin')
+      signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
       const token = request.cookies.get('business_sid')?.value
       if (!token) {
-        return NextResponse.redirect(buildRedirectUrl(request, '/signin'))
+        return NextResponse.redirect(signinUrl)
       }
       const payload = await inTenant(() => verifyBusinessToken(token, reqSignals))
       if (!payload) {
-        const res = NextResponse.redirect(buildRedirectUrl(request, '/signin'))
+        const res = NextResponse.redirect(signinUrl)
         res.cookies.delete('business_sid')
         return res
       }
@@ -420,6 +429,9 @@ async function handle(request: NextRequest) {
   // Business portal auth — applies to /business/* paths (not subdomain, not API, not public pages)
   // Skip on admin subdomain: /business/* there gets rewritten to /admin/business/* by the block below
   if (!isAdminSubdomain && pathname.startsWith('/business/')) {
+    if (pathname === '/business/login') {
+      return NextResponse.redirect(buildRedirectUrl(request, '/business/signin' + request.nextUrl.search), 308)
+    }
     const PUBLIC_BUSINESS = ['/business/signin', '/business/signup', '/business/pending']
     const isPublic = PUBLIC_BUSINESS.some(p => pathname.startsWith(p))
     if (!isPublic) {

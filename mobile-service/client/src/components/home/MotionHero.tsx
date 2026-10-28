@@ -1,13 +1,14 @@
 import { useId, useState } from 'react'
 import { View, useWindowDimensions } from 'react-native'
 import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg'
-import { Gradient, Media, Overline, Pager, Text, usePageParallax, usePageReveal, type PageInfo } from '../../ui'
+import { GUTTER, Gradient, Media, Overline, Pager, Text, usePageParallax, usePageReveal, type PageInfo } from '../../ui'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import Animated from 'react-native-reanimated'
 import { SlideCta } from './layout'
 import { useOnScreen } from './scroll-context'
 import { absUrl, openHref, type RemoteImage } from '../../lib/links'
+import { shapeBox } from '../../lib/shape'
 import { useImageSource } from '../../hooks/useImageSource'
 import { radius, status } from '../../theme'
 import type { MotionHeroData, MotionHeroSlide, SectionProps } from '../../types/home'
@@ -25,26 +26,31 @@ export default function MotionHero({ section, data }: SectionProps) {
 
 function Hero({ hero, aspect }: { hero: MotionHeroData; aspect?: number | null }) {
   const router = useRouter()
-  const screenH = useWindowDimensions().height
+  const { width: screenW, height: screenH } = useWindowDimensions()
   const [current, setCurrent] = useState(0)
+  // An admin-set shape: exact, and the pages narrow (centred) rather than grow past 80% of the screen.
+  const full = screenW - GUTTER * 2
+  const shaped = aspect ? shapeBox(full, aspect, screenH * 0.8).width + GUTTER * 2 : undefined
   const { ref, onLayout, onScreen } = useOnScreen(hero.slides.length > 1 || hero.slides.some(s => s.bgVideo))
   return (
     <Animated.View ref={ref} onLayout={onLayout} collapsable={false} className="bg-surface pb-4 pt-3">
-      <Pager
-        data={hero.slides}
-        keyExtractor={(slide, i) => `${i}-${slide.bgImage}`}
-        // An admin-set shape, kept on screen.
-        height={w => (aspect ? Math.round(Math.min(w / aspect, screenH * 0.8)) : Math.min(420, Math.round(w * 0.9)))}
-        // Off screen (or on another tab) it holds instead of paging under the feed.
-        autoplay={onScreen}
-        intervalMs={hero.intervalMs}
-        dots={{ size: 6 }}
-        onPress={slide => openHref(router, slide.url)}
-        canPress={slide => !!slide.url}
-        itemLabel={slide => [slide.eyebrow, slide.headline, slide.sub, slide.ctaLabel].filter(Boolean).join(', ')}
-        onIndexChange={setCurrent}
-        renderItem={(slide, info) => <Card slide={slide} info={info} active={onScreen && info.index === current} />}
-      />
+      <View style={shaped ? { width: shaped, alignSelf: 'center' } : undefined}>
+        <Pager
+          data={hero.slides}
+          keyExtractor={(slide, i) => `${i}-${slide.bgImage}`}
+          width={shaped}
+          height={w => (aspect ? Math.round(w / aspect) : Math.min(420, Math.round(w * 0.9)))}
+          // Off screen (or on another tab) it holds instead of paging under the feed.
+          autoplay={onScreen}
+          intervalMs={hero.intervalMs}
+          dots={{ size: 6 }}
+          onPress={slide => openHref(router, slide.url)}
+          canPress={slide => !!slide.url}
+          itemLabel={slide => [slide.eyebrow, slide.headline, slide.sub, slide.ctaLabel].filter(Boolean).join(', ')}
+          onIndexChange={setCurrent}
+          renderItem={(slide, info) => <Card slide={slide} info={info} active={onScreen && info.index === current} />}
+        />
+      </View>
     </Animated.View>
   )
 }

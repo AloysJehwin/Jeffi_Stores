@@ -8,6 +8,11 @@ import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { Badge, Card, FormPage, PageHeader } from '@/components/admin/kit'
 import { updateCoupon } from './actions'
 import { initialDraftLock } from '@/lib/admin/draft-locks'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { draftBehind, draftsOf, getDraftRow } from '@/lib/admin/draft-branches'
+import { couponDrafts } from '@/lib/catalog/coupon-draft'
+import DraftBehindBanner from '@/components/admin/drafts/DraftBehindBanner'
+import MergeOnLoad from '@/components/admin/drafts/MergeOnLoad'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +36,8 @@ interface Coupon {
 
 function toDatetimeLocal(val: string | null) {
   if (!val) return ''
+  // Drafts already hold the form's value; re-parsing it would read it in the server's zone.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(val)) return val
   return new Date(val).toISOString().slice(0, 16)
 }
 
@@ -48,6 +55,7 @@ export default async function EditCouponPage({
 
   const host = await getHost()
   const back = resolvedSearchParams?.back
+  const merge = resolvedSearchParams?.merge
   const backUrl = back && back.startsWith('/admin/coupons') ? back : '/admin/coupons'
   const USERS_PAGE_SIZE = 10
   const usersPage = Math.max(1, parseInt(resolvedSearchParams.usersPage || '1', 10))
@@ -142,20 +150,23 @@ export default async function EditCouponPage({
             ),
           ])
 
-  // Editing ALWAYS goes through a draft. Direct navigation to the edit URL for a
-  // coupon with no draft redirects to the detail page, where the Edit button
-  // creates a draft first. The live coupon is never edited directly.
-  const draftRow = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
-    `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`,
-    [coupon.id]
-  )
+  // Editing ALWAYS goes through a draft (?draft=<id>). Without one, open the admin's own draft;
+  // otherwise the detail page lists the open drafts and starts a new one.
+  let draftRow = resolvedSearchParams.draft ? await getDraftRow(couponDrafts, resolvedSearchParams.draft) : null
+  if (draftRow && draftRow.coupon_id !== coupon.id) draftRow = null
   const isDraft = !!draftRow
   if (!isDraft) {
-    redirect(ap(`/admin/coupons/${id}/view${back ? `?back=${encodeURIComponent(backUrl)}` : ''}`, host))
+    const session = await getAdminSession()
+    const mine = session ? (await draftsOf(couponDrafts, id)).find(d => d.authorId === session.adminId) : null
+    const qs = new URLSearchParams({ ...(back ? { back } : {}), ...(mine ? { draft: mine.id } : {}) }).toString()
+    redirect(ap(mine ? `/admin/coupons/${id}/edit?${qs}` : `/admin/coupons/${id}/view${back ? `?back=${encodeURIComponent(backUrl)}` : ''}`, host))
   }
   const df = (draftRow?.fields || {}) as any
+  const lockId = draftRow!.id as string
+  const [behind, siblings] = await Promise.all([draftBehind(couponDrafts, lockId), draftsOf(couponDrafts, id).then(d => d.length - 1)])
 
-  const initialLock = await initialDraftLock('coupon', id)
+  const initialLock = await initialDraftLock('coupon', lockId)
+  const editHref = `/admin/coupons/${id}/edit?draft=${lockId}`
 
   return (
     <MobileEditBlock>
@@ -163,20 +174,29 @@ export default async function EditCouponPage({
         header={
           <PageHeader
             back={{ href: ap(backUrl, host), label: 'Coupons' }}
-            title={isDraft ? 'Edit Draft' : 'Edit Coupon'}
+            title={isDraft ? (draftRow!.title ? `Edit Draft · ${draftRow!.title}` : 'Edit Draft') : 'Edit Coupon'}
             description={<span className="font-mono">{coupon.code}</span>}
             badges={isDraft && <Badge tone="amber">Draft pending</Badge>}
           />
         }
       >
+        {merge === '1' && (
+          <MergeOnLoad
+            publishPath={`/api/admin/coupons/${id}/publish?draft=${lockId}`}
+            doneHref={ap('/admin/coupons', host)}
+            closeHref={ap(editHref, host)}
+          />
+        )}
+        <DraftBehindBanner info={behind} siblings={siblings} noun="coupon" />
         <CouponForm
           initialLock={initialLock}
-          action={updateCoupon.bind(null, id)}
+          lockId={lockId}
+          action={updateCoupon.bind(null, id, lockId)}
           couponId={id}
           submitLabel={isDraft ? undefined : 'Save Changes'}
           isDraft={isDraft}
           backUrl={backUrl}
-          discardAction={isDraft ? updateCoupon.bind(null, id) : undefined}
+          discardAction={isDraft ? updateCoupon.bind(null, id, lockId) : undefined}
           defaultValues={{
             code: df.code ?? coupon.code,
             discount_type: df.discount_type ?? coupon.discount_type,

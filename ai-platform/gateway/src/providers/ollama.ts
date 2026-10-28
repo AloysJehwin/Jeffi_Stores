@@ -28,7 +28,7 @@ async function chatAt(base: string, req: AiChatRequest): Promise<OllamaChatResul
       signal: ctrl.signal,
       body: JSON.stringify({
         model,
-        messages: req.messages,
+        messages: req.messages.map(({ providerState: _s, ...m }) => m),
         tools: req.tools,
         stream: false,
         think: false,

@@ -164,9 +164,13 @@ export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit',
         if (frame.viewers) setViewers(frame.viewers as DraftViewer[])
         return
       }
+      if (frame.type === 'request') {
+        if (wasMine.current) toast.info(`${frame.byName ?? 'An admin'} asked for this draft${frame.reason ? `: “${frame.reason}”` : ''} — use Hand over when you are done`)
+        return
+      }
       void refresh()
     })
-  }, [resourceId, resourceType, refresh])
+  }, [resourceId, resourceType, refresh, toast])
 
   const act = useCallback(
     async (payload: Record<string, unknown>, ok?: string): Promise<boolean> => {

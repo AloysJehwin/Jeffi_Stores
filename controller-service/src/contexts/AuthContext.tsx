@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { ensureFingerprintCookie } from '@/lib/client/fp-beacon'
+import { bp } from '@/lib/shared/business-path'
 
 interface User {
   id: string
@@ -68,10 +69,7 @@ export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { childr
 
   const isBusiness = meEndpoint === '/api/business/me'
   const logoutEndpoint = isBusiness ? '/api/business/logout' : '/api/auth/logout'
-  // On business.jeffistores.in the /business/* prefix is added by middleware rewrite,
-  // so paths within the page must NOT include it — use /signin directly.
-  const isBusinessSubdomain = typeof window !== 'undefined' && window.location.hostname.startsWith('business.')
-  const logoutRedirect = isBusiness ? (isBusinessSubdomain ? '/signin' : '/business/signin') : '/'
+  const logoutRedirect = isBusiness ? bp('/business/signin') : '/'
 
   const fetchUser = async () => {
     try {

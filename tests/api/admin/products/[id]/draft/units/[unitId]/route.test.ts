@@ -12,6 +12,9 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
+// Routes address one draft of the product (?draft=); these tests use a fixed one.
+vi.mock('@/lib/catalog/product-draft-id', () => ({ productDraftIdFor: vi.fn(async () => 'draft-1') }))
+
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { PATCH, DELETE } from '@/app/api/(admin)/admin/products/[id]/draft/units/[unitId]/route'
 

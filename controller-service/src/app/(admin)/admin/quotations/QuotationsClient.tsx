@@ -18,6 +18,7 @@ import LineItemsSection, {
   isBlankLine,
   isCustomLine,
   validateLineItems,
+  validateDraftLines,
   apiErrorMessage,
 } from '@/components/admin/LineItemsSection'
 import BatchPickerModal, {
@@ -103,7 +104,7 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function QuotationsClient({ canWrite = false }: { canWrite?: boolean }) {
+export default function QuotationsClient({ canWrite = false, section = 'list' }: { canWrite?: boolean; section?: 'list' | 'drafts' }) {
   const { showToast } = useToast()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -245,11 +246,12 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
 
   // Ordered server-side across all quotations via ?sort&dir.
   const list = useInfiniteList<Quotation>({
-    key: view === 'list' ? `${filters}|${sort}|${dir}` : null,
+    key: view === 'list' ? `${section}|${filters}|${sort}|${dir}` : null,
     pageSize: PAGE_SIZE,
     getKey: q => q.id,
     fetchPage: async (p, signal) => {
-      const params = new URLSearchParams(filters)
+      const params = new URLSearchParams(section === 'drafts' ? '' : filters)
+      if (section === 'drafts') params.set('status', 'draft')
       if (sort) {
         params.set('sort', sort)
         params.set('dir', dir)
@@ -476,7 +478,8 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
     }
   }
 
-  async function save(newStatus?: string) {
+  /** No status = autosave; 'draft' = the explicit Save as Draft; 'final' = finalise. */
+  async function save(newStatus?: 'draft' | 'final') {
     if (newStatus === 'final') {
       if (!cName.trim()) {
         setSaveError('Consignee name is required')
@@ -509,18 +512,24 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         }
       }
     }
-    // Explicit save (final) surfaces line problems; autosave just waits for valid lines.
-    const lineError = validateLineItems(items)
+    // Finalising needs complete lines; a draft keeps half-filled ones (custom items included).
+    const lineError =
+      newStatus === 'final'
+        ? validateLineItems(items)
+        : !editId && !cName.trim()
+          ? 'Add a consignee name to save the draft'
+          : validateDraftLines(items)
     if (lineError) {
-      if (newStatus === 'final') {
+      if (newStatus) {
         setSaveError(lineError)
         showToast(lineError, 'error')
-      } else if (items.some(i => !isBlankLine(i))) {
+      } else if (editId || items.some(i => !isBlankLine(i))) {
         setSaveError(`Not saved yet — ${lineError}`)
       }
       setAutoSaveStatus('idle')
       return
     }
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     setSaving(true)
     setSaveError('')
     setAutoSaveStatus('saving')
@@ -604,6 +613,10 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
       if (newStatus === 'final') {
         setIsFinal(true)
         navigateView('list')
+      } else if (newStatus === 'draft') {
+        showToast('Draft saved', 'success')
+        setViewState('list')
+        router.replace(ap('/admin/quotations?tab=drafts'), { scroll: false })
       }
     } catch (e: any) {
       setSaveError(e.message || 'Save failed')
@@ -820,27 +833,32 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   if (view === 'list') {
     return (
       <div className="space-y-5">
-        <PageHeader title="Quotations" description="Create and manage B2B quotations" />
         {canWrite && (
           <TabActionsPortal>
             <TabAction onClick={newQuotation} icon={<Plus className="w-4 h-4" />} label="New Quotation" />
           </TabActionsPortal>
         )}
 
-        <ListFilters
-          entity="quotations"
-          fields={QUOTATION_FIELDS}
-          aliases={QUOTATION_ALIASES}
-          search={QUOTATION_SEARCH}
-          noun="Quotations"
-          tab="list"
-          exportable
-        />
+        {section === 'list' && (
+          <ListFilters
+            entity="quotations"
+            fields={QUOTATION_FIELDS}
+            aliases={QUOTATION_ALIASES}
+            search={QUOTATION_SEARCH}
+            noun="Quotations"
+            tab="list"
+            exportable
+          />
+        )}
 
         {loading ? (
           <TableSkeleton rows={8} cols={6} />
         ) : quotations.length === 0 ? (
-          <EmptyState title="No quotations found." body="Create your first one." />
+          section === 'drafts' ? (
+            <EmptyState title="No draft quotations." />
+          ) : (
+            <EmptyState title="No quotations found." body="Create your first one." />
+          )
         ) : (
           <>
             <div className="hidden overflow-hidden rounded-xl border border-border-default bg-surface-elevated md:block">
@@ -1870,9 +1888,14 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
           {downloading ? 'Generating…' : 'Download PDF'}
         </FormButton>
         {!isFinal && canWrite && (
-          <FormButton type="button" onClick={() => save('final')} disabled={saving}>
-            {saving ? 'Saving…' : 'Finalise & Save'}
-          </FormButton>
+          <>
+            <FormButton type="button" variant="secondary" onClick={() => save('draft')} disabled={saving || lock.readOnly}>
+              {saving ? 'Saving…' : 'Save as Draft'}
+            </FormButton>
+            <FormButton type="button" onClick={() => save('final')} disabled={saving || lock.readOnly}>
+              {saving ? 'Saving…' : 'Save & Finalize'}
+            </FormButton>
+          </>
         )}
       </FormFooter>
 

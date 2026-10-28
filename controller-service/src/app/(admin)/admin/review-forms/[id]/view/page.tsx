@@ -10,13 +10,15 @@ import {
   StatusBadge,
   ACTIVE_STATUS,
   badgeCls,
-  ViewDraftLink,
 } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { formsHostForHost } from '@/lib/tenant-registry'
 import { queryOne } from '@/lib/shared/db'
-import { heldDraftForView } from '@/lib/admin/draft-locks'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { draftsForView } from '@/lib/admin/draft-branches'
+import { reviewFormDrafts } from '@/lib/catalog/review-form-draft'
+import EntityDrafts from '@/components/admin/drafts/EntityDrafts'
 import { startReviewFormDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -62,10 +64,11 @@ export default async function ReviewFormViewPage({
   )
   if (!form) notFound()
 
-  const [hasDraft, held] = await Promise.all([
-    queryOne<{ form_id: string }>(`SELECT form_id FROM review_form_drafts WHERE form_id = $1`, [id]),
-    heldDraftForView('review_form', id, `/admin/review-forms/${id}/edit`, backUrl),
-  ])
+  const session = await getAdminSession()
+  const me = session?.adminId ?? null
+  // A never-published form is edited in place, without drafts.
+  const drafts = form.is_draft ? [] : await draftsForView(reviewFormDrafts, id, me)
+  const myDraft = drafts.find(d => d.authorId === me)
 
   const formsBase = `https://${formsHostForHost(host)}`
   const publicUrl = `${formsBase}/${form.slug}`
@@ -84,7 +87,7 @@ export default async function ReviewFormViewPage({
             <>
               <StatusBadge status={String(form.is_active)} map={ACTIVE_STATUS} />
               {form.is_draft && <Badge tone="amber">Unpublished</Badge>}
-              {hasDraft && <Badge tone="amber">Draft pending</Badge>}
+              {drafts.length > 0 && <Badge tone="amber">{drafts.length === 1 ? 'Draft pending' : `${drafts.length} drafts`}</Badge>}
               <span className={badgeCls('blue')}>{TYPE_LABEL[form.template_type]}</span>
             </>
           }
@@ -94,29 +97,25 @@ export default async function ReviewFormViewPage({
             { label: 'Created', value: day(form.created_at) },
           ]}
           actions={
-            held ? (
-              <ViewDraftLink held={held} />
-            ) : form.is_draft || hasDraft ? (
+            form.is_draft ? (
               <Link
                 href={ap(`/admin/review-forms/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
                 className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
               >
-                {hasDraft ? 'Edit Draft' : 'Edit'}
+                Edit
               </Link>
             ) : (
               <form action={startReviewFormDraft.bind(null, id)}>
                 <input type="hidden" name="_back" value={backUrl} />
-                <button
-                  type="submit"
-                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-                >
-                  Edit
+                <button type="submit" className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600">
+                  {myDraft ? 'Edit my draft' : 'Edit'}
                 </button>
               </form>
             )
           }
         />
       }
+      notices={drafts.length > 0 && <EntityDrafts drafts={drafts} start={startReviewFormDraft.bind(null, id)} back={backUrl} me={me} noun="review form" />}
       aside={
         <Card title="Details">
           <Fields cols={1}>

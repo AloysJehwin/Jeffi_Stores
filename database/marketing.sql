@@ -122,11 +122,16 @@ CREATE TABLE public.coupons (
 --
 
 CREATE TABLE public.coupon_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    author_admin_id uuid,
+    title character varying(120),
+    base jsonb,
+    base_revision integer DEFAULT 0 NOT NULL,
     coupon_id uuid NOT NULL,
     fields jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT coupon_drafts_pkey PRIMARY KEY (coupon_id)
+    CONSTRAINT coupon_drafts_pkey PRIMARY KEY (id)
 );
 
 
@@ -229,6 +234,20 @@ CREATE TABLE public.custom_scenarios (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     product_sql text
+);
+
+
+--
+-- Name: scenario_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.scenario_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid NOT NULL,
+    title character varying(128),
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 

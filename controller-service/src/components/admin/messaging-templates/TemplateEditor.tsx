@@ -5,6 +5,7 @@ import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import EmailBlockBuilder from '@/components/admin/email-composer/EmailBlockBuilder'
 import { renderBlocks } from '@/lib/templates/blocks'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { FormButton, FormFooter } from '@/components/admin/kit/form'
 import EmojiPicker from './EmojiPicker'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
@@ -92,6 +93,8 @@ type Props = {
   saving?: boolean
   /** Inside another editor (campaigns, Messaging): single column, no preview panel, one save action. */
   embedded?: boolean
+  /** Shows Cancel in the bottom action bar (the page closes the editor). */
+  onCancel?: () => void
   /** Campaign kind whose variables this template must use (else derived from a campaign/<kind> slug). */
   campaignKind?: string | null
   /** Variables to offer in the insert menu when not a campaign template (e.g. the picked template's own). */
@@ -146,6 +149,7 @@ export default function TemplateEditor({
   onSave: rawSave,
   saving,
   embedded,
+  onCancel,
   campaignKind,
   variableNames,
   apiNote,
@@ -1312,34 +1316,19 @@ export default function TemplateEditor({
             </span>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => onSave(false)}
-              disabled={saving}
-              className="px-5 h-control bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-60"
-            >
-              Save draft
-            </button>
-            <button
-              type="button"
-              onClick={() => onSave(true)}
-              disabled={saving}
-              className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-60"
-            >
-              Publish
-            </button>
+          <FormFooter sticky={false} onCancel={onCancel}>
             {value.channel === 'email' && (
-              <button
-                type="button"
-                onClick={runPreview}
-                disabled={previewing}
-                className="px-5 h-control bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-60"
-              >
+              <FormButton type="button" variant="secondary" onClick={runPreview} disabled={previewing}>
                 Preview
-              </button>
+              </FormButton>
             )}
-          </div>
+            <FormButton type="button" variant="secondary" onClick={() => onSave(false)} disabled={saving}>
+              Save as Draft
+            </FormButton>
+            <FormButton type="button" onClick={() => onSave(true)} disabled={saving}>
+              Publish
+            </FormButton>
+          </FormFooter>
         )}
       </div>
 

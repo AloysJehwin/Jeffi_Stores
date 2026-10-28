@@ -43,12 +43,30 @@ data:
   GOOGLE_VEO_FALLBACK: "veo-3.0-generate-001"
   GOOGLE_TIMEOUT_MS: "120000"
   REPLICATE_TIMEOUT_MS: "180000"
+  # Claude text. Text order; empty = anthropic,razer when Claude auth is configured.
+  AI_TEXT_PROVIDERS: ""
+  # Workload identity federation: org-wide id + the projected token (gateway.yaml). Per-store
+  # workspace/service-account/rule ids come with each request from ai_provider_identities.
+  ANTHROPIC_ORGANIZATION_ID: ""
+  ANTHROPIC_IDENTITY_TOKEN_FILE: "/var/run/secrets/anthropic/token"
+  # Must equal the projected token audience in gateway.yaml.
+  ANTHROPIC_FEDERATION_AUDIENCE: "https://api.anthropic.com"
+  ANTHROPIC_AGENT_MODEL: "claude-sonnet-5-5"
+  ANTHROPIC_AGENT_EFFORT: "medium"
+  ANTHROPIC_FAST_MODEL: "claude-haiku-5-5"
+  ANTHROPIC_COPY_MODEL: "claude-haiku-5-5"
+  ANTHROPIC_DEEP_MODEL: "claude-opus-5-5"
+  ANTHROPIC_VISION_MODEL: "claude-sonnet-5-5"
+  ANTHROPIC_FALLBACKS: "default"
+  ANTHROPIC_TIMEOUT_MS: "120000"
+  ANTHROPIC_MIN_MAX_TOKENS: "8000"
 ---
 # secret.example.yaml — copy to a real Secret (never commit real values).
 # AI_CACHE_PG_URL: postgres connection for the ai_cache (pgvector) table.
 # OPENAI_API_KEY: only used when a request forces the openai provider.
 # GOOGLE_AI_API_KEY: Gemini API key (images, Veo video). Empty = google skipped.
 # REPLICATE_API_TOKEN: Replicate token (Flux, Wan video). Empty = replicate skipped.
+# ANTHROPIC_API_KEY: local dev only (production uses workload identity). Leave empty in clusters.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -60,3 +78,4 @@ stringData:
   OPENAI_API_KEY: ""
   GOOGLE_AI_API_KEY: ""
   REPLICATE_API_TOKEN: ""
+  ANTHROPIC_API_KEY: ""

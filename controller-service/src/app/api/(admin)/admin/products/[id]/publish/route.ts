@@ -15,6 +15,8 @@ import {
   storedProductPublishErrors,
 } from '@/lib/catalog/product-validation'
 import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
+import { draftConflictResponse } from '@/lib/admin/draft-branches'
+import { productDraftIdFor } from '@/lib/catalog/product-draft-id'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,12 +33,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   try {
-    const draft = await queryOne<{ product_id: string }>(
-      `SELECT product_id FROM product_drafts WHERE product_id = $1`,
-      [id]
-    )
+    // ?draft=<id> (body { resolutions } after a merge-dialog round); a create-draft has none.
+    const draftId = await productDraftIdFor(req, id, admin.adminId)
+    const body = await req.json().catch(() => ({}))
 
-    if (!draft) {
+    if (!draftId) {
       // Create-draft (is_draft=true, no product_drafts edit-draft): publish by flipping the flags
       // directly, mirroring brands/coupons. Open-order block still applies.
       const createDraft = await queryOne<{ id: string }>(`SELECT id FROM products WHERE id = $1 AND is_draft = true`, [
@@ -88,12 +89,12 @@ export async function POST(req: NextRequest, { params }: Params) {
       )
     }
 
-    await publishProductDraft(id, { activate: true, actor: actorOf(admin), epoch: epochFrom(req) })
+    await publishProductDraft(id, { activate: true, actor: actorOf(admin), epoch: epochFrom(req), draftId, resolutions: body?.resolutions })
     revalidatePath('/admin/products')
     return NextResponse.json({ success: true, productId: id })
   } catch (err: unknown) {
-    const locked = draftLockResponse(err)
-    if (locked) return locked
+    const handled = draftLockResponse(err) ?? draftConflictResponse(err)
+    if (handled) return handled
     console.error('[product-publish] publish failed for', id, err)
     const status =
       err instanceof OpenOrdersBlockError || err instanceof UnitChangeBlockedError

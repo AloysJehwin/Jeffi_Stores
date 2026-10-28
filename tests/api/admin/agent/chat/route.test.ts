@@ -5,6 +5,10 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/admin-agent/permissions', () => ({
+  toolAllowed: () => true,
+  describeActorCapabilities: () => 'Role: super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
@@ -835,10 +839,10 @@ describe('POST /api/admin/agent/chat', () => {
     expect(data.message).toMatch(/1 item skipped/i)
     expect(data.uiBlocks).toContainEqual({ type: 'heading', value: 'Quote', level: 2 })
     // propose called with the non-skipped item only
-    expect(proposeTool.handler).toHaveBeenCalledWith({
-      customerEmail: 'buyer@example.com',
-      items: JSON.stringify([{ productId: 'p1', quantity: 2 }]),
-    })
+    expect(proposeTool.handler).toHaveBeenCalledWith(
+      { customerEmail: 'buyer@example.com', items: JSON.stringify([{ productId: 'p1', quantity: 2 }]) },
+      expect.objectContaining({ adminId: 'a1', role: 'super_admin' })
+    )
   })
 
   it('surfaces address picker on needs_choice during __quotation_confirm__', async () => {

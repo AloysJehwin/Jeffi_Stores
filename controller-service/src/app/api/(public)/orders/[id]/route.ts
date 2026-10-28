@@ -19,6 +19,7 @@ import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { parseBody } from '@/lib/shared/validate'
 import { isPlatformOwner } from '@/lib/auth/scopes'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
+import { ORDER_STATUSES, orderLockedError, orderTransitionError, paymentStatusError } from '@/lib/orders/status-flow'
 import {
   notifyOrderConfirmed,
   notifyOrderShipped,
@@ -52,24 +53,6 @@ const OrderPatchSchema = z.object({
   override: z.boolean().nullish(),
   override_reason: z.string().trim().min(10).max(500).nullish(),
 })
-
-const ALL_ORDER_STATUSES = [
-  'pending',
-  'confirmed',
-  'processing',
-  'shipped',
-  'out_for_delivery',
-  'delivered',
-  'granted',
-  'cancel_requested',
-  'cancel_rejected',
-  'cancelled',
-  'return_requested',
-  'return_approved',
-  'return_received',
-  'return_rejected',
-  'returned',
-]
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -374,7 +357,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           { status: 400 }
         )
       }
-      if (status && !ALL_ORDER_STATUSES.includes(status)) {
+      if (status && !ORDER_STATUSES.includes(status)) {
         return NextResponse.json({ error: `Unknown order status: ${status}` }, { status: 400 })
       }
     }
@@ -396,55 +379,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    const VALID_TRANSITIONS: Record<string, string[]> = {
-      pending: ['confirmed', 'cancel_requested', 'cancelled'],
-      confirmed: ['processing', 'cancel_requested', 'cancelled'],
-      processing: ['shipped', 'cancel_requested'],
-      shipped: ['out_for_delivery', 'delivered'],
-      out_for_delivery: ['delivered'],
-      delivered: ['return_requested'],
-      // Digital fulfilment: set by the payment paths, never by hand; nothing follows it.
-      granted: [],
-      cancel_requested: ['cancelled', 'cancel_rejected'],
-      cancel_rejected: [],
-      cancelled: [],
-      return_requested: ['return_approved', 'return_rejected'],
-      return_approved: ['return_received'],
-      return_received: ['returned'],
-      return_rejected: [],
-      returned: [],
+    const locked = wantsOverride ? null : orderLockedError(currentOrder.status)
+    if (locked) return NextResponse.json({ error: locked }, { status: 400 })
+
+    if (!wantsOverride && status) {
+      const transition = orderTransitionError(currentOrder.status, status)
+      if (transition) return NextResponse.json({ error: transition }, { status: 400 })
     }
 
-    const TERMINAL_STATUSES = ['cancelled', 'cancel_rejected', 'return_rejected', 'returned']
-
-    if (!wantsOverride && TERMINAL_STATUSES.includes(currentOrder.status)) {
-      return NextResponse.json(
-        { error: `Orders with status '${currentOrder.status}' cannot be modified` },
-        { status: 400 }
-      )
-    }
-
-    const validPaymentStatuses = ['pending', 'unpaid', 'paid', 'failed', 'refunded', 'cod_pending', 'cod_collected']
-
-    if (!wantsOverride && status && status !== currentOrder.status) {
-      const allowed = VALID_TRANSITIONS[currentOrder.status] ?? []
-      if (!allowed.includes(status)) {
-        return NextResponse.json(
-          { error: `Cannot transition order from '${currentOrder.status}' to '${status}'` },
-          { status: 400 }
-        )
-      }
-    }
-
-    if (payment_status && !validPaymentStatuses.includes(payment_status)) {
-      return NextResponse.json({ error: `Invalid payment status: ${payment_status}` }, { status: 400 })
-    }
-
-    if (!wantsOverride && currentOrder.payment_status === 'paid' && payment_status === 'pending') {
-      return NextResponse.json(
-        { error: 'Paid orders cannot revert to pending. Use refunded instead.' },
-        { status: 400 }
-      )
+    if (payment_status) {
+      const payErr = paymentStatusError(currentOrder.payment_status, payment_status, wantsOverride)
+      if (payErr) return NextResponse.json({ error: payErr }, { status: 400 })
     }
 
     const statusChanged = status && status !== currentOrder.status

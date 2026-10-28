@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, query, withTransaction } from '@/lib/shared/db'
-import type { PoolClient } from 'pg'
-import { actorOf, announceDraftClosed, assertDraftHolder, closeDraftLockTx, draftLockResponse, epochFrom } from '@/lib/admin/draft-locks'
+import { actorOf, draftLockResponse, epochFrom } from '@/lib/admin/draft-locks'
+import { draftConflictResponse, getDraftRow } from '@/lib/admin/draft-branches'
+import { brandDrafts, publishBrandDraft } from '@/lib/catalog/brand-draft'
 
 export const dynamic = 'force-dynamic'
 interface Params {
   params: Promise<{ id: string }>
 }
 
+// POST ?draft=<id> { resolutions? } — merge the draft into live; 409 lists overlapping edits.
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
@@ -17,72 +18,18 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'brands:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const body = await req.json().catch(() => ({}))
+  const draftId = req.nextUrl.searchParams.get('draft') ?? body?.draftId
+  if (!draftId) return NextResponse.json({ error: 'Missing draft' }, { status: 400 })
+  const row = await getDraftRow(brandDrafts, draftId)
+  if (!row || row.brand_id !== id) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 
-  const draft = await queryOne<{ brand_id: string; fields: Record<string, unknown> }>(
-    `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`,
-    [id]
-  )
-  if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
-
-  const f = draft.fields as any
-  const prevIsActive = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM brands WHERE id = $1`, [id])
-
-  const actor = actorOf(admin)
-  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
   try {
-    await withTransaction(async (client: PoolClient) => {
-      await assertDraftHolder(client, actor, 'brand', id, { epoch: epochFrom(req) })
-      const slug =
-        f.slug ||
-        (f.name
-          ? f.name
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, '-')
-              .replace(/^-|-$/g, '')
-          : null)
-
-      await client.query(
-        `UPDATE brands SET
-           name = COALESCE($2, name),
-           slug = COALESCE($3, slug),
-           description = $4,
-           website = $5,
-           logo_url = $6,
-           is_active = CASE WHEN is_draft THEN true ELSE COALESCE($7::boolean, is_active) END,
-           is_draft = false,
-           return_allowed = COALESCE($8::boolean, return_allowed),
-           return_window_days = COALESCE($9::integer, return_window_days),
-           replacement_allowed = COALESCE($10::boolean, replacement_allowed),
-           replacement_window_days = COALESCE($11::integer, replacement_window_days)
-         WHERE id = $1`,
-        [
-          id,
-          f.name || null,
-          slug,
-          f.description ?? null,
-          f.website ?? null,
-          f.logo_url ?? null,
-          f.is_active != null ? f.is_active : null,
-          f.return_allowed != null ? f.return_allowed : null,
-          f.return_window_days != null ? parseInt(f.return_window_days) : null,
-          f.replacement_allowed != null ? f.replacement_allowed : null,
-          f.replacement_window_days != null ? parseInt(f.replacement_window_days) : null,
-        ]
-      )
-
-      if (f.is_active != null && f.is_active !== prevIsActive?.is_active) {
-        await client.query(`UPDATE products SET is_active = $1 WHERE brand_id = $2`, [f.is_active, id])
-      }
-
-      await client.query(`DELETE FROM brand_drafts WHERE brand_id = $1`, [id])
-      closed = await closeDraftLockTx(client, actor, 'brand', id, 'published')
-    })
-    await announceDraftClosed(actor, 'brand', id, closed, 'published')
-
-    return NextResponse.json({ success: true, brandId: id })
+    const r = await publishBrandDraft(draftId, { actor: actorOf(admin), resolutions: body?.resolutions, epoch: epochFrom(req) })
+    return NextResponse.json({ success: true, brandId: id, revision: r.revision })
   } catch (err: unknown) {
-    const locked = draftLockResponse(err)
-    if (locked) return locked
+    const handled = draftLockResponse(err) ?? draftConflictResponse(err)
+    if (handled) return handled
     const msg = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: msg || 'Failed to publish' }, { status: 500 })
   }

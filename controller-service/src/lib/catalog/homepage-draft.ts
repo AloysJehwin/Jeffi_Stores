@@ -1,7 +1,8 @@
-import type { PoolClient } from 'pg'
+import { NextResponse } from 'next/server'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import { randomUUID } from 'crypto'
 import {
+  HOMEPAGE_DRAFT_HEADER,
   HOMEPAGE_PAGES,
   HOMEPAGE_SURFACES,
   SECTION_META,
@@ -16,7 +17,7 @@ import {
 } from '@/lib/catalog/homepage-sections'
 import type { HeroSlide } from '@/lib/catalog/hero-slides'
 import {
-  HOMEPAGE_LOCK_ID,
+  HOMEPAGE_ENTITY_ID,
   actorOf,
   announceDraftClosed,
   announceDraftLock,
@@ -24,13 +25,44 @@ import {
   canDiscard,
   closeDraftLockTx,
   epochFrom,
+  lockedOr,
   type DraftActor,
+  type DraftDb,
 } from '@/lib/admin/draft-locks'
+import {
+  DraftNotFoundError,
+  createDraft,
+  draftConflictResponse,
+  mergeAndPublish,
+  type DraftAdapter,
+} from '@/lib/admin/draft-branches'
+import type { Content, Resolution } from '@/lib/admin/draft-merge'
+
+// Several drafts of the homepage at once (like products / coupons): each branch is a full copy of
+// sections + hero slides, merged into live on publish (draft-branches). Sections and slides merge
+// per row id, so two drafts editing different sections both land.
 
 /** The editing admin for the draft lock. No actor (system writers, tests) = no lock. */
 export interface HomepageLockOpts {
   actor?: DraftActor
   epoch?: number | null
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The draft a route works on: the editor's header, or `?draft=`. */
+export function homepageDraftIdFrom(req: { url?: string; headers: { get(name: string): string | null } }): string | null {
+  let id = req.headers.get(HOMEPAGE_DRAFT_HEADER)
+  if (!id && req.url) id = new URL(req.url, 'http://x').searchParams.get('draft')
+  return id && UUID_RE.test(id) ? id : null
+}
+
+export const noHomepageDraft = () =>
+  NextResponse.json({ error: 'Open a homepage draft first', code: 'NO_DRAFT' }, { status: 400 })
+
+/** Route catch: 423 for a lock, 404 for a draft that is gone, 409 for merge conflicts. */
+export function homepageDraftOr(err: unknown): NextResponse {
+  return draftConflictResponse(err) ?? lockedOr(err)
 }
 
 /** Lock options for a route: the signed-in admin and the tab's epoch header. */
@@ -50,7 +82,7 @@ export interface HomepageDraftState {
 }
 
 export interface EditableHomepage extends HomepageDraftState {
-  draft: { updatedAt: string | null; updatedBy: string | null } | null
+  draft: { id: string; title: string | null; authorId: string | null; updatedAt: string | null; updatedBy: string | null } | null
 }
 
 export interface DraftDiff {
@@ -62,6 +94,7 @@ export interface DraftDiff {
 
 export interface HomepageDraftSummary {
   hasDraft: boolean
+  title: string | null
   updatedAt: string | null
   updatedBy: string | null
   sections: DraftDiff
@@ -75,7 +108,6 @@ export interface HomepageDraftSummary {
 }
 
 export type PublishCounts = { inserted: number; updated: number; deleted: number }
-export type PublishResult = { sections: PublishCounts; heroSlides: PublishCounts }
 
 interface DraftRow {
   id: string
@@ -146,24 +178,20 @@ const liveRows = (table: 'homepage_sections' | 'hero_slides') =>
 
 const READ_LIVE_SQL = `SELECT ${liveRows('homepage_sections')} AS sections, ${liveRows('hero_slides')} AS hero_slides`
 
-const READ_DRAFT_SQL = `SELECT d.sections, d.hero_slides, d.updated_at,
+const READ_DRAFT_SQL = `SELECT d.id, d.title, d.author_admin_id, d.base, d.sections, d.hero_slides, d.updated_at,
        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS updated_by_name
-  FROM homepage_drafts d
+  FROM homepage_draft_branches d
   LEFT JOIN admins a ON a.id = d.updated_by
   LEFT JOIN users u ON u.id = a.user_id
- WHERE d.id = true`
+ WHERE d.id = $1`
 
-const ENSURE_DRAFT_SQL = `INSERT INTO homepage_drafts (id, sections, hero_slides, updated_by)
-SELECT true, ${liveRows('homepage_sections')}, ${liveRows('hero_slides')}, $1::uuid
-ON CONFLICT (id) DO NOTHING`
+const LOCK_DRAFT_SQL = `SELECT sections, hero_slides FROM homepage_draft_branches WHERE id = $1 FOR UPDATE`
 
-const LOCK_DRAFT_SQL = `SELECT sections, hero_slides FROM homepage_drafts WHERE id = true FOR UPDATE`
-
-const WRITE_DRAFT_SQL = `UPDATE homepage_drafts
+const WRITE_DRAFT_SQL = `UPDATE homepage_draft_branches
    SET sections = $1::jsonb, hero_slides = $2::jsonb, updated_by = $3::uuid, updated_at = now()
- WHERE id = true`
+ WHERE id = $4`
 
-const DELETE_DRAFT_SQL = `DELETE FROM homepage_drafts WHERE id = true`
+const DELETE_DRAFT_SQL = `DELETE FROM homepage_draft_branches WHERE id = $1`
 
 interface TableSpec {
   table: 'homepage_sections' | 'hero_slides'
@@ -191,8 +219,6 @@ const SECTION_DIFF_FIELDS = SECTION_COLUMNS.filter(c => c !== 'display_order')
 const SLIDE_DIFF_FIELDS = SLIDE_COLUMNS.filter(c => c !== 'display_order')
 const TIME_FIELDS = new Set(['starts_at', 'ends_at'])
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 class Unchanged extends Error {
   constructor(readonly result: unknown) {
     super('homepage draft unchanged')
@@ -206,7 +232,6 @@ const asRows = <T extends DraftRow>(value: unknown): T[] =>
   asArray<T>(value).map(r => ({ ...r, surface: rowSurface(r), audience: rowAudience(r) }))
 const asSections = (value: unknown): DraftSection[] => asRows<DraftSection>(value).map(r => ({ ...r, page: rowPage(r) }))
 const asUuid = (id: string | null | undefined) => (id && UUID_RE.test(id) ? id : null)
-const isUndefinedTable = (err: unknown) => (err as { code?: string } | null)?.code === '42P01'
 
 function toIso(value: unknown): string | null {
   if (!value) return null
@@ -362,52 +387,56 @@ export function endsBeforeStart(startsAt: unknown, endsAt: unknown): boolean {
   return Date.parse(String(endsAt)) <= Date.parse(String(startsAt))
 }
 
-async function readDraft() {
-  try {
-    return await queryOne<{
-      sections: unknown
-      hero_slides: unknown
-      updated_at: unknown
-      updated_by_name: string | null
-    }>(READ_DRAFT_SQL)
-  } catch (err) {
-    if (isUndefinedTable(err)) return null
-    throw err
-  }
+interface DraftRead {
+  id: string
+  title: string | null
+  author_admin_id: string | null
+  base: unknown
+  sections: unknown
+  hero_slides: unknown
+  updated_at: unknown
+  updated_by_name: string | null
 }
+
+async function readDraft(draftId: string | null | undefined): Promise<DraftRead | null> {
+  if (!asUuid(draftId)) return null
+  return queryOne<DraftRead>(READ_DRAFT_SQL, [draftId])
+}
+
+const stateOf = (row: { sections?: unknown; hero_slides?: unknown } | null | undefined): HomepageDraftState => ({
+  sections: asSections(row?.sections),
+  heroSlides: asRows<DraftHeroSlide>(row?.hero_slides),
+})
 
 async function readLive(): Promise<HomepageDraftState> {
-  const row = await queryOne<{ sections: unknown; hero_slides: unknown }>(READ_LIVE_SQL)
-  return { sections: asSections(row?.sections), heroSlides: asRows(row?.hero_slides) }
+  return stateOf(await queryOne<{ sections: unknown; hero_slides: unknown }>(READ_LIVE_SQL))
 }
 
-export async function getEditableHomepage(): Promise<EditableHomepage> {
-  const draft = await readDraft()
+/** The draft's sections and slides, or live (draft: null) when there is no such draft. */
+export async function getEditableHomepage(draftId?: string | null): Promise<EditableHomepage> {
+  const draft = await readDraft(draftId)
   if (!draft) return { ...(await readLive()), draft: null }
   return {
     sections: sortByDisplayOrder(asSections(draft.sections)),
     heroSlides: sortByDisplayOrder(asRows<DraftHeroSlide>(draft.hero_slides)),
-    draft: { updatedAt: toIso(draft.updated_at), updatedBy: draft.updated_by_name ?? null },
+    draft: {
+      id: draft.id,
+      title: draft.title ?? null,
+      authorId: draft.author_admin_id ?? null,
+      updatedAt: toIso(draft.updated_at),
+      updatedBy: draft.updated_by_name ?? null,
+    },
   }
-}
-
-// A publish committed while we waited on the lock deletes the row; copy the new live state and retry.
-async function lockDraft(client: PoolClient, updatedBy: string | null): Promise<HomepageDraftState> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await client.query(ENSURE_DRAFT_SQL, [updatedBy])
-    const { rows } = await client.query(LOCK_DRAFT_SQL)
-    if (rows[0]) return { sections: asSections(rows[0].sections), heroSlides: asRows(rows[0].hero_slides) }
-  }
-  throw new Error('Homepage draft is unavailable')
 }
 
 /**
- * Runs `mutate` against the locked draft, creating it from the live tables on first edit, and writes
- * both arrays back. A mutate that changes nothing rolls back, so it never leaves a fresh draft behind.
- * With `lock.actor` the caller must hold the draft lock (DraftLockError otherwise); an unclaimed
- * draft is claimed, all inside the same transaction.
+ * Runs `mutate` against the locked draft and writes both arrays back. A mutate that changes nothing
+ * rolls back. With `lock.actor` the caller must hold the draft's lock (DraftLockError otherwise);
+ * an unclaimed draft is claimed, all inside the same transaction. DraftNotFoundError when the
+ * draft is gone (published or discarded meanwhile).
  */
 export async function withHomepageDraft<T>(
+  draftId: string,
   adminId: string | null,
   mutate: (draft: HomepageDraftState) => T | Promise<T>,
   lock: HomepageLockOpts = {}
@@ -416,15 +445,17 @@ export async function withHomepageDraft<T>(
   let held: Awaited<ReturnType<typeof assertDraftHolder>> = null
   try {
     const out = await withTransaction(async client => {
-      const draft = await lockDraft(client, updatedBy)
-      held = await assertDraftHolder(client, lock.actor, 'homepage', HOMEPAGE_LOCK_ID, { epoch: lock.epoch })
+      const { rows } = await client.query(LOCK_DRAFT_SQL, [draftId])
+      if (!rows[0]) throw new DraftNotFoundError(draftId)
+      const draft = stateOf(rows[0])
+      held = await assertDraftHolder(client, lock.actor, 'homepage', draftId, { epoch: lock.epoch })
       const before = JSON.stringify(draft)
       const result = await mutate(draft)
       if (JSON.stringify(draft) === before) throw new Unchanged(result)
-      await client.query(WRITE_DRAFT_SQL, [JSON.stringify(draft.sections), JSON.stringify(draft.heroSlides), updatedBy])
+      await client.query(WRITE_DRAFT_SQL, [JSON.stringify(draft.sections), JSON.stringify(draft.heroSlides), updatedBy, draftId])
       return result
     })
-    await announceDraftLock(lock.actor, 'homepage', HOMEPAGE_LOCK_ID, held)
+    await announceDraftLock(lock.actor, 'homepage', draftId, held)
     return out
   } catch (err) {
     if (err instanceof Unchanged) return err.result as T
@@ -432,52 +463,82 @@ export async function withHomepageDraft<T>(
   }
 }
 
-async function publishRows(client: PoolClient, spec: TableSpec, rows: DraftRow[]): Promise<PublishCounts> {
-  const upserted = await client.query<{ inserted: boolean }>(spec.upsert, [JSON.stringify(rows)])
-  const deleted = await client.query(`DELETE FROM ${spec.table} WHERE NOT (id = ANY($1::uuid[]))`, [
-    rows.map(r => r.id),
-  ])
+async function publishRows(db: DraftDb, spec: TableSpec, rows: DraftRow[]): Promise<PublishCounts> {
+  const upserted = await db.query<{ inserted: boolean }>(spec.upsert, [JSON.stringify(rows)])
+  const deleted = await db.query(`DELETE FROM ${spec.table} WHERE NOT (id = ANY($1::uuid[]))`, [rows.map(r => r.id)])
   const inserted = upserted.rows.filter(r => r.inserted).length
   return { inserted, updated: upserted.rows.length - inserted, deleted: deleted.rowCount ?? 0 }
 }
 
+// Merge content: rows without updated_at (every edit bumps it, so it would conflict on its own) and
+// with times as ISO strings (live reads them back in Postgres' format).
+const TIME_KEYS = ['starts_at', 'ends_at', 'created_at']
+function contentRow(row: DraftRow): Record<string, unknown> {
+  const { updated_at: _u, ...rest } = row as DraftRow & Record<string, unknown>
+  for (const k of TIME_KEYS) if (rest[k]) rest[k] = toIso(rest[k]) ?? rest[k]
+  return rest
+}
+
+function contentOf(row: { sections?: unknown; hero_slides?: unknown } | null | undefined): Content {
+  const state = stateOf(row)
+  return { sections: state.sections.map(contentRow), hero_slides: state.heroSlides.map(contentRow) }
+}
+
+export const homepageDrafts: DraftAdapter = {
+  type: 'homepage',
+  table: 'homepage_draft_branches',
+  entityKey: 'homepage_id',
+  arrayKeys: { sections: 'id', hero_slides: 'id' },
+  labels: { sections: 'Section', hero_slides: 'Hero slide', config: 'Settings', is_active: 'Shown' },
+  live: async db => contentOf((await db.query(READ_LIVE_SQL)).rows[0]),
+  toContent: row => contentOf(row),
+  normalizeBase: base => contentOf(base),
+  toColumns: c => ({ sections: c.sections ?? [], hero_slides: c.hero_slides ?? [] }),
+  // Live is two tables with no parent row: serialise publishes instead.
+  lockLive: async db => {
+    await db.query(`SELECT pg_advisory_xact_lock(hashtext('homepage_publish'))`)
+  },
+  apply: async (db, _id, merged) => {
+    await publishRows(db, SECTIONS, merged.sections as DraftRow[])
+    await publishRows(db, SLIDES, merged.hero_slides as DraftRow[])
+  },
+  // Two drafts that both reordered a list: this draft's order wins (ties sort by created_at).
+  autoResolve: c => (c.path.endsWith('.display_order') ? 'mine' : null),
+}
+
+/** Starts a draft from live, locked to the actor. */
+export function createHomepageDraft(actor: DraftActor, title?: string | null): Promise<string> {
+  return createDraft(homepageDrafts, actor, HOMEPAGE_ENTITY_ID, { title })
+}
+
 /**
- * Copies the draft onto the live tables in one transaction and deletes it. Null when there is no draft.
- * With `lock.actor` the draft lock is asserted and closed in that transaction.
+ * Merges the draft into live and deletes it. Throws DraftConflictError while overlapping edits
+ * (the same section's field in another published draft) are unresolved, DraftNotFoundError when gone.
  */
-export async function publishHomepageDraft(lock: HomepageLockOpts = {}): Promise<PublishResult | null> {
-  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
-  const out = await withTransaction(async client => {
-    const { rows } = await client.query(LOCK_DRAFT_SQL)
-    if (!rows[0]) return null
-    await assertDraftHolder(client, lock.actor, 'homepage', HOMEPAGE_LOCK_ID, { epoch: lock.epoch })
-    const sections = await publishRows(client, SECTIONS, asArray(rows[0].sections))
-    const heroSlides = await publishRows(client, SLIDES, asArray(rows[0].hero_slides))
-    await client.query(DELETE_DRAFT_SQL)
-    closed = await closeDraftLockTx(client, lock.actor, 'homepage', HOMEPAGE_LOCK_ID, 'published')
-    return { sections, heroSlides }
-  })
-  await announceDraftClosed(lock.actor, 'homepage', HOMEPAGE_LOCK_ID, closed, 'published')
-  return out
+export function publishHomepageDraft(
+  draftId: string,
+  opts: { actor?: DraftActor; epoch?: number | null; resolutions?: Record<string, Resolution> } = {}
+) {
+  return mergeAndPublish(homepageDrafts, draftId, opts.actor, opts)
 }
 
 /** With `lock.actor`: the holder or an owner role (audited) discards, and the lock closes with the row. */
-export async function discardHomepageDraft(lock: HomepageLockOpts = {}): Promise<boolean> {
+export async function discardHomepageDraft(draftId: string, lock: HomepageLockOpts = {}): Promise<boolean> {
   const actor = lock.actor
   if (!actor?.adminId) {
-    const result = await query(DELETE_DRAFT_SQL)
+    const result = await query(DELETE_DRAFT_SQL, [draftId])
     return (result.rowCount ?? 0) > 0
   }
-  const allowed = await canDiscard(actor, 'homepage', HOMEPAGE_LOCK_ID)
+  const allowed = await canDiscard(actor, 'homepage', draftId)
   if (!allowed.ok) throw allowed.error
   let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
   const discarded = await withTransaction(async client => {
-    const result = await client.query(DELETE_DRAFT_SQL)
+    const result = await client.query(DELETE_DRAFT_SQL, [draftId])
     if (!result.rowCount) return false
-    closed = await closeDraftLockTx(client, actor, 'homepage', HOMEPAGE_LOCK_ID, 'discarded')
+    closed = await closeDraftLockTx(client, actor, 'homepage', draftId, 'discarded')
     return true
   })
-  await announceDraftClosed(actor, 'homepage', HOMEPAGE_LOCK_ID, closed, 'discarded')
+  await announceDraftClosed(actor, 'homepage', draftId, closed, 'discarded')
   return discarded
 }
 
@@ -534,12 +595,14 @@ const perSurface = <T>(fn: (surface: HomepageSurface) => T) =>
 const perPage = <T>(fn: (page: HomepagePage) => T) =>
   Object.fromEntries(HOMEPAGE_PAGES.map(p => [p, fn(p)])) as Record<HomepagePage, T>
 
-export async function getHomepageDraftSummary(): Promise<HomepageDraftSummary> {
-  const draft = await readDraft()
+/** What the draft changes: diffed against the live it started from, so others' publishes don't count. */
+export async function getHomepageDraftSummary(draftId: string | null | undefined): Promise<HomepageDraftSummary> {
+  const draft = await readDraft(draftId)
   if (!draft) {
     const none = () => ({ sections: noChanges(), slides: noChanges() })
     return {
       hasDraft: false,
+      title: null,
       updatedAt: null,
       updatedBy: null,
       ...none(),
@@ -548,21 +611,22 @@ export async function getHomepageDraftSummary(): Promise<HomepageDraftSummary> {
       business: perSurface(none),
     }
   }
-  const live = await readLive()
-  const state: HomepageDraftState = { sections: asSections(draft.sections), heroSlides: asRows(draft.hero_slides) }
+  const base = draft.base ? stateOf(draft.base as { sections?: unknown; hero_slides?: unknown }) : await readLive()
+  const state = stateOf(draft)
   return {
     hasDraft: true,
+    title: draft.title ?? null,
     updatedAt: toIso(draft.updated_at),
     updatedBy: draft.updated_by_name ?? null,
-    ...diffState(state, live),
-    bySurface: perSurface(surface => diffState(onSurface(state, surface), onSurface(live, surface))),
+    ...diffState(state, base),
+    bySurface: perSurface(surface => diffState(onSurface(state, surface), onSurface(base, surface))),
     byPage: perPage(page =>
       perSurface(surface =>
-        diffState(onSurface(state, surface, page, 'store'), onSurface(live, surface, page, 'store'))
+        diffState(onSurface(state, surface, page, 'store'), onSurface(base, surface, page, 'store'))
       )
     ),
     business: perSurface(surface =>
-      diffState(onSurface(state, surface, 'home', 'business'), onSurface(live, surface, 'home', 'business'))
+      diffState(onSurface(state, surface, 'home', 'business'), onSurface(base, surface, 'home', 'business'))
     ),
   }
 }

@@ -6,6 +6,7 @@ import { queryOne } from '@/lib/shared/db'
 import { uploadVariantImage, getS3Url, currentBucket, deleteProductImage, UploadValidationError } from '@/lib/shared/s3'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { actorOf, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
+import { productDraftIdFor } from '@/lib/catalog/product-draft-id'
 
 // Draft-scoped variant images. Uploads go to S3 immediately (a file must physically
 // exist before publish), but the ROW is staged in product_drafts.variant_images —
@@ -35,11 +36,9 @@ const PatchSchema = z.object({
   displayOrder: z.number().int().min(0).optional(),
 })
 
-async function getStage(productId: string): Promise<any[]> {
-  const row = await queryOne<{ variant_images: any[] }>(
-    `SELECT variant_images FROM product_drafts WHERE product_id = $1`,
-    [productId]
-  )
+async function getStage(draftId: string | null): Promise<any[]> {
+  if (!draftId) return []
+  const row = await queryOne<{ variant_images: any[] }>(`SELECT variant_images FROM product_drafts WHERE id = $1`, [draftId])
   return Array.isArray(row?.variant_images) ? row!.variant_images : []
 }
 
@@ -47,17 +46,18 @@ async function getStage(productId: string): Promise<any[]> {
 async function saveStage(
   req: NextRequest,
   admin: { adminId?: string; role?: string; scopes?: string[] },
-  productId: string,
+  draftId: string | null,
   stage: any[]
 ): Promise<NextResponse | null> {
+  if (!draftId) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   try {
     await withDraftWrite(
       actorOf(admin),
       'product',
-      productId,
+      draftId,
       db =>
-        db.query(`UPDATE product_drafts SET variant_images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-          productId,
+        db.query(`UPDATE product_drafts SET variant_images = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+          draftId,
           JSON.stringify(stage),
         ]),
       { epoch: epochFrom(req), assertAfter: true }
@@ -82,8 +82,9 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products:read'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const draftId = await productDraftIdFor(request, id, admin.adminId)
 
-  const stage = await getStage(id)
+  const stage = await getStage(draftId)
   const images = forVariant(stage, variantId).sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
   return NextResponse.json({ images })
 }
@@ -96,9 +97,10 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const draftId = await productDraftIdFor(request, id, admin.adminId)
 
   try {
-    const stage = await getStage(id)
+    const stage = await getStage(draftId)
     const existing = forVariant(stage, variantId)
     if (existing.length >= MAX_IMAGES) {
       return NextResponse.json({ error: `Maximum ${MAX_IMAGES} images per variant` }, { status: 400 })
@@ -156,7 +158,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         _staged: true, // freshly uploaded S3 file, not yet in live variant_images
       }
     }
-    const locked = await saveStage(request, admin, id, [...stage, staged])
+    const locked = await saveStage(request, admin, draftId, [...stage, staged])
     if (locked) {
       if (staged?._staged && staged.s3_key)
         await deleteProductImage(staged.s3_key, staged.s3_thumbnail_key || '').catch(() => {})
@@ -178,6 +180,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const draftId = await productDraftIdFor(request, id, admin.adminId)
 
   const rawDel = await request.json().catch(() => null)
   if (!rawDel) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -185,7 +188,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!parsedDel.ok) return parsedDel.response
   const { imageId } = parsedDel.data
 
-  const stage = await getStage(id)
+  const stage = await getStage(draftId)
   const removed = stage.find((vi: any) => vi.id === imageId && vi.variant_id === variantId)
   // Drop the row from the stage. We do NOT delete the S3 file here: for a freshly
   // staged upload the file is cleaned up on draft discard; for a live image, the file
@@ -198,7 +201,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
     if (rest[0]) next = next.map((vi: any) => (vi.id === rest[0].id ? { ...vi, is_primary: true } : vi))
   }
-  const locked = await saveStage(request, admin, id, next)
+  const locked = await saveStage(request, admin, draftId, next)
   if (locked) return locked
   return NextResponse.json({ success: true })
 }
@@ -211,6 +214,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const draftId = await productDraftIdFor(request, id, admin.adminId)
 
   const rawPatch = await request.json().catch(() => null)
   if (!rawPatch) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -218,14 +222,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!parsedPatch.ok) return parsedPatch.response
   const { imageId, isPrimary, displayOrder } = parsedPatch.data
 
-  const stage = await getStage(id)
+  const stage = await getStage(draftId)
   const next = stage.map((vi: any) => {
     if (vi.variant_id !== variantId) return vi
     if (isPrimary) return { ...vi, is_primary: vi.id === imageId }
     if (displayOrder !== undefined && vi.id === imageId) return { ...vi, display_order: displayOrder }
     return vi
   })
-  const locked = await saveStage(request, admin, id, next)
+  const locked = await saveStage(request, admin, draftId, next)
   if (locked) return locked
   return NextResponse.json({ success: true })
 }

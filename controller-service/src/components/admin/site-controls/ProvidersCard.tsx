@@ -32,8 +32,8 @@ const KEY_LABEL: Record<Key, string> = {
   ai_video_providers: 'AI video order',
   ai_image_default_quality: 'Image default quality',
 }
-const ALL: Record<Cap, string[]> = { text: ['razer'], image: ['razer', 'google', 'replicate'], video: ['google', 'replicate'] }
-const PROVIDER_LABEL: Record<string, string> = { razer: 'Razer', google: 'Google', replicate: 'Replicate', twilio: 'Twilio', aws: 'AWS' }
+const ALL: Record<Cap, string[]> = { text: ['anthropic', 'razer'], image: ['razer', 'google', 'replicate'], video: ['google', 'replicate'] }
+const PROVIDER_LABEL: Record<string, string> = { anthropic: 'Claude', razer: 'Razer', google: 'Google', replicate: 'Replicate', twilio: 'Twilio', aws: 'AWS' }
 const QUALITY = ['draft', 'standard', 'premium']
 const capOf = (k: Key): Cap | null => (k === 'ai_text_providers' ? 'text' : k === 'ai_image_providers' ? 'image' : k === 'ai_video_providers' ? 'video' : null)
 const label = (p: string) => PROVIDER_LABEL[p] ?? p

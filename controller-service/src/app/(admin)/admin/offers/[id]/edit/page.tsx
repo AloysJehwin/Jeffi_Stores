@@ -1,12 +1,16 @@
 import { notFound, redirect } from 'next/navigation'
 import { z } from 'zod'
-import { queryMany, queryOne } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { getOfferById } from '@/lib/catalog/product-offers'
 import type { AssignOption } from '@/components/admin/OffersProductPicker'
 import OfferDetailClient from '../OfferDetailClient'
 import { initialDraftLock } from '@/lib/admin/draft-locks'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { draftBehind, draftsOf, getDraftRow } from '@/lib/admin/draft-branches'
+import { offerDrafts, offerFieldsOf } from '@/lib/admin/offer-drafts'
+import DraftBehindBanner from '@/components/admin/drafts/DraftBehindBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,30 +66,49 @@ async function loadAssignOptions() {
   }
 }
 
-// Editing ALWAYS goes through a draft. Direct navigation to /edit for an offer
-// with no draft redirects to /view, where the Edit button creates the draft
-// first. The live offer is never edited directly through this route.
-export default async function EditOfferPage({ params }: { params: Promise<{ id: string }> }) {
+// Editing ALWAYS goes through a draft (?draft=<id>). Without one, open the admin's own draft;
+// otherwise /view lists the open drafts and its Edit button starts one. The live offer is never
+// edited directly through this route.
+export default async function EditOfferPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
   const { id } = await params
+  const { draft } = await searchParams
   if (!z.guid().safeParse(id).success) notFound()
 
   const offer = await getOfferById(id)
   if (!offer) notFound()
 
   const host = await getHost()
-  const hasDraft = await queryOne<{ offer_id: string }>(`SELECT offer_id FROM offer_drafts WHERE offer_id = $1`, [id])
-  if (!hasDraft) {
-    redirect(ap(`/admin/offers/${id}/view`, host))
+  let draftRow = draft && z.guid().safeParse(draft).success ? await getDraftRow(offerDrafts, draft) : null
+  if (draftRow && draftRow.offer_id !== id) draftRow = null
+  if (!draftRow) {
+    const session = await getAdminSession()
+    const mine = session ? (await draftsOf(offerDrafts, id)).find(d => d.authorId === session.adminId) : null
+    redirect(ap(mine ? `/admin/offers/${id}/edit?draft=${mine.id}` : `/admin/offers/${id}/view`, host))
   }
 
-  const options = await loadAssignOptions()
+  const draftId = draftRow.id as string
+  const [options, initialLock, behind, siblings] = await Promise.all([
+    loadAssignOptions(),
+    initialDraftLock('offer', draftId),
+    draftBehind(offerDrafts, draftId),
+    draftsOf(offerDrafts, id).then(d => d.length - 1),
+  ])
   return (
     <OfferDetailClient
-      offer={offer}
+      offer={{ ...offer, ...offerFieldsOf(draftRow.fields ?? {}) }}
+      draftId={draftId}
+      draftTitle={draftRow.title ?? null}
       backHref={ap('/admin/offers?tab=offers', host)}
       categoryOptions={options.categories}
       brandOptions={options.brands}
-      initialLock={await initialDraftLock('offer', id)}
+      initialLock={initialLock}
+      notices={<DraftBehindBanner info={behind} siblings={siblings} noun="offer" />}
     />
   )
 }
