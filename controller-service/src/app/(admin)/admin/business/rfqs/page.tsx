@@ -18,6 +18,7 @@ import { RFQ_FIELDS, RFQ_SEARCH } from '@/lib/filters/fields/business-rfqs'
 import BusinessRfqsTable from './_components/BusinessRfqsTable'
 import RfqTrendChart, { type RfqTrendPoint } from './_components/RfqTrendChart'
 import RfqsOverview from './_components/RfqsOverview'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
 const PAGE_SIZE = 25
 
@@ -80,7 +81,8 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
     redirect(ap('/admin/dashboard', host))
 
   // Overview by default; any list filter (or ?page) opens the list.
-  const showList = isListUrl(resolvedSearchParams, RFQ_FIELDS)
+  const showDrafts = resolvedSearchParams.tab === 'drafts'
+  const showList = !showDrafts && isListUrl(resolvedSearchParams, RFQ_FIELDS)
   const href = (t: string) => ap(tabHref('/admin/business/rfqs', t, resolvedSearchParams, RFQ_FIELDS), host)
   const q = normalizeQuery(RFQ_ENTITY, resolvedSearchParams)
 
@@ -92,11 +94,14 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
         tabs={[
           { id: 'overview', label: 'Overview', href: href('overview') },
           { id: 'list', label: 'All RFQs', href: href('list') },
+          { id: 'drafts', label: <DraftsTabLabel type="rfq_reply" label="Draft replies" />, href: ap('/admin/business/rfqs?tab=drafts', host) },
         ]}
-        value={showList ? 'list' : 'overview'}
+        value={showDrafts ? 'drafts' : showList ? 'list' : 'overview'}
       />
 
-      {!showList ? (
+      {showDrafts ? (
+        <PageDrafts type="rfq_reply" />
+      ) : !showList ? (
         <Suspense fallback={null}>
           <RfqsOverview />
         </Suspense>
