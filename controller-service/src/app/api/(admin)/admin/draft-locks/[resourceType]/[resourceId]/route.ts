@@ -111,6 +111,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         const name = [admin.first_name, admin.last_name].filter(Boolean).join(' ') || admin.email
         const r = await requestDraftAccess({ ...actor, displayName: name }, t.type, t.id, body.message, req)
         const state = await getDraftLockState(admin, t.type, t.id)
+        if (!r.sent) {
+          const error = r.reason === 'rate_limited' ? 'You already asked in the last 5 minutes' : 'Nobody holds this draft — claim it instead'
+          return NextResponse.json({ ...state, me: admin.adminId, request: r, error }, { status: r.reason === 'rate_limited' ? 429 : 409 })
+        }
         return NextResponse.json({ ...state, me: admin.adminId, request: r })
       }
     }

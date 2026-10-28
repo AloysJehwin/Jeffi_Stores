@@ -123,7 +123,7 @@ export function useDraftsList(scope: DraftsScope, type: string, sort?: string | 
       t = setTimeout(() => void refresh(), 800)
     }
     const off = subscribeAdminEvents(f => {
-      if (f.kind === 'lock' && f.type !== 'presence') soon()
+      if (f.kind === 'lock' && f.type !== 'presence' && f.type !== 'request') soon()
     })
     const poll = setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
@@ -165,7 +165,7 @@ export function useDraftCounts(type: string) {
     void refresh()
     let t: ReturnType<typeof setTimeout> | null = null
     const off = subscribeAdminEvents(f => {
-      if (f.kind !== 'lock' || f.type === 'presence') return
+      if (f.kind !== 'lock' || f.type === 'presence' || f.type === 'request') return
       if (t) clearTimeout(t)
       t = setTimeout(() => void refresh(), 800)
     })
