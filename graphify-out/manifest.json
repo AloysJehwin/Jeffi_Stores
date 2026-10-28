@@ -23543,5 +23543,10 @@
     "mtime": 1793209199.7812002,
     "ast_hash": "8d4ea103e0bd279da7d01bea67866bc0",
     "semantic_hash": ""
+  },
+  "database/migrations/claude-identities-live.sql": {
+    "mtime": 1793214928.6142464,
+    "ast_hash": "c00fd887c4f8a1d3101dcdacc8abe333",
+    "semantic_hash": ""
   }
 }
