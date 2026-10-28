@@ -7815,8 +7815,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(business)/business/quotes/page.tsx": {
-    "mtime": 1792943291.6670177,
-    "ast_hash": "facc70016172498f8aec5fbcd00a144b",
+    "mtime": 1793208082.3694408,
+    "ast_hash": "3abe03d5058db6f8781bacee53b721d2",
     "semantic_hash": ""
   },
   "controller-service/src/app/(business)/business/signin/loading.tsx": {
@@ -12550,8 +12550,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/homepage/SectionConfigFields.tsx": {
-    "mtime": 1793112905.0390644,
-    "ast_hash": "8633dcc5347f386616607b5c80af8085",
+    "mtime": 1793208789.0409894,
+    "ast_hash": "dcef3b2f61ea1f7b487717785c3f0ec7",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/homepage/SectionPreview.tsx": {
@@ -12680,8 +12680,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/homepage/editors/fields.tsx": {
-    "mtime": 1793112867.8471277,
-    "ast_hash": "eaea874416da803d96476b2e9368a9bb",
+    "mtime": 1793209077.8905747,
+    "ast_hash": "9cdef7da084431cd5bf355668366f53d",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/homepage/editors/icon-options.ts": {
@@ -13160,8 +13160,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/OfferSlider.tsx": {
-    "mtime": 1793080690.1575687,
-    "ast_hash": "4fe15bed4c92d62fbc521517c4477d2d",
+    "mtime": 1793208833.0684073,
+    "ast_hash": "512826afe30c1361fe41b82e34e27b20",
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/PageTracker.tsx": {
@@ -13345,8 +13345,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/home/CategoryGrid.tsx": {
-    "mtime": 1793080833.6820486,
-    "ast_hash": "013fe5efd1563f2c5cfea6727c4ca6ef",
+    "mtime": 1793208560.734828,
+    "ast_hash": "deffa8fa81bf17210c704b06651f94fb",
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/home/CategoryShowcase.tsx": {
@@ -13385,8 +13385,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/home/PromoBanner.tsx": {
-    "mtime": 1793080874.3704255,
-    "ast_hash": "e150d79e47aeada61b4d1d9a8c3d8bcf",
+    "mtime": 1793208889.06203,
+    "ast_hash": "79e7257018147e47557c2f0c2a19e225",
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/home/Reveal.tsx": {
@@ -13395,8 +13395,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/home/SectionRenderer.tsx": {
-    "mtime": 1793113028.8093665,
-    "ast_hash": "8e4226cceb5759797f40e6f48c0bb4e9",
+    "mtime": 1793208815.8619776,
+    "ast_hash": "06ca91f0fcb22d43750515a0ff270d72",
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/home/SocialStrip.tsx": {
@@ -14085,8 +14085,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/catalog/homepage-sections.ts": {
-    "mtime": 1793203045.3707352,
-    "ast_hash": "42d11bf826458e8a4cd218a81f998edf",
+    "mtime": 1793209077.8899791,
+    "ast_hash": "e129b5ac800c24be5e7eec3f9806ca72",
     "semantic_hash": ""
   },
   "controller-service/src/lib/catalog/kyc-upload.ts": {
@@ -20695,8 +20695,8 @@
     "semantic_hash": ""
   },
   "mobile-service/client/src/components/home/OfferSlider.tsx": {
-    "mtime": 1793080839.2839887,
-    "ast_hash": "3e338252888ba15310d898aa7b8d7930",
+    "mtime": 1793209237.9810557,
+    "ast_hash": "6fb9a88030a10d1b17c7bc5640319880",
     "semantic_hash": ""
   },
   "mobile-service/client/src/components/home/ProductRowSection.tsx": {
@@ -20705,8 +20705,8 @@
     "semantic_hash": ""
   },
   "mobile-service/client/src/components/home/PromoBanner.tsx": {
-    "mtime": 1793080839.2866936,
-    "ast_hash": "674553a48d35538673f9dc1c111e264f",
+    "mtime": 1793209216.4876702,
+    "ast_hash": "0c5097ddd0d60d53fe1db147261791e5",
     "semantic_hash": ""
   },
   "mobile-service/client/src/components/home/RecentlyViewed.tsx": {
@@ -21425,8 +21425,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/home/MotionHero.tsx": {
-    "mtime": 1793080937.1200595,
-    "ast_hash": "d2be0e6eee27307a6fa28f349ca1de37",
+    "mtime": 1793209100.426056,
+    "ast_hash": "0daf18c7b391bb1cb87368154c70a45d",
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/home/ProductSpotlight.tsx": {
@@ -21470,8 +21470,8 @@
     "semantic_hash": ""
   },
   "mobile-service/client/src/components/home/MotionHero.tsx": {
-    "mtime": 1793080839.2849207,
-    "ast_hash": "2ffa65f37669570ab9c8ea0cdca291d4",
+    "mtime": 1793209237.980649,
+    "ast_hash": "fd4800a1906e22549003cf4e44df8817",
     "semantic_hash": ""
   },
   "mobile-service/client/src/components/home/ProductSpotlight.tsx": {
@@ -21700,8 +21700,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/slides/PromoCard.tsx": {
-    "mtime": 1793080772.6518435,
-    "ast_hash": "9774576cfc96fcf31b39f14ff1ebdec8",
+    "mtime": 1793208479.4275374,
+    "ast_hash": "67dbdc33df38474622df6a2eb1bfe055",
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/slides/SlideControls.tsx": {
@@ -21715,8 +21715,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/slides/Slides.tsx": {
-    "mtime": 1793080726.6546168,
-    "ast_hash": "c307dfd88d4aebca3282e7b0431e16f4",
+    "mtime": 1793208511.7006342,
+    "ast_hash": "a7575307cf2482b90c27b6e78715f5ac",
     "semantic_hash": ""
   },
   "controller-service/src/components/visitor/slides/slide-motion.tsx": {
@@ -23532,6 +23532,16 @@
   "document-service/src/admin/invoices/cash-sale-drafts.ts": {
     "mtime": 1793202598.3880386,
     "ast_hash": "8b42de9ac3aad60a10594b43d01ec2f6",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/visitor/home/BannerSides.tsx": {
+    "mtime": 1793209090.9832242,
+    "ast_hash": "c54cedf0c2f1078e26031455c26e9ba1",
+    "semantic_hash": ""
+  },
+  "mobile-service/client/src/lib/shape.ts": {
+    "mtime": 1793209199.7812002,
+    "ast_hash": "8d4ea103e0bd279da7d01bea67866bc0",
     "semantic_hash": ""
   }
 }
