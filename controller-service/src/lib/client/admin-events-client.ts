@@ -6,12 +6,13 @@ export type SessionFrame =
 export type NotificationsFrame = { kind: 'notifications'; items: any[]; unreadCount: number }
 export type LockFrame = {
   kind: 'lock'
-  type: 'acquired' | 'released' | 'handover' | 'takeover' | 'closed' | 'presence'
+  type: 'acquired' | 'released' | 'handover' | 'takeover' | 'closed' | 'presence' | 'request'
   resourceType: string
   resourceId: string
   lock: any | null
   viewers?: any[]
   by: string | null
+  byName?: string | null
   reason?: string | null
   at: string
 }

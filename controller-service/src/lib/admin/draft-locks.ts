@@ -573,8 +573,9 @@ export async function requestDraftAccess(actor: NonNullable<DraftActor> & { disp
   } catch {
     /* no redis: the notification dedupe still applies */
   }
+  // admin_notifications.type is varchar(50): one row per requester, deduped while unread.
   await createAdminNotification({
-    type: `draft_access_request:${actor.adminId}`,
+    type: `draft_req:${actor.adminId}`,
     category: 'drafts',
     title: `${actor.displayName ?? 'An admin'} asked for your ${entityLabel(type)} draft`,
     message: message?.slice(0, 500) || 'Hand it over from the draft banner when you are done.',
@@ -591,6 +592,7 @@ export async function requestDraftAccess(actor: NonNullable<DraftActor> & { disp
     summary: `Requested ${lock.ownerName ?? 'the holder'}'s ${entityLabel(type)} draft`,
     request: request as any,
   })
+  await publishLockEvent({ type: 'request', resourceType: type, resourceId: id, lock, by: actor.adminId, byName: actor.displayName ?? null, reason: message ?? null })
   return { sent: true as const }
 }
 
