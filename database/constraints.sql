@@ -889,6 +889,17 @@ ALTER TABLE ONLY public.ads_campaigns
 ALTER TABLE ONLY public.ads_experiments
     ADD CONSTRAINT ads_experiments_pkey PRIMARY KEY (experiment_id);
 
+
+--
+-- Name: ads_campaign_drafts ads_campaign_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_campaign_drafts
+    ADD CONSTRAINT ads_campaign_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_campaign_drafts
+    ADD CONSTRAINT ads_campaign_drafts_fields_check CHECK ((jsonb_typeof(fields) = 'object'::text));
+
 --
 -- Name: ads_ad_groups ads_ad_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --

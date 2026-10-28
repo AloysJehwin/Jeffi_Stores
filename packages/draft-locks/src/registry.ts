@@ -20,6 +20,7 @@ export type DraftResourceType =
   | 'po_receive'
   | 'cash_sale'
   | 'scenario'
+  | 'google_ads_campaign'
 
 /** The homepage is one entity with no row of its own; its drafts and revisions use the nil uuid. */
 export const HOMEPAGE_ENTITY_ID = '00000000-0000-0000-0000-000000000000'
@@ -191,6 +192,17 @@ export const DRAFT_RESOURCES: Record<DraftResourceType, DraftResourceDef> = {
                  FROM scenario_drafts WHERE id = ANY($1::uuid[])`,
     hintSql: `SELECT admin_id FROM scenario_drafts WHERE id = $1`,
     editHref: id => `/admin/campaigns/scenarios/new?draft=${id}`,
+  },
+  google_ads_campaign: {
+    label: 'Google Ads campaign',
+    writeScope: 'google_ads_campaigns:write',
+    readScope: 'google_ads:read',
+    existsSql: `SELECT 1 FROM ads_campaign_drafts WHERE id = $1`,
+    listSql: `SELECT id, updated_at FROM ads_campaign_drafts`,
+    labelSql: `SELECT id, ('New campaign · ' || COALESCE(NULLIF(title, ''), NULLIF(fields->'draft'->>'name', ''), 'untitled'))::text AS label, NULL::text AS ref
+                 FROM ads_campaign_drafts WHERE id = ANY($1::uuid[])`,
+    hintSql: `SELECT admin_id FROM ads_campaign_drafts WHERE id = $1`,
+    editHref: id => `/admin/google-ads?tab=drafts&draft=${id}`,
   },
 }
 

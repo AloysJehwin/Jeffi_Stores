@@ -3,12 +3,14 @@ import { requireAdminScope } from '@/lib/auth/jwt'
 import { googleAdsClientFor } from '@/lib/google-ads/credentials'
 import { CampaignSpecSchema, FEED_TYPES, IMAGE_AD_TYPES, specProblems } from '@/lib/google-ads/campaign-spec'
 import { demandGenMinimumDaily } from '@/lib/google-ads/image-ads'
-import { queryOne } from '@/lib/shared/db'
+import { queryOne, withTransaction } from '@/lib/shared/db'
 import { createCampaign } from '@/lib/google-ads/campaigns'
 import { itemIdsForCategories, type ListingTree } from '@/lib/google-ads/listing'
 import { prepareImages } from '@/lib/google-ads/assets'
 import { merchantLinkStatus } from '@/lib/google-ads/merchant-link'
 import { actorOf, adsErrorResponse, readJson, withCampaignPlan } from '@/lib/google-ads/manage-route'
+import { finishJsonDraft } from '@/lib/admin/json-drafts'
+import { ADS_CAMPAIGN_DRAFTS } from '@/lib/google-ads/campaign-drafts'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -77,6 +79,12 @@ export async function POST(request: NextRequest) {
       actorOf(admin),
       { client: ads, preview: body?.preview === true }
     )
+    // The campaign exists: its wizard draft is done with.
+    if (body?.preview !== true && body?.draft_id) {
+      await withTransaction(c => finishJsonDraft(c, ADS_CAMPAIGN_DRAFTS, admin, body.draft_id)).catch(err =>
+        console.error('[google-ads] campaign draft cleanup failed', err)
+      )
+    }
     return NextResponse.json({ ok: true, preview: body?.preview === true, ...result })
   } catch (e) {
     return adsErrorResponse(e)
