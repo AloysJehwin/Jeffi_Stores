@@ -70,16 +70,16 @@ export function newCustomLineItem(): LineItem {
   return { ...newLineItem(), is_custom: true, gst_rate: '18', unit: 'PCS' }
 }
 
-/** Problems with one line, in admin wording. Empty array ⇒ valid. */
-export function lineItemIssues(it: LineItem): string[] {
+/** Problems with one line, in admin wording. Empty array ⇒ valid. A draft may lack a name or rate. */
+export function lineItemIssues(it: LineItem, opts: { draft?: boolean } = {}): string[] {
   const issues: string[] = []
   const custom = isCustomLine(it)
-  if (!it.product_name.trim()) issues.push(custom ? 'Enter an item name' : 'Pick a product or add a custom item')
+  if (!opts.draft && !it.product_name.trim()) issues.push(custom ? 'Enter an item name' : 'Pick a product or add a custom item')
   const qty = Number(it.quantity)
   if (!(qty > 0)) issues.push('Quantity must be greater than 0')
   const price = Number(it.unit_price)
   if (!Number.isFinite(price) || price < 0) issues.push('Rate cannot be negative')
-  else if (!(price > 0)) issues.push('Enter a rate greater than 0')
+  else if (!opts.draft && !(price > 0)) issues.push('Enter a rate greater than 0')
   const gst = Number(it.gst_rate)
   if (!Number.isFinite(gst) || gst < 0 || gst > 40) issues.push('GST % must be between 0 and 40')
   const disc = Number(it.discount_pct) || 0
@@ -96,6 +96,16 @@ export function validateLineItems(items: LineItem[]): string | null {
   for (let i = 0; i < items.length; i++) {
     if (isBlankLine(items[i])) continue
     const issues = lineItemIssues(items[i])
+    if (issues.length) return `Item ${i + 1}: ${issues[0]}`
+  }
+  return null
+}
+
+/** Draft check: keeps half-filled lines (custom ones included); only impossible values block it. */
+export function validateDraftLines(items: LineItem[]): string | null {
+  for (let i = 0; i < items.length; i++) {
+    if (isBlankLine(items[i])) continue
+    const issues = lineItemIssues(items[i], { draft: true })
     if (issues.length) return `Item ${i + 1}: ${issues[0]}`
   }
   return null

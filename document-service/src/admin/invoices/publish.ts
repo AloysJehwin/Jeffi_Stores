@@ -3,6 +3,7 @@ import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryOne } from '@jeffi/tenancy'
 import { draftLockResponse, epochFrom, withDraftWrite } from '../../lib/draft-locks'
+import { assertCompleteLines, IncompleteLinesError } from '../../lib/invoice-line-items'
 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -25,6 +26,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const originalId = original.id
 
     await withDraftWrite(admin, 'invoice', id, async client => {
+      // The amendment may have been saved with half-filled custom lines.
+      const lines = await client.query(
+        `SELECT product_id, product_name AS name, unit_price AS rate FROM order_items WHERE order_id = $1 ORDER BY created_at ASC`,
+        [id]
+      )
+      assertCompleteLines(lines.rows)
       await client.query(
         `UPDATE orders SET
           total_amount          = $1,
@@ -86,6 +93,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (err: any) {
     const locked = draftLockResponse(err)
     if (locked) return locked
+    if (err instanceof IncompleteLinesError) return NextResponse.json({ error: err.message }, { status: 400 })
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

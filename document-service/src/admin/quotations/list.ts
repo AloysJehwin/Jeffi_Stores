@@ -6,7 +6,7 @@ import { QUOTATIONS_ENTITY, QUOTE_SUBTOTAL_SQL, QUOTE_TOTAL_SQL, buildWhere, nor
 import { z } from 'zod'
 import { parseBody, zNonEmpty, zEmail } from '../../lib/validate'
 import {
-  quotationLineSchema,
+  draftQuotationLineSchema,
   quotationLineRow,
   quotationTotals,
   insertQuotationItem,
@@ -23,10 +23,11 @@ function buildQuoteNumber(now: Date, seq: number): string {
   return `QT/${fy}/${mon}/${seq}`
 }
 
+// A new quotation is always a draft, so its lines may be half-filled; finalising checks them.
 const createQuotationSchema = z.object({
   consignee_name: zNonEmpty,
   consignee_email: zEmail.nullish(),
-  items: z.array(quotationLineSchema).min(1, 'Add at least one line item'),
+  items: z.array(draftQuotationLineSchema).default([]),
 })
 
 export async function GET(request: NextRequest) {

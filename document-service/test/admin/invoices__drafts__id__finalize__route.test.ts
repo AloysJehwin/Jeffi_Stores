@@ -189,12 +189,25 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{ product_id: null, variant_id: null, sub_variant_id: null, quantity: '1', product_name: 'Gift' }],
+      itemsRows: [{ product_id: null, variant_id: null, sub_variant_id: null, quantity: '1', product_name: 'Gift', unit_price: '250' }],
     })
     setupTx(client)
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
+  })
+
+  it('refuses a draft whose custom line was saved without a rate', async () => {
+    mockAuth.mockResolvedValue(ADMIN as any)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValueOnce(draftOrder)
+    const client = makeTxClient({
+      itemsRows: [{ product_id: null, variant_id: null, sub_variant_id: null, quantity: '1', product_name: 'Gift', unit_price: '0' }],
+    })
+    setupTx(client)
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Item 1: Enter a rate greater than 0')
   })
 
   // ── Transaction body: sub_variant_id path ──────────────────────────────────

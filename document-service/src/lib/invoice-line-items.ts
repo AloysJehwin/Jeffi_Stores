@@ -42,12 +42,13 @@ function refineCustom(
   unit: string | null | undefined,
   ctx: z.RefinementCtx,
   rateKey: string,
-  unitKey: string
+  unitKey: string,
+  draft = false
 ) {
   if (item.product_id) return
   if (item.variant_id || item.sub_variant_id)
     ctx.addIssue({ code: 'custom', path: ['product_id'], message: 'A variant needs a store product' })
-  if (!(rate > 0)) ctx.addIssue({ code: 'custom', path: [rateKey], message: 'Rate must be greater than 0' })
+  if (!draft && !(rate > 0)) ctx.addIssue({ code: 'custom', path: [rateKey], message: 'Rate must be greater than 0' })
   if (unit && unit.trim().length > CUSTOM_UNIT_MAX)
     ctx.addIssue({
       code: 'custom',
@@ -58,41 +59,46 @@ function refineCustom(
 
 // ── Invoices / orders / cash sales ────────────────────────────────────────────
 
-export const invoiceLineSchema = z
-  .object({
-    product_id: zOptUuid,
-    variant_id: zOptUuid,
-    sub_variant_id: zOptUuid,
-    product_name: z.string().trim().min(1, 'Item name is required').max(255),
-    product_sku: z.string().nullish(),
-    variant_name: z.string().nullish(),
-    sub_variant_name: z.string().nullish(),
-    hsn_code: z.string().trim().max(20, 'HSN must be at most 20 characters').nullish(),
-    gst_rate: zGst.default(18),
-    unit_price: z.coerce.number().min(0, 'Rate cannot be negative'),
-    quantity: zQty,
-    discount_pct: zDiscount,
-    sell_unit_factor: z.coerce.number().positive().default(1),
-    sell_unit_dimension: z.string().nullish(),
-    buy_unit: z.string().trim().max(20).nullish(),
-    unit: z.string().trim().nullish(),
-    buy_mode: z.string().nullish(),
-    temp_id: z.string().nullish(),
-    is_custom: z.boolean().nullish(),
-  })
-  .superRefine((item, ctx) => {
-    refineCustom(item, item.unit_price, item.buy_unit || item.unit, ctx, 'unit_price', 'unit')
-    if (item.product_id && item.buy_unit && item.buy_unit.length > CUSTOM_UNIT_MAX)
-      ctx.addIssue({
-        code: 'custom',
-        path: ['buy_unit'],
-        message: `Unit must be at most ${CUSTOM_UNIT_MAX} characters`,
-      })
-  })
+// A draft keeps half-filled lines: the name may be empty and a custom rate may be 0.
+const invoiceLine = (draft: boolean) =>
+  z
+    .object({
+      product_id: zOptUuid,
+      variant_id: zOptUuid,
+      sub_variant_id: zOptUuid,
+      product_name: z.string().trim().min(draft ? 0 : 1, 'Item name is required').max(255),
+      product_sku: z.string().nullish(),
+      variant_name: z.string().nullish(),
+      sub_variant_name: z.string().nullish(),
+      hsn_code: z.string().trim().max(20, 'HSN must be at most 20 characters').nullish(),
+      gst_rate: zGst.default(18),
+      unit_price: z.coerce.number().min(0, 'Rate cannot be negative'),
+      quantity: zQty,
+      discount_pct: zDiscount,
+      sell_unit_factor: z.coerce.number().positive().default(1),
+      sell_unit_dimension: z.string().nullish(),
+      buy_unit: z.string().trim().max(20).nullish(),
+      unit: z.string().trim().nullish(),
+      buy_mode: z.string().nullish(),
+      temp_id: z.string().nullish(),
+      is_custom: z.boolean().nullish(),
+    })
+    .superRefine((item, ctx) => {
+      refineCustom(item, item.unit_price, item.buy_unit || item.unit, ctx, 'unit_price', 'unit', draft)
+      if (item.product_id && item.buy_unit && item.buy_unit.length > CUSTOM_UNIT_MAX)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['buy_unit'],
+          message: `Unit must be at most ${CUSTOM_UNIT_MAX} characters`,
+        })
+    })
+
+export const invoiceLineSchema = invoiceLine(false)
+export const draftInvoiceLineSchema = invoiceLine(true)
 
 export type InvoiceLineInput = z.infer<typeof invoiceLineSchema>
 
-/** Header + lines for invoice drafts / edits (address fields optional on drafts). */
+/** Header + lines for invoice drafts / edits (address fields optional on drafts, lines may be half-filled). */
 export const draftInvoiceSchema = z.object({
   customerName: z.string({ error: 'Customer name is required' }).trim().min(1, 'Customer name is required'),
   customerPhone: z.string().nullish(),
@@ -106,7 +112,7 @@ export const draftInvoiceSchema = z.object({
   paymentMode: z.string().nullish(),
   invoiceDate: z.string().nullish(),
   notes: z.string().nullish(),
-  items: z.array(invoiceLineSchema).default([]),
+  items: z.array(draftInvoiceLineSchema).default([]),
 })
 
 export const editInvoiceSchema = draftInvoiceSchema.extend({
@@ -250,28 +256,55 @@ export function priceInvoiceLines(
 
 // ── Quotations ────────────────────────────────────────────────────────────────
 
-export const quotationLineSchema = z
-  .object({
-    description: z.string().trim().min(1, 'Item name is required'),
-    quantity: zQty,
-    rate: z.coerce.number().min(0, 'Rate cannot be negative'),
-    hsn_code: z.string().trim().max(20, 'HSN must be at most 20 characters').nullish(),
-    gst_rate: zGst.default(18),
-    unit: z.string().trim().max(20, 'Unit must be at most 20 characters').default('PCS'),
-    buy_unit: z.string().trim().max(20).nullish(),
-    discount_pct: zDiscount,
-    product_id: zOptUuid,
-    variant_id: zOptUuid,
-    sub_variant_id: zOptUuid,
-    variant_name: z.string().nullish(),
-    sub_variant_name: z.string().nullish(),
-    sell_unit_factor: z.coerce.number().positive().nullish(),
-    sell_unit_dimension: z.string().nullish(),
-    is_custom: z.boolean().nullish(),
-  })
-  .superRefine((item, ctx) => refineCustom(item, item.rate, item.unit, ctx, 'rate', 'unit'))
+const quotationLine = (draft: boolean) =>
+  z
+    .object({
+      description: z.string().trim().min(draft ? 0 : 1, 'Item name is required'),
+      quantity: zQty,
+      rate: z.coerce.number().min(0, 'Rate cannot be negative'),
+      hsn_code: z.string().trim().max(20, 'HSN must be at most 20 characters').nullish(),
+      gst_rate: zGst.default(18),
+      unit: z.string().trim().max(20, 'Unit must be at most 20 characters').default('PCS'),
+      buy_unit: z.string().trim().max(20).nullish(),
+      discount_pct: zDiscount,
+      product_id: zOptUuid,
+      variant_id: zOptUuid,
+      sub_variant_id: zOptUuid,
+      variant_name: z.string().nullish(),
+      sub_variant_name: z.string().nullish(),
+      sell_unit_factor: z.coerce.number().positive().nullish(),
+      sell_unit_dimension: z.string().nullish(),
+      is_custom: z.boolean().nullish(),
+    })
+    .superRefine((item, ctx) => refineCustom(item, item.rate, item.unit, ctx, 'rate', 'unit', draft))
+
+export const quotationLineSchema = quotationLine(false)
+export const draftQuotationLineSchema = quotationLine(true)
 
 export type QuotationLineInput = z.infer<typeof quotationLineSchema>
+
+/**
+ * Lines stored while a document was a draft may be half-filled. Before it is finalised, each custom
+ * line needs a name and a rate: returns "Item N: …" for the first that doesn't, else null.
+ */
+type StoredLine = { product_id?: string | null; name: string | null; rate: number | string | null }
+
+export function incompleteLineError(lines: StoredLine[]): string | null {
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]
+    if (!(l.name ?? '').trim()) return `Item ${i + 1}: Enter an item name`
+    if (!l.product_id && !(Number(l.rate) > 0)) return `Item ${i + 1}: Enter a rate greater than 0`
+  }
+  return null
+}
+
+export class IncompleteLinesError extends Error {}
+
+/** Throws IncompleteLinesError (→ 400) inside a transaction when a stored line is half-filled. */
+export function assertCompleteLines(lines: StoredLine[]): void {
+  const msg = incompleteLineError(lines)
+  if (msg) throw new IncompleteLinesError(msg)
+}
 
 /** Ex-GST line amount. `rate` is per base piece, so count units scale by factor. */
 export function quotationLineAmount(item: QuotationLineInput): number {
