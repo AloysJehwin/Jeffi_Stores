@@ -13,11 +13,14 @@ import {
   SECTION_ASPECTS,
   SECTION_META,
   businessVisitorView,
+  rowSurface,
   sectionAspectValue,
   sectionLayout,
   sectionLimit,
   sectionCopyDefaults,
   sectionPlacement,
+  sectionSides,
+  sideOptions,
   type HomepageSection,
   type SectionCopy,
   type SectionType,
@@ -666,6 +669,31 @@ export function AspectField({ props }: { props: EditorProps }) {
       disabled={!props.canWrite}
       hint="Default keeps the built-in look. Set it per layout, so desktop, phone browsers and the app can differ."
       onChange={v => b.saveConfig({ aspect: v === 'auto' ? null : v })}
+    />
+  )
+}
+
+const SIDES_LABELS: Record<string, string> = {
+  plain: 'Plain',
+  shadow: 'Soft shadow',
+  glow: 'Image glow',
+  peek: 'Previous and next slides',
+}
+
+/** What fills the row beside a banner its shape narrows; website banners with a shape set only. */
+export function SidesField({ props }: { props: EditorProps }) {
+  const b = useSectionBinding(props)
+  const options = sideOptions(props.section.type)
+  if (!options.length || sectionAspectValue(props.section) === 'auto' || rowSurface(props.section) === 'app') return null
+  const peek = options.includes('peek')
+  return (
+    <Select
+      label="Left and right of the banner"
+      value={sectionSides(props.section)}
+      options={options.map(v => ({ value: v, label: SIDES_LABELS[v] }))}
+      disabled={!props.canWrite}
+      hint={`A tall shape narrows the banner on wide screens. Fill the space beside it with a soft shadow, a blurred glow of its picture${peek ? ', or the previous and next slides, faded' : ''}.`}
+      onChange={v => b.saveConfig({ sides: v === 'plain' ? null : v })}
     />
   )
 }

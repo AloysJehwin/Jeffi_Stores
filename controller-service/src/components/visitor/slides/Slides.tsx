@@ -78,11 +78,13 @@ export interface SlidesProps {
   slideClassName?: string
 }
 
-export const CARD_WIDTH = '[--slide-w:72vw] sm:[--slide-w:42%] lg:[--slide-w:28%] xl:[--slide-w:24%]'
+// --card-min widens the cards for a wide custom shape (CARD_MIN_H tall at its ratio), up to the row.
+export const CARD_WIDTH =
+  '[--slide-w:min(100%,max(72vw,var(--card-min,0px)))] sm:[--slide-w:min(100%,max(42%,var(--card-min,0px)))] lg:[--slide-w:min(100%,max(28%,var(--card-min,0px)))] xl:[--slide-w:min(100%,max(24%,var(--card-min,0px)))]'
 const RAIL_ITEM = 'w-[45%] sm:w-[30%] lg:w-[18%]'
 const ASPECT: Record<SlidesAspect, string> = { '4:5': 'aspect-[4/5]', '1:1': 'aspect-square', '16:9': 'aspect-video' }
 const DEFAULT_AUTOPLAY_MS = 5000
-// A custom card shape still leaves room for the card's text.
+// A wide custom card shape gets wider cards, so it is at least this tall and its text fits.
 const CARD_MIN_H = '16rem'
 const SETTLE_MS = 150
 const MIN_OPACITY = 0.35
@@ -276,7 +278,7 @@ function Track({
   slideClassName = '',
 }: InnerProps) {
   const cards = layout === 'cards'
-  const cardShape = aspectRatio ? { aspectRatio, minHeight: CARD_MIN_H } : undefined
+  const cardShape = aspectRatio ? { aspectRatio } : undefined
   const rail = layout === 'rail'
   const n = items.length
   const reduced = !!useReducedMotion()
@@ -501,6 +503,7 @@ function Track({
         ref={trackRef}
         tabIndex={0}
         className={`${trackBase} ${trackClassName ?? (cards ? '' : 'gap-3 md:gap-5')}`}
+        style={cards && aspectRatio ? ({ '--card-min': `calc(${CARD_MIN_H} * ${aspectRatio})` } as CSSProperties) : undefined}
         onKeyDown={e => onArrowKeys(e, () => step(-1), () => step(1))}
         onClick={onTrackClick}
       >
@@ -519,7 +522,7 @@ function Track({
                 reduced={reduced}
                 current={current}
                 label={`${s.i + 1} of ${n}`}
-                className={cardShape ? slideClassName : `${ASPECT[aspect]} ${slideClassName}`}
+                className={cardShape ? `shape-box ${slideClassName}` : `${ASPECT[aspect]} ${slideClassName}`}
                 style={cardShape}
               >
                 {content}

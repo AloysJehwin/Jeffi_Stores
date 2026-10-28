@@ -39,6 +39,7 @@ import {
   rewardsGamePublic,
   safeHref,
   sectionAspect,
+  sectionSides,
   spotlightConfig,
   storyGroups,
   SECTION_COPY_DEFAULTS,
@@ -113,6 +114,7 @@ export default function SectionRenderer({
   const carousel = sectionLayout(section) === 'carousel'
   const extra = data.extras.get(section.id)
   const aspect = sectionAspect(section)
+  const sides = sectionSides(section)
 
   switch (section.type) {
     case 'hero':
@@ -120,7 +122,9 @@ export default function SectionRenderer({
 
     case 'offer_slider':
       if (data.offers.length === 0) return null
-      return <OfferSlider offers={data.offers} title={section.title} eyebrow={section.eyebrow} aspect={aspect} />
+      return (
+        <OfferSlider offers={data.offers} title={section.title} eyebrow={section.eyebrow} aspect={aspect} sides={sides} />
+      )
 
     case 'trust_strip':
       return (
@@ -209,6 +213,7 @@ export default function SectionRenderer({
           ctaLabel={section.cta_label}
           ctaUrl={section.cta_url}
           aspect={aspect}
+          sides={sides}
         />
       )
 
@@ -374,7 +379,7 @@ export default function SectionRenderer({
     case 'motion_hero': {
       const slides = motionHeroSlides(section)
       if (slides.length === 0) return null
-      return <MotionHero slides={slides} intervalMs={motionHeroIntervalMs(section)} aspect={aspect} />
+      return <MotionHero slides={slides} intervalMs={motionHeroIntervalMs(section)} aspect={aspect} sides={sides} />
     }
 
     case 'stories': {

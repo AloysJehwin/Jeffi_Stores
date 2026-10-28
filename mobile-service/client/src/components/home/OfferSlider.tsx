@@ -6,6 +6,7 @@ import Animated from 'react-native-reanimated'
 import { SHADOW_ROOM, SectionHeading, SlideBadge, SlideCta } from './layout'
 import { useOnScreen } from './scroll-context'
 import { absUrl, openHref } from '../../lib/links'
+import { shapeBox } from '../../lib/shape'
 import { status } from '../../theme'
 import type { ProductOffer, SectionProps } from '../../types/home'
 
@@ -29,6 +30,7 @@ function Offers({ offers, title, eyebrow, aspect }: { offers: ProductOffer[]; ti
   const ratio = aspect ?? ASPECT
   const open = (o: ProductOffer) => openHref(router, `/products?offer=${encodeURIComponent(o.slug)}`)
   const single = offers.length === 1
+  const box = single && aspect ? shapeBox(width - 24, aspect, height * 0.8) : null
   const [current, setCurrent] = useState(0)
   const { ref, onLayout, onScreen } = useOnScreen(offers.some(o => (single ? o.video_url : o.video_url_card)))
 
@@ -40,9 +42,14 @@ function Offers({ offers, title, eyebrow, aspect }: { offers: ProductOffer[]; ti
 
       {single ? (
         <View className="px-3">
-          <Pressable onPress={() => open(offers[0])} accessibilityRole="button" accessibilityLabel={shopLabel(offers[0])}>
-            {/* An admin-set shape for the lone banner, inside px-3 and kept on screen. */}
-            <OfferBanner offer={offers[0]} width={width} active={onScreen} height={aspect ? Math.min((width - 24) / aspect, height * 0.8) : undefined} />
+          {/* An admin-set shape for the lone banner, inside px-3: exact, narrowed rather than taller than 80% of the screen. */}
+          <Pressable
+            onPress={() => open(offers[0])}
+            accessibilityRole="button"
+            accessibilityLabel={shopLabel(offers[0])}
+            style={box ? { width: box.width, alignSelf: 'center' } : undefined}
+          >
+            <OfferBanner offer={offers[0]} width={box?.width ?? width} active={onScreen} height={box?.height} />
           </Pressable>
         </View>
       ) : (
