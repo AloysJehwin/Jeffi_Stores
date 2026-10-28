@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import BusinessHeader from '@/components/business/Header'
 import { CartProvider } from '@/contexts/CartContext'
+import { isBusinessHost } from '@/lib/shared/business-path'
 
 const AUTH_PAGES = ['/business/signin', '/business/signup', '/business/pending']
 const AUTH_PAGES_SUBDOMAIN = ['/signin', '/signup', '/pending']
@@ -16,7 +17,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   const router = useRouter()
   const pathname = usePathname()
 
-  const isSubdomain = typeof window !== 'undefined' && window.location.hostname.startsWith('business.')
+  const isSubdomain = typeof window !== 'undefined' && isBusinessHost(window.location.hostname)
   const authPages = isSubdomain ? AUTH_PAGES_SUBDOMAIN : AUTH_PAGES
   const signinPath = isSubdomain ? '/signin' : '/business/signin'
   const pendingPath = isSubdomain ? '/pending' : '/business/pending'
@@ -29,7 +30,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   useEffect(() => {
     if (isLoading || isPublic) return
     if (!user || !user.isBusiness) {
-      router.replace(signinPath)
+      router.replace(`${signinPath}?callbackUrl=${encodeURIComponent(pathname)}`)
       return
     }
     if (user.approvalStatus === 'pending') {
@@ -40,7 +41,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
       router.replace(`${signinPath}?rejected=1`)
       return
     }
-  }, [user, isLoading, isPublic, router, signinPath, pendingPath])
+  }, [user, isLoading, isPublic, router, signinPath, pendingPath, pathname])
 
   if (isPublic) return <>{children}</>
 

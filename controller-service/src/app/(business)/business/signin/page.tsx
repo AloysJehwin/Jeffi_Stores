@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
-import { bp } from '@/lib/shared/business-path'
+import { bp, businessReturnPath } from '@/lib/shared/business-path'
 import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
@@ -28,16 +28,17 @@ function BusinessSignInPage() {
   // Which button started the sign-in, so that one keeps its spinner until the next page opens.
   const via = useRef<'google' | 'form' | null>(null)
 
-  const callbackUrl = searchParams.get('callbackUrl')
+  // Where the visitor was headed; checkout and account pages send ?redirect=, middleware ?callbackUrl=.
+  const returnTo = businessReturnPath(searchParams.get('callbackUrl') ?? searchParams.get('redirect'))
 
   useEffect(() => {
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'approved') {
-      go(callbackUrl || bp('/business'), 'replace')
+      go(returnTo, 'replace')
     }
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'pending') {
       go(bp('/business/pending'), 'replace')
     }
-  }, [user, authLoading, go, callbackUrl])
+  }, [user, authLoading, go, returnTo])
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [email, setEmail] = useState('')
@@ -120,7 +121,7 @@ function BusinessSignInPage() {
           go(bp('/business/pending'))
           return
         }
-        go(bp('/business/dashboard'))
+        go(returnTo, 'hard')
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
       .finally(() => setGoogleLoading(false))
@@ -215,7 +216,7 @@ function BusinessSignInPage() {
         body: JSON.stringify({ notificationChannel: channel }),
       }).catch(() => {})
       // Redirect to business portal
-      go(callbackUrl || bp('/business'), 'hard')
+      go(returnTo, 'hard')
     } catch (err: any) {
       setError(err.message)
       setOtp('')
@@ -273,7 +274,7 @@ function BusinessSignInPage() {
     }
     via.current = 'google'
     setGoogleLoading(true)
-    const result = await openGoogleOAuthPopup({ clientId, returnTo: '/business/signin' })
+    const result = await openGoogleOAuthPopup({ clientId, returnTo: bp('/business/signin') })
     if (!result.accessToken) {
       if (result.error && result.error !== 'popup_closed') setError(result.error)
       setGoogleLoading(false)
@@ -316,7 +317,7 @@ function BusinessSignInPage() {
         setShowPhoneModal(true)
         return
       }
-      go(callbackUrl || bp('/business'), 'hard')
+      go(returnTo, 'hard')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -355,7 +356,7 @@ function BusinessSignInPage() {
           body: JSON.stringify({}),
         }).catch(() => {})
       }
-      go(bp('/business'), 'hard')
+      go(returnTo, 'hard')
     } catch (err: any) {
       setPhoneError(err.message)
     } finally {
