@@ -7,6 +7,10 @@ import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { discardReviewFormDraft, resnapshotReviewFormSession } from './actions'
 import { initialDraftLock } from '@/lib/admin/draft-locks'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { draftBehind, draftsOf, getDraftRow } from '@/lib/admin/draft-branches'
+import { reviewFormDrafts } from '@/lib/catalog/review-form-draft'
+import DraftBehindBanner from '@/components/admin/drafts/DraftBehindBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,23 +55,25 @@ export default async function EditReviewFormPage({
   // (edit-draft) row for it. Publish flips is_draft = false + is_active = true.
   const isCreateDraft = !!form.is_draft
 
-  // Editing a live form ALWAYS goes through an edit-draft; the single entry is the
-  // view page's Edit button (startReviewFormDraft). Hitting /edit directly on a live
-  // form with no draft redirects to the view, matching products/coupons/suppliers.
-  const draftRow = isCreateDraft
-    ? null
-    : await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
-        `SELECT form_id, fields FROM review_form_drafts WHERE form_id = $1`,
-        [id]
-      )
+  // Editing a live form ALWAYS goes through an edit-draft (?draft=<id>). Without one, open the
+  // admin's own draft; otherwise the view page lists the open drafts and starts a new one.
+  let draftRow = isCreateDraft || !resolvedSearchParams.draft ? null : await getDraftRow(reviewFormDrafts, resolvedSearchParams.draft)
+  if (draftRow && draftRow.form_id !== id) draftRow = null
   if (!isCreateDraft && !draftRow) {
-    redirect(ap(`/admin/review-forms/${id}/view${back ? `?back=${encodeURIComponent(backUrl)}` : ''}`, host))
+    const session = await getAdminSession()
+    const mine = session ? (await draftsOf(reviewFormDrafts, id)).find(d => d.authorId === session.adminId) : null
+    const qs = new URLSearchParams({ ...(back ? { back } : {}), ...(mine ? { draft: mine.id } : {}) }).toString()
+    redirect(ap(mine ? `/admin/review-forms/${id}/edit?${qs}` : `/admin/review-forms/${id}/view${back ? `?back=${encodeURIComponent(backUrl)}` : ''}`, host))
   }
 
   const isDraft = !!draftRow
   const df = (draftRow?.fields || {}) as any
+  const lockId = isDraft ? (draftRow!.id as string) : id
+  const [behind, siblings] = isDraft
+    ? await Promise.all([draftBehind(reviewFormDrafts, lockId), draftsOf(reviewFormDrafts, id).then(d => d.length - 1)])
+    : [null, 0]
 
-  const initialLock = await initialDraftLock('review_form', id)
+  const initialLock = await initialDraftLock('review_form', lockId)
 
   return (
     <MobileEditBlock>
@@ -75,20 +81,22 @@ export default async function EditReviewFormPage({
         header={
           <PageHeader
             back={{ href: ap(backUrl, host), label: 'Review Forms' }}
-            title={isCreateDraft ? 'Edit Draft Form' : isDraft ? 'Edit Draft' : 'Edit Review Form'}
+            title={isCreateDraft ? 'Edit Draft Form' : isDraft ? (draftRow!.title ? `Edit Draft · ${draftRow!.title}` : 'Edit Draft') : 'Edit Review Form'}
             badges={(isDraft || isCreateDraft) && <Badge tone="amber">Draft</Badge>}
           />
         }
       >
+        {isDraft && <DraftBehindBanner info={behind} siblings={siblings} noun="review form" />}
         <ReviewFormForm
           initialLock={initialLock}
+          draftId={isDraft ? lockId : null}
           isDraft={isDraft}
           isCreateDraft={isCreateDraft}
           coupons={coupons}
           formId={form.id}
           backUrl={backUrl}
-          discardAction={isDraft ? discardReviewFormDraft.bind(null, id) : undefined}
-          resnapshotAction={resnapshotReviewFormSession.bind(null, id)}
+          discardAction={isDraft ? discardReviewFormDraft.bind(null, id, lockId) : undefined}
+          resnapshotAction={resnapshotReviewFormSession.bind(null, lockId)}
           defaultValues={{
             title: df.title ?? form.title,
             slug: df.slug ?? form.slug,

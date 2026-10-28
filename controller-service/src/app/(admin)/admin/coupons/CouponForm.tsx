@@ -26,6 +26,8 @@ interface CouponFormProps {
   discardAction?: (formData: FormData) => Promise<void>
   /** Draft lock state from the server (initialDraftLock), so a non-holder renders read-only. */
   initialLock?: DraftLockState | null
+  /** The draft being edited (its lock id). */
+  lockId?: string | null
   defaultValues?: {
     code?: string
     discount_type?: string
@@ -57,6 +59,7 @@ export default function CouponForm({
   couponId,
   discardAction,
   initialLock,
+  lockId,
   defaultValues: d = {},
 }: CouponFormProps) {
   const router = useRouter()
@@ -67,8 +70,9 @@ export default function CouponForm({
   const [discountType, setDiscountType] = useState(d.discount_type || 'percentage')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
-  const lock = useDraftLock({ resourceType: 'coupon', resourceId: couponId ?? null, initial: initialLock })
-  const edit = useEditSession({ resourceType: 'coupon', resourceId: couponId ?? null, lock })
+  const lockKey = lockId ?? couponId ?? null
+  const lock = useDraftLock({ resourceType: 'coupon', resourceId: lockKey, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'coupon', resourceId: lockKey, lock })
 
   function setInput(name: string, value: string) {
     const el = formRef.current?.elements.namedItem(name) as HTMLInputElement | null

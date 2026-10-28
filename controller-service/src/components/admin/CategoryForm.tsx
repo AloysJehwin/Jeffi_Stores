@@ -97,6 +97,8 @@ interface CategoryFormProps {
   discardAction?: (formData: FormData) => Promise<void>
   /** Draft lock state from the server (initialDraftLock), so a non-holder renders read-only. */
   initialLock?: DraftLockState | null
+  /** The draft being edited (its lock id); the category id for a create-draft. */
+  lockId?: string | null
 }
 
 function IconPreview({ name, className }: { name: string; className?: string }) {
@@ -233,6 +235,7 @@ export default function CategoryForm({
   submitLabel,
   discardAction,
   initialLock,
+  lockId,
 }: CategoryFormProps) {
   const isSubcat = !!category?.parent_category_id
   const isCurrentlyInherited = isSubcat && category?.return_allowed == null
@@ -265,8 +268,9 @@ export default function CategoryForm({
     category?.replacement_window_days ?? parentCat?.replacement_window_days ?? 7
   )
   const nameRef = useRef<HTMLInputElement>(null)
-  const lock = useDraftLock({ resourceType: 'category', resourceId: category?.id ?? null, initial: initialLock })
-  const edit = useEditSession({ resourceType: 'category', resourceId: category?.id ?? null, lock })
+  const lockKey = lockId ?? category?.id ?? null
+  const lock = useDraftLock({ resourceType: 'category', resourceId: lockKey, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'category', resourceId: lockKey, lock })
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
 

@@ -28,11 +28,16 @@ CREATE TABLE public.brands (
 --
 
 CREATE TABLE public.brand_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    author_admin_id uuid,
+    title character varying(120),
+    base jsonb,
+    base_revision integer DEFAULT 0 NOT NULL,
     brand_id uuid NOT NULL,
     fields jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT brand_drafts_pkey PRIMARY KEY (brand_id)
+    CONSTRAINT brand_drafts_pkey PRIMARY KEY (id)
 );
 
 
@@ -70,11 +75,16 @@ CREATE TABLE public.categories (
 --
 
 CREATE TABLE public.category_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    author_admin_id uuid,
+    title character varying(120),
+    base jsonb,
+    base_revision integer DEFAULT 0 NOT NULL,
     category_id uuid NOT NULL,
     fields jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT category_drafts_pkey PRIMARY KEY (category_id)
+    CONSTRAINT category_drafts_pkey PRIMARY KEY (id)
 );
 
 
@@ -158,6 +168,7 @@ CREATE TABLE public.product_files (
     page_count integer,
     display_order integer DEFAULT 0 NOT NULL,
     uploaded_by uuid,
+    draft_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -483,6 +494,11 @@ CREATE TABLE public.product_serials (
 --
 
 CREATE TABLE public.product_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    author_admin_id uuid,
+    title character varying(120),
+    base jsonb,
+    base_revision integer DEFAULT 0 NOT NULL,
     product_id uuid NOT NULL,
     fields jsonb DEFAULT '{}'::jsonb NOT NULL,
     variants jsonb DEFAULT '[]'::jsonb NOT NULL,
@@ -492,7 +508,7 @@ CREATE TABLE public.product_drafts (
     variant_images jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT product_drafts_pkey PRIMARY KEY (product_id)
+    CONSTRAINT product_drafts_pkey PRIMARY KEY (id)
 );
 
 
@@ -501,11 +517,16 @@ CREATE TABLE public.product_drafts (
 --
 
 CREATE TABLE public.supplier_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    author_admin_id uuid,
+    title character varying(120),
+    base jsonb,
+    base_revision integer DEFAULT 0 NOT NULL,
     supplier_id uuid NOT NULL,
     fields jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT supplier_drafts_pkey PRIMARY KEY (supplier_id)
+    CONSTRAINT supplier_drafts_pkey PRIMARY KEY (id)
 );
 
 
@@ -672,6 +693,11 @@ CREATE TABLE public.product_offer_items (
 -- to product_offers + product_offer_items in one transaction.
 
 CREATE TABLE public.offer_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    author_admin_id uuid,
+    title character varying(120),
+    base jsonb,
+    base_revision integer DEFAULT 0 NOT NULL,
     offer_id uuid NOT NULL,
     fields jsonb DEFAULT '{}'::jsonb NOT NULL,
     products jsonb DEFAULT '[]'::jsonb NOT NULL,

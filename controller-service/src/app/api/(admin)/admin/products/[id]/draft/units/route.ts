@@ -5,22 +5,24 @@ import { queryOne, query, queryMany } from '@/lib/shared/db'
 import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/catalog/selling-unit'
 import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
 import { actorOf, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
+import { productDraftIdFor } from '@/lib/catalog/product-draft-id'
 
 // Write the units column under the draft lock: a 423 response when someone else holds the draft.
 async function saveUnits(
   req: NextRequest,
   admin: { adminId?: string; role?: string; scopes?: string[] },
-  id: string,
+  draftId: string | null,
   units: unknown[]
 ): Promise<NextResponse | null> {
+  if (!draftId) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   try {
     await withDraftWrite(
       actorOf(admin),
       'product',
-      id,
+      draftId,
       db =>
-        db.query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-          id,
+        db.query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+          draftId,
           JSON.stringify(units),
         ]),
       { epoch: epochFrom(req), assertAfter: true }
@@ -59,8 +61,9 @@ async function liveBaseUnit(productId: string, variantId: string | null, subVari
   )
 }
 
-async function getAllDraftUnits(productId: string): Promise<any[]> {
-  const row = await queryOne<{ units: any[] }>(`SELECT units FROM product_drafts WHERE product_id = $1`, [productId])
+async function getAllDraftUnits(draftId: string | null): Promise<any[]> {
+  if (!draftId) return []
+  const row = await queryOne<{ units: any[] }>(`SELECT units FROM product_drafts WHERE id = $1`, [draftId])
   return Array.isArray(row?.units) ? row!.units : []
 }
 
@@ -79,11 +82,12 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:read')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const draftId = await productDraftIdFor(req, id, admin.adminId)
 
   const variantId = req.nextUrl.searchParams.get('variant_id')
   const subVariantId = req.nextUrl.searchParams.get('sub_variant_id')
 
-  const raw = await getAllDraftUnits(id)
+  const raw = await getAllDraftUnits(draftId)
   // Ensure stable ids
   let changed = false
   const all = raw.map((u: any, i: number) => {
@@ -94,8 +98,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     return u
   })
   if (changed) {
-    await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-      id,
+    await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+      draftId,
       JSON.stringify(all),
     ])
   }
@@ -132,11 +136,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const draftId = await productDraftIdFor(req, id, admin.adminId)
 
   const digital = await queryOne<{ is_digital: boolean }>(
     `SELECT COALESCE(NULLIF(d.fields->>'is_digital', '')::boolean, p.is_digital, false) AS is_digital
-       FROM products p LEFT JOIN product_drafts d ON d.product_id = p.id WHERE p.id = $1`,
-    [id]
+       FROM products p LEFT JOIN product_drafts d ON d.id = $2::uuid WHERE p.id = $1`,
+    [id, draftId]
   )
   if (digital?.is_digital) return NextResponse.json({ error: DIGITAL_UNIT_MESSAGE }, { status: 409 })
 
@@ -166,7 +171,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
-  const all = await getAllDraftUnits(id)
+  const all = await getAllDraftUnits(draftId)
   const newUnit = {
     ...body,
     override: undefined,
@@ -188,7 +193,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     updated = [...all, newUnit]
   }
 
-  const locked = await saveUnits(req, admin, id, updated)
+  const locked = await saveUnits(req, admin, draftId, updated)
   if (locked) return locked
   return NextResponse.json({ success: true, unit: newUnit })
 }
@@ -201,14 +206,15 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+  const draftId = await productDraftIdFor(req, id, admin.adminId)
 
   const delBody = await req.json().catch(() => null)
   if (!delBody?.unitId) return NextResponse.json({ error: 'unitId required' }, { status: 400 })
   const { unitId } = delBody
-  const all = await getAllDraftUnits(id)
+  const all = await getAllDraftUnits(draftId)
   const updated = all.filter((u: any) => u.id !== unitId)
 
-  const locked = await saveUnits(req, admin, id, updated)
+  const locked = await saveUnits(req, admin, draftId, updated)
   if (locked) return locked
   return NextResponse.json({ success: true })
 }

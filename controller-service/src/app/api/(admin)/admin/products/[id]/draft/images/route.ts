@@ -11,6 +11,7 @@ import {
 } from '@/lib/shared/s3'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { actorOf, assertDraftHolder, draftLockResponse, epochFrom, type DraftActor } from '@/lib/admin/draft-locks'
+import { productDraftIdFor } from '@/lib/catalog/product-draft-id'
 
 // Draft-scoped MAIN product images. Uploads go to S3 immediately, but the ROW is
 // staged in product_drafts.images — NOT in live product_images. publishProductDraft()
@@ -32,8 +33,9 @@ const PatchSchema = z.object({
   displayOrder: z.number().int().min(0).optional(),
 })
 
-async function getStage(productId: string): Promise<any[]> {
-  const row = await queryOne<{ images: any[] }>(`SELECT images FROM product_drafts WHERE product_id = $1`, [productId])
+async function getStage(draftId: string | null): Promise<any[]> {
+  if (!draftId) return []
+  const row = await queryOne<{ images: any[] }>(`SELECT images FROM product_drafts WHERE id = $1`, [draftId])
   return Array.isArray(row?.images) ? row!.images : []
 }
 
@@ -54,22 +56,22 @@ class StageError extends Error {
 // Read-modify-write of the staged array under a row lock, so concurrent uploads/edits never
 // overwrite each other. `fn` returns the next array, or null for no change.
 async function mutateStage<T>(
-  productId: string,
+  draftId: string | null,
   fn: (stage: any[]) => { next: any[] | null; result: T },
   lock?: { actor: DraftActor; epoch: number | null }
 ): Promise<T> {
   return withTransaction(async client => {
-    const r = await client.query(`SELECT images FROM product_drafts WHERE product_id = $1 FOR UPDATE`, [productId])
+    const r = draftId ? await client.query(`SELECT images FROM product_drafts WHERE id = $1 FOR UPDATE`, [draftId]) : { rows: [] }
     if (!r.rows[0]) throw new StageError('No draft exists for this product. Reload the edit page and try again.', 404)
     const stage = Array.isArray(r.rows[0].images) ? r.rows[0].images : []
     const { next, result } = fn(stage)
     if (next) {
-      await client.query(`UPDATE product_drafts SET images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-        productId,
+      await client.query(`UPDATE product_drafts SET images = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+        draftId,
         JSON.stringify(next),
       ])
       // Same transaction: a refusal (someone else holds the draft) rolls the write back.
-      await assertDraftHolder(client, lock?.actor, 'product', productId, { epoch: lock?.epoch })
+      await assertDraftHolder(client, lock?.actor, 'product', draftId!, { epoch: lock?.epoch })
     }
     return result
   })
@@ -90,8 +92,9 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products:read'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const draftId = await productDraftIdFor(request, id, admin.adminId)
 
-  const stage = await getStage(id)
+  const stage = await getStage(draftId)
   const images = [...stage].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
   return NextResponse.json({ images })
 }
@@ -102,11 +105,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const draftId = await productDraftIdFor(request, id, admin.adminId)
 
   let uploaded: { s3_key: string; s3_thumbnail_key: string } | null = null
   try {
     // Fast fail before uploading; the locked append below re-checks.
-    if ((await getStage(id)).length >= MAX_IMAGES) {
+    if ((await getStage(draftId)).length >= MAX_IMAGES) {
       return NextResponse.json({ error: `Maximum ${MAX_IMAGES} images per product` }, { status: 400 })
     }
     const contentType = request.headers.get('content-type') || ''
@@ -160,7 +164,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     uploaded = { s3_key: staged.s3_key, s3_thumbnail_key: staged.s3_thumbnail_key || '' }
     const image = await mutateStage(
-      id,
+      draftId,
       stage => {
         if (stage.length >= MAX_IMAGES) throw new StageError(`Maximum ${MAX_IMAGES} images per product`, 400)
         const img = { ...staged, display_order: stage.length, is_primary: stage.length === 0 }
@@ -182,6 +186,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const draftId = await productDraftIdFor(request, id, admin.adminId)
 
   const rawDel = await request.json().catch(() => null)
   if (!rawDel) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -191,7 +196,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
   try {
     await mutateStage(
-      id,
+      draftId,
       stage => {
         const removed = stage.find((img: any) => img.id === imageId)
         let next = stage.filter((img: any) => img.id !== imageId)
@@ -215,6 +220,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const draftId = await productDraftIdFor(request, id, admin.adminId)
 
   const rawPatch = await request.json().catch(() => null)
   if (!rawPatch) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -224,7 +230,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   try {
     await mutateStage(
-      id,
+      draftId,
       stage => ({
         next: stage.map((img: any) => {
           if (isPrimary) return { ...img, is_primary: img.id === imageId }

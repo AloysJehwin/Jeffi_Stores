@@ -23,6 +23,8 @@ interface Props {
   basePrice?: number | string | null
   onUnitLoaded?: (info: UnitLoadedInfo) => void
   isDraft?: boolean
+  /** The product draft being edited (sent as ?draft=). */
+  draftId?: string | null
   readOnly?: boolean
   /** Overrides the right-hand hint — used when this unit acts as a fallback for a deeper grain. */
   roleNote?: string
@@ -42,6 +44,7 @@ export default function UnitsManager({
   basePrice,
   onUnitLoaded,
   isDraft = false,
+  draftId = null,
   readOnly = false,
   roleNote,
 }: Props) {
@@ -71,8 +74,17 @@ export default function UnitsManager({
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const draftBasePath = isDraft ? `/api/admin/products/${productId}/draft/units` : null
+  // Scope params plus the draft being edited (several can be open on one product).
+  const draftQs = (() => {
+    const q = new URLSearchParams()
+    if (subVariantId) q.set('sub_variant_id', subVariantId)
+    if (variantId) q.set('variant_id', variantId)
+    if (draftId) q.set('draft', draftId)
+    const s = q.toString()
+    return s ? `?${s}` : ''
+  })()
   const baseUrl = isDraft
-    ? `${draftBasePath}${subVariantId ? `?sub_variant_id=${subVariantId}&variant_id=${variantId}` : variantId ? `?variant_id=${variantId}` : ''}`
+    ? `${draftBasePath}${draftQs}`
     : subVariantId
       ? `/api/admin/products/${productId}/variants/${variantId}/sub-variants/${subVariantId}/units`
       : variantId
@@ -82,7 +94,7 @@ export default function UnitsManager({
   // But include scope params so DELETE knows which scope to clear
   const unitUrl = (unitId: string) =>
     isDraft
-      ? `${draftBasePath}/${unitId}${subVariantId ? `?sub_variant_id=${subVariantId}&variant_id=${variantId}` : variantId ? `?variant_id=${variantId}` : ''}`
+      ? `${draftBasePath}/${unitId}${draftQs}`
       : `${baseUrl}/${unitId}`
   const isVariantScope = !!variantId && !subVariantId
   const isSubVariantScope = !!subVariantId

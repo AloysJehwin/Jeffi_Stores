@@ -6,6 +6,8 @@ import { suggestIcon } from '@/lib/shared/icon-suggest'
 import { canUseAi } from '@/lib/auth/ai-scope'
 import { revalidatePath } from 'next/cache'
 import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
+import { recordDirectRevision } from '@/lib/admin/entity-revisions'
+import { categoryContentOf } from '@/lib/catalog/category-draft'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -116,6 +118,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const updated = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [id])
+  // Drafts open on this category see who changed what when they publish.
+  if (before && updated)
+    await recordDirectRevision({ type: 'category', id, before: categoryContentOf(before), after: categoryContentOf(updated), actorAdminId: admin.adminId })
 
   return NextResponse.json(updated)
 }

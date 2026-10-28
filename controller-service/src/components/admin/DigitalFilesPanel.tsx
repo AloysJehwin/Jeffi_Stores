@@ -14,10 +14,13 @@ interface VaultFile {
   mime_type: string
   size_bytes: string
   created_at: string
+  draft_id?: string | null
 }
 
 interface Props {
   productId: string
+  /** Editing a draft: uploads, removals and toggles stay in it until publish. */
+  draftId?: string | null
 }
 
 const ACCEPT =
@@ -30,7 +33,7 @@ function fmtBytes(n: number): string {
   return `${(n / 1024 ** i).toFixed(i ? 1 : 0)} ${u[i]}`
 }
 
-export default function DigitalFilesPanel({ productId }: Props) {
+export default function DigitalFilesPanel({ productId, draftId = null }: Props) {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const canWrite = useCanWrite('vault')
@@ -39,7 +42,8 @@ export default function DigitalFilesPanel({ productId }: Props) {
   const [busy, setBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const base = `/api/admin/products/${productId}/files`
+  const base = `/api/admin/products/${productId}/files${draftId ? `?draft=${draftId}` : ''}`
+  const join = (extra: string) => `${base}${base.includes('?') ? '&' : '?'}${extra}`
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -89,7 +93,7 @@ export default function DigitalFilesPanel({ productId }: Props) {
       })
       const cd = await comp.json()
       if (!comp.ok) throw new Error(cd.error || 'Finalise failed')
-      showToast('File uploaded', 'success')
+      showToast(draftId ? 'File added to the draft — goes live when you publish' : 'File uploaded', 'success')
       await load()
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Upload failed', 'error')
@@ -122,7 +126,7 @@ export default function DigitalFilesPanel({ productId }: Props) {
       }))
     )
       return
-    const res = await fetch(`${base}?file_id=${encodeURIComponent(f.id)}`, { method: 'DELETE' })
+    const res = await fetch(join(`file_id=${encodeURIComponent(f.id)}`), { method: 'DELETE' })
     if (res.ok) {
       setFiles(prev => prev.filter(x => x.id !== f.id))
       showToast('File deleted', 'success')
@@ -162,6 +166,7 @@ export default function DigitalFilesPanel({ productId }: Props) {
       ) : files.length === 0 ? (
         <p className="text-xs text-foreground-muted">
           No files yet. Buyers open these in the vault; downloads also require the store-wide download switch.
+          {draftId ? ' Changes here apply when the draft is published.' : ''}
         </p>
       ) : (
         <ul className="divide-y divide-border-default border border-border-default rounded">
@@ -173,6 +178,9 @@ export default function DigitalFilesPanel({ productId }: Props) {
               <span className="flex-1 min-w-0 truncate text-foreground" title={f.display_name}>
                 {f.display_name}
               </span>
+              {f.draft_id && (
+                <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">In draft</span>
+              )}
               <span className="shrink-0 text-xs text-foreground-muted">{fmtBytes(Number(f.size_bytes))}</span>
               <label className="shrink-0 flex items-center gap-1 text-xs text-foreground-muted">
                 <input

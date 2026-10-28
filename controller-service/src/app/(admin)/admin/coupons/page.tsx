@@ -133,26 +133,28 @@ async function CouponPendingDrafts() {
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'coupons:write')
   const [editDrafts, createDrafts] = await Promise.all([
-    // Edit-drafts: unpublished CHANGES staged against a live coupon (coupon_drafts).
-    queryMany<{ coupon_id: string; code: string; updated_at: string }>(
-      `SELECT cd.coupon_id, c.code, cd.updated_at
+    // Edit-drafts: one row per draft (several admins can each hold one of the same coupon).
+    // A new coupon edited before its first publish has one too, and is listed here.
+    queryMany<{ id: string; coupon_id: string; code: string; title: string | null; author: string | null; is_new: boolean; updated_at: string }>(
+      `SELECT cd.id, cd.coupon_id, COALESCE(NULLIF(cd.fields->>'code', ''), c.code) AS code, cd.title, c.is_draft AS is_new, cd.updated_at,
+              COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS author
        FROM coupon_drafts cd
-       JOIN coupons c ON c.id = cd.coupon_id AND c.is_draft = false
+       JOIN coupons c ON c.id = cd.coupon_id
+       LEFT JOIN admins ad ON ad.id = cd.author_admin_id LEFT JOIN users u ON u.id = ad.user_id
        ORDER BY cd.updated_at DESC
        LIMIT 200`
     ),
-    // Create-drafts: brand-new coupons never published to the live list (is_draft = true).
-    // A new coupon edited before its first publish also has a coupon_drafts row — list it once.
-    queryMany<{ id: string; code: string; created_at: string; staged: boolean }>(
-      `SELECT c.id, COALESCE(cd.fields->>'code', c.code) AS code, c.created_at, cd.coupon_id IS NOT NULL AS staged
-       FROM coupons c LEFT JOIN coupon_drafts cd ON cd.coupon_id = c.id
-       WHERE c.is_draft = true ORDER BY c.created_at DESC LIMIT 200`
+    // Create-drafts: brand-new coupons never published to the live list (is_draft = true), no draft yet.
+    queryMany<{ id: string; code: string; created_at: string }>(
+      `SELECT c.id, c.code, c.created_at FROM coupons c
+       WHERE c.is_draft = true AND NOT EXISTS (SELECT 1 FROM coupon_drafts cd WHERE cd.coupon_id = c.id)
+       ORDER BY c.created_at DESC LIMIT 200`
     ),
   ])
   const pendingDrafts = editDrafts
   const pendingDraftsCount = editDrafts.length + createDrafts.length
   if (!pendingDraftsCount) return null
-  const locks = await draftLockChips('coupon', [...createDrafts.map(d => d.id), ...editDrafts.map(d => d.coupon_id)])
+  const locks = await draftLockChips('coupon', [...createDrafts.map(d => d.id), ...editDrafts.map(d => d.id)])
 
   return (
         <details open className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
@@ -182,9 +184,9 @@ async function CouponPendingDrafts() {
                     subtitle="New coupon — not yet published"
                     updatedAt={d.created_at}
                     editHref={ap(`/admin/coupons/${d.id}/edit`, host)}
-                    publishPath={d.staged ? `/api/admin/coupons/${d.id}/publish` : `/api/admin/coupons/${d.id}`}
-                    publishMethod={d.staged ? undefined : 'PATCH'}
-                    publishBody={d.staged ? undefined : { is_draft: false, is_active: true }}
+                    publishPath={`/api/admin/coupons/${d.id}`}
+                    publishMethod="PATCH"
+                    publishBody={{ is_draft: false, is_active: true }}
                     publishConfirm={`Publish "${d.code}" to the live coupon list?`}
                     discardPath={`/api/admin/coupons/${d.id}`}
                     discardConfirm={`Delete the draft coupon "${d.code}"? This cannot be undone.`}
@@ -204,23 +206,24 @@ async function CouponPendingDrafts() {
               {pendingDrafts.map(d =>
                 canWrite ? (
                   <DraftRowActions
-                    key={d.coupon_id}
+                    key={d.id}
                     entityId={d.coupon_id}
-                    name={d.code}
-                    subtitle={null}
+                    name={d.title ? `${d.code} · ${d.title}` : d.code}
+                    subtitle={[d.is_new ? 'New coupon — not yet published' : null, d.author ? `Draft by ${d.author}` : null].filter(Boolean).join(' · ') || null}
                     updatedAt={d.updated_at}
-                    editHref={ap(`/admin/coupons/${d.coupon_id}/edit`, host)}
-                    publishPath={`/api/admin/coupons/${d.coupon_id}/publish`}
-                    discardPath={`/api/admin/coupons/${d.coupon_id}/draft`}
+                    editHref={ap(`/admin/coupons/${d.coupon_id}/edit?draft=${d.id}`, host)}
+                    publishPath={`/api/admin/coupons/${d.coupon_id}/publish?draft=${d.id}`}
+                    publishConfirm={d.is_new ? `Publish "${d.code}" to the live coupon list?` : undefined}
+                    discardPath={`/api/admin/coupons/${d.coupon_id}/draft?draft=${d.id}`}
                     entityLabel="coupon"
-                    lock={locks[d.coupon_id]}
+                    lock={locks[d.id]}
                   />
                 ) : (
-                  <div key={d.coupon_id} className="px-4 py-2.5 flex items-center gap-2">
+                  <div key={d.id} className="px-4 py-2.5 flex items-center gap-2">
                     <p className="text-sm font-medium text-amber-700 dark:text-amber-400 font-mono truncate">
-                      {d.code}
+                      {d.title ? `${d.code} · ${d.title}` : d.code}
                     </p>
-                    <DraftLockBadge lock={locks[d.coupon_id]} mine={locks[d.coupon_id]?.mine} />
+                    <DraftLockBadge lock={locks[d.id]} mine={locks[d.id]?.mine} />
                   </div>
                 )
               )}

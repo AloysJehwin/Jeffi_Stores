@@ -7,6 +7,8 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { DraftLockBadge } from '@/components/admin/kit/draft-lock'
 import type { DraftLockChip } from '@/lib/client/draft-lock-client'
+import type { MergeConflict } from '@/lib/admin/draft-merge'
+import MergeDialog from '@/components/admin/drafts/MergeDialog'
 
 interface Props {
   entityId: string
@@ -47,6 +49,7 @@ export default function DraftRowActions({
   const [publishing, setPublishing] = useState(false)
   const [discarding, setDiscarding] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [conflicts, setConflicts] = useState<MergeConflict[] | null>(null)
 
   async function handlePublish() {
     const ok = await confirm({
@@ -63,6 +66,10 @@ export default function DraftRowActions({
         ...(publishBody ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(publishBody) } : {}),
       })
       const data = await res.json()
+      if (res.status === 409 && data.code === 'DRAFT_CONFLICT') {
+        setConflicts(data.conflicts ?? [])
+        return
+      }
       if (!res.ok) {
         setError(data.error || 'Publish failed')
         return
@@ -130,6 +137,19 @@ export default function DraftRowActions({
           </button>
         </RequireWrite>
       </div>
+      {conflicts && (
+        <MergeDialog
+          open
+          conflicts={conflicts}
+          publishPath={publishPath}
+          extraBody={publishBody}
+          onClose={() => setConflicts(null)}
+          onDone={() => {
+            setConflicts(null)
+            router.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

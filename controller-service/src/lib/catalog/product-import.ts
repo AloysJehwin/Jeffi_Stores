@@ -126,8 +126,7 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
         await discardSkeleton(createdId)
         continue
       }
-      await writeDraft(productId, draftFields, buildVariants(group), images, [])
-      await publishProductDraft(productId)
+      await publishProductDraft(productId, { draftId: await writeDraft(productId, draftFields, buildVariants(group), images, []) })
 
       // Phase 2: sub-variants AND variant images need real variant ids (only exist post-publish).
       // Re-read the persisted variant ids, seed both, and republish. Idempotent — the product +
@@ -140,8 +139,8 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
         const subVariants = buildSubVariants(group, variantIdBySku)
         const variantImages = await buildVariantImages(group, variantIdBySku, imageProgress, rowResults)
         if (subVariants.length > 0 || variantImages.length > 0) {
-          await writeDraft(productId, draftFields, buildVariants(group), images, subVariants, variantImages)
-          await publishProductDraft(productId)
+          const draftId = await writeDraft(productId, draftFields, buildVariants(group), images, subVariants, variantImages)
+          await publishProductDraft(productId, { draftId })
         }
       }
 
@@ -357,14 +356,17 @@ async function writeDraft(
   variants: Record<string, unknown>[],
   images: DraftImage[],
   subVariants: Record<string, unknown>[],
-  variantImages: Record<string, unknown>[] = []
-): Promise<void> {
-  await query(
-    `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, variant_images, updated_at)
-     VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, '[]'::jsonb, $6::jsonb, now())
-     ON CONFLICT (product_id) DO UPDATE SET
+  variantImages: Record<string, unknown>[] = [],
+  draftId: string | null = null
+): Promise<string> {
+  // The import's own draft; admins' open drafts on the product are left alone.
+  const r = await query<{ id: string }>(
+    `INSERT INTO product_drafts (id, product_id, title, fields, variants, images, sub_variants, units, variant_images, updated_at)
+     VALUES (COALESCE($7::uuid, gen_random_uuid()), $1, 'Import', $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, '[]'::jsonb, $6::jsonb, now())
+     ON CONFLICT (id) DO UPDATE SET
        fields = EXCLUDED.fields, variants = EXCLUDED.variants, images = EXCLUDED.images,
-       sub_variants = EXCLUDED.sub_variants, variant_images = EXCLUDED.variant_images, updated_at = now()`,
+       sub_variants = EXCLUDED.sub_variants, variant_images = EXCLUDED.variant_images, updated_at = now()
+     RETURNING id`,
     [
       productId,
       JSON.stringify(fields),
@@ -372,8 +374,10 @@ async function writeDraft(
       JSON.stringify(images),
       JSON.stringify(subVariants),
       JSON.stringify(variantImages),
+      draftId,
     ]
   )
+  return r.rows[0].id
 }
 
 // Fetch each variant's image_urls and stage them as draft variant_images rows, tagged with the

@@ -21,6 +21,8 @@ import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import { fieldInputCls } from '@/components/admin/kit'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
+import type { MergeConflict } from '@/lib/admin/draft-merge'
+import MergeDialog from '@/components/admin/drafts/MergeDialog'
 
 interface Coupon {
   id: string
@@ -71,6 +73,8 @@ interface ReviewFormFormProps {
   resnapshotAction?: () => Promise<void>
   /** Draft lock state from the server (initialDraftLock), so a non-holder renders read-only. */
   initialLock?: DraftLockState | null
+  /** The edit-draft being edited (its lock id); null for a create-draft, locked by the form id. */
+  draftId?: string | null
   defaultValues?: {
     title?: string
     slug?: string
@@ -107,6 +111,7 @@ export default function ReviewFormForm({
   discardAction,
   resnapshotAction,
   initialLock,
+  draftId,
   defaultValues: d = {},
 }: ReviewFormFormProps) {
   const router = useRouter()
@@ -120,8 +125,12 @@ export default function ReviewFormForm({
   const [customFields, setCustomFields] = useState<CustomField[]>(d.custom_fields || [])
   const [submitting, setSubmitting] = useState(false)
   const { showToast } = useToast()
-  const lock = useDraftLock({ resourceType: 'review_form', resourceId: formId ?? null, initial: initialLock })
-  const edit = useEditSession({ resourceType: 'review_form', resourceId: formId ?? null, lock })
+  const lockKey = draftId ?? formId ?? null
+  const lock = useDraftLock({ resourceType: 'review_form', resourceId: lockKey, initial: initialLock })
+  const edit = useEditSession({ resourceType: 'review_form', resourceId: lockKey, lock })
+  const [conflicts, setConflicts] = useState<MergeConflict[] | null>(null)
+  const publishPath = `/api/admin/review-forms/${formId}/publish?draft=${draftId}`
+  const listHref = backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms'
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutosaveStatus>('idle')
   const [formsHost, setFormsHost] = useState('forms.jeffistores.in')
   useEffect(() => {
@@ -151,8 +160,8 @@ export default function ReviewFormForm({
       try {
         const res = await fetch(`/api/admin/review-forms/${formId}/draft`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', formId) },
-          body: JSON.stringify({
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', lockKey) },
+          body: JSON.stringify({ draftId, fields: {
             title: v.title.trim(),
             slug: v.slug
               .toLowerCase()
@@ -164,7 +173,7 @@ export default function ReviewFormForm({
             description: v.description.trim() || null,
             is_active: v.isActive,
             custom_fields: v.customFields,
-          }),
+          } }),
         })
         if (res.status === 423) {
           autosaveBlockedRef.current = true
@@ -251,37 +260,41 @@ export default function ReviewFormForm({
         return
       }
 
-      if (isDraft && formId) {
+      if (isDraft && formId && draftId) {
         // Determine intent from the clicked button
         const intent = (document.activeElement as HTMLButtonElement)?.value || 'draft'
         if (intent === 'publish') {
-          // Save to draft then publish
+          // Save to draft then merge it into live
           await fetch(`/api/admin/review-forms/${formId}/draft`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', formId) },
-            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', lockKey) },
+            body: JSON.stringify({ draftId, fields: payload }),
           })
-          const res = await fetch(`/api/admin/review-forms/${formId}/draft`, {
+          const res = await fetch(publishPath, {
             method: 'POST',
-            headers: lockHeaders('review_form', formId),
+            headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', lockKey) },
+            body: JSON.stringify({}),
           })
           if (!res.ok) {
             if (res.status === 423) lock.markLocked()
             const d = await res.json()
+            // Someone published overlapping edits since this draft started: resolve them first.
+            if (res.status === 409 && d.code === 'DRAFT_CONFLICT') {
+              autosaveBlockedRef.current = true
+              setConflicts(d.conflicts ?? [])
+              return
+            }
             showToast(d.error || 'Failed to publish', 'error')
             return
           }
-          autosaveBlockedRef.current = true
-          if (edit.sessionId) await edit.save()
-          router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
-          router.refresh()
+          await afterPublish()
           return
         }
         // Save draft, resnapshot so Cancel reverts to this save, then return to the list.
         const res = await fetch(`/api/admin/review-forms/${formId}/draft`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', formId) },
-          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('review_form', lockKey) },
+          body: JSON.stringify({ draftId, fields: payload }),
         })
         if (!res.ok) {
           if (res.status === 423) lock.markLocked()
@@ -324,6 +337,13 @@ export default function ReviewFormForm({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function afterPublish() {
+    autosaveBlockedRef.current = true
+    if (edit.sessionId) await edit.save()
+    router.push(listHref)
+    router.refresh()
   }
 
   function handleAIFill(values: Record<string, unknown>) {
@@ -372,6 +392,7 @@ export default function ReviewFormForm({
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
       {lock.loaded && (
         <div className="lg:col-span-2">
@@ -639,5 +660,21 @@ export default function ReviewFormForm({
         </FormFooter>
       </div>
     </form>
+    {conflicts && (
+      <MergeDialog
+        open
+        conflicts={conflicts}
+        publishPath={publishPath}
+        onClose={() => {
+          setConflicts(null)
+          autosaveBlockedRef.current = false
+        }}
+        onDone={() => {
+          setConflicts(null)
+          void afterPublish()
+        }}
+      />
+    )}
+    </>
   )
 }

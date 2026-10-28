@@ -1165,6 +1165,17 @@ ALTER TABLE ONLY public.order_items
 
 
 --
+-- Name: entity_revisions entity_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.entity_revisions
+    ADD CONSTRAINT entity_revisions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.entity_revisions
+    ADD CONSTRAINT entity_revisions_resource_revision_key UNIQUE (resource_type, resource_id, revision);
+
+
+
+--
 -- Name: order_status_history order_status_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3825,7 +3836,7 @@ ALTER TABLE ONLY public.campaign_drafts
 -- offer_drafts
 --
 ALTER TABLE ONLY public.offer_drafts
-    ADD CONSTRAINT offer_drafts_pkey PRIMARY KEY (offer_id);
+    ADD CONSTRAINT offer_drafts_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.offer_drafts
     ADD CONSTRAINT offer_drafts_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES public.product_offers(id) ON DELETE CASCADE;
 

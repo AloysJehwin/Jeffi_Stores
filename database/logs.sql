@@ -49,6 +49,27 @@ CREATE TABLE public.admin_audit_log (
 
 
 --
+-- Name: entity_revisions; Type: TABLE; Schema: public; Owner: -
+-- One row per change to a draftable entity (publish, or a direct write). changes = { path: { from, to } };
+-- the merge names who changed a field since a draft started (docs/plans/MULTI_DRAFT_PLAN.md).
+--
+
+CREATE TABLE public.entity_revisions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    resource_type character varying(32) NOT NULL,
+    resource_id uuid NOT NULL,
+    revision integer NOT NULL,
+    draft_id uuid,
+    draft_title character varying(120),
+    actor_admin_id uuid,
+    actor_name text,
+    source character varying(24) DEFAULT 'publish'::character varying NOT NULL,
+    changes jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: email_logs; Type: TABLE; Schema: public; Owner: -
 --
 

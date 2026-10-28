@@ -16,6 +16,8 @@ import {
   withDraftCreate,
   withDraftWrite,
 } from '@/lib/admin/draft-locks'
+import { productDraftIdFor, startProductDraft } from '@/lib/catalog/product-draft-id'
+import { discardDraftFiles } from '@/lib/vault/files'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,15 +26,15 @@ interface Params {
 }
 
 // A session's snapshot belongs to the draft it was opened on; a new or discarded draft ends it.
-async function closeProductSessions(productId: string) {
+async function closeProductSessions(draftId: string) {
   try {
     await query(
       `UPDATE editor_sessions SET closed_at = now(), closed_reason = 'save'
         WHERE resource_type = 'product' AND resource_id = $1 AND closed_at IS NULL`,
-      [productId]
+      [draftId]
     )
   } catch (e) {
-    console.error('[product-draft] closing edit sessions failed for', productId, e)
+    console.error('[product-draft] closing edit sessions failed for', draftId, e)
   }
 }
 
@@ -53,46 +55,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    const existingDraft = await queryOne<{ product_id: string }>(
-      `SELECT product_id FROM product_drafts WHERE product_id = $1`,
-      [id]
-    )
-    const actor = actorOf(admin)
-    if (existingDraft) {
-      // 409 = the draft is (now) yours, go edit; 423 = someone else holds it.
-      await acquireDraftLock(actor, 'product', id)
-      return NextResponse.json(
-        { error: 'A draft already exists for this product', productId: existingDraft.product_id },
-        { status: 409 }
-      )
-    }
+    const body = await req.json().catch(() => ({}))
+    const { draftId, existing } = await startProductDraft(actorOf(admin), id, {
+      fresh: !!body?.new,
+      title: typeof body?.title === 'string' ? body.title : null,
+    })
+    if (existing) return NextResponse.json({ success: true, productId: id, draftId, existing: true })
+    await closeProductSessions(draftId)
 
-    await withDraftCreate(actor, 'product', id, db =>
-      db.query(
-        `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, variant_images)
-       SELECT
-         p.id,
-         to_jsonb(p) - 'id' - 'created_at' - 'updated_at' - 'search_vector' - 'views_count' - 'sales_count' - 'inventory_quantity',
-         COALESCE((SELECT json_agg(to_jsonb(v) || jsonb_build_object('sub_variant_type_on',
-                     v.sub_variant_type_on OR EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = v.id AND sv.is_active = true)))
-                   FROM product_variants v WHERE v.product_id = p.id), '[]'),
-         COALESCE((SELECT json_agg(to_jsonb(i) ORDER BY i.display_order) FROM product_images i WHERE i.product_id = p.id), '[]'),
-         COALESCE((SELECT json_agg(to_jsonb(sv) ORDER BY sv.created_at, sv.sub_variant_name)
-                   FROM product_sub_variants sv
-                   JOIN product_variants v ON v.id = sv.variant_id
-                   WHERE v.product_id = p.id AND sv.is_active = true), '[]'),
-         COALESCE((SELECT json_agg(to_jsonb(u) - 'id') FROM product_units u WHERE u.product_id = p.id), '[]'),
-         COALESCE((SELECT json_agg(to_jsonb(vi) ORDER BY vi.display_order)
-                   FROM variant_images vi
-                   JOIN product_variants v ON v.id = vi.variant_id
-                   WHERE v.product_id = p.id), '[]')
-       FROM products p WHERE p.id = $1`,
-        [id]
-      )
-    )
-    await closeProductSessions(id)
-
-    return NextResponse.json({ success: true, productId: id })
+    return NextResponse.json({ success: true, productId: id, draftId })
   } catch (err: unknown) {
     const locked = draftLockResponse(err)
     if (locked) return locked
@@ -118,11 +89,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     }
 
-    const draft = await queryOne<{ product_id: string }>(
-      `SELECT product_id FROM product_drafts WHERE product_id = $1`,
-      [id]
-    )
-    if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+    const draftId = await productDraftIdFor(req, id, admin.adminId)
+    if (!draftId) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
 
     // Build image snapshot: take live product_images, apply order/primary from client state
     const imageOrder: string[] = body?.imageOrder || []
@@ -183,18 +151,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     await withDraftWrite(
       actorOf(admin),
       'product',
-      id,
+      draftId,
       db =>
         db.query(
-          `UPDATE product_drafts SET fields = $2::jsonb,
+          // The form never sends _files (staged digital-file changes); keep them.
+          `UPDATE product_drafts SET fields = $2::jsonb || jsonb_strip_nulls(jsonb_build_object('_files', fields->'_files')),
            images = COALESCE($3::jsonb, images),
            variants = COALESCE($4::jsonb, variants),
-           updated_at = NOW() WHERE product_id = $1`,
-          [id, JSON.stringify(roundMoneyFields(fields)), imagesJson, variantsJson]
+           updated_at = NOW() WHERE id = $1`,
+          [draftId, JSON.stringify(roundMoneyFields(fields)), imagesJson, variantsJson]
         ),
       { epoch: epochFrom(req) }
     )
-    await applyDraftSubVariantPrices(id, parseSubVariantPriceEntries(body?.subVariantSubscriptionPrices))
+    await applyDraftSubVariantPrices(draftId, parseSubVariantPriceEntries(body?.subVariantSubscriptionPrices))
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
@@ -214,16 +183,16 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const actor = actorOf(admin)
-  const denied = await discardGuard(actor, 'product', id)
+  const draftId = await productDraftIdFor(req, id, admin.adminId)
+  const denied = await discardGuard(actor, 'product', draftId ?? id)
   if (denied) return denied
   try {
     // Clean up S3 files for variant images that were uploaded fresh into this draft
     // (staged, never applied to live). Live-image rows (real uuid ids) are left alone —
     // their files still back the live product.
-    const draft = await queryOne<{ variant_images: any[]; images: any[] }>(
-      `SELECT variant_images, images FROM product_drafts WHERE product_id = $1`,
-      [id]
-    )
+    const draft = draftId
+      ? await queryOne<{ variant_images: any[]; images: any[] }>(`SELECT variant_images, images FROM product_drafts WHERE id = $1`, [draftId])
+      : null
 
     // Create-draft (is_draft=true, no product_drafts edit-draft): discarding means deleting the
     // product row itself, since it was never published to the live list.
@@ -236,6 +205,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
         await closeAfter(actor, 'product', id, 'discarded')
         return NextResponse.json({ success: true })
       }
+      return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     }
 
     const stagedVI = Array.isArray(draft?.variant_images) ? draft!.variant_images : []
@@ -254,9 +224,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
         )
       }
     }
-    await query(`DELETE FROM product_drafts WHERE product_id = $1`, [id])
-    await closeProductSessions(id)
-    await closeAfter(actor, 'product', id, 'discarded')
+    await discardDraftFiles(draftId!)
+    await query(`DELETE FROM product_drafts WHERE id = $1`, [draftId])
+    await closeProductSessions(draftId!)
+    await closeAfter(actor, 'product', draftId!, 'discarded')
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
     console.error('[product-draft] discard failed for', id, err)

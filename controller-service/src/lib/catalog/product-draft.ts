@@ -13,7 +13,12 @@ import {
   skuConflictError,
   uniqueProductSlug,
 } from '@/lib/catalog/product-validation'
-import { announceDraftClosed, assertDraftHolder, closeDraftLockTx, isDraftLockError, type DraftActor } from '@/lib/admin/draft-locks'
+import { announceDraftClosed, assertDraftHolder, closeDraftLockTx, isDraftLockError, type DraftActor, type DraftDb } from '@/lib/admin/draft-locks'
+import type { Resolution } from '@/lib/admin/draft-merge'
+import { currentRevision, recordRevision } from '@/lib/admin/entity-revisions'
+import { notifyDraftSiblings } from '@/lib/admin/draft-branches'
+import { liveProductSnapshot, mergeProductDraft, type ProductSnapshot } from './product-draft-merge'
+import { applyDraftFileOpsTx, releaseFileObjects } from '@/lib/vault/files'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -254,7 +259,11 @@ async function wipeStockForScope(
 }
 
 interface ProductDraft {
+  id: string
   product_id: string
+  title?: string | null
+  base?: ProductSnapshot | null
+  base_revision?: number | null
   fields: Record<string, unknown>
   variants: Record<string, unknown>[]
   images: Record<string, unknown>[]
@@ -271,12 +280,42 @@ interface ProductDraft {
  * With an `actor` the draft lock is asserted and closed inside the same transaction
  * (system callers such as the importer pass none).
  */
-export async function publishProductDraft(
-  productId: string,
-  opts: { activate?: boolean; actor?: DraftActor; epoch?: number | null } = {}
-): Promise<{ keptForHistory: PurgeResult['deactivated'] }> {
-  const draft = await queryOne<ProductDraft>(`SELECT * FROM product_drafts WHERE product_id = $1`, [productId])
+export interface PublishProductOpts {
+  activate?: boolean
+  actor?: DraftActor
+  epoch?: number | null
+  /** The draft to publish; without it, the product's newest draft (system callers). */
+  draftId?: string | null
+  /** Picks for fields that live changed too (merge dialog): path -> mine | theirs | { value }. */
+  resolutions?: Record<string, Resolution>
+}
+
+/** Live moved between the merge and the write lock: merge again. */
+class StaleMergeError extends Error {}
+
+export async function publishProductDraft(productId: string, opts: PublishProductOpts = {}): Promise<{ keptForHistory: PurgeResult['deactivated'] }> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await publishProductDraftOnce(productId, opts)
+    } catch (err) {
+      if (!(err instanceof StaleMergeError) || attempt >= 2) throw err
+    }
+  }
+}
+
+async function publishProductDraftOnce(productId: string, opts: PublishProductOpts): Promise<{ keptForHistory: PurgeResult['deactivated'] }> {
+  const draft = opts.draftId
+    ? await queryOne<ProductDraft>(`SELECT * FROM product_drafts WHERE id = $1 AND product_id = $2`, [opts.draftId, productId])
+    : await queryOne<ProductDraft>(`SELECT * FROM product_drafts WHERE product_id = $1 ORDER BY updated_at DESC LIMIT 1`, [productId])
   if (!draft) throw new Error('Draft not found')
+  const draftId = draft.id
+
+  // Three-way merge against the newest live (docs/plans/MULTI_DRAFT_PLAN.md): fields this draft
+  // never touched keep what others published since; overlaps throw DraftConflictError.
+  const poolDb: DraftDb = { query: (t, p) => query(t, p) }
+  const [liveSnap, liveRevision] = await Promise.all([liveProductSnapshot(poolDb, productId), currentRevision(poolDb, 'product', productId)])
+  const merge = liveSnap ? await mergeProductDraft(poolDb, draft, liveSnap, opts.resolutions) : null
+  if (merge) Object.assign(draft, merge.merged)
 
   // Hard gate: never publish while the product has open (pending/confirmed) orders.
   // This is the last line of defence — callers surface a friendlier message first.
@@ -389,8 +428,13 @@ export async function publishProductDraft(
 
   const purged: PurgeResult[] = []
   let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
+  let revision: number | null = null
+  let siblings: { id: string; author_admin_id: string | null }[] = []
+  let removedFiles: { storage_key: string; size_bytes: string }[] = []
   await withTransaction(async client => {
-    await assertDraftHolder(client, opts.actor, 'product', productId, { epoch: opts.epoch })
+    await assertDraftHolder(client, opts.actor, 'product', draftId, { epoch: opts.epoch })
+    await client.query(`SELECT 1 FROM products WHERE id = $1 FOR UPDATE`, [productId])
+    if (merge && (await currentRevision(client as unknown as DraftDb, 'product', productId)) !== liveRevision) throw new StaleMergeError()
     await client.query(
       `UPDATE products SET
          category_id              = NULLIF(($2::jsonb)->>'category_id', '')::uuid,
@@ -1656,10 +1700,25 @@ export async function publishProductDraft(
     if (newDigital) await normalizeDigitalProduct(client, productId)
     await recomputeStockStatusForProduct(client, productId)
 
-    await client.query(`DELETE FROM product_drafts WHERE product_id = $1`, [productId])
-    closed = await closeDraftLockTx(client, opts.actor, 'product', productId, 'published')
+    if (merge)
+      revision = await recordRevision(client as unknown as DraftDb, {
+        type: 'product',
+        id: productId,
+        before: merge.before,
+        after: merge.after,
+        actorAdminId: opts.actor?.adminId,
+        draftId,
+        draftTitle: draft.title ?? null,
+        source: opts.actor ? 'publish' : 'import',
+      })
+    // Digital files: this draft's uploads go live with it; its removals and toggles apply now.
+    await client.query(`UPDATE product_files SET draft_id = NULL, updated_at = now() WHERE draft_id = $1`, [draftId])
+    removedFiles = await applyDraftFileOpsTx(client, productId, (draft.fields as any)?._files)
+    await client.query(`DELETE FROM product_drafts WHERE id = $1`, [draftId])
+    closed = await closeDraftLockTx(client, opts.actor, 'product', draftId, 'published')
+    siblings = (await client.query(`SELECT id, author_admin_id FROM product_drafts WHERE product_id = $1`, [productId])).rows
   }).catch(err => {
-    if (isDraftLockError(err)) throw err
+    if (isDraftLockError(err) || err instanceof StaleMergeError) throw err
     const friendly = friendlyProductDbError(err)
     if (friendly) throw new ProductValidationError(friendly, { cause: err })
     throw err
@@ -1669,12 +1728,14 @@ export async function publishProductDraft(
     await query(
       `UPDATE editor_sessions SET closed_at = now(), closed_reason = 'save'
         WHERE resource_type = 'product' AND resource_id = $1 AND closed_at IS NULL`,
-      [productId]
+      [draftId]
     )
   } catch (e) {
     console.error('[product-draft] closing edit sessions failed for', productId, e)
   }
-  await announceDraftClosed(opts.actor, 'product', productId, closed, 'published')
+  await announceDraftClosed(opts.actor, 'product', draftId, closed, 'published')
+  await releaseFileObjects(removedFiles)
+  if (revision != null) await notifyDraftSiblings('product', opts.actor, productId, draft.title ?? null, siblings)
   const keptForHistory = purged.flatMap(p => p.deactivated)
   if (keptForHistory.length > 0)
     console.warn('[product-draft] toggled-off rows kept (deactivated) for history on', productId, keptForHistory)

@@ -30,11 +30,14 @@ const FILTER_THRESHOLD = 12
 
 export default function OfferProductPicker({
   offerId,
+  draftId,
   canWrite,
   categoryOptions,
   brandOptions,
 }: {
   offerId: string
+  /** Read and write this draft's product list; without one, the live membership. */
+  draftId?: string | null
   canWrite: boolean
   categoryOptions: AssignOption[]
   brandOptions: AssignOption[]
@@ -50,11 +53,12 @@ export default function OfferProductPicker({
   const [filter, setFilter] = useState('')
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const busy = loading || saving || bulkBusy
+  const productsUrl = `/api/admin/product-offers/${offerId}/products${draftId ? `?draft=${draftId}` : ''}`
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/product-offers/${offerId}/products`, { credentials: 'include' })
+      const res = await fetch(productsUrl, { credentials: 'include' })
       if (!res.ok) throw new Error('failed')
       const d = await res.json()
       setMembers(d.products || [])
@@ -63,7 +67,7 @@ export default function OfferProductPicker({
     } finally {
       setLoading(false)
     }
-  }, [offerId, showToast])
+  }, [productsUrl, showToast])
 
   useEffect(() => {
     load()
@@ -98,7 +102,7 @@ export default function OfferProductPicker({
   async function persist(next: PickedProduct[]) {
     setSaving(true)
     try {
-      const res = await fetch(`/api/admin/product-offers/${offerId}/products`, {
+      const res = await fetch(productsUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -144,7 +148,7 @@ export default function OfferProductPicker({
     }
     setBulkBusy(true)
     try {
-      const res = await fetch(`/api/admin/product-offers/${offerId}/products`, {
+      const res = await fetch(productsUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

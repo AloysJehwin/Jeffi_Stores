@@ -4,17 +4,10 @@ import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
-import { findOpenSession } from '@/lib/admin/editor-sessions'
-import { ensureOfferDraftTx } from '@/lib/admin/offer-drafts'
-import {
-  actorOf,
-  closeIfLocked,
-  discardGuard,
-  draftLockResponse,
-  epochFrom,
-  lockedByOther,
-  withDraftWrite,
-} from '@/lib/admin/draft-locks'
+import { draftsOf, getDraftRow } from '@/lib/admin/draft-branches'
+import { offerDrafts, offerFieldsOf } from '@/lib/admin/offer-drafts'
+import { recordDirectRevision } from '@/lib/admin/entity-revisions'
+import { actorOf, closeIfLocked, discardGuard, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,9 +79,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
   const actor = actorOf(admin)
-  // Media and legacy writes hit the live row: not while someone else holds the draft.
-  const denied = await lockedByOther(actor, 'offer', id)
-  if (denied) return denied
+  // ?draft=<id>: copy fields go to that draft. Media always goes to the live row.
+  const draftId = request.nextUrl.searchParams.get('draft')
+  if (draftId && touched.length > 0) {
+    const draft = await getDraftRow(offerDrafts, draftId)
+    if (!draft || draft.offer_id !== id) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+  }
 
   if (media.length > 0) {
     const sets = media.map(([, col], i) => `${col} = $${i + 1}`)
@@ -101,9 +97,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ offer: await queryOne(`SELECT * FROM product_offers WHERE id = $1`, [id]) })
   }
 
-  const session = await findOpenSession(admin.adminId, 'offer', id)
-
-  if (session) {
+  if (draftId) {
     // Draft path — merge the patch into offer_drafts.fields.
     const patchJson: Record<string, unknown> = {}
     for (const [key, col] of touched) patchJson[col] = d[key] ?? null
@@ -111,16 +105,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const row = await withDraftWrite(
         actor,
         'offer',
-        id,
-        async db => {
-          await ensureOfferDraftTx(db, id)
-          await db.query(
-            `UPDATE offer_drafts SET fields = fields || $1::jsonb, updated_at = now()
-             WHERE offer_id = $2`,
-            [JSON.stringify(patchJson), id]
-          )
-          return (await db.query(`SELECT * FROM offer_drafts WHERE offer_id = $1`, [id])).rows[0] ?? null
-        },
+        draftId,
+        async db =>
+          (
+            await db.query(
+              `UPDATE offer_drafts SET fields = fields || $1::jsonb, updated_at = now()
+               WHERE id = $2 RETURNING *`,
+              [JSON.stringify(patchJson), draftId]
+            )
+          ).rows[0] ?? null,
         { epoch: epochFrom(request), ensure: true }
       )
       return NextResponse.json({ draft: row })
@@ -140,7 +133,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     vals.push(d[key] ?? null)
   }
   vals.push(id)
-  await query(`UPDATE product_offers SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i}`, vals)
+  // Before and after in one statement, so drafts open on this offer see who changed what.
+  const res = await query<{ before: Record<string, unknown>; after: Record<string, unknown> }>(
+    `WITH old AS (SELECT * FROM product_offers WHERE id = $${i} FOR UPDATE)
+     UPDATE product_offers po SET ${sets.join(', ')}, updated_at = NOW() FROM old WHERE po.id = old.id
+     RETURNING to_jsonb(old) AS before, to_jsonb(po) AS after`,
+    vals
+  )
+  const changed = res.rows[0]
+  if (changed)
+    await recordDirectRevision({ type: 'offer', id, before: offerFieldsOf(changed.before), after: offerFieldsOf(changed.after), actorAdminId: admin.adminId })
   const offer = await queryOne(`SELECT * FROM product_offers WHERE id = $1`, [id])
   if (!offer) return NextResponse.json({ error: 'Offer not found' }, { status: 404 })
   return NextResponse.json({ offer })
@@ -154,12 +156,16 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const actor = actorOf(admin)
-  const denied = await discardGuard(actor, 'offer', id)
-  if (denied) return denied
+  // Deleting the offer drops its drafts: not while someone else holds one (owners may).
+  const drafts = await draftsOf(offerDrafts, id)
+  for (const dr of drafts) {
+    const denied = await discardGuard(actor, 'offer', dr.id)
+    if (denied) return denied
+  }
   await withTransaction(async client => {
     await client.query(`DELETE FROM product_offer_items WHERE offer_id = $1`, [id])
     await client.query(`DELETE FROM product_offers WHERE id = $1`, [id])
   })
-  await closeIfLocked(actor, 'offer', id)
+  for (const dr of drafts) await closeIfLocked(actor, 'offer', dr.id)
   return NextResponse.json({ success: true })
 }
