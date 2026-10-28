@@ -613,9 +613,9 @@ export default function ReviewFormForm({
       </LockedFieldset>
 
       {/* Shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
-      <div className="lg:col-span-2">
+      <div className="lg:col-span-2 sticky bottom-0 z-10">
         <FormFooter
-          sticky
+          sticky={false}
           lock={lock}
           autosave={isDraft && autoSaveStatus !== 'idle' ? <AutosaveStatusPill status={autoSaveStatus} /> : null}
           draftBadge={isDraft || isCreateDraft ? <Badge tone="amber">Draft pending</Badge> : null}
