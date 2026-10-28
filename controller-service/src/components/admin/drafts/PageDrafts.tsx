@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { ChevronDown, FileClock } from 'lucide-react'
+import { FileClock } from 'lucide-react'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -10,8 +10,7 @@ import { useDraftCounts, useDraftsList, type DraftListItem, type DraftsScope } f
 import { timeAgo } from '@/lib/client/draft-lock-client'
 import { DataTable, DraftLockBadge, HandoverDialog, TakeoverDialog, Tabs, useActionToast, useListSort, type DataCol } from '@/components/admin/kit'
 
-// A list page's own drafts (one draft type), with claim / hand over / take over.
-// Hidden while the type has none; collapsed until opened.
+// A list page's Drafts tab (one draft type), with claim / hand over / take over / request.
 
 const SORT_NS = 'drafts'
 
@@ -99,33 +98,39 @@ function RowLockActions({ r, onChanged }: { r: DraftListItem; onChanged: () => v
   )
 }
 
-/** Drafts of `type` on that type's list page. */
-export default function PageDrafts({ type }: { type: string }) {
+/** Tab label for a list page's Drafts tab, with a live count. */
+export function DraftsTabLabel({ type, label = 'Drafts' }: { type: string; label?: string }) {
+  const { counts } = useDraftCounts(type)
+  const n = counts ? counts.all + counts.unclaimed : 0
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {label}
+      {n > 0 && <span className="rounded-full bg-accent-500/15 px-1.5 text-[11px] font-semibold text-accent-500">{n}</span>}
+    </span>
+  )
+}
+
+/** Body of a list page's Drafts tab: `children` (publish / discard rows) above the lock table. */
+export default function PageDrafts({ type, children }: { type: string; children?: ReactNode }) {
   const { counts, refresh: refreshCounts } = useDraftCounts(type)
-  const [open, setOpen] = useState(false)
   const [scope, setScope] = useState<DraftsScope>('all')
-  if (!counts || counts.all + counts.unclaimed === 0) return null
   const tabs = [
-    { id: 'mine' as const, label: `Mine (${counts.mine})` },
-    { id: 'all' as const, label: `All locked (${counts.all})` },
-    { id: 'unclaimed' as const, label: `Unclaimed (${counts.unclaimed})` },
+    { id: 'all' as const, label: `In progress (${counts?.all ?? 0})` },
+    { id: 'mine' as const, label: `Mine (${counts?.mine ?? 0})` },
+    { id: 'unclaimed' as const, label: `Unclaimed (${counts?.unclaimed ?? 0})` },
   ]
   return (
-    <section className="mb-4 rounded-xl border border-border-default bg-surface-elevated">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="flex w-full items-center gap-2 px-4 py-3 text-left">
-        <FileClock className="h-4 w-4 text-accent-500" />
-        <span className="text-sm font-semibold text-foreground">Drafts in progress</span>
-        <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-xs text-foreground-secondary">{counts.all + counts.unclaimed}</span>
-        {counts.mine > 0 && <span className="text-xs text-accent-500">{counts.mine} yours</span>}
-        <ChevronDown className={`ml-auto h-4 w-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <div className="space-y-3 border-t border-border-default px-4 py-3">
-          <Tabs tabs={tabs} value={scope} onChange={setScope} />
-          <DraftsTable type={type} scope={scope} onChanged={() => void refreshCounts()} />
+    <div className="space-y-4">
+      {children}
+      <section className="space-y-3 rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
+        <div className="flex items-center gap-2">
+          <FileClock className="h-4 w-4 text-accent-500" />
+          <span className="text-sm font-semibold text-foreground">Who is editing</span>
         </div>
-      )}
-    </section>
+        <Tabs tabs={tabs} value={scope} onChange={setScope} />
+        <DraftsTable type={type} scope={scope} onChanged={() => void refreshCounts()} />
+      </section>
+    </div>
   )
 }
 

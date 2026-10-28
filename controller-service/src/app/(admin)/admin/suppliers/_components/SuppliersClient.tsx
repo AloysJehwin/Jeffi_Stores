@@ -10,20 +10,21 @@ import { tabHref } from '@/lib/admin/filter-url'
 import { SUPPLIER_FIELDS, SUPPLIER_LIST_PRESET } from '@/lib/filters/fields/suppliers'
 import SuppliersOverview from './SuppliersOverview'
 import SuppliersTab from './SuppliersTab'
-import PageDrafts from '@/components/admin/drafts/PageDrafts'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
-type Tab = 'overview' | 'suppliers'
+type Tab = 'overview' | 'suppliers' | 'drafts'
 
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: Tab; label: React.ReactNode }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'suppliers', label: 'Suppliers' },
+  { id: 'drafts', label: <DraftsTabLabel type="supplier" /> },
 ]
 
 export default function SuppliersClient() {
   const sp = useSearchParams()
   const router = useRouter()
   const listQuery = canonicalQuery(sp, SUPPLIER_FIELDS, { omit: ['from', 'to'] })
-  const tab: Tab = sp.get('tab') === 'suppliers' || (!sp.get('tab') && listQuery) ? 'suppliers' : 'overview'
+  const tab: Tab = sp.get('tab') === 'drafts' ? 'drafts' : sp.get('tab') === 'suppliers' || (!sp.get('tab') && listQuery) ? 'suppliers' : 'overview'
 
   // Tabs keep the filters; the list opens on active suppliers unless filters came along.
   const go = (t: Tab) => {
@@ -44,14 +45,7 @@ export default function SuppliersClient() {
             </RequireWrite>
           }
         />
-        {tab === 'overview' ? (
-          <SuppliersOverview />
-        ) : (
-          <>
-            <PageDrafts type="supplier" />
-            <SuppliersTab />
-          </>
-        )}
+        {tab === 'overview' ? <SuppliersOverview /> : tab === 'drafts' ? <PageDrafts type="supplier" /> : <SuppliersTab />}
       </div>
     </TabActionsHost>
   )

@@ -18,7 +18,7 @@ import DraftRowActions from '@/components/admin/DraftRowActions'
 import { draftLockChips } from '@/lib/admin/draft-locks'
 import OverviewTabs from './_components/OverviewTabs'
 import CouponsOverview from './_components/CouponsOverview'
-import PageDrafts from '@/components/admin/drafts/PageDrafts'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -29,7 +29,7 @@ type SP = { [key: string]: string | undefined }
 
 export default async function CouponsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams
-  const tab = isListUrl(sp, COUPON_FIELDS, { aliases: COUPON_ALIASES }) ? 'list' : 'overview'
+  const tab = sp.tab === 'drafts' ? 'drafts' : isListUrl(sp, COUPON_FIELDS, { aliases: COUPON_ALIASES }) ? 'list' : 'overview'
   const host = await getHost()
   const href = (t: string) => ap(tabHref('/admin/coupons', t, sp, COUPON_FIELDS, { aliases: COUPON_ALIASES }), host)
   const q = normalizeQuery(COUPONS_ENTITY, sp)
@@ -42,7 +42,8 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
         active={tab}
         sp={sp}
         listLabel="Coupons"
-        hrefs={{ overview: href('overview'), list: href('list') }}
+        hrefs={{ overview: href('overview'), list: href('list'), drafts: href('drafts') }}
+        draftsLabel={<DraftsTabLabel type="coupon" />}
         actions={
           <Suspense fallback={null}>
             <AddCouponButton />
@@ -54,9 +55,14 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
         <Suspense fallback={null}>
           <CouponsOverview />
         </Suspense>
+      ) : tab === 'drafts' ? (
+        <PageDrafts type="coupon">
+          <Suspense fallback={null}>
+            <CouponPendingDrafts />
+          </Suspense>
+        </PageDrafts>
       ) : (
         <>
-          <PageDrafts type="coupon" />
           <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
             <CouponsStats q={q} />
           </Suspense>
@@ -100,32 +106,7 @@ async function AddCouponButton() {
 
 /** KPIs over every coupon the filters match (not just the page shown). */
 async function CouponsStats({ q }: { q: FilterQuery }) {
-  const host = await getHost()
-  const h = await headers()
-  const role = h.get('x-user-role') || ''
-  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
-  const canWrite = hasScope(role, scopes, 'coupons:write')
-  const [summary, editDrafts, createDrafts] = await Promise.all([
-    getCouponsSummary(q),
-    // Edit-drafts: unpublished CHANGES staged against a live coupon (coupon_drafts).
-    queryMany<{ coupon_id: string; code: string; updated_at: string }>(
-      `SELECT cd.coupon_id, c.code, cd.updated_at
-       FROM coupon_drafts cd
-       JOIN coupons c ON c.id = cd.coupon_id AND c.is_draft = false
-       ORDER BY cd.updated_at DESC
-       LIMIT 20`
-    ),
-    // Create-drafts: brand-new coupons never published to the live list (is_draft = true).
-    // A new coupon edited before its first publish also has a coupon_drafts row — list it once.
-    queryMany<{ id: string; code: string; created_at: string; staged: boolean }>(
-      `SELECT c.id, COALESCE(cd.fields->>'code', c.code) AS code, c.created_at, cd.coupon_id IS NOT NULL AS staged
-       FROM coupons c LEFT JOIN coupon_drafts cd ON cd.coupon_id = c.id
-       WHERE c.is_draft = true ORDER BY c.created_at DESC LIMIT 20`
-    ),
-  ])
-  const pendingDrafts = editDrafts
-  const pendingDraftsCount = editDrafts.length + createDrafts.length
-  const locks = await draftLockChips('coupon', [...createDrafts.map(d => d.id), ...editDrafts.map(d => d.coupon_id)])
+  const summary = await getCouponsSummary(q)
 
   const { total: totalCoupons, active: activeCoupons, expired: expiredCoupons, campaign: campaignCoupons } = summary
 
@@ -138,8 +119,43 @@ async function CouponsStats({ q }: { q: FilterQuery }) {
         <Kpi label="From campaigns" value={campaignCoupons.toLocaleString('en-IN')} />
       </KpiGrid>
 
-      {pendingDraftsCount > 0 && (
-        <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+    </div>
+  )
+}
+
+// Keys the table Suspense on the query string so filter/pagination changes re-trigger the shimmer
+// while the stats + filters above stay mounted.
+// Publish / discard rows for the Drafts tab.
+async function CouponPendingDrafts() {
+  const host = await getHost()
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'coupons:write')
+  const [editDrafts, createDrafts] = await Promise.all([
+    // Edit-drafts: unpublished CHANGES staged against a live coupon (coupon_drafts).
+    queryMany<{ coupon_id: string; code: string; updated_at: string }>(
+      `SELECT cd.coupon_id, c.code, cd.updated_at
+       FROM coupon_drafts cd
+       JOIN coupons c ON c.id = cd.coupon_id AND c.is_draft = false
+       ORDER BY cd.updated_at DESC
+       LIMIT 200`
+    ),
+    // Create-drafts: brand-new coupons never published to the live list (is_draft = true).
+    // A new coupon edited before its first publish also has a coupon_drafts row — list it once.
+    queryMany<{ id: string; code: string; created_at: string; staged: boolean }>(
+      `SELECT c.id, COALESCE(cd.fields->>'code', c.code) AS code, c.created_at, cd.coupon_id IS NOT NULL AS staged
+       FROM coupons c LEFT JOIN coupon_drafts cd ON cd.coupon_id = c.id
+       WHERE c.is_draft = true ORDER BY c.created_at DESC LIMIT 200`
+    ),
+  ])
+  const pendingDrafts = editDrafts
+  const pendingDraftsCount = editDrafts.length + createDrafts.length
+  if (!pendingDraftsCount) return null
+  const locks = await draftLockChips('coupon', [...createDrafts.map(d => d.id), ...editDrafts.map(d => d.coupon_id)])
+
+  return (
+        <details open className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
           <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
             <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
               <svg
@@ -150,7 +166,7 @@ async function CouponsStats({ q }: { q: FilterQuery }) {
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              Pending Drafts ({pendingDraftsCount})
+              Ready to publish ({pendingDraftsCount})
             </span>
             <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
           </summary>
@@ -211,13 +227,9 @@ async function CouponsStats({ q }: { q: FilterQuery }) {
             </div>
           </div>
         </details>
-      )}
-    </div>
   )
 }
 
-// Keys the table Suspense on the query string so filter/pagination changes re-trigger the shimmer
-// while the stats + filters above stay mounted.
 function CouponsListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (

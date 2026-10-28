@@ -2,16 +2,18 @@
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Tabs } from '@/components/admin/channels/ui'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import OffersClient from './OffersClient'
 import OffersListClient from './OffersListClient'
 import OffersOverview from './OffersOverview'
 
-type Tab = 'overview' | 'bank' | 'offers'
+type Tab = 'overview' | 'bank' | 'offers' | 'drafts'
 
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: Tab; label: React.ReactNode }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'bank', label: 'Bank Offers' },
   { id: 'offers', label: 'Offers' },
+  { id: 'drafts', label: <DraftsTabLabel type="offer" /> },
 ]
 
 export default function OffersTabs({ canWrite }: { canWrite: boolean }) {
@@ -20,7 +22,7 @@ export default function OffersTabs({ canWrite }: { canWrite: boolean }) {
   const pathname = usePathname()
 
   const raw = searchParams.get('tab')
-  const tab: Tab = raw === 'offers' || raw === 'bank' ? raw : 'overview'
+  const tab: Tab = raw === 'offers' || raw === 'bank' || raw === 'drafts' ? raw : 'overview'
 
   function selectTab(next: Tab) {
     const params = new URLSearchParams(searchParams.toString())
@@ -40,6 +42,8 @@ export default function OffersTabs({ canWrite }: { canWrite: boolean }) {
 
       {tab === 'overview' ? (
         <OffersOverview />
+      ) : tab === 'drafts' ? (
+        <PageDrafts type="offer" />
       ) : tab === 'bank' ? (
         <OffersClient canWrite={canWrite} />
       ) : (
