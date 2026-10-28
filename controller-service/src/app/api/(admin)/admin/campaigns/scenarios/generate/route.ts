@@ -28,8 +28,6 @@ CRITICAL RULES — violating any returns a useless response:
 4. "description" must be one terse sentence stating WHO is targeted and WHEN. No marketing fluff.
 5. Both queries must be single SELECT statements. No semicolons except trailing. No DML/DDL. No system functions.
 6. The audience "sql" MUST select only the user identifier (u.id, user_id, or equivalent). No other columns. No PII.
-5. Both queries must be single SELECT statements. No semicolons except trailing. No DML/DDL. No system functions.
-6. The audience "sql" MUST select only the user identifier (u.id, user_id, or equivalent). No other columns. No PII.
 7. The "product_sql" MUST select EXACTLY these columns and nothing else, in this order, with these aliases:
      p.id::text AS product_id,
      p.name AS name,
