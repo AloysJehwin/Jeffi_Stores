@@ -37,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:read')) {
+  if (!hasScope(admin.role, admin.scopes, 'campaigns:read')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -111,7 +111,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ki
   const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
+  if (!hasScope(admin.role, admin.scopes, 'campaigns:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -155,7 +155,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
   const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
+  if (!hasScope(admin.role, admin.scopes, 'campaigns:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
