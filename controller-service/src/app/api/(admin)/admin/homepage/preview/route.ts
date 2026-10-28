@@ -46,7 +46,7 @@ import {
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
 import { getFeatureFlags, getStorefrontContent } from '@/lib/catalog/site-controls'
-import { getEditableHomepage } from '@/lib/catalog/homepage-draft'
+import { getEditableHomepage, homepageDraftIdFrom } from '@/lib/catalog/homepage-draft'
 import { listActiveOffers, listOffersByIds } from '@/lib/catalog/product-offers'
 
 export const dynamic = 'force-dynamic'
@@ -191,8 +191,8 @@ async function topBrands(): Promise<PreviewItem[]> {
 }
 
 // The slides the surface would show: its own, or the website's when it has none (as the live model does).
-async function heroItems(surface: HomepageSurface, audience: HomepageAudience): Promise<PreviewItem[]> {
-  const { heroSlides } = await getEditableHomepage()
+async function heroItems(surface: HomepageSurface, audience: HomepageAudience, draftId: string | null): Promise<PreviewItem[]> {
+  const { heroSlides } = await getEditableHomepage(draftId)
   return forSurface(heroSlides.filter(s => rowAudience(s) === audience), surface)
     .filter(s => s.is_active)
     .slice(0, PREVIEW_LIMIT)
@@ -316,7 +316,7 @@ function tileItems(config: Record<string, unknown>, titleKey: string, fallback: 
     }))
 }
 
-type PreviewContext = { surface: HomepageSurface; audience: HomepageAudience }
+type PreviewContext = { surface: HomepageSurface; audience: HomepageAudience; draftId: string | null }
 const RESOLVERS: Partial<
   Record<SectionType, (config: Record<string, unknown>, ctx: PreviewContext) => Promise<PreviewResult>>
 > = {
@@ -326,7 +326,7 @@ const RESOLVERS: Partial<
   category_grid: async () => ({ kind: 'categories', items: await mainCategories() }),
   category_showcase: async () => ({ kind: 'categories', items: await showcaseCategories() }),
   brand_carousel: async () => ({ kind: 'brands', items: await topBrands() }),
-  hero: async (_c, ctx) => ({ kind: 'hero', items: await heroItems(ctx.surface, ctx.audience) }),
+  hero: async (_c, ctx) => ({ kind: 'hero', items: await heroItems(ctx.surface, ctx.audience, ctx.draftId) }),
   offer_slider: async c => ({ kind: 'offers', items: await offerItems(c) }),
   about: async c => ({ kind: 'about', items: await aboutItems(c) }),
   countdown_deal: countdownDeal,
@@ -408,6 +408,7 @@ export async function GET(request: NextRequest) {
     const { kind, items, note, slides } = await resolver(config, {
       surface: rowSurface({ surface: parsed.data.surface }),
       audience: rowAudience({ audience: parsed.data.audience }),
+      draftId: homepageDraftIdFrom(request),
     })
     return NextResponse.json({ kind, items, ...(note ? { note } : {}), ...(slides ? { slides } : {}) })
   } catch (err) {

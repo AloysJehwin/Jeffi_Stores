@@ -11,13 +11,12 @@ import FilterSidebar from '@/components/visitor/FilterSidebar'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
 import { buildProductFilterClauses, getFilterFacets } from '@/lib/catalog/product-filters'
-import { getOfferBySlug, listActiveOffers, listFilterOffers } from '@/lib/catalog/product-offers'
+import { getOfferBySlug, listFilterOffers } from '@/lib/catalog/product-offers'
 import ProductCard from '@/components/visitor/ProductCard'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { round2 } from '@/lib/catalog/gst'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
-import ListingPromoBanner, { pickPromoOffer } from '@/components/visitor/listing/ListingPromoBanner'
 import { bp } from '@/lib/shared/business-path'
 
 const PAGE_SIZE = 60
@@ -333,16 +332,10 @@ export default async function BusinessProductsPage({
   }
   const facets = await getFilterFacets(facetBaseConditions, facetBaseParams)
 
-  const [liveOffers, activeOffer, activeOffers] = await Promise.all([
+  const [liveOffers, activeOffer] = await Promise.all([
     listFilterOffers(),
     resolvedSearchParams.offer ? getOfferBySlug(String(resolvedSearchParams.offer)) : Promise.resolve(null),
-    listActiveOffers(),
   ])
-  const promoOffer = pickPromoOffer(activeOffers, {
-    page,
-    activeSlug: resolvedSearchParams.offer ?? null,
-    eligibleSlugs: new Set(liveOffers.map(o => o.slug)),
-  })
   const filterOffers =
     activeOffer && !liveOffers.some(o => o.slug === activeOffer.slug)
       ? [...liveOffers, { slug: activeOffer.slug, title: activeOffer.title }]
@@ -378,16 +371,6 @@ export default async function BusinessProductsPage({
                     key: String(product.id),
                     node: renderProductItem(product, gstEnabled),
                   }))
-                  if (page === 1 && promoOffer && items.length > 6) {
-                    items.splice(6, 0, {
-                      key: 'promo-slot',
-                      node: (
-                        <div className="col-span-full">
-                          <ListingPromoBanner offer={promoOffer} />
-                        </div>
-                      ),
-                    })
-                  }
                   return (
                     <ProductGrid
                       products={products as any[]}
@@ -407,7 +390,6 @@ export default async function BusinessProductsPage({
                           basePath={basePath}
                         />
                       }
-                      promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined}
                       pagedItems={items}
                       page={page}
                       basePath={basePath}

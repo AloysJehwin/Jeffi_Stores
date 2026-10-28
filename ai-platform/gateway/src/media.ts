@@ -9,8 +9,8 @@ import type {
   VideoAspect, VideoGenerateRequest, VideoJobResponse, VideoProviderName, VideoStartResponse,
 } from '../../sdk/types'
 import type { FileStore } from './files'
-import { costFor } from './pricing'
-import { ProviderError, type ImageGenInput, type MediaProvider, type VideoGenInput } from './providers/types'
+import { costFor, round } from './pricing'
+import { ProviderError, type BackgroundRemover, type GeneratedImage, type ImageGenInput, type MediaProvider, type VideoGenInput } from './providers/types'
 import { createVideoJobStore, resultFrom, toResponse, type VideoJobStore } from './video-jobs'
 
 export const IMAGE_PROVIDER_ORDER: ImageProviderName[] = ['razer', 'google', 'replicate']
@@ -23,11 +23,24 @@ export class UpstreamError extends Error {
 }
 export class NotConfiguredError extends Error { readonly status = 503 }
 
+export const TRANSPARENT_NEEDS_REPLICATE = 'Transparent background needs the Replicate provider'
+// Isolating the subject on a flat contrasting backdrop gives the cutout model clean edges.
+const CUTOUT_HINT = 'Single subject isolated and fully in frame, on a plain uniform solid-colour studio background that contrasts strongly with the subject, no scenery, no props, no cast shadows on the background, soft even lighting, crisp clean edges.'
+
+export function withCutoutHint(prompt: string): string {
+  return `${prompt.replace(/[\s.]+$/, '')}. ${CUTOUT_HINT}`
+}
+
 interface ParsedImageReq extends ImageGenInput { provider?: ImageProviderName; providers?: ImageProviderName[]; namespace: string; cacheKey: string }
 interface ParsedVideoReq extends VideoGenInput { provider?: VideoProviderName; providers?: VideoProviderName[]; namespace: string }
 
-export const TEXT_PROVIDER_ORDER: TextProviderName[] = ['razer']
-const TEXT_PROVIDER_SET = new Set<TextProviderName>(TEXT_PROVIDER_ORDER)
+const TEXT_PROVIDER_SET = new Set<TextProviderName>(['anthropic', 'razer'])
+const ANTHROPIC_READY = !!process.env.ANTHROPIC_API_KEY || !!(process.env.ANTHROPIC_ORGANIZATION_ID && process.env.ANTHROPIC_IDENTITY_TOKEN_FILE)
+/** AI_TEXT_PROVIDERS, else anthropic then razer when Claude auth is configured, else razer only. */
+export function defaultTextOrder(raw = process.env.AI_TEXT_PROVIDERS, claude = ANTHROPIC_READY): TextProviderName[] {
+  return parseProviders(raw, claude ? ['anthropic', 'razer'] : ['razer'], TEXT_PROVIDER_SET)
+}
+export const TEXT_PROVIDER_ORDER: TextProviderName[] = defaultTextOrder()
 const IMAGE_PROVIDER_SET = new Set<ImageProviderName>(['razer', 'google', 'replicate'])
 const VIDEO_PROVIDER_SET = new Set<VideoProviderName>(['google', 'replicate'])
 const QUALITIES = new Set<ImageQuality>(['draft', 'standard', 'premium'])
@@ -71,6 +84,8 @@ export const parseVideoOrder = (raw: unknown) => parseRequestedProviders(raw, VI
 /** Text routing: forceProvider wins; else the requested order, else the gateway default. */
 export function textRoute(req: { forceProvider?: string; providers?: unknown }): TextProviderName[] {
   const order = parseTextOrder(req.providers)
+  if (req.forceProvider === 'ollama') return ['razer']
+  if (req.forceProvider === 'anthropic') return ['anthropic', 'razer']
   return req.forceProvider ? TEXT_PROVIDER_ORDER : order ?? TEXT_PROVIDER_ORDER
 }
 
@@ -110,8 +125,9 @@ export function parseImageRequest(raw: unknown): ParsedImageReq {
   const negativePrompt = typeof r.negativePrompt === 'string' && r.negativePrompt ? r.negativePrompt : undefined
   const referenceImageUrl = typeof r.referenceImageUrl === 'string' && r.referenceImageUrl ? r.referenceImageUrl : undefined
   const seed = typeof r.seed === 'number' && Number.isFinite(r.seed) ? Math.floor(r.seed) : undefined
-  const cacheKey = imageCacheKey({ prompt, negativePrompt, width, height, n, quality, provider, providers, referenceImageUrl, namespace })
-  return { prompt, negativePrompt, width, height, n, quality, provider, providers, referenceImageUrl, seed, namespace, cacheKey }
+  const transparent = r.transparent === true || undefined
+  const cacheKey = imageCacheKey({ prompt, negativePrompt, width, height, n, quality, provider, providers, referenceImageUrl, namespace, transparent })
+  return { prompt, negativePrompt, width, height, n, quality, provider, providers, referenceImageUrl, seed, transparent, namespace, cacheKey }
 }
 
 export function parseVideoRequest(raw: unknown): ParsedVideoReq {
@@ -131,7 +147,7 @@ export function parseVideoRequest(raw: unknown): ParsedVideoReq {
 export function imageCacheKey(req: {
   prompt: string; negativePrompt?: string; width: number; height: number
   n: number; quality: ImageQuality; provider?: ImageProviderName; providers?: ImageProviderName[]
-  referenceImageUrl?: string; namespace: string
+  referenceImageUrl?: string; namespace: string; transparent?: boolean
 }): string {
   const shape = {
     namespace: req.namespace,
@@ -142,6 +158,7 @@ export function imageCacheKey(req: {
     // A restricted order must not be served an image another provider made; unset keeps old keys.
     ...(req.providers ? { providers: req.providers.join(',') } : {}),
     ref: req.referenceImageUrl || '',
+    ...(req.transparent ? { transparent: true } : {}),
   }
   return 'ai:image:kv:' + createHash('sha256').update(JSON.stringify(shape)).digest('hex')
 }
@@ -163,6 +180,8 @@ export interface ImageRouterDeps {
   redis?: Redis | null
   fileBaseUrl?: string
   ttlSec?: number
+  /** Cutout step for `transparent` requests (Replicate). */
+  cutout?: BackgroundRemover
 }
 
 export async function handleImageGenerate(req: ImageGenerateRequest, deps: ImageRouterDeps): Promise<ImageGenerateResponse> {
@@ -170,6 +189,7 @@ export async function handleImageGenerate(req: ImageGenerateRequest, deps: Image
   const start = Date.now()
   const route = imageRoute(req, deps.order).filter(name => deps.providers[name]?.configured())
   if (!route.length) throw new NotConfiguredError('no image provider configured')
+  if (p.transparent && !deps.cutout?.configured()) throw new ValidationError(TRANSPARENT_NEEDS_REPLICATE)
 
   const cacheable = typeof p.seed !== 'number'
   if (cacheable && deps.redis) {
@@ -178,28 +198,47 @@ export async function handleImageGenerate(req: ImageGenerateRequest, deps: Image
   }
 
   const tried: { provider: string; error: string }[] = []
+  const input = p.transparent ? { ...p, prompt: withCutoutHint(p.prompt) } : p
   for (const name of route) {
     const provider = deps.providers[name]
     try {
       if (!provider.generateImage) throw new ProviderError(name, 'no image support')
-      const out = await provider.generateImage(p)
-      const refs = await Promise.all(out.images.map(img => storeImage(deps, img.bytes, img.mime, img.width, img.height)))
-      const costInr = costFor(name, out.model, { image: refs.length })
+      const out = await provider.generateImage(input)
+      const { images, removal } = await cutoutImages(out.images, p.transparent ? deps.cutout : undefined)
+      const refs = await Promise.all(images.map(img => storeImage(deps, img.bytes, img.mime, img.width, img.height)))
+      const costInr = round(costFor(name, out.model, { image: refs.length }) + (removal?.costInr ?? 0))
       const response: ImageGenerateResponse = {
         images: refs,
         provider: name,
         model: out.model,
         usage: { units: refs.length, unitType: 'image', costInr },
+        ...(removal ? { backgroundRemoval: removal } : {}),
         latencyMs: Date.now() - start,
         cache: null,
       }
       if (cacheable && deps.redis) await writeImageCache(deps.redis, p.cacheKey, response, deps.ttlSec ?? 3600)
       return response
     } catch (err) {
+      // A failed cutout must not re-generate on the next provider.
+      if (err instanceof CutoutError) throw new UpstreamError('background removal failed', [{ provider: 'replicate', error: err.message }])
       tried.push({ provider: name, error: err instanceof Error ? err.message : String(err) })
     }
   }
   throw new UpstreamError('image generation failed on all providers', tried)
+}
+
+class CutoutError extends Error {}
+
+async function cutoutImages(images: GeneratedImage[], cutout: BackgroundRemover | undefined): Promise<{ images: GeneratedImage[]; removal?: ImageGenerateResponse['backgroundRemoval'] }> {
+  if (!cutout) return { images }
+  let out: GeneratedImage[]
+  try {
+    out = await Promise.all(images.map(img => cutout.removeBackground(img)))
+  } catch (err) {
+    throw new CutoutError(err instanceof Error ? err.message : String(err))
+  }
+  const model = cutout.cutoutModel()
+  return { images: out, removal: { provider: 'replicate', model, costInr: costFor('replicate', model, { image: out.length }) } }
 }
 
 async function storeImage(deps: ImageRouterDeps, bytes: Buffer, mime: string, width: number, height: number): Promise<GeneratedImageRef> {

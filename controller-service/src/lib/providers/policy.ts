@@ -8,7 +8,7 @@ import { getFeatureFlags } from '@/lib/catalog/site-controls'
 // Controls messaging choice, the gateway's own AI order).
 
 export const MESSAGING_PROVIDERS = ['twilio', 'aws'] as const
-export const AI_TEXT_PROVIDERS = ['razer'] as const
+export const AI_TEXT_PROVIDERS = ['anthropic', 'razer'] as const
 export const AI_IMAGE_PROVIDERS = ['razer', 'google', 'replicate'] as const
 export const AI_VIDEO_PROVIDERS = ['google', 'replicate'] as const
 export const AI_IMAGE_QUALITIES = ['draft', 'standard', 'premium'] as const
@@ -156,6 +156,37 @@ export async function getAiRouting(tenantId?: string | null): Promise<AiRouting>
   if (p.aiImageProviders.length) out.image = p.aiImageProviders
   if (p.aiVideoProviders.length) out.video = p.aiVideoProviders
   return out
+}
+
+export interface AnthropicIdentity {
+  workspaceId: string
+  serviceAccountId: string
+  federationRuleId: string
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const identityCache = new Map<string, { at: number; value: AnthropicIdentity | null }>()
+
+/** A store's Anthropic workload-identity ids (ai_provider_identities); null = none provisioned.
+ *  `tenantId` undefined = the tenant in the current request scope; null/platform = the flagship row. */
+export async function getAnthropicIdentity(tenantId?: string | null): Promise<AnthropicIdentity | null> {
+  const id = tenantId === undefined ? await resolveTenantId().catch(() => null) : tenantId
+  const tid = id && UUID_RE.test(id) ? id : PLATFORM_TENANT_ID
+  const hit = identityCache.get(tid)
+  if (hit && Date.now() - hit.at < TTL_MS * 10) return hit.value
+  const r = await controlPlanePool()
+    .query<{ workspace_id: string; service_account_id: string; federation_rule_id: string }>(
+      `SELECT workspace_id, service_account_id, federation_rule_id FROM ai_provider_identities
+        WHERE tenant_id = $1::uuid AND provider = 'anthropic'`,
+      [tid]
+    )
+    .catch(() => null)
+  const row = r?.rows[0]
+  const value = row
+    ? { workspaceId: row.workspace_id, serviceAccountId: row.service_account_id, federationRuleId: row.federation_rule_id }
+    : null
+  identityCache.set(tid, { at: Date.now(), value })
+  return value
 }
 
 export interface ProviderSettingRow {

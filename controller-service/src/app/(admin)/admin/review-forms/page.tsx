@@ -15,7 +15,7 @@ import { formsHostForHost } from '@/lib/tenant-registry'
 import { REVIEW_FORMS_ENTITY } from '@/lib/filters/entities/review-forms'
 import { REVIEW_FORM_FIELDS, REVIEW_FORM_SEARCH } from '@/lib/filters/fields/review-forms'
 import ReviewFormsOverview from './_components/ReviewFormsOverview'
-import PageDrafts from '@/components/admin/drafts/PageDrafts'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -54,7 +54,7 @@ async function getForms(q: FilterQuery, page = 1, sp: SP = {}) {
 export default async function ReviewFormsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const host = await getHost()
   const sp = await searchParams
-  const tab = isListUrl(sp, REVIEW_FORM_FIELDS) ? 'list' : 'overview'
+  const tab = sp.tab === 'drafts' ? 'drafts' : isListUrl(sp, REVIEW_FORM_FIELDS) ? 'list' : 'overview'
   const href = (t: string) => ap(tabHref('/admin/review-forms', t, sp, REVIEW_FORM_FIELDS), host)
 
   return (
@@ -66,6 +66,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
           tabs={[
             { id: 'overview', label: 'Overview', href: href('overview') },
             { id: 'list', label: 'Forms', href: href('list') },
+            { id: 'drafts', label: <DraftsTabLabel type="review_form" />, href: href('drafts') },
           ]}
           value={tab}
           actions={
@@ -84,9 +85,14 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
         <Suspense fallback={null}>
           <ReviewFormsOverview />
         </Suspense>
+      ) : tab === 'drafts' ? (
+        <PageDrafts type="review_form">
+          <Suspense fallback={null}>
+            <ReviewFormsDraftsBanner host={host} />
+          </Suspense>
+        </PageDrafts>
       ) : (
         <>
-          <PageDrafts type="review_form" />
           <ListFilters
             entity="review_forms"
             fields={REVIEW_FORM_FIELDS}
@@ -95,10 +101,6 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
             tab="list"
             exportable
           />
-
-          <Suspense fallback={null}>
-            <ReviewFormsDraftsBanner host={host} />
-          </Suspense>
 
           <ReviewFormsListSection resolvedSearchParams={sp} host={host} />
         </>
@@ -109,26 +111,28 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
 
 async function ReviewFormsDraftsBanner({ host }: { host: string }) {
   const [pendingDrafts, createDrafts] = await Promise.all([
-    // Edit-drafts: unpublished CHANGES staged against a live form (review_form_drafts).
-    queryMany<{ form_id: string; name: string; updated_at: string }>(
-      `SELECT rfd.form_id, rf.title AS name, rfd.updated_at
+    // Edit-drafts: one row per draft (several admins can each hold one of the same form).
+    queryMany<{ id: string; form_id: string; name: string; title: string | null; author: string | null; updated_at: string }>(
+      `SELECT rfd.id, rfd.form_id, rf.title AS name, rfd.title, rfd.updated_at,
+              COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS author
        FROM review_form_drafts rfd
        JOIN review_forms rf ON rf.id = rfd.form_id
+       LEFT JOIN admins ad ON ad.id = rfd.author_admin_id LEFT JOIN users u ON u.id = ad.user_id
        ORDER BY rfd.updated_at DESC
-       LIMIT 20`
+       LIMIT 200`
     ),
     // Create-drafts: brand-new forms never published to the live list (is_draft = true).
     queryMany<{ id: string; title: string; created_at: string }>(
-      `SELECT id, title, created_at FROM review_forms WHERE is_draft = true ORDER BY created_at DESC LIMIT 20`
+      `SELECT id, title, created_at FROM review_forms WHERE is_draft = true ORDER BY created_at DESC LIMIT 200`
     ),
   ])
 
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
   if (pendingDraftsCount === 0) return null
-  const locks = await draftLockChips('review_form', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.form_id)])
+  const locks = await draftLockChips('review_form', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.id)])
 
   return (
-    <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+    <details open className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
       <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 min-h-11 py-2 sm:h-11 sm:py-0">
         <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
           <svg
@@ -139,7 +143,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          Pending Drafts ({pendingDraftsCount})
+          Ready to publish ({pendingDraftsCount})
         </span>
         <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
       </summary>
@@ -166,15 +170,16 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
           ))}
           {pendingDrafts.map(d => (
             <DraftRowActions
-              key={d.form_id}
+              key={d.id}
               entityId={d.form_id}
-              name={d.name}
+              name={d.title ? `${d.name} · ${d.title}` : d.name}
+              subtitle={d.author ? `Draft by ${d.author}` : null}
               updatedAt={d.updated_at}
-              editHref={ap(`/admin/review-forms/${d.form_id}/edit`, host)}
-              publishPath={`/api/admin/review-forms/${d.form_id}/publish`}
-              discardPath={`/api/admin/review-forms/${d.form_id}/draft`}
+              editHref={ap(`/admin/review-forms/${d.form_id}/edit?draft=${d.id}`, host)}
+              publishPath={`/api/admin/review-forms/${d.form_id}/publish?draft=${d.id}`}
+              discardPath={`/api/admin/review-forms/${d.form_id}/draft?draft=${d.id}`}
               entityLabel="review form"
-              lock={locks[d.form_id]}
+              lock={locks[d.id]}
             />
           ))}
         </div>

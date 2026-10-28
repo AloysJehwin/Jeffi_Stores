@@ -211,7 +211,7 @@ export const GOOGLE_ADS_TOOLS: ToolDef[] = [
       const { items } = await loadProducts(await rangeForDays(clampDays(days, 14)))
       const oos = items.filter(i => i.flags.includes('out_of_stock'))
       return {
-        products: oos.map(i => ({ sku: i.sku, name: i.productName || i.title, spend: r2(i.cost), clicks: i.clicks, stock: i.stock, stockStatus: i.stockStatus })),
+        products: oos.map(i => ({ sku: i.sku, name: i.productName || i.title, spend: r2(i.cost), clicks: i.clicks, stockStatus: i.stockStatus, inventoryQty: i.stock })),
         totalSpend: r2(oos.reduce((s, i) => s + i.cost, 0)),
       }
     },

@@ -65,6 +65,26 @@ CREATE TABLE public.cash_sales (
 
 
 --
+-- Name: cash_sale_drafts; Type: TABLE; Schema: public; Owner: -
+-- Held (parked) cash-sale bills as typed, several per admin. Complete Sale turns one into a cash_sales row
+-- and deletes it; nothing here touches stock or invoice numbers. assignments: {batches, batch_labels, serials}.
+--
+
+CREATE TABLE public.cash_sale_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid NOT NULL,
+    label character varying(80),
+    payment_mode character varying(16) DEFAULT 'cash'::character varying NOT NULL,
+    notes text,
+    items jsonb DEFAULT '[]'::jsonb NOT NULL,
+    assignments jsonb DEFAULT '{}'::jsonb NOT NULL,
+    total_estimate numeric(12,2) DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: invoices; Type: TABLE; Schema: public; Owner: -
 --
 

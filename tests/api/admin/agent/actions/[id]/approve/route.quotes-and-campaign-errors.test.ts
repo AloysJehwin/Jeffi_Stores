@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({
+  hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
@@ -59,6 +62,7 @@ const mockGetClient = vi.mocked(getClient)
 
 describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   beforeEach(() => {
+    vi.unstubAllGlobals()
     vi.clearAllMocks()
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
@@ -108,14 +112,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const mockClient = {
-      query: vi
-        .fn()
-        .mockResolvedValueOnce({ rows: [{ max_seq: null }] }) // seq lookup
-        .mockResolvedValueOnce({ rows: [{ id: 'qt-1', quote_number: 'QT/25-26/JUN/1', view_token: 'tok-xyz' }] }) // INSERT quotation
-        .mockResolvedValueOnce({ rows: [] }), // INSERT item
-    }
-    mockWithTransaction.mockImplementation(async (fn: any) => fn(mockClient))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => ({ quotation: { id: 'qt-1', quote_number: 'QT/25-26/JUN/1', total_amount: '590.00', view_token: 'tok-xyz' } }) }))
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
@@ -124,7 +121,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     expect(body.result.quoteNumber).toBe('QT/25-26/JUN/1')
   })
 
-  it('returns 500 when create_quotation transaction throws', async () => {
+  it('returns 500 when the create_quotation request throws', async () => {
     mockQueryOne.mockResolvedValueOnce({
       id: ACTION_ID,
       admin_id: ADMIN.adminId,
@@ -149,7 +146,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       },
       status: 'proposed',
     } as any)
-    mockWithTransaction.mockRejectedValueOnce(new Error('DB error'))
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('DB error')))
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)

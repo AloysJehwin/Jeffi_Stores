@@ -16,7 +16,7 @@ import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messagi
 import { getDraftLockMap } from '@/lib/admin/draft-locks'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
-import PageDrafts from '@/components/admin/drafts/PageDrafts'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -45,7 +45,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
   const [host, sp, flags] = await Promise.all([getHost(), searchParams, getFeatureFlags()])
   // Only the channels Site Controls leaves on.
   const sends = ['email', flags.smsEnabled && 'SMS', flags.whatsappEnabled && 'WhatsApp'].filter(Boolean).join(', ')
-  const tab = isListUrl(sp, MESSAGING_FIELDS) ? 'list' : 'overview'
+  const tab = sp.tab === 'drafts' ? 'drafts' : isListUrl(sp, MESSAGING_FIELDS) ? 'list' : 'overview'
   const href = (t: string) => ap(tabHref('/admin/marketing/messaging', t, sp, MESSAGING_FIELDS), host)
   return (
     <PageBody>
@@ -55,6 +55,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
         tabs={[
           { id: 'overview', label: 'Overview', href: href('overview') },
           { id: 'list', label: 'Messages', href: href('list') },
+          { id: 'drafts', label: <DraftsTabLabel type="mailer" />, href: href('drafts') },
         ]}
         value={tab}
         actions={
@@ -70,9 +71,10 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
         <Suspense fallback={null}>
           <MessagingOverview />
         </Suspense>
+      ) : tab === 'drafts' ? (
+        <PageDrafts type="mailer" />
       ) : (
         <>
-          <PageDrafts type="mailer" />
           <ListFilters entity="messaging" fields={MESSAGING_FIELDS} search={MESSAGING_SEARCH} noun="Messages" tab="list" exportable />
           <Suspense key={listKey(sp)} fallback={<TableSkeleton rows={8} cols={6} />}>
             <MailerListContent resolvedSearchParams={sp} />

@@ -12,6 +12,8 @@ export interface ImageGenInput {
   quality: ImageQuality
   seed?: number
   referenceImageUrl?: string
+  /** Subject will be cut out afterwards; providers see the prompt with the isolation hint already added. */
+  transparent?: boolean
 }
 
 export interface GeneratedImage {
@@ -65,6 +67,13 @@ export interface MediaProvider {
   videoModel?(req: VideoGenInput): string
   startVideo?(req: VideoGenInput): Promise<VideoStart>
   pollVideo?(opId: string, model: string): Promise<VideoPoll>
+}
+
+/** Post-step that cuts the subject out to a transparent PNG. */
+export interface BackgroundRemover {
+  configured(): boolean
+  cutoutModel(): string
+  removeBackground(img: GeneratedImage): Promise<GeneratedImage>
 }
 
 export class ProviderError extends Error {

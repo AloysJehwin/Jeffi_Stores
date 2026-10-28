@@ -2,11 +2,19 @@ type Row = Record<string, any> & { id: string }
 type Table = 'sections' | 'hero_slides'
 
 interface Draft {
+  id: string
+  title: string | null
+  author_admin_id: string | null
+  base: { sections: Row[]; hero_slides: Row[] } | null
   sections: Row[]
   hero_slides: Row[]
   updated_by: string | null
   updated_at: string
 }
+
+/** The draft every test works on; routes find it via the x-homepage-draft header or ?draft=. */
+export const DRAFT_ID = 'abababab-0000-4000-8000-000000000001'
+export const draftHeaders = { 'x-homepage-draft': DRAFT_ID }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 const tableOf = (name: string): Table => (name === 'homepage_sections' ? 'sections' : 'hero_slides')
@@ -14,9 +22,10 @@ const ordered = (rows: Row[]) =>
   [...rows].sort((a, b) => a.display_order - b.display_order || Date.parse(a.created_at) - Date.parse(b.created_at))
 
 /**
- * In-memory stand-in for the homepage_drafts / homepage_sections / hero_slides SQL issued by
- * src/lib/homepage-draft.ts. Any other statement throws, so a route that still writes a live
- * table directly fails its test. A throwing transaction restores the state (rollback).
+ * In-memory stand-in for the homepage_draft_branches / homepage_sections / hero_slides SQL issued by
+ * src/lib/catalog/homepage-draft.ts (and the draft-branches publish it uses). Any other statement
+ * throws, so a route that still writes a live table directly fails its test. A throwing transaction
+ * restores the state (rollback).
  */
 export function makeHomepageDraftDb() {
   const state = {
@@ -26,34 +35,46 @@ export function makeHomepageDraftDb() {
     statements: [] as string[],
     rollbacks: 0,
   }
+  const isDraft = (id: unknown) => !!state.draft && state.draft.id === id
+  const liveRow = () => ({ sections: ordered(clone(state.live.sections)), hero_slides: ordered(clone(state.live.hero_slides)) })
 
   function run(sql: string, params: any[] = []) {
     state.statements.push(sql)
-    if (sql.startsWith('INSERT INTO homepage_drafts')) {
-      if (state.draft) return { rows: [], rowCount: 0 }
-      state.draft = { ...clone(state.live), updated_by: params[0] ?? null, updated_at: new Date().toISOString() }
-      return { rows: [], rowCount: 1 }
-    }
-    if (sql.startsWith('SELECT sections, hero_slides FROM homepage_drafts') && sql.includes('FOR UPDATE')) {
-      const rows = state.draft
-        ? [{ sections: clone(state.draft.sections), hero_slides: clone(state.draft.hero_slides) }]
+    if (sql.startsWith('SELECT sections, hero_slides FROM homepage_draft_branches') && sql.includes('FOR UPDATE')) {
+      const rows = isDraft(params[0])
+        ? [{ sections: clone(state.draft!.sections), hero_slides: clone(state.draft!.hero_slides) }]
         : []
       return { rows, rowCount: rows.length }
     }
-    if (sql.startsWith('UPDATE homepage_drafts')) {
-      state.draft = {
+    if (sql.startsWith('SELECT * FROM homepage_draft_branches') && sql.includes('FOR UPDATE')) {
+      const rows = isDraft(params[0])
+        ? [{ ...clone(state.draft!), homepage_id: '00000000-0000-0000-0000-000000000000', base_revision: 0 }]
+        : []
+      return { rows, rowCount: rows.length }
+    }
+    if (sql.startsWith('UPDATE homepage_draft_branches')) {
+      if (!isDraft(params[3])) return { rows: [], rowCount: 0 }
+      Object.assign(state.draft!, {
         sections: JSON.parse(params[0]),
         hero_slides: JSON.parse(params[1]),
         updated_by: params[2],
         updated_at: new Date().toISOString(),
-      }
+      })
       return { rows: [], rowCount: 1 }
     }
-    if (sql.startsWith('DELETE FROM homepage_drafts')) {
-      const had = state.draft !== null
-      state.draft = null
+    if (sql.startsWith('DELETE FROM homepage_draft_branches')) {
+      const had = isDraft(params[0])
+      if (had) state.draft = null
       return { rows: [], rowCount: had ? 1 : 0 }
     }
+    if (sql.startsWith('SELECT id, author_admin_id FROM homepage_draft_branches')) {
+      const rows = state.draft ? [{ id: state.draft.id, author_admin_id: state.draft.author_admin_id }] : []
+      return { rows, rowCount: rows.length }
+    }
+    if (sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [], rowCount: 1 }
+    if (sql.startsWith('SELECT COALESCE((SELECT jsonb_agg')) return { rows: [liveRow()], rowCount: 1 }
+    if (sql.startsWith('INSERT INTO entity_revisions')) return { rows: [{ revision: 1 }], rowCount: 1 }
+    if (/^SELECT revision\b/.test(sql)) return { rows: [], rowCount: 0 }
     const upsert = sql.match(/^INSERT INTO (homepage_sections|hero_slides) AS t/)
     if (upsert) {
       const table = tableOf(upsert[1])
@@ -81,21 +102,18 @@ export function makeHomepageDraftDb() {
     throw new Error(`unexpected SQL: ${sql.slice(0, 80)}`)
   }
 
-  function queryOne(sql: string) {
+  function queryOne(sql: string, params: any[] = []) {
     state.statements.push(sql)
-    if (sql.includes('FROM homepage_drafts d')) {
-      const d = state.draft
-      if (!d) return null
+    if (sql.includes('FROM homepage_draft_branches d')) {
+      if (!isDraft(params[0])) return null
+      const d = state.draft!
       return {
-        sections: clone(d.sections),
-        hero_slides: clone(d.hero_slides),
+        ...clone(d),
         updated_at: new Date(d.updated_at),
         updated_by_name: d.updated_by ? (state.adminNames[d.updated_by] ?? null) : null,
       }
     }
-    if (sql.startsWith('SELECT COALESCE((SELECT jsonb_agg')) {
-      return { sections: ordered(clone(state.live.sections)), hero_slides: ordered(clone(state.live.hero_slides)) }
-    }
+    if (sql.startsWith('SELECT COALESCE((SELECT jsonb_agg')) return liveRow()
     throw new Error(`unexpected SQL: ${sql.slice(0, 80)}`)
   }
 
@@ -119,16 +137,31 @@ export function makeHomepageDraftDb() {
     state.rollbacks = 0
   }
 
+  /** A draft started from the current live rows (what Edit / New draft does). */
+  function startDraft(extra: Partial<Draft> = {}) {
+    state.draft = {
+      id: DRAFT_ID,
+      title: null,
+      author_admin_id: null,
+      base: clone(state.live),
+      ...clone(state.live),
+      updated_by: null,
+      updated_at: new Date().toISOString(),
+      ...extra,
+    }
+    return state.draft
+  }
+
   const db = {
     query: async (sql: string, params?: any[]) => run(sql, params),
-    queryOne: async (sql: string) => queryOne(sql),
+    queryOne: async (sql: string, params?: any[]) => queryOne(sql, params),
     queryMany: async (sql: string) => {
       throw new Error(`unexpected SQL: ${sql.slice(0, 80)}`)
     },
     withTransaction,
   }
 
-  return { state, db, reset }
+  return { state, db, reset, startDraft }
 }
 
 export function sectionRow(id: string, display_order: number, extra: Record<string, unknown> = {}): Row {

@@ -102,7 +102,7 @@ export function TabLinks({
 }: {
   base: string
   active: string
-  tabs: { id: string; label: string }[]
+  tabs: { id: string; label: React.ReactNode }[]
   actions?: React.ReactNode
   /** A list's filters, carried to every tab. */
   query?: string
@@ -167,7 +167,7 @@ export function TabMemory({
   explicit,
 }: {
   storageKey: string
-  tab: 'overview' | 'list'
+  tab: 'overview' | 'list' | 'drafts'
   explicit: boolean
 }) {
   const router = useRouter()

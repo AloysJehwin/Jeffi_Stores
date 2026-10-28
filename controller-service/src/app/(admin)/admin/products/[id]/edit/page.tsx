@@ -9,6 +9,8 @@ import { getAdminSession } from '@/lib/auth/admin-auth'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateProduct } from './actions'
 import { initialDraftLock } from '@/lib/admin/draft-locks'
+import { draftBehindFor } from '@/lib/catalog/product-draft-id'
+import DraftBehindBanner from '@/components/admin/drafts/DraftBehindBanner'
 
 export default async function EditProductPage({
   params,
@@ -18,7 +20,7 @@ export default async function EditProductPage({
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
   const { id } = await params
-  const { back } = await searchParams
+  const { back, draft } = await searchParams
   const host = await getHost()
   const product = await getProduct(id).catch(err => {
     console.error('[product-edit] getProduct failed for', id, err)
@@ -56,13 +58,26 @@ export default async function EditProductPage({
   const { getFeatureFlags } = await import('@/lib/catalog/site-controls')
   const flags = await getFeatureFlags()
 
+  // Several drafts can be open on a product: ?draft=<id> picks one, else open your own.
   const draftRow = await queryOne<{
+    id: string
     product_id: string
+    title: string | null
     fields: Record<string, unknown>
     variants: Record<string, unknown>[]
     sub_variants: Record<string, unknown>[]
     images: Record<string, unknown>[]
-  }>(`SELECT product_id, fields, variants, sub_variants, images FROM product_drafts WHERE product_id = $1`, [id])
+  }>(
+    draft
+      ? `SELECT id, product_id, title, fields, variants, sub_variants, images FROM product_drafts WHERE id = $2 AND product_id = $1`
+      : `SELECT id, product_id, title, fields, variants, sub_variants, images FROM product_drafts
+          WHERE product_id = $1 AND author_admin_id = $2 ORDER BY updated_at DESC LIMIT 1`,
+    [id, draft ?? session?.adminId ?? null]
+  )
+  if (draftRow && !draft) {
+    const qs = new URLSearchParams({ ...(back ? { back } : {}), draft: draftRow.id }).toString()
+    redirect(ap(`/admin/products/${id}/edit?${qs}`, host))
+  }
   const isDraft = !!draftRow
   // A create-draft product (is_draft = true) has no product_drafts row but must still render its
   // edit form (editing in place via the live-edit path) rather than bouncing to the detail page.
@@ -130,7 +145,9 @@ export default async function EditProductPage({
       ])
     : withDraftSubVariants(liveVariants)
 
-  const initialLock = await initialDraftLock('product', id)
+  const lockId = draftRow?.id ?? id
+  const initialLock = await initialDraftLock('product', lockId)
+  const [behind, siblings] = draftRow ? await draftBehindFor(draftRow.id) : [null, 0]
   // Those variants' live images were never staged; stage them so image edits reconcile correctly.
   // Only the holder (or anyone, on a draft nobody holds) normalises it.
   if (liveOnlyInactive.length > 0 && (initialLock?.canEdit ?? true)) {
@@ -140,8 +157,8 @@ export default async function EditProductPage({
            WHERE vi.variant_id = ANY($2::uuid[])
              AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(d.variant_images, '[]'::jsonb)) e
                               WHERE e->>'variant_id' = vi.variant_id::text)), '[]'::jsonb)
-        WHERE d.product_id = $1`,
-      [id, liveOnlyInactive.map(v => v.id)]
+        WHERE d.id = $1`,
+      [lockId, liveOnlyInactive.map(v => v.id)]
     )
   }
 
@@ -226,14 +243,16 @@ export default async function EditProductPage({
       header={
         <PageHeader
           back={{ href: ap(backUrl, host), label: 'Products' }}
-          title={isDraft ? 'Edit Draft' : 'Edit Product'}
+          title={isDraft ? (draftRow!.title ? `Edit Draft · ${draftRow!.title}` : 'Edit Draft') : 'Edit Product'}
           description={isDraft ? 'Changes are saved to the draft only' : 'Update product information'}
           badges={isDraft ? <Badge tone="amber">Draft pending</Badge> : undefined}
         />
       }
     >
+      {isDraft && <DraftBehindBanner info={behind} siblings={siblings} noun="product" />}
       <ProductForm
         initialLock={initialLock}
+        draftId={draftRow?.id ?? null}
         categories={categories || []}
         brands={brands || []}
         product={productForForm}

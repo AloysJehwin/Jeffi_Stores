@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { uploadGalleryMedia } from '@/lib/shared/s3'
-import { applyDraftPatch, getEditableHomepage, homepageLockFrom, withHomepageDraft } from '@/lib/catalog/homepage-draft'
-import { HOMEPAGE_LOCK_ID, actorOf, lockedByOther, lockedOr } from '@/lib/admin/draft-locks'
+import { applyDraftPatch, getEditableHomepage, homepageLockFrom, withHomepageDraft, homepageDraftIdFrom, homepageDraftOr, noHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { actorOf, lockedByOther } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,9 +22,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Refuse before spending on the image when another admin holds the draft.
-    const held = await lockedByOther(actorOf(admin), 'homepage', HOMEPAGE_LOCK_ID)
+    const draftId = homepageDraftIdFrom(request)
+    if (!draftId) return noHomepageDraft()
+    const held = await lockedByOther(actorOf(admin), 'homepage', draftId)
     if (held) return held
-    const { heroSlides } = await getEditableHomepage()
+    const { heroSlides } = await getEditableHomepage(draftId)
     if (!heroSlides.some(s => s.id === id)) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
 
     const formData = await request.formData()
@@ -38,11 +40,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { url, blurhash } = await uploadGalleryMedia(buffer, file.name, file.type)
     const hashField = field === 'image_url_mobile' ? 'blurhash_mobile' : 'blurhash'
 
-    const saved = await withHomepageDraft(admin.adminId, draft => {
+    const saved = await withHomepageDraft(draftId, admin.adminId, draft => {
       const slide = draft.heroSlides.find(s => s.id === id)
       if (slide) applyDraftPatch(slide, { [field]: url, [hashField]: blurhash ?? null })
       return !!slide
-    }, homepageLockFrom(admin, request)).catch(lockedOr)
+    }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
     if (saved instanceof NextResponse) return saved
     if (!saved) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
     return NextResponse.json({ url, field, blurhash })

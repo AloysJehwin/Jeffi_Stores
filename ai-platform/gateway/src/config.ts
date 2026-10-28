@@ -28,9 +28,20 @@ export const CONFIG = {
   imageCacheTtlSeconds: Number(process.env.AI_IMAGE_CACHE_TTL_SECONDS) || 3600,
   videoPollMs: Number(process.env.AI_VIDEO_POLL_MS) || 10_000,
 
-  // OpenAI escape hatch (only when a request forces it) — parity with the old client.
-  openaiApiKey: process.env.OPENAI_API_KEY || '',
-  openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  // Anthropic (Claude) text. No key = provider skipped and text stays on Razer.
+  // Production auth is workload identity federation: one Anthropic workspace + service account per
+  // store, ids sent per request; the org id and the projected k8s token file are gateway-wide.
+  anthropicOrganizationId: process.env.ANTHROPIC_ORGANIZATION_ID || '',
+  anthropicIdentityTokenFile: process.env.ANTHROPIC_IDENTITY_TOKEN_FILE || '',
+  // Local dev only: a static key used when a request carries no store identity.
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+  anthropicTimeoutMs: Number(process.env.ANTHROPIC_TIMEOUT_MS) || 120_000,
+  // Floor for max_tokens: thinking counts against it, and the cap is billed only when used.
+  anthropicMinMaxTokens: Number(process.env.ANTHROPIC_MIN_MAX_TOKENS) || 8000,
+  // Server-side refusal fallback on Sonnet/Opus ('off' disables).
+  anthropicFallbacks: (process.env.ANTHROPIC_FALLBACKS || 'default') !== 'off',
+  // Text provider order (anthropic, razer). Default: anthropic first when the key is set.
+  textProviders: process.env.AI_TEXT_PROVIDERS || '',
 }
 
 export function parseUrls(raw: string): string[] {
@@ -47,7 +58,8 @@ const FAST = process.env.OLLAMA_FAST_MODEL || process.env.OLLAMA_EMAIL_MODEL || 
 export function modelForHint(hint: ModelHint | undefined): string {
   switch (hint) {
     case 'sql': return process.env.OLLAMA_SQL_MODEL || 'gemma4:12b'
-    case 'agent': return AGENT
+    case 'agent':
+    case 'deep': return AGENT
     case 'fast': return FAST
     case 'email': return process.env.OLLAMA_EMAIL_MODEL || FAST
     case 'enrich': return process.env.OLLAMA_ENRICH_MODEL || FAST
@@ -57,3 +69,27 @@ export function modelForHint(hint: ModelHint | undefined): string {
 }
 
 export const VISION_MODEL = process.env.OLLAMA_VISION_MODEL || 'gemma4:12b'
+
+export type ClaudeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
+const CLAUDE_SONNET = 'claude-sonnet-5-5'
+const CLAUDE_HAIKU = 'claude-haiku-5-5'
+const effort = (v: string | undefined, d: ClaudeEffort): ClaudeEffort =>
+  (['low', 'medium', 'high', 'xhigh', 'max'] as const).includes(v as ClaudeEffort) ? (v as ClaudeEffort) : d
+
+/** Claude model + effort per hint. Agent/SQL reason over tools (Sonnet); copy/fast work is Haiku. */
+export function claudeModelForHint(hint: ModelHint | undefined): { model: string; effort: ClaudeEffort } {
+  const env = process.env
+  switch (hint) {
+    case 'agent': return { model: env.ANTHROPIC_AGENT_MODEL || CLAUDE_SONNET, effort: effort(env.ANTHROPIC_AGENT_EFFORT, 'medium') }
+    case 'sql': return { model: env.ANTHROPIC_SQL_MODEL || env.ANTHROPIC_AGENT_MODEL || CLAUDE_SONNET, effort: effort(env.ANTHROPIC_AGENT_EFFORT, 'medium') }
+    case 'deep': return { model: env.ANTHROPIC_DEEP_MODEL || 'claude-opus-5-5', effort: effort(env.ANTHROPIC_DEEP_EFFORT, 'high') }
+    case 'fast': return { model: env.ANTHROPIC_FAST_MODEL || CLAUDE_HAIKU, effort: 'low' }
+    case 'email': return { model: env.ANTHROPIC_EMAIL_MODEL || env.ANTHROPIC_COPY_MODEL || CLAUDE_HAIKU, effort: 'low' }
+    case 'enrich': return { model: env.ANTHROPIC_ENRICH_MODEL || env.ANTHROPIC_FAST_MODEL || CLAUDE_HAIKU, effort: 'low' }
+    case 'copy':
+    default: return { model: env.ANTHROPIC_COPY_MODEL || CLAUDE_HAIKU, effort: effort(env.ANTHROPIC_COPY_EFFORT, 'low') }
+  }
+}
+
+export const CLAUDE_VISION_MODEL = process.env.ANTHROPIC_VISION_MODEL || CLAUDE_SONNET

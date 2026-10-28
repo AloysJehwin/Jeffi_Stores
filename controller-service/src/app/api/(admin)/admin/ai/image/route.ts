@@ -23,6 +23,7 @@ const Body = z.object({
   quality: z.enum(['draft', 'standard', 'premium']).optional(),
   referenceImageUrl: z.string().url().optional(),
   seed: z.number().int().optional(),
+  transparent: z.boolean().optional(),
   ref: z.string().max(80).optional(),
   attachToProductId: z.string().uuid().optional(),
   saveToGallery: z.boolean().optional(),

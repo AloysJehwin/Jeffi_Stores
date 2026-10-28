@@ -28,8 +28,10 @@ type VisionResult =
   { ok: true; text: string; model: string; pages?: number } | { ok: false; reason: string; hint?: string }
 
 export async function ocrImage(image: Buffer, _mimeType: string): Promise<VisionResult> {
-  // The gateway runs PaddleOCR first, then the Ollama vision model as fallback.
-  const r = await aiVision([image.toString('base64')], extractionPrompt(await storeDescriptorForPrompt()))
+  // The gateway runs Claude when it leads the text order, else PaddleOCR then the Ollama vision model.
+  const r = await aiVision([image.toString('base64')], extractionPrompt(await storeDescriptorForPrompt()), undefined, {
+    feature: 'quotation_ocr',
+  })
   if (!r.ok || !r.text) {
     return { ok: false, reason: r.error || 'No text detected in the image', hint: r.hint }
   }

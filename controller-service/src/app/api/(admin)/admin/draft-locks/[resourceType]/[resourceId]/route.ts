@@ -38,6 +38,10 @@ const WRITE_SCOPE: Record<DraftResourceType, string> = {
   purchase_order: 'inventory:write',
   po_new: 'inventory:write',
   po_receive: 'inventory:write',
+  cash_sale: 'invoices:write',
+  scenario: 'campaigns:write',
+  google_ads_campaign: 'google_ads_campaigns:write',
+  rfq_reply: 'business_rfqs:write',
 }
 
 const db = { query: (t: string, p?: unknown[]) => query(t, p as any[]) }
@@ -111,6 +115,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         const name = [admin.first_name, admin.last_name].filter(Boolean).join(' ') || admin.email
         const r = await requestDraftAccess({ ...actor, displayName: name }, t.type, t.id, body.message, req)
         const state = await getDraftLockState(admin, t.type, t.id)
+        if (!r.sent) {
+          const error = r.reason === 'rate_limited' ? 'You already asked in the last 5 minutes' : 'Nobody holds this draft — claim it instead'
+          return NextResponse.json({ ...state, me: admin.adminId, request: r, error }, { status: r.reason === 'rate_limited' ? 429 : 409 })
+        }
         return NextResponse.json({ ...state, me: admin.adminId, request: r })
       }
     }

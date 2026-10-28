@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Mail, Tag, Package, X, ChevronDown, Wand2 } from 'lucide-react'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
+import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
+import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
@@ -379,6 +381,8 @@ export default function CustomerMailerPanel({
   const [previewLoading, setPreviewLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number } | null>(null)
+  const [savedDraftId, setSavedDraftId] = useState<string | null>(null)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
 
   const { showToast, showConfirm } = useToast()
@@ -462,6 +466,41 @@ export default function CustomerMailerPanel({
     if (tab === 'preview') loadPreview()
   }, [tab])
 
+  const messageBody = () => ({
+    title: `${customerName} — ${subject}`,
+    template_key: templateKey,
+    subject,
+    template_data: buildTemplateData(),
+    audience_type: 'specific_user',
+    audience_filter: {
+      userId: customerId,
+      ...(attachMode === 'coupon' && selectedCoupon ? { couponId: selectedCoupon.id } : {}),
+    },
+  })
+
+  // An unsent message: a Messaging draft, finished later in the composer.
+  async function handleSaveDraft() {
+    if (!subject.trim()) {
+      setSendError('Add a subject to save a draft.')
+      return
+    }
+    setSendError(null)
+    setSavingDraft(true)
+    try {
+      const res = await fetch('/api/admin/mailer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(messageBody()),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.id) return showToast(j.error || 'Could not save the draft.', 'error')
+      setSavedDraftId(j.id)
+    } finally {
+      setSavingDraft(false)
+    }
+  }
+
   async function handleSend() {
     if (!subject.trim() || !headline.trim()) {
       setSendError('Subject and headline are required.')
@@ -481,17 +520,7 @@ export default function CustomerMailerPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          title: `${customerName} — ${subject}`,
-          template_key: templateKey,
-          subject,
-          template_data: buildTemplateData(),
-          audience_type: 'specific_user',
-          audience_filter: {
-            userId: customerId,
-            ...(attachMode === 'coupon' && selectedCoupon ? { couponId: selectedCoupon.id } : {}),
-          },
-        }),
+        body: JSON.stringify(messageBody()),
       })
       if (!createRes.ok) {
         showToast('Failed to create message.', 'error')
@@ -532,6 +561,24 @@ export default function CustomerMailerPanel({
   ]
     .filter(Boolean)
     .join(' ')
+
+  if (savedDraftId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
+        <div className="w-10 h-10 rounded-full bg-accent-500/10 flex items-center justify-center">
+          <Mail className="w-5 h-5 text-accent-500" />
+        </div>
+        <p className="text-sm font-semibold text-foreground">Draft saved</p>
+        <p className="text-xs text-foreground-muted">Nothing was sent. Finish it any time from Messaging → Drafts.</p>
+        <Link
+          href={ap(`/admin/marketing/messaging/new?draftId=${savedDraftId}`)}
+          className="mt-1 px-3 h-control-sm inline-flex items-center rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors"
+        >
+          Continue in Messaging
+        </Link>
+      </div>
+    )
+  }
 
   if (sendResult) {
     return (
@@ -856,6 +903,14 @@ export default function CustomerMailerPanel({
       <div className="flex flex-col gap-1 pt-1 border-t border-border-default">
         <div className="flex items-center gap-2 flex-wrap">
           <RequireWrite scope="customers:write">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={savingDraft || sending || !subject.trim()}
+              className="px-4 h-control-sm rounded-lg border border-border-secondary bg-surface text-xs font-semibold text-foreground-secondary hover:bg-surface-secondary transition-colors disabled:opacity-60"
+            >
+              {savingDraft ? 'Saving…' : 'Save as Draft'}
+            </button>
             <button
               type="button"
               onClick={handleSend}

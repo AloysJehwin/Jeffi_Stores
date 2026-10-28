@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
 import Link from 'next/link'
-import { DetailHeader, DraftLockBanner, FormFooter, LockedFieldset, PageBody, StatusBadge, fieldInputCls } from '@/components/admin/kit'
+import { Badge, DetailHeader, DraftLockBanner, FormFooter, LockedFieldset, PageBody, StatusBadge, fieldInputCls } from '@/components/admin/kit'
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
@@ -15,6 +15,8 @@ import { useEditSession } from '@/hooks/useEditSession'
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
+import type { MergeConflict } from '@/lib/admin/draft-merge'
+import MergeDialog from '@/components/admin/drafts/MergeDialog'
 
 function toDateInput(iso: string | null): string {
   if (!iso) return ''
@@ -39,12 +41,23 @@ export default function OfferDetailClient({
   categoryOptions,
   brandOptions,
   initialLock,
+  draftId = null,
+  draftTitle,
+  draftCount = 0,
+  actions,
+  notices,
 }: {
   offer: ProductOffer
   backHref: string
   categoryOptions: AssignOption[]
   brandOptions: AssignOption[]
   initialLock?: DraftLockState | null
+  /** The draft being edited (lock and session key); without one the page is read-only. */
+  draftId?: string | null
+  draftTitle?: string | null
+  draftCount?: number
+  actions?: ReactNode
+  notices?: ReactNode
 }) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -57,11 +70,14 @@ export default function OfferDetailClient({
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [pickerKey, setPickerKey] = useState(0)
+  const [conflicts, setConflicts] = useState<MergeConflict[] | null>(null)
 
-  const lock = useDraftLock({ resourceType: 'offer', resourceId: offer.id, initial: initialLock })
+  const lock = useDraftLock({ resourceType: 'offer', resourceId: draftId, initial: initialLock })
+  const readOnly = !draftId || lock.readOnly
+  const publishPath = `/api/admin/product-offers/${offer.id}/publish?draft=${draftId}`
   const edit = useEditSession({
     resourceType: 'offer',
-    resourceId: offer.id,
+    resourceId: draftId,
     lock,
     onCancelled: () => {
       // Reset local state + remount picker so it re-fetches the restored live rows.
@@ -77,11 +93,12 @@ export default function OfferDetailClient({
 
   const save = useCallback(
     async (patch: Record<string, unknown>): Promise<boolean> => {
+      if (!draftId) return false
       setSaving(true)
       try {
-        const res = await fetch(`/api/admin/product-offers/${offer.id}`, {
+        const res = await fetch(`/api/admin/product-offers/${offer.id}?draft=${draftId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...lockHeaders('offer', offer.id) },
+          headers: { 'Content-Type': 'application/json', ...lockHeaders('offer', draftId) },
           credentials: 'include',
           body: JSON.stringify(patch),
         })
@@ -100,7 +117,7 @@ export default function OfferDetailClient({
         setSaving(false)
       }
     },
-    [offer.id, showToast, lock]
+    [offer.id, draftId, showToast, lock]
   )
 
   async function commitTitle(value = title) {
@@ -116,14 +133,19 @@ export default function OfferDetailClient({
   async function publish() {
     setPublishing(true)
     try {
-      const res = await fetch(`/api/admin/product-offers/${offer.id}/publish`, {
+      const res = await fetch(publishPath, {
         method: 'POST',
         credentials: 'include',
-        headers: lockHeaders('offer', offer.id),
+        headers: lockHeaders('offer', draftId),
       })
       if (!res.ok) {
         if (res.status === 423) lock.markLocked()
         const body = await res.json().catch(() => ({}))
+        // Someone published overlapping edits since this draft started: pick per field.
+        if (res.status === 409 && body.code === 'DRAFT_CONFLICT') {
+          setConflicts(body.conflicts ?? [])
+          return
+        }
         showToast(body.error || 'Failed to publish', 'error')
         return
       }
@@ -142,12 +164,23 @@ export default function OfferDetailClient({
     <PageBody>
       <DetailHeader
         back={{ href: backHref, label: 'Offers' }}
-        title={title || 'Untitled offer'}
-        status={<StatusBadge status={String(isActive)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />}
+        title={`${title || 'Untitled offer'}${draftTitle ? ` · ${draftTitle}` : ''}`}
+        status={
+          <>
+            <StatusBadge status={String(isActive)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />
+            {draftId ? (
+              <Badge tone="amber">Draft</Badge>
+            ) : (
+              draftCount > 0 && <Badge tone="amber">{draftCount === 1 ? 'Draft pending' : `${draftCount} drafts`}</Badge>
+            )}
+          </>
+        }
+        actions={actions}
       />
 
-      <DraftLockBanner lock={lock} scope="coupons:write" />
-      <LockedFieldset readOnly={lock.readOnly} className="contents">
+      {notices}
+      {draftId && <DraftLockBanner lock={lock} scope="coupons:write" />}
+      <LockedFieldset readOnly={readOnly} className="contents">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)] items-start">
           <div className="space-y-4 min-w-0">
             <div className="space-y-5 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
@@ -251,7 +284,8 @@ export default function OfferDetailClient({
             <OfferProductPicker
               key={pickerKey}
               offerId={offer.id}
-              canWrite={canWrite && !lock.readOnly}
+              draftId={draftId}
+              canWrite={canWrite && !readOnly}
               categoryOptions={categoryOptions}
               brandOptions={brandOptions}
             />
@@ -259,7 +293,7 @@ export default function OfferDetailClient({
         </div>
       </LockedFieldset>
 
-      {canWrite && (
+      {canWrite && draftId && (
         <FormFooter
           lock={lock}
           cancelHref={lock.readOnly ? backHref : undefined}
@@ -278,6 +312,19 @@ export default function OfferDetailClient({
             {publishing ? 'Publishing…' : 'Publish'}
           </button>
         </FormFooter>
+      )}
+      {conflicts && (
+        <MergeDialog
+          open
+          conflicts={conflicts}
+          publishPath={publishPath}
+          onClose={() => setConflicts(null)}
+          onDone={() => {
+            setConflicts(null)
+            showToast('Offer published', 'success')
+            router.push(ap(`/admin/offers/${offer.id}/view`))
+          }}
+        />
       )}
     </PageBody>
   )

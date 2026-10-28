@@ -19,7 +19,7 @@ import RowActions from '@/components/admin/RowActions'
 import { DraftLockBadge, EmptyState, InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
 
-export default function CampaignsListClient() {
+export default function CampaignsListClient({ draftsOnly = false }: { draftsOnly?: boolean }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const [busy, setBusy] = useState<string | null>(null)
@@ -128,6 +128,59 @@ export default function CampaignsListClient() {
 
   if (loading) return <CampaignCardListSkeleton />
 
+  // Unpublished edits, for the Drafts tab.
+  const pendingBlock = (() => {
+    const pendingDrafts = campaigns.filter(c => c.kind !== 'broadcast' && c.draft_fields != null)
+    if (!pendingDrafts.length) return null
+    return (
+      <div className="overflow-hidden rounded-xl border border-amber-500/40 bg-amber-500/5">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-500/40">
+          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+            Pending Drafts ({pendingDrafts.length})
+          </p>
+          <p className="text-xs text-foreground-muted">Unpublished edits — click to open</p>
+        </div>
+        <div className="divide-y divide-amber-500/20">
+          {pendingDrafts.map(d => (
+            <div
+              key={d.kind}
+              className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-500/10 transition-colors"
+            >
+              <Link href={ap(`/admin/campaigns/${d.kind}/edit`)} className="flex-1 min-w-0 mr-4">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{d.name}</p>
+              </Link>
+              <div className="flex items-center gap-2 shrink-0">
+                <DraftLockBadge lock={d.draft_lock} mine={d.draft_lock?.mine} />
+                <RequireWrite scope="campaigns:write">
+                  {!(d.draft_lock && !d.draft_lock.mine) && (
+                    <button
+                      type="button"
+                      onClick={() => publishDraft(d)}
+                      disabled={busy === d.kind}
+                      className="control-sm bg-green-600 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                    >
+                      Publish
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => discardDraft(d)}
+                    disabled={busy === d.kind}
+                    className="control-sm border border-amber-500/40 font-semibold text-amber-700 hover:bg-amber-500/10 disabled:opacity-50 dark:text-amber-400"
+                  >
+                    {busy === d.kind ? '…' : 'Discard'}
+                  </button>
+                </RequireWrite>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  })()
+
+  if (draftsOnly) return pendingBlock
+
   return (
     <div className="space-y-3">
 
@@ -229,56 +282,6 @@ export default function CampaignsListClient() {
         </p>
       )}
 
-      {/* Pending drafts */}
-      {(() => {
-        const pendingDrafts = campaigns.filter(c => c.kind !== 'broadcast' && c.draft_fields != null)
-        if (!pendingDrafts.length) return null
-        return (
-          <div className="overflow-hidden rounded-xl border border-amber-500/40 bg-amber-500/5">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-500/40">
-              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                Pending Drafts ({pendingDrafts.length})
-              </p>
-              <p className="text-xs text-foreground-muted">Unpublished edits — click to open</p>
-            </div>
-            <div className="divide-y divide-amber-500/20">
-              {pendingDrafts.map(d => (
-                <div
-                  key={d.kind}
-                  className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-500/10 transition-colors"
-                >
-                  <Link href={ap(`/admin/campaigns/${d.kind}/edit`)} className="flex-1 min-w-0 mr-4">
-                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{d.name}</p>
-                  </Link>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <DraftLockBadge lock={d.draft_lock} mine={d.draft_lock?.mine} />
-                    <RequireWrite scope="campaigns:write">
-                      {!(d.draft_lock && !d.draft_lock.mine) && (
-                        <button
-                          type="button"
-                          onClick={() => publishDraft(d)}
-                          disabled={busy === d.kind}
-                          className="control-sm bg-green-600 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-                        >
-                          Publish
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => discardDraft(d)}
-                        disabled={busy === d.kind}
-                        className="control-sm border border-amber-500/40 font-semibold text-amber-700 hover:bg-amber-500/10 disabled:opacity-50 dark:text-amber-400"
-                      >
-                        {busy === d.kind ? '…' : 'Discard'}
-                      </button>
-                    </RequireWrite>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })()}
 
       {/* Campaign cards */}
       {filtered.length === 0 ? (

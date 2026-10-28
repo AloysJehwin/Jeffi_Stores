@@ -2,7 +2,7 @@ import type { DraftLock, DraftResourceType, DraftViewer } from '@jeffi/draft-loc
 import { publish, subscribe } from '@/lib/shared/pubsub'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 
-export type LockEventType = 'acquired' | 'released' | 'handover' | 'takeover' | 'closed' | 'presence'
+export type LockEventType = 'acquired' | 'released' | 'handover' | 'takeover' | 'closed' | 'presence' | 'request'
 
 export interface LockFrame {
   kind: 'lock'
@@ -12,6 +12,8 @@ export interface LockFrame {
   lock: DraftLock | null
   viewers?: DraftViewer[]
   by: string | null
+  /** Display name of `by` (request frames). */
+  byName?: string | null
   reason?: string | null
   at: string
 }

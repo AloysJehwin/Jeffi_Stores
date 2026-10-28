@@ -5,6 +5,8 @@ import { listParamNames } from '@jeffi/list-filters/client'
 import { QUOTATION_ALIASES, QUOTATION_FIELDS } from '@jeffi/list-filters/fields'
 import { TabActionsHost, Tabs } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
+import { PageHeader } from '@/components/admin/kit'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import { resolveOverviewTab, type OverviewTab } from '@/lib/overviews/sales-documents'
 import QuotationsClient from './QuotationsClient'
 import QuotationsOverview from './_components/QuotationsOverview'
@@ -31,20 +33,36 @@ export default function QuotationsTabs({ canWrite }: { canWrite: boolean }) {
     router.replace(ap(`/admin/quotations?${p}`), { scroll: false })
   }
 
+  // The editor renders alone, whichever tab opened it.
+  if (editing)
+    return (
+      <TabActionsHost>
+        <QuotationsClient canWrite={canWrite} section={tab === 'drafts' ? 'drafts' : 'list'} />
+      </TabActionsHost>
+    )
+
   return (
     <TabActionsHost>
       <div className="space-y-5">
-        {!editing && (
-          <Tabs
-            tabs={[
-              { id: 'overview', label: 'Overview' },
-              { id: 'list', label: 'Quotations' },
-            ]}
-            value={tab}
-            onChange={go}
-          />
+        <PageHeader title="Quotations" description="Create and manage B2B quotations" />
+        <Tabs
+          tabs={[
+            { id: 'overview', label: 'Overview' },
+            { id: 'list', label: 'Quotations' },
+            { id: 'drafts', label: <DraftsTabLabel type="quotation" /> },
+          ]}
+          value={tab}
+          onChange={go}
+        />
+        {tab === 'overview' ? (
+          <QuotationsOverview />
+        ) : tab === 'drafts' ? (
+          <PageDrafts type="quotation">
+            <QuotationsClient canWrite={canWrite} section="drafts" />
+          </PageDrafts>
+        ) : (
+          <QuotationsClient canWrite={canWrite} />
         )}
-        {tab === 'overview' ? <QuotationsOverview /> : <QuotationsClient canWrite={canWrite} />}
       </div>
     </TabActionsHost>
   )

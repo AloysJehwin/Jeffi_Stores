@@ -1,8 +1,12 @@
 import { documentUrl } from '@/lib/shared/customer-links'
 import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { round2 } from '@/lib/catalog/gst'
-import { lineItemExGst } from '@/lib/catalog/pricing'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { productLabel } from '@/lib/catalog/product-label'
+import { quotationLineRow, quotationLineSchema, quotationTotals, type QuotationLineInput } from '@/lib/documents/invoice-line-items'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
+import { unitChainsFor, asSellingUnit, type LineUnit } from '@/lib/catalog/unit-factor'
+import { normUnit, validatePurchaseQuantity } from '@/lib/catalog/selling-unit'
 import { embed, queryManyReplica, runWithHnswTuning } from '@/lib/shared/rag'
 import { aiChat } from '@/lib/shared/ai-client'
 import type { ToolDef } from '../tools'
@@ -103,8 +107,6 @@ function fmtDate(d: string | Date | null | undefined): string {
   }
 }
 
-const ORDER_STATUS_FLOW = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
-const PAYMENT_MODES = ['cash', 'card', 'upi', 'bank_transfer', 'cheque', 'razorpay', 'credit']
 
 const list_quotations: ToolDef = {
   name: 'list_quotations',
@@ -340,12 +342,186 @@ interface QuotationItemInput {
   variantId?: string
   subVariantId?: string
   quantity: number
+  buyUnit?: string
   unitPrice?: number
   discountPct?: number
-  unit?: string
-  buyUnit?: string
+  extraDiscountPct?: number
   hsnCode?: string
   gstRate?: number
+}
+
+const unitMatches = (u: LineUnit, word: string) => normUnit(u.unit) === normUnit(word) || normUnit(u.label) === normUnit(word)
+
+/**
+ * The selling unit and quantity for a requested line, when it is unambiguous: a named unit the line sells in,
+ * or pieces (bare number) as a 1-pc unit, or whole default units when the pieces divide evenly.
+ */
+function pickLineUnit(qty: number, requested: string | null | undefined, units: LineUnit[]) {
+  const want = requested ? normUnit(requested) : ''
+  if (!units.length) return !want || want === 'pc' ? { quantity: qty, unit: null } : null
+  let unit: LineUnit | undefined
+  let quantity = qty
+  if (want && want !== 'pc') {
+    unit = units.find(u => unitMatches(u, want))
+  } else {
+    unit = units.find(u => u.dimension === 'count' && u.factor === 1) ?? units.find(u => u.isDefault && u.dimension === 'count')
+    if (unit) quantity = qty / unit.factor
+  }
+  if (!unit || !validatePurchaseQuantity(quantity, asSellingUnit(unit)).ok) return null
+  return { quantity, unit }
+}
+
+type ResolverLine = {
+  status: string
+  qty: number
+  requestedUnit?: string | null
+  candidates: Array<{
+    productId: string
+    units?: LineUnit[]
+    variants?: Array<{ id: string; units?: LineUnit[]; subVariants?: unknown[] }>
+  }>
+}
+
+/** Items to propose straight from resolver lines, or null when any line still needs the admin (variant, unit). */
+export function autoQuotationItems(lines: ResolverLine[]): QuotationItemInput[] | null {
+  const out: QuotationItemInput[] = []
+  for (const l of lines) {
+    const c = l.candidates[0]
+    if (l.status !== 'matched' || !c) return null
+    let variantId: string | undefined
+    let units = c.units ?? []
+    if (c.variants?.length) {
+      const [v, ...rest] = c.variants
+      if (rest.length || v.subVariants?.length) return null
+      variantId = v.id
+      units = v.units ?? []
+    }
+    const pick = pickLineUnit(l.qty, l.requestedUnit, units)
+    if (!pick) return null
+    out.push({ productId: c.productId, variantId, quantity: pick.quantity, buyUnit: pick.unit?.unit })
+  }
+  return out.length ? out : null
+}
+
+const unitList = (units: LineUnit[]) =>
+  units.map(u => (u.dimension === 'count' && u.factor !== 1 ? `${u.label} (${u.factor} pcs)` : u.label)).join(', ')
+
+/** Last 10 digits, as the quotation editor stores phones. */
+function phone10(v: unknown): string | null {
+  const d = String(v ?? '').replace(/\D/g, '').slice(-10)
+  return d.length === 10 ? d : null
+}
+
+// One row per requested line: the grain's own price, MRP and discount, falling back sub-variant → variant → product.
+const LINE_GRAIN_SQL = `
+  SELECT x.idx::int AS idx, p.id::text AS product_id, pv.id::text AS variant_id, ps.id::text AS sub_variant_id,
+         p.name, pv.variant_name, ps.sub_variant_name, COALESCE(ps.sku, pv.sku, p.sku) AS sku,
+         (CASE WHEN ps.id IS NOT NULL THEN ps.price WHEN pv.id IS NOT NULL THEN COALESCE(pv.price, p.base_price) ELSE p.base_price END)::float AS price,
+         (CASE WHEN ps.id IS NOT NULL THEN COALESCE(ps.mrp, pv.mrp, p.mrp) WHEN pv.id IS NOT NULL THEN COALESCE(pv.mrp, p.mrp) ELSE p.mrp END)::float AS mrp,
+         COALESCE(ps.discount_pct, pv.discount_pct, p.discount_pct, 0)::float AS discount_pct,
+         COALESCE(p.gst_percentage, 0)::float AS gst_percentage, p.hsn_code, p.is_active, p.has_variants,
+         (pv.id IS NOT NULL AND EXISTS (SELECT 1 FROM product_sub_variants s WHERE s.variant_id = pv.id AND s.is_active)) AS has_subs,
+         COALESCE(ps.stock_status, pv.stock_status, p.stock_status) AS stock_status
+    FROM unnest($1::uuid[], $2::uuid[], $3::uuid[]) WITH ORDINALITY AS x(pid, vid, sid, idx)
+    JOIN products p ON p.id = x.pid
+    LEFT JOIN product_variants pv ON pv.id = x.vid AND pv.product_id = p.id AND pv.is_active
+    LEFT JOIN product_sub_variants ps ON ps.id = x.sid AND ps.variant_id = pv.id AND ps.is_active`
+
+/**
+ * Agent quotation lines priced and unit-checked the way the quotation editor does: quantity in the chosen
+ * selling unit, rate per piece ex GST anchored on MRP with the catalog discount, variant names on the line.
+ */
+async function resolveQuotationLines(items: QuotationItemInput[]) {
+  const fail = (summary: string, hint?: string) => ({ error: err(summary, undefined, hint) })
+  if (items.some(i => !i.productId)) return fail('Every item needs a productId', 'Resolve products with match_quotation_items first')
+  const id = (v: unknown) => (v ? String(v) : null)
+  const [grains, chains, { gstEnabled }] = await Promise.all([
+    queryMany<{
+      idx: number
+      product_id: string
+      variant_id: string | null
+      sub_variant_id: string | null
+      name: string
+      variant_name: string | null
+      sub_variant_name: string | null
+      sku: string | null
+      price: number | null
+      mrp: number | null
+      discount_pct: number
+      gst_percentage: number
+      hsn_code: string | null
+      is_active: boolean
+      has_variants: boolean
+      has_subs: boolean
+      stock_status: string | null
+    }>(LINE_GRAIN_SQL, [items.map(i => String(i.productId)), items.map(i => id(i.variantId)), items.map(i => id(i.subVariantId))]),
+    unitChainsFor(items.map(i => ({ productId: String(i.productId), variantId: id(i.variantId), subVariantId: id(i.subVariantId) }))),
+    getFeatureFlags(),
+  ])
+  const lines: QuotationLineInput[] = []
+  const meta: { sku: string | null; stockStatus: string | null; unit: LineUnit | null }[] = []
+  for (let n = 0; n < items.length; n++) {
+    const it = items[n]
+    const g = grains.find(r => r.idx === n + 1)
+    const at = `Line ${n + 1}`
+    if (!g || !g.is_active) return fail(`${at}: product ${it.productId} not found or inactive`)
+    const name = productLabel({ product_name: g.name, variant_name: g.variant_name, sub_variant_name: g.sub_variant_name }, ' — ')
+    if (it.variantId && !g.variant_id) return fail(`${at}: ${it.variantId} is not an active variant of ${g.name}`)
+    if (it.subVariantId && !g.sub_variant_id) return fail(`${at}: ${it.subVariantId} is not an active sub-variant of ${name}`)
+    if (g.has_variants && !g.variant_id) return fail(`${at}: ${g.name} has variants — pass variantId`, 'get_product_variants lists them')
+    if (g.has_subs && !g.sub_variant_id) return fail(`${at}: ${name} has sub-variants — pass subVariantId`, 'get_product_variants lists them')
+
+    const units = chains[n]
+    const want = normUnit(it.buyUnit)
+    let unit: LineUnit | null = null
+    if (units.length) {
+      if (!want)
+        return fail(
+          `${at}: ${name} sells in ${unitList(units)} — pass buyUnit and quantity in that unit`,
+          `Quantity counts selling units, e.g. 50 pcs of a ${units[0].factor}-pc ${units[0].unit} = quantity ${50 / units[0].factor}, buyUnit "${units[0].unit}". Ask the admin if the pieces don't divide evenly.`
+        )
+      unit = units.find(u => unitMatches(u, want)) ?? null
+      if (!unit) return fail(`${at}: ${name} has no unit "${it.buyUnit}" — it sells in ${unitList(units)}`)
+    } else if (want && want !== 'pc') {
+      return fail(`${at}: ${name} has no selling units — quantity is in pieces; omit buyUnit`)
+    }
+    const qty = Number(it.quantity)
+    const check = validatePurchaseQuantity(qty, unit ? asSellingUnit(unit) : null)
+    if (!check.ok) return fail(`${at} (${name}): ${check.reason}`)
+
+    // Catalog prices are GST-inclusive; the line carries MRP and the discount off it.
+    const gst = gstEnabled ? (it.gstRate != null ? Number(it.gstRate) : g.gst_percentage) : 0
+    const mrp = Number(g.mrp) || 0
+    const price = Number(g.price) || 0
+    const custom = it.unitPrice != null && Number(it.unitPrice) > 0
+    const incl = custom ? Number(it.unitPrice) : mrp > 0 ? mrp : price
+    if (!(incl > 0)) return fail(`${at}: ${name} has no price — pass unitPrice`)
+    const catalogDiscount = custom || !(mrp > 0) ? 0 : g.discount_pct > 0 ? g.discount_pct : mrp > price && price > 0 ? round2(((mrp - price) / mrp) * 100) : 0
+    let discount = it.discountPct != null ? Number(it.discountPct) : catalogDiscount
+    if (it.extraDiscountPct) discount = round2(100 - (100 - discount) * (1 - Number(it.extraDiscountPct) / 100))
+    if (!(discount >= 0 && discount < 100)) return fail(`${at}: discount must be between 0 and 99%`)
+
+    lines.push({
+      description: name,
+      quantity: qty,
+      rate: incl / (1 + gst / 100),
+      hsn_code: it.hsnCode || g.hsn_code || null,
+      gst_rate: gst,
+      unit: (unit?.label || 'PCS').toUpperCase(),
+      buy_unit: unit?.unit ?? null,
+      discount_pct: discount,
+      product_id: g.product_id,
+      variant_id: g.variant_id,
+      sub_variant_id: g.sub_variant_id,
+      variant_name: g.variant_name,
+      sub_variant_name: g.sub_variant_name,
+      sell_unit_factor: unit?.factor ?? 1,
+      sell_unit_dimension: unit?.dimension ?? null,
+      is_custom: false,
+    })
+    meta.push({ sku: g.sku, stockStatus: g.stock_status, unit })
+  }
+  return { lines, meta, gstEnabled }
 }
 
 function vec(arr: number[]): string {
@@ -355,21 +531,21 @@ function vec(arr: number[]): string {
 const match_quotation_items: ToolDef = {
   name: 'match_quotation_items',
   description:
-    'Take a free-form list of requested items (text per line + qty) and resolve them against the catalog using semantic search + text overlap scoring (0–100). Score ≥ 90 with a clear lead = matched (auto-add). Score 45–89 = ambiguous (admin confirms). Score < 45 = unmatched. Returns a quotation_resolver UI block for admin confirmation. Use BEFORE propose_create_quotation. Pass ALL lines in a SINGLE call (up to 50 lines). DOES NOT create anything — read-only.',
+    'Take a free-form list of requested items (text per line + qty + the unit the customer wrote) and resolve them against the catalog using semantic search + text overlap scoring (0–100). Score ≥ 90 with a clear lead = matched (auto-add). Score 45–89 = ambiguous (admin confirms). Score < 45 = unmatched. Each candidate, variant and sub-variant lists its selling units (unit, factor = pieces per unit, min/max/step); the admin picks the unit and quantity in the resolver. Returns a quotation_resolver UI block for admin confirmation. Use BEFORE propose_create_quotation. Pass ALL lines in a SINGLE call (up to 50 lines). DOES NOT create anything — read-only.',
   inputSchema: {
     type: 'object',
     properties: {
       lines: {
         type: 'string',
         description:
-          'JSON array string: [{"requestedText":"<item as the customer wrote it>","qty":50}, {"requestedText":"<another item>","qty":200}]. Each line.qty must be > 0.',
+          'JSON array string: [{"requestedText":"<item as the customer wrote it>","qty":50,"unit":"pcs"}, {"requestedText":"<another item>","qty":2,"unit":"box"}]. Each line.qty must be > 0. unit = the unit the customer wrote (pcs, box, pack, m, kg…); omit it when they gave a bare number, which is read as pieces.',
       },
     },
     required: ['lines'],
   },
   mutating: false,
   handler: async ({ lines }) => {
-    let parsed: { requestedText: string; qty: number }[]
+    let parsed: { requestedText: string; qty: number; unit?: string | null }[]
     try {
       const raw = typeof lines === 'string' ? JSON.parse(lines) : lines
       if (!Array.isArray(raw)) throw new Error('not an array')
@@ -383,6 +559,7 @@ const match_quotation_items: ToolDef = {
     const results: Array<{
       requestedText: string
       qty: number
+      requestedUnit: string | null
       status: 'matched' | 'ambiguous' | 'unmatched'
       candidates: Array<{
         productId: string
@@ -391,14 +568,17 @@ const match_quotation_items: ToolDef = {
         price: number
         sim: number
         score: number
+        units?: LineUnit[]
+        variants?: Array<{ id: string; units?: LineUnit[]; subVariants?: Array<{ id: string; units?: LineUnit[] }> }>
       }>
     }> = []
 
     for (const line of parsed) {
       const text = String(line.requestedText || '').trim()
       const qty = Number(line.qty)
+      const requestedUnit = line.unit ? String(line.unit).trim() || null : null
       if (!text || !isFinite(qty) || qty <= 0) {
-        results.push({ requestedText: text, qty, status: 'unmatched', candidates: [] })
+        results.push({ requestedText: text, qty, requestedUnit, status: 'unmatched', candidates: [] })
         continue
       }
       const v = await embed(text)
@@ -585,10 +765,24 @@ const match_quotation_items: ToolDef = {
       results.push({
         requestedText: text,
         qty,
+        requestedUnit,
         status,
         candidates: topCandidates,
       })
     }
+
+    // Selling units for every candidate scope the resolver can pick (product, variant, sub-variant).
+    const scopes: { productId: string; variantId?: string; subVariantId?: string; target: { units?: LineUnit[] } }[] = []
+    for (const r of results)
+      for (const c of r.candidates) {
+        scopes.push({ productId: c.productId, target: c })
+        for (const v of c.variants ?? []) {
+          scopes.push({ productId: c.productId, variantId: v.id, target: v })
+          for (const sv of v.subVariants ?? []) scopes.push({ productId: c.productId, variantId: v.id, subVariantId: sv.id, target: sv })
+        }
+      }
+    const chains = await unitChainsFor(scopes)
+    scopes.forEach((sc, i) => (sc.target.units = chains[i]))
 
     const counts = {
       matched: results.filter(r => r.status === 'matched').length,
@@ -619,7 +813,7 @@ const match_quotation_items: ToolDef = {
 const extract_quotation_lines_from_attachment: ToolDef = {
   name: 'extract_quotation_lines_from_attachment',
   description:
-    'Read an uploaded file (PDF, image jpg/png/webp, or scanned PDF) and return its raw text so YOU can parse line-items. Use this when the admin attaches a quotation request document. Workflow: call this tool with the attachment_id from the chat, read the returned text, parse it into [{requestedText, qty}], then call match_quotation_items. Falls back from pdf-parse → vision OCR for scanned PDFs. Vision OCR for images runs against the configured Razer model.',
+    'Read an uploaded file (PDF, image jpg/png/webp, or scanned PDF) and return its raw text so YOU can parse line-items. Use this when the admin attaches a quotation request document. Workflow: call this tool with the attachment_id from the chat, read the returned text, parse it into [{requestedText, qty, unit}] (unit as written: pcs, box, m…; omit for a bare number), then call match_quotation_items. Falls back from pdf-parse → vision OCR for scanned PDFs. Vision OCR for images runs against the configured Razer model.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -732,7 +926,7 @@ const extract_quotation_lines_from_attachment: ToolDef = {
 const propose_create_quotation: ToolDef = {
   name: 'propose_create_quotation',
   description:
-    'Propose creating a draft quotation for a customer with the given line items. Pass items as a JSON-stringified array. If unitPrice is omitted, the variant min-price (or product base_price) is used. Admin must approve before the draft is created.',
+    'Propose creating a draft quotation for a customer, priced exactly like the quotation editor: each line is a specific variant/sub-variant, quantity is in its selling unit, the price is MRP with the catalog discount, and the customer\'s phone, GSTIN and saved address are filled in. Pass items as a JSON-stringified array. Lines are validated against the selling unit\'s min/max/step. Admin must approve before the draft is created.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -769,7 +963,7 @@ const propose_create_quotation: ToolDef = {
       items: {
         type: 'string',
         description:
-          'JSON array: [{productId, quantity, unitPrice?, discountPct?, variantId?, subVariantId?, unit?, buyUnit?, hsnCode?, gstRate?}]',
+          'JSON array: [{productId, variantId?, subVariantId?, quantity, buyUnit?, unitPrice?, discountPct?, extraDiscountPct?, hsnCode?, gstRate?}]. variantId is required for products with variants, subVariantId for variants with sub-variants. quantity is in buyUnit; buyUnit is required when the line has selling units (match_quotation_items lists them with factor = pieces per unit), so 50 pcs of a 10-pc box is quantity 5, buyUnit "box". Omit unitPrice to use the catalog price (MRP with its discount). unitPrice = a custom price per PIECE incl. GST (no catalog discount then). discountPct = the total discount % off MRP, replacing the catalog one; extraDiscountPct = an extra % off on top of the catalog discount.',
       },
       notes: { type: 'string', description: 'Optional internal notes for the quotation.' },
       quoteDate: { type: 'string', description: 'ISO date string YYYY-MM-DD. Defaults to today.' },
@@ -817,31 +1011,9 @@ const propose_create_quotation: ToolDef = {
     }
     if (parsed.length < 1 || parsed.length > 50) throw new Error('items: provide 1-50 lines')
 
-    const productIds = parsed.map(i => String(i.productId || '')).filter(Boolean)
-    if (productIds.length !== parsed.length) throw new Error('every item needs a productId')
-
-    const products = await queryMany<{
-      id: string
-      name: string
-      sku: string
-      gst_percentage: string
-      hsn_code: string | null
-      price: string
-      base_price: string
-    }>(
-      `SELECT p.id::text, p.name, p.sku, COALESCE(p.gst_percentage, 18)::text AS gst_percentage,
-              p.hsn_code,
-              COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-              p.base_price::text
-         FROM products p WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
-      [productIds]
-    )
-    if (products.length !== new Set(productIds).size) {
-      throw new Error(
-        `Only ${products.length} of ${new Set(productIds).size} unique productIds resolved to active products`
-      )
-    }
-    const pById = new Map(products.map(p => [p.id, p]))
+    const resolved = await resolveQuotationLines(parsed)
+    if ('error' in resolved) return resolved.error
+    const { lines, meta, gstEnabled } = resolved
 
     const customer = await queryOne<{
       user_id: string
@@ -918,58 +1090,20 @@ const propose_create_quotation: ToolDef = {
       (!hasExplicitAddress && savedAddresses.length === 1 ? savedAddresses[0] : null) ??
       (!hasExplicitAddress ? (savedAddresses.find(a => a.is_default) ?? null) : null)
 
-    const previewItems = parsed.map(it => {
-      const p = pById.get(String(it.productId))!
-      const qty = Number(it.quantity)
-      if (!isFinite(qty) || qty <= 0) throw new Error(`Invalid quantity for ${p.name}`)
-      const unitPrice = it.unitPrice != null && Number(it.unitPrice) > 0 ? Number(it.unitPrice) : Number(p.price)
-      const discountPct = Number(it.discountPct) || 0
-      const gstRate = it.gstRate != null ? Number(it.gstRate) : Number(p.gst_percentage) || 18
-      const hsnCode = it.hsnCode || p.hsn_code || null
-      const unit = it.unit || 'PCS'
-      const buyUnit = it.buyUnit || null
-      const variantId = it.variantId || null
-      const subVariantId = it.subVariantId || null
-      const lineAmount = lineItemExGst(qty, unitPrice, discountPct)
-      return {
-        productId: p.id,
-        variantId,
-        subVariantId,
-        description: p.name,
-        sku: p.sku,
-        hsnCode,
-        gstRate,
-        quantity: qty,
-        unit,
-        buyUnit,
-        unitPrice,
-        discountPct,
-        lineAmount,
-      }
-    })
-
-    const subtotal = previewItems.reduce((s, i) => s + i.lineAmount, 0)
-    const cgst = previewItems.reduce((s, i) => s + (i.lineAmount * i.gstRate) / 200, 0)
-    const sgst = cgst
-    const total = round2(subtotal + cgst + sgst)
-
     // Fallback consignee state is the store's own state (site_settings), never a flagship default.
     const { storeOrigin } = await import('@/lib/catalog/brand')
     const storeState = (await storeOrigin()).state
 
+    // The same body the quotation editor posts; the executor sends it to POST /api/admin/quotations.
     const payload = {
       consignee_email: email,
       consignee_name: consigneeNameResolved,
-      subtotal: round2(subtotal),
-      cgst: round2(cgst),
-      sgst: round2(sgst),
-      total,
-      consignee_phone: consigneePhone || addrToUse?.phone || customer?.phone || null,
+      consignee_phone: phone10(consigneePhone || customer?.phone || addrToUse?.phone),
       consignee_addr1: consigneeAddr1 || addrToUse?.address_line1 || customer?.business_address || '',
       consignee_addr2: consigneeAddr2 || addrToUse?.address_line2 || null,
       consignee_city: consigneeCity || addrToUse?.city || '',
       consignee_state: consigneeState || addrToUse?.state || storeState,
-      consignee_gstin: consigneeGstin || customer?.gst_number || null,
+      consignee_gstin: consigneeGstin ? String(consigneeGstin).toUpperCase() : customer?.gst_number || null,
       consignee_pincode: consigneePincode || addrToUse?.postal_code || null,
       buyer_same: buyerSame !== false,
       buyer_name: buyerName || null,
@@ -977,82 +1111,88 @@ const propose_create_quotation: ToolDef = {
       buyer_addr2: buyerAddr2 || null,
       buyer_city: buyerCity || null,
       buyer_state: buyerState || null,
-      buyer_gstin: buyerGstin || null,
-      buyer_phone: buyerPhone || null,
+      buyer_gstin: buyerGstin ? String(buyerGstin).toUpperCase() : null,
+      buyer_phone: phone10(buyerPhone),
       buyer_pincode: buyerPincode || null,
       buyer_email: buyerEmail || null,
       notes: notes ? String(notes).slice(0, 500) : null,
       quote_date: quoteDate || new Date().toISOString().slice(0, 10),
-      items: previewItems.map(i => ({
-        description: i.description,
-        quantity: i.quantity,
-        rate: i.unitPrice,
-        discount_pct: i.discountPct,
-        hsn_code: i.hsnCode,
-        gst_rate: i.gstRate,
-        unit: i.unit,
-        buy_unit: i.buyUnit,
-        product_id: i.productId,
-        variant_id: i.variantId,
-        sub_variant_id: i.subVariantId,
-        amount: i.lineAmount,
-      })),
+      items: lines,
     }
+    if (!payload.buyer_same && !(payload.buyer_name && payload.buyer_addr1 && payload.buyer_city))
+      return err('A separate buyer needs buyerName, buyerAddr1 and buyerCity', undefined, 'Or leave buyerSame true')
+
+    const rows = lines.map(l => quotationLineRow(quotationLineSchema.parse(l), gstEnabled))
+    const totals = quotationTotals(rows)
+    // What finalising will ask for; the draft saves without them.
+    const missing = [
+      !payload.consignee_phone && 'phone number',
+      !payload.consignee_addr1 && 'address',
+      !payload.consignee_city && 'city',
+    ].filter(Boolean)
+    const discountTotal = rows.reduce((t, r) => t + r.quantity * (r.sold_unit_factor || 1) * r.rate * (r.discount_pct / 100), 0)
 
     return {
       proposed: true,
       kind: 'create_quotation',
-      payload,
-      confirmation: `Create draft quotation for ${consigneeNameResolved} (${email}) with ${previewItems.length} line${previewItems.length === 1 ? '' : 's'}, total ₹${fmtINR(total)}?`,
+      payload: { ...payload, total: totals.total_amount },
+      confirmation: `Create draft quotation for ${consigneeNameResolved} (${email}) with ${rows.length} line${rows.length === 1 ? '' : 's'}, total ₹${fmtINR(totals.total_amount)}?`,
       ui_blocks: [
-        { type: 'heading', value: `Quotation preview · ${consigneeNameResolved}`, level: 2 },
         {
-          type: 'kv_pairs',
-          pairs: [
-            { key: 'Customer', value: `${consigneeNameResolved} <${email}>` },
-            ...(payload.consignee_phone ? [{ key: 'Phone', value: payload.consignee_phone }] : []),
-            ...(payload.consignee_addr1
-              ? [
+          type: 'document',
+          kind: 'quotation',
+          title: 'Quotation',
+          subtitle: `Draft · ${payload.quote_date}`,
+          status: { label: 'Draft', tone: 'neutral' },
+          parties: [
+            {
+              label: payload.buyer_same ? 'Bill & ship to' : 'Ship to',
+              name: consigneeNameResolved,
+              lines: [
+                [payload.consignee_addr1, payload.consignee_addr2].filter(Boolean).join(', '),
+                [payload.consignee_city, payload.consignee_state, payload.consignee_pincode].filter(Boolean).join(', '),
+                [payload.consignee_phone && `+91 ${payload.consignee_phone}`, email].filter(Boolean).join(' · '),
+                payload.consignee_gstin ? `GSTIN ${payload.consignee_gstin}` : '',
+              ].filter(Boolean),
+            },
+            ...(payload.buyer_same
+              ? []
+              : [
                   {
-                    key: 'Address',
-                    value: [
-                      payload.consignee_addr1,
-                      payload.consignee_addr2,
-                      payload.consignee_city,
-                      payload.consignee_state,
-                      payload.consignee_pincode,
-                    ]
-                      .filter(Boolean)
-                      .join(', '),
+                    label: 'Bill to',
+                    name: payload.buyer_name!,
+                    lines: [
+                      [payload.buyer_addr1, payload.buyer_addr2].filter(Boolean).join(', '),
+                      [payload.buyer_city, payload.buyer_state, payload.buyer_pincode].filter(Boolean).join(', '),
+                      payload.buyer_gstin ? `GSTIN ${payload.buyer_gstin}` : '',
+                    ].filter(Boolean),
                   },
-                ]
-              : []),
-            ...(payload.consignee_gstin ? [{ key: 'GSTIN', value: payload.consignee_gstin }] : []),
+                ]),
           ],
-        },
-        {
-          type: 'table',
-          headers: ['Item', 'Qty', 'Unit ₹', 'Disc%', 'Line ₹'],
-          rows: previewItems.map(i => [
-            i.description + (i.sku ? ` (${i.sku})` : ''),
-            String(i.quantity),
-            fmtINR(i.unitPrice),
-            i.discountPct > 0 ? `${i.discountPct}%` : '—',
-            fmtINR(i.lineAmount),
-          ]),
-        },
-        {
-          type: 'kv_pairs',
-          pairs: [
-            { key: 'Subtotal', value: `₹${fmtINR(subtotal)}` },
-            { key: 'CGST + SGST', value: `₹${fmtINR(cgst + sgst)}` },
-            { key: 'Total', value: `₹${fmtINR(total)}` },
+          lines: rows.map((r, n) => ({
+            name: r.description,
+            sku: meta[n].sku,
+            href: `/admin/products/${r.product_id}`,
+            qty: r.quantity,
+            unit: meta[n].unit ? meta[n].unit!.label : 'pcs',
+            baseQty: r.base_quantity ? `= ${r.base_quantity} pcs` : null,
+            rate: round2(r.rate * (1 + r.gst_rate / 100)),
+            rateNote: 'per pc incl. GST',
+            discountPct: r.discount_pct || null,
+            taxPct: gstEnabled ? r.gst_rate : null,
+            amount: round2(r.amount * (1 + r.gst_rate / 100)),
+            warning: meta[n].stockStatus === 'Out of Stock' ? 'Out of Stock on the store' : null,
+          })),
+          totals: [
+            { key: 'Subtotal (ex GST)', value: round2(totals.subtotal) },
+            ...(discountTotal > 0 ? [{ key: 'Discount (ex GST)', value: round2(discountTotal) }] : []),
+            ...(gstEnabled ? [{ key: 'CGST + SGST', value: round2(totals.cgst_amount + totals.sgst_amount) }] : []),
+            { key: 'Total', value: totals.total_amount, emphasis: true },
           ],
-        },
-        {
-          type: 'text',
-          value: `${previewItems.length} line item${previewItems.length === 1 ? '' : 's'} · status will be "draft" — admin can finalise after creation.`,
-          weight: 'muted',
+          notes: payload.notes,
+          footnote: missing.length
+            ? `Saved as a draft. Add the ${missing.join(', ')} before finalising.`
+            : 'Saved as a draft — finalise it from Quotations.',
         },
       ],
     }
@@ -1133,186 +1273,6 @@ const propose_send_quotation_email: ToolDef = {
   },
 }
 
-const propose_mark_invoice_paid: ToolDef = {
-  name: 'propose_mark_invoice_paid',
-  description:
-    'Propose marking an invoice (an order with invoice_number) as paid. Records payment_mode and an optional paidAt date. Admin must approve.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      invoiceId: { type: 'string', description: 'Order UUID for the invoice.' },
-      invoiceNumber: { type: 'string', description: 'Alternative to invoiceId.' },
-      paymentMode: { type: 'string', description: `One of: ${PAYMENT_MODES.join(', ')}` },
-      paidAt: { type: 'string', description: 'ISO date (YYYY-MM-DD). Defaults to today.' },
-    },
-    required: ['paymentMode'],
-  },
-  mutating: true,
-  handler: async ({ invoiceId, invoiceNumber, paymentMode, paidAt }) => {
-    if (!invoiceId && !invoiceNumber) throw new Error('Provide invoiceId or invoiceNumber')
-    const mode = String(paymentMode || '')
-      .trim()
-      .toLowerCase()
-    if (!PAYMENT_MODES.includes(mode)) throw new Error(`paymentMode must be one of: ${PAYMENT_MODES.join(', ')}`)
-    const dateStr = String(paidAt || '').trim()
-    if (dateStr && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new Error('paidAt must be YYYY-MM-DD')
-
-    const inv = await queryOne<{
-      id: string
-      order_number: string
-      invoice_number: string
-      total_amount: string
-      payment_status: string
-      customer_name: string | null
-    }>(
-      `SELECT id::text, order_number, invoice_number, total_amount::text, payment_status, customer_name
-         FROM orders
-        WHERE (id = $1::uuid OR invoice_number = $2) AND invoice_number IS NOT NULL LIMIT 1`,
-      [invoiceId || '00000000-0000-0000-0000-000000000000', invoiceNumber || '']
-    )
-    if (!inv) throw new Error('Invoice not found')
-    if (inv.payment_status === 'paid') {
-      return { proposed: false, info: `Invoice ${inv.invoice_number} is already paid.` }
-    }
-    if (inv.payment_status === 'refunded') {
-      return { proposed: false, info: `Invoice ${inv.invoice_number} is refunded — cannot mark paid.` }
-    }
-
-    return {
-      proposed: true,
-      kind: 'mark_invoice_paid',
-      payload: {
-        orderId: inv.id,
-        invoiceNumber: inv.invoice_number,
-        paymentMode: mode,
-        paidAt: dateStr || null,
-        amount: Number(inv.total_amount),
-        customerName: inv.customer_name || '',
-      },
-      confirmation: `Mark invoice ${inv.invoice_number} (₹${fmtINR(inv.total_amount)}) as paid via ${mode}?`,
-      ui_blocks: [
-        { type: 'heading', value: `Mark invoice paid`, level: 2 },
-        {
-          type: 'kv_pairs',
-          pairs: [
-            { key: 'Invoice', value: inv.invoice_number },
-            { key: 'Customer', value: inv.customer_name || '—' },
-            { key: 'Amount', value: `₹${fmtINR(inv.total_amount)}` },
-            { key: 'Payment mode', value: mode },
-            { key: 'Paid on', value: dateStr || fmtDate(new Date()) },
-            { key: 'Current status', value: inv.payment_status },
-          ],
-        },
-      ],
-    }
-  },
-}
-
-const propose_update_order_status: ToolDef = {
-  name: 'propose_update_order_status',
-  description: `Propose advancing an order's status. Allowed: ${ORDER_STATUS_FLOW.join(' → ')}. Optionally attach an AWB on shipped. Replaces mark_order_shipped for richer transitions. Flags status regressions in the preview. Digital orders (status "granted" = access granted) never ship and cannot be changed here.`,
-  inputSchema: {
-    type: 'object',
-    properties: {
-      orderId: { type: 'string', description: 'Order UUID.' },
-      orderNumber: { type: 'string', description: 'Alternative to orderId.' },
-      newStatus: { type: 'string', description: ORDER_STATUS_FLOW.join(' | ') },
-      awbNumber: { type: 'string', description: 'Optional AWB; only meaningful when newStatus is shipped.' },
-    },
-    required: ['newStatus'],
-  },
-  mutating: true,
-  handler: async ({ orderId, orderNumber, newStatus, awbNumber }) => {
-    if (!orderId && !orderNumber) throw new Error('Provide orderId or orderNumber')
-    const status = String(newStatus || '')
-      .trim()
-      .toLowerCase()
-    if (!ORDER_STATUS_FLOW.includes(status)) {
-      throw new Error(`newStatus must be one of: ${ORDER_STATUS_FLOW.join(', ')}`)
-    }
-    const awb = awbNumber ? String(awbNumber).trim() : null
-    if (awb && awb.length > 64) throw new Error('awbNumber too long (max 64)')
-
-    const o = await queryOne<{
-      id: string
-      order_number: string
-      status: string
-      payment_status: string
-      customer_name: string | null
-      total_amount: string
-      awb_number: string | null
-      all_digital: boolean | null
-    }>(
-      `SELECT id::text, order_number, status, payment_status, customer_name,
-              total_amount::text, awb_number,
-              (SELECT bool_and(oi.is_digital IS TRUE) FROM order_items oi WHERE oi.order_id = orders.id) AS all_digital
-         FROM orders WHERE id = $1::uuid OR order_number = $2 LIMIT 1`,
-      [orderId || '00000000-0000-0000-0000-000000000000', orderNumber || '']
-    )
-    if (!o) throw new Error('Order not found')
-    if (o.status === status) {
-      return { proposed: false, info: `Order ${o.order_number} is already in status "${status}".` }
-    }
-    // Digital orders are settled by payment (status 'granted'); they never ship.
-    if (o.status === 'granted' || (o.all_digital && status !== 'cancelled')) {
-      return {
-        proposed: false,
-        info: `Order ${o.order_number} is a digital order — access is granted on payment and it has no shipping states.`,
-      }
-    }
-
-    const fromIdx = ORDER_STATUS_FLOW.indexOf(o.status)
-    const toIdx = ORDER_STATUS_FLOW.indexOf(status)
-    const isRegression = fromIdx >= 0 && toIdx >= 0 && toIdx < fromIdx && status !== 'cancelled'
-
-    const blocks: Record<string, unknown>[] = [
-      { type: 'heading', value: `Order ${o.order_number}: ${o.status} → ${status}`, level: 2 },
-      {
-        type: 'kv_pairs',
-        pairs: [
-          { key: 'Customer', value: o.customer_name || '—' },
-          { key: 'Total', value: `₹${fmtINR(o.total_amount)}` },
-          { key: 'Payment', value: o.payment_status },
-          { key: 'From status', value: o.status },
-          { key: 'To status', value: status },
-          ...(awb ? [{ key: 'AWB', value: awb }] : []),
-          ...(o.awb_number && !awb ? [{ key: 'Existing AWB', value: o.awb_number }] : []),
-        ],
-      },
-    ]
-    if (isRegression) {
-      blocks.push({
-        type: 'callout',
-        tone: 'warn',
-        title: 'Status regression',
-        message: `Moving from "${o.status}" back to "${status}" is unusual — confirm this is intentional.`,
-      })
-    }
-    if (status === 'shipped' && !awb && !o.awb_number) {
-      blocks.push({
-        type: 'callout',
-        tone: 'info',
-        message: 'Marking shipped without an AWB number — customer-facing tracking will be empty.',
-      })
-    }
-
-    return {
-      proposed: true,
-      kind: 'update_order_status',
-      payload: {
-        orderId: o.id,
-        orderNumber: o.order_number,
-        fromStatus: o.status,
-        newStatus: status,
-        awbNumber: awb,
-        isRegression,
-      },
-      confirmation: `Move order ${o.order_number} from ${o.status} → ${status}${awb ? ` with AWB ${awb}` : ''}?`,
-      ui_blocks: blocks,
-    }
-  },
-}
-
 export const SALES_TOOLS: ToolDef[] = [
   list_quotations,
   get_quotation,
@@ -1324,6 +1284,4 @@ export const SALES_TOOLS: ToolDef[] = [
   extract_quotation_lines_from_attachment,
   propose_create_quotation,
   propose_send_quotation_email,
-  propose_mark_invoice_paid,
-  propose_update_order_status,
 ]

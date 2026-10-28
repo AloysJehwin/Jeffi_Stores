@@ -75,6 +75,23 @@ CREATE TABLE public.ads_experiments (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+
+--
+-- Name: ads_campaign_drafts; Type: TABLE; Schema: public; Owner: -
+--
+-- New-campaign wizard drafts: the wizard's form state (fields.draft), asset picks (fields.ext)
+-- and step, kept until the campaign is created.
+--
+
+CREATE TABLE public.ads_campaign_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid NOT NULL,
+    title character varying(128),
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 COMMENT ON COLUMN public.ads_experiments.change IS 'What the treatment arm changes, as set from the console (bid strategy / target); null for experiments made elsewhere.';
 
 COMMENT ON COLUMN public.ads_experiments.results IS 'Treatment vs control metrics with point estimate, margin of error and p-value per metric (experiment resource).';

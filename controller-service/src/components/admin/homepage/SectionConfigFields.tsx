@@ -7,6 +7,7 @@ import {
   DateTimeField,
   Grid,
   PlacementFields,
+  SidesField,
   useSectionBinding,
   type EditorProps,
 } from './editors/fields'
@@ -100,6 +101,7 @@ export default function SectionConfigFields(props: EditorProps) {
           {meta.aspect && (
             <Grid>
               <AspectField props={props} />
+              <SidesField props={props} />
             </Grid>
           )}
         </div>

@@ -24,7 +24,7 @@ async function paddle(base64: string): Promise<VisionResponse | null> {
     if (!res.ok) return null
     const body = await res.json().catch(() => null) as { ok?: boolean; text?: string; pages?: number } | null
     if (!body?.ok || !body.text) return null
-    return { ok: true, text: body.text, model: 'PP-OCRv5', pages: body.pages }
+    return { ok: true, text: body.text, model: 'PP-OCRv5', pages: body.pages, provider: 'paddleocr' }
   } catch {
     return null
   } finally {
@@ -58,7 +58,7 @@ async function ollamaVisionAt(base: string, base64Images: string[], prompt: stri
     }
     const data = await res.json().catch(() => null) as { message?: { content?: string } } | null
     const text = (data?.message?.content || '').trim()
-    return { ok: !!text, text, model }
+    return { ok: !!text, text, model, provider: 'ollama' }
   } catch (e: any) {
     if (isNetworkError(e)) throw e
     return {

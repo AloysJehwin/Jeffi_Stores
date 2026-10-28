@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeHomepageDraftDb, sectionRow } from '../../../helpers/homepage-draft-db'
+import { draftHeaders, makeHomepageDraftDb, sectionRow } from '../../../helpers/homepage-draft-db'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
@@ -37,7 +37,7 @@ function req(method: string, body?: unknown) {
   return new NextRequest('http://localhost/api/admin/homepage-sections', {
     method,
     body: body !== undefined ? JSON.stringify(body) : undefined,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...draftHeaders },
   })
 }
 
@@ -49,6 +49,7 @@ beforeEach(() => {
   vi.mocked(authenticateAdmin).mockResolvedValue(admin as any)
   vi.mocked(hasScope).mockReturnValue(true)
   fake.reset({ sections: [sectionRow(A, 0), sectionRow(B, 1), sectionRow(C, 2)] })
+  fake.startDraft()
 })
 
 describe('authorization', () => {
@@ -68,7 +69,7 @@ describe('authorization', () => {
     expect((await PATCH(req('PATCH', { order: [A] }))).status).toBe(403)
     expect((await PATCH_ONE(req('PATCH', { title: 'x' }), paramsFor(A))).status).toBe(403)
     expect((await DELETE(req('DELETE'), paramsFor(A))).status).toBe(403)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
   })
 })
 
@@ -89,7 +90,7 @@ describe('POST', () => {
   it('rejects an unknown section type', async () => {
     const res = await POST(req('POST', { type: 'definitely_not_a_section' }))
     expect(res.status).toBe(400)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
   })
 
   it('appends to a draft copied from live, with table defaults, and leaves live alone', async () => {
@@ -132,7 +133,7 @@ describe('POST', () => {
       })
     )
     expect(res.status).toBe(400)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
   })
 })
 
@@ -180,7 +181,7 @@ describe('PATCH one', () => {
   it('404s an id that is not in the draft and leaves no draft behind', async () => {
     const res = await PATCH_ONE(req('PATCH', { title: 'x' }), paramsFor('aaaaaaaa-0000-4000-8000-00000000ffff'))
     expect(res.status).toBe(404)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
   })
 
   it('404s a section that was already removed in the draft', async () => {
@@ -195,13 +196,13 @@ describe('PATCH one', () => {
       paramsFor(A)
     )
     expect(res.status).toBe(400)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
   })
 
   it('does not create a draft for a save that changes nothing', async () => {
     const res = await PATCH_ONE(req('PATCH', { title: 'Section ' + A }), paramsFor(A))
     expect(res.status).toBe(200)
-    expect(fake.state.draft).toBeNull()
+    expect(fake.state.statements.filter(s => s.startsWith('UPDATE homepage_draft_branches'))).toEqual([])
     expect(fake.state.rollbacks).toBe(1)
   })
 })

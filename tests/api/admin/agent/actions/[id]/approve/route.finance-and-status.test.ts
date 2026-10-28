@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({
+  hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
@@ -184,7 +187,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     expect((await res.json()).error).toMatch(/items missing/)
   })
 
-  it('returns 500 when create_quotation transaction throws', async () => {
+  it('returns the quotations endpoint error for create_quotation', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('create_quotation', {
         consignee_email: 'c@x.com',
@@ -207,10 +210,14 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
         buyer_same: true,
       }) as any
     )
-    mockWithTransaction.mockRejectedValueOnce(new Error('deadlock'))
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'Validation failed', fields: { consignee_state: 'Required' } }),
+    }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/deadlock/)
+    expect((await res.json()).error).toBe('Validation failed — consignee_state: Required')
   })
 
   it('executes create_quotation successfully', async () => {
@@ -236,12 +243,15 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
         buyer_same: true,
       }) as any
     )
-    mockWithTransaction.mockResolvedValueOnce({ id: 'q1', quote_number: 'QT/24-25/JAN/1', view_token: 'tok' } as any)
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => ({ quotation: { id: 'q1', quote_number: 'QT/24-25/JAN/1', total_amount: '236.00', view_token: 'tok' } }) })
+    global.fetch = fetchMock as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.result.quotationId).toBe('q1')
-    expect(body.result.quoteNumber).toMatch(/^QT\//)
+    expect(body.result).toEqual({ quotationId: 'q1', quoteNumber: 'QT/24-25/JAN/1', total: 236, viewToken: 'tok' })
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(sent.items).toHaveLength(1)
+    expect(sent).not.toHaveProperty('total')
   })
 
   // ── send_quotation_email throws branch ────────────────────────────────
@@ -264,11 +274,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   // ── unknown action kind (default branch) ──────────────────────────────
 
-  it('returns 500 for unknown action kind', async () => {
+  it('refuses an unknown action kind', async () => {
     mockQueryOne.mockResolvedValueOnce(proposed('mystery_action', {}) as any)
     const res = await POST(makeReq(), params())
-    expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/Unknown action kind/)
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/can't run/)
   })
 
   // ── status transition: approved → executed / failed ───────────────────

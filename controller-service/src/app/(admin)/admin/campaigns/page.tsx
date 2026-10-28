@@ -7,8 +7,9 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import CampaignsListClient from './CampaignsListClient'
 import ScenariosListClient from './scenarios/ScenariosListClient'
 import CampaignsOverview from './_components/CampaignsOverview'
+import ScenarioDrafts from './_components/ScenarioDrafts'
 import { PageBody, PageHeader, TabAction, TabLinks } from '@/components/admin/kit'
-import PageDrafts from '@/components/admin/drafts/PageDrafts'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -19,7 +20,7 @@ export default async function CampaignsPage({
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
   const sp = await searchParams
-  const tab = sp.tab === 'scenarios' ? 'scenarios' : resolveListTab(sp, [])
+  const tab = sp.tab === 'scenarios' || sp.tab === 'drafts' ? sp.tab : resolveListTab(sp, [])
   const host = await getHost()
   const base = ap('/admin/campaigns', host)
   const period = new URLSearchParams()
@@ -29,6 +30,7 @@ export default async function CampaignsPage({
     { id: 'overview' as const, label: 'Overview', href: period.size ? `${base}?${period}` : base },
     { id: 'list' as const, label: 'Campaigns', href: `${base}?tab=list` },
     { id: 'scenarios' as const, label: 'Scenarios', href: `${base}?tab=scenarios` },
+    { id: 'drafts' as const, label: <DraftsTabLabel type="campaign,scenario" />, href: `${base}?tab=drafts` },
   ]
   return (
     <PageBody>
@@ -38,7 +40,7 @@ export default async function CampaignsPage({
           tabs={tabs}
           value={tab}
           actions={
-            tab === 'overview' ? undefined : (
+            tab === 'overview' || tab === 'drafts' ? undefined : (
               <RequireWrite scope="campaigns:write">
                 {tab === 'scenarios' ? (
                   <TabAction href={ap('/admin/campaigns/scenarios/new', host)} icon={<Plus className="w-4 h-4" />} label="New scenario" />
@@ -56,11 +58,13 @@ export default async function CampaignsPage({
         </Suspense>
       ) : tab === 'scenarios' ? (
         <ScenariosListClient />
+      ) : tab === 'drafts' ? (
+        <PageDrafts type="campaign,scenario">
+          <ScenarioDrafts />
+          <CampaignsListClient draftsOnly />
+        </PageDrafts>
       ) : (
-        <>
-          <PageDrafts type="campaign" />
-          <CampaignsListClient />
-        </>
+        <CampaignsListClient />
       )}
     </PageBody>
   )

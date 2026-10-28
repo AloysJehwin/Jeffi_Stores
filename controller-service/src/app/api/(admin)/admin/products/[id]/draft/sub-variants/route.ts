@@ -6,6 +6,7 @@ import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import { isDigitalProduct } from '@/lib/catalog/digital-guard'
 import { priceErrors, roundMoneyFields } from '@/lib/catalog/product-validation'
 import { actorOf, assertDraftHolder, draftLockResponse, epochFrom, type DraftActor } from '@/lib/admin/draft-locks'
+import { productDraftIdFor } from '@/lib/catalog/product-draft-id'
 
 export const dynamic = 'force-dynamic'
 
@@ -94,10 +95,9 @@ function errorResponse(err: any, productId: string, action: string) {
   return NextResponse.json({ error: err?.message || `Failed to ${action} sub-variant` }, { status: 500 })
 }
 
-async function getAllDraftSubVariants(productId: string): Promise<any[]> {
-  const row = await queryOne<{ sub_variants: any[] }>(`SELECT sub_variants FROM product_drafts WHERE product_id = $1`, [
-    productId,
-  ])
+async function getAllDraftSubVariants(draftId: string | null): Promise<any[]> {
+  if (!draftId) return []
+  const row = await queryOne<{ sub_variants: any[] }>(`SELECT sub_variants FROM product_drafts WHERE id = $1`, [draftId])
   return Array.isArray(row?.sub_variants) ? row!.sub_variants : []
 }
 
@@ -114,23 +114,21 @@ type Client = { query: (sql: string, params?: unknown[]) => Promise<{ rows: any[
 // Locked read-modify-write of product_drafts.sub_variants: concurrent add/edit/delete calls
 // serialise on the draft row instead of overwriting each other's array.
 async function mutateSubVariants<T>(
-  productId: string,
+  draftId: string | null,
   fn: (all: any[], client: Client) => Promise<{ next: any[]; result: T }>,
   lock?: { actor: DraftActor; epoch: number | null }
 ): Promise<T> {
   return withTransaction(async client => {
-    const r = await client.query(`SELECT sub_variants FROM product_drafts WHERE product_id = $1 FOR UPDATE`, [
-      productId,
-    ])
+    const r = draftId ? await client.query(`SELECT sub_variants FROM product_drafts WHERE id = $1 FOR UPDATE`, [draftId]) : { rows: [] }
     if (!r.rows[0]) throw new RouteError('No draft exists for this product. Reload the edit page and try again.', 404)
     const all = Array.isArray(r.rows[0].sub_variants) ? r.rows[0].sub_variants : []
     const { next, result } = await fn(all, client)
-    await client.query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-      productId,
+    await client.query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+      draftId,
       JSON.stringify(next),
     ])
     // Same transaction: a refusal (someone else holds the draft) rolls the write back.
-    await assertDraftHolder(client, lock?.actor, 'product', productId, { epoch: lock?.epoch })
+    await assertDraftHolder(client, lock?.actor, 'product', draftId!, { epoch: lock?.epoch })
     return result
   })
 }
@@ -162,14 +160,15 @@ async function gate(req: NextRequest, write: boolean): Promise<{ denied: NextRes
 // otherwise fall back to the live rows.
 export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params
-  const { denied } = await gate(req, false)
+  const { denied, actor } = await gate(req, false)
   if (denied) return denied
+  const draftId = await productDraftIdFor(req, id, actor?.adminId)
 
   const variantId = req.nextUrl.searchParams.get('variant_id')
   if (!variantId) return NextResponse.json({ error: 'variant_id required' }, { status: 400 })
 
   try {
-    const all = await getAllDraftSubVariants(id)
+    const all = await getAllDraftSubVariants(draftId)
     if (!variantTouched(all, variantId)) {
       const live = await queryMany(`SELECT * FROM product_sub_variants WHERE variant_id = $1 ORDER BY created_at ASC`, [
         variantId,
@@ -190,6 +189,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { denied, actor } = await gate(req, true)
   if (denied) return denied
   const lock = { actor, epoch: epochFrom(req) }
+  const draftId = await productDraftIdFor(req, id, actor?.adminId)
 
   try {
     const variantId = req.nextUrl.searchParams.get('variant_id')
@@ -199,7 +199,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     priceCheck(body)
 
     const newSv = await mutateSubVariants(
-      id,
+      draftId,
       async (stored, client) => {
         const all = await ensureVariantSeeded(client, variantId, stored)
         nameClash(all, variantId, body.sub_variant_name)
@@ -225,12 +225,13 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const { denied, actor } = await gate(req, true)
   if (denied) return denied
   const lock = { actor, epoch: epochFrom(req) }
+  const draftId = await productDraftIdFor(req, id, actor?.adminId)
 
   try {
     const variantId = req.nextUrl.searchParams.get('variant_id')
     const { id: svId } = await readBody(req, DeleteSchema)
     await mutateSubVariants(
-      id,
+      draftId,
       async (stored, client) => {
         const all = variantId ? await ensureVariantSeeded(client, variantId, stored) : stored
         const filtered = all.filter((sv: any) => sv.id !== svId)
@@ -256,6 +257,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { denied, actor } = await gate(req, true)
   if (denied) return denied
   const lock = { actor, epoch: epochFrom(req) }
+  const draftId = await productDraftIdFor(req, id, actor?.adminId)
 
   try {
     const variantId = req.nextUrl.searchParams.get('variant_id')
@@ -263,7 +265,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { id: svId, ...updates } = roundMoneyFields(body)
 
     const result = await mutateSubVariants(
-      id,
+      draftId,
       async (stored, client) => {
         const all = variantId ? await ensureVariantSeeded(client, variantId, stored) : stored
         const existing = all.find((sv: any) => sv.id === svId)

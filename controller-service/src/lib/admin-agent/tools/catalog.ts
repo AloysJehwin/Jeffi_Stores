@@ -33,7 +33,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
   {
     name: 'list_featured_products',
     description:
-      'List products currently flagged as is_featured = TRUE. Returns the same shape as search_products (id, name, sku, price, stock with variant rollup, image_url) so you can drop the result straight into a product_grid ui_block. Use this whenever the admin asks "show me featured products" / "what is currently featured" / "list featured items".',
+      'List products currently flagged as is_featured = TRUE. Returns the same shape as search_products (id, name, sku, price, stock_status, inventory_qty rolled up over variants, image_url) so you can drop the result straight into a product_grid ui_block. Use this whenever the admin asks "show me featured products" / "what is currently featured" / "list featured items".',
     inputSchema: {
       type: 'object',
       properties: {
@@ -51,14 +51,15 @@ export const CATALOG_TOOLS: ToolDef[] = [
         slug: string | null
         sku: string | null
         price: number
-        stock: number
+        stock_status: string
+        inventory_qty: number
         image_url: string | null
         brand: string | null
         category: string | null
       }>(
         `SELECT p.id::text, p.name, p.slug, p.sku,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)::float AS price,
-                ${EFFECTIVE_STOCK_SQL}::int AS stock,
+                p.stock_status, ${EFFECTIVE_STOCK_SQL}::int AS inventory_qty,
                 (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order ASC LIMIT 1) AS image_url,
                 b.name AS brand, c.name AS category
            FROM products p
@@ -69,7 +70,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
           LIMIT $1`,
         [lim]
       )
-      const inStock = rows.filter(r => Number(r.stock) > 0).length
+      // "In stock" as customers see it: the selling status, not the unit count.
+      const inStock = rows.filter(r => r.stock_status !== 'Out of Stock').length
       return ok({
         summary:
           rows.length === 0
@@ -182,7 +184,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
   },
   {
     name: 'list_inventory_low',
-    description: 'Low-stock products (≤ threshold) with brand and best variant detail. Use for restock decisions.',
+    description:
+      'Products whose units on hand (inventory_qty) are at or below a threshold, with brand and the lowest variants. Use for restock decisions. This filters on inventory, not stock status; each row also carries stock_status.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -195,7 +198,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
       const lim = clamp(typeof limit === 'number' ? limit : 50, 1, 200)
       const t = clamp(typeof threshold === 'number' ? threshold : 10, 0, 1000)
       const rows = await queryMany(
-        `SELECT p.id::text, p.name, p.sku, p.inventory_quantity AS stock, p.has_variants,
+        `SELECT p.id::text, p.name, p.sku, p.stock_status, p.inventory_quantity AS inventory_qty, p.has_variants,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
                 b.name AS brand,
                 (SELECT COUNT(*)::int FROM product_variants pv
@@ -205,7 +208,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
                           'id', pv.id::text,
                           'variant_name', pv.variant_name,
                           'sku', pv.sku,
-                          'stock', pv.inventory_quantity))
+                          'stock_status', pv.stock_status,
+                          'inventory_qty', pv.inventory_quantity))
                    FROM (SELECT * FROM product_variants pv2
                           WHERE pv2.product_id = p.id AND pv2.is_active = TRUE
                             AND pv2.inventory_quantity <= $1
@@ -225,7 +229,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
   {
     name: 'get_product_full',
     description:
-      'Full product detail with all variants, sub-variants, and images. Use this (vs get_product) when you need the complete picture for editing or audits.',
+      'Full product detail with all variants, sub-variants, and images. Use this (vs get_product) when you need the complete picture for editing or audits. Each level has stock_status (what the store sells on) and inventory_qty (units on hand); inventory_sync says whether the status follows the units.',
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string' } },
@@ -236,7 +240,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
       const product = await queryOne<any>(
         `SELECT p.id::text, p.name, p.slug, p.sku, p.short_description, p.description,
                 p.base_price::text, p.mrp::text, p.gst_percentage, p.hsn_code,
-                ${EFFECTIVE_STOCK_SQL}::int AS stock, p.is_active, p.is_featured, p.has_variants,
+                p.stock_status, ${EFFECTIVE_STOCK_SQL}::int AS inventory_qty, p.inventory_sync, p.low_stock_threshold,
+                p.is_active, p.is_featured, p.has_variants,
                 p.brand_id::text, p.category_id::text,
                 b.name AS brand_name, c.name AS category_name,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)::float AS effective_price
@@ -249,7 +254,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
       if (!product) return { error: 'Product not found' }
       const variants = await queryMany<any>(
         `SELECT id::text, variant_name, sku, price::text, mrp::text,
-                inventory_quantity AS stock, is_active, attributes
+                stock_status, inventory_quantity AS inventory_qty, is_active, attributes
            FROM product_variants WHERE product_id = $1::uuid ORDER BY variant_name`,
         [id]
       )
@@ -257,7 +262,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
       const subVariants = variantIds.length
         ? await queryMany(
             `SELECT id::text, variant_id::text, sku, sub_variant_name, price::text, mrp::text,
-                    stock_status AS stock, is_active
+                    stock_status, inventory_quantity AS inventory_qty, is_active
                FROM product_sub_variants
               WHERE variant_id = ANY($1::uuid[]) ORDER BY sub_variant_name`,
             [variantIds]
@@ -451,12 +456,12 @@ export const CATALOG_TOOLS: ToolDef[] = [
   {
     name: 'propose_adjust_inventory',
     description:
-      'Propose an inventory adjustment for a product. delta is a signed integer (negative = write-down). Logged in inventory_transactions.',
+      'Propose an inventory adjustment for a product: changes its units on hand (inventory_quantity) by delta, a signed integer (negative = write-down). Logged in inventory_transactions. It does not set the stock status customers see; that follows only when the product has inventory_sync on.',
     inputSchema: {
       type: 'object',
       properties: {
         productId: { type: 'string' },
-        delta: { type: 'integer', description: 'Signed change. e.g. +50 to add stock, -3 to write off damaged.' },
+        delta: { type: 'integer', description: 'Signed change in units on hand. e.g. +50 received, -3 written off as damaged.' },
         reason: { type: 'string', description: 'Required note (1-200 chars).' },
       },
       required: ['productId', 'delta', 'reason'],
@@ -476,8 +481,10 @@ export const CATALOG_TOOLS: ToolDef[] = [
         sku: string
         inventory_quantity: number
         has_variants: boolean
+        stock_status: string
+        inventory_sync: boolean
       }>(
-        `SELECT id::text, name, sku, inventory_quantity, has_variants
+        `SELECT id::text, name, sku, inventory_quantity, has_variants, stock_status, inventory_sync
            FROM products WHERE id = $1::uuid LIMIT 1`,
         [id]
       )
@@ -491,9 +498,10 @@ export const CATALOG_TOOLS: ToolDef[] = [
           type: 'kv_pairs',
           pairs: [
             { key: 'Product', value: `${p.name} (${p.sku})` },
-            { key: 'Current stock', value: String(current) },
-            { key: 'Delta', value: (d > 0 ? '+' : '') + String(d) },
-            { key: 'New stock', value: String(newStock) },
+            { key: 'Units on hand now', value: String(current) },
+            { key: 'Change', value: (d > 0 ? '+' : '') + String(d) },
+            { key: 'Units on hand after', value: String(newStock) },
+            { key: 'Stock status', value: p.inventory_sync ? `${p.stock_status} (follows the units)` : `${p.stock_status} (unchanged)` },
             { key: 'Reason', value: note },
           ],
         },
@@ -502,8 +510,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
         ui_blocks.push({
           type: 'callout',
           tone: 'error',
-          title: 'Negative stock',
-          message: `New stock would be ${newStock}. Inventory cannot be negative; lower the |delta| or add stock first.`,
+          title: 'Negative inventory',
+          message: `Units on hand would be ${newStock}. Inventory cannot be negative; lower the |delta| or add stock first.`,
         })
       }
       if (p.has_variants) {
@@ -511,7 +519,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
           type: 'callout',
           tone: 'info',
           title: 'Product has variants',
-          message: 'This adjusts the parent product row only. Variant-level stock is not changed.',
+          message: 'This adjusts the parent product row only. Variant units on hand are not changed.',
         })
       }
 
@@ -519,7 +527,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
         proposed: true,
         kind: 'adjust_inventory',
         payload: { productId: p.id, productName: p.name, currentStock: current, delta: d, newStock, reason: note },
-        confirmation: `Adjust stock of "${p.name}" by ${d > 0 ? '+' : ''}${d} (→ ${newStock})?`,
+        confirmation: `Adjust units on hand of "${p.name}" by ${d > 0 ? '+' : ''}${d} (→ ${newStock})?`,
         ui_blocks,
       }
     },

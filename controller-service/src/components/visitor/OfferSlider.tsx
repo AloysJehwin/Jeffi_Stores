@@ -10,7 +10,9 @@ import {
   PromoHeading,
   PromoMedia,
 } from '@/components/visitor/slides/PromoCard'
+import BannerSides from '@/components/visitor/home/BannerSides'
 import { offerHref, type ProductOffer } from '@/lib/catalog/product-offers-shared'
+import type { SectionSides } from '@/lib/catalog/homepage-sections'
 
 const PLACEHOLDER =
   'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="640"%3E%3Crect width="100%25" height="100%25" fill="%230d0d0d"/%3E%3C/svg%3E'
@@ -23,12 +25,14 @@ interface Props {
   eyebrow?: string | null
   /** Width / height of the cards, or of a lone offer's banner; null keeps the defaults. */
   aspect?: number | null
+  /** Beside a lone offer's banner when its shape narrows it. */
+  sides?: SectionSides
 }
 
 const shopLabel = (o: ProductOffer) => [`Shop ${o.title}`, o.badge_text, o.subtitle].filter(Boolean).join(', ')
 
 // Several offers are 4:5 cards whose neighbours fade and shrink; a lone offer stays one wide banner.
-export default function OfferSlider({ offers, title, eyebrow, aspect }: Props) {
+export default function OfferSlider({ offers, title, eyebrow, aspect, sides = 'plain' }: Props) {
   if (!offers.length) return null
   const single = offers.length === 1
 
@@ -45,7 +49,13 @@ export default function OfferSlider({ offers, title, eyebrow, aspect }: Props) {
         dots={{ label: i => `Go to offer ${i + 1}`, className: 'mt-3 justify-center' }}
       >
         {offers.map(o =>
-          single ? <OfferBanner key={o.id} offer={o} aspect={aspect} /> : <OfferCard key={o.id} offer={o} />
+          single ? (
+            <BannerSides key={o.id} sides={aspect ? sides : 'plain'} image={o.image_url || o.image_url_mobile}>
+              <OfferBanner offer={o} aspect={aspect} />
+            </BannerSides>
+          ) : (
+            <OfferCard key={o.id} offer={o} />
+          )
         )}
       </Slides>
     </section>

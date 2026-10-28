@@ -1,8 +1,9 @@
 import { createServer } from 'node:http'
 import IORedis from 'ioredis'
 import pg from 'pg'
-import { CONFIG, modelForHint } from './config'
+import { CONFIG, modelForHint, claudeModelForHint } from './config'
 import { ollamaChat, ollamaEmbed, ollamaPool } from './providers/ollama'
+import { anthropicAvailable, anthropicChat, anthropicConfigured, anthropicVision } from './providers/anthropic'
 import { runVision } from './providers/paddleocr'
 import { runJob, startWorker, queueHealth, pendingWaiters, type JobData } from './queue'
 import { policyFor } from './cache/policy'
@@ -17,11 +18,11 @@ import { replicateProvider } from './providers/replicate'
 import {
   handleImageGenerate, handleVideoStart, readVideoJob, advanceVideoJob, readImageCache,
   parseImageRequest, parseImageProviders, parseVideoProviders, textRoute, providerStatus, TEXT_PROVIDER_ORDER,
-  ValidationError, UpstreamError, NotConfiguredError,
+  ValidationError, UpstreamError, NotConfiguredError, TRANSPARENT_NEEDS_REPLICATE,
   type ImageRouterDeps, type VideoRouterDeps,
 } from './media'
 import type {
-  AiChatRequest, AiChatResponse, EmbedRequest, EmbedResponse, VisionRequest, VisionResponse,
+  AiChatRequest, AiChatResponse, AiChatStreamEvent, EmbedRequest, EmbedResponse, VisionRequest, VisionResponse,
   ImageGenerateRequest, ImageGenerateResponse, ProvidersResponse,
 } from '../../sdk/types'
 
@@ -37,6 +38,7 @@ const imageDeps: ImageRouterDeps = {
   redis,
   fileBaseUrl: CONFIG.publicUrl,
   ttlSec: CONFIG.imageCacheTtlSeconds,
+  cutout: replicateProvider,
 }
 const videoDeps: VideoRouterDeps = {
   providers: { google: googleProvider, replicate: replicateProvider },
@@ -93,44 +95,108 @@ function assertOllamaUp(): void {
 /** Truthful dependency check (cached ~probe interval). */
 async function readiness(): Promise<{ ok: boolean; reason?: string; queue: boolean; ollama: Awaited<ReturnType<typeof ollamaPool.health>> }> {
   const [queue, ollama] = await Promise.all([queueHealth(), ollamaPool.health()])
-  const reasons = [!queue && 'redis queue unreachable', !ollama.ok && (ollama.reason || 'Ollama unreachable')].filter(Boolean)
+  // With Claude configured, chat survives an Ollama outage, so Ollama alone does not fail readiness.
+  const reasons = [!queue && 'redis queue unreachable', !ollama.ok && !anthropicConfigured() && (ollama.reason || 'Ollama unreachable')].filter(Boolean)
   return { ok: reasons.length === 0, reason: reasons.join('; ') || undefined, queue, ollama }
 }
 
-// ── Chat with the two-tier cache in front of the durable queue ───────────────
-async function handleChat(req: AiChatRequest): Promise<AiChatResponse> {
-  const start = Date.now()
-  // Only the Ollama pool ('razer') serves chat today; an order without it has nothing to run on.
-  if (!textRoute(req).includes('razer')) throw new NotConfiguredError('no text provider in the requested order is available')
-  const model = modelForHint(req.modelHint)
-  const policy = policyFor(req)
+// ── Chat: providers in route order; each answer goes through the two-tier cache ──────────────
+type Emit = (e: AiChatStreamEvent) => void
 
+async function handleChat(req: AiChatRequest, emit?: Emit, signal?: AbortSignal): Promise<AiChatResponse> {
+  const route = textRoute(req).filter(p => p === 'razer' || anthropicAvailable(req))
+  if (!route.length) throw new NotConfiguredError('no text provider in the requested order is available')
+  const failures: string[] = []
+  for (const provider of route) {
+    const isLast = provider === route[route.length - 1]
+    let emitted = false
+    const tracked: Emit | undefined = emit && (e => { emitted = true; emit(e) })
+    try {
+      const r = provider === 'anthropic' ? await chatAnthropic(req, tracked, signal) : await chatRazer(req, tracked)
+      return failures.length ? { ...r, fallbackUsed: true } : r
+    } catch (err) {
+      // Partial output already reached the client, or nothing left to try: surface the error.
+      if (emitted || isLast || signal?.aborted) throw err
+      const msg = err instanceof Error ? err.message : String(err)
+      failures.push(`${provider}: ${msg}`)
+      console.warn(`[ai-gateway] text provider ${provider} failed, trying next: ${msg.slice(0, 300)}`)
+    }
+  }
+  throw new UpstreamError('all text providers failed', failures.map(f => ({ provider: f.split(':')[0], error: f })))
+}
+
+async function cached(req: AiChatRequest, model: string, provider: AiChatResponse['provider'], start: number): Promise<AiChatResponse | null> {
+  const policy = policyFor(req)
   if (policy.kv) {
     const hit = await kvGet(redis, cacheKey(req, model))
-    if (hit) return { content: hit.content, provider: 'ollama', model: hit.model, latencyMs: Date.now() - start, fallbackUsed: false, cache: 'kv', usage: FREE }
+    if (hit) return { content: hit.content, provider, model: hit.model, latencyMs: Date.now() - start, fallbackUsed: false, cache: 'kv', usage: FREE }
   }
   const sem = policy.semantic ? semanticKey(req, model) : null
   if (sem && pgPool) {
     const hit = await semanticGet(pgPool, sem, policy.similarity)
-    if (hit) return { content: hit, provider: 'ollama', model, latencyMs: Date.now() - start, fallbackUsed: false, cache: 'semantic', usage: FREE }
+    if (hit) return { content: hit, provider, model, latencyMs: Date.now() - start, fallbackUsed: false, cache: 'semantic', usage: FREE }
   }
+  return null
+}
+
+async function remember(req: AiChatRequest, model: string, content: string): Promise<void> {
+  const policy = policyFor(req)
+  if (policy.kv) await kvSet(redis, cacheKey(req, model), { content, model }, policy.ttlSeconds)
+  const sem = policy.semantic ? semanticKey(req, model) : null
+  if (sem && pgPool) await semanticSet(pgPool, sem, content)
+}
+
+async function chatAnthropic(req: AiChatRequest, emit?: Emit, signal?: AbortSignal): Promise<AiChatResponse> {
+  const start = Date.now()
+  const { model } = claudeModelForHint(req.modelHint)
+  const hit = await cached(req, model, 'anthropic', start)
+  if (hit) { emit?.({ type: 'text', text: hit.content }); return hit }
+  const r = await anthropicChat(req, emit, signal)
+  // Only plain, complete text answers are cached (never tool calls).
+  if (!r.toolCalls?.length && r.content && r.stopReason === 'end_turn') await remember(req, model, r.content)
+  return {
+    content: r.content, toolCalls: r.toolCalls, provider: 'anthropic', model: r.model, latencyMs: Date.now() - start,
+    fallbackUsed: false, cache: null, usage: r.usage, providerState: r.providerState, stopReason: r.stopReason,
+  }
+}
+
+async function chatRazer(req: AiChatRequest, emit?: Emit): Promise<AiChatResponse> {
+  const start = Date.now()
+  const model = modelForHint(req.modelHint)
+  const hit = await cached(req, model, 'ollama', start)
+  if (hit) { emit?.({ type: 'text', text: hit.content }); return hit }
 
   assertOllamaUp()
   const r = await runJob<{ content: string; toolCalls?: AiChatResponse['toolCalls']; model: string; promptTokens?: number; completionTokens?: number }>({ kind: 'chat', payload: req })
 
   // Only cache plain text answers (never tool calls).
-  if (!r.toolCalls?.length && r.content) {
-    if (policy.kv) await kvSet(redis, cacheKey(req, model), { content: r.content, model: r.model }, policy.ttlSeconds)
-    if (sem && pgPool) await semanticSet(pgPool, sem, r.content)
-  }
+  if (!r.toolCalls?.length && r.content) await remember(req, model, r.content)
 
+  for (const tc of r.toolCalls ?? []) emit?.({ type: 'tool_call', name: tc.name })
+  if (r.content) emit?.({ type: 'text', text: r.content })
   const usage = tokenUsage('ollama', r.model, r.promptTokens ?? 0, r.completionTokens ?? 0)
   return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false, cache: null, usage }
 }
 
+/** Claude first when it leads the default text order; PaddleOCR/Ollama otherwise or on failure. */
+async function handleVision(body: VisionRequest): Promise<VisionResponse> {
+  if (TEXT_PROVIDER_ORDER[0] === 'anthropic' && anthropicAvailable(body) && !body.model) {
+    try {
+      return await anthropicVision(body)
+    } catch (err) {
+      console.warn(`[ai-gateway] Claude vision failed, falling back: ${(err as Error).message.slice(0, 300)}`)
+    }
+  }
+  return runJob<VisionResponse>({ kind: 'vision', payload: body })
+}
+
 function providersReport(): ProvidersResponse {
+  const text: ProvidersResponse['text'] = [
+    { name: 'anthropic', configured: anthropicConfigured(), keyFallback: !!CONFIG.anthropicApiKey },
+    { name: 'razer', configured: !ollamaPool.knownDown() },
+  ]
   return {
-    text: [{ name: 'razer', configured: !ollamaPool.knownDown() }],
+    text: [...TEXT_PROVIDER_ORDER.map(n => text.find(t => t.name === n)!), ...text.filter(t => !TEXT_PROVIDER_ORDER.includes(t.name))],
     image: providerStatus(imageDeps.order, imageDeps.providers),
     video: providerStatus(videoDeps.order, videoDeps.providers),
     defaults: { text: TEXT_PROVIDER_ORDER, image: imageDeps.order, video: videoDeps.order },
@@ -145,6 +211,8 @@ const FREE = { promptTokens: 0, completionTokens: 0, costInr: 0 }
 async function handleImage(body: ImageGenerateRequest): Promise<ImageGenerateResponse> {
   const start = Date.now()
   const p = parseImageRequest(body)
+  // Checked here too: inside the queue a 400 would surface as a 502.
+  if (p.transparent && !replicateProvider.configured()) throw new ValidationError(TRANSPARENT_NEEDS_REPLICATE)
   if (typeof p.seed !== 'number') {
     const hit = await readImageCache(redis, p.cacheKey)
     if (hit) return { ...hit, latencyMs: Date.now() - start, cache: 'kv' }
@@ -191,6 +259,29 @@ function json(res: import('node:http').ServerResponse, status: number, body: unk
   res.end(s)
 }
 
+function errorStatus(err: unknown): number {
+  return err instanceof HttpError || err instanceof ValidationError || err instanceof UpstreamError || err instanceof NotConfiguredError
+    ? err.status : 500
+}
+
+// NDJSON: one AiChatStreamEvent per line, ending with 'done' or 'error'. Headers go out with the
+// first frame, so a failure before any output is still a plain JSON error with its status.
+async function streamChat(body: AiChatRequest, res: import('node:http').ServerResponse): Promise<void> {
+  const ac = new AbortController()
+  res.on('close', () => { if (!res.writableFinished) ac.abort() })
+  const write = (e: AiChatStreamEvent) => {
+    if (!res.headersSent) res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' })
+    res.write(JSON.stringify(e) + '\n')
+  }
+  try {
+    write({ type: 'done', response: await handleChat(body, write, ac.signal) })
+  } catch (err) {
+    if (!res.headersSent) throw err
+    write({ type: 'error', error: err instanceof Error ? err.message : 'internal error', status: errorStatus(err) })
+  }
+  res.end()
+}
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', 'http://gateway')
@@ -209,6 +300,9 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'POST' && path === '/v1/chat') {
       return json(res, 200, await handleChat(await readBody(req)))
+    }
+    if (req.method === 'POST' && path === '/v1/chat/stream') {
+      return await streamChat(await readBody(req), res)
     }
     if (req.method === 'POST' && path === '/v1/embed') {
       const body = await readBody(req)
@@ -237,13 +331,12 @@ const server = createServer(async (req, res) => {
       return void res.end(f.bytes)
     }
     if (req.method === 'POST' && path === '/v1/vision') {
-      const r = await runJob<VisionResponse>({ kind: 'vision', payload: await readBody(req) })
+      const r = await handleVision(await readBody(req))
       return json(res, !r.ok && ollamaPool.knownDown() ? 503 : 200, r)
     }
     json(res, 404, { error: 'not found' })
   } catch (err) {
-    const status = err instanceof HttpError || err instanceof ValidationError || err instanceof UpstreamError || err instanceof NotConfiguredError
-      ? err.status : 500
+    const status = errorStatus(err)
     const body: Record<string, unknown> = { error: err instanceof Error ? err.message : 'internal error' }
     if (err instanceof UpstreamError) body.tried = err.tried
     json(res, status, body)
@@ -252,5 +345,5 @@ const server = createServer(async (req, res) => {
 
 server.listen(CONFIG.port, () => {
   // eslint-disable-next-line no-console
-  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama [${CONFIG.ollamaBaseUrls.join(', ')}]`)
+  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama [${CONFIG.ollamaBaseUrls.join(', ')}], text order [${TEXT_PROVIDER_ORDER.join(', ')}]`)
 })

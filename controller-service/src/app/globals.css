@@ -415,3 +415,23 @@ body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-botto
 @container (min-width: 636px) { .kpi-grid > div { --cols: var(--kpi-c4); } }
 @container (min-width: 798px) { .kpi-grid > div { --cols: var(--kpi-c5); } }
 @container (min-width: 960px) { .kpi-grid > div { --cols: var(--kpi-c6); } }
+
+/* A homepage box in the admin's chosen shape. Size containment lets the ratio alone set its height (the
+   copy can't stretch it); on a short shape the copy sheds extras: -short below 15rem, -shorter below
+   10rem, -tiny below 5.5rem. */
+.shape-box {
+  container-type: size;
+}
+@container (max-height: 15rem) {
+  .shape-box .shape-short-hide { display: none; }
+  .shape-box .shape-short-tight { padding-top: 1rem; padding-bottom: 1rem; gap: 0.5rem; }
+  .shape-box .shape-short-title { font-size: clamp(1rem, 16cqh, 1.75rem); }
+  .shape-box .shape-short-tight.shape-above-dots { padding-bottom: 2.25rem; }
+  .shape-box .shape-short-cta { padding: 0.5rem 1rem; font-size: 0.75rem; }
+}
+@container (max-height: 10rem) {
+  .shape-box .shape-shorter-hide { display: none; }
+}
+@container (max-height: 5.5rem) {
+  .shape-box .shape-tiny-hide { display: none; }
+}

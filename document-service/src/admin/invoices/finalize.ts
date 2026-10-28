@@ -9,6 +9,7 @@ import { getFeatureFlags } from '../../lib/site-controls'
 import { sendInvoiceFinalizedEmail } from '../../lib/mail'
 import { generateOrderInvoice, assignInvoiceNumber } from '../../lib/invoice'
 import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
+import { assertCompleteLines, IncompleteLinesError } from '../../lib/invoice-line-items'
 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,10 +29,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     } catch (_) {}
 
     const order = await queryOne<any>(
-      `SELECT id, status, source, customer_name, customer_email, total_amount, order_number FROM orders WHERE id = $1`,
+      `SELECT id, status, source, customer_name, customer_email, total_amount, order_number, draft_of_id FROM orders WHERE id = $1`,
       [id]
     )
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+    if (order.draft_of_id)
+      return NextResponse.json({ error: 'This is an amendment draft — publish the amendment instead' }, { status: 400 })
     const allowedStatuses = ['draft', 'confirmed', 'delivered', 'granted', 'processing']
     if (!allowedStatuses.includes(order.status)) {
       return NextResponse.json({ error: 'Invoice is already finalized' }, { status: 400 })
@@ -54,6 +57,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (!items.length) {
         throw new Error('Cannot finalize an invoice with no items')
       }
+      // A draft may have been saved with half-filled custom lines.
+      assertCompleteLines(
+        [...items]
+          .sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))
+          .map(i => ({ product_id: i.product_id, name: i.product_name, rate: i.unit_price }))
+      )
 
       if (inventoryValidationEnabled && hasScope(admin.role, admin.scopes, 'inventory:read')) {
         // Store-product lines only (custom lines have no product_id). Online cart lines
@@ -112,6 +121,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (err: any) {
     const locked = draftLockResponse(err)
     if (locked) return locked
+    if (err instanceof IncompleteLinesError) return NextResponse.json({ error: err.message }, { status: 400 })
     if (err instanceof InsufficientStockError)
       return NextResponse.json({ error: `Cannot finalize — ${err.message}`, code: err.code }, { status: 409 })
     console.error(`[admin/invoices/drafts/${(await params).id}/finalize] failed`, err)

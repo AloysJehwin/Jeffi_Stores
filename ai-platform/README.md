@@ -131,6 +131,10 @@ Providers:
 | google | `GOOGLE_AI_API_KEY` | `gemini-3.1-flash-image` (`gemini-3-pro-image` for premium) via `/v1beta/interactions`; optional Imagen `:predict` fallback via `GOOGLE_IMAGEN_MODEL` | `veo-3.1-fast-generate-preview`, fallback `veo-3.0-generate-001`; 4/6/8 s, 16:9 or 9:16, 720p |
 | replicate | `REPLICATE_API_TOKEN` | `black-forest-labs/flux-schnell` (draft), `flux-dev` (standard), `flux-1.1-pro` (premium) | `wan-video/wan-2.2-t2v-fast` (`wan-2.2-i2v-fast` with an image) |
 
+`transparent: true` on an image request adds an isolate-the-subject hint to the prompt, then cuts each image out with
+`REPLICATE_BG_REMOVAL_MODEL` (default `bria/remove-background`) on Replicate, whichever provider drew it. Without a
+Replicate token such requests are rejected (400) rather than returned opaque.
+
 Tests: `npm test` (vitest, all network mocked).
 
 ## Migrate to cloud

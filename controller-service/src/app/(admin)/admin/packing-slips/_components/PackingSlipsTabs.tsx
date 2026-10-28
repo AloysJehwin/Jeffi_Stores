@@ -1,7 +1,7 @@
 'use client'
 
 import { Tabs } from '@/components/admin/channels/ui'
-import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { ListFilters, PageHeader, useFilterQuery } from '@/components/admin/kit'
 import { isListUrl } from '@/lib/admin/filter-url'
 import { PACKING_FIELDS, PACKING_SEARCH } from '@/lib/filters/fields/packing-slips'
 import { OverviewPanel, useTab } from '../../orders/_components/overview-shared'
@@ -19,19 +19,20 @@ export default function PackingSlipsTabs() {
     legacy: sp => (isListUrl(Object.fromEntries(sp), PACKING_FIELDS) ? 'slips' : null),
   })
   const filters = useFilterQuery(PACKING_FIELDS, { omit: ['from', 'to'] })
-  const bar = (
-    <div className="mb-5">
-      <Tabs tabs={[...TABS]} value={tab} onChange={setTab} />
-    </div>
+  const header = (
+    <>
+      <div className="mb-5">
+        <PageHeader title="Packing Slips" description="Packing slips, shipping labels and invoices for each order" />
+      </div>
+      <div className="mb-5">
+        <Tabs tabs={[...TABS]} value={tab} onChange={setTab} />
+      </div>
+    </>
   )
-  if (tab === 'slips') return <PackingSlipsClient tabs={bar} />
+  if (tab === 'slips') return <PackingSlipsClient header={header} />
   return (
     <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Packing Slips</h1>
-        <p className="text-sm text-foreground-muted mt-1">Download packing slips to attach to parcels</p>
-      </div>
-      {bar}
+      {header}
       {/* The period is the slips list's order date; the strip follows the other filters too. */}
       <OverviewPanel
         endpoint="/api/admin/packing-slips/overview"

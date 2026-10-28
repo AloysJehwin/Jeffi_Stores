@@ -1,7 +1,8 @@
 import { loadConfig, type SdkConfig } from './config'
-import { post, get, getHealth } from './transport'
+import { post, get, getHealth, postNdjson } from './transport'
+import { AiClientError } from './types'
 import type {
-  AiChatRequest, AiChatResponse,
+  AiChatRequest, AiChatResponse, AiChatStreamEvent,
   EmbedRequest, EmbedResponse,
   VisionRequest, VisionResponse,
   ImageGenerateRequest, ImageGenerateResponse,
@@ -29,6 +30,22 @@ export function configure(overrides: Partial<SdkConfig>): void {
  */
 export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
   return post<AiChatResponse>(cfg(), '/v1/chat', req)
+}
+
+/**
+ * Streaming chat: calls onEvent for each text delta / tool-call start, resolves with the final
+ * response (same shape as aiChat). Abort with `signal`.
+ */
+export async function aiChatStream(
+  req: AiChatRequest,
+  opts: { onEvent?: (e: AiChatStreamEvent) => void; signal?: AbortSignal } = {},
+): Promise<AiChatResponse> {
+  for await (const e of postNdjson<AiChatStreamEvent>(cfg(), '/v1/chat/stream', req, opts.signal)) {
+    if (e.type === 'done') return e.response
+    if (e.type === 'error') throw new AiClientError(`AI gateway stream: ${e.error}`, 'gateway')
+    opts.onEvent?.(e)
+  }
+  throw new AiClientError('AI gateway stream ended without a result', 'gateway')
 }
 
 /** Text embeddings (RAG, semantic cache). */

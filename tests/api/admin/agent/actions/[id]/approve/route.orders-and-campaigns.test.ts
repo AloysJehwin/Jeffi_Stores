@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({
+  hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
@@ -99,48 +102,45 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── mark_invoice_paid ─────────────────────────────────────────────────────
 
   it('mark_invoice_paid success', async () => {
-    primeAction(action('mark_invoice_paid', { orderId: 'o1', paymentMode: 'cash', paidAt: null }), {
-      id: 'o1',
-      invoice_number: 'INV-1',
-      payment_status: 'paid',
-      invoice_date: null,
-    })
+    primeAction(action('mark_invoice_paid', { orderId: 'o1', paymentMode: 'cash', paidAt: null }))
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
-  it('mark_invoice_paid not found', async () => {
-    primeAction(action('mark_invoice_paid', { orderId: 'o1', paymentMode: 'cash', paidAt: '2026-01-01' }), null)
+  it('mark_invoice_paid refused by the payment-status route', async () => {
+    primeAction(action('mark_invoice_paid', { orderId: 'o1', paymentMode: 'cash', paidAt: '2026-01-01' }))
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: 'Order not found' }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
+    expect((await res.json()).error).toBe('Order not found')
   })
 
   // ── update_order_status ───────────────────────────────────────────────────
 
-  it('update_order_status invalid status', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      action('update_order_status', { orderId: 'o1', newStatus: 'bad', awbNumber: null })
-    )
+  it('update_order_status rejected by the order endpoint', async () => {
+    mockQueryOne.mockResolvedValueOnce(action('update_order_status', { orderId: 'o1', newStatus: 'bad', awbNumber: null }))
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: "Cannot transition order from 'pending' to 'bad'" }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/invalid status/i)
+    expect((await res.json()).error).toMatch(/cannot transition/i)
   })
 
   it('update_order_status shipped with awb success', async () => {
-    primeAction(action('update_order_status', { orderId: 'o1', newStatus: 'shipped', awbNumber: 'AWB1' }), {
-      id: 'o1',
-      order_number: 'ORD-1',
-      status: 'shipped',
-      awb_number: 'AWB1',
-    })
+    primeAction(action('update_order_status', { orderId: 'o1', newStatus: 'shipped', awbNumber: 'AWB1' }))
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true }) } as any)
+    global.fetch = fetchMock
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('update_order_status pending (no ts col) not found', async () => {
-    primeAction(action('update_order_status', { orderId: 'o1', newStatus: 'pending', awbNumber: null }), null)
+  it('update_order_status fails when the AWB cannot be saved', async () => {
+    primeAction(action('update_order_status', { orderId: 'o1', newStatus: 'shipped', awbNumber: 'AWB1' }))
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ error: 'Insufficient permissions' }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
+    expect((await res.json()).error).toMatch(/AWB/)
   })
 
   // ── create_coupon ─────────────────────────────────────────────────────────

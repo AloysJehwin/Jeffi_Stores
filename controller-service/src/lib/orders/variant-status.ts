@@ -22,6 +22,18 @@ async function patchDraft(
       WHERE product_id = $1 AND jsonb_typeof(${column}) = 'array' AND jsonb_array_length(${column}) > 0`,
     [productId, rowId, active]
   )
+  // Same flip on each draft's base, so the merge on publish doesn't count it as anyone's edit.
+  await client.query(
+    `UPDATE product_drafts
+        SET base = jsonb_set(base, ARRAY['${column}'], (
+              SELECT COALESCE(jsonb_agg(
+                       CASE WHEN e->>'id' = $2 THEN jsonb_set(e, '{is_active}', to_jsonb($3::boolean)) ELSE e END
+                       ORDER BY ord), '[]'::jsonb)
+                FROM jsonb_array_elements(base->'${column}') WITH ORDINALITY AS t(e, ord)
+            ))
+      WHERE product_id = $1 AND jsonb_typeof(base->'${column}') = 'array' AND jsonb_array_length(base->'${column}') > 0`,
+    [productId, rowId, active]
+  )
 }
 
 export async function setVariantActive(productId: string, variantId: string, active: boolean): Promise<boolean> {

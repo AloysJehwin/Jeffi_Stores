@@ -80,7 +80,8 @@ Opening an editor session acquires the lock in the same transaction (423 if some
 ### Realtime and housekeeping
 
 - Lock changes go out on the admin event stream (`dl:<tenant>` pub/sub, plus a `draft_locks.updated_at` poll so changes arrive without Redis and from document-service). Editors open on a draft heartbeat presence every 20 s; a viewer drops out after 45 s without one.
-- `/admin/drafts` lists drafts by tab: **Mine**, **All locked**, **Unclaimed**, with claim / release / hand over / take over where allowed.
+- Each list page has a **Drafts** tab (live count in the label): publish / discard rows, then the lock table by **In progress**, **Mine**, **Unclaimed**, with claim / release / hand over / take over / request where allowed. `/admin/drafts` redirects to the dashboard.
+- **Request access** notifies the holder in the bell and, if they have the draft open, with a toast pointing at Hand over. A repeat within 5 minutes returns 429.
 - The 5-minute `cron/sweep-sessions` job deletes stale presence, closes locks whose draft no longer exists (`orphaned`), releases locks held by inactive admins, and deletes tombstones older than 7 days.
 
 ## UI: the shared `FormFooter` bottom bar

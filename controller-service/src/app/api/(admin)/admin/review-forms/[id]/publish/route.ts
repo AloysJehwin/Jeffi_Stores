@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne } from '@/lib/shared/db'
-import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
+import { actorOf, draftLockResponse, epochFrom } from '@/lib/admin/draft-locks'
+import { draftConflictResponse, getDraftRow } from '@/lib/admin/draft-branches'
+import { reviewFormDrafts, publishReviewFormDraft } from '@/lib/catalog/review-form-draft'
 
 export const dynamic = 'force-dynamic'
 interface Params {
   params: Promise<{ id: string }>
 }
 
-// POST — publish draft to live
+// POST ?draft=<id> { resolutions? } — merge the draft into live; 409 lists overlapping edits.
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
@@ -17,50 +18,19 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'review_forms:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const draft = await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
-    `SELECT form_id, fields FROM review_form_drafts WHERE form_id = $1`,
-    [id]
-  )
-  if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
+  const body = await req.json().catch(() => ({}))
+  const draftId = req.nextUrl.searchParams.get('draft') ?? body?.draftId
+  if (!draftId) return NextResponse.json({ error: 'Missing draft' }, { status: 400 })
+  const row = await getDraftRow(reviewFormDrafts, draftId)
+  if (!row || row.form_id !== id) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 
-  const f = draft.fields as any
   try {
-    await withDraftPublish(
-      actorOf(admin),
-      'review_form',
-      id,
-      async db => {
-        await db.query(
-          `UPDATE review_forms SET
-           title = COALESCE($2, title),
-           slug = COALESCE($3, slug),
-           template_type = COALESCE($4, template_type),
-           google_review_url = COALESCE($5, google_review_url),
-           coupon_id = $6::uuid,
-           description = $7,
-           is_active = COALESCE($8::boolean, is_active),
-           custom_fields = COALESCE($9::jsonb, custom_fields)
-         WHERE id = $1`,
-          [
-            id,
-            f.title || null,
-            f.slug || null,
-            f.template_type || null,
-            f.google_review_url || null,
-            f.coupon_id || null,
-            f.description ?? null,
-            f.is_active != null ? f.is_active : null,
-            f.custom_fields ? JSON.stringify(f.custom_fields) : null,
-          ]
-        )
-        await db.query(`DELETE FROM review_form_drafts WHERE form_id = $1`, [id])
-      },
-      { epoch: epochFrom(req) }
-    )
-  } catch (err) {
-    const locked = draftLockResponse(err)
-    if (locked) return locked
-    throw err
+    const r = await publishReviewFormDraft(draftId, { actor: actorOf(admin), resolutions: body?.resolutions, epoch: epochFrom(req) })
+    return NextResponse.json({ success: true, formId: id, revision: r.revision })
+  } catch (err: unknown) {
+    const handled = draftLockResponse(err) ?? draftConflictResponse(err)
+    if (handled) return handled
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: msg || 'Failed to publish' }, { status: 500 })
   }
-  return NextResponse.json({ success: true })
 }

@@ -4,6 +4,8 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { parseBody } from '@/lib/shared/validate'
+import { recordDirectRevision } from '@/lib/admin/entity-revisions'
+import { supplierContentOf } from '@/lib/admin/supplier-drafts'
 
 const PatchSchema = z
   .object({
@@ -139,7 +141,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updates.push(`updated_at = NOW()`)
     values.push(id)
 
-    await query(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = $${i}`, values)
+    // Before and after in one statement, so drafts open on this supplier see who changed what.
+    const res = await query<{ before: Record<string, unknown>; after: Record<string, unknown> }>(
+      `WITH old AS (SELECT * FROM suppliers WHERE id = $${i} FOR UPDATE)
+       UPDATE suppliers s SET ${updates.join(', ')} FROM old WHERE s.id = old.id
+       RETURNING to_jsonb(old) AS before, to_jsonb(s) AS after`,
+      values
+    )
+    const row = res.rows[0]
+    if (row)
+      await recordDirectRevision({ type: 'supplier', id, before: supplierContentOf(row.before), after: supplierContentOf(row.after), actorAdminId: admin.adminId })
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

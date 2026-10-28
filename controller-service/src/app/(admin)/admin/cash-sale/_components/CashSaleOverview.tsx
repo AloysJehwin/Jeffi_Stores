@@ -25,12 +25,6 @@ export default function CashSaleOverview() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Cash Sales</h1>
-        <p className="text-sm text-foreground-muted mt-0.5">
-          Counter sales: takings, bills, payment modes, busy hours and best sellers
-        </p>
-      </div>
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       <ListFilters
         entity="cash_sale"

@@ -28,7 +28,7 @@ import { Card, Field, Fields } from '@/components/admin/kit/layout'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
 import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, STATUS_BADGE } from '@/components/admin/purchasing/shared'
-import { FormFooter } from '@/components/admin/kit/form'
+import { FormButton, FormFooter } from '@/components/admin/kit/form'
 import { DraftLockBadge, DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders } from '@/lib/client/draft-lock-client'
@@ -207,16 +207,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const [scanSerials, setScanSerials] = useState(true)
   const [draftRestored, setDraftRestored] = useState(false)
-  const [poDrafts, setPoDrafts] = useState<
-    { id: string; supplier_name: string | null; line_count: number; updated_at: string }[]
-  >([])
-
-  useEffect(() => {
-    fetch('/api/admin/inventory/po/draft', { credentials: 'include' })
-      .then(r => (r.ok ? r.json() : { drafts: [] }))
-      .then(j => setPoDrafts(j.drafts || []))
-      .catch(() => setPoDrafts([]))
-  }, [])
   // Refs to every serial input, keyed "itemIdx:slotIdx", so Enter/scan can advance focus.
   const serialInputRefs = React.useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -738,7 +728,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
         <DetailHeader
           title={`Receive Goods — ${receiveMode.po.po_number}`}
           subtitle={`Supplier: ${receiveMode.po.supplier_name}`}
-          secondary={[{ key: 'back', label: 'Back', icon: ChevronLeft, onClick: cancelReceive }]}
           actions={
           <button
             type="button"
@@ -772,19 +761,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             <p className="text-sm text-foreground flex-1">
               Restored your unsaved progress for this PO. Your entries auto-save as you go.
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  localStorage.removeItem(`po_receive_draft:${receiveMode.po.id}`)
-                } catch {}
-                setDraftRestored(false)
-                openReceive(receiveMode.po.id)
-              }}
-              className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline shrink-0"
-            >
-              Discard draft
-            </button>
           </div>
         )}
         <LockedFieldset readOnly={receiveLock.readOnly} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
@@ -1122,24 +1098,24 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
         <FormFooter
           lock={receiveLock}
           cancel={cancelReceive}
-          cancelLabel="Cancel"
+          discard={
+            draftRestored
+              ? () => {
+                  try {
+                    localStorage.removeItem(`po_receive_draft:${receiveMode.po.id}`)
+                  } catch {}
+                  setDraftRestored(false)
+                  openReceive(receiveMode.po.id)
+                }
+              : undefined
+          }
         >
-          <button
-            type="button"
-            className="control-md inline-flex items-center border border-border-secondary bg-surface text-foreground-secondary hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={saveDraftAndExit}
-            disabled={receiveSaving}
-          >
+          <FormButton type="button" variant="secondary" onClick={saveDraftAndExit} disabled={receiveSaving}>
             Save as Draft
-          </button>
-          <button
-            type="button"
-            className="control-md inline-flex items-center border border-accent-500 bg-accent-500 text-white font-medium hover:bg-accent-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={submitReceive}
-            disabled={receiveSaving}
-          >
-            {receiveSaving ? 'Saving...' : 'Confirm Receipt'}
-          </button>
+          </FormButton>
+          <FormButton type="button" onClick={submitReceive} pending={receiveSaving} pendingLabel="Saving...">
+            Confirm Receipt
+          </FormButton>
         </FormFooter>
       </div>
     )
@@ -1434,28 +1410,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
         tab="orders"
         exportable
       />
-
-      {poDrafts.length > 0 && (
-        <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-              {poDrafts.length} draft{poDrafts.length === 1 ? '' : 's'} in progress — resume where you left off:
-            </span>
-            <div className="flex items-center gap-2 flex-wrap">
-              {poDrafts.slice(0, 5).map(d => (
-                <Link
-                  key={d.id}
-                  href={ap(`/admin/purchase-orders/new?draftId=${d.id}`)}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-amber-500/40 bg-surface text-xs text-foreground hover:bg-surface-secondary transition"
-                >
-                  <span className="font-medium">{d.supplier_name || 'No supplier'}</span>
-                  <span className="text-foreground-muted">· {d.line_count} line{d.line_count === 1 ? '' : 's'}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">

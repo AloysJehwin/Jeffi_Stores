@@ -22,10 +22,10 @@ export default function CategoryGrid({ categories, title, eyebrow, carousel = fa
   const items = categories.map(category => (
     <Link key={category.id} href={`/categories/${category.slug}`} className="group">
       <div
-        className={aspect ? `${TILE} justify-center` : TILE}
+        className={aspect ? `${TILE} shape-box justify-center overflow-hidden` : TILE}
         style={aspect ? { aspectRatio: aspect } : undefined}
       >
-        <div className="w-14 h-14 sm:w-12 sm:h-12 bg-primary-100 dark:bg-primary-900/25 rounded-2xl sm:rounded-xl flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 group-active:scale-95 transition-all shrink-0">
+        <div className="shape-tiny-hide w-14 h-14 sm:w-12 sm:h-12 bg-primary-100 dark:bg-primary-900/25 rounded-2xl sm:rounded-xl flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 group-active:scale-95 transition-all shrink-0">
           <CategoryIcon categoryName={category.name} className="w-6 h-6 text-primary-600 dark:text-primary-400" />
         </div>
         <span className="text-[11px] sm:text-xs font-semibold sm:font-bold text-foreground group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2 flex items-start sm:items-center justify-center min-h-[2rem] sm:min-h-[2.25rem] min-w-0 px-0.5">

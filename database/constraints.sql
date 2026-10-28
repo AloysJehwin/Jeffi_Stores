@@ -331,6 +331,17 @@ ALTER TABLE ONLY public.business_rfqs
     ADD CONSTRAINT business_rfqs_pkey PRIMARY KEY (id);
 
 
+--
+-- Name: rfq_reply_drafts rfq_reply_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rfq_reply_drafts
+    ADD CONSTRAINT rfq_reply_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.rfq_reply_drafts
+    ADD CONSTRAINT rfq_reply_drafts_counter_prices_check CHECK ((jsonb_typeof(counter_prices) = 'object'::text));
+
+
 
 --
 -- Name: business_rfqs business_rfqs_rfq_number_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -374,6 +385,21 @@ ALTER TABLE ONLY public.cart_items
 
 ALTER TABLE ONLY public.cash_sale_items
     ADD CONSTRAINT cash_sale_items_pkey PRIMARY KEY (id);
+
+
+
+--
+-- Name: cash_sale_drafts cash_sale_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cash_sale_drafts
+    ADD CONSTRAINT cash_sale_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.cash_sale_drafts
+    ADD CONSTRAINT cash_sale_drafts_payment_mode_check CHECK (((payment_mode)::text = ANY ((ARRAY['cash'::character varying, 'upi'::character varying, 'upi_qr'::character varying])::text[])));
+
+ALTER TABLE ONLY public.cash_sale_drafts
+    ADD CONSTRAINT cash_sale_drafts_items_check CHECK ((jsonb_typeof(items) = 'array'::text));
 
 
 
@@ -482,6 +508,17 @@ ALTER TABLE ONLY public.reward_game_plays
 
 ALTER TABLE ONLY public.custom_scenarios
     ADD CONSTRAINT custom_scenarios_pkey PRIMARY KEY (kind);
+
+
+--
+-- Name: scenario_drafts scenario_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scenario_drafts
+    ADD CONSTRAINT scenario_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.scenario_drafts
+    ADD CONSTRAINT scenario_drafts_fields_check CHECK ((jsonb_typeof(fields) = 'object'::text));
 
 
 
@@ -863,6 +900,17 @@ ALTER TABLE ONLY public.ads_campaigns
 ALTER TABLE ONLY public.ads_experiments
     ADD CONSTRAINT ads_experiments_pkey PRIMARY KEY (experiment_id);
 
+
+--
+-- Name: ads_campaign_drafts ads_campaign_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_campaign_drafts
+    ADD CONSTRAINT ads_campaign_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_campaign_drafts
+    ADD CONSTRAINT ads_campaign_drafts_fields_check CHECK ((jsonb_typeof(fields) = 'object'::text));
+
 --
 -- Name: ads_ad_groups ads_ad_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -1004,14 +1052,11 @@ ALTER TABLE ONLY public.ads_alerts
 
 
 --
--- Name: homepage_drafts homepage_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: homepage_draft_branches homepage_draft_branches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.homepage_drafts
-    ADD CONSTRAINT homepage_drafts_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY public.homepage_drafts
-    ADD CONSTRAINT homepage_drafts_singleton CHECK (id);
+ALTER TABLE ONLY public.homepage_draft_branches
+    ADD CONSTRAINT homepage_draft_branches_pkey PRIMARY KEY (id);
 
 
 --
@@ -1161,6 +1206,17 @@ ALTER TABLE ONLY public.admin_notifications
 
 ALTER TABLE ONLY public.order_items
     ADD CONSTRAINT order_items_pkey PRIMARY KEY (id);
+
+
+
+--
+-- Name: entity_revisions entity_revisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.entity_revisions
+    ADD CONSTRAINT entity_revisions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.entity_revisions
+    ADD CONSTRAINT entity_revisions_resource_revision_key UNIQUE (resource_type, resource_id, revision);
 
 
 
@@ -3825,7 +3881,7 @@ ALTER TABLE ONLY public.campaign_drafts
 -- offer_drafts
 --
 ALTER TABLE ONLY public.offer_drafts
-    ADD CONSTRAINT offer_drafts_pkey PRIMARY KEY (offer_id);
+    ADD CONSTRAINT offer_drafts_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.offer_drafts
     ADD CONSTRAINT offer_drafts_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES public.product_offers(id) ON DELETE CASCADE;
 

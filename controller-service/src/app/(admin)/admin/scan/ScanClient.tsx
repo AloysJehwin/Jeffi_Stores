@@ -308,12 +308,6 @@ export default function ScanClient() {
               />
             </svg>
           </div>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-foreground">QuickScan</h1>
-            <p className="text-foreground-muted mt-1 text-sm">
-              Scan a packing slip QR to update orders, or a product label QR to view product details
-            </p>
-          </div>
           <button
             onClick={startCamera}
             className="w-full max-w-xs py-4 bg-secondary-500 hover:bg-secondary-600 active:bg-secondary-700 text-white font-semibold rounded-2xl text-lg transition-colors"

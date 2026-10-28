@@ -1,12 +1,14 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Info } from 'lucide-react'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
-import { Card, DetailHeader, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, EmptyState, Badge, ViewDraftLink } from '@/components/admin/kit'
-import { heldDraftForView } from '@/lib/admin/draft-locks'
+import { Card, DetailHeader, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, EmptyState, Badge } from '@/components/admin/kit'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { draftsForView } from '@/lib/admin/draft-branches'
+import { brandDrafts } from '@/lib/catalog/brand-draft'
+import EntityDrafts from '@/components/admin/drafts/EntityDrafts'
 import { startBrandDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -49,9 +51,10 @@ export default async function BrandViewPageDetail({
   const brand = await queryOne<Brand>('SELECT * FROM brands WHERE id = $1', [id])
   if (!brand) notFound()
 
-  const [hasDraft, held, products, counts] = await Promise.all([
-    queryOne<{ brand_id: string }>('SELECT brand_id FROM brand_drafts WHERE brand_id = $1', [id]),
-    heldDraftForView('brand', id, `/admin/brands/${id}/edit`, backUrl),
+  const session = await getAdminSession()
+  const me = session?.adminId ?? null
+  const [drafts, products, counts] = await Promise.all([
+    draftsForView(brandDrafts, id, me),
     queryMany<ProductRow>(
       'SELECT id, name, sku, is_active, base_price FROM products WHERE brand_id = $1 ORDER BY name LIMIT 20',
       [id]
@@ -64,6 +67,7 @@ export default async function BrandViewPageDetail({
     ),
   ])
 
+  const myDraft = drafts.find(d => d.authorId === me)
   const totalProducts = parseInt(counts?.total || '0', 10)
   const activeProducts = parseInt(counts?.active || '0', 10)
   const created = new Date(brand.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -83,49 +87,22 @@ export default async function BrandViewPageDetail({
           status={
             <>
               <StatusBadge status={String(brand.is_active)} map={ACTIVE_STATUS} />
-              {hasDraft && <Badge tone="amber">Draft pending</Badge>}
+              {drafts.length > 0 && <Badge tone="amber">{drafts.length === 1 ? 'Draft pending' : `${drafts.length} drafts`}</Badge>}
             </>
           }
           subtitle={brand.description || undefined}
           identifiers={[{ label: 'Created', value: created }]}
           actions={
-            held ? (
-              <ViewDraftLink held={held} />
-            ) : hasDraft ? (
-              <Link
-                href={ap(`/admin/brands/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
-                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-              >
-                Edit Draft
-              </Link>
-            ) : (
-              <form action={startBrandDraft.bind(null, id)}>
-                <input type="hidden" name="_back" value={backUrl} />
-                <button
-                  type="submit"
-                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-                >
-                  Edit
-                </button>
-              </form>
-            )
+            <form action={startBrandDraft.bind(null, id)}>
+              <input type="hidden" name="_back" value={backUrl} />
+              <button type="submit" className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600">
+                {myDraft ? 'Edit my draft' : 'Edit'}
+              </button>
+            </form>
           }
         />
       }
-      notices={
-        hasDraft && (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
-            <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground">
-              {held ? (
-                <>This brand has unpublished draft changes by {held.ownerName}. You can view them read-only.</>
-              ) : (
-                <>This brand has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to review and publish them.</>
-              )}
-            </p>
-          </div>
-        )
-      }
+      notices={drafts.length > 0 && <EntityDrafts drafts={drafts} start={startBrandDraft.bind(null, id)} back={backUrl} me={me} noun="brand" />}
       kpis={
         <KpiGrid>
           <Kpi label="Total products" value={totalProducts.toLocaleString('en-IN')} />

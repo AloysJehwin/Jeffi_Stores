@@ -369,6 +369,13 @@ CREATE INDEX idx_cash_sale_items_sale_id ON public.cash_sale_items USING btree (
 
 
 --
+-- Name: idx_cash_sale_drafts_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_cash_sale_drafts_admin ON public.cash_sale_drafts USING btree (admin_id, updated_at DESC);
+
+
+--
 -- Name: idx_cash_sales_invoice_date; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -446,6 +453,13 @@ CREATE UNIQUE INDEX reward_game_plays_game_user_period_key ON public.reward_game
 --
 
 CREATE INDEX idx_custom_scenarios_enabled ON public.custom_scenarios USING btree (enabled) WHERE (enabled = true);
+
+
+--
+-- Name: idx_scenario_drafts_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_scenario_drafts_admin ON public.scenario_drafts USING btree (admin_id, updated_at DESC);
 
 
 
@@ -1001,6 +1015,13 @@ CREATE INDEX idx_ads_ad_groups_campaign ON public.ads_ad_groups USING btree (cam
 --
 
 CREATE INDEX idx_ads_experiments_base_campaign ON public.ads_experiments USING btree (base_campaign_id);
+
+
+--
+-- Name: idx_ads_campaign_drafts_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_campaign_drafts_admin ON public.ads_campaign_drafts USING btree (admin_id, updated_at DESC);
 
 
 --
@@ -1790,6 +1811,13 @@ CREATE INDEX idx_reviews_user_id ON public.product_reviews USING btree (user_id)
 CREATE INDEX idx_rfq_messages_rfq_id ON public.rfq_messages USING btree (rfq_id);
 
 
+--
+-- Name: idx_rfq_reply_drafts_rfq_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_rfq_reply_drafts_rfq_admin ON public.rfq_reply_drafts USING btree (rfq_id, admin_id);
+
+
 
 --
 -- Name: idx_scenario_audit_admin; Type: INDEX; Schema: public; Owner: -
@@ -2364,6 +2392,7 @@ CREATE INDEX idx_subscriptions_user ON public.subscriptions USING btree (user_id
 --
 
 CREATE INDEX idx_product_files_product ON public.product_files USING btree (product_id, display_order);
+CREATE INDEX idx_product_files_draft ON public.product_files USING btree (draft_id) WHERE (draft_id IS NOT NULL);
 
 CREATE INDEX idx_vault_entitlements_user ON public.vault_entitlements USING btree (user_id, status);
 CREATE INDEX idx_vault_entitlements_product ON public.vault_entitlements USING btree (product_id);
@@ -2495,3 +2524,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_prompt_presets_scope_scenario ON public.
     COALESCE(feature, ''::text),
     scenario
 );
+
+
+-- Several drafts per entity (docs/plans/MULTI_DRAFT_PLAN.md): the old key is a plain index.
+CREATE INDEX IF NOT EXISTS idx_brand_drafts_brand ON public.brand_drafts USING btree (brand_id);
+CREATE INDEX IF NOT EXISTS idx_category_drafts_category ON public.category_drafts USING btree (category_id);
+CREATE INDEX IF NOT EXISTS idx_product_drafts_product ON public.product_drafts USING btree (product_id);
+CREATE INDEX IF NOT EXISTS idx_supplier_drafts_supplier ON public.supplier_drafts USING btree (supplier_id);
+CREATE INDEX IF NOT EXISTS idx_coupon_drafts_coupon ON public.coupon_drafts USING btree (coupon_id);
+CREATE INDEX IF NOT EXISTS idx_homepage_draft_branches_updated ON public.homepage_draft_branches USING btree (updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_review_form_drafts_form ON public.review_form_drafts USING btree (form_id);
+CREATE INDEX IF NOT EXISTS idx_offer_drafts_offer ON public.offer_drafts USING btree (offer_id);
+CREATE INDEX IF NOT EXISTS idx_entity_revisions_resource ON public.entity_revisions USING btree (resource_type, resource_id, revision DESC);

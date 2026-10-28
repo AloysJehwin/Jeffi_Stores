@@ -325,21 +325,13 @@ export default function MessagingTemplatesClient() {
           )}
           {selected && (
             <>
-              <div className="flex items-start justify-between gap-4 mb-5">
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
-                    {CHANNEL_LABEL[selected.channel]}
-                  </div>
-                  <div className="font-semibold text-lg text-foreground truncate">
-                    {selected.name || selected.slug || 'New template'}
-                  </div>
+              <div className="min-w-0 mb-5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
+                  {CHANNEL_LABEL[selected.channel]}
                 </div>
-                <button
-                  onClick={closeEditor}
-                  className="px-4 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
-                >
-                  Close
-                </button>
+                <div className="font-semibold text-lg text-foreground truncate">
+                  {selected.name || selected.slug || 'New template'}
+                </div>
               </div>
               {!selected.id && (
                 <div className="mb-5">
@@ -363,6 +355,7 @@ export default function MessagingTemplatesClient() {
                 onChange={setSelected}
                 onSave={save}
                 saving={saving}
+                onCancel={closeEditor}
                 apiNote="API sends use the Messaging-API copy of this template (ecom console → Messaging), so edits to the store copy here do not change them."
                 canUseScenarioFill={canUseScenarioFill}
                 isPlatformLibrary={isPlatformLibrary}

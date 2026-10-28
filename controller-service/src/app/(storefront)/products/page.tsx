@@ -9,7 +9,6 @@ import ProductGrid from '@/components/visitor/ProductGrid'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
 import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
-import ListingPromoBanner from '@/components/visitor/listing/ListingPromoBanner'
 
 // Each group is counted without its own filter so sibling brands/categories stay selectable.
 function buildPageUrl(searchParams: Record<string, string | undefined>, page: number) {
@@ -59,7 +58,6 @@ export default async function ProductsPage({
     categoryBanners,
     facets,
     filterOffers,
-    promoOffer,
   } = await buildListingModel(resolvedSearchParams)
 
   // Server-renders this page's product cards; useServerPages accumulates page 1..N under one
@@ -68,18 +66,6 @@ export default async function ProductsPage({
     key: String(product.id),
     node: renderProductItem(product, gstEnabled),
   }))
-  // Promo slot keeps its page-1 placement (idx 6) as a col-span-full node; later pages don't re-inject it.
-  if (page === 1 && promoOffer && items.length > 6) {
-    items.splice(6, 0, {
-      key: 'promo-slot',
-      extra: true,
-      node: (
-        <div className="col-span-full">
-          <ListingPromoBanner offer={promoOffer} />
-        </div>
-      ),
-    })
-  }
   const pagedItems = await withListingSections(items, {
     page: 'products',
     surface: await getWebSurface(resolvedSearchParams.layout),
@@ -147,7 +133,6 @@ export default async function ProductsPage({
                     offers={filterOffers}
                   />
                 }
-                promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined}
                 pagedItems={pagedItems}
                 page={page}
               />

@@ -931,7 +931,7 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON public.api_keys USING btree (t
 CREATE TABLE IF NOT EXISTS public.ai_price_list (
     id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     capability  character varying(16) NOT NULL,   -- text | embed | vision | image | video
-    provider    character varying(32) NOT NULL,   -- ollama | razer | google | replicate | openai
+    provider    character varying(32) NOT NULL,   -- ollama | razer | anthropic | google | replicate | openai
     model       character varying(128) NOT NULL,  -- '*' = default for the provider
     unit_type   character varying(16) NOT NULL,   -- token_1k_in | token_1k_out | image | video_second | call
     cost_inr    numeric(10,4) NOT NULL DEFAULT 0,
@@ -968,6 +968,26 @@ ALTER TABLE ONLY public.platform_provider_settings ADD CONSTRAINT platform_provi
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_platform_provider_settings_scope_key ON public.platform_provider_settings
     USING btree ((COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid)), key);
+
+-- ai_provider_identities: per-store AI provider workload identity (non-secret ids). For Anthropic
+-- one workspace + service account + federation rule per store; the gateway exchanges its pod token
+-- for a workspace-scoped access token with them. tenant_id is the store (the platform sentinel for
+-- the flagship). Provisioned outside the app; read by lib/providers/policy.ts. No row = no Claude
+-- for that store (text falls back to Razer).
+CREATE TABLE IF NOT EXISTS public.ai_provider_identities (
+    tenant_id           uuid NOT NULL,
+    provider            text NOT NULL,
+    workspace_id        text NOT NULL,   -- wrkspc_...
+    service_account_id  text NOT NULL,   -- svac_...
+    federation_rule_id  text NOT NULL,   -- fdrl_...
+    created_at          timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at          timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_pkey PRIMARY KEY (tenant_id, provider);
+ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_provider_check
+    CHECK (provider IN ('anthropic'));
+ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 
 --
 -- Ad-free add-on. Every store shows the platform's Google AdSense ads; a tenant pays Rs 500 a month

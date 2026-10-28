@@ -9,6 +9,7 @@
     "dev": "node --watch --experimental-strip-types src/server.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0",
     "bullmq": "^5.34.0",
     "ioredis": "^5.9.3",
     "pg": "^8.13.0"

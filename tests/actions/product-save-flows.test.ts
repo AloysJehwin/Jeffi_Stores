@@ -223,7 +223,7 @@ describe('updateProduct', () => {
     String(sql).includes('SELECT sku, is_draft FROM products')
       ? row
       : String(sql).includes('FROM product_drafts WHERE product_id') && draft
-        ? { product_id: PID, fields: {} }
+        ? { id: 'draft-1', product_id: PID, fields: {} }
         : null
 
   beforeEach(() => {
@@ -273,11 +273,12 @@ describe('updateProduct', () => {
       liveRow({ sku: 'LIVE-SKU', is_draft: false }, true)(sql)) as any)
     const r = await updateProduct(PID, form({ ...complete, sku: '', intent: 'publish', _no_redirect: '1' }))
     expect(r).toEqual({ ok: true, redirectTo: `/admin/products/${PID}` })
-    const draftWrite = vi.mocked(query).mock.calls.find(c => String(c[0]).includes('INSERT INTO product_drafts'))!
+    const draftWrite = vi.mocked(query).mock.calls.find(c => String(c[0]).includes('UPDATE product_drafts SET'))!
+    expect(draftWrite[1]![0]).toBe('draft-1')
     const fields = JSON.parse(String(draftWrite[1]![1]))
     expect(fields.sku).toBe('LIVE-SKU')
     expect(fields.is_active).toBe(true)
-    expect(publishProductDraft).toHaveBeenCalledWith(PID, { activate: true })
+    expect(publishProductDraft).toHaveBeenCalledWith(PID, expect.objectContaining({ activate: true, draftId: 'draft-1' }))
   })
 
   it('surfaces a publish failure after the draft was saved', async () => {

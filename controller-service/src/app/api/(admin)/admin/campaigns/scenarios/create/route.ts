@@ -3,6 +3,8 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
+import { finishJsonDraft } from '@/lib/admin/json-drafts'
+import { SCENARIO_DRAFTS } from '@/lib/campaigns/scenario-drafts'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +19,7 @@ function slugify(s: string): string {
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
+  if (!hasScope(admin.role, admin.scopes, 'campaigns:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -83,6 +85,8 @@ export async function POST(req: NextRequest) {
           JSON.stringify(parameters),
         ]
       )
+      // The wizard's draft is done with once the scenario exists.
+      await finishJsonDraft(client, SCENARIO_DRAFTS, admin, body.draft_id)
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to save scenario' }, { status: 500 })

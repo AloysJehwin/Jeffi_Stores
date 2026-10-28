@@ -3,24 +3,26 @@
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import { query } from '@/lib/shared/db'
-import { draftEditUrl, tryAcquireForAction } from '@/lib/admin/draft-locks'
+import { actionActor, draftEditUrl, tryAcquireForAction } from '@/lib/admin/draft-locks'
+import { createDraft, draftsOf } from '@/lib/admin/draft-branches'
+import { brandDrafts } from '@/lib/catalog/brand-draft'
 
-// Create (or reuse) an edit-draft for the brand, then redirect to the edit page.
-// This is the single entry to editing; the edit page itself redirects back here
-// (or to the brands list) when no draft exists.
+// Opens the admin's own draft of the brand, or starts one (another alongside with _new=1).
+// Opening someone else's draft (_draft) is read-only unless it is unclaimed.
 export async function startBrandDraft(id: string, formData: FormData) {
   const back = (formData.get('_back') as string | null) || null
-  // Someone else's draft opens read-only.
-  const mine = await tryAcquireForAction('brand', id)
-  if (mine)
-    await query(
-      `INSERT INTO brand_drafts (brand_id, fields)
-       SELECT b.id, to_jsonb(b) - 'id' - 'created_at' - 'updated_at'
-       FROM brands b WHERE b.id = $1
-       ON CONFLICT (brand_id) DO NOTHING`,
-      [id]
-    )
   const host = await getHost()
-  redirect(ap(draftEditUrl(`/admin/brands/${id}/edit`, back, mine), host))
+  const open = (formData.get('_draft') as string | null) || null
+  const actor = await actionActor()
+  let draftId = open
+  if (!draftId && formData.get('_new') !== '1' && actor?.adminId)
+    draftId = (await draftsOf(brandDrafts, id)).find(d => d.authorId === actor.adminId)?.id ?? null
+  let mine = true
+  if (draftId) mine = await tryAcquireForAction('brand', draftId)
+  else {
+    const title = ((formData.get('_title') as string | null) || '').trim().slice(0, 120) || null
+    draftId = await createDraft(brandDrafts, actor, id, { title })
+  }
+  const url = draftEditUrl(`/admin/brands/${id}/edit`, back, mine)
+  redirect(ap(`${url}${url.includes('?') ? '&' : '?'}draft=${draftId}`, host))
 }

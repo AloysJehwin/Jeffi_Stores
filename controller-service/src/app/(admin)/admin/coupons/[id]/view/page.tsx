@@ -13,12 +13,14 @@ import {
   StatusBadge,
   ACTIVE_STATUS,
   badgeCls,
-  ViewDraftLink,
 } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
-import { heldDraftForView } from '@/lib/admin/draft-locks'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { draftsForView } from '@/lib/admin/draft-branches'
+import { couponDrafts } from '@/lib/catalog/coupon-draft'
+import EntityDrafts from '@/components/admin/drafts/EntityDrafts'
 import { startCouponDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -78,10 +80,10 @@ export default async function CouponViewPage({
   const coupon = await queryOne<Coupon>('SELECT * FROM coupons WHERE id = $1', [id])
   if (!coupon) notFound()
 
-  const [hasDraft, held] = await Promise.all([
-    queryOne<{ coupon_id: string }>('SELECT coupon_id FROM coupon_drafts WHERE coupon_id = $1', [id]),
-    heldDraftForView('coupon', id, `/admin/coupons/${id}/edit`, backUrl),
-  ])
+  const session = await getAdminSession()
+  const me = session?.adminId ?? null
+  const drafts = await draftsForView(couponDrafts, id, me)
+  const myDraft = drafts.find(d => d.authorId === me)
 
   const isExpired = coupon.valid_until && new Date(coupon.valid_until) < new Date()
   const isPersonal = coupon.auto_generated && coupon.generated_for_user_id
@@ -162,35 +164,22 @@ export default async function CouponViewPage({
               <StatusBadge status={String(coupon.is_active)} map={ACTIVE_STATUS} />
               {isExpired && <Badge tone="amber">Expired</Badge>}
               {coupon.generated_for_campaign && <Badge tone="blue">{coupon.generated_for_campaign}</Badge>}
-              {hasDraft && <Badge tone="amber">Draft pending</Badge>}
+              {drafts.length > 0 && <Badge tone="amber">{drafts.length === 1 ? 'Draft pending' : `${drafts.length} drafts`}</Badge>}
             </>
           }
           subtitle={coupon.description || undefined}
           identifiers={[{ label: 'Created', value: day(coupon.created_at) }]}
           actions={
-            held ? (
-              <ViewDraftLink held={held} />
-            ) : hasDraft ? (
-              <Link
-                href={ap(`/admin/coupons/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
-                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-              >
-                Edit Draft
-              </Link>
-            ) : (
-              <form action={startCouponDraft.bind(null, id)}>
-                <input type="hidden" name="_back" value={backUrl} />
-                <button
-                  type="submit"
-                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-                >
-                  Edit
-                </button>
-              </form>
-            )
+            <form action={startCouponDraft.bind(null, id)}>
+              <input type="hidden" name="_back" value={backUrl} />
+              <button type="submit" className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600">
+                {myDraft ? 'Edit my draft' : 'Edit'}
+              </button>
+            </form>
           }
         />
       }
+      notices={drafts.length > 0 && <EntityDrafts drafts={drafts} start={startCouponDraft.bind(null, id)} back={backUrl} me={me} noun="coupon" />}
       kpis={
         <KpiGrid>
           <Kpi label="Times used" value={`${coupon.times_used}${coupon.usage_limit ? `/${coupon.usage_limit}` : ''}`} />

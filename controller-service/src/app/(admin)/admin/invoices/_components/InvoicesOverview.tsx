@@ -37,12 +37,6 @@ export default function InvoicesOverview() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
-        <p className="text-sm text-foreground-muted mt-0.5">
-          Invoiced value, GST, collections and e-invoicing across orders and cash sales
-        </p>
-      </div>
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       <ListFilters
         entity="invoices"

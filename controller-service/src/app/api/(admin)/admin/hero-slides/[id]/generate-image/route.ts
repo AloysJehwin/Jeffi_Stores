@@ -4,8 +4,8 @@ import { aiDenial, AI_ADMIN_SCOPE } from '@/lib/auth/ai-scope'
 import { currentTenantPlanGate } from '@/lib/auth/plan-gate'
 import { generateImage } from '@/lib/ai/media'
 import { aiMediaErrorResponse } from '@/lib/ai/media-route'
-import { applyDraftPatch, getEditableHomepage, homepageLockFrom, withHomepageDraft } from '@/lib/catalog/homepage-draft'
-import { HOMEPAGE_LOCK_ID, actorOf, lockedByOther, lockedOr } from '@/lib/admin/draft-locks'
+import { applyDraftPatch, getEditableHomepage, homepageLockFrom, withHomepageDraft, homepageDraftIdFrom, homepageDraftOr, noHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { actorOf, lockedByOther } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180
@@ -24,9 +24,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!plan.allowed) return NextResponse.json({ error: 'AI tools are not available for your plan' }, { status: 403 })
 
     // Refuse before spending on the image when another admin holds the draft.
-    const held = await lockedByOther(actorOf(admin), 'homepage', HOMEPAGE_LOCK_ID)
+    const draftId = homepageDraftIdFrom(request)
+    if (!draftId) return noHomepageDraft()
+    const held = await lockedByOther(actorOf(admin), 'homepage', draftId)
     if (held) return held
-    const { heroSlides } = await getEditableHomepage()
+    const { heroSlides } = await getEditableHomepage(draftId)
     if (!heroSlides.some(s => s.id === id)) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
 
     const body = await request.json().catch(() => ({}))
@@ -50,11 +52,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     const hashField = field === 'image_url_mobile' ? 'blurhash_mobile' : 'blurhash'
 
-    const saved = await withHomepageDraft(admin.adminId, draft => {
+    const saved = await withHomepageDraft(draftId, admin.adminId, draft => {
       const slide = draft.heroSlides.find(s => s.id === id)
       if (slide) applyDraftPatch(slide, { [field]: url, [hashField]: blurhash ?? null })
       return !!slide
-    }, homepageLockFrom(admin, request)).catch(lockedOr)
+    }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
     if (saved instanceof NextResponse) return saved
     if (!saved) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
     return NextResponse.json({ url, field, blurhash })

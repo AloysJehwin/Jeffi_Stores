@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeftRight, PlugZap, RefreshCw, Unplug } from 'lucide-react'
+import { ArrowLeftRight, Megaphone, PlugZap, RefreshCw, Unplug } from 'lucide-react'
 import { btnGhost, Tabs } from '@/components/admin/channels/ui'
 import { useActionToast } from '@/components/admin/kit/toast'
 import IconButton from '@/components/ui/IconButton'
@@ -15,6 +15,8 @@ import type { AdsConnectionStatus } from '@/lib/google-ads/connection'
 import type { AdsTab } from '@/lib/google-ads/report'
 import { AdsManageProvider } from './_components/ManageContext'
 import { NewCampaignButton } from './_components/CampaignWizard'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
+import WizardDrafts from '@/components/admin/drafts/WizardDrafts'
 import ConnectPanel, { NotConfigured } from './_components/ConnectPanel'
 import ConversionsView from './_components/ConversionsView'
 import ExperimentsView from './_components/ExperimentsView'
@@ -31,7 +33,9 @@ import {
   SyncView,
 } from './_components/ReportViews'
 
-const TABS: { id: AdsTab; label: string }[] = [
+type PageTab = AdsTab | 'drafts'
+
+const TABS: { id: PageTab; label: ReactNode }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'campaigns', label: 'Campaigns' },
   { id: 'adgroups', label: 'Ad groups & ads' },
@@ -44,6 +48,7 @@ const TABS: { id: AdsTab; label: string }[] = [
   { id: 'experiments', label: 'Experiments' },
   { id: 'audiences', label: 'Audiences' },
   { id: 'sync', label: 'Sync status' },
+  { id: 'drafts', label: <DraftsTabLabel type="google_ads_campaign" /> },
 ]
 
 const PRESETS = [7, 14, 30, 90]
@@ -82,8 +87,9 @@ export default function GoogleAdsClient({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const tabParam = searchParams.get('tab') as AdsTab | null
-  const [tab, setTabState] = useState<AdsTab>(tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'overview')
+  const tabParam = searchParams.get('tab') as PageTab | null
+  const resumeDraft = searchParams.get('draft')
+  const [tab, setTabState] = useState<PageTab>(tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'overview')
   const [status, setStatus] = useState(initialStatus)
   const [range, setRange] = useState(() => lastDays(30))
   const [data, setData] = useState<any>(null)
@@ -122,7 +128,7 @@ export default function GoogleAdsClient({
 
   const connected = status.connected
   useEffect(() => {
-    if (!connected) return
+    if (!connected || tab === 'drafts') return
     setLoading(true)
     setLoadError(null)
     const qs = new URLSearchParams({ tab, from: range.from, to: range.to })
@@ -136,7 +142,7 @@ export default function GoogleAdsClient({
       .finally(() => setLoading(false))
   }, [tab, range, connected, reloadKey])
 
-  function setTab(next: AdsTab) {
+  function setTab(next: PageTab) {
     setData(null)
     setTabState(next)
     const params = new URLSearchParams(searchParams.toString())
@@ -279,7 +285,16 @@ export default function GoogleAdsClient({
             onChange={setTab}
             actions={
               <>
-                <NewCampaignButton onCreated={reload} />
+                <NewCampaignButton
+                  onCreated={reload}
+                  resume={resumeDraft}
+                  onResumeClosed={() => {
+                    const params = new URLSearchParams(searchParams.toString())
+                    params.delete('draft')
+                    router.replace(`${ap('/admin/google-ads')}?${params.toString()}`, { scroll: false })
+                    setReloadKey(k => k + 1)
+                  }}
+                />
                 {canWrite && (
                   <IconButton icon={RefreshCw} label="Sync now (last 30 days)" busy={busy === 'sync'} onClick={() => action('sync')} />
                 )}
@@ -287,43 +302,65 @@ export default function GoogleAdsClient({
             }
           />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg">
-              {PRESETS.map(n => {
-                const r = lastDays(n)
-                const active = r.from === range.from && r.to === range.to
-                return (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setRange(r)}
-                    className={`flex items-center px-3 text-xs font-medium rounded-md ${active ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
-                  >
-                    {n}d
-                  </button>
-                )
-              })}
+          {tab === 'drafts' ? (
+            <PageDrafts type="google_ads_campaign">
+              <WizardDrafts
+                key={reloadKey}
+                endpoint="/api/admin/google-ads/campaign-drafts"
+                heading="Campaigns in progress"
+                icon={<Megaphone className="h-4 w-4" />}
+                writeScope="google_ads_campaigns"
+                label={d => d.title || 'Untitled campaign'}
+                detail={d => (d.campaign_type ? String(d.campaign_type).replace(/_/g, ' ').toLowerCase() : null)}
+                onResume={id => {
+                  const params = new URLSearchParams(searchParams.toString())
+                  params.set('draft', id)
+                  router.replace(`${ap('/admin/google-ads')}?${params.toString()}`, { scroll: false })
+                }}
+                discardMessage="Nothing has been created in Google Ads."
+              />
+            </PageDrafts>
+          ) : (
+            <>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg">
+                {PRESETS.map(n => {
+                  const r = lastDays(n)
+                  const active = r.from === range.from && r.to === range.to
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setRange(r)}
+                      className={`flex items-center px-3 text-xs font-medium rounded-md ${active ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+                    >
+                      {n}d
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-foreground-muted">
+                <DatePicker value={range.from} max={range.to} onChange={v => v && setRange(r => ({ ...r, from: v }))} />
+                to
+                <DatePicker value={range.to} min={range.from} onChange={v => v && setRange(r => ({ ...r, to: v }))} />
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-foreground-muted">
-              <DatePicker value={range.from} max={range.to} onChange={v => v && setRange(r => ({ ...r, from: v }))} />
-              to
-              <DatePicker value={range.to} min={range.from} onChange={v => v && setRange(r => ({ ...r, to: v }))} />
-            </div>
-          </div>
 
-          {!hasData && !data && (
-            <p className="text-sm text-foreground-muted">No data synced yet. Use Sync now (next to the tabs) to pull the last 30 days.</p>
+            {!hasData && !data && (
+              <p className="text-sm text-foreground-muted">No data synced yet. Use Sync now (next to the tabs) to pull the last 30 days.</p>
+            )}
+
+            {loadError ? (
+              <p className="text-sm text-red-500">{loadError}</p>
+            ) : loading && !data ? (
+              <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+            ) : data ? (
+              <AdsManageProvider currency={currency} onChanged={reload}>
+                <TabBody tab={tab} data={data} currency={currency} />
+              </AdsManageProvider>
+            ) : null}
+            </>
           )}
-
-          {loadError ? (
-            <p className="text-sm text-red-500">{loadError}</p>
-          ) : loading && !data ? (
-            <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
-          ) : data ? (
-            <AdsManageProvider currency={currency} onChanged={reload}>
-              <TabBody tab={tab} data={data} currency={currency} />
-            </AdsManageProvider>
-          ) : null}
         </>
       )}
     </div>

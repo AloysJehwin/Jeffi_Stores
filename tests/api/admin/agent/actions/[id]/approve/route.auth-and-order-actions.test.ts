@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({
+  hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
@@ -60,6 +63,17 @@ const mockQueryMany = vi.mocked(queryMany)
 const mockWithTransaction = vi.mocked(withTransaction)
 const mockGetClient = vi.mocked(getClient)
 
+function mockFetchOk(data: unknown = { success: true }) {
+  const fn = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => data })
+  vi.stubGlobal('fetch', fn)
+  return fn
+}
+function mockFetchError(status: number, error: string) {
+  const fn = vi.fn().mockResolvedValue({ ok: false, status, json: async () => ({ error }) })
+  vi.stubGlobal('fetch', fn)
+  return fn
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('POST /api/admin/agent/actions/[id]/approve', () => {
@@ -68,6 +82,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQuery.mockResolvedValue({ rowCount: 1 } as any)
+    vi.unstubAllGlobals()
   })
 
   // ── Auth / authz ────────────────────────────────────────────────────────
@@ -196,39 +211,42 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   // ── mark_order_shipped ──────────────────────────────────────────────────
 
-  it('executes mark_order_shipped successfully', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({
-        id: ACTION_ID,
-        admin_id: ADMIN.adminId,
-        conversation_id: 'conv-1',
-        kind: 'mark_order_shipped',
-        payload: { orderId: 'order-1', awbNumber: 'AWB123' },
-        status: 'proposed',
-      } as any)
-      .mockResolvedValueOnce({ id: 'order-1', order_number: 'ORD-001', status: 'shipped', awb_number: 'AWB123' } as any)
+  it('executes mark_order_shipped through the order endpoints (AWB first, then status)', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'mark_order_shipped',
+      payload: { orderId: 'order-1', orderNumber: 'ORD-001', awbNumber: 'AWB123' },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk()
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.status).toBe('shipped')
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/admin\/orders\/order-1$/)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ awb_number: 'AWB123' })
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/orders\/order-1$/)
+    expect(fetchMock.mock.calls[1][1].method).toBe('PATCH')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ status: 'shipped' })
   })
 
-  it('returns 500 when order not found for mark_order_shipped', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({
-        id: ACTION_ID,
-        admin_id: ADMIN.adminId,
-        conversation_id: 'conv-1',
-        kind: 'mark_order_shipped',
-        payload: { orderId: 'bad-id', awbNumber: null },
-        status: 'proposed',
-      } as any)
-      .mockResolvedValueOnce(null)
+  it("returns the order endpoint's error for mark_order_shipped", async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'mark_order_shipped',
+      payload: { orderId: 'order-1', awbNumber: null },
+      status: 'proposed',
+    } as any)
+    mockFetchError(400, "Cannot transition order from 'confirmed' to 'shipped'")
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/not found|already shipped/)
+    expect((await res.json()).error).toMatch(/Cannot transition/)
   })
 
   // ── send_order_delay_email ──────────────────────────────────────────────
@@ -382,64 +400,228 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     expect((await res.json()).error).toMatch(/Method not permitted/)
   })
 
-  // ── update_order_status ─────────────────────────────────────────────────
-
-  it('executes update_order_status successfully', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({
-        id: ACTION_ID,
-        admin_id: ADMIN.adminId,
-        conversation_id: 'conv-1',
-        kind: 'update_order_status',
-        payload: { orderId: 'order-1', newStatus: 'confirmed', awbNumber: null },
-        status: 'proposed',
-      } as any)
-      .mockResolvedValueOnce({ id: 'order-1', order_number: 'ORD-1', status: 'confirmed', awb_number: null } as any)
+  it('refuses call_admin_api to an order payment path (dedicated tool)', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'call_admin_api',
+      payload: { method: 'PATCH', path: '/api/admin/orders/order-1/payment-status', body: '{"payment_status":"refunded"}' },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk()
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
-    expect(res.status).toBe(200)
-    expect((await res.json()).result.status).toBe('confirmed')
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).toMatch(/propose_set_payment_status/)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('returns 500 for invalid status in update_order_status', async () => {
+  it('refuses call_admin_api for a non-owner approver', async () => {
+    mockAuth.mockResolvedValue({ ...ADMIN, role: 'admin', scopes: ['agent:write'] } as any)
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'call_admin_api',
+      payload: { method: 'POST', path: '/api/admin/products', body: null },
+      status: 'proposed',
+    } as any)
+
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/administrator or super admin/)
+  })
+
+  // ── update_order_status ─────────────────────────────────────────────────
+
+  it('executes update_order_status through PATCH /api/orders/[id]', async () => {
     mockQueryOne.mockResolvedValueOnce({
       id: ACTION_ID,
       admin_id: ADMIN.adminId,
       conversation_id: 'conv-1',
       kind: 'update_order_status',
-      payload: { orderId: 'order-1', newStatus: 'flying', awbNumber: null },
+      payload: { orderId: 'order-1', newStatus: 'confirmed', awbNumber: null },
       status: 'proposed',
     } as any)
+    const fetchMock = mockFetchOk()
+
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    expect(res.status).toBe(200)
+    expect((await res.json()).result.status).toBe('confirmed')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ status: 'confirmed' })
+  })
+
+  it("returns the order endpoint's rule error for update_order_status", async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'update_order_status',
+      payload: { orderId: 'order-1', newStatus: 'delivered', awbNumber: null },
+      status: 'proposed',
+    } as any)
+    mockFetchError(400, "Cannot transition order from 'pending' to 'delivered'")
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toBe('Invalid status')
+    expect((await res.json()).error).toBe("Cannot transition order from 'pending' to 'delivered'")
+  })
+
+  it('sends an owner override with its reason', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'update_order_status',
+      payload: { orderId: 'order-1', newStatus: 'pending', override: true, overrideReason: 'Customer re-opened the order' },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk()
+
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    expect(res.status).toBe(200)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      status: 'pending',
+      override: true,
+      override_reason: 'Customer re-opened the order',
+    })
+  })
+
+  it('refuses an override approved by a non-owner and marks the action failed', async () => {
+    mockAuth.mockResolvedValue({ ...ADMIN, role: 'admin', scopes: ['agent:write', 'orders:write'] } as any)
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'update_order_status',
+      payload: { orderId: 'order-1', newStatus: 'pending', override: true, overrideReason: 'Customer re-opened the order' },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk()
+
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/administrator or super admin/)
+    expect(fetchMock).not.toHaveBeenCalled()
+    const failed = mockQuery.mock.calls.find(c => /status = 'failed'/.test(String(c[0])))
+    expect(failed?.[1]).toEqual([ADMIN.adminId, expect.stringMatching(/override/), ACTION_ID])
+  })
+
+  it('refuses an order change when the approver lacks orders:write', async () => {
+    mockHasScope.mockImplementation((_role, _scopes, scope) => scope === 'agent:write')
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'update_order_status',
+      payload: { orderId: 'order-1', newStatus: 'confirmed' },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk()
+
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/Orders \(write\)/)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses a plain "refunded" payment change', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'set_payment_status',
+      payload: { orderId: 'order-1', paymentStatus: 'refunded', override: false },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk()
+
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/real refund/)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   // ── mark_invoice_paid ───────────────────────────────────────────────────
 
-  it('executes mark_invoice_paid successfully', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({
-        id: ACTION_ID,
-        admin_id: ADMIN.adminId,
-        conversation_id: 'conv-1',
-        kind: 'mark_invoice_paid',
-        payload: { orderId: 'order-1', paymentMode: 'cash', paidAt: null },
-        status: 'proposed',
-      } as any)
-      .mockResolvedValueOnce({
-        id: 'order-1',
-        invoice_number: 'INV-1',
-        payment_status: 'paid',
-        invoice_date: null,
-      } as any)
+  it('executes mark_invoice_paid through the payment-status route', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'mark_invoice_paid',
+      payload: { orderId: 'order-1', invoiceNumber: 'INV-1', paymentMode: 'cash', paidAt: null },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk()
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.payment_status).toBe('paid')
     expect(body.result.paymentMode).toBe('cash')
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/admin\/orders\/order-1\/payment-status$/)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ payment_status: 'paid', payment_mode: 'cash' })
+  })
+
+  // ── refund_order / cancel_order ─────────────────────────────────────────
+
+  it('executes a Razorpay refund_order through the order refund route', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'refund_order',
+      payload: { orderId: 'order-1', method: 'razorpay', amount: 500, reason: 'Cancelled by customer' },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk({ success: true, totalRefunded: 500 })
+
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    expect(res.status).toBe(200)
+    expect((await res.json()).result.totalRefunded).toBe(500)
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/orders\/order-1\/refund$/)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ reason: 'Cancelled by customer' })
+  })
+
+  it('records an external refund_order with its method, reference and note', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'refund_order',
+      payload: { orderId: 'order-1', method: 'bank_transfer', amount: 300, reason: 'Damaged', notes: 'Paid to HDFC', reference: 'UTR1', notify: false },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk()
+
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    expect(res.status).toBe(200)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      external: { method: 'bank_transfer', reference: 'UTR1', note: 'Damaged — Paid to HDFC' },
+      amount: 300,
+      notify: false,
+      reason: 'Damaged',
+    })
+  })
+
+  it('cancels an offline invoice through the invoice cancel route', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'cancel_order',
+      payload: { orderId: 'order-1', source: 'offline', newStatus: 'cancelled' },
+      status: 'proposed',
+    } as any)
+    const fetchMock = mockFetchOk()
+
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
+    expect(res.status).toBe(200)
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/admin\/orders\/order-1\/cancel$/)
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST')
   })
 
   // ── create_coupon ───────────────────────────────────────────────────────

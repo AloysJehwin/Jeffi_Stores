@@ -30,6 +30,8 @@ const LABELS: Record<string, string> = {
   storefront_assistant: 'Storefront assistant',
   campaign_scenario: 'Campaign scenario',
   form_fill: 'AI form fill',
+  vision: 'Vision / OCR',
+  quotation_ocr: 'Quotation OCR',
 }
 
 export function aiFeatureLabel(feature: string | null | undefined): string {

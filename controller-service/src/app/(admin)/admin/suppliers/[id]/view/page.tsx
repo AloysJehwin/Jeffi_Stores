@@ -5,8 +5,10 @@ import SupplierDetailClient from '../SupplierDetailClient'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
-import { queryOne } from '@/lib/shared/db'
-import { heldDraftForView } from '@/lib/admin/draft-locks'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { draftsForView } from '@/lib/admin/draft-branches'
+import { supplierDrafts } from '@/lib/admin/supplier-drafts'
+import EntityDrafts from '@/components/admin/drafts/EntityDrafts'
 import { startSupplierDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -24,11 +26,17 @@ export default async function SupplierViewPage({ params }: { params: Promise<{ i
     redirect(ap('/admin/login', host))
   }
 
-  const [draftRow, held] = await Promise.all([
-    queryOne<{ supplier_id: string }>(`SELECT supplier_id FROM supplier_drafts WHERE supplier_id = $1`, [id]),
-    heldDraftForView('supplier', id, `/admin/suppliers/${id}/edit`),
-  ])
-  const hasDraft = !!draftRow
+  const me = (await getAdminSession())?.adminId ?? null
+  const drafts = await draftsForView(supplierDrafts, id, me)
+  const start = startSupplierDraft.bind(null, id)
 
-  return <SupplierDetailClient id={id} hasDraft={hasDraft} startDraftAction={startSupplierDraft.bind(null, id)} heldDraft={held} />
+  return (
+    <SupplierDetailClient
+      id={id}
+      draftCount={drafts.length}
+      myDraft={drafts.some(d => d.authorId === me)}
+      startDraftAction={start}
+      draftsNotice={drafts.length > 0 && <EntityDrafts drafts={drafts} start={start} back="/admin/suppliers?tab=suppliers&active=true" me={me} noun="supplier" />}
+    />
+  )
 }

@@ -14,6 +14,12 @@ describe('bp (business-path)', () => {
     expect(bp('/business', 'business.jeffistores.in')).toBe('/')
   })
 
+  it("strips /business on a tenant's business host", () => {
+    expect(bp('/business/products', 'acme.business.jeffistores.in')).toBe('/products')
+    expect(bp('/business?layout=web', 'acme.business.localhost')).toBe('/?layout=web')
+    expect(bp('/businesses', 'business.jeffistores.in')).toBe('/businesses')
+  })
+
   it('strips /business from nested paths', () => {
     expect(bp('/business/cart', 'business.example.com')).toBe('/cart')
   })
