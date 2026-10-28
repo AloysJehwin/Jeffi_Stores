@@ -53,7 +53,7 @@ export function fillKeyed<K extends string>(
   })
 }
 
-export type OverviewTab = 'overview' | 'list'
+export type OverviewTab = 'overview' | 'list' | 'drafts'
 
 /** Which tab a page opens on: ?tab wins; old list links (any of `listKeys` present) open the list. */
 export function resolveOverviewTab(
@@ -61,6 +61,6 @@ export function resolveOverviewTab(
   listKeys: readonly string[]
 ): OverviewTab {
   const t = sp.get('tab')
-  if (t === 'overview' || t === 'list') return t
+  if (t === 'overview' || t === 'list' || t === 'drafts') return t
   return listKeys.some(k => sp.has(k)) ? 'list' : 'overview'
 }

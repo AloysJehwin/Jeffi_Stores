@@ -5,6 +5,7 @@ import { listParamNames } from '@jeffi/list-filters/client'
 import { QUOTATION_ALIASES, QUOTATION_FIELDS } from '@jeffi/list-filters/fields'
 import { TabActionsHost, Tabs } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import { resolveOverviewTab, type OverviewTab } from '@/lib/overviews/sales-documents'
 import QuotationsClient from './QuotationsClient'
 import QuotationsOverview from './_components/QuotationsOverview'
@@ -39,12 +40,13 @@ export default function QuotationsTabs({ canWrite }: { canWrite: boolean }) {
             tabs={[
               { id: 'overview', label: 'Overview' },
               { id: 'list', label: 'Quotations' },
+              { id: 'drafts', label: <DraftsTabLabel type="quotation" /> },
             ]}
             value={tab}
             onChange={go}
           />
         )}
-        {tab === 'overview' ? <QuotationsOverview /> : <QuotationsClient canWrite={canWrite} />}
+        {tab === 'overview' ? <QuotationsOverview /> : tab === 'drafts' ? <PageDrafts type="quotation" /> : <QuotationsClient canWrite={canWrite} />}
       </div>
     </TabActionsHost>
   )

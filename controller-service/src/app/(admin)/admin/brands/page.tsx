@@ -16,7 +16,7 @@ import { draftLockChips } from '@/lib/admin/draft-locks'
 import BrandsTable from './_components/BrandsTable'
 import GroupOverview from '../categories/_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
-import PageDrafts from '@/components/admin/drafts/PageDrafts'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -54,35 +54,15 @@ async function AddBrandButton() {
 
 /** KPIs over every brand the filters match. */
 async function BrandsStats({ q }: { q: FilterQuery }) {
-  const host = await getHost()
   const w = buildWhere(BRANDS_ENTITY, q)
-  const [stats, pendingDrafts, createDrafts] = await Promise.all([
-    queryOne<{ total: number; active: number }>(
-      `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE b.is_active)::int AS active FROM brands b ${w.where}`,
-      w.params
-    ),
-    // Edit-drafts: unpublished CHANGES staged against a live brand (brand_drafts).
-    queryMany<{ brand_id: string; name: string; updated_at: string }>(
-      `SELECT bd.brand_id, b.name, bd.updated_at
-       FROM brand_drafts bd
-       JOIN brands b ON b.id = bd.brand_id AND b.is_draft = false
-       ORDER BY bd.updated_at DESC
-       LIMIT 20`
-    ),
-    // Create-drafts: brand-new brands never published to the live list (is_draft = true).
-    // A new brand edited before its first publish also has a brand_drafts row — list it once.
-    queryMany<{ id: string; name: string; created_at: string; staged: boolean }>(
-      `SELECT b.id, COALESCE(bd.fields->>'name', b.name) AS name, b.created_at, bd.brand_id IS NOT NULL AS staged
-       FROM brands b LEFT JOIN brand_drafts bd ON bd.brand_id = b.id
-       WHERE b.is_draft = true ORDER BY b.created_at DESC LIMIT 20`
-    ),
-  ])
+  const stats = await queryOne<{ total: number; active: number }>(
+    `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE b.is_active)::int AS active FROM brands b ${w.where}`,
+    w.params
+  )
 
   const totalBrands = stats?.total ?? 0
   const activeBrands = stats?.active ?? 0
   const inactiveBrands = totalBrands - activeBrands
-  const pendingDraftsCount = pendingDrafts.length + createDrafts.length
-  const locks = await draftLockChips('brand', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.brand_id)])
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -91,9 +71,36 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
         <Kpi label="Active" value={activeBrands.toLocaleString('en-IN')} />
         <Kpi label="Inactive" value={inactiveBrands.toLocaleString('en-IN')} />
       </KpiGrid>
+    </div>
+  )
+}
 
-      {pendingDraftsCount > 0 && (
-        <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+// Publish / discard rows for the Drafts tab.
+async function BrandPendingDrafts() {
+  const host = await getHost()
+  const [pendingDrafts, createDrafts] = await Promise.all([
+    // Edit-drafts: unpublished CHANGES staged against a live brand (brand_drafts).
+    queryMany<{ brand_id: string; name: string; updated_at: string }>(
+      `SELECT bd.brand_id, b.name, bd.updated_at
+       FROM brand_drafts bd
+       JOIN brands b ON b.id = bd.brand_id AND b.is_draft = false
+       ORDER BY bd.updated_at DESC
+       LIMIT 200`
+    ),
+    // Create-drafts: brand-new brands never published to the live list (is_draft = true).
+    // A new brand edited before its first publish also has a brand_drafts row — list it once.
+    queryMany<{ id: string; name: string; created_at: string; staged: boolean }>(
+      `SELECT b.id, COALESCE(bd.fields->>'name', b.name) AS name, b.created_at, bd.brand_id IS NOT NULL AS staged
+       FROM brands b LEFT JOIN brand_drafts bd ON bd.brand_id = b.id
+       WHERE b.is_draft = true ORDER BY b.created_at DESC LIMIT 200`
+    ),
+  ])
+  const pendingDraftsCount = pendingDrafts.length + createDrafts.length
+  if (!pendingDraftsCount) return null
+  const locks = await draftLockChips('brand', [...createDrafts.map(d => d.id), ...pendingDrafts.map(d => d.brand_id)])
+
+  return (
+        <details open className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
           <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
             <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
               <svg
@@ -104,7 +111,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              Pending Drafts ({pendingDraftsCount})
+              Ready to publish ({pendingDraftsCount})
             </span>
             <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
           </summary>
@@ -145,8 +152,7 @@ async function BrandsStats({ q }: { q: FilterQuery }) {
             </div>
           </div>
         </details>
-      )}
-    </div>
+      
   )
 }
 
@@ -172,7 +178,7 @@ async function BrandsListContent({ resolvedSearchParams }: { resolvedSearchParam
 export default async function BrandsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams
   const host = await getHost()
-  const tab = isListUrl(sp, BRAND_FIELDS, { aliases: BRAND_ALIASES }) ? 'list' : 'overview'
+  const tab = sp.tab === 'drafts' ? 'drafts' : isListUrl(sp, BRAND_FIELDS, { aliases: BRAND_ALIASES }) ? 'list' : 'overview'
   const href = (t: string) => ap(tabHref('/admin/brands', t, sp, BRAND_FIELDS, { aliases: BRAND_ALIASES }), host)
   const q = normalizeQuery(BRANDS_ENTITY, sp)
   return (
@@ -184,6 +190,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
           tabs={[
             { id: 'overview', label: 'Overview', href: href('overview') },
             { id: 'list', label: 'Brands', href: href('list') },
+            { id: 'drafts', label: <DraftsTabLabel type="brand" />, href: href('drafts') },
           ]}
           value={tab}
           scroll={false}
@@ -205,9 +212,14 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
         <Suspense fallback={null}>
           <GroupOverview dim="brand" />
         </Suspense>
+      ) : tab === 'drafts' ? (
+        <PageDrafts type="brand">
+          <Suspense fallback={null}>
+            <BrandPendingDrafts />
+          </Suspense>
+        </PageDrafts>
       ) : (
         <>
-          <PageDrafts type="brand" />
           <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
             <BrandsStats q={q} />
           </Suspense>

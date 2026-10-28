@@ -5,6 +5,7 @@ import { listParamNames } from '@jeffi/list-filters/client'
 import { INVOICE_ALIASES, INVOICE_FIELDS } from '@jeffi/list-filters/fields'
 import { TabActionsHost, Tabs } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
+import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import { resolveOverviewTab, type OverviewTab } from '@/lib/overviews/sales-documents'
 import InvoicesClient from './InvoicesClient'
 import InvoicesOverview from './_components/InvoicesOverview'
@@ -41,12 +42,13 @@ export default function InvoicesTabs({ canWrite }: { canWrite: boolean }) {
             tabs={[
               { id: 'overview', label: 'Overview' },
               { id: 'list', label: 'Invoices' },
+              { id: 'drafts', label: <DraftsTabLabel type="invoice" /> },
             ]}
             value={tab}
             onChange={go}
           />
         )}
-        {tab === 'overview' ? <InvoicesOverview /> : <InvoicesClient canWrite={canWrite} />}
+        {tab === 'overview' ? <InvoicesOverview /> : tab === 'drafts' ? <PageDrafts type="invoice" /> : <InvoicesClient canWrite={canWrite} />}
       </div>
     </TabActionsHost>
   )
