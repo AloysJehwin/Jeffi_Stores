@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { uploadGalleryMedia, fetchRemoteImage } from '@/lib/shared/s3'
+import { uploadGalleryMedia, fetchRemoteImage, GALLERY_MAX_BYTES } from '@/lib/shared/s3'
 import { queryOne } from '@/lib/shared/db'
 
 export async function OPTIONS() {
@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
     if (contentType.includes('application/json')) {
       const body = await request.json()
       if (!body.imageUrl) return NextResponse.json({ error: 'imageUrl is required' }, { status: 400 })
+      if (!URL.canParse(body.imageUrl)) return NextResponse.json({ error: 'Not a valid link' }, { status: 422 })
       sourceUrl = body.imageUrl
       customName = body.customName || null
       categoryId = body.categoryId || null
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData()
       const file = formData.get('file') as File | null
       if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      if (file.size > GALLERY_MAX_BYTES) return NextResponse.json({ error: 'Images can be up to 20 MB' }, { status: 413 })
       fileName = file.name
       mime = file.type
       customName = (formData.get('customName') as string | null) || null
@@ -76,6 +78,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(record)
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Upload failed' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Upload failed' }, { status: typeof err?.status === 'number' ? err.status : 500 })
   }
 }

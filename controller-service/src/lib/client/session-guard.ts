@@ -105,6 +105,18 @@ async function makeProof(method: string, path: string): Promise<string | null> {
   return `${ts.toString(36)}.${nonce}.${b64url(sig)}`
 }
 
+/** The proof header for a same-origin API call made without window.fetch (an XHR upload with progress). */
+export async function apiProofHeaders(method: string, url: string): Promise<Record<string, string>> {
+  try {
+    const u = new URL(url, window.location.href)
+    if (u.origin !== window.location.origin || !u.pathname.startsWith('/api/')) return {}
+    const proof = await makeProof(method, u.pathname)
+    return proof ? { [PROOF_HEADER]: proof } : {}
+  } catch {
+    return {}
+  }
+}
+
 function bind(rawFetch: typeof fetch, retry = true): Promise<void> {
   if (binding) return binding
   binding = (async () => {

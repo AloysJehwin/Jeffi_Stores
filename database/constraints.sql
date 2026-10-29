@@ -1759,6 +1759,45 @@ ALTER TABLE ONLY public.support_messages
 ALTER TABLE ONLY public.support_sessions
     ADD CONSTRAINT support_sessions_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.support_sessions
+    ADD CONSTRAINT support_sessions_ticket_number_key UNIQUE (ticket_number);
+
+ALTER TABLE public.support_sessions
+    ADD CONSTRAINT support_sessions_handler_check CHECK (handler IN ('ai','human'));
+
+ALTER TABLE ONLY public.support_message_attachments
+    ADD CONSTRAINT support_message_attachments_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.support_ai_actions
+    ADD CONSTRAINT support_ai_actions_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.support_ai_actions
+    ADD CONSTRAINT support_ai_actions_status_check CHECK (status IN ('pending','confirmed','declined','done','failed','expired'));
+
+ALTER TABLE ONLY public.drive_folders
+    ADD CONSTRAINT drive_folders_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.drive_folders
+    ADD CONSTRAINT drive_folders_visibility_check CHECK (visibility IN ('private','team','shared'));
+
+ALTER TABLE ONLY public.drive_files
+    ADD CONSTRAINT drive_files_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.drive_shares
+    ADD CONSTRAINT drive_shares_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.drive_shares
+    ADD CONSTRAINT drive_shares_level_check CHECK (level IN ('view','edit','manage'));
+
+ALTER TABLE public.drive_shares
+    ADD CONSTRAINT drive_shares_target_check CHECK ((folder_id IS NULL) <> (file_id IS NULL));
+
+ALTER TABLE public.drive_shares
+    ADD CONSTRAINT drive_shares_grantee_check CHECK ((grantee_admin_id IS NULL) <> (grantee_role IS NULL));
+
+ALTER TABLE ONLY public.drive_access_log
+    ADD CONSTRAINT drive_access_log_pkey PRIMARY KEY (id);
+
 
 --
 -- Name: template_variables template_variables_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -3449,6 +3488,21 @@ ALTER TABLE ONLY public.support_messages
 
 ALTER TABLE ONLY public.support_sessions
     ADD CONSTRAINT support_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.support_message_attachments
+    ADD CONSTRAINT support_message_attachments_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.support_messages(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.support_ai_actions
+    ADD CONSTRAINT support_ai_actions_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.support_sessions(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.drive_files
+    ADD CONSTRAINT drive_files_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES public.drive_folders(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.drive_shares
+    ADD CONSTRAINT drive_shares_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES public.drive_folders(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.drive_shares
+    ADD CONSTRAINT drive_shares_file_id_fkey FOREIGN KEY (file_id) REFERENCES public.drive_files(id) ON DELETE CASCADE;
 
 
 

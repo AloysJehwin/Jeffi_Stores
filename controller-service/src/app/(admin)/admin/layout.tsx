@@ -56,6 +56,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/invoices', label: 'Invoices', scope: 'invoices:read', group: 'Sales' },
     { href: '/admin/cash-sale', label: 'Cash Sale', scope: 'invoices:read', group: 'Sales' },
     { href: '/admin/customers', label: 'Customers', scope: 'customers:read', group: 'Sales' },
+    { href: '/admin/support', label: 'Support', scope: 'customers:read', group: 'Sales' },
     { href: '/admin/crm', label: 'CRM', scope: 'crm:read', group: 'Sales' },
     { href: '/admin/tasks', label: 'Tasks', scope: 'tasks:read', group: 'Sales' },
     { href: '/admin/returns', label: 'Returns', scope: 'returns:read', group: 'Actions' },

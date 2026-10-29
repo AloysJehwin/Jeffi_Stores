@@ -11,6 +11,7 @@ export {
   sendAdminContactEmail,
   sendSupportEscalationEmail,
   sendAgentConnectedEmail,
+  sendSupportReplyEmail,
 } from './notifications'
 export {
   sendReturnStatusEmail,

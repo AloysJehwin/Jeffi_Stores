@@ -26,6 +26,23 @@ export interface WhatsAppProvider {
   sendTemplate(toE164: string, templateRef: string, vars: Record<string, string>): Promise<string>
   /** Free-text message (only valid inside the 24h customer-service window). */
   sendText(toE164: string, body: string): Promise<string>
+  /** Free-form media (image/video/audio/document) inside the 24h window; `caption` rides along. */
+  sendMedia(toE164: string, media: OutboundMedia): Promise<string>
+  /** Blue ticks on the customer's message, where the provider supports it. */
+  markRead(providerMessageId: string): Promise<void>
+  /** Bytes of an inbound media item: a Twilio MediaUrl or an AWS/Meta media id. */
+  downloadMedia(ref: string): Promise<{ bytes: Buffer; mime: string }>
+}
+
+export interface OutboundMedia {
+  kind: 'image' | 'video' | 'audio' | 'document'
+  mime: string
+  filename?: string
+  caption?: string
+  /** Short-lived URL the provider fetches (Twilio, or AWS when no S3 object is available). */
+  url: string
+  /** The object in our private bucket (AWS uploads straight from S3). */
+  s3?: { bucket: string; key: string }
 }
 
 export type ProviderName = 'twilio' | 'aws'

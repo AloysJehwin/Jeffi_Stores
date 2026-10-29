@@ -39,6 +39,7 @@ export function verifyLocalToken(key: string, token: string): boolean {
 
 export class LocalStorageDriver implements StorageDriver {
   readonly name = 'local' as const
+  readonly bucket = null
 
   // Upload "URL" is our own PUT route; the admin client PUTs bytes there and we write to disk.
   async signUpload(key: string): Promise<string> {
@@ -78,6 +79,14 @@ export class LocalStorageDriver implements StorageDriver {
 
   async readLocal(key: string): Promise<Buffer> {
     return fs.readFile(diskPath(key))
+  }
+
+  put(key: string, body: Buffer): Promise<void> {
+    return this.writeLocal(key, body)
+  }
+
+  get(key: string): Promise<Buffer> {
+    return this.readLocal(key)
   }
 
   /** Leading bytes only (content sniff) without loading a multi-GB file. */

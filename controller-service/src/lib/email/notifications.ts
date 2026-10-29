@@ -12,6 +12,7 @@ import {
   storeContactLine,
   storeAddressLine,
   storeBaseUrlAsync,
+  escapeHtml,
 } from './shared'
 
 export async function sendNewReviewNotification(review: any, user: any, product: any) {
@@ -246,47 +247,91 @@ export async function sendAdminContactEmail(
   }
 }
 
-export async function sendSupportEscalationEmail(
-  customerName: string,
-  customerEmail: string,
-  customerId: string,
-  sessionId: string,
+export async function sendSupportEscalationEmail(p: {
+  customerName: string
+  customerEmail: string | null
+  customerPhone?: string | null
+  sessionId: string
+  ticket: string | null
+  reason: string | null
+  summary: string | null
+  channel: string
   adminEmails: string[]
-): Promise<{ success: boolean; error?: unknown }> {
-  // Three things were wrong here: the link went to the platform's admin panel, which a
-  // tenant's certificate cannot open; the sender was the platform's; and the fallback
-  // recipient was a personal Gmail, so a tenant's support request reached an individual.
-  const chatLink = `${await currentAdminBaseUrlAsync()}/customers/${customerId}?chat=true`
-  const recipients = adminEmails.length > 0 ? adminEmails : [platformAdminEmail()]
+}): Promise<{ success: boolean; error?: unknown }> {
+  const chatLink = `${await currentAdminBaseUrlAsync()}/support?s=${p.sessionId}`
+  const recipients = p.adminEmails.length > 0 ? p.adminEmails : [platformAdminEmail()]
   const brand = await currentBrandNameAsync()
-
-  const mailOptions = {
-    from: await customerMailFromAsync(),
-    to: recipients.join(', '),
-    subject: `Support Request from ${customerName}`,
-    html: mailShell({
-      brand,
-      kicker: 'Admin Notification',
-      title: 'New Support Chat Request',
-      content: `
-        <p>A customer has requested to connect with a support agent.</p>
-        <div class="info">
-          <p style="margin:0 0 6px"><strong>Name:</strong> ${customerName}</p>
-          <p style="margin:0 0 6px"><strong>Email:</strong> ${customerEmail}</p>
-          <p style="margin:0"><strong>Session ID:</strong> ${sessionId}</p>
-        </div>
-        <p>Click below to open the customer profile and join the chat:</p>
-        <div class="cta"><a href="${chatLink}" class="button">Open Support Chat</a></div>
-      `,
-      footerLines: [`${brand} Admin Notification — do not reply to this email.`],
-    }),
-  }
+  const row = (k: string, v: string | null | undefined) => (v ? `<p style="margin:0 0 6px"><strong>${k}:</strong> ${escapeHtml(v)}</p>` : '')
 
   try {
     await sendAuditedMail({
-      ...mailOptions,
+      from: await customerMailFromAsync(),
+      to: recipients.join(', '),
+      subject: `Support${p.ticket ? ` ${p.ticket}` : ''}: ${p.customerName} needs a person`,
+      html: mailShell({
+        brand,
+        kicker: 'Admin Notification',
+        title: 'A customer needs a support agent',
+        content: `
+          <p>The assistant handed this chat to the team.</p>
+          <div class="info">
+            ${row('Customer', p.customerName)}${row('Email', p.customerEmail)}${row('Phone', p.customerPhone)}
+            ${row('Ticket', p.ticket)}${row('Channel', p.channel)}${row('Why', p.reason)}
+          </div>
+          ${p.summary ? `<p><strong>Summary from the assistant</strong></p><p>${escapeHtml(p.summary)}</p>` : ''}
+          <div class="cta"><a href="${chatLink}" class="button">Open the chat</a></div>
+        `,
+        footerLines: [`${brand} Admin Notification — do not reply to this email.`],
+      }),
       kind: 'support',
       templateName: 'support_escalation',
+      entityType: 'support_session',
+      entityId: p.sessionId,
+    })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+/** A support agent joined or replied while the customer was away from the chat. */
+export async function sendSupportReplyEmail(p: {
+  customerName: string
+  customerEmail: string
+  agentName: string
+  ticket: string | null
+  preview: string | null
+  joined: boolean
+  userId: string
+  sessionId: string
+  chatPath?: string
+}): Promise<{ success: boolean; error?: unknown }> {
+  const chatLink = `${await storeBaseUrlAsync()}${p.chatPath ?? '/support'}`
+  const brand = await currentBrandNameAsync()
+  const title = p.joined ? `${p.agentName} has joined your support chat` : `${p.agentName} replied to your support chat`
+  const preview = p.preview ? escapeHtml(p.preview.length > 400 ? `${p.preview.slice(0, 400)}…` : p.preview) : ''
+  try {
+    await sendAuditedMail({
+      from: await customerMailFromAsync(),
+      to: p.customerEmail,
+      subject: p.ticket ? `${title} (${p.ticket})` : title,
+      html: mailShell({
+        brand,
+        kicker: 'Support',
+        title: `Hi ${escapeHtml(p.customerName)},`,
+        content: `
+          <p>${escapeHtml(title)}.</p>
+          ${preview ? `<div class="info"><p style="margin:0;white-space:pre-wrap">${preview}</p></div>` : ''}
+          <div class="cta"><a href="${chatLink}" class="button">Open the chat</a></div>
+          ${p.ticket ? `<p class="muted">Ticket ${escapeHtml(p.ticket)}</p>` : ''}
+        `,
+        footerLines: [`${brand} Support. Reply in the chat; replies to this email are not read.`],
+      }),
+      kind: 'support',
+      templateName: 'support_reply',
+      userId: p.userId,
+      entityType: 'support_session',
+      entityId: p.sessionId,
     })
     return { success: true }
   } catch (error) {

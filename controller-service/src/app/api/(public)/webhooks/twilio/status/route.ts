@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import twilio from 'twilio'
-import { query } from '@/lib/shared/db'
 import { debitMessageCost, refundMessageEstimate } from '@/lib/shared/messaging/billing'
 import { usdToInr } from '@/lib/shared/messaging/pricing'
 import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
+import { applyDeliveryStatus } from '@/lib/shared/messaging/delivery-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,11 +51,7 @@ export async function POST(request: Request) {
     const ctx = await lookupTenantContextById(tenantId)
     if (ctx) {
       await runWithTenantContext(ctx, () =>
-        query(
-          `UPDATE message_logs SET delivery_status = $2, price = $3, currency = 'INR', priced_at = now(), provider = 'twilio'
-           WHERE provider_sid = $1`,
-          [sid, status, chargedInr]
-        )
+        applyDeliveryStatus({ providerSid: sid, status, provider: 'twilio', priceInr: chargedInr, error: params.ErrorMessage || (params.ErrorCode ? `Error ${params.ErrorCode}` : null) })
       )
     }
     return new NextResponse(null, { status: 204 })

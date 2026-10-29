@@ -229,15 +229,15 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
   {
     key: 'customers:read',
     label: 'Customers (Read)',
-    description: 'View customer accounts, notes, tags and activity',
-    routes: ['/admin/customers'],
+    description: 'View customer accounts, notes, tags, activity and support chats',
+    routes: ['/admin/customers', '/admin/support'],
     group: 'Sales',
   },
   {
     key: 'customers:write',
     label: 'Customers (Write)',
-    description: 'Edit customer accounts, add notes, tags and manage CRM tasks',
-    routes: ['/admin/customers'],
+    description: 'Edit customer accounts, add notes, tags, manage CRM tasks and reply in support chats',
+    routes: ['/admin/customers', '/admin/support'],
     group: 'Sales',
   },
   // CRM & Tasks — previously piggybacked on customers:read. Dedicated keys for tiering.
@@ -430,6 +430,21 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     label: 'Vault (Write)',
     description: 'Upload, replace and delete digital files; set download permissions',
     routes: ['/admin/vault'],
+    group: 'Catalogue',
+  },
+  // Drive — the store team's private files (chat attachments, uploads), with the gallery inside. On every plan.
+  {
+    key: 'drive:read',
+    label: 'Drive (Read)',
+    description: 'Browse Drive folders shared with you, view and download files',
+    routes: ['/admin/drive'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'drive:write',
+    label: 'Drive (Write)',
+    description: 'Upload, rename, move, share and delete Drive files and folders',
+    routes: ['/admin/drive'],
     group: 'Catalogue',
   },
   // Traffic analytics — previously piggybacked on dashboard:read. Dedicated key.
@@ -826,6 +841,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/replacements')) return 'replacements:read'
   if (pathname.startsWith('/api/admin/delhivery')) return 'delhivery:read'
   if (pathname.startsWith('/api/admin/support')) return 'customers:read'
+  if (pathname.startsWith('/api/admin/drive')) return 'drive:read'
   if (pathname.startsWith('/api/admin/users')) return 'settings:read'
   if (pathname.startsWith('/api/admin/site-controls')) return 'settings:read'
   if (pathname.startsWith('/api/admin/certificates')) return 'settings:read'

@@ -22,6 +22,7 @@ export const APPLY_ORDER = [
   'messaging.sql',
   'reviews.sql',
   'support.sql',
+  'drive.sql',
   'logs.sql',
   'settings.sql',
   'editor-sessions.sql',
