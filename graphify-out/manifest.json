@@ -100,13 +100,13 @@
     "semantic_hash": ""
   },
   "database/functions.sql": {
-    "mtime": 1792943292.2487307,
-    "ast_hash": "caf9884fb968896495b9c066b1841fe4",
+    "mtime": 1793259158.8476992,
+    "ast_hash": "599c833d950798f7d40cd779883e6405",
     "semantic_hash": ""
   },
   "database/indexes.sql": {
-    "mtime": 1793252149.5394335,
-    "ast_hash": "5ca3e0a3446c9b1de8a3d691d18da191",
+    "mtime": 1793259204.053392,
+    "ast_hash": "c35eef16983e99988889474554a60d15",
     "semantic_hash": ""
   },
   "database/inventory.sql": {
@@ -160,8 +160,8 @@
     "semantic_hash": ""
   },
   "database/triggers.sql": {
-    "mtime": 1787763971.7269766,
-    "ast_hash": "8c69cb2964c41f7f5e85d562797caa68",
+    "mtime": 1793259836.7142136,
+    "ast_hash": "1f0c00e05f20ca8b43d272d7c018605a",
     "semantic_hash": ""
   },
   "database/users.sql": {
@@ -880,8 +880,8 @@
     "semantic_hash": ""
   },
   "tests/lib/admin-audit.test.ts": {
-    "mtime": 1790931257.0406759,
-    "ast_hash": "8d447f9f8f97a216770fe2c3f7102f04",
+    "mtime": 1793260660.445517,
+    "ast_hash": "b2b2f49bc0e8443df4294f6b8e16bf9d",
     "semantic_hash": ""
   },
   "tests/lib/admin-crm.test.ts": {
@@ -5700,8 +5700,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/audit/AdminAuditClient.tsx": {
-    "mtime": 1792994601.681676,
-    "ast_hash": "496aff4ebe1cd8ece7a1763266d4880a",
+    "mtime": 1793260179.5131817,
+    "ast_hash": "a37c2fce47d7d5335c47057870d3a690",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/audit/loading.tsx": {
@@ -5735,8 +5735,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/brands/[id]/view/page.tsx": {
-    "mtime": 1793176891.8836854,
-    "ast_hash": "ade6415dfa20384f76b08ffd10331f82",
+    "mtime": 1793259776.4990366,
+    "ast_hash": "46aa6cab3b4f2f57f1c797327edc7274",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/brands/_components/BrandsMobileList.tsx": {
@@ -5775,8 +5775,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/business/customers/[id]/BusinessCustomerDetailClient.tsx": {
-    "mtime": 1792953513.8222136,
-    "ast_hash": "010edf76ad4fb120ca699dd053859180",
+    "mtime": 1793260013.7143023,
+    "ast_hash": "ae7f03d0ca92b49aaf0a5189e43d52af",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/business/customers/[id]/loading.tsx": {
@@ -5810,8 +5810,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/business/rfqs/[id]/RFQDetailClient.tsx": {
-    "mtime": 1793205453.7837393,
-    "ast_hash": "0bf37d61f2cbde57556d9e7cd9b1ceed",
+    "mtime": 1793260013.7181916,
+    "ast_hash": "9e855e65edc9203600b8284797b9ff8c",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/business/rfqs/[id]/loading.tsx": {
@@ -5885,8 +5885,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/campaigns/[kind]/view/CampaignViewClient.tsx": {
-    "mtime": 1793093012.5575185,
-    "ast_hash": "e850ff676f46836620d0278ab895837e",
+    "mtime": 1793259940.8920121,
+    "ast_hash": "f3baaff8dfaecb2daeb592f608a25a1f",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/campaigns/[kind]/view/page.tsx": {
@@ -5985,8 +5985,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/cash-sale/[id]/CashSaleDetailClient.tsx": {
-    "mtime": 1792943291.5367332,
-    "ast_hash": "c653d6a7db710b9228cff890975db731",
+    "mtime": 1793259812.598556,
+    "ast_hash": "fabbb36aa5e89531b379bda48db8b60a",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/cash-sale/[id]/loading.tsx": {
@@ -6060,8 +6060,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/categories/[id]/view/page.tsx": {
-    "mtime": 1793176048.003604,
-    "ast_hash": "baa4c7a91516535f8178cba5a5c0c237",
+    "mtime": 1793259776.499659,
+    "ast_hash": "c50e73ab1e610347325d46dfddd8a260",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/categories/_components/CategoriesMobileList.tsx": {
@@ -6155,8 +6155,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/coupons/[id]/view/page.tsx": {
-    "mtime": 1793177053.369052,
-    "ast_hash": "2c68c2ef9c1c205a41c12c5b29eb4a38",
+    "mtime": 1793259776.5002298,
+    "ast_hash": "99d481c435bf55b7677277d759d9339b",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/coupons/_components/CouponsMobileList.tsx": {
@@ -6410,8 +6410,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/customers/[id]/view/page.tsx": {
-    "mtime": 1792943291.5542095,
-    "ast_hash": "3c56bf9fc77d333ccbb3e78f60faefaa",
+    "mtime": 1793259742.7855363,
+    "ast_hash": "e5dc4feb6cc3482d20b4e54c99639db1",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/customers/_components/CustomersMobileList.tsx": {
@@ -6685,8 +6685,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/financial/payables/[id]/PayableDetailClient.tsx": {
-    "mtime": 1793115898.108759,
-    "ast_hash": "e509583347b6f3bad3d6e653c9f21489",
+    "mtime": 1793259865.7397966,
+    "ast_hash": "ed7f4988417f3d74578b1b26e5c49a71",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/financial/payables/[id]/loading.tsx": {
@@ -6770,8 +6770,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/invoices/[id]/InvoiceDetailClient.tsx": {
-    "mtime": 1793254955.8101692,
-    "ast_hash": "efaa047b2145c99a89ffc5de3f376569",
+    "mtime": 1793259800.610356,
+    "ast_hash": "629320c5fc779fc38f87a3d60d9f65bc",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/invoices/[id]/loading.tsx": {
@@ -6900,8 +6900,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/marketing/messaging/[id]/view/page.tsx": {
-    "mtime": 1792943291.5894756,
-    "ast_hash": "2f3e678d2767f01272e12aae5435b12b",
+    "mtime": 1793259947.568465,
+    "ast_hash": "bff01ed1fe68670a048c3a972194cf8f",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/marketing/messaging/_components/MailerMobileList.tsx": {
@@ -6950,8 +6950,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/offers/[id]/OfferDetailClient.tsx": {
-    "mtime": 1793178132.5133653,
-    "ast_hash": "aff745efdaa891684544f6940097a1bc",
+    "mtime": 1793259927.0857527,
+    "ast_hash": "beb902307bea64f2976ab5eecdedb8c4",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/offers/[id]/page.tsx": {
@@ -7055,8 +7055,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/orders/[id]/view/page.tsx": {
-    "mtime": 1793015294.660756,
-    "ast_hash": "24960e95b0bf1455b13ebd9a6783818e",
+    "mtime": 1793259705.7682452,
+    "ast_hash": "12065639dbe33e7d2702f35051d71b6f",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/orders/_components/OrdersMobileList.tsx": {
@@ -7105,8 +7105,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/products/[id]/ProductDetailClient.tsx": {
-    "mtime": 1793254955.809059,
-    "ast_hash": "d2e4bfb8cb1c88266f068f1f89cfe273",
+    "mtime": 1793259882.9302616,
+    "ast_hash": "01510b3ac881f808140950150f95112e",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/products/[id]/analytics/ProductAnalyticsClient.tsx": {
@@ -7230,8 +7230,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/quotations/[id]/QuotationDetailClient.tsx": {
-    "mtime": 1793254955.8111093,
-    "ast_hash": "57435fb9000f4b74d98809a54059327b",
+    "mtime": 1793259805.784999,
+    "ast_hash": "768b214a13023ad56eab846d12c0fde7",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/quotations/[id]/loading.tsx": {
@@ -7470,8 +7470,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/subscriptions/[id]/view/page.tsx": {
-    "mtime": 1792943291.637857,
-    "ast_hash": "f3b278ce747326e105b63c79ed7991ff",
+    "mtime": 1793259776.5013049,
+    "ast_hash": "be0a497bb65c31a67a958df55bc326bf",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/subscriptions/_status.ts": {
@@ -7485,8 +7485,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/suppliers/[id]/SupplierDetailClient.tsx": {
-    "mtime": 1793177083.067587,
-    "ast_hash": "aa53fbbce21a13657073cc904252f8bf",
+    "mtime": 1793259897.3176446,
+    "ast_hash": "6cc5f1ff2e9dc7b6f67f802a486bcd59",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/suppliers/[id]/edit/loading.tsx": {
@@ -8960,8 +8960,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/chat/route.ts": {
-    "mtime": 1793254822.8822665,
-    "ast_hash": "b450d3ed8efcc1cde746c5ca85ecca13",
+    "mtime": 1793260080.3716872,
+    "ast_hash": "458f7973460e01e261cc6c12292cc584",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/conversations/[id]/messages/route.ts": {
@@ -9500,8 +9500,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/delhivery/sync-statuses/route.ts": {
-    "mtime": 1792943291.7622006,
-    "ast_hash": "86b21aa7df7d7daed5fd9ecca381645a",
+    "mtime": 1793259360.7034342,
+    "ast_hash": "ac7a5c3831c8e16fa3c7cccafd8eee93",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/account-mode/route.ts": {
@@ -10250,8 +10250,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/orders/[id]/track/route.ts": {
-    "mtime": 1792943291.8350575,
-    "ast_hash": "731fa70c1c6e5065b96666e0248fcc92",
+    "mtime": 1793259391.8926477,
+    "ast_hash": "a83d8bf7ced36fefe3e4724237fa3b80",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/orders/[id]/update-shipment/route.ts": {
@@ -11500,8 +11500,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/orders/[id]/track/route.ts": {
-    "mtime": 1792943291.9532173,
-    "ast_hash": "75de4586c163859b8b68f61694599302",
+    "mtime": 1793259391.8915234,
+    "ast_hash": "94871d52fb81a25f48833e11efc081a8",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/orders/[id]/variant-change/confirm/route.ts": {
@@ -11880,13 +11880,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/webhooks/razorpay/[tenant]/route.ts": {
-    "mtime": 1792943291.9899752,
-    "ast_hash": "0df6bf18a10401bec4e7fb01e7449eb7",
+    "mtime": 1793259360.7022655,
+    "ast_hash": "80e416ed2be1415719370a51cb10a19b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/webhooks/razorpay/route.ts": {
-    "mtime": 1793015182.4785016,
-    "ast_hash": "00766861dc2c9530e5f3d25b67e96cdf",
+    "mtime": 1793259360.7007833,
+    "ast_hash": "6d68d63cc9ba45e887f5a7febd0583ff",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/webhooks/twilio/route.ts": {
@@ -13570,8 +13570,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/index.ts": {
-    "mtime": 1793255406.4009497,
-    "ast_hash": "5e89c571aaeb2362f265cd0a1242abe8",
+    "mtime": 1793260059.3623972,
+    "ast_hash": "61cbb28d305e5b2398ea4e770b7d5238",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/marketing.ts": {
@@ -13660,8 +13660,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/auth/audit-context.ts": {
-    "mtime": 1792943292.0760384,
-    "ast_hash": "12a20fa95309c10d7f968789228184c2",
+    "mtime": 1793259291.2374964,
+    "ast_hash": "86cfbf6f69cc2be0716ebff6aa7b691e",
     "semantic_hash": ""
   },
   "controller-service/src/lib/auth/auth-sessions.ts": {
@@ -14860,8 +14860,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/admin-audit.ts": {
-    "mtime": 1793073649.2280889,
-    "ast_hash": "2b6642929d9f52a32f2394de15b746d3",
+    "mtime": 1793260671.1199644,
+    "ast_hash": "980a80b524fbfcbb2add5262754b6a69",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/admin-crm.ts": {
@@ -15010,8 +15010,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/db.ts": {
-    "mtime": 1792943292.203081,
-    "ast_hash": "4085ec31d749258476d4e47d9ea0900a",
+    "mtime": 1793259382.1612227,
+    "ast_hash": "8b43150437d8ee7ad1b11ee6ca85135c",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/ec2-client.ts": {
@@ -19815,8 +19815,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/review-forms/[id]/view/page.tsx": {
-    "mtime": 1793177199.1530433,
-    "ast_hash": "d040fdc40ff14ed451957594bd3dbd9b",
+    "mtime": 1793259776.500741,
+    "ast_hash": "e40e8473465dc4d8c1becd9094cc0ff3",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/suppliers/[id]/edit/EditSupplierClient.tsx": {
@@ -23425,8 +23425,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/permissions.ts": {
-    "mtime": 1793254861.9427652,
-    "ast_hash": "4fdf7fa12351a4c1c80c1240d1ac2252",
+    "mtime": 1793260059.3680353,
+    "ast_hash": "eae39bb7b69f37d9f37ab4d1ced0fd20",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/orders.ts": {
@@ -23550,8 +23550,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/agent/AgentDock.tsx": {
-    "mtime": 1793255618.0903928,
-    "ast_hash": "d10adb0812ca36491773a71f7b3dd090",
+    "mtime": 1793260088.3864493,
+    "ast_hash": "846ec1d36e5213e9e707f483c471887e",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/agent/RecordCard.tsx": {
@@ -23575,13 +23575,58 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/page-context.ts": {
-    "mtime": 1793254798.1014085,
-    "ast_hash": "dff8aaad5236d82e19f7795eaf2d3def",
+    "mtime": 1793260070.4862165,
+    "ast_hash": "023ba68eee2e042bc20fd990a8dd131e",
     "semantic_hash": ""
   },
   "controller-service/src/lib/client/agent-events.ts": {
     "mtime": 1793254924.1105676,
     "ast_hash": "f70c5b8b014110fb758614fb65d2f06f",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/change-log/route.ts": {
+    "mtime": 1793259514.5146644,
+    "ast_hash": "df5dc9721d781c25042b4db7907c8cc1",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/change-log/ChangeLog.tsx": {
+    "mtime": 1793260455.8081508,
+    "ast_hash": "21dac101201f4f4c93c98ed69318cd02",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/change-log/OrderStatusHistory.tsx": {
+    "mtime": 1793260142.525657,
+    "ast_hash": "4c4ec17102441c3b63f10447e8398e83",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/change-log/index.ts": {
+    "mtime": 1793259696.6690166,
+    "ast_hash": "2e3f21f1fe64c189573a9f66f1eb8110",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/change-log/status.ts": {
+    "mtime": 1793260142.534204,
+    "ast_hash": "1a00a938dc63d4d932b15706425ecd26",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/change-log/useChangeLog.ts": {
+    "mtime": 1793259623.1930447,
+    "ast_hash": "5de4d1b89082de026f714e2773bc93f9",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/admin/change-log-format.ts": {
+    "mtime": 1793260515.5937464,
+    "ast_hash": "1af30e44e0751ae1c614564a4f919422",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/admin/change-log.ts": {
+    "mtime": 1793260455.80681,
+    "ast_hash": "30bee316ca0b6e9bf62f8dc20e7ba5f3",
+    "semantic_hash": ""
+  },
+  "database/migrations/2026-10-29_change_log.sql": {
+    "mtime": 1793259836.8048842,
+    "ast_hash": "1a50e65fea43c243faff99e3064896c1",
     "semantic_hash": ""
   }
 }
