@@ -6,13 +6,12 @@ import { queryOne } from '@/lib/shared/db'
 import { fileFor } from '@/lib/drive/listing'
 import { logDriveAccess, readFileBytes } from '@/lib/drive/files'
 import { denied, driveActor, reqMeta } from '@/lib/drive/http'
+import { MAX_ATTACHMENT_BYTES, resolveMime, unsupportedMessage } from '@/lib/admin-agent/file-types'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 // A Drive file handed to the assistant: copied into its attachments, with the same limits as an upload.
-const MAX_BYTES = 5 * 1024 * 1024
-const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
 
 const schema = z.object({ fileId: z.string().uuid() })
 
@@ -25,9 +24,10 @@ export async function POST(req: NextRequest) {
 
   const f = await fileFor(actor, parsed.data.fileId)
   if (!f) return denied()
-  const mime = f.row.mime_type.toLowerCase()
-  if (!ALLOWED_MIMES.has(mime)) return NextResponse.json({ error: 'The assistant reads JPG, PNG, WEBP or PDF files' }, { status: 415 })
-  if (Number(f.row.size_bytes) > MAX_BYTES) return NextResponse.json({ error: 'File too large (max 5MB)' }, { status: 413 })
+  const mime = resolveMime(f.row.name, f.row.mime_type)
+  if (!mime) return NextResponse.json({ error: unsupportedMessage(f.row.mime_type.toLowerCase()) }, { status: 415 })
+  if (Number(f.row.size_bytes) > MAX_ATTACHMENT_BYTES)
+    return NextResponse.json({ error: `File too large (max ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB)` }, { status: 413 })
 
   const buf = await readFileBytes(f.row)
   const inserted = await queryOne<{ id: string; expires_at: string }>(

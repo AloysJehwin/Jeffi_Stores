@@ -39,7 +39,7 @@ export function ago(iso: string | null | undefined, now = Date.now()): string {
 
 export function previewOf(m: Pick<SupportMessage, 'text' | 'attachments' | 'payloads'>): string {
   if (m.text) return m.text
-  if (m.attachments?.length) return m.attachments.length === 1 ? `📎 ${m.attachments[0].name}` : `📎 ${m.attachments.length} files`
+  if (m.attachments?.length) return m.attachments.length === 1 ? `Attachment: ${m.attachments[0].name}` : `${m.attachments.length} attachments`
   const p = m.payloads?.[0]
   if (p?.type === 'confirm') return p.title
   if (p?.type === 'orders') return `${p.orders.length} order(s)`

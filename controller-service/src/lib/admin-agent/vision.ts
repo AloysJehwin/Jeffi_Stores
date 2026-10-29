@@ -1,5 +1,6 @@
 import { aiVision } from '@/lib/shared/ai-client'
 import { storeDescriptorForPrompt } from '@/lib/catalog/brand'
+import { pdfPageImages } from './pdf'
 
 // OCR/vision now runs through the ai-platform gateway (PaddleOCR-first, Ollama-vision fallback,
 // queue + retry). This file keeps the DOMAIN logic — the quotation extraction prompt and PDF
@@ -24,19 +25,25 @@ Rules:
 - Do NOT invent items not visible in the image.
 - If the image contains no quotation items at all, output exactly: NO_ITEMS_FOUND`
 
+const generalPrompt = (store: string) => `You are reading a file for the admin of ${store}. Transcribe ALL the text in the image exactly as written, keeping its layout (lines, columns and tables as plain text rows).
+Then, on a new line starting "Image:", describe in one or two sentences anything that is not text (a product photo, a damaged item, a receipt, a screenshot of an app...).
+If there is no text at all, output only the "Image:" line.`
+
 type VisionResult =
   { ok: true; text: string; model: string; pages?: number } | { ok: false; reason: string; hint?: string }
 
-export async function ocrImage(image: Buffer, _mimeType: string): Promise<VisionResult> {
+/** quotation: the line items as "QTY UNIT - DESCRIPTION"; general: all the text plus what the image shows. */
+export async function ocrImage(image: Buffer, purpose: 'quotation' | 'general' = 'quotation'): Promise<VisionResult> {
   // The gateway runs Claude when it leads the text order, else PaddleOCR then the Ollama vision model.
-  const r = await aiVision([image.toString('base64')], extractionPrompt(await storeDescriptorForPrompt()), undefined, {
-    feature: 'quotation_ocr',
+  const store = await storeDescriptorForPrompt()
+  const r = await aiVision([image.toString('base64')], purpose === 'quotation' ? extractionPrompt(store) : generalPrompt(store), undefined, {
+    feature: purpose === 'quotation' ? 'quotation_ocr' : 'agent_file_read',
   })
   if (!r.ok || !r.text) {
     return { ok: false, reason: r.error || 'No text detected in the image', hint: r.hint }
   }
   const text = r.text.trim()
-  if (!text || text === 'NO_ITEMS_FOUND') {
+  if (!text || (purpose === 'quotation' && text === 'NO_ITEMS_FOUND')) {
     return { ok: false, reason: 'No quotation items detected in the image' }
   }
   return { ok: true, text, model: r.model, pages: r.pages }
@@ -44,27 +51,17 @@ export async function ocrImage(image: Buffer, _mimeType: string): Promise<Vision
 
 export async function ocrPdfPages(
   pdf: Buffer,
-  opts?: { maxPages?: number; perPageTimeoutMs?: number }
+  opts?: { maxPages?: number; perPageTimeoutMs?: number; purpose?: 'quotation' | 'general' }
 ): Promise<VisionResult> {
   // Rasterize app-side, then OCR each page image through the gateway.
   const maxPages = Math.max(1, Math.min(20, opts?.maxPages ?? 10))
   let pages = 0
   const collected: string[] = []
 
-  let pdfToImg: any
   try {
-    pdfToImg = await import('pdf-to-img')
-  } catch (e: any) {
-    return { ok: false, reason: `pdf-to-img not available: ${String(e?.message || e)}` }
-  }
-  const { pdf: pdfRender } = pdfToImg
-
-  try {
-    const document = await pdfRender(pdf, { scale: 2 })
-    for await (const pageBuf of document) {
+    for await (const pageBuf of pdfPageImages(pdf, { maxPages, scale: 2 })) {
       pages++
-      if (pages > maxPages) break
-      const r = await ocrImage(pageBuf as Buffer, 'image/png')
+      const r = await ocrImage(pageBuf, opts?.purpose ?? 'quotation')
       if (!r.ok) {
         if (collected.length === 0) {
           return { ok: false, reason: `Page ${pages} OCR failed: ${r.reason}`, hint: r.hint }

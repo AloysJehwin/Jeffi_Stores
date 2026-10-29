@@ -29,6 +29,7 @@ import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import AutoGrowTextarea from '@/components/ui/AutoGrowTextarea'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import { useDrivePicker } from '@/components/admin/drive/DrivePicker'
+import { ACCEPTED_EXTENSIONS, MAX_ATTACHMENT_BYTES, splitAttachmentNotes } from '@/lib/admin-agent/file-types'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 import { useAdminHost } from '@/contexts/AdminHostContext'
@@ -49,7 +50,11 @@ interface Props {
 
 /** A chat's display name: its title without attachment markers, or a control message's label. */
 export function chatTitle(title: string | null | undefined): string {
-  return internalMessageLabel(title) || title?.replace(/\s*\[attachment_id=[^\]]*\]/g, '').trim() || 'Untitled chat'
+  const label = internalMessageLabel(title)
+  if (label) return label
+  // A long title can cut its attachment note off half way.
+  const { text, files } = splitAttachmentNotes((title ?? '').replace(/\s*\[attachment_id=[^\]]*$/, ''))
+  return text || files[0] || 'Untitled chat'
 }
 
 export default function AgentChatPanel({ chat, variant, showHistory, onConversationPicked, approveWrapper, empty }: Props) {
@@ -521,7 +526,7 @@ function Composer({
   const canDrive = useHasScope('drive:read')
   const drive = useDrivePicker()
   const fromDrive = async () => {
-    const f = (await drive.pick({ title: 'Attach from Drive', multiple: false, kinds: ['image', 'pdf'], maxBytes: 5 * 1024 * 1024 }))?.[0]
+    const f = (await drive.pick({ title: 'Attach from Drive', multiple: false, kinds: ['image', 'pdf', 'doc', 'other'], maxBytes: MAX_ATTACHMENT_BYTES }))?.[0]
     if (f) chat.attachFromDrive(f)
   }
   return (
@@ -549,7 +554,7 @@ function Composer({
         <input
           ref={chat.fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,application/pdf"
+          accept={ACCEPTED_EXTENSIONS.join(',')}
           onChange={chat.onPickFile}
           className="hidden"
         />

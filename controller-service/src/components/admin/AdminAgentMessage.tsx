@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { Fragment, ReactNode } from 'react'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Paperclip } from 'lucide-react'
+import { splitAttachmentNotes } from '@/lib/admin-agent/file-types'
 import { ap } from '@/lib/shared/admin-path'
 import { ENTITY_ROUTES, fmtQty } from './agent/format'
 import type { QuotationConfirmItem } from './agent/QuotationResolver'
@@ -395,7 +396,20 @@ export function internalMessageLabel(text: string | null | undefined): string | 
 /** A user bubble's content: plain text, or a readable summary of a control message. */
 export function AdminAgentUserMessage({ text }: { text: string }) {
   const items = parseQuotationConfirm(text)
-  if (!items) return <p className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">{text}</p>
+  if (!items) {
+    const { text: body, files } = splitAttachmentNotes(text)
+    return (
+      <div className="space-y-1.5">
+        {body && <p className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">{body}</p>}
+        {files.map((f, i) => (
+          <p key={i} className="flex items-center gap-1.5 text-xs font-medium">
+            <Paperclip className="h-3.5 w-3.5 shrink-0" />
+            <span className="[overflow-wrap:anywhere]">{f}</span>
+          </p>
+        ))}
+      </div>
+    )
+  }
   const skipped = items.filter(i => i.skipped).length
   return (
     <div className="space-y-1.5">

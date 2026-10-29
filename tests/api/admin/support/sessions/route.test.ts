@@ -17,7 +17,7 @@ const mockList = vi.mocked(listInbox)
 const mockCounts = vi.mocked(inboxCounts)
 
 const admin = { adminId: 'a1', email: 'a@x.com', role: 'admin', scopes: ['customers:read'] }
-const COUNTS = { needs_human: 2, mine: 1, ai: 3, open: 5, closed: 0 }
+const COUNTS = { needs_human: 2, mine: 1, ai: 3, open: 5, closed: 0, approval: 0 }
 
 const makeReq = (query = '') => new NextRequest(`http://localhost/api/admin/support/sessions${query}`)
 

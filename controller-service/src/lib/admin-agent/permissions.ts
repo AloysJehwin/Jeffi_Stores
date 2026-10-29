@@ -120,6 +120,7 @@ export const TOOL_SCOPES: Record<string, string | 'owner'> = {
   // Each list's own read scope is checked in the tool.
   get_page_rows: 'agent:read',
   get_change_log: 'agent:read',
+  read_attachment: 'agent:read',
   render_ui: 'agent:read',
 
   // No area of their own: they reach any table, file or route

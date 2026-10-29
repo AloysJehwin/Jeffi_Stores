@@ -11,6 +11,7 @@ import { GOOGLE_ADS_TOOLS } from './google-ads'
 import { ORDER_TOOLS } from './orders'
 import { dedicatedOrderTool, type AgentActor } from '../permissions'
 import { ok, err } from '../tool-envelope'
+import { readStoredAttachment } from '../files'
 import { appPath, repoRoot } from '@/lib/shared/paths'
 import { normalizeQuery } from '@jeffi/list-filters'
 import { hasScope } from '@/lib/auth/scopes'
@@ -555,6 +556,34 @@ export const TOOLS: ToolDef[] = [
         summary: `${capped ? `Over ${count}` : count} ${entity.noun.toLowerCase()} match; showing the first ${compact.length}${compact.length < rows.length ? ' (pass columns for more)' : ''}.`,
         count,
         data: { list: entity.key, query: new URLSearchParams(q).toString(), capped, columns: entity.export.columns.map(c => c.key), rows: compact },
+      })
+    },
+  },
+  {
+    name: 'read_attachment',
+    description:
+      'Read a file the admin attached in this chat (from the [attachment_id=...] note) and return everything it says as text: PDF or scanned PDF, photo or image (text plus a short description of what it shows), Word, Excel/CSV (each sheet as CSV), PowerPoint, OpenDocument or text/JSON/HTML. Use it for any attachment; for a quotation request use extract_quotation_lines_from_attachment instead. Audio and video cannot be read.',
+    inputSchema: {
+      type: 'object',
+      properties: { attachment_id: { type: 'string', description: 'The attachment_id from the chat message.' } },
+      required: ['attachment_id'],
+    },
+    mutating: false,
+    handler: async (input, actor) => {
+      const id = String(input.attachment_id ?? '').trim()
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return err('A valid attachment_id is required.')
+      const row = await queryOne<{ id: string; mime_type: string; filename: string | null; data: Buffer; extracted_text: string | null }>(
+        `SELECT id::text, mime_type, filename, data, extracted_text FROM admin_agent_attachments
+          WHERE id = $1::uuid AND expires_at > NOW() AND ($2::uuid IS NULL OR admin_id = $2::uuid)`,
+        [id, actor?.adminId ?? null]
+      )
+      if (!row) return err('Attachment not found or expired', undefined, 'Ask the admin to attach the file again.')
+      const r = await readStoredAttachment(row, 'general')
+      if (!r.ok) return err(`Could not read "${row.filename || 'the file'}"`, r.reason, r.hint)
+      return ok({
+        summary: `Read "${row.filename || row.mime_type}"${r.pages ? ` (${r.pages} page(s))` : ''}${r.truncated ? ', first 60,000 characters' : ''}.`,
+        data: { filename: row.filename, mime_type: row.mime_type, text: r.text },
+        meta: { cached: !!r.cached, source: r.source, pages: r.pages, model: r.model, truncated: r.truncated },
       })
     },
   },

@@ -90,6 +90,7 @@ const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
     test: /\b(file|repo|code|route|api|endpoint|source)\b/i,
     tools: ['list_repo_files', 'read_repo_file', 'list_admin_api_routes', 'call_admin_api'],
   },
+  { test: /\[attachment_id=|\b(attach(ed|ment)?|pdf|document|image|photo|screenshot|spreadsheet|excel|csv|sheet)\b/i, tools: ['read_attachment', 'extract_quotation_lines_from_attachment'] },
   { test: /\b(similar|recommend|like this|related)\b/i, tools: ['find_similar_products'] },
   { test: /\b(recent|latest|new)\b/i, tools: ['get_recent_customers', 'get_recent_products'] },
   {
@@ -182,7 +183,7 @@ RULES (non-negotiable):
 - Mutating tools (those that change data) return {proposed:true} — when they do, tell the user "I've proposed this — review the action card."
 - If a tool returns {needs_choice:true}: write "Multiple matches — pick one above." and stop.
 - If the user says "Use address id <uuid> ..." (from the address picker): call propose_create_quotation again with the same customerEmail and items, and pass addressId=<uuid>. Do NOT ask for confirmation — just call the tool.
-- Be concise. Numbers and bullet points beat paragraphs. No filler.
+- Be concise. Numbers and bullet points beat paragraphs. No filler. Never use emojis.
 ${dynamicList}
 
 ## DOMAIN RULES
@@ -215,6 +216,9 @@ Output format — use ui_blocks for any data display:
 - Free text outside ui_blocks renders above the blocks — use it for brief framing or questions only.
 
 ## QUOTATION FLOW — MANDATORY (violations waste all iterations)
+
+## Attachments
+A message with [attachment_id=... filename=... mime=...] carries a file. Read it with read_attachment (any PDF, scan, photo, Word, Excel/CSV, PowerPoint or text file). If it is a quotation request, use extract_quotation_lines_from_attachment and follow the quotation steps. Audio and video cannot be read: say so and ask the admin to type out what matters.
 
 When the user asks to "prepare a quotation", "create a quote", or provides a list of items/tools/materials:
 STEP 1 — Call match_quotation_items ONCE with ALL items packed into a single JSON array in the "lines" field.
@@ -435,7 +439,10 @@ ${STOCK_RULES}
   - One record or summary of anything (an invoice, quotation, coupon, campaign, supplier, an order or customer in detail, KPIs for a period): card, with stats for the headline numbers, fields for the details, items for its lines, and actions to open it or ask the obvious next question. Several such records: cards.
   - Wide comparisons: table. Warnings and outcomes: callout.
 - Link records inline as [[product:<uuid>|Name]], [[order:<uuid>|ORD-001]], [[customer:<uuid>|Name]] or [[campaign:<kind>|Label]], using real ids from tool output only.
-- Short markdown (bold, lists, \`code\`) is fine.
+- Short markdown (bold, lists, \`code\`) is fine. Never use emojis.
+
+## Attachments
+A message with [attachment_id=... filename=... mime=...] carries a file. Read it with read_attachment (any PDF, scan, photo, Word, Excel/CSV, PowerPoint or text file). If it is a quotation request, use extract_quotation_lines_from_attachment and follow the quotation steps. Audio and video cannot be read: say so and ask the admin to type out what matters.
 
 ## Quotations
 When the admin asks to prepare a quotation or gives a list of items:

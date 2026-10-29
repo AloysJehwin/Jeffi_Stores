@@ -31,7 +31,7 @@ CREATE TABLE public.admin_agent_attachments (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     admin_id uuid NOT NULL,
     filename character varying(255),
-    mime_type character varying(64) NOT NULL,
+    mime_type character varying(128) NOT NULL,
     byte_size integer NOT NULL,
     data bytea NOT NULL,
     extracted_text text,
