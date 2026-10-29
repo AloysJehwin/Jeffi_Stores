@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { MessageCircle, ChevronDown, LayoutTemplate } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
-import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
+import { driveToAttachment } from '@/components/admin/drive/api'
+import { useDrivePicker } from '@/components/admin/drive/DrivePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import ChatShell from '@/components/chat/ChatShell'
 import Composer from '@/components/chat/Composer'
@@ -69,6 +71,8 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
   const [templatesOpen, setTemplatesOpen] = useState(false)
   const tplBox = useRef<HTMLDivElement>(null)
   const canWrite = useCanWrite('customers')
+  const canDrive = useHasScope('drive:read')
+  const drive = useDrivePicker()
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -107,7 +111,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
     if (showLoading) setIsLoading(false)
   }
 
-  async function send(payload: { templateKey?: string; variables?: Record<string, string>; text?: string }) {
+  async function send(payload: { templateKey?: string; variables?: Record<string, string>; text?: string; attachmentIds?: string[] }) {
     if (isSending) return
     setIsSending(true)
     setSendError('')
@@ -269,7 +273,8 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
           <Composer
             text={freeText}
             setText={setFreeText}
-            onSend={t => send({ text: t })}
+            onSend={(t, a) => send({ text: t, attachmentIds: a.map(x => x.id) })}
+            onPickFromDrive={canDrive ? async () => (await drive.pick({ title: 'Send from Drive', kinds: ['image', 'video', 'audio', 'pdf', 'doc'] }))?.map(driveToAttachment) ?? null : undefined}
             disabled={isSending}
             placeholder="Message (delivers within 24h of their last message; use a template otherwise)"
             accessory={
@@ -309,6 +314,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
         showTicks={isMine}
         empty={<p className="text-center text-xs text-foreground-muted pt-8">{isLoading ? 'Loading conversation…' : 'No WhatsApp messages yet.'}</p>}
       />
+      {drive.node}
     </ChatShell>
   )
 

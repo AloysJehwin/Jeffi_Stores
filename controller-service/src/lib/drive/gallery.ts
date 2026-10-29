@@ -109,11 +109,11 @@ export async function listGalleryAsFiles(opts: { search?: string; kind?: 'image'
 }
 
 /** Copy a private Drive file into the public gallery (images and MP4/WebM videos). */
-export async function publishToGallery(f: DriveFileRow, adminId: string | null): Promise<{ kind: 'image' | 'video'; id: string; url: string }> {
+export async function publishToGallery(f: DriveFileRow, adminId: string | null): Promise<{ kind: 'image' | 'video'; id: string; url: string; row: unknown }> {
   const bytes = await readFileBytes(f)
   if (f.kind === 'image') {
     const row = await insertGalleryImage(bytes, f.name, f.mime_type, { customName: f.name.replace(/\.[^.]+$/, '') })
-    return { kind: 'image', id: row.id, url: row.image_url }
+    return { kind: 'image', id: row.id, url: row.image_url, row }
   }
   if (f.kind === 'video' && (f.mime_type === 'video/mp4' || f.mime_type === 'video/webm')) {
     const key = `media/video/${randomUUID()}.${f.mime_type === 'video/mp4' ? 'mp4' : 'webm'}`
@@ -127,7 +127,7 @@ export async function publishToGallery(f: DriveFileRow, adminId: string | null):
       label: f.name.replace(/\.[^.]+$/, ''),
       createdBy: adminId,
     })
-    return { kind: 'video', id: v.id, url: v.url }
+    return { kind: 'video', id: v.id, url: v.url, row: v }
   }
   throw new DriveError('Only images and MP4/WebM videos can go to the gallery', 415)
 }

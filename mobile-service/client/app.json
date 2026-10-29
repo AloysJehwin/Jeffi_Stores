@@ -96,7 +96,16 @@
           "color": "#7CB900"
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can send them in support chats.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera so you can send photos in support chats.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-document-picker"
     ],
     "experiments": {
       "typedRoutes": true

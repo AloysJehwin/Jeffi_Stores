@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bot, Globe, MessageSquareText, Smartphone, Sparkles, Undo2, UserRoundCheck, X } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
-import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import { driveToAttachment } from '@/components/admin/drive/api'
+import { useDrivePicker } from '@/components/admin/drive/DrivePicker'
 import ChatShell from '@/components/chat/ChatShell'
 import Composer, { type ComposerHandle, type ReadyAttachment } from '@/components/chat/Composer'
 import LanguagePicker from '@/components/chat/LanguagePicker'
@@ -112,6 +114,9 @@ export default function SupportConversation({ sessionId, onSession, onClose, inC
   const chat = useSupportChat({ sessionId, role: 'admin' })
   const s = chat.session
   const canWrite = useCanWrite('customers')
+  const canDrive = useHasScope('drive:read')
+  const drive = useDrivePicker()
+  const pickFromDrive = useCallback(async () => (await drive.pick({ title: 'Attach from Drive' }))?.map(driveToAttachment) ?? null, [drive.pick])
   const storeName = useStoreConfig().identity.name
   const { showToast } = useToast()
   const [text, setText] = useState('')
@@ -266,7 +271,7 @@ export default function SupportConversation({ sessionId, onSession, onClose, inC
           setText={setText}
           onSend={(t, a) => chat.send(t, a)}
           upload={upload}
-          onPickFromDrive={onPickFromDrive}
+          onPickFromDrive={onPickFromDrive ?? (canDrive ? pickFromDrive : undefined)}
           onTyping={chat.notifyTyping}
           notice={closed ? 'This chat is closed.' : !canWrite ? 'You can read this chat but not reply.' : undefined}
           placeholder={s.handler === 'ai' ? 'Reply to take over from the assistant…' : 'Type a reply'}
@@ -296,6 +301,7 @@ export default function SupportConversation({ sessionId, onSession, onClose, inC
         empty={chat.loading ? <p className="text-center text-xs text-foreground-muted pt-8">Loading…</p> : <p className="text-center text-xs text-foreground-muted pt-8">No messages yet</p>}
         footer={typingLabel ? <TypingIndicator label={typingLabel} /> : null}
       />
+      {drive.node}
     </ChatShell>
   )
 }

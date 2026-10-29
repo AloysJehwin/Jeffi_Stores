@@ -174,7 +174,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
           <View className="flex-row items-center gap-1 shrink-0">
             <IconButton icon={Search} label="Search" color={iconColor} onPress={openSearch} />
             {user ? (
-              <IconButton icon={Sparkles} label="Ask the assistant" color={iconColor} onPress={() => router.push('/info/support')} />
+              <IconButton icon={Sparkles} label="Ask the assistant" color={iconColor} onPress={() => router.push('/info/support-chat')} />
             ) : null}
             {/* Cart, notifications and account moved into the menu to keep the bar to three icons. */}
             <MenuButton />

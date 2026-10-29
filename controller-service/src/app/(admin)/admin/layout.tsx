@@ -50,6 +50,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/amazon', label: 'Amazon', scope: 'amazon:read', group: 'Catalogue' },
     { href: '/admin/data-source', label: 'Data Source', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/social-posts', label: 'Social Posts', scope: 'social:read', group: 'Catalogue' },
+    { href: '/admin/drive', label: 'Drive', scope: 'drive:read', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },
     { href: '/admin/subscriptions', label: 'Subscriptions', scope: 'subscriptions:read', group: 'Sales' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations:read', group: 'Sales' },

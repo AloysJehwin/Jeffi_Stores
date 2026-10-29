@@ -6,6 +6,7 @@ import {
   XCircle,
   Loader2,
   Paperclip,
+  HardDrive,
   X,
   Send,
   Square,
@@ -26,6 +27,8 @@ import AdminAgentBlocks from '../AdminAgentBlocks'
 import ProposedActionCard, { splitProposalBlocks } from './ProposedActionCard'
 import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import AutoGrowTextarea from '@/components/ui/AutoGrowTextarea'
+import { useHasScope } from '@/contexts/AdminScopesContext'
+import { useDrivePicker } from '@/components/admin/drive/DrivePicker'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 import { useAdminHost } from '@/contexts/AdminHostContext'
@@ -515,6 +518,12 @@ function Composer({
   page: boolean
 }) {
   const { pendingFile, uploading, attachmentId, loading, input } = chat
+  const canDrive = useHasScope('drive:read')
+  const drive = useDrivePicker()
+  const fromDrive = async () => {
+    const f = (await drive.pick({ title: 'Attach from Drive', multiple: false, kinds: ['image', 'pdf'], maxBytes: 5 * 1024 * 1024 }))?.[0]
+    if (f) chat.attachFromDrive(f)
+  }
   return (
     <div
       className={`border-t border-border-default ${page ? 'p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] shrink-0' : 'p-2'} flex flex-col gap-2`}
@@ -557,7 +566,7 @@ function Composer({
           }}
           maxLength={2000}
           disabled={loading}
-          placeholder={pendingFile ? 'Add an instruction (optional) and send' : 'Ask anything about the store'}
+          placeholder={pendingFile ? 'Add an instruction (optional)' : 'Ask anything about the store'}
           className="flex-1 min-w-0 px-3 py-2 text-sm leading-5 bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
         <button
@@ -570,6 +579,19 @@ function Composer({
         >
           <Paperclip className="w-4 h-4" />
         </button>
+        {canDrive && (
+          <button
+            type="button"
+            onClick={fromDrive}
+            disabled={loading || uploading}
+            className="w-9 h-9 flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-secondary rounded-lg disabled:opacity-50 shrink-0"
+            aria-label="Attach from Drive"
+            title="Attach from Drive"
+          >
+            <HardDrive className="w-4 h-4" />
+          </button>
+        )}
+        {drive.node}
         {loading ? (
           <button
             onClick={chat.stop}
