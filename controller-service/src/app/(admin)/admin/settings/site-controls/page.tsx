@@ -24,9 +24,13 @@ import TemplateVariablesPanel from '@/components/admin/site-controls/TemplateVar
 import DeliveryEstimateCard from '@/components/admin/site-controls/DeliveryEstimateCard'
 import GoogleTagCard from '@/components/admin/site-controls/GoogleTagCard'
 import ProvidersCard from '@/components/admin/site-controls/ProvidersCard'
+import OpsEmailCard, { type OpsEmailAdmin } from '@/components/admin/site-controls/OpsEmailCard'
+import { loadOpsEmail } from '@/lib/shared/ops-email'
+import { OPS_ATTACHMENTS, OPS_SECTIONS, OPS_SECTION_IDS } from '@/lib/shared/ops-email-config'
+import { planGate } from '@/lib/auth/plan-gate'
 import SiteControlsTabs from '@/components/admin/site-controls/SiteControlsTabs'
 import { Suspense } from 'react'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { resolveTenant, resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getProviderPolicy } from '@/lib/providers/policy'
@@ -89,6 +93,35 @@ async function seedBuiltinShortcuts() {
   if (changed) invalidateSiteControlsCache()
 }
 
+// The daily email card: its settings, the admins it can go to, and what the plan leaves locked (with the plan that has it).
+async function loadOpsEmailCard() {
+  const [{ cfg, planHas }, admins, tenantId] = await Promise.all([
+    loadOpsEmail(),
+    queryMany<OpsEmailAdmin>(
+      `SELECT a.id::text, TRIM(CONCAT_WS(' ', u.first_name, u.last_name)) AS name, u.email, a.role
+         FROM admins a JOIN users u ON u.id = a.user_id
+        WHERE a.is_active = TRUE AND u.email IS NOT NULL ORDER BY u.first_name, u.email`
+    ),
+    resolveTenantId().catch(() => null),
+  ])
+  const lockLabel = async (scope: string | null | undefined) => {
+    if (!scope || planHas(scope) || !tenantId) return null
+    const plan = (await planGate(tenantId, scope)).upgradeRequired
+    return plan ? `${plan[0].toUpperCase()}${plan.slice(1)} plan` : 'Not in your plan'
+  }
+  const lockedSections: Record<string, string> = {}
+  for (const id of OPS_SECTION_IDS) {
+    const l = await lockLabel((OPS_SECTIONS[id] as { scope?: string }).scope)
+    if (l) lockedSections[id] = l
+  }
+  const lockedAttachments: Record<string, string> = {}
+  for (const k of Object.keys(OPS_ATTACHMENTS) as Array<keyof typeof OPS_ATTACHMENTS>) {
+    const l = await lockLabel(OPS_ATTACHMENTS[k].scope)
+    if (l) lockedAttachments[k] = l
+  }
+  return { cfg, admins, lockedSections, lockedAttachments }
+}
+
 async function loadInvoiceKeys(): Promise<Record<string, string>> {
   const rows = await queryMany<{ key: string; value: string }>(
     `SELECT key, value FROM site_settings WHERE key LIKE 'business_%' OR key LIKE 'bank_%' OR key IN ('invoice_prefix', 'min_order_amount')`
@@ -118,6 +151,7 @@ export default async function SiteControlsPage() {
     getProviderPolicy(),
   ])
   const inv = await loadInvoiceKeys()
+  const opsEmail = await loadOpsEmailCard()
   const delivery = await getDeliverySettings()
   const isTenant = (await resolveTenant().catch(() => null)) != null
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
@@ -624,6 +658,18 @@ export default async function SiteControlsPage() {
                     />
                   </div>
                 </>
+              ),
+            },
+            {
+              id: 'daily-email',
+              label: 'Daily email',
+              content: (
+                <OpsEmailCard
+                  initial={opsEmail.cfg}
+                  admins={opsEmail.admins}
+                  lockedSections={opsEmail.lockedSections}
+                  lockedAttachments={opsEmail.lockedAttachments}
+                />
               ),
             },
             {
