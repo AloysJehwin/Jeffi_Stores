@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1793286345.5325868,
-    "ast_hash": "0e8e887c6b0d4fd921bbac8c2f91a52b",
+    "mtime": 1793290841.9597113,
+    "ast_hash": "35a2fb73ae948fd0bf32951e967393fb",
     "semantic_hash": ""
   },
   "store_documents/.claude/settings.local.json": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "database/ai.sql": {
-    "mtime": 1793252149.5335128,
-    "ast_hash": "9a6b0f682c1b35d2de2321a91b84174c",
+    "mtime": 1793291081.2633996,
+    "ast_hash": "00bd72e074f8d4056b17a719eef92b51",
     "semantic_hash": ""
   },
   "database/catalog.sql": {
@@ -565,8 +565,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/support/sessions/route.test.ts": {
-    "mtime": 1793267498.5345623,
-    "ast_hash": "e2cd58b04bc3f1e7ea700b9d68bbbbdb",
+    "mtime": 1793291474.529686,
+    "ast_hash": "f1384d6fcdd61ed56bde0acf518399d7",
     "semantic_hash": ""
   },
   "tests/api/admin/token/generate/route.test.ts": {
@@ -870,13 +870,13 @@
     "semantic_hash": ""
   },
   "tests/lib/admin-agent/tools/sales.test.ts": {
-    "mtime": 1793186923.5308967,
-    "ast_hash": "85398300e8dabf73fdacf5e6be93b748",
+    "mtime": 1793291348.6365235,
+    "ast_hash": "cdc99f3866154afe48148ae50174299b",
     "semantic_hash": ""
   },
   "tests/lib/admin-agent/vision.test.ts": {
-    "mtime": 1790931257.0376449,
-    "ast_hash": "6dd2dc2fbc249935c1c4c1ed30971536",
+    "mtime": 1793291401.5444996,
+    "ast_hash": "174f77a3d7a7bd96f145e4d2f6feeb5d",
     "semantic_hash": ""
   },
   "tests/lib/admin-audit.test.ts": {
@@ -2590,8 +2590,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/agent/upload/route.test.ts": {
-    "mtime": 1790931254.4044096,
-    "ast_hash": "e71f1976755af45315907fbca5a1d87b",
+    "mtime": 1793291323.8931198,
+    "ast_hash": "1b535dcf0265622009b4ee2d7a85f7f5",
     "semantic_hash": ""
   },
   "tests/api/admin/ai-generate-email/route.test.ts": {
@@ -5515,8 +5515,8 @@
     "semantic_hash": ""
   },
   "controller-service/next.config.js": {
-    "mtime": 1793272120.1369393,
-    "ast_hash": "325575a73df39dec4d861a9ecb51e98c",
+    "mtime": 1793290813.2561347,
+    "ast_hash": "8b406d42442edddb5daf49a6d190c552",
     "semantic_hash": ""
   },
   "controller-service/postcss.config.js": {
@@ -8955,8 +8955,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/chat/route.ts": {
-    "mtime": 1793260080.3716872,
-    "ast_hash": "458f7973460e01e261cc6c12292cc584",
+    "mtime": 1793290614.7526078,
+    "ast_hash": "a52e38d0f5776ec5353799959a0199e9",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/conversations/[id]/messages/route.ts": {
@@ -8990,8 +8990,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/upload/route.ts": {
-    "mtime": 1792943291.720424,
-    "ast_hash": "985fcc2b3b11301d8cb345f7d90e5e11",
+    "mtime": 1793290482.1756923,
+    "ast_hash": "235d59af040b5705a1903a99a4e78f34",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ai-enrich-field/route.ts": {
@@ -11960,8 +11960,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/AdminAgentMessage.tsx": {
-    "mtime": 1793251006.9649599,
-    "ast_hash": "22e461e221a9c027802333e10527c554",
+    "mtime": 1793290585.6218684,
+    "ast_hash": "785e2deebe9f13287b85501c553d3118",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/AdminAgentTrigger.tsx": {
@@ -13565,8 +13565,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/index.ts": {
-    "mtime": 1793260059.3623972,
-    "ast_hash": "61cbb28d305e5b2398ea4e770b7d5238",
+    "mtime": 1793290407.339366,
+    "ast_hash": "852275e8cb17b8777617c26aa7d8b4d4",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/marketing.ts": {
@@ -13580,13 +13580,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/sales.ts": {
-    "mtime": 1793186908.4637206,
-    "ast_hash": "9cb184723568b9d30ed2d67f5ab32033",
+    "mtime": 1793290389.7798462,
+    "ast_hash": "32c6065b83ece9feca73280bae07e844",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/vision.ts": {
-    "mtime": 1793175319.7588532,
-    "ast_hash": "0302d96f5283864da17d3b8b2994303b",
+    "mtime": 1793290797.7022953,
+    "ast_hash": "9dabdb6bffb0e582f36de478a1f62b3b",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin/editor-sessions.ts": {
@@ -23305,8 +23305,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/agent/AgentChatPanel.tsx": {
-    "mtime": 1793271023.7540178,
-    "ast_hash": "1467bb2bf02103418e7bd053dbefed08",
+    "mtime": 1793290598.6930566,
+    "ast_hash": "082a6dacb33020019fcfa4a201bc58ed",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/drafts/DraftBehindBanner.tsx": {
@@ -23330,8 +23330,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/hooks/useAdminAgentChat.ts": {
-    "mtime": 1793270573.9217343,
-    "ast_hash": "0c86b6b599869034abd35f0c39543913",
+    "mtime": 1793290576.10754,
+    "ast_hash": "f0ccbafd6d8abef628ac2f26698f8a72",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin/draft-branches.ts": {
@@ -23420,8 +23420,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/permissions.ts": {
-    "mtime": 1793260059.3680353,
-    "ast_hash": "eae39bb7b69f37d9f37ab4d1ced0fd20",
+    "mtime": 1793290407.3405638,
+    "ast_hash": "06353828b02d455d6884fe3c17057198",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/orders.ts": {
@@ -23845,8 +23845,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/chat/format.ts": {
-    "mtime": 1793267409.6481843,
-    "ast_hash": "d4e96b7beb738fad45ef0534af1816ae",
+    "mtime": 1793290585.6585724,
+    "ast_hash": "ee2ee73a3b7cbb7e8b50d25ad7c4a97f",
     "semantic_hash": ""
   },
   "controller-service/src/components/chat/useSupportChat.ts": {
@@ -24025,8 +24025,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/attach-drive/route.ts": {
-    "mtime": 1793270551.0893257,
-    "ast_hash": "278c7f1dee5b5b590db2fdb54497167d",
+    "mtime": 1793290476.6075993,
+    "ast_hash": "41b3eb85e7843017d52bc1aebfb5ec77",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/drive/documents/[folder]/[id]/route.ts": {
@@ -24342,6 +24342,21 @@
   "document-service/src/lib/reply-context.ts": {
     "mtime": 1793288307.8574746,
     "ast_hash": "29aefae49f548654e3e8cb11663e5242",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/admin-agent/file-types.ts": {
+    "mtime": 1793290576.1068165,
+    "ast_hash": "7edf10cf830f077c1e9d51a505e03b4e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/admin-agent/files.ts": {
+    "mtime": 1793290797.7019248,
+    "ast_hash": "260d2c71b81620c5b40f8300c1459b56",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/admin-agent/pdf.ts": {
+    "mtime": 1793290876.1103628,
+    "ast_hash": "8a3d6025f32e07c2c17e92eb826e4b29",
     "semantic_hash": ""
   }
 }
