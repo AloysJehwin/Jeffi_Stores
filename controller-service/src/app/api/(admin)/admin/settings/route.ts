@@ -48,6 +48,7 @@ const EDITABLE_KEYS = [
   'feature_marketing_push_enabled',
   'feature_birthday_enabled',
   'feature_agent_dock_enabled',
+  'feature_agent_whatsapp_enabled',
   'feature_reply_actions_enabled',
   'feature_reply_auto_apply',
   // Shared with Marketing > Referrals so the two switches can never disagree.
