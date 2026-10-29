@@ -155,7 +155,9 @@ CREATE TABLE public.quotations (
     buyer_pincode character varying(10),
     buyer_email text,
     consignee_email text,
-    view_token uuid DEFAULT gen_random_uuid()
+    view_token uuid DEFAULT gen_random_uuid(),
+    customer_response character varying(20),
+    customer_response_at timestamp with time zone
 );
 
 

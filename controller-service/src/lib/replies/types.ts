@@ -60,6 +60,8 @@ export interface ExecCtx {
   userId: string | null
   /** Set when an admin approved it. */
   adminId?: string | null
+  /** What the customer wrote, as written. */
+  text?: string
 }
 
 export interface Scenario<S = any> {

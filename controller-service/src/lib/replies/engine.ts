@@ -75,7 +75,7 @@ export async function handleCustomerReply(r: IncomingReply): Promise<'handled' |
   // Only the person we asked (not just whoever holds the Reply-To token) gets things applied.
   const outcome = decideOutcome({ tier, confidence: reading.confidence, verified: r.verified && identifies(c.context, r), autoApply: flags?.replyAutoApply !== false })
   const title = def.title(c.snapshot, reading.args)
-  const action = await createReplyAction(r.session.id, c.context, reading, title, outcome === 'admin' ? 'admin' : outcome === 'ask' ? 'customer' : 'none')
+  const action = await createReplyAction(r.session.id, c.context, reading, { title, text }, outcome === 'admin' ? 'admin' : outcome === 'ask' ? 'customer' : 'none')
 
   if (outcome === 'apply') {
     const res = await runReplyAction(action, { userId: r.userId, auto: true })
@@ -131,13 +131,12 @@ async function candidatesFor(r: IncomingReply): Promise<Matched[]> {
 
 /** A token or a quoted message proves which question; it must still be the same customer's. */
 function belongs(c: ReplyContextRow, r: IncomingReply): boolean {
-  if (c.user_id && r.userId) return c.user_id === r.userId
-  return identifies(c, r) || !!r.token
+  return identifies(c, r) || (!!r.token && !(c.user_id && r.userId))
 }
 
-/** The sender is the account, number or address the question went to. */
+/** The sender is the account, number or address the question went to (one person can hold two accounts). */
 function identifies(c: ReplyContextRow, r: IncomingReply): boolean {
-  if (c.user_id && r.userId) return c.user_id === r.userId
+  if (c.user_id && r.userId && c.user_id === r.userId) return true
   const phone = r.phone?.replace(/\D/g, '').slice(-10)
   if (c.contact_phone && phone && c.contact_phone === phone) return true
   return !!(c.contact_email && r.email && c.contact_email.toLowerCase() === r.email.toLowerCase())
@@ -147,7 +146,7 @@ async function linkMessage(messageId: string, ctx: ReplyContextRow): Promise<voi
   await query(`UPDATE support_messages SET reply_context_id = $2, entity_type = $3, entity_id = $4 WHERE id = $1`, [messageId, ctx.id, ctx.entity_type, ctx.entity_id])
 }
 
-async function createReplyAction(sessionId: string, ctx: ReplyContextRow, reading: Reading, title: string, awaiting: 'customer' | 'admin' | 'none'): Promise<ReplyAction> {
+async function createReplyAction(sessionId: string, ctx: ReplyContextRow, reading: Reading, extra: { title: string; text: string }, awaiting: 'customer' | 'admin' | 'none'): Promise<ReplyAction> {
   // A newer answer to the same question replaces one still waiting.
   await query(
     `UPDATE support_ai_actions SET status = 'expired', decided_at = now() WHERE context_id = $1 AND status = 'pending'`,
@@ -156,7 +155,7 @@ async function createReplyAction(sessionId: string, ctx: ReplyContextRow, readin
   return (await queryOne<ReplyAction>(
     `INSERT INTO support_ai_actions (session_id, kind, args, awaiting, context_id, entity_type, entity_id, confidence, reading)
      VALUES ($1, 'reply', $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [sessionId, JSON.stringify({ scenario: ctx.scenario, intent: reading.intent, args: reading.args, title }), awaiting, ctx.id, ctx.entity_type, ctx.entity_id, reading.confidence, reading.reading || null]
+    [sessionId, JSON.stringify({ scenario: ctx.scenario, intent: reading.intent, args: reading.args, ...extra }), awaiting, ctx.id, ctx.entity_type, ctx.entity_id, reading.confidence, reading.reading || null]
   ))!
 }
 

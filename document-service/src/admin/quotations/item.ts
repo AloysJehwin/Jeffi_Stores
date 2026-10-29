@@ -4,6 +4,7 @@ import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { query, queryMany, queryOne, withTransaction } from '@jeffi/tenancy'
 import { sendQuotationFinalizedEmail } from '../../lib/mail'
+import { quotationReply } from '../../lib/reply-context'
 import { getFeatureFlags } from '../../lib/site-controls'
 import { z } from 'zod'
 import { parseBody } from '../../lib/validate'
@@ -265,7 +266,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           qt.consignee_name || 'Customer',
           qt.quote_number,
           Number(qt.total_amount),
-          viewUrl
+          viewUrl,
+          await quotationReply(qt)
         )
       } catch (emailErr) {
         console.error(`[admin/quotations/${id}] finalised email failed`, emailErr)

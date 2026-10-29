@@ -9,6 +9,7 @@ import { useAgentChanges } from '@/lib/client/agent-events'
 import { formatINR, formatDate } from '@/lib/shared/format'
 import { ActionButton, Card, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, PageBody, QUOTATION_STATUS, StatusBadge, badgeCls, useActionToast, type KitAction } from '@/components/admin/kit'
 import { ChangeLog } from '@/components/admin/change-log'
+import RecordReplies from '@/components/admin/replies/RecordReplies'
 
 const th = 'px-4 py-2.5 text-xs font-medium text-foreground-muted whitespace-nowrap'
 
@@ -108,7 +109,12 @@ export default function QuotationDetailClient({ id }: { id: string }) {
         <DetailHeader
           back={{ href: ap('/admin/quotations'), label: 'Quotations' }}
           title={<span className="font-mono [overflow-wrap:anywhere]">{q.quote_number}</span>}
-          status={<StatusBadge status={q.status} map={QUOTATION_STATUS} />}
+          status={
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <StatusBadge status={q.status} map={QUOTATION_STATUS} />
+              {q.customer_response && <span className={badgeCls(q.customer_response === 'accepted' ? 'green' : 'muted')}>Customer {q.customer_response === 'accepted' ? 'accepted' : 'declined'}</span>}
+            </span>
+          }
           identifiers={[{ label: 'Date', value: formatDate(q.quote_date || q.created_at) }]}
           secondary={secondary}
           actions={
@@ -199,6 +205,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
               <p className="text-sm text-foreground break-words">{q.notes}</p>
             </Card>
           )}
+          <RecordReplies entityType="quotations" entityId={id} canWrite={canWrite} />
           <ChangeLog kind="quotation" id={id} version={q.updated_at} />
         </>
       }

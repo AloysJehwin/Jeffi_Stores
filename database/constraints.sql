@@ -1777,6 +1777,9 @@ ALTER TABLE public.support_ai_actions
 ALTER TABLE public.support_ai_actions
     ADD CONSTRAINT support_ai_actions_awaiting_check CHECK (awaiting IN ('customer','admin','none'));
 
+ALTER TABLE public.quotations
+    ADD CONSTRAINT quotations_customer_response_check CHECK (customer_response IN ('accepted','rejected'));
+
 --
 -- Name: reply_contexts reply_contexts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --

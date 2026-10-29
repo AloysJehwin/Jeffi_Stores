@@ -13,7 +13,7 @@ export interface ReplyAction {
   session_id: string
   message_id: string | null
   kind: 'reply'
-  args: { scenario: string; intent: string; args: Record<string, unknown>; title?: string }
+  args: { scenario: string; intent: string; args: Record<string, unknown>; title?: string; text?: string }
   status: string
   awaiting: 'customer' | 'admin' | 'none'
   context_id: string | null
@@ -40,7 +40,7 @@ export async function runReplyAction(a: ReplyAction, by: { userId: string | null
   if (!snapshot) return finish('failed', { ok: false, text: 'This was already settled.' })
 
   const userId = ctx.user_id ?? by.userId
-  const run = () => scenario.execute(a.args.intent, a.args.args ?? {}, snapshot, { context: ctx, userId, adminId: by.adminId ?? null })
+  const run = () => scenario.execute(a.args.intent, a.args.args ?? {}, snapshot, { context: ctx, userId, adminId: by.adminId ?? null, text: a.args.text ?? '' })
   let r: ExecResult
   try {
     r = by.adminId ? await run() : userId ? await runWithAuditActor(`customer:${userId}`, run) : await runWithAuditActor('assistant', run)

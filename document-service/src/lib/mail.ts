@@ -1,6 +1,7 @@
 import { signServiceToken } from '@jeffi/service-auth'
 import { currentTenant, PLATFORM_TENANT_ID } from '@jeffi/tenancy'
 import { mailShell } from './mail-template'
+import { recordEmailSend, type ReplyTarget } from './reply-context'
 import { currentBrandNameAsync, customerMailFromAsync, storeAddressLine, storeContactLine } from './brand'
 
 const MESSAGING_URL = process.env.MESSAGING_URL || 'http://localhost:3101'
@@ -8,7 +9,7 @@ const inr = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2,
 
 type Result = { success: boolean; messageId?: string; error?: unknown }
 
-async function send(to: string, subject: string, html: string, templateName: string, metadata: Record<string, unknown>): Promise<Result> {
+async function send(to: string, subject: string, html: string, templateName: string, metadata: Record<string, unknown>, reply?: ReplyTarget | null): Promise<Result> {
   const t = currentTenant() ?? { tenantId: PLATFORM_TENANT_ID, slug: 'platform' }
   try {
     const res = await fetch(`${MESSAGING_URL}/messages`, {
@@ -17,10 +18,11 @@ async function send(to: string, subject: string, html: string, templateName: str
         'content-type': 'application/json',
         authorization: `Bearer ${signServiceToken({ service: 'documents', tenantId: t.tenantId, tenantSlug: t.slug, internal: true })}`,
       },
-      body: JSON.stringify({ channel: 'email', to, subject, body: html, from: await customerMailFromAsync(), reference: templateName, metadata }),
+      body: JSON.stringify({ channel: 'email', to, subject, body: html, from: await customerMailFromAsync(), reference: templateName, metadata, reply_to: reply?.replyTo }),
     })
     const d: any = await res.json().catch(() => ({}))
     if (!res.ok) return { success: false, error: d?.message ?? res.statusText }
+    if (reply && d.status !== 'failed') await recordEmailSend(reply.contextId, d.provider_ref)
     return { success: d.status !== 'failed', messageId: d.id, error: d.error ?? undefined }
   } catch (error) {
     return { success: false, error }
@@ -48,7 +50,7 @@ export async function sendInvoiceFinalizedEmail(toEmail: string, customerName: s
   return send(toEmail, `Invoice ${invoiceNumber} from ${brand}`, html, 'invoice_finalized', { invoiceNumber, orderNumber: orderNumber ?? null, totalAmount })
 }
 
-export async function sendQuotationFinalizedEmail(toEmail: string, consigneeName: string, quoteNumber: string, totalAmount: number, viewUrl: string): Promise<Result> {
+export async function sendQuotationFinalizedEmail(toEmail: string, consigneeName: string, quoteNumber: string, totalAmount: number, viewUrl: string, reply?: ReplyTarget | null): Promise<Result> {
   const brandName = await currentBrandNameAsync()
   const { brand, html } = await shell('Quotation', `Quotation ${quoteNumber}`, `
     <p>Dear ${consigneeName},</p>
@@ -58,8 +60,8 @@ export async function sendQuotationFinalizedEmail(toEmail: string, consigneeName
       <p style="margin:0"><strong>Total Amount:</strong> ₹${inr(totalAmount)}</p>
     </div>
     <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Quotation</a></div>
-    <p>If you have any questions regarding this quotation, please feel free to contact us.</p>`)
-  return send(toEmail, `Quotation ${quoteNumber} from ${brand}`, html, 'quotation_finalized', { quoteNumber, totalAmount })
+    <p>${reply ? 'To accept it, ask for changes or ask a question, simply reply to this email.' : 'If you have any questions regarding this quotation, please feel free to contact us.'}</p>`)
+  return send(toEmail, `Quotation ${quoteNumber} from ${brand}`, html, 'quotation_finalized', { quoteNumber, totalAmount }, reply)
 }
 
 export async function sendPurchaseOrderEmail(
