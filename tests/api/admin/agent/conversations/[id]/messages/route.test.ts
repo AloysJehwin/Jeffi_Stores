@@ -3,17 +3,22 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn() }))
+vi.mock('@/lib/admin-agent/conversations', () => ({
+  conversationAccess: vi.fn(),
+  conversationMeta: vi.fn(async () => ({ title: 'Hello', shared: false, owner_name: 'Owner' })),
+}))
 
 import { GET } from '@/app/api/(admin)/admin/agent/conversations/[id]/messages/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryOne } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
+import { conversationAccess } from '@/lib/admin-agent/conversations'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
 const mockQueryMany = vi.mocked(queryMany)
-const mockQueryOne = vi.mocked(queryOne)
+const mockAccess = vi.mocked(conversationAccess)
 
 const admin = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['agent'] }
 const params = Promise.resolve({ id: 'conv-uuid-123' })
@@ -50,7 +55,7 @@ describe('GET /api/admin/agent/conversations/[id]/messages', () => {
   it('returns 404 when conversation not found', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockResolvedValue(null)
+    mockAccess.mockResolvedValue('none')
 
     const res = await GET(makeRequest(), { params })
     expect(res.status).toBe(404)
@@ -60,7 +65,7 @@ describe('GET /api/admin/agent/conversations/[id]/messages', () => {
   it('returns 403 when conversation belongs to different admin', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockResolvedValue({ admin_id: 'other-admin' })
+    mockAccess.mockResolvedValue('denied')
 
     const res = await GET(makeRequest(), { params })
     expect(res.status).toBe(403)
@@ -70,7 +75,7 @@ describe('GET /api/admin/agent/conversations/[id]/messages', () => {
   it('returns messages for authorized admin', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockResolvedValue({ admin_id: 'admin-1' })
+    mockAccess.mockResolvedValue('owner')
     mockQueryMany.mockResolvedValue(sampleMessages)
 
     const res = await GET(makeRequest(), { params })
@@ -83,7 +88,7 @@ describe('GET /api/admin/agent/conversations/[id]/messages', () => {
   it('returns empty messages array when none exist', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockResolvedValue({ admin_id: 'admin-1' })
+    mockAccess.mockResolvedValue('owner')
     mockQueryMany.mockResolvedValue([])
 
     const res = await GET(makeRequest(), { params })

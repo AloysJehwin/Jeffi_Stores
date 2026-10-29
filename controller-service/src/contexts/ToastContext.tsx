@@ -61,7 +61,7 @@ function ToastItem({
       data-toast
       role={toast.type === 'error' ? 'alert' : 'status'}
       className={`animate-slide-in-right fixed z-[9999] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border max-w-sm ${BG[toast.type]}`}
-      style={{ bottom: bottomOffset, right: 16 }}
+      style={{ bottom: `calc(${bottomOffset}px + var(--dock-offset, 0px))`, right: 16 }}
     >
       {toast.type === 'success' && (
         <svg

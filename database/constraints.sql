@@ -55,6 +55,15 @@ ALTER TABLE ONLY public.admin_agent_attachments
 
 
 --
+-- Name: admin_agent_conversations admin_agent_conversations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_agent_conversations
+    ADD CONSTRAINT admin_agent_conversations_pkey PRIMARY KEY (id);
+
+
+
+--
 -- Name: admin_agent_messages admin_agent_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1927,6 +1936,14 @@ ALTER TABLE ONLY public.admin_agent_actions
 ALTER TABLE ONLY public.admin_agent_actions
     ADD CONSTRAINT admin_agent_actions_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.admin_agent_messages(id) ON DELETE SET NULL;
 
+
+
+--
+-- Name: admin_agent_conversations admin_agent_conversations_admin_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_agent_conversations
+    ADD CONSTRAINT admin_agent_conversations_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.admins(id) ON DELETE CASCADE;
 
 
 --

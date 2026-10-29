@@ -21,7 +21,6 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/AccessDenied.tsx',
   'controller-service/src/components/admin/TwoFactorCard.tsx',
   'controller-service/src/components/admin/AdminSupportChat.tsx',
-  'controller-service/src/components/admin/AdminAgentModal.tsx',
   // Self-service: marks the member's own notification bell read; no scoped record mutation.
   'controller-service/src/components/admin/NotificationBell.tsx',
   // Self-service: the member's own saved filter views. Sharing one is offered only when the

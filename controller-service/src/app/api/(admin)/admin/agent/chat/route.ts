@@ -17,7 +17,7 @@ import { normUnit } from '@/lib/catalog/selling-unit'
 import { toolAllowed, describeActorCapabilities, type AgentActor } from '@/lib/admin-agent/permissions'
 import { findSimilar } from '@/lib/shared/rag'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
-import crypto from 'crypto'
+import { startTurn, type PageContext } from '@/lib/admin-agent/conversations'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -34,6 +34,8 @@ const CLAUDE_TOOL_OUTPUT_CHARS = 12000
 interface IncomingMessage {
   conversationId?: string
   message: string
+  /** Where the admin is (the dock sends it): the page path and the record on it. */
+  pageContext?: PageContext
   /** Re-run of the last user message (UI retry): skip re-inserting it when it is already stored. */
   retry?: boolean
 }
@@ -512,7 +514,28 @@ interface TurnContext {
   admin: AgentActor
   conversationId: string
   userMessage: string
+  pageContext: PageContext | null
   req: NextRequest
+}
+
+const PAGE_KINDS = new Set(['product', 'order', 'customer', 'invoice', 'quotation', 'coupon', 'supplier', 'rfq', 'category', 'brand', 'campaign'])
+
+function cleanPageContext(pc: unknown): PageContext | null {
+  if (!pc || typeof pc !== 'object') return null
+  const { path, section, entity } = pc as PageContext
+  const out: PageContext = {}
+  if (typeof path === 'string' && /^\/admin(\/[\w\-./]*)?$/.test(path) && path.length <= 200) out.path = path
+  if (typeof section === 'string' && /^[\w\- ]{1,60}$/.test(section)) out.section = section
+  if (entity && PAGE_KINDS.has(entity.kind) && typeof entity.id === 'string' && /^[\w-]{1,64}$/.test(entity.id)) {
+    out.entity = { kind: entity.kind, id: entity.id }
+  }
+  return out.path || out.entity ? out : null
+}
+
+function pageContextNote(pc: PageContext | null): string {
+  if (!pc) return ''
+  const where = pc.entity ? `the ${pc.entity.kind} ${pc.entity.id}${pc.path ? ` (${pc.path})` : ''}` : `${pc.section || 'the page'} (${pc.path})`
+  return `\n\n<page_context>The admin is viewing ${where}. "This" or "here" refers to it unless they say otherwise.</page_context>`
 }
 
 export async function POST(req: NextRequest) {
@@ -527,7 +550,9 @@ export async function POST(req: NextRequest) {
   if (!userMessage) return NextResponse.json({ error: 'message is required' }, { status: 400 })
   if (userMessage.length > 2000) return NextResponse.json({ error: 'message too long (max 2000)' }, { status: 400 })
 
-  const conversationId = body.conversationId || crypto.randomUUID()
+  const pageContext = cleanPageContext(body.pageContext)
+  const conversationId = await startTurn(admin.adminId, body.conversationId, userMessage, pageContext)
+  if (!conversationId) return NextResponse.json({ error: 'Not your conversation' }, { status: 403 })
 
   const last = body.retry
     ? await queryOne<{ role: string; content: string }>(
@@ -542,7 +567,13 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const ctx: TurnContext = { admin: { adminId: admin.adminId, role: admin.role, scopes: admin.scopes }, conversationId, userMessage, req }
+  const ctx: TurnContext = {
+    admin: { adminId: admin.adminId, role: admin.role, scopes: admin.scopes },
+    conversationId,
+    userMessage,
+    pageContext,
+    req,
+  }
   if (!(req.headers.get('accept') || '').includes('text/event-stream')) {
     const out = await runTurn(ctx, null, req.signal)
     return NextResponse.json(out.body, { status: out.status })
@@ -590,7 +621,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal | undefined): Promise<TurnResult> {
-  const { admin, conversationId, userMessage, req } = ctx
+  const { admin, conversationId, userMessage, pageContext, req } = ctx
   const actor: AgentActor = { adminId: admin.adminId, role: admin.role, scopes: admin.scopes }
   const send: Emit = emit ?? (() => {})
   const done = (body: Record<string, unknown>): TurnResult => ({ status: 200, body })
@@ -897,6 +928,9 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
       if (h.role === 'user' || h.role === 'assistant') messages.push({ role: h.role, content: h.content })
     }
   }
+  const note = pageContextNote(pageContext)
+  const latestUser = note ? [...messages].reverse().find(m => m.role === 'user') : undefined
+  if (latestUser) latestUser.content += note
 
   let toolsDef = claude ? [...buildToolsDef(actor), RENDER_UI_TOOL] : buildToolsDef(actor, userMessage)
   let maxIterations = claude ? CLAUDE_MAX_ITERATIONS : MAX_ITERATIONS

@@ -54,12 +54,12 @@ describe('GET /api/admin/agent/conversations', () => {
   it('returns conversation items on happy path', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    const rows = [{ id: 'conv-1', preview: 'hello', title: null, last_message_at: '2024-01-01', message_count: 3 }]
+    const rows = [{ id: 'conv-1', title: 'hello', shared: false, last_message_at: '2024-01-01', message_count: 3 }]
     mockQueryMany.mockResolvedValue(rows)
     const res = await GET(makeReq())
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.items).toEqual(rows)
+    expect(body.items).toEqual([{ ...rows[0], preview: 'hello' }])
   })
 
   it('caps limit at 100', async () => {

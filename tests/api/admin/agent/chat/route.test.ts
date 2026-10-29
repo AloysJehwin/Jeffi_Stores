@@ -26,6 +26,9 @@ vi.mock('@/lib/shared/ai-client', () => ({
     }
   },
 }))
+vi.mock('@/lib/admin-agent/conversations', () => ({
+  startTurn: vi.fn(async (_admin: string, id?: string) => id || crypto.randomUUID()),
+}))
 vi.mock('@/lib/shared/rag', () => ({
   findSimilar: vi.fn().mockResolvedValue([]),
 }))
@@ -72,6 +75,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { aiChat, AiClientError } from '@/lib/shared/ai-client'
 import { getTool } from '@/lib/admin-agent/tools'
+import { startTurn } from '@/lib/admin-agent/conversations'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -525,6 +529,16 @@ describe('POST /api/admin/agent/chat', () => {
     expect(data.uiBlocks).toHaveLength(1)
     expect(data.uiBlocks[0].type).toBe('heading')
     expect(data.message).toBe('Here are the products:')
+  })
+
+  it("refuses another admin's conversation", async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    setupDbMocks()
+    vi.mocked(startTurn).mockResolvedValueOnce(null)
+    const res = await POST(makePost({ message: 'hello', conversationId }))
+    expect(res.status).toBe(403)
+    expect(mockAiChat).not.toHaveBeenCalled()
   })
 
   it('stores user message and assistant response in DB', async () => {

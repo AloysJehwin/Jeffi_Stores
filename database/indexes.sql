@@ -83,6 +83,14 @@ CREATE INDEX idx_admin_agent_attachments_expiry ON public.admin_agent_attachment
 
 
 --
+-- Name: idx_admin_agent_conversations_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_agent_conversations_admin ON public.admin_agent_conversations USING btree (admin_id, last_message_at DESC);
+
+
+
+--
 -- Name: idx_admin_agent_messages_admin; Type: INDEX; Schema: public; Owner: -
 --
 

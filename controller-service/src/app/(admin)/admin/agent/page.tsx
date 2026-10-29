@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
-import { Bot, MessageSquare, Slash, LayoutGrid, BarChart3, Plus, History } from 'lucide-react'
-import AgentChatPanel from '@/components/admin/agent/AgentChatPanel'
-import { useAdminAgentChat } from '@/hooks/useAdminAgentChat'
+import { useRouter } from 'next/navigation'
+import { Bot, MessageSquare, Slash, LayoutGrid, BarChart3, Plus, History, Users } from 'lucide-react'
+import AgentChatPanel, { chatTitle } from '@/components/admin/agent/AgentChatPanel'
+import { useAdminAgent } from '@/contexts/AdminAgentContext'
+import { useAdminHost } from '@/contexts/AdminHostContext'
+import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { Tabs } from '@/components/admin/channels/ui'
 import AgentOverview from './_components/AgentOverview'
@@ -677,14 +680,27 @@ const TOOL_GROUPS: ToolGroup[] = [
 type Tab = 'chat' | 'slash' | 'tools' | 'overview'
 
 export default function AdminAgentPage() {
-  const chat = useAdminAgentChat()
+  const { chat } = useAdminAgent()
+  const router = useRouter()
+  const host = useAdminHost()
   const [tab, setTab] = useState<Tab>('chat')
   const [showHistory, setShowHistory] = useState(false)
+  const [urlReady, setUrlReady] = useState(false)
 
+  // ?c=<id> opens that chat (yours, or one shared with you); the URL then follows the open chat.
   useEffect(() => {
-    chat.loadConversations()
+    const c = new URLSearchParams(window.location.search).get('c')
+    if (c && c !== chat.conversationId) chat.loadConversation(c).finally(() => setUrlReady(true))
+    else setUrlReady(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!urlReady) return
+    if ((chat.conversationId ?? null) !== new URLSearchParams(window.location.search).get('c')) {
+      router.replace(ap(`/admin/agent${chat.conversationId ? `?c=${chat.conversationId}` : ''}`, host), { scroll: false })
+    }
+  }, [urlReady, chat.conversationId, router, host])
 
   function newChat() {
     chat.reset()
@@ -697,7 +713,17 @@ export default function AdminAgentPage() {
       <div className="px-4 sm:px-6 py-4 border-b border-border-default shrink-0">
         <PageHeader
           title="Admin Assistant"
-          description="Read-only chat + admin-approved actions"
+          description={
+            chat.conversationId ? (
+              <span className="inline-flex items-center gap-1.5">
+                {chat.info.shared && <Users className="w-3.5 h-3.5 text-accent-500" />}
+                {chatTitle(chat.info.title)}
+                {chat.info.readOnly && ` · shared by ${chat.info.ownerName || 'another admin'}, read-only`}
+              </span>
+            ) : (
+              'Your chats are private unless you share one. Changes need your approval.'
+            )
+          }
           media={
             <div className="w-9 h-9 rounded-xl bg-accent-500 flex items-center justify-center shrink-0">
               <Bot className="w-5 h-5 text-white" />

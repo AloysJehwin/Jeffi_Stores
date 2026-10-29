@@ -57,6 +57,9 @@ export interface FeatureFlags {
   // Store-wide master switch for vault file downloads. Effective download = this && the product's
   // own `downloadable` flag. Off by default: stream/read only until the store opts in.
   vaultDownloadsEnabled: boolean
+  // The admin assistant's floating button on every admin page. Off hides only the button; the
+  // header icon still opens the assistant.
+  agentDockEnabled: boolean
   // Customer subscriptions (Razorpay recurring). On by default; available on every plan.
   subscriptionsEnabled: boolean
 }
@@ -164,6 +167,7 @@ const DEFAULTS: SiteControls = {
     digitalProductsEnabled: true,
     vaultDownloadsEnabled: false,
     subscriptionsEnabled: true,
+    agentDockEnabled: true,
     ondeviceSummaryEnabled:
       envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) ||
       process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
@@ -449,6 +453,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         digitalProductsEnabled: bool('feature_digital_products_enabled', d.flags.digitalProductsEnabled),
         vaultDownloadsEnabled: bool('feature_vault_downloads_enabled', d.flags.vaultDownloadsEnabled),
         subscriptionsEnabled: bool('feature_subscriptions_enabled', d.flags.subscriptionsEnabled),
+        agentDockEnabled: bool('feature_agent_dock_enabled', d.flags.agentDockEnabled),
         ondeviceSummaryEnabled: bool('feature_ondevice_summary_enabled', d.flags.ondeviceSummaryEnabled),
         ondeviceFinetuneEnabled: bool('feature_ondevice_finetune_enabled', d.flags.ondeviceFinetuneEnabled),
         ondeviceSummaryMobileEnabled: bool(

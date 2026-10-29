@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import type { UiBlock } from '@/components/admin/AdminAgentBlocks'
+import type { PageContext } from '@/lib/admin-agent/conversations'
 
-// Admin agent chat state, shared by the modal and the full page. Talks to
+// Admin agent chat state, one instance for the whole admin panel (AdminAgentContext). Talks to
 // /api/admin/agent/chat over SSE: text deltas, tool steps, ui blocks and actions stream in,
 // then a 'done' event carries the persisted turn.
 
@@ -87,9 +88,20 @@ export interface ConversationListItem {
   id: string
   title: string | null
   preview: string | null
+  shared: boolean
   last_message_at: string
   message_count: number
 }
+
+/** Whose chat is open: the caller's own, or another admin's shared one (read-only). */
+export interface ConversationInfo {
+  title: string | null
+  shared: boolean
+  readOnly: boolean
+  ownerName: string | null
+}
+
+const NEW_CHAT: ConversationInfo = { title: null, shared: false, readOnly: false, ownerName: null }
 
 const uid = () => crypto.randomUUID()
 
@@ -149,6 +161,7 @@ export function useAdminAgentChat() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [info, setInfo] = useState<ConversationInfo>(NEW_CHAT)
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [conversations, setConversations] = useState<ConversationListItem[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -158,6 +171,7 @@ export function useAdminAgentChat() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const convRef = useRef<string | null>(null)
+  const pageRef = useRef<PageContext | null>(null)
   convRef.current = conversationId
 
   useEffect(() => () => abortRef.current?.abort(), [])
@@ -226,12 +240,18 @@ export function useAdminAgentChat() {
     }
   }, [])
 
-  async function loadConversation(id: string): Promise<boolean> {
+  async function loadConversation(id: string, opts: { quiet?: boolean } = {}): Promise<boolean> {
+    abortRef.current?.abort()
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/agent/conversations/${id}/messages`, { credentials: 'include' })
+      const res = await fetch(`/api/admin/agent/conversations/${encodeURIComponent(id)}/messages`, {
+        credentials: 'include',
+      })
       if (!res.ok) {
-        showToast('Failed to load conversation', 'error')
+        if (!opts.quiet) {
+          const msg = res.status === 403 ? 'This chat is private to the admin who started it' : res.status === 404 ? 'Chat not found' : 'Failed to load conversation'
+          showToast(msg, 'error')
+        }
         return false
       }
       const data = await res.json()
@@ -250,6 +270,7 @@ export function useAdminAgentChat() {
       }))
       setTurns(restored)
       setConversationId(id)
+      setInfo({ title: data.title ?? null, shared: !!data.shared, readOnly: !!data.readOnly, ownerName: data.ownerName ?? null })
       return true
     } finally {
       setLoading(false)
@@ -260,8 +281,39 @@ export function useAdminAgentChat() {
     abortRef.current?.abort()
     setTurns([])
     setConversationId(null)
+    setInfo(NEW_CHAT)
     setInput('')
     setLoading(false)
+  }
+
+  async function patchConversation(id: string, patch: { title?: string; shared?: boolean }): Promise<boolean> {
+    const res = await fetch(`/api/admin/agent/conversations/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).catch(() => null)
+    if (!res?.ok) {
+      showToast('Could not update the chat', 'error')
+      return false
+    }
+    setConversations(prev => prev.map(c => (c.id !== id ? c : { ...c, ...patch, preview: patch.title ?? c.preview })))
+    if (id === convRef.current) setInfo(i => ({ ...i, ...patch }))
+    return true
+  }
+
+  async function deleteConversation(id: string): Promise<boolean> {
+    const res = await fetch(`/api/admin/agent/conversations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    }).catch(() => null)
+    if (!res?.ok) {
+      showToast('Could not delete the chat', 'error')
+      return false
+    }
+    setConversations(prev => prev.filter(c => c.id !== id))
+    if (id === convRef.current) reset()
+    return true
   }
 
   function stop() {
@@ -285,12 +337,13 @@ export function useAdminAgentChat() {
     }
     const fail = (msg: string) =>
       patchTurn(assistantId, t => ({ ...t, streaming: false, error: msg, retryText: userText }))
+    const isNew = !convRef.current
     try {
       const res = await fetch('/api/admin/agent/chat', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: JSON.stringify({ conversationId: convRef.current, message: userText, retry }),
+        body: JSON.stringify({ conversationId: convRef.current, message: userText, retry, pageContext: pageRef.current }),
         signal: ac.signal,
       })
       if (!res.ok || !(res.headers.get('content-type') || '').includes('text/event-stream') || !res.body) {
@@ -396,13 +449,14 @@ export function useAdminAgentChat() {
     } finally {
       if (abortRef.current === ac) abortRef.current = null
       setLoading(false)
+      if (isNew && convRef.current) loadConversations()
     }
   }
 
   async function sendMessage(text: string) {
     const trimmed = text.trim()
     const hasFile = !!pendingFile
-    if ((!trimmed && !hasFile) || loading) return
+    if ((!trimmed && !hasFile) || loading || info.readOnly) return
 
     let attId = attachmentId
     if (hasFile && !attId) {
@@ -419,6 +473,7 @@ export function useAdminAgentChat() {
     const displayContent = trimmed || `📎 ${pendingFile?.name || 'attachment'}`
 
     const assistantId = uid()
+    if (!convRef.current) setInfo({ ...NEW_CHAT, title: displayContent.slice(0, 160) })
     setTurns(t => [
       ...t,
       { id: uid(), role: 'user', content: displayContent },
@@ -431,7 +486,7 @@ export function useAdminAgentChat() {
 
   async function retry(turnId: string) {
     const turn = turns.find(t => t.id === turnId)
-    if (!turn?.retryText || loading) return
+    if (!turn?.retryText || loading || info.readOnly) return
     patchTurn(turnId, t => ({
       ...t,
       content: '',
@@ -451,6 +506,7 @@ export function useAdminAgentChat() {
   }
 
   async function decideAction(turnId: string, actionId: string, decision: 'approve' | 'reject') {
+    if (info.readOnly) return
     const setStatus = (patch: Partial<ProposedAction>) =>
       patchTurn(turnId, t => ({
         ...t,
@@ -481,6 +537,7 @@ export function useAdminAgentChat() {
     setInput,
     loading,
     conversationId,
+    info,
     turns,
     setTurns,
     conversations,
@@ -493,6 +550,11 @@ export function useAdminAgentChat() {
     clearAttachment,
     loadConversations,
     loadConversation,
+    patchConversation,
+    deleteConversation,
+    setPageContext: (c: PageContext | null) => {
+      pageRef.current = c
+    },
     reset,
     stop,
     sendMessage,
