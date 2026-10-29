@@ -53,9 +53,11 @@ aws sns set-topic-attributes --region "$REGION" --topic-arn "$TOPIC_ARN" --attri
  "Action":"sns:Publish","Resource":"$TOPIC_ARN","Condition":{"StringEquals":{"aws:SourceAccount":"$ACCOUNT"}}}]}
 JSON
 )"
-if ! aws sns list-subscriptions-by-topic --region "$REGION" --topic-arn "$TOPIC_ARN" --query "Subscriptions[?Endpoint=='$ENDPOINT']" --output text | grep -q .; then
+# Subscribing again while the subscription is still pending re-sends the confirmation (SNS sends it once;
+# it is lost if the webhook was not deployed yet).
+if ! aws sns list-subscriptions-by-topic --region "$REGION" --topic-arn "$TOPIC_ARN" --query "Subscriptions[?Endpoint=='$ENDPOINT' && SubscriptionArn!='PendingConfirmation']" --output text | grep -q .; then
   aws sns subscribe --region "$REGION" --topic-arn "$TOPIC_ARN" --protocol https --notification-endpoint "$ENDPOINT" >/dev/null
-  echo "Subscribed $ENDPOINT (the webhook confirms it on the first request)"
+  echo "Subscribed $ENDPOINT (the webhook confirms it on the first request; re-run after deploying if it stays pending)"
 fi
 
 SET=${ACTIVE:-$RULE_SET}
@@ -87,3 +89,4 @@ JSON
 
 echo "Done. Rule '$RULE' in set '$SET' -> s3://$BUCKET/inbound/ -> $TOPIC_ARN -> $ENDPOINT"
 echo "Set REPLY_MAIL_DOMAIN=$SUB on the controller only if it differs from reply.\$PLATFORM_DOMAIN."
+echo "If AWS_MESSAGING_SNS_TOPIC_ARNS is set in jeffi/production, it must include $TOPIC_ARN."
