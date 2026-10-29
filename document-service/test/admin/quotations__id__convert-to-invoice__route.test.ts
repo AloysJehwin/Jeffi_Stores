@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
+vi.mock('../../src/lib/reply-context', () => ({ invoiceReply: async () => null, recordEmailSend: async () => {} }))
 vi.mock('@/lib/shared/customer-links', () => ({
   documentUrl: vi.fn(async (app: string, token: string) => `https://${app}-acme.jeffistores.in/${token}`),
   orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),

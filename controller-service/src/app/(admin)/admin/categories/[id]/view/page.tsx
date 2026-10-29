@@ -5,6 +5,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import CopySku from '@/components/ui/CopySku'
 import { ACTIVE_STATUS, Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge } from '@/components/admin/kit'
+import { ChangeLog } from '@/components/admin/change-log'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { draftsForView } from '@/lib/admin/draft-branches'
 import { categoryDrafts } from '@/lib/catalog/category-draft'
@@ -214,6 +215,7 @@ export default async function CategoryViewPage({
         </>
       }
       aside={
+        <>
         <Card title="Category details">
           <Fields cols={1}>
             <Field label="Slug" value={category.slug} mono copy={category.slug} />
@@ -237,6 +239,8 @@ export default async function CategoryViewPage({
             <Field label="Replacement" value={effReplaceAllowed ? `${effReplaceDays} days` : 'Not allowed'} />
           </Fields>
         </Card>
+        <ChangeLog kind="category" id={id} variant="compact" />
+        </>
       }
     />
   )

@@ -17,7 +17,8 @@ import { normUnit } from '@/lib/catalog/selling-unit'
 import { toolAllowed, describeActorCapabilities, type AgentActor } from '@/lib/admin-agent/permissions'
 import { findSimilar } from '@/lib/shared/rag'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
-import crypto from 'crypto'
+import { startTurn, type PageContext } from '@/lib/admin-agent/conversations'
+import { MAX_PROPOSALS_PER_TURN, cleanPageContext, pageContextNote, pageTools } from '@/lib/admin-agent/page-context'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -34,6 +35,8 @@ const CLAUDE_TOOL_OUTPUT_CHARS = 12000
 interface IncomingMessage {
   conversationId?: string
   message: string
+  /** Where the admin is (the dock sends it): the page path and the record on it. */
+  pageContext?: PageContext
   /** Re-run of the last user message (UI retry): skip re-inserting it when it is already stored. */
   retry?: boolean
 }
@@ -67,7 +70,7 @@ const CORE_TOOLS = new Set([
   'list_admin_tools',
 ])
 
-// Extra tool groups, gated by keywords in the user's message.
+// Extra tool groups, gated by keywords in the user's message (plus the page's own tools, see pageTools).
 const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
   {
     test: /\b(email|campaign|mail|announce|newsletter|audience|subscriber|send|blast|promo)\b/i,
@@ -81,11 +84,13 @@ const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
     ],
   },
   { test: /\b(ship|shipped|dispatch|delivery|delivered|track|awb|fulfil)\b/i, tools: ['mark_order_shipped'] },
+  { test: /\b(history|changed|change log|changelog|who (changed|edited|updated)|when did)\b/i, tools: ['get_change_log'] },
   { test: /\b(schema|table|column|sql|query|database|db)\b/i, tools: ['describe_schema'] },
   {
     test: /\b(file|repo|code|route|api|endpoint|source)\b/i,
     tools: ['list_repo_files', 'read_repo_file', 'list_admin_api_routes', 'call_admin_api'],
   },
+  { test: /\[attachment_id=|\b(attach(ed|ment)?|pdf|document|image|photo|screenshot|spreadsheet|excel|csv|sheet)\b/i, tools: ['read_attachment', 'extract_quotation_lines_from_attachment'] },
   { test: /\b(similar|recommend|like this|related)\b/i, tools: ['find_similar_products'] },
   { test: /\b(recent|latest|new)\b/i, tools: ['get_recent_customers', 'get_recent_products'] },
   {
@@ -105,8 +110,8 @@ const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
 
 // Build the native tools array, selecting a query-relevant subset to keep the
 // per-turn prompt small. Falls back to core-only when nothing matches.
-function selectToolNames(userMessage: string): Set<string> {
-  const selected = new Set(CORE_TOOLS)
+function selectToolNames(userMessage: string, extra: string[]): Set<string> {
+  const selected = new Set([...CORE_TOOLS, ...extra])
   for (const g of TOOL_GROUPS) {
     if (g.test.test(userMessage)) for (const t of g.tools) selected.add(t)
   }
@@ -116,8 +121,8 @@ function selectToolNames(userMessage: string): Set<string> {
 const allowedTool = (name: string, actor: AgentActor) => (toolAllowed(name, actor) ? getTool(name) : undefined)
 
 // Only the tools the admin's role and scopes allow are offered at all.
-function buildToolsDef(actor: AgentActor, userMessage?: string): AiToolDef[] {
-  const allow = userMessage ? selectToolNames(userMessage) : null
+function buildToolsDef(actor: AgentActor, userMessage?: string, extra: string[] = []): AiToolDef[] {
+  const allow = userMessage ? selectToolNames(userMessage, extra) : null
   return TOOLS.filter(t => toolAllowed(t.name, actor) && (!allow || allow.has(t.name))).map(t => ({
     type: 'function' as const,
     function: {
@@ -178,7 +183,7 @@ RULES (non-negotiable):
 - Mutating tools (those that change data) return {proposed:true} — when they do, tell the user "I've proposed this — review the action card."
 - If a tool returns {needs_choice:true}: write "Multiple matches — pick one above." and stop.
 - If the user says "Use address id <uuid> ..." (from the address picker): call propose_create_quotation again with the same customerEmail and items, and pass addressId=<uuid>. Do NOT ask for confirmation — just call the tool.
-- Be concise. Numbers and bullet points beat paragraphs. No filler.
+- Be concise. Numbers and bullet points beat paragraphs. No filler. Never use emojis.
 ${dynamicList}
 
 ## DOMAIN RULES
@@ -201,14 +206,19 @@ Output format — use ui_blocks for any data display:
   {"type":"table","headers":["Col1","Col2"],"rows":[["a","b"]]},
   {"type":"order_list","orders":[{"id":"<uuid>","order_number":"ORD-001","status":"shipped","total":5000}]},
   {"type":"customer_list","customers":[{"id":"<uuid>","email":"x@y.com","name":"Name"}]},
-  {"type":"callout","tone":"warn","message":"Note"}
+  {"type":"callout","tone":"warn","message":"Note"},
+  {"type":"card","title":"INV-0042","subtitle":"Acme Traders","icon":"invoice","entity":{"kind":"invoice","id":"<uuid>"},"badges":[{"label":"Unpaid","tone":"warn"}],"stats":[{"label":"Total","value":24975,"format":"inr"}],"fields":[{"label":"Due","value":"2026-11-05","format":"date"}]}
 ]</ui_blocks>
 - IDs must be real UUIDs from tool output — they become deep links.
 - Numbers must be raw (no ₹, no commas). price:1234 not "₹1,234".
 - 2+ products → always product_grid, never bullet lists.
+- One record or summary of anything else (invoice, quotation, coupon, campaign, KPIs) → card; several → {"type":"cards","cards":[...]}.
 - Free text outside ui_blocks renders above the blocks — use it for brief framing or questions only.
 
 ## QUOTATION FLOW — MANDATORY (violations waste all iterations)
+
+## Attachments
+A message with [attachment_id=... filename=... mime=...] carries a file. Read it with read_attachment (any PDF, scan, photo, Word, Excel/CSV, PowerPoint or text file). If it is a quotation request, use extract_quotation_lines_from_attachment and follow the quotation steps. Audio and video cannot be read: say so and ask the admin to type out what matters.
 
 When the user asks to "prepare a quotation", "create a quote", or provides a list of items/tools/materials:
 STEP 1 — Call match_quotation_items ONCE with ALL items packed into a single JSON array in the "lines" field.
@@ -338,6 +348,8 @@ const UI_BLOCK_TYPES = [
   'link_button',
   'image_card',
   'code_block',
+  'card',
+  'cards',
 ]
 
 // Structured display instead of <ui_blocks> in prose; the prose parser stays as a fallback.
@@ -357,6 +369,20 @@ const RENDER_UI_TOOL: AiToolDef = {
       '- {"type":"customer_list","customers":[{"id":"<uuid>","email":"x@y.com","name":"Name","total_orders":3,"lifetime_value":12000}]}\n' +
       '- {"type":"callout","tone":"info|warn|error|success","title":"...","message":"..."}\n' +
       '- {"type":"link_button","label":"Open orders","href":"/admin/orders"}\n' +
+      '- {"type":"card", ...} for ONE record or summary of anything else (invoice, quotation, coupon, campaign, supplier, ' +
+      'an order or customer in detail, KPIs). Every key except title is optional: ' +
+      '{"type":"card","title":"INV-0042","subtitle":"Acme Traders","eyebrow":"Invoice","icon":"invoice",' +
+      '"entity":{"kind":"invoice","id":"<uuid>"},"tone":"warn","badges":[{"label":"Overdue","tone":"danger"}],' +
+      '"stats":[{"label":"Total","value":24975,"format":"inr"},{"label":"Paid","value":10000,"format":"inr","delta":-12,"hint":"vs last month"}],' +
+      '"fields":[{"label":"Due","value":"2026-11-05","format":"date"},{"label":"Customer","value":"Acme","entity":{"kind":"customer","id":"<uuid>"}}],' +
+      '"items":[{"title":"Drill 13mm","subtitle":"5 box × 10 pcs","value":4995,"format":"inr","entity":{"kind":"product","id":"<uuid>"}}],' +
+      '"progress":{"label":"Collected","value":10000,"max":24975},"note":"Due in 7 days.",' +
+      '"actions":[{"label":"Open invoice","entity":{"kind":"invoice","id":"<uuid>"},"primary":true},{"label":"Draft a reminder","prompt":"Draft a payment reminder for INV-0042"}]}\n' +
+      '  formats: inr|number|percent|date|datetime|text; tones: neutral|info|success|warn|danger; entity kinds: ' +
+      'product, order, customer, invoice, quotation, coupon, supplier, rfq, category, brand, campaign (id = kind slug); ' +
+      'icons: those kinds plus payment, shipment, email, report, inventory, alert. href only for app paths ("/admin/...") or https URLs. ' +
+      'An action with "prompt" sends that text as the admin\'s next message; it never changes data itself.\n' +
+      '- {"type":"cards","layout":"grid|list","cards":[<card without "type">, ...]} for several such records.\n' +
       'IDs must be real UUIDs from tool output (they become links). Numbers raw: price 1234, not "₹1,234".',
     parameters: {
       type: 'object',
@@ -408,9 +434,15 @@ ${STOCK_RULES}
 
 ## Answers
 - Lead with the answer. Be concise: short sentences, bullets and numbers; no filler and no restating the question.
-- Show records and lists with the render_ui tool (product_grid for 2+ products, order_list, customer_list, table, kv_pairs, callout), then add at most a sentence or two of text. Do not repeat in prose what render_ui shows.
+- Show records and lists with the render_ui tool, then add at most a sentence or two of text. Do not repeat in prose what render_ui shows.
+  - Lists of products, orders or customers: product_grid (2+ products), order_list, customer_list.
+  - One record or summary of anything (an invoice, quotation, coupon, campaign, supplier, an order or customer in detail, KPIs for a period): card, with stats for the headline numbers, fields for the details, items for its lines, and actions to open it or ask the obvious next question. Several such records: cards.
+  - Wide comparisons: table. Warnings and outcomes: callout.
 - Link records inline as [[product:<uuid>|Name]], [[order:<uuid>|ORD-001]], [[customer:<uuid>|Name]] or [[campaign:<kind>|Label]], using real ids from tool output only.
-- Short markdown (bold, lists, \`code\`) is fine.
+- Short markdown (bold, lists, \`code\`) is fine. Never use emojis.
+
+## Attachments
+A message with [attachment_id=... filename=... mime=...] carries a file. Read it with read_attachment (any PDF, scan, photo, Word, Excel/CSV, PowerPoint or text file). If it is a quotation request, use extract_quotation_lines_from_attachment and follow the quotation steps. Audio and video cannot be read: say so and ask the admin to type out what matters.
 
 ## Quotations
 When the admin asks to prepare a quotation or gives a list of items:
@@ -491,6 +523,7 @@ interface TurnContext {
   admin: AgentActor
   conversationId: string
   userMessage: string
+  pageContext: PageContext | null
   req: NextRequest
 }
 
@@ -506,7 +539,9 @@ export async function POST(req: NextRequest) {
   if (!userMessage) return NextResponse.json({ error: 'message is required' }, { status: 400 })
   if (userMessage.length > 2000) return NextResponse.json({ error: 'message too long (max 2000)' }, { status: 400 })
 
-  const conversationId = body.conversationId || crypto.randomUUID()
+  const pageContext = cleanPageContext(body.pageContext)
+  const conversationId = await startTurn(admin.adminId, body.conversationId, userMessage, pageContext)
+  if (!conversationId) return NextResponse.json({ error: 'Not your conversation' }, { status: 403 })
 
   const last = body.retry
     ? await queryOne<{ role: string; content: string }>(
@@ -521,7 +556,13 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const ctx: TurnContext = { admin: { adminId: admin.adminId, role: admin.role, scopes: admin.scopes }, conversationId, userMessage, req }
+  const ctx: TurnContext = {
+    admin: { adminId: admin.adminId, role: admin.role, scopes: admin.scopes },
+    conversationId,
+    userMessage,
+    pageContext,
+    req,
+  }
   if (!(req.headers.get('accept') || '').includes('text/event-stream')) {
     const out = await runTurn(ctx, null, req.signal)
     return NextResponse.json(out.body, { status: out.status })
@@ -569,7 +610,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal | undefined): Promise<TurnResult> {
-  const { admin, conversationId, userMessage, req } = ctx
+  const { admin, conversationId, userMessage, pageContext, req } = ctx
   const actor: AgentActor = { adminId: admin.adminId, role: admin.role, scopes: admin.scopes }
   const send: Emit = emit ?? (() => {})
   const done = (body: Record<string, unknown>): TurnResult => ({ status: 200, body })
@@ -876,8 +917,12 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
       if (h.role === 'user' || h.role === 'assistant') messages.push({ role: h.role, content: h.content })
     }
   }
+  const note = pageContextNote(pageContext)
+  const latestUser = note ? [...messages].reverse().find(m => m.role === 'user') : undefined
+  if (latestUser) latestUser.content += note
 
-  let toolsDef = claude ? [...buildToolsDef(actor), RENDER_UI_TOOL] : buildToolsDef(actor, userMessage)
+  const onPage = pageTools(pageContext)
+  let toolsDef = claude ? [...buildToolsDef(actor), RENDER_UI_TOOL] : buildToolsDef(actor, userMessage, onPage)
   let maxIterations = claude ? CLAUDE_MAX_ITERATIONS : MAX_ITERATIONS
   const toolCallRecords: ToolCallRecord[] = []
   const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
@@ -945,7 +990,7 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
       // The gateway failed over to Ollama: fall back to the gated tool set and short loop.
       if (claude && r.provider !== 'anthropic') {
         claude = false
-        toolsDef = buildToolsDef(actor, userMessage)
+        toolsDef = buildToolsDef(actor, userMessage, onPage)
         maxIterations = Math.min(maxIterations, iter + MAX_ITERATIONS)
       }
 
@@ -997,6 +1042,13 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
         const tool = getTool(tc.name)
         if (!tool || !toolAllowed(tc.name, actor)) {
           const err = tool ? `${tc.name} is not available to your role (${actor.role})` : `Unknown tool: ${tc.name}`
+          record({ tool: tc.name, input: parsed, output: err, isError: true })
+          toolMessage(tc.id, err)
+          continue
+        }
+
+        if (tool.mutating && proposedActions.length >= MAX_PROPOSALS_PER_TURN) {
+          const err = `Limit reached: ${MAX_PROPOSALS_PER_TURN} changes per answer. Stop proposing; tell the admin to approve these or narrow the list first.`
           record({ tool: tc.name, input: parsed, output: err, isError: true })
           toolMessage(tc.id, err)
           continue

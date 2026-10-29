@@ -9,6 +9,8 @@ import { notifyVariantChangeRequested } from '@/lib/shared/notify'
 import { sendOrderAdjustmentEmail } from '@/lib/email/lifecycle'
 import { orderUrlById } from '@/lib/shared/customer-links'
 import { logActivity } from '@/lib/shared/activity'
+import { openReplyContextSafe } from '@/lib/replies/context'
+import { withReplyContext } from '@/lib/replies/scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,28 +79,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id, preview } = await createAdjustment({ orderId, lines, settlePayment, adminId: admin.adminId, adminNotes })
 
     const order = await queryOne<any>(
-      `SELECT o.order_number, o.user_id, o.customer_email, o.customer_name, u.email AS user_email, u.first_name, u.last_name
+      `SELECT o.order_number, o.user_id, o.customer_email, o.customer_name, u.email AS user_email, u.first_name, u.last_name,
+              COALESCE(NULLIF(u.phone, ''), o.customer_phone) AS phone
          FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
       [orderId]
     )
     const email = order?.user_email || order?.customer_email
-    if (email) {
-      sendOrderAdjustmentEmail({
-        customerEmail: email,
-        customerName: order.first_name ? `${order.first_name} ${order.last_name || ''}`.trim() : order.customer_name || 'Customer',
-        orderNumber: order.order_number,
-        orderId,
-        changes: preview.lines.map(l => ({
-          action: l.action,
-          from: `${l.old.name} × ${l.old.quantity}${l.old.unit ? ` ${l.old.unit}` : ''}`,
-          to: l.new ? `${l.new.productName} × ${l.new.quantity}${l.new.unit ? ` ${l.new.unit}` : ''}` : null,
-        })),
-        netDiff: preview.netDiff,
-        settlementType: preview.settlementType,
-        newTotal: preview.newTotal,
-      }).catch(() => {})
-    }
-    if (order) notifyVariantChangeRequested(order.user_id, order.order_number, await orderUrlById(orderId)).catch(() => {})
+    // The customer can answer by replying to the email or WhatsApp; the reply comes back to this.
+    const reply = order ? await openReplyContextSafe({ scenario: 'order_adjustment', entityType: 'orders', entityId: orderId, refId: id, userId: order.user_id, email, phone: order.phone }) : null
+    const scope = reply && { contextId: reply.context.id, replyTo: reply.replyTo, entityType: 'orders', entityId: orderId }
+    await withReplyContext(scope, async () => {
+      if (email) {
+        sendOrderAdjustmentEmail({
+          customerEmail: email,
+          customerName: order.first_name ? `${order.first_name} ${order.last_name || ''}`.trim() : order.customer_name || 'Customer',
+          orderNumber: order.order_number,
+          orderId,
+          changes: preview.lines.map(l => ({
+            action: l.action,
+            from: `${l.old.name} × ${l.old.quantity}${l.old.unit ? ` ${l.old.unit}` : ''}`,
+            to: l.new ? `${l.new.productName} × ${l.new.quantity}${l.new.unit ? ` ${l.new.unit}` : ''}` : null,
+          })),
+          netDiff: preview.netDiff,
+          settlementType: preview.settlementType,
+          newTotal: preview.newTotal,
+        }).catch(() => {})
+      }
+      if (order) notifyVariantChangeRequested(order.user_id, order.order_number, await orderUrlById(orderId)).catch(() => {})
+    })
     if (order?.user_id) {
       logActivity({
         userId: order.user_id,

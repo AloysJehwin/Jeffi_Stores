@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, ImagePlus, Loader2, Terminal, Trash2 } from 'lucide-react'
 import { Card } from '../_components/Card'
-import PdfPreview from './PdfPreview'
+import PdfPreview from '@/components/ui/PdfPreview'
 import { useToast } from '@/contexts/ToastContext'
 import PlayDialog, { PlayButton } from '../_components/PlayDialog'
 import type { Seller } from './BulkDocuments'

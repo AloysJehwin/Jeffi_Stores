@@ -10,6 +10,8 @@ import * as gov from './governance.js'
 import { render, missingKeys, type Vars } from './render.js'
 import { sendEmail } from './providers/email.js'
 import { sendSms, sendWhatsApp } from './providers/twilio.js'
+import * as aws from './providers/aws.js'
+import { messagingProvider } from './providers/policy.js'
 import { wrapEmail } from './mail-shell.js'
 import { hostUrl, MediaError } from './media.js'
 
@@ -49,6 +51,7 @@ export const toApi = (m: MessageRow) => ({
   template: m.template_slug,
   status: m.status,
   provider_ref: m.provider_ref,
+  body: m.body,
   price_inr: Number(m.price_inr),
   charged_inr: Number(m.charged_inr),
   error: m.error,
@@ -95,7 +98,7 @@ export async function resolveTemplate(tenantId: string, channel: string, slug: s
     const live = channel === 'whatsapp' && t.variant.provider_ref
       ? (await tpl.liveVersion(pool, t.variant.id, t.variant.provider_ref)) ?? t.version
       : t.version
-    return { subject: live.subject, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any, layout: live.layout, meta_category: t.variant.meta_category ?? undefined }
+    return { subject: live.subject, preheader: live.preheader ?? null, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any, layout: live.layout, meta_category: t.variant.meta_category ?? undefined }
   }
   return null
 }
@@ -189,27 +192,32 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     ...(await systemVars(ctx.tenantId)),
     ...(req.channel === 'email' ? { customer_email: req.to } : {}),
     ...(given.customer_first_name && !given.customer_name ? { customer_name: given.customer_first_name } : {}),
+    ...(given.customer_name && !given.customer_first_name ? { customer_first_name: String(given.customer_name).trim().split(/\s+/)[0] } : {}),
     ...given,
   }
   let subject = req.subject ?? null
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
   let layout: 'store' | 'none' = 'store'
+  let preheader: string | null = null
   let mediaHosted = false
   let waVars: Record<string, string> | null = null
+  let waHeader: string | undefined
   if (req.template) {
     const t = await resolveTemplate(ctx.tenantId, req.channel, req.template, ctx.space)
     if (!t) throw new SendError(404, 'template_not_found', `No ${req.channel} template '${req.template}'`)
-    const missing = missingKeys(t.body + ' ' + (t.subject ?? ''), vars)
+    const missing = missingKeys(t.body + ' ' + (t.subject ?? '') + ' ' + (t.preheader ?? ''), vars)
     if (missing.length) throw new SendError(422, 'missing_variables', `Template needs: ${missing.join(', ')}`, { missing })
     subject = subject ?? t.subject
     body = t.body
+    preheader = t.preheader
     providerRef = providerRef ?? t.provider_ref ?? undefined
     layout = (t as any).layout === 'none' ? 'none' : 'store'
     if (req.channel === 'whatsapp') {
       // Slots follow the approved body: its own {{n}}, then {{brand_name}}, then header and button.
       const blocks = (t as any).blocks
       const plan = planSlots(t.body, blocks)
+      waHeader = blocks?.types?.['twilio/media']?.media?.[0]
       const action = await actionVars(ctx, blocks, plan, vars, req)
       mediaHosted = action.mediaHosted
       waVars = {}
@@ -219,7 +227,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     }
   }
   const html = req.channel === 'email'
-  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, waVars, layout, mediaHosted }
+  return { subject: subject ? render(subject, vars) : null, preheader: preheader ? render(preheader, vars) : null, body: render(body, vars, html), providerRef, vars, waVars, waHeader, layout, mediaHosted }
 }
 
 // The store's Site Controls switches (feature_sms_enabled / feature_whatsapp_enabled) have the last word on
@@ -250,7 +258,7 @@ export async function assertChannelOn(tenantId: string, channel: string, space: 
 
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
   await assertChannelOn(ctx.tenantId, req.channel, ctx.space)
-  const { subject, body, providerRef, vars, waVars, layout, mediaHosted } = await compose(ctx, req)
+  const { subject, preheader, body, providerRef, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
 
   const id = randomUUID()
@@ -286,14 +294,19 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     if (req.channel === 'email') {
       provider = 'ses'
       // layout 'none': the template's HTML exactly as written, no store header/footer.
-      const html = layout === 'none' ? body : wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact })
-      ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html })
+      const html = layout === 'none' ? body : wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact, accent: req.accent, replyHint: !!req.reply_to, preheader })
+      ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html, replyTo: req.reply_to, inReplyTo: req.in_reply_to })
     } else if (req.channel === 'sms') {
-      ref = await sendSms({ to: req.to, body, messageId: id })
+      // The tenant's provider policy decides; a tenant on AWS never falls back to Twilio.
+      provider = await messagingProvider(ctx.tenantId, 'sms')
+      ref = provider === 'aws' ? await aws.sendSms({ to: req.to, body, messageId: id }) : await sendSms({ to: req.to, body, messageId: id })
     } else {
       // A raw content SID (no template) gets the caller's numbered variables as given.
       const variables = waVars ?? Object.fromEntries(Object.entries(vars).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, String(v ?? '')]))
-      ref = await sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id })
+      provider = await messagingProvider(ctx.tenantId, 'whatsapp')
+      ref = provider === 'aws'
+        ? await aws.sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id, headerUrl: waHeader })
+        : await sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id })
     }
     await db.query(
       `UPDATE messages SET status='sent', provider=$2, provider_ref=$3, charged_inr=$4, updated_at=now() WHERE id=$1`,

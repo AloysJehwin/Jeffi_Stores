@@ -6,6 +6,7 @@ import {
   XCircle,
   Loader2,
   Paperclip,
+  HardDrive,
   X,
   Send,
   Square,
@@ -15,18 +16,31 @@ import {
   ChevronRight,
   Wrench,
   AlertTriangle,
+  Users,
+  Link2,
+  Pencil,
+  Trash2,
+  Lock,
 } from 'lucide-react'
 import AdminAgentMessage, { AdminAgentUserMessage, internalMessageLabel } from '../AdminAgentMessage'
 import AdminAgentBlocks from '../AdminAgentBlocks'
 import ProposedActionCard, { splitProposalBlocks } from './ProposedActionCard'
-import type { AdminAgentChat, ChatTurn, TimelineItem, ToolStep } from '@/hooks/useAdminAgentChat'
+import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
+import AutoGrowTextarea from '@/components/ui/AutoGrowTextarea'
+import { useHasScope } from '@/contexts/AdminScopesContext'
+import { useDrivePicker } from '@/components/admin/drive/DrivePicker'
+import { ACCEPTED_EXTENSIONS, MAX_ATTACHMENT_BYTES, splitAttachmentNotes } from '@/lib/admin-agent/file-types'
+import { useToast } from '@/contexts/ToastContext'
+import { ap } from '@/lib/shared/admin-path'
+import { useAdminHost } from '@/contexts/AdminHostContext'
+import type { AdminAgentChat, ChatTurn, ConversationListItem, TimelineItem, ToolStep } from '@/hooks/useAdminAgentChat'
 
-// Chat transcript + composer (+ optional history sidebar) shared by AdminAgentModal and
-// the /admin/agent page; each keeps its own chrome and tabs.
+// Chat transcript + composer (+ optional history list) shared by the bottom-right dock and the
+// /admin/agent page; each keeps its own chrome.
 
 interface Props {
   chat: AdminAgentChat
-  variant: 'modal' | 'page'
+  variant: 'dock' | 'page'
   showHistory: boolean
   onConversationPicked?: () => void
   /** Wraps the Approve/Reject buttons (the page gates them on agent:write). */
@@ -34,10 +48,20 @@ interface Props {
   empty: ReactNode
 }
 
+/** A chat's display name: its title without attachment markers, or a control message's label. */
+export function chatTitle(title: string | null | undefined): string {
+  const label = internalMessageLabel(title)
+  if (label) return label
+  // A long title can cut its attachment note off half way.
+  const { text, files } = splitAttachmentNotes((title ?? '').replace(/\s*\[attachment_id=[^\]]*$/, ''))
+  return text || files[0] || 'Untitled chat'
+}
+
 export default function AgentChatPanel({ chat, variant, showHistory, onConversationPicked, approveWrapper, empty }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const { turns, loading } = chat
+  const readOnly = chat.info.readOnly
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -54,10 +78,10 @@ export default function AgentChatPanel({ chat, variant, showHistory, onConversat
     <div className="flex flex-1 min-h-0">
       {showHistory && (
         <aside
-          className={`${page ? 'flex w-full md:w-56 lg:w-64 md:border-r' : 'flex w-40 sm:w-64 border-r'} border-border-default bg-surface-secondary/50 flex-col shrink-0`}
+          className={`${page ? 'flex w-full md:w-56 lg:w-64 md:border-r' : 'flex w-full'} border-border-default bg-surface-secondary/50 flex-col shrink-0`}
         >
           <div className="px-3 py-2 border-b border-border-default flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Chat history</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Your chats</p>
             <button
               onClick={chat.loadConversations}
               disabled={chat.loadingHistory}
@@ -71,39 +95,137 @@ export default function AgentChatPanel({ chat, variant, showHistory, onConversat
               <p className="text-[11px] text-foreground-muted p-2">No past conversations.</p>
             )}
             {chat.conversations.map(c => (
-              <button
-                key={c.id}
-                onClick={async () => {
-                  if (await chat.loadConversation(c.id)) onConversationPicked?.()
-                }}
-                className={`w-full text-left px-2 ${page ? 'py-2.5 md:py-1.5 text-sm md:text-xs' : 'py-1.5 text-xs'} rounded transition-colors ${
-                  c.id === chat.conversationId ? 'bg-accent-500/10 border border-accent-500/30' : 'hover:bg-surface-secondary'
-                }`}
-              >
-                <p className="font-medium text-foreground truncate">
-                  {internalMessageLabel(c.title) || c.title || internalMessageLabel(c.preview) || c.preview?.slice(0, 60) || 'Untitled chat'}
-                </p>
-                <p className="text-[10px] text-foreground-muted">
-                  {new Date(c.last_message_at).toLocaleString()} · {c.message_count} msg
-                </p>
-              </button>
+              <HistoryItem key={c.id} item={c} chat={chat} page={page} onPicked={onConversationPicked} />
             ))}
           </div>
+          <p className="px-3 py-2 border-t border-border-default text-[10px] text-foreground-muted">
+            Only you can see your chats unless you share one.
+          </p>
         </aside>
       )}
 
-      <div className={`${page && showHistory ? 'hidden md:flex' : 'flex'} flex-1 flex-col min-w-0`}>
+      <div className={`${showHistory ? (page ? 'hidden md:flex' : 'hidden') : 'flex'} flex-1 flex-col min-w-0`}>
         <div
           ref={scrollRef}
           className={`overflow-y-auto p-4 space-y-3 flex-1 min-h-0 ${page ? 'pb-[max(1rem,env(safe-area-inset-bottom))]' : ''}`}
         >
           {turns.length === 0 && !loading && empty}
           {turns.map(turn => (
-            <TurnView key={turn.id} turn={turn} chat={chat} approveWrapper={approveWrapper} />
+            <TurnView
+              key={turn.id}
+              turn={turn}
+              chat={chat}
+              approveWrapper={readOnly ? () => null : approveWrapper}
+            />
           ))}
         </div>
-        <Composer chat={chat} inputRef={inputRef} page={page} />
+        {readOnly ? <ReadOnlyBar chat={chat} page={page} /> : <Composer chat={chat} inputRef={inputRef} page={page} />}
       </div>
+    </div>
+  )
+}
+
+function HistoryItem({
+  item: c,
+  chat,
+  page,
+  onPicked,
+}: {
+  item: ConversationListItem
+  chat: AdminAgentChat
+  page: boolean
+  onPicked?: () => void
+}) {
+  const confirm = useConfirm()
+  const prompt = usePrompt()
+  const { showToast } = useToast()
+  const host = useAdminHost()
+  const title = chatTitle(c.title || c.preview)
+
+  async function share() {
+    if (c.shared) {
+      if (await chat.patchConversation(c.id, { shared: false })) showToast('Chat is private again', 'success')
+      return
+    }
+    if (!(await chat.patchConversation(c.id, { shared: true }))) return
+    const url = `${window.location.origin}${ap(`/admin/agent?c=${c.id}`, host)}`
+    try {
+      await navigator.clipboard.writeText(url)
+      showToast('Shared read-only with other admins · link copied', 'success')
+    } catch {
+      showToast('Shared read-only with other admins', 'success')
+    }
+  }
+
+  async function rename() {
+    const next = await prompt({ title: 'Rename chat', message: 'A name for this chat', defaultValue: title, confirmLabel: 'Save' })
+    if (next?.trim()) await chat.patchConversation(c.id, { title: next.trim() })
+  }
+
+  async function remove() {
+    const ok = await confirm({
+      title: 'Delete chat',
+      message: `Delete "${title}"? Its messages are removed for good${c.shared ? ' and the shared link stops working' : ''}.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    })
+    if (ok) await chat.deleteConversation(c.id)
+  }
+
+  const action = 'p-1 rounded text-foreground-muted hover:text-foreground hover:bg-surface'
+  return (
+    <div
+      className={`group/item relative rounded transition-colors ${
+        c.id === chat.conversationId ? 'bg-accent-500/10 border border-accent-500/30' : 'hover:bg-surface-secondary'
+      }`}
+    >
+      <button
+        onClick={async () => {
+          if (await chat.loadConversation(c.id)) onPicked?.()
+        }}
+        className={`w-full text-left px-2 [@media(hover:none)]:pr-20 ${page ? 'py-2.5 md:py-1.5 text-sm md:text-xs' : 'py-1.5 text-xs'}`}
+      >
+        <p className="font-medium text-foreground truncate">{title}</p>
+        <p className="flex items-center gap-1 text-[10px] text-foreground-muted">
+          {c.shared && <Users className="w-3 h-3 text-accent-500" aria-label="Shared" />}
+          {new Date(c.last_message_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} · {c.message_count} msg
+        </p>
+      </button>
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center rounded bg-surface-elevated/95 shadow-sm opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:bg-transparent [@media(hover:none)]:shadow-none transition-opacity">
+        <button onClick={share} className={action} title={c.shared ? 'Stop sharing' : 'Share read-only with other admins'}>
+          <Link2 className={`w-3.5 h-3.5 ${c.shared ? 'text-accent-500' : ''}`} />
+        </button>
+        <button onClick={rename} className={action} title="Rename">
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={remove} className={action} title="Delete">
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** In place of the composer on another admin's shared chat. */
+function ReadOnlyBar({ chat, page }: { chat: AdminAgentChat; page: boolean }) {
+  const { ownerName, title } = chat.info
+  return (
+    <div
+      className={`border-t border-border-default ${page ? 'p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]' : 'p-2'} flex flex-wrap items-center gap-2 text-xs shrink-0`}
+    >
+      <Lock className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+      <span className="flex-1 min-w-0 text-foreground-muted">
+        Shared by {ownerName || 'another admin'} · read-only
+      </span>
+      <button
+        onClick={() => {
+          chat.reset()
+          chat.setInput(`Following up on "${chatTitle(title)}": `)
+        }}
+        className="px-2.5 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold"
+      >
+        Continue in a new chat
+      </button>
     </div>
   )
 }
@@ -208,6 +330,7 @@ function TurnView({
         )}
         {turn.proposedActions && turn.proposedActions.length > 0 && (
           <div className={`${text || blocks.length ? 'mt-3' : 'mt-1'} space-y-2`}>
+            <BatchBar turn={turn} chat={chat} approveWrapper={approveWrapper} />
             {turn.proposedActions.map(action => (
               <ProposedActionCard
                 key={action.id}
@@ -223,6 +346,46 @@ function TurnView({
       {!turn.streaming && (turn.content || turn.model) && <TurnMeta turn={turn} />}
     </div>
   )
+}
+
+/** Approve or reject every change still waiting in a turn (e.g. one per row of a list). */
+function BatchBar({
+  turn,
+  chat,
+  approveWrapper,
+}: {
+  turn: ChatTurn
+  chat: AdminAgentChat
+  approveWrapper?: (node: ReactNode) => ReactNode
+}) {
+  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null)
+  const pending = turn.proposedActions?.filter(a => a.status === 'proposed').length ?? 0
+  if (pending < 2 && !busy) return null
+  const run = async (d: 'approve' | 'reject') => {
+    setBusy(d)
+    await chat.decideAll(turn.id, d)
+    setBusy(null)
+  }
+  const bar = (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent-500/40 bg-accent-500/5 px-3 py-2 text-xs">
+      <span className="flex-1 min-w-0 font-medium text-foreground">{busy ? 'Working through the changes…' : `${pending} changes waiting`}</span>
+      <button
+        onClick={() => run('reject')}
+        disabled={!!busy}
+        className="px-2.5 py-1 rounded-md border border-border-default text-foreground hover:bg-surface disabled:opacity-50"
+      >
+        {busy === 'reject' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Reject all'}
+      </button>
+      <button
+        onClick={() => run('approve')}
+        disabled={!!busy}
+        className="px-2.5 py-1 rounded-md bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50"
+      >
+        {busy === 'approve' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Approve all (${pending})`}
+      </button>
+    </div>
+  )
+  return <>{approveWrapper ? approveWrapper(bar) : bar}</>
 }
 
 function TurnMeta({ turn }: { turn: ChatTurn }) {
@@ -360,6 +523,12 @@ function Composer({
   page: boolean
 }) {
   const { pendingFile, uploading, attachmentId, loading, input } = chat
+  const canDrive = useHasScope('drive:read')
+  const drive = useDrivePicker()
+  const fromDrive = async () => {
+    const f = (await drive.pick({ title: 'Attach from Drive', multiple: false, kinds: ['image', 'pdf', 'doc', 'other'], maxBytes: MAX_ATTACHMENT_BYTES }))?.[0]
+    if (f) chat.attachFromDrive(f)
+  }
   return (
     <div
       className={`border-t border-border-default ${page ? 'p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] shrink-0' : 'p-2'} flex flex-col gap-2`}
@@ -385,13 +554,14 @@ function Composer({
         <input
           ref={chat.fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,application/pdf"
+          accept={ACCEPTED_EXTENSIONS.join(',')}
           onChange={chat.onPickFile}
           className="hidden"
         />
-        <textarea
+        <AutoGrowTextarea
           ref={inputRef}
           value={input}
+          maxRows={10}
           onChange={e => chat.setInput(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -399,11 +569,10 @@ function Composer({
               chat.sendMessage(input)
             }
           }}
-          rows={1}
           maxLength={2000}
           disabled={loading}
-          placeholder={pendingFile ? 'Add an instruction (optional) and send' : 'Ask anything about the store'}
-          className="flex-1 min-w-0 px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none"
+          placeholder={pendingFile ? 'Add an instruction (optional)' : 'Ask anything about the store'}
+          className="flex-1 min-w-0 px-3 py-2 text-sm leading-5 bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
         <button
           type="button"
@@ -415,6 +584,19 @@ function Composer({
         >
           <Paperclip className="w-4 h-4" />
         </button>
+        {canDrive && (
+          <button
+            type="button"
+            onClick={fromDrive}
+            disabled={loading || uploading}
+            className="w-9 h-9 flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-secondary rounded-lg disabled:opacity-50 shrink-0"
+            aria-label="Attach from Drive"
+            title="Attach from Drive"
+          >
+            <HardDrive className="w-4 h-4" />
+          </button>
+        )}
+        {drive.node}
         {loading ? (
           <button
             onClick={chat.stop}

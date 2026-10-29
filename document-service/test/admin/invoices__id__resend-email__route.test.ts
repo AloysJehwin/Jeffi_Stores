@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+vi.mock('../../src/lib/reply-context', () => ({ invoiceReply: async () => null, recordEmailSend: async () => {} }))
 vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
@@ -119,7 +120,8 @@ describe('POST /api/admin/invoices/[id]/resend-email', () => {
       'INV-2024-001',
       1200,
       'ORD-001',
-      expect.stringContaining('view-token-abc')
+      expect.stringContaining('view-token-abc'),
+      null
     )
   })
 

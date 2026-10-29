@@ -1,10 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Play } from 'lucide-react'
-import { Dialog, InfiniteFooter, fetchJson, fieldInputCls, tabCls, useInfiniteList, type InfiniteList } from '@/components/admin/kit'
+import { HardDrive, Loader2, Play } from 'lucide-react'
+import { Dialog, InfiniteFooter, fetchJson, fieldInputCls, tabCls, useActionToast, useInfiniteList, type InfiniteList } from '@/components/admin/kit'
 import AdminSelect from '@/components/admin/AdminSelect'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import { useHasScope } from '@/contexts/AdminScopesContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
+import { driveApi } from '@/components/admin/drive/api'
+import { useDrivePicker } from '@/components/admin/drive/DrivePicker'
 
 export interface GalleryImage {
   id: string
@@ -136,6 +140,46 @@ export default function GalleryPicker({
     }
   }, [search])
 
+  // A private Drive file used here becomes a public gallery copy, after the admin agrees.
+  const canDrive = useHasScope('drive:read')
+  const drive = useDrivePicker()
+  const confirm = useConfirm()
+  const toast = useActionToast()
+  const [publishing, setPublishing] = useState(false)
+  async function fromDrive() {
+    const wantVideo = showVideos
+    const picks = await drive.pick({
+      title: wantVideo ? 'Choose a video from Drive' : 'Choose from Drive',
+      kinds: wantVideo ? ['video'] : ['image'],
+      multiple: !wantVideo && mode === 'multi',
+      max: maxSelect ?? 10,
+      confirmLabel: 'Use',
+    })
+    if (!picks?.length) return
+    const ok = await confirm({
+      title: 'Make public?',
+      message: `${picks.length === 1 ? 'A copy of this file goes' : `Copies of these ${picks.length} files go`} into the public gallery so the store can show ${picks.length === 1 ? 'it' : 'them'}. Anyone with the link can see the copy; the Drive original stays private.`,
+      confirmLabel: 'Add to gallery',
+    })
+    if (!ok) return
+    setPublishing(true)
+    const added: GalleryImage[] = []
+    try {
+      for (const f of picks) {
+        const out = await driveApi.publish(f.id)
+        if (out.kind === 'video') {
+          setPublishing(false)
+          return onPickVideo?.(out.row as GalleryVideo)
+        }
+        added.push((out.row as GalleryImage) ?? { id: out.id, image_url: out.url, thumbnail_url: null, file_name: f.name })
+      }
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+    setPublishing(false)
+    if (added.length) onConfirm(added)
+  }
+
   const onSearch = (v: string) => setSearch(v)
   const onCategory = (v: string) => setCategory(v)
 
@@ -201,6 +245,17 @@ export default function GalleryPicker({
             onChange={e => onSearch(e.target.value)}
             className={`flex-1 min-w-0 ${PANEL_INPUT}`}
           />
+          {canDrive && (
+            <button
+              type="button"
+              onClick={fromDrive}
+              disabled={publishing}
+              className="control-md inline-flex shrink-0 items-center gap-1.5 border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+            >
+              {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <HardDrive className="h-4 w-4" />}
+              <span className="hidden sm:inline">From Drive</span>
+            </button>
+          )}
           <div className={`w-36 sm:w-48 shrink-0 ${showVideos ? 'hidden' : ''}`}>
             <AdminSelect
               value={category}
@@ -266,6 +321,7 @@ export default function GalleryPicker({
           </div>
         )}
       </div>
+      {drive.node}
     </Dialog>
   )
 }

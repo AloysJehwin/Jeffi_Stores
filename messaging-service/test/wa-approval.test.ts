@@ -2,8 +2,18 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('../src/db.js', () => ({ db: {} }))
 vi.mock('../src/pools.js', () => ({ poolsForTenant: vi.fn() }))
+vi.mock('../src/providers/policy.js', () => ({ messagingProvider: vi.fn(async () => 'aws') }))
+vi.mock('../src/templates-v2.js', async orig => ({ ...(await orig<any>()), findById: vi.fn(), setApprovalStatus: vi.fn() }))
+const { awsSend } = vi.hoisted(() => ({ awsSend: vi.fn() }))
+vi.mock('@aws-sdk/client-socialmessaging', async orig => ({
+  ...(await orig<any>()),
+  SocialMessagingClient: class { send = awsSend },
+  CreateWhatsAppMessageTemplateCommand: class { constructor(public input: any) {} },
+  ListWhatsAppMessageTemplatesCommand: class { constructor(public input: any) {} },
+}))
 
-const { composeTypes, validateForMeta, samplesFor, metaName, renumberForSubmit } = await import('../src/wa-approval')
+const { composeTypes, validateForMeta, samplesFor, metaName, renumberForSubmit, awsTemplate, submit, syncTenant } = await import('../src/wa-approval')
+const tpl = await import('../src/templates-v2')
 
 describe('wa-approval', () => {
   it('composes the saved body, not stale blocks text', () => {
@@ -78,5 +88,59 @@ describe('wa-approval', () => {
     expect(samplesFor('Hi {{1}}, your order {{2}} ships. Track here: {{3}} today.')).toEqual({ 1: 'Priya', 2: 'JS-10234', 3: 'https://jeffistores.in/account/orders' })
     expect(metaName('testco', 'order/confirmed', 3)).toBe('testco_order_confirmed_v3')
     expect(metaName('platform', 'order/confirmed', 1)).toBe('jeffi_order_confirmed_v1')
+  })
+
+  it('builds the AWS template and a ref whose slots send back through cloudTemplate', async () => {
+    const { planSlots, parseAwsTemplateRef, cloudTemplate } = await import('@jeffi/api-contracts')
+    const body = 'Hi {{1}}, your order {{2}} ships — from {{brand_name}} team.'
+    const blocks = {
+      types: { 'twilio/media': { media: ['https://cdn.jeffi/{{1}}'] } },
+      buttons: [{ type: 'url' as const, label: 'Track', value: 'https://jeffi/t/{{1}}' }],
+      variables: { 1: 'order-123.png' },
+    }
+    const { definition, ref } = awsTemplate('testco_order_v3', 'en', 'UTILITY', planSlots(body, blocks, { 1: 'Priya', 2: 'JS-10234' }), 'handle-1')
+    expect(ref).toBe('aws:testco_order_v3:en|h=4:image|b=5@0')
+    expect(definition.components).toEqual([
+      { type: 'HEADER', format: 'IMAGE', example: { header_handle: ['handle-1'] } },
+      { type: 'BODY', text: 'Hi {{1}}, your order {{2}} ships — from {{3}} team.', example: { body_text: [['Priya', 'JS-10234', 'Jeffi Stores']] } },
+      { type: 'BUTTONS', buttons: [{ type: 'URL', text: 'Track', url: 'https://jeffi/t/{{1}}', example: ['https://jeffi/t/order-123.png'] }] },
+    ])
+    const msg = cloudTemplate('+919999999999', parseAwsTemplateRef(ref), { 1: 'Ann', 2: 'JS-1', 3: 'Acme', 4: 'https://cdn.jeffi/x.png', 5: 'abc' })
+    expect(msg.template.components).toEqual([
+      { type: 'header', parameters: [{ type: 'image', image: { link: 'https://cdn.jeffi/x.png' } }] },
+      { type: 'body', parameters: ['Ann', 'JS-1', 'Acme'].map(text => ({ type: 'text', text })) },
+      { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: 'abc' }] },
+    ])
+    // provider_ref is varchar(80): a long name is cut, keeping the version.
+    const long = awsTemplate(`${'x'.repeat(90)}_v12`, 'en', 'UTILITY', planSlots('Hello there.', {}))
+    expect(long.ref.length).toBeLessThanOrEqual(80)
+    expect(long.name).toMatch(/^x+_v12$/)
+  })
+
+  it('submits to AWS for a tenant on AWS and promotes the ref once Meta approves', async () => {
+    process.env.AWS_WHATSAPP_WABA_ID = 'waba-1'
+    try {
+      vi.mocked(tpl.findById).mockResolvedValue({
+        family: { slug: 'order/confirmed' }, template: { channel: 'whatsapp' },
+        variant: { id: 'v1', locale: 'en', approval_status: 'draft', meta_category: null },
+        version: { id: 'ver1', body: 'Your order {{1}} is confirmed. Thank you for shopping with us.', blocks: {}, version: 3, provider_ref: null },
+      } as any)
+      const pool = { query: vi.fn(async (sql: string) => ({ rows: sql.includes('FROM template_variant v') ? [{ id: 'v1', sid: 'aws:testco_order_confirmed_v3:en' }] : [] })) }
+      awsSend.mockResolvedValueOnce({ metaTemplateId: '991', templateStatus: 'PENDING', category: 'UTILITY' })
+      const r = await submit(pool as any, 't1', 'testco', 'tpl1')
+      expect(r).toEqual({ sid: 'aws:testco_order_confirmed_v3:en', name: 'testco_order_confirmed_v3', status: 'pending' })
+      const create = awsSend.mock.calls[0][0].input
+      expect(create.id).toBe('waba-1')
+      expect(JSON.parse(new TextDecoder().decode(create.templateDefinition))).toMatchObject({ name: 'testco_order_confirmed_v3', language: 'en', category: 'UTILITY' })
+      expect(pool.query.mock.calls[0]).toEqual(['UPDATE template_version SET provider_ref=$2 WHERE id=$1', ['ver1', 'aws:testco_order_confirmed_v3:en']])
+
+      awsSend.mockResolvedValueOnce({ templates: [{ templateName: 'testco_order_confirmed_v3', templateLanguage: 'en', templateStatus: 'APPROVED' }] })
+      expect(await syncTenant(pool as any, 't1')).toEqual({ checked: 1, changed: 1 })
+      expect(awsSend.mock.calls[1][0].input).toMatchObject({ id: 'waba-1' })
+      expect(vi.mocked(tpl.setApprovalStatus).mock.calls[0][2]).toMatchObject({ status: 'approved', raw: 'APPROVED' })
+      expect(pool.query.mock.calls.at(-1)).toEqual(['UPDATE template_variant SET provider_ref=$2 WHERE id=$1', ['v1', 'aws:testco_order_confirmed_v3:en']])
+    } finally {
+      delete process.env.AWS_WHATSAPP_WABA_ID
+    }
   })
 })

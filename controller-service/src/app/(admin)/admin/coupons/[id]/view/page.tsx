@@ -14,6 +14,7 @@ import {
   ACTIVE_STATUS,
   badgeCls,
 } from '@/components/admin/kit'
+import { ChangeLog } from '@/components/admin/change-log'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
@@ -196,6 +197,7 @@ export default async function CouponViewPage({
         </KpiGrid>
       }
       aside={
+        <>
         <Card title="Coupon details">
           <Fields cols={1}>
             <Field label="Type" value={<span className="capitalize">{coupon.discount_type}</span>} />
@@ -232,6 +234,8 @@ export default async function CouponViewPage({
             <Field label="Source" value={coupon.generated_for_campaign || (isPersonal ? 'Personal' : 'Manual')} />
           </Fields>
         </Card>
+        <ChangeLog kind="coupon" id={id} variant="compact" />
+        </>
       }
       main={
         <>

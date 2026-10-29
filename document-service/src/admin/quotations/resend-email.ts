@@ -4,6 +4,7 @@ import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryOne } from '@jeffi/tenancy'
 import { sendQuotationFinalizedEmail } from '../../lib/mail'
+import { quotationReply } from '../../lib/reply-context'
 import { lockedByOther } from '../../lib/draft-locks'
 
 
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const qt = await queryOne<any>(
-      `SELECT consignee_email, consignee_name, quote_number, total_amount, view_token FROM quotations WHERE id = $1`,
+      `SELECT id, consignee_email, consignee_phone, consignee_name, quote_number, total_amount, view_token FROM quotations WHERE id = $1`,
       [id]
     )
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -31,7 +32,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       qt.consignee_name || '',
       qt.quote_number,
       Number(qt.total_amount),
-      viewUrl
+      viewUrl,
+      await quotationReply(qt)
     )
 
     return NextResponse.json({ success: true })

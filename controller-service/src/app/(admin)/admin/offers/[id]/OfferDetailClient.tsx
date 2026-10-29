@@ -17,6 +17,7 @@ import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
 import type { MergeConflict } from '@/lib/admin/draft-merge'
 import MergeDialog from '@/components/admin/drafts/MergeDialog'
+import { ChangeLog } from '@/components/admin/change-log'
 
 function toDateInput(iso: string | null): string {
   if (!iso) return ''
@@ -278,6 +279,8 @@ export default function OfferDetailClient({
                 .
               </p>
             </div>
+
+            <ChangeLog kind="offer" id={offer.id} variant="compact" version={offer.updated_at} />
           </div>
 
           <div className="min-w-0 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">

@@ -3,6 +3,7 @@
 // Wrappers keep their public shape so callers don't change; they now one-line into here.
 
 import { messagingTenant, serviceToken } from '@/lib/messaging/library'
+import { currentReplyScope, recordScopedSend } from '@/lib/replies/scope'
 
 const MESSAGING_URL = (process.env.MESSAGING_URL || 'http://localhost:3101').replace(/\/$/, '')
 
@@ -22,14 +23,22 @@ export interface SendResult {
   id?: string
   status: string
   error?: string
+  /** The provider's own message id (Twilio SID / WhatsApp message id). */
+  providerSid?: string | null
+  body?: string
 }
 
-export async function brandFields(channel: Channel): Promise<{ brand?: string; kicker?: string; footer_contact?: string }> {
+export async function brandFields(channel: Channel): Promise<{ brand?: string; kicker?: string; footer_contact?: string; accent?: string }> {
   if (channel !== 'email') return {}
   try {
-    const { currentBrandNameAsync, storeContactLine } = await import('@/lib/catalog/brand')
-    const [brand, footer_contact] = await Promise.all([currentBrandNameAsync(), storeContactLine()])
-    return { brand, kicker: 'Notifications', footer_contact: footer_contact || undefined }
+    const { currentBrandNameAsync, storeContactLine, storeMailTheme } = await import('@/lib/catalog/brand')
+    const [brand, footer_contact, theme] = await Promise.all([currentBrandNameAsync(), storeContactLine(), storeMailTheme()])
+    return {
+      brand,
+      kicker: 'Notifications',
+      footer_contact: footer_contact || undefined,
+      accent: /^#[0-9a-f]{6}$/i.test(theme.accent) ? theme.accent : undefined,
+    }
   } catch { return {} }
 }
 
@@ -57,6 +66,8 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
     subject: i.subject,
     reference: i.reference,
     locale: i.locale,
+    // Inside a reply scope the customer's email reply comes back to the record that asked.
+    reply_to: i.channel === 'email' ? currentReplyScope()?.replyTo : undefined,
     ...extra,
   }
   try {
@@ -68,7 +79,13 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { status: 'failed', error: data?.message || data?.error || `HTTP ${res.status}` }
-    return { id: data.id, status: data.status ?? 'sent' }
+    if (data.provider_ref && data.status !== 'failed') {
+      if (i.channel === 'email') {
+        const ref = String(data.provider_ref)
+        await recordScopedSend({ channel: 'email', emailMessageIds: [ref.includes('@') ? ref : `${ref}@email.amazonses.com`] })
+      } else await recordScopedSend({ channel: i.channel, providerSid: data.provider_ref })
+    }
+    return { id: data.id, status: data.status ?? 'sent', providerSid: data.provider_ref ?? null, body: data.body }
   } catch (e: any) {
     return { status: 'failed', error: e?.message || 'network error' }
   }

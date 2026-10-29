@@ -117,7 +117,9 @@ export function openHref(router: Router, href: string | null | undefined) {
     '/account/quotes': '/account/quotes',
     '/about': '/info/about',
     '/contact': '/info/contact',
-    '/support': '/info/support',
+    // The web's /support is the chat (support reply pushes link there).
+    '/support': '/info/support-chat',
+    '/business/support': '/info/support-chat',
     '/return-policy': '/info/return-policy',
     '/legal': '/legal',
     '/login': '/(auth)/login',

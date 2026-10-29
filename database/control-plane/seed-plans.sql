@@ -289,12 +289,16 @@ JOIN (VALUES
   ('enterprise', 'social:approve'),
   -- Vault + customer subscriptions ship on EVERY plan (storefront features are not plan-gated).
   ('basic', 'vault:read'), ('basic', 'vault:write'),
+  ('basic', 'drive:read'), ('basic', 'drive:write'),
   ('basic', 'subscriptions:read'), ('basic', 'subscriptions:write'),
   ('growth', 'vault:read'), ('growth', 'vault:write'),
+  ('growth', 'drive:read'), ('growth', 'drive:write'),
   ('growth', 'subscriptions:read'), ('growth', 'subscriptions:write'),
   ('pro', 'vault:read'), ('pro', 'vault:write'),
+  ('pro', 'drive:read'), ('pro', 'drive:write'),
   ('pro', 'subscriptions:read'), ('pro', 'subscriptions:write'),
   ('enterprise', 'vault:read'), ('enterprise', 'vault:write'),
+  ('enterprise', 'drive:read'), ('enterprise', 'drive:write'),
   ('enterprise', 'subscriptions:read'), ('enterprise', 'subscriptions:write')
 ) AS v(plan_slug, scope_key) ON v.plan_slug = p.slug
 ON CONFLICT (plan_id, scope_key) DO NOTHING;
@@ -562,12 +566,16 @@ WHERE pf.plan_id = p.id
       ('enterprise', 'social:write'),
       ('enterprise', 'social:approve'),
       ('basic', 'vault:read'), ('basic', 'vault:write'),
+      ('basic', 'drive:read'), ('basic', 'drive:write'),
       ('basic', 'subscriptions:read'), ('basic', 'subscriptions:write'),
       ('growth', 'vault:read'), ('growth', 'vault:write'),
+      ('growth', 'drive:read'), ('growth', 'drive:write'),
       ('growth', 'subscriptions:read'), ('growth', 'subscriptions:write'),
       ('pro', 'vault:read'), ('pro', 'vault:write'),
+      ('pro', 'drive:read'), ('pro', 'drive:write'),
       ('pro', 'subscriptions:read'), ('pro', 'subscriptions:write'),
       ('enterprise', 'vault:read'), ('enterprise', 'vault:write'),
+      ('enterprise', 'drive:read'), ('enterprise', 'drive:write'),
       ('enterprise', 'subscriptions:read'), ('enterprise', 'subscriptions:write')
     ) AS d(plan_slug, scope_key)
     WHERE d.plan_slug = p.slug AND d.scope_key = pf.scope_key

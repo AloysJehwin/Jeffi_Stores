@@ -5,6 +5,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { Card, DetailHeader, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, EmptyState, Badge } from '@/components/admin/kit'
+import { ChangeLog } from '@/components/admin/change-log'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { draftsForView } from '@/lib/admin/draft-branches'
 import { brandDrafts } from '@/lib/catalog/brand-draft'
@@ -177,6 +178,7 @@ export default async function BrandViewPageDetail({
         </Card>
       }
       aside={
+        <>
         <Card title="Brand details">
           <Fields cols={1}>
             <Field label="Slug" value={brand.slug} mono copy={brand.slug} />
@@ -195,6 +197,8 @@ export default async function BrandViewPageDetail({
             <Field label="Replacement" value={brand.replacement_allowed ? `${brand.replacement_window_days} days` : 'Not allowed'} />
           </Fields>
         </Card>
+        <ChangeLog kind="brand" id={id} variant="compact" />
+        </>
       }
     />
   )

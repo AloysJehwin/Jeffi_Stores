@@ -1,25 +1,22 @@
 'use client'
 
-import { useState } from 'react'
 import { Bot } from 'lucide-react'
-import AdminAgentModal from './AdminAgentModal'
+import { useAdminAgent } from '@/contexts/AdminAgentContext'
 
-export default function AdminAgentTrigger({ canUse }: { canUse: boolean }) {
-  const [open, setOpen] = useState(false)
-  if (!canUse) return null
+export default function AdminAgentTrigger() {
+  const { enabled, open, onAgentPage, toggleAgent } = useAdminAgent()
+  if (!enabled || onAgentPage) return null
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="h-9 w-9 inline-flex items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
-        title="Admin Assistant"
-        aria-label="Open admin assistant"
-      >
-        <Bot className="w-5 h-5" />
-      </button>
-      <AdminAgentModal isOpen={open} onClose={() => setOpen(false)} />
-    </>
+    <button
+      type="button"
+      onClick={toggleAgent}
+      aria-pressed={open}
+      className={`h-9 w-9 inline-flex items-center justify-center rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500 ${open ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+      title="Admin Assistant"
+      aria-label="Toggle admin assistant"
+    >
+      <Bot className="w-5 h-5" />
+    </button>
   )
 }

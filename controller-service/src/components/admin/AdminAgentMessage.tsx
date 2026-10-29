@@ -2,19 +2,13 @@
 
 import Link from 'next/link'
 import { Fragment, ReactNode } from 'react'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Paperclip } from 'lucide-react'
+import { splitAttachmentNotes } from '@/lib/admin-agent/file-types'
 import { ap } from '@/lib/shared/admin-path'
-import { fmtQty } from './agent/format'
+import { ENTITY_ROUTES, fmtQty } from './agent/format'
 import type { QuotationConfirmItem } from './agent/QuotationResolver'
 
-const ENTITY_ROUTES: Record<string, (id: string) => string> = {
-  product: id => `/admin/products/${id}`,
-  order: id => `/admin/orders/${id}/view`,
-  customer: id => `/admin/customers/${id}/view`,
-  campaign: kind => `/admin/campaigns/${kind}`,
-}
-
-const ENTITY_RE = /\[\[(product|order|customer|campaign):([^|\]]+)\|([^\]]+)\]\]/g
+const ENTITY_RE = new RegExp(`\\[\\[(${Object.keys(ENTITY_ROUTES).join('|')}):([^|\\]]+)\\|([^\\]]+)\\]\\]`, 'g')
 // Bold, italic and inline code, in one pass so their markers never nest wrongly.
 const EMPH_RE = /`([^`\n]+)`|\*\*([^*]+)\*\*|(?<![\w*])\*([^*\s][^*\n]*?)\*(?![\w*])|(?<![\w_])_([^_\s][^_\n]*?)_(?![\w_])/g
 const IMAGE_MD_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
@@ -402,7 +396,20 @@ export function internalMessageLabel(text: string | null | undefined): string | 
 /** A user bubble's content: plain text, or a readable summary of a control message. */
 export function AdminAgentUserMessage({ text }: { text: string }) {
   const items = parseQuotationConfirm(text)
-  if (!items) return <p className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">{text}</p>
+  if (!items) {
+    const { text: body, files } = splitAttachmentNotes(text)
+    return (
+      <div className="space-y-1.5">
+        {body && <p className="whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">{body}</p>}
+        {files.map((f, i) => (
+          <p key={i} className="flex items-center gap-1.5 text-xs font-medium">
+            <Paperclip className="h-3.5 w-3.5 shrink-0" />
+            <span className="[overflow-wrap:anywhere]">{f}</span>
+          </p>
+        ))}
+      </div>
+    )
+  }
   const skipped = items.filter(i => i.skipped).length
   return (
     <div className="space-y-1.5">

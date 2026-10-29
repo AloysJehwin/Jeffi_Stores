@@ -237,7 +237,7 @@ async function sendWhatsAppPart(
       const { getStoreIdentity } = await import('@/lib/catalog/site-controls')
       const storeName = await getStoreIdentity().then(s => s.name).catch(() => '')
       logMessage({ channel: 'whatsapp', to: phone, from: 'messaging-service', body: t.body.replace(/\{\{\s*brand_name\s*\}\}/g, storeName).replace(/\{\{\s*(\d+)\s*\}\}/g, (_m, n) => variables[n] ?? ''),
-        kind, status: sent ? 'sent' : 'failed', error: res.error, providerSid: res.id, provider: 'messaging-service', ...entity })
+        kind, status: sent ? 'sent' : 'failed', error: res.error, providerSid: res.providerSid ?? res.id, provider: 'messaging-service', ...entity })
       return sent
     }
     // Not approved yet / slots not filled → the built-in template for this kind still goes out.

@@ -4,6 +4,10 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { getAdminSubscriptionDetail } from '@/lib/queries/subscriptions'
 import { Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, StatusBadge } from '@/components/admin/kit'
+import { headers } from 'next/headers'
+import { ChangeLog } from '@/components/admin/change-log'
+import RecordReplies from '@/components/admin/replies/RecordReplies'
+import { hasScope } from '@/lib/auth/scopes'
 import { SUBSCRIPTION_STATUS, fmtDate, inr } from '../../_status'
 import SubscriptionActions from '../SubscriptionActions'
 
@@ -17,6 +21,8 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
   const { id } = await params
   const [detail, host] = await Promise.all([getAdminSubscriptionDetail(id), getHost()])
   if (!detail) notFound()
+  const h = await headers()
+  const canWrite = hasScope(h.get('x-user-role') || '', JSON.parse(h.get('x-user-scopes') || '[]'), 'subscriptions:write')
   const { subscription: s, customer, product, cycles } = detail
   const sub = s as Sub & typeof s
   const status = String(sub.status)
@@ -138,6 +144,8 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
               <p className="text-sm text-foreground-secondary">{[address.line1, address.city, address.state, address.pincode].filter(Boolean).join(', ')}</p>
             </Card>
           )}
+          <RecordReplies entityType="subscriptions" entityId={id} canWrite={canWrite} />
+          <ChangeLog kind="subscription" id={id} variant="compact" />
         </>
       }
     />

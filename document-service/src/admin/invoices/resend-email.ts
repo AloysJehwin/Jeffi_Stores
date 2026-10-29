@@ -3,6 +3,7 @@ import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryOne } from '@jeffi/tenancy'
 import { sendInvoiceFinalizedEmail } from '../../lib/mail'
+import { invoiceReply } from '../../lib/reply-context'
 import { documentUrl } from '../../lib/customer-links'
 
 
@@ -30,7 +31,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       order.invoice_number,
       Number(order.total_amount),
       order.order_number,
-      viewUrl
+      viewUrl,
+      await invoiceReply(id)
     )
 
     return NextResponse.json({ success: true })

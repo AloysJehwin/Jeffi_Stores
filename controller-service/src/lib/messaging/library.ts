@@ -69,3 +69,30 @@ export async function getLibraryTemplate(channel: Channel, slug: string): Promis
   cache.set(key, { at: Date.now(), t })
   return t
 }
+
+export interface PageTemplate {
+  slug: string
+  name: string
+  subject: string
+  preheader: string
+  body: string
+  tags: string[]
+}
+
+/** The email templates offered on an admin page (tag 'page:order'), the store's copies over the standard ones. */
+export async function listPageTemplates(tag: string): Promise<PageTemplate[]> {
+  const { tenantId, slug: tenantSlug } = await messagingTenant()
+  try {
+    const r = await fetch(`${MESSAGING_URL}/v2/templates?channel=email&tag=${encodeURIComponent(tag)}&with_body=1`, {
+      headers: { authorization: `Bearer ${serviceToken(tenantId, tenantSlug)}` },
+      cache: 'no-store',
+    })
+    if (!r.ok) return []
+    const { items } = await r.json()
+    return (items ?? [])
+      .filter((i: any) => i.status !== 'archived' && i.body)
+      .map((i: any) => ({ slug: i.slug, name: i.name, subject: i.subject ?? '', preheader: i.preheader ?? '', body: i.body, tags: i.tags ?? [] }))
+  } catch {
+    return []
+  }
+}

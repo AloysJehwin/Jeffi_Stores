@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import type { UiBlock } from '@/components/admin/AdminAgentBlocks'
+import type { PageContext } from '@/lib/admin-agent/conversations'
+import { announceAgentChange } from '@/lib/client/agent-events'
+import { ATTACHMENT_PROMPT, MAX_ATTACHMENT_BYTES, resolveMime, unsupportedMessage } from '@/lib/admin-agent/file-types'
 
-// Admin agent chat state, shared by the modal and the full page. Talks to
+// Admin agent chat state, one instance for the whole admin panel (AdminAgentContext). Talks to
 // /api/admin/agent/chat over SSE: text deltas, tool steps, ui blocks and actions stream in,
 // then a 'done' event carries the persisted turn.
 
@@ -87,11 +90,30 @@ export interface ConversationListItem {
   id: string
   title: string | null
   preview: string | null
+  shared: boolean
   last_message_at: string
   message_count: number
 }
 
+/** Whose chat is open: the caller's own, or another admin's shared one (read-only). */
+export interface ConversationInfo {
+  title: string | null
+  shared: boolean
+  readOnly: boolean
+  ownerName: string | null
+}
+
+const NEW_CHAT: ConversationInfo = { title: null, shared: false, readOnly: false, ownerName: null }
+
 const uid = () => crypto.randomUUID()
+
+/** The page's filters and search, read when a message is sent (the agent's own ?c= left out). */
+function pageQuery(): string | undefined {
+  const sp = new URLSearchParams(window.location.search)
+  sp.delete('c')
+  const q = sp.toString()
+  return q && q.length <= 1000 ? q : undefined
+}
 
 const STATUSES: ActionStatus[] = ['proposed', 'approving', 'approved', 'rejected', 'failed']
 
@@ -149,15 +171,17 @@ export function useAdminAgentChat() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [info, setInfo] = useState<ConversationInfo>(NEW_CHAT)
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [conversations, setConversations] = useState<ConversationListItem[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingFile, setPendingFile] = useState<Pick<File, 'name' | 'size' | 'type'> | null>(null)
   const [uploading, setUploading] = useState(false)
   const [attachmentId, setAttachmentId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const convRef = useRef<string | null>(null)
+  const pageRef = useRef<PageContext | null>(null)
   convRef.current = conversationId
 
   useEffect(() => () => abortRef.current?.abort(), [])
@@ -175,19 +199,43 @@ export function useAdminAgentChat() {
   function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    if (f.size > 5 * 1024 * 1024) {
-      showToast('File too large (max 5MB)', 'error')
+    if (f.size > MAX_ATTACHMENT_BYTES) {
+      showToast(`File too large (max ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB)`, 'error')
       e.target.value = ''
       return
     }
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-    if (!allowed.includes(f.type)) {
-      showToast('Only JPG, PNG, WEBP, or PDF files are supported', 'error')
+    if (!resolveMime(f.name, f.type)) {
+      showToast(unsupportedMessage(f.type), 'error')
       e.target.value = ''
       return
     }
     setPendingFile(f)
     setAttachmentId(null)
+  }
+
+  // A Drive file the admin can open, copied server-side into the assistant's attachments.
+  async function attachFromDrive(f: { id: string; name: string; size: number; mime: string }) {
+    setUploading(true)
+    try {
+      const res = await fetch('/api/admin/agent/attach-drive', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId: f.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Could not attach the file', 'error')
+        return
+      }
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setPendingFile({ name: f.name, size: f.size, type: data.mime_type || f.mime })
+      setAttachmentId(data.attachment_id)
+    } catch (e: any) {
+      showToast(e?.message || 'Could not attach the file', 'error')
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function uploadPendingFile(): Promise<string | null> {
@@ -196,7 +244,7 @@ export function useAdminAgentChat() {
     setUploading(true)
     try {
       const fd = new FormData()
-      fd.append('file', pendingFile)
+      fd.append('file', pendingFile as File)
       const res = await fetch('/api/admin/agent/upload', { method: 'POST', credentials: 'include', body: fd })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -226,12 +274,18 @@ export function useAdminAgentChat() {
     }
   }, [])
 
-  async function loadConversation(id: string): Promise<boolean> {
+  async function loadConversation(id: string, opts: { quiet?: boolean } = {}): Promise<boolean> {
+    abortRef.current?.abort()
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/agent/conversations/${id}/messages`, { credentials: 'include' })
+      const res = await fetch(`/api/admin/agent/conversations/${encodeURIComponent(id)}/messages`, {
+        credentials: 'include',
+      })
       if (!res.ok) {
-        showToast('Failed to load conversation', 'error')
+        if (!opts.quiet) {
+          const msg = res.status === 403 ? 'This chat is private to the admin who started it' : res.status === 404 ? 'Chat not found' : 'Failed to load conversation'
+          showToast(msg, 'error')
+        }
         return false
       }
       const data = await res.json()
@@ -250,6 +304,7 @@ export function useAdminAgentChat() {
       }))
       setTurns(restored)
       setConversationId(id)
+      setInfo({ title: data.title ?? null, shared: !!data.shared, readOnly: !!data.readOnly, ownerName: data.ownerName ?? null })
       return true
     } finally {
       setLoading(false)
@@ -260,8 +315,39 @@ export function useAdminAgentChat() {
     abortRef.current?.abort()
     setTurns([])
     setConversationId(null)
+    setInfo(NEW_CHAT)
     setInput('')
     setLoading(false)
+  }
+
+  async function patchConversation(id: string, patch: { title?: string; shared?: boolean }): Promise<boolean> {
+    const res = await fetch(`/api/admin/agent/conversations/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).catch(() => null)
+    if (!res?.ok) {
+      showToast('Could not update the chat', 'error')
+      return false
+    }
+    setConversations(prev => prev.map(c => (c.id !== id ? c : { ...c, ...patch, preview: patch.title ?? c.preview })))
+    if (id === convRef.current) setInfo(i => ({ ...i, ...patch }))
+    return true
+  }
+
+  async function deleteConversation(id: string): Promise<boolean> {
+    const res = await fetch(`/api/admin/agent/conversations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    }).catch(() => null)
+    if (!res?.ok) {
+      showToast('Could not delete the chat', 'error')
+      return false
+    }
+    setConversations(prev => prev.filter(c => c.id !== id))
+    if (id === convRef.current) reset()
+    return true
   }
 
   function stop() {
@@ -285,12 +371,18 @@ export function useAdminAgentChat() {
     }
     const fail = (msg: string) =>
       patchTurn(assistantId, t => ({ ...t, streaming: false, error: msg, retryText: userText }))
+    const isNew = !convRef.current
     try {
       const res = await fetch('/api/admin/agent/chat', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: JSON.stringify({ conversationId: convRef.current, message: userText, retry }),
+        body: JSON.stringify({
+          conversationId: convRef.current,
+          message: userText,
+          retry,
+          pageContext: pageRef.current && { ...pageRef.current, query: pageQuery() },
+        }),
         signal: ac.signal,
       })
       if (!res.ok || !(res.headers.get('content-type') || '').includes('text/event-stream') || !res.body) {
@@ -396,13 +488,14 @@ export function useAdminAgentChat() {
     } finally {
       if (abortRef.current === ac) abortRef.current = null
       setLoading(false)
+      if (isNew && convRef.current) loadConversations()
     }
   }
 
   async function sendMessage(text: string) {
     const trimmed = text.trim()
     const hasFile = !!pendingFile
-    if ((!trimmed && !hasFile) || loading) return
+    if ((!trimmed && !hasFile) || loading || info.readOnly) return
 
     let attId = attachmentId
     if (hasFile && !attId) {
@@ -410,18 +503,16 @@ export function useAdminAgentChat() {
       if (!attId) return
     }
 
-    const fileNote = pendingFile ? ` [attachment_id=${attId} filename="${pendingFile.name}" mime=${pendingFile.type}]` : ''
-    const finalUserText =
-      (trimmed ||
-        (hasFile
-          ? `Process the attached ${pendingFile?.type.startsWith('image/') ? 'image' : 'PDF'} as a quotation request.`
-          : '')) + fileNote
-    const displayContent = trimmed || `📎 ${pendingFile?.name || 'attachment'}`
+    const fileNote = pendingFile
+      ? ` [attachment_id=${attId} filename="${pendingFile.name}" mime=${resolveMime(pendingFile.name, pendingFile.type) ?? pendingFile.type}]`
+      : ''
+    const finalUserText = (trimmed || (hasFile ? ATTACHMENT_PROMPT : '')) + fileNote
 
     const assistantId = uid()
+    if (!convRef.current) setInfo({ ...NEW_CHAT, title: (trimmed || pendingFile?.name || 'Attachment').slice(0, 160) })
     setTurns(t => [
       ...t,
-      { id: uid(), role: 'user', content: displayContent },
+      { id: uid(), role: 'user', content: finalUserText },
       { id: assistantId, role: 'assistant', content: '', streaming: true, timeline: [] },
     ])
     setInput('')
@@ -431,7 +522,7 @@ export function useAdminAgentChat() {
 
   async function retry(turnId: string) {
     const turn = turns.find(t => t.id === turnId)
-    if (!turn?.retryText || loading) return
+    if (!turn?.retryText || loading || info.readOnly) return
     patchTurn(turnId, t => ({
       ...t,
       content: '',
@@ -450,7 +541,15 @@ export function useAdminAgentChat() {
     sendMessage(`Use ${kind} id ${option.id} (${option.label}) for the previous request.`)
   }
 
-  async function decideAction(turnId: string, actionId: string, decision: 'approve' | 'reject') {
+  /** One decision; `batch` leaves the toast and the page refresh to decideAll. True when it went through. */
+  async function decideAction(
+    turnId: string,
+    actionId: string,
+    decision: 'approve' | 'reject',
+    batch = false
+  ): Promise<boolean> {
+    if (info.readOnly) return false
+    const kind = turns.find(t => t.id === turnId)?.proposedActions?.find(a => a.id === actionId)?.kind ?? ''
     const setStatus = (patch: Partial<ProposedAction>) =>
       patchTurn(turnId, t => ({
         ...t,
@@ -469,11 +568,28 @@ export function useAdminAgentChat() {
         error: data.error,
       })
       if (!res.ok) showToast(data.error || 'Action failed', 'error')
-      else showToast(decision === 'approve' ? 'Action executed' : 'Action rejected', 'success')
+      else if (!batch) {
+        showToast(decision === 'approve' ? 'Action executed' : 'Action rejected', 'success')
+        if (decision === 'approve') announceAgentChange([kind])
+      }
+      return res.ok
     } catch (err: any) {
       setStatus({ status: 'failed', error: err?.message })
       showToast(err?.message || 'Network error', 'error')
+      return false
     }
+  }
+
+  /** Every still-proposed change in a turn, one at a time; stops at the first failure. */
+  async function decideAll(turnId: string, decision: 'approve' | 'reject') {
+    const pending = turns.find(t => t.id === turnId)?.proposedActions?.filter(a => a.status === 'proposed') ?? []
+    let done = 0
+    for (const a of pending) {
+      if (!(await decideAction(turnId, a.id, decision, true))) break
+      done++
+    }
+    if (decision === 'approve' && done) announceAgentChange([...new Set(pending.slice(0, done).map(a => a.kind))])
+    if (done) showToast(`${decision === 'approve' ? 'Approved' : 'Rejected'} ${done} of ${pending.length}`, done === pending.length ? 'success' : 'warning')
   }
 
   return {
@@ -481,6 +597,7 @@ export function useAdminAgentChat() {
     setInput,
     loading,
     conversationId,
+    info,
     turns,
     setTurns,
     conversations,
@@ -490,15 +607,22 @@ export function useAdminAgentChat() {
     attachmentId,
     fileInputRef,
     onPickFile,
+    attachFromDrive,
     clearAttachment,
     loadConversations,
     loadConversation,
+    patchConversation,
+    deleteConversation,
+    setPageContext: (c: PageContext | null) => {
+      pageRef.current = c
+    },
     reset,
     stop,
     sendMessage,
     retry,
     pick,
     decideAction,
+    decideAll,
   }
 }
 

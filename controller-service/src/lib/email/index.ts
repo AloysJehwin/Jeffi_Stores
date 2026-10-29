@@ -9,8 +9,10 @@ export {
   sendNewReviewNotification,
   sendPaymentFailedAdminNotification,
   sendAdminContactEmail,
+  adminContactHtml,
   sendSupportEscalationEmail,
   sendAgentConnectedEmail,
+  sendSupportReplyEmail,
 } from './notifications'
 export {
   sendReturnStatusEmail,

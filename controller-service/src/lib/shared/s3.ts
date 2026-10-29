@@ -686,17 +686,12 @@ export async function deleteGalleryImage(s3Key: string, s3ThumbnailKey: string) 
 // Fetch a remote image URL into a Buffer. Some merchant/CDN sources present broken TLS
 // chains, so verification is briefly disabled and always restored. Shared by the gallery
 // upload route and the bulk product importer (image-URL cell -> S3).
+export const GALLERY_MAX_BYTES = 20 * 1024 * 1024
+
+/** An image from a link someone pasted (public hosts only, size-capped). */
 export async function fetchRemoteImage(url: string): Promise<Buffer> {
-  const prev = process.env.NODE_TLS_REJECT_UNAUTHORIZED
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-  try {
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`)
-    return Buffer.from(await res.arrayBuffer())
-  } finally {
-    if (prev === undefined) delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
-    else process.env.NODE_TLS_REJECT_UNAUTHORIZED = prev
-  }
+  const { fetchPublic } = await import('./safe-fetch')
+  return (await fetchPublic(url, GALLERY_MAX_BYTES)).bytes
 }
 
 // Stage a raw bulk-import workbook so the background worker can read it out-of-request.

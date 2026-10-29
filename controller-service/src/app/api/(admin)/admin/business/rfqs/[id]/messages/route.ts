@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'
 import { clearReplyDraft } from '@/lib/admin/rfq-reply-drafts'
+import { notifyRfqReply } from '@/lib/business/rfq-notify'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // The reply is sent: the admin's draft of it is done with.
     await withTransaction(c => clearReplyDraft(c, admin, id, 'sent')).catch(err => console.error('[rfq] reply draft cleanup failed', err))
+    notifyRfqReply(id, msg.id).catch(err => console.error('[rfq] customer email failed', err instanceof Error ? err.message : err))
 
     return NextResponse.json({ message: msg })
   } catch (err: any) {

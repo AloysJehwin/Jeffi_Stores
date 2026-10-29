@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { runWithAuditActor } from '@/lib/auth/audit-context'
 import crypto from 'crypto'
 import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
@@ -61,7 +62,7 @@ class TransientWebhookError extends Error {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handle(request: NextRequest) {
   try {
     const rawBody = await request.text()
     const webhookSignature = request.headers.get('x-razorpay-signature')
@@ -891,3 +892,5 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
     payment,
   }).catch(() => {})
 }
+
+export const POST = (request: NextRequest) => runWithAuditActor('razorpay', () => handle(request))

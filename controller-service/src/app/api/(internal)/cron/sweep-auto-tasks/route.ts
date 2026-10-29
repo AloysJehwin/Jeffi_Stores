@@ -185,14 +185,15 @@ const RULES: SweepRule[] = [
     kind: 'support_pickup',
     priority: 'urgent',
     dueInDays: 0,
-    description: 'Customer support session opened with no admin reply yet.',
+    description: 'The support assistant handed a chat to the team and no agent has taken it.',
     query: `
       SELECT ss.user_id, ss.id::text AS ref_id,
-             'Pick up support session' AS title
+             'Pick up support chat ' || COALESCE(ss.ticket_number, '') AS title
       FROM support_sessions ss
       WHERE ss.status = 'open'
-        AND ss.admin_name IS NULL
-        AND ss.created_at < NOW() - INTERVAL '15 minutes'
+        AND ss.handler = 'human'
+        AND ss.assigned_admin_id IS NULL
+        AND COALESCE(ss.handoff_at, ss.created_at) < NOW() - INTERVAL '15 minutes'
         AND ss.user_id IS NOT NULL
     `,
   },
@@ -200,18 +201,17 @@ const RULES: SweepRule[] = [
     kind: 'support_urgent',
     priority: 'urgent',
     dueInDays: 0,
-    description: 'Open support session with no admin reply for >2 hours.',
+    description: 'A customer in a chat with the team has waited over 2 hours for a reply.',
     query: `
       SELECT ss.user_id, ss.id::text AS ref_id,
-             'Urgent: respond to support session' AS title
+             'Urgent: reply to support chat ' || COALESCE(ss.ticket_number, '') AS title
       FROM support_sessions ss
       WHERE ss.status = 'open'
+        AND ss.handler = 'human'
         AND ss.user_id IS NOT NULL
-        AND COALESCE(
-          (SELECT MAX(sm.created_at) FROM support_messages sm
-           WHERE sm.session_id = ss.id AND sm.sender = 'admin'),
-          ss.created_at
-        ) < NOW() - INTERVAL '2 hours'
+        AND (SELECT MAX(sm.created_at) FROM support_messages sm WHERE sm.session_id = ss.id AND sm.sender = 'customer')
+            > COALESCE((SELECT MAX(sm.created_at) FROM support_messages sm WHERE sm.session_id = ss.id AND sm.sender = 'admin'), ss.created_at)
+        AND (SELECT MAX(sm.created_at) FROM support_messages sm WHERE sm.session_id = ss.id AND sm.sender = 'customer') < NOW() - INTERVAL '2 hours'
     `,
   },
   {

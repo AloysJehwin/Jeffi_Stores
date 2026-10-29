@@ -23,6 +23,7 @@ import * as qResend from './quotations/resend-email'
 import * as qConvert from './quotations/convert-to-invoice'
 import * as poList from './po/list'
 import * as poItem from './po/item'
+import * as poPdf from './po/pdf'
 import * as poResend from './po/resend-email'
 import * as poDrafts from './po/drafts'
 import * as poDraft from './po/draft'
@@ -78,6 +79,7 @@ export async function adminRoutes(app: FastifyInstance) {
   mount(app, 'PATCH', '/admin/inventory/po/draft/:id', poDraft.PATCH)
   mount(app, 'DELETE', '/admin/inventory/po/draft/:id', poDraft.DELETE)
   mount(app, 'GET', '/admin/inventory/po/:id', poItem.GET)
+  mount(app, 'GET', '/admin/inventory/po/:id/pdf', poPdf.GET)
   mount(app, 'PATCH', '/admin/inventory/po/:id', poItem.PATCH)
   mount(app, 'POST', '/admin/inventory/po/:id/resend-email', poResend.POST)
   mount(app, 'POST', '/admin/inventory/po/:id/receive', poReceive.POST)

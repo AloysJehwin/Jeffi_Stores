@@ -15,8 +15,9 @@ vi.mock('@/lib/shared/rag', () => ({
   queryManyReplica: vi.fn(),
   runWithHnswTuning: vi.fn(),
 }))
-vi.mock('pdf-parse', () => ({
-  default: vi.fn(),
+vi.mock('@/lib/admin-agent/pdf', () => ({
+  pdfText: vi.fn(),
+  pdfPageImages: vi.fn(),
 }))
 vi.mock('@/lib/admin-agent/vision', () => ({
   ocrImage: vi.fn(),
@@ -35,6 +36,7 @@ import * as siteControls from '@/lib/catalog/site-controls'
 import * as db from '@/lib/shared/db'
 import * as rag from '@/lib/shared/rag'
 import * as vision from '@/lib/admin-agent/vision'
+import * as pdf from '@/lib/admin-agent/pdf'
 import * as aiClient from '@/lib/shared/ai-client'
 
 const mockQueryMany = vi.mocked(db.queryMany)
@@ -931,7 +933,7 @@ describe('extract_quotation_lines_from_attachment', () => {
       filename: 'order.pdf',
       byte_size: 1024,
       data: Buffer.from(''),
-      extracted_text: 'Line 1\nLine 2',
+      extracted_text: '#read:any\nLine 1\nLine 2',
       expires_at: '2099-01-01',
     })
     const result = (await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' })) as any
@@ -940,9 +942,8 @@ describe('extract_quotation_lines_from_attachment', () => {
     expect(result.data.text).toBe('Line 1\nLine 2')
   })
 
-  it('extracts text from PDF via pdf-parse when text is available', async () => {
-    const pdfParse = ((await import('pdf-parse')) as any).default
-    pdfParse.mockResolvedValueOnce({ text: 'Parsed PDF text' })
+  it('extracts text from PDF from the PDF text layer when text is available', async () => {
+    vi.mocked(pdf.pdfText).mockResolvedValueOnce({ text: 'Parsed PDF text from the text layer', pages: 1 })
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1',
       mime_type: 'application/pdf',
@@ -955,14 +956,13 @@ describe('extract_quotation_lines_from_attachment', () => {
     mockQuery.mockResolvedValue(undefined as any)
     const result = (await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' })) as any
     expect(result.ok).toBe(true)
-    expect(result.data.text).toBe('Parsed PDF text')
+    expect(result.data.text).toBe('Parsed PDF text from the text layer')
     expect(result.meta.source).toBe('pdf_text')
     expect(result.meta.cached).toBe(false)
   })
 
-  it('falls back to vision OCR when pdf-parse yields empty text and OCR succeeds', async () => {
-    const pdfParse = ((await import('pdf-parse')) as any).default
-    pdfParse.mockResolvedValueOnce({ text: '   ' })
+  it('falls back to vision OCR when the text layer yields empty text and OCR succeeds', async () => {
+    vi.mocked(pdf.pdfText).mockResolvedValueOnce({ text: '   ', pages: 3 })
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1',
       mime_type: 'application/pdf',
@@ -981,9 +981,8 @@ describe('extract_quotation_lines_from_attachment', () => {
     expect(result.meta.pages).toBe(3)
   })
 
-  it('returns err when pdf-parse yields empty and vision OCR fails', async () => {
-    const pdfParse = ((await import('pdf-parse')) as any).default
-    pdfParse.mockResolvedValueOnce({ text: '' })
+  it('returns err when the text layer yields empty and vision OCR fails', async () => {
+    vi.mocked(pdf.pdfText).mockResolvedValueOnce({ text: '', pages: 1 })
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1',
       mime_type: 'application/pdf',
@@ -996,13 +995,12 @@ describe('extract_quotation_lines_from_attachment', () => {
     mockOcrPdfPages.mockResolvedValueOnce({ ok: false, reason: 'Vision not configured', hint: 'Set up vision key' })
     const result = (await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' })) as any
     expect(result.ok).toBe(false)
-    expect(result.summary).toMatch(/Could not extract text from PDF/i)
+    expect(result.summary).toMatch(/Could not read the attachment/i)
     expect(result.reason).toBe('Vision not configured')
   })
 
-  it('returns err when pdf-parse throws and vision OCR also fails', async () => {
-    const pdfParse = ((await import('pdf-parse')) as any).default
-    pdfParse.mockRejectedValueOnce(new Error('corrupt PDF'))
+  it('returns err when the text layer throws and vision OCR also fails', async () => {
+    vi.mocked(pdf.pdfText).mockRejectedValueOnce(new Error('corrupt PDF'))
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1',
       mime_type: 'application/pdf',
@@ -1015,7 +1013,7 @@ describe('extract_quotation_lines_from_attachment', () => {
     mockOcrPdfPages.mockResolvedValueOnce({ ok: false, reason: 'OCR error', hint: undefined })
     const result = (await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' })) as any
     expect(result.ok).toBe(false)
-    expect(result.summary).toMatch(/Could not extract text from PDF/i)
+    expect(result.summary).toMatch(/Could not read the attachment/i)
   })
 
   it('extracts text from image via vision OCR when OCR succeeds', async () => {
@@ -1049,22 +1047,22 @@ describe('extract_quotation_lines_from_attachment', () => {
     mockOcrImage.mockResolvedValueOnce({ ok: false, reason: 'No vision model', hint: 'Configure vision' })
     const result = (await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' })) as any
     expect(result.ok).toBe(false)
-    expect(result.summary).toMatch(/Image OCR failed/i)
+    expect(result.summary).toMatch(/Could not read the attachment/i)
     expect(result.reason).toBe('No vision model')
   })
 
   it('returns err for unsupported mime type', async () => {
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1',
-      mime_type: 'text/csv',
-      filename: 'data.csv',
+      mime_type: 'audio/mpeg',
+      filename: 'note.mp3',
       byte_size: 300,
-      data: Buffer.from('a,b'),
+      data: Buffer.from('id3'),
       extracted_text: null,
       expires_at: '2099-01-01',
     })
     const result = (await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' })) as any
     expect(result.ok).toBe(false)
-    expect(result.summary).toMatch(/Unsupported attachment type/i)
+    expect(result.reason).toMatch(/cannot listen to audio/i)
   })
 })

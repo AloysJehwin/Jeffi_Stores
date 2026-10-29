@@ -44,6 +44,7 @@ export default function CustomerTags({ customerId, initialTags, canWrite: canWri
   const canWriteScope = useCanWrite('customers:write')
   const canWrite = canWriteProp && canWriteScope
   const [tags, setTags] = useState<Tag[]>(initialTags)
+  useEffect(() => setTags(initialTags), [initialTags])
   const [definitions, setDefinitions] = useState<TagDefinition[]>([])
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)

@@ -93,12 +93,19 @@ const nextConfig = {
   devIndicators: false,
   experimental: {
     instrumentationHook: true,
-    outputFileTracingIncludes: {
-      '/api/admin/orders/[id]/shipping-label': ['../node_modules/pdfkit/js/data/**/*'],
-      '/api/vault/pdf-worker': ['../node_modules/pdfjs-dist/build/pdf.worker.min.mjs'],
-    },
   },
-  serverExternalPackages: ['pdfkit', 'ioredis', 'pg'],
+  outputFileTracingIncludes: {
+    '/api/admin/orders/[id]/shipping-label': ['../node_modules/pdfkit/js/data/**/*'],
+    '/api/vault/pdf-worker': ['../node_modules/pdfjs-dist/build/pdf.worker.min.mjs'],
+    // The assistant's file reader: pdfjs loads its worker, fonts and cmaps by path at run time.
+    '/api/admin/agent/**': [
+      '../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+      '../node_modules/pdfjs-dist/standard_fonts/**/*',
+      '../node_modules/pdfjs-dist/cmaps/**/*',
+    ],
+  },
+  // Bundled, pdfjs can't find its worker ("pdf.worker.mjs" missing); @napi-rs/canvas is native.
+  serverExternalPackages: ['pdfkit', 'ioredis', 'pg', 'pdfjs-dist', '@napi-rs/canvas'],
   images: {
     remotePatterns: IMAGE_HOSTS.map(hostname => ({ protocol: 'https', hostname })),
     deviceSizes: IMAGE_OPT.deviceSizes,

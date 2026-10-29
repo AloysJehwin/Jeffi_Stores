@@ -1,11 +1,11 @@
-import { Linking, View, useWindowDimensions } from 'react-native'
+import { Linking, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Mail, MapPin, MessageSquare, Phone } from 'lucide-react-native'
-import { BodySmall, Caption, Card, EmptyState, Heading, ListGroup, ListRow, Overline, Screen, ScreenHeader, Text, Title } from '../../src/ui'
-import SupportChat from '../../src/components/info/SupportChat'
+import { Bot, Mail, MapPin, MessageSquare, Phone } from 'lucide-react-native'
+import { BodySmall, Button, Caption, Card, ListGroup, ListRow, Screen, ScreenHeader, Subheading, Text, Title } from '../../src/ui'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { useAuthStore } from '../../src/stores/authStore'
 import { openHref } from '../../src/lib/links'
+import { primary } from '../../src/theme'
 
 // Mirror of controller-service app/(marketing)/support/page.tsx at the mobile breakpoint.
 
@@ -48,17 +48,38 @@ function LinkCard({ title, links }: { title: string; links: Array<{ label: strin
 
 export default function SupportScreen() {
   const router = useRouter()
-  const { height } = useWindowDimensions()
   const { identity } = useStoreConfig()
   const { user, isLoading } = useAuthStore()
-  const chatHeight = Math.min(680, Math.max(480, Math.round(height * 0.65)))
 
   return (
-    <Screen header={<ScreenHeader title="Help & Support" />} mode="keyboard" scrollProps={{ showsVerticalScrollIndicator: false }}>
+    <Screen header={<ScreenHeader title="Help & Support" />} scrollProps={{ showsVerticalScrollIndicator: false }}>
       <View className="mb-6">
         <Title>How can we help?</Title>
-        <BodySmall className="mt-1.5">Chat with our support bot or reach us directly.</BodySmall>
+        <BodySmall className="mt-1.5">Chat with our assistant or reach us directly.</BodySmall>
       </View>
+
+      <Card className="mb-8">
+        <View className="flex-row items-start gap-3">
+          <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30">
+            <Bot size={22} color={primary[500]} />
+          </View>
+          <View className="flex-1">
+            <Subheading>Chat with us</Subheading>
+            <BodySmall className="mt-0.5">
+              Our assistant can track, cancel or return orders, change a delivery address and answer questions right away. Ask for a person anytime.
+            </BodySmall>
+          </View>
+        </View>
+        {isLoading ? null : (
+          <Button
+            className="mt-4"
+            size="md"
+            icon={MessageSquare}
+            label={user ? 'Open support chat' : 'Sign in to chat'}
+            onPress={() => (user ? router.push('/info/support-chat') : openHref(router, '/login'))}
+          />
+        )}
+      </Card>
 
       <View className="mb-8 gap-6">
         <ListGroup title="Contact Us">
@@ -81,27 +102,6 @@ export default function SupportScreen() {
         <LinkCard title="Quick Links" links={QUICK_LINKS} />
         <LinkCard title="Legal & Policies" links={LEGAL_LINKS} />
       </View>
-
-      <View className="mb-4">
-        <Overline className="mb-1 text-accent-600 dark:text-accent-400">Support Chat</Overline>
-        <Heading>Chat with us</Heading>
-      </View>
-
-      {isLoading ? null : user ? (
-        <Card padded={false} className="overflow-hidden" style={{ height: chatHeight }}>
-          <SupportChat />
-        </Card>
-      ) : (
-        <Card padded={false}>
-          <EmptyState
-            icon={MessageSquare}
-            title="Sign in to use Support Chat"
-            message="Log in to chat with our support bot and get help with your orders and account."
-            actionLabel="Sign In"
-            onAction={() => openHref(router, '/login')}
-          />
-        </Card>
-      )}
     </Screen>
   )
 }

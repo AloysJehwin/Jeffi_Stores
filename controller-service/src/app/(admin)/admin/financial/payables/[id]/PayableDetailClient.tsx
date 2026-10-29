@@ -7,6 +7,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
 import { Card, DataTable, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, PageBody, StatusBadge, type DataCol } from '@/components/admin/kit'
 import { SETTLEMENT_STATUS, payoutBadge } from '../../_components/shared'
+import { ChangeLog } from '@/components/admin/change-log'
 
 const formatINR = (n: number) => formatINRBase(n, 0)
 
@@ -94,6 +95,7 @@ export default function PayableDetailClient({ id }: { id: string }) {
         </KpiGrid>
       }
       main={
+        <>
         <Card title="Payment History" flush>
           {payments.length === 0 ? (
             <EmptyState bare title="No payments recorded yet" />
@@ -101,6 +103,8 @@ export default function PayableDetailClient({ id }: { id: string }) {
             <DataTable<any> bare rows={payments} cols={PAYMENT_COLS} rowKey={p => p.id} mobileCard={p => <PaymentCard p={p} />} />
           )}
         </Card>
+        <ChangeLog kind="payable" id={id} version={`${e.updated_at}|${payments.length}`} />
+        </>
       }
       aside={
         <>

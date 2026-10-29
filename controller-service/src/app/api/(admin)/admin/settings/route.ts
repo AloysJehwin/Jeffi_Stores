@@ -21,6 +21,7 @@ const EDITABLE_KEYS = [
   'business_name',
   'business_web',
   'business_logo_url',
+  'business_email_accent',
   'business_email',
   'business_phone',
   // Invoice / legal / bank identity (previously DB-seeded, now editable)
@@ -45,6 +46,9 @@ const EDITABLE_KEYS = [
   'feature_push_enabled',
   'feature_marketing_push_enabled',
   'feature_birthday_enabled',
+  'feature_agent_dock_enabled',
+  'feature_reply_actions_enabled',
+  'feature_reply_auto_apply',
   // Shared with Marketing > Referrals so the two switches can never disagree.
   'referral_enabled',
   'loyalty_enabled',

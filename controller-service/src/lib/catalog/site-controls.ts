@@ -15,6 +15,7 @@ export interface StoreIdentity {
   phone: string
   web: string
   logoUrl: string // '' means "no logo" — render the store name as text
+  emailAccent: string // '#rrggbb' for email buttons and links; '' keeps the default blue
 }
 
 export interface FeatureFlags {
@@ -57,6 +58,13 @@ export interface FeatureFlags {
   // Store-wide master switch for vault file downloads. Effective download = this && the product's
   // own `downloadable` flag. Off by default: stream/read only until the store opts in.
   vaultDownloadsEnabled: boolean
+  // The admin assistant's floating button on every admin page. Off hides only the button; the
+  // header icon still opens the assistant.
+  agentDockEnabled: boolean
+  // Customer replies (WhatsApp / email) to a question the store asked are read by the AI and acted on.
+  replyActionsEnabled: boolean
+  // Clear, low-risk answers are applied straight away; off = an admin approves every one.
+  replyAutoApply: boolean
   // Customer subscriptions (Razorpay recurring). On by default; available on every plan.
   subscriptionsEnabled: boolean
 }
@@ -147,6 +155,7 @@ const DEFAULTS: SiteControls = {
     phone: '+91 96853 54099',
     web: 'jeffistores.in',
     logoUrl: '',
+    emailAccent: '',
   },
   flags: {
     // Preserve current env-driven behavior when the DB key is unset.
@@ -164,6 +173,9 @@ const DEFAULTS: SiteControls = {
     digitalProductsEnabled: true,
     vaultDownloadsEnabled: false,
     subscriptionsEnabled: true,
+    agentDockEnabled: true,
+    replyActionsEnabled: true,
+    replyAutoApply: true,
     ondeviceSummaryEnabled:
       envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) ||
       process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
@@ -249,6 +261,7 @@ const KEYS = [
   'business_phone',
   'business_web',
   'business_logo_url',
+  'business_email_accent',
   'feature_razorpay_enabled',
   'feature_cod_enabled',
   'feature_gst_enabled',
@@ -263,6 +276,9 @@ const KEYS = [
   'feature_digital_products_enabled',
   'feature_vault_downloads_enabled',
   'feature_subscriptions_enabled',
+  'feature_agent_dock_enabled',
+  'feature_reply_actions_enabled',
+  'feature_reply_auto_apply',
   'feature_ondevice_summary_enabled',
   'feature_ondevice_finetune_enabled',
   'feature_ondevice_summary_mobile_enabled',
@@ -388,6 +404,7 @@ async function identityDefaults(): Promise<StoreIdentity> {
     phone: '',
     web: `${slug}.${domain}`,
     logoUrl: '',
+    emailAccent: '',
   }
 }
 
@@ -433,6 +450,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         phone: str('business_phone', id.phone),
         web: str('business_web', id.web),
         logoUrl: str('business_logo_url', id.logoUrl),
+        emailAccent: str('business_email_accent', id.emailAccent),
       },
       flags: {
         razorpayEnabled: bool('feature_razorpay_enabled', d.flags.razorpayEnabled),
@@ -449,6 +467,9 @@ export async function getSiteControls(): Promise<SiteControls> {
         digitalProductsEnabled: bool('feature_digital_products_enabled', d.flags.digitalProductsEnabled),
         vaultDownloadsEnabled: bool('feature_vault_downloads_enabled', d.flags.vaultDownloadsEnabled),
         subscriptionsEnabled: bool('feature_subscriptions_enabled', d.flags.subscriptionsEnabled),
+        agentDockEnabled: bool('feature_agent_dock_enabled', d.flags.agentDockEnabled),
+        replyActionsEnabled: bool('feature_reply_actions_enabled', d.flags.replyActionsEnabled),
+        replyAutoApply: bool('feature_reply_auto_apply', d.flags.replyAutoApply),
         ondeviceSummaryEnabled: bool('feature_ondevice_summary_enabled', d.flags.ondeviceSummaryEnabled),
         ondeviceFinetuneEnabled: bool('feature_ondevice_finetune_enabled', d.flags.ondeviceFinetuneEnabled),
         ondeviceSummaryMobileEnabled: bool(

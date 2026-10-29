@@ -1,5 +1,8 @@
 import { documentUrl } from '@/lib/shared/customer-links'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
+import { queryOne } from '@/lib/shared/db'
+import { openReplyContextSafe } from '@/lib/replies/context'
+import { withReplyContext } from '@/lib/replies/scope'
 import { callInternalApi, type AgentAction, type ActionResult } from './shared'
 
 // Same endpoint, validation and pricing as the quotation editor, under the approving admin's session.
@@ -31,7 +34,18 @@ export async function sendQuotationEmail(action: AgentAction): Promise<ActionRes
   if (!toEmail || !quoteNumber) return { result: null, error: 'Missing recipient or quote number' }
   try {
     const viewUrl = await documentUrl('quotation', viewToken)
-    await sendQuotationFinalizedEmail(toEmail, consigneeName || '', quoteNumber, Number(totalAmount), viewUrl)
+    // The customer can answer by replying (lib/replies): accept, decline or ask for changes.
+    const q = await queryOne<{ id: string; consignee_phone: string | null; user_id: string | null }>(
+      `SELECT q.id, q.consignee_phone, COALESCE(b.user_id, u.id) AS user_id FROM quotations q
+         LEFT JOIN business_rfqs b ON b.converted_quotation_id = q.id
+         LEFT JOIN users u ON lower(u.email) = lower($2)
+        WHERE q.quote_number = $1 LIMIT 1`,
+      [quoteNumber, toEmail]
+    )
+    const opened = q ? await openReplyContextSafe({ scenario: 'quotation', entityType: 'quotations', entityId: q.id, userId: q.user_id, email: toEmail.toLowerCase(), phone: q.consignee_phone }) : null
+    await withReplyContext(opened && q ? { contextId: opened.context.id, replyTo: opened.replyTo, entityType: 'quotations', entityId: q.id } : null, () =>
+      sendQuotationFinalizedEmail(toEmail, consigneeName || '', quoteNumber, Number(totalAmount), viewUrl)
+    )
     return { result: { sentTo: toEmail, quoteNumber }, error: null }
   } catch (err: any) {
     return { result: null, error: String(err?.message || 'Send failed') }

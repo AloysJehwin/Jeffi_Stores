@@ -14,9 +14,14 @@ vi.mock('@/lib/catalog/brand', () => ({
   campaignMailFromAsync: vi.fn(async () => '"Acme" <campaigns@acme.in>'),
   customerMailFromAsync: vi.fn(async () => '"Acme" <noreply@acme.in>'),
   storeContactLine: vi.fn(async () => ''),
+  storeMailTheme: vi.fn(async () => ({})),
+  storeAddressLine: vi.fn(async () => ''),
 }))
 vi.mock('@/lib/shared/mail-audit', () => ({ sendAuditedMail: vi.fn(async () => ({})) }))
-vi.mock('@/lib/shared/customer-links', () => ({ apiBaseUrl: vi.fn(async () => 'https://acme.jeffistores.in') }))
+vi.mock('@/lib/shared/customer-links', () => ({
+  apiBaseUrl: vi.fn(async () => 'https://acme.jeffistores.in'),
+  orderUrl: vi.fn(async () => 'https://acme.jeffistores.in/account/orders/o1'),
+}))
 vi.mock('@/lib/shared/marketing', async () => {
   const actual = await vi.importActual<typeof import('@/lib/shared/marketing')>('@/lib/shared/marketing')
   return {
@@ -31,7 +36,10 @@ vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(async () => ({ adminId: 'a', role: 'admin', scopes: [] })),
 }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn(() => true) }))
-vi.mock('@/lib/email', () => ({ sendAdminContactEmail: vi.fn(async () => ({ success: true })) }))
+vi.mock('@/lib/email', async () => ({
+  sendAdminContactEmail: vi.fn(async () => ({ success: true })),
+  adminContactHtml: (await vi.importActual<typeof import('@/lib/email')>('@/lib/email')).adminContactHtml,
+}))
 vi.mock('@/lib/queries', () => ({ getCustomerById: vi.fn() }))
 
 import { query, queryMany, queryOne } from '@/lib/shared/db'
@@ -54,7 +62,7 @@ import { POST as orderMail } from '@/app/api/(admin)/admin/orders/[id]/send-cust
 import { POST as orderMailPreview } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/preview/route'
 import { POST as customerContact } from '@/app/api/(public)/customers/[id]/contact/route'
 
-const IDENTITY = { name: 'Acme Tools', email: 'hi@acme.in', phone: '+91 90000 11111', web: 'acme.in', logoUrl: '' }
+const IDENTITY = { name: 'Acme Tools', email: 'hi@acme.in', phone: '+91 90000 11111', web: 'acme.in', logoUrl: '', emailAccent: '' }
 
 // Any token (either syntax, any case) whose key is registered.
 function registeredLeaks(s: string | undefined): string[] {
@@ -255,9 +263,15 @@ describe('admin routes', () => {
   const ORDER = {
     id: 'o1',
     order_number: 'ORD-9',
+    status: 'processing',
+    payment_status: 'paid',
+    created_at: '2026-10-01',
+    total_amount: '1200',
     customer_name: 'Asha R',
     customer_email: 'asha@x.in',
-    users: { email: 'asha@x.in', first_name: 'Asha', last_name: 'R' },
+    u_email: 'asha@x.in',
+    u_first: 'Asha',
+    u_last: 'R',
   }
 
   it('mailer preview', async () => {

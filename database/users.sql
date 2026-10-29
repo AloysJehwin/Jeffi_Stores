@@ -96,7 +96,8 @@ CREATE TABLE public.admins (
     mfa_secret_enc text,
     mfa_enabled boolean DEFAULT false NOT NULL,
     mfa_enrolled_at timestamp with time zone,
-    idle_timeout_minutes integer
+    idle_timeout_minutes integer,
+    support_language character varying(10) DEFAULT 'en'::character varying NOT NULL
 );
 
 

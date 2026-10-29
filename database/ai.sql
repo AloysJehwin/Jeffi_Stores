@@ -31,12 +31,28 @@ CREATE TABLE public.admin_agent_attachments (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     admin_id uuid NOT NULL,
     filename character varying(255),
-    mime_type character varying(64) NOT NULL,
+    mime_type character varying(128) NOT NULL,
     byte_size integer NOT NULL,
     data bytea NOT NULL,
     extracted_text text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     expires_at timestamp with time zone DEFAULT (now() + '02:00:00'::interval) NOT NULL
+);
+
+
+--
+-- Name: admin_agent_conversations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_agent_conversations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid NOT NULL,
+    title character varying(160),
+    context jsonb DEFAULT '{}'::jsonb NOT NULL,
+    shared_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_message_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // In-memory stand-in for the messages table + mocked wallet/providers.
 const rows = new Map<string, any>()
@@ -20,16 +20,28 @@ vi.mock('../src/db.js', () => ({
   one: vi.fn(async (sql: string, params: any[]) => (sql.startsWith('SELECT * FROM messages') ? rows.get(params[0]) : undefined)),
 }))
 vi.mock('../src/pools.js', () => ({ poolsForTenant: vi.fn().mockResolvedValue({ pools: {} }) }))
-vi.mock('../src/templates-v2.js', () => ({ findBySlugWithDefaults: vi.fn().mockResolvedValue(null), PLATFORM_TENANT_ID: '00000000-0000-0000-0000-000000000000' }))
+vi.mock('../src/templates-v2.js', () => ({ findBySlugWithDefaults: vi.fn().mockResolvedValue(null), liveVersion: vi.fn().mockResolvedValue(null), PLATFORM_TENANT_ID: '00000000-0000-0000-0000-000000000000' }))
 vi.mock('@jeffi/wallet', () => ({ debit: vi.fn(), trueUp: vi.fn() }))
 vi.mock('../src/providers/email.js', () => ({ sendEmail: vi.fn() }))
-vi.mock('../src/providers/twilio.js', () => ({ sendSms: vi.fn(), sendWhatsApp: vi.fn() }))
+vi.mock('../src/providers/twilio.js', () => ({ sendSms: vi.fn(), sendWhatsApp: vi.fn(), normalizePhone: (s: string) => s }))
+vi.mock('../src/providers/policy.js', () => ({ messagingProvider: vi.fn() }))
+const { awsSend } = vi.hoisted(() => ({ awsSend: vi.fn() }))
+vi.mock('@aws-sdk/client-pinpoint-sms-voice-v2', () => ({
+  PinpointSMSVoiceV2Client: class { send = awsSend },
+  SendTextMessageCommand: class { constructor(public input: any) {} },
+}))
+vi.mock('@aws-sdk/client-socialmessaging', async orig => ({
+  ...(await orig<any>()),
+  SocialMessagingClient: class { send = awsSend },
+  SendWhatsAppMessageCommand: class { constructor(public input: any) {} },
+}))
 
 import { sendMessage, SendError } from '../src/send'
 import { findBySlugWithDefaults } from '../src/templates-v2'
 import * as wallet from '@jeffi/wallet'
 import { sendEmail } from '../src/providers/email'
-import { sendSms } from '../src/providers/twilio'
+import { sendSms, sendWhatsApp } from '../src/providers/twilio'
+import { messagingProvider } from '../src/providers/policy'
 
 // Shaped like FullTemplate — the subset resolveTemplate reads.
 const v2 = (subject: string | null, body: string, provider_ref: string | null = null) => ({
@@ -49,6 +61,8 @@ describe('sendMessage', () => {
     vi.mocked(sendEmail).mockReset().mockResolvedValue('ses-1')
     vi.mocked(sendSms).mockReset().mockResolvedValue('SM1')
     vi.mocked(findBySlugWithDefaults).mockReset().mockResolvedValue(null)
+    vi.mocked(messagingProvider).mockReset().mockResolvedValue('twilio')
+    awsSend.mockReset()
   })
 
   it('renders a template, debits the wallet at public price and sends', async () => {
@@ -92,5 +106,46 @@ describe('sendMessage', () => {
     expect(m.status).toBe('failed')
     expect(m.error).toBe('twilio down')
     expect(vi.mocked(wallet.trueUp).mock.calls[0][0]).toMatchObject({ tenantId: 't1', amountInr: 0.5, externalRef: `pub:${m.id}` })
+  })
+
+  describe('a tenant on AWS End User Messaging', () => {
+    const env = { AWS_SMS_ORIGINATION: 'sender-1', AWS_WHATSAPP_PHONE_NUMBER_ID: 'phone-number-id-1' }
+    afterEach(() => { for (const k of Object.keys(env)) delete process.env[k] })
+
+    it('sends SMS through AWS and records provider aws with its message id', async () => {
+      Object.assign(process.env, env)
+      vi.mocked(messagingProvider).mockResolvedValue('aws')
+      awsSend.mockResolvedValue({ MessageId: 'aws-sms-1' })
+      const m = await sendMessage(ctx, { channel: 'sms', to: '+919999999999', body: 'hello' } as any)
+      expect(m).toMatchObject({ status: 'sent', provider: 'aws', provider_ref: 'aws-sms-1' })
+      expect(awsSend.mock.calls[0][0].input).toMatchObject({ DestinationPhoneNumber: '+919999999999', OriginationIdentity: 'sender-1', MessageBody: 'hello' })
+      expect(sendSms).not.toHaveBeenCalled()
+      expect(vi.mocked(messagingProvider).mock.calls[0]).toEqual(['t1', 'sms'])
+    })
+
+    it('sends an aws: template ref as a Cloud API template with the body variables in order', async () => {
+      Object.assign(process.env, env)
+      vi.mocked(messagingProvider).mockResolvedValue('aws')
+      vi.mocked(findBySlugWithDefaults).mockResolvedValue(v2(null, 'Your order {{1}} ships on {{2}} — thanks for shopping.', 'aws:acme_order_v1:en') as any)
+      awsSend.mockResolvedValue({ messageId: 'wamid.1' })
+      const m = await sendMessage(ctx, { channel: 'whatsapp', to: '+919999999999', template: 'order', variables: { 1: 'JS-1', 2: 'Monday' } } as any)
+      expect(m).toMatchObject({ status: 'sent', provider: 'aws', provider_ref: 'wamid.1' })
+      const input = awsSend.mock.calls[0][0].input
+      expect(input.originationPhoneNumberId).toBe('phone-number-id-1')
+      expect(JSON.parse(new TextDecoder().decode(input.message)).template).toEqual({
+        name: 'acme_order_v1', language: { code: 'en' },
+        components: [{ type: 'body', parameters: [{ type: 'text', text: 'JS-1' }, { type: 'text', text: 'Monday' }] }],
+      })
+      expect(sendWhatsApp).not.toHaveBeenCalled()
+    })
+
+    it('fails clearly instead of falling back to Twilio when AWS is not configured', async () => {
+      vi.mocked(messagingProvider).mockResolvedValue('aws')
+      const m = await sendMessage(ctx, { channel: 'sms', to: '+919999999999', body: 'x' } as any)
+      expect(m.status).toBe('failed')
+      expect(m.error).toMatch(/AWS messaging is not configured/)
+      expect(sendSms).not.toHaveBeenCalled()
+      expect(awsSend).not.toHaveBeenCalled()
+    })
   })
 })

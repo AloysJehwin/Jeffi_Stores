@@ -8,6 +8,7 @@ import { formatINR, formatDate } from '@/lib/shared/format'
 import { fmtQty } from '@/lib/shared/number-display'
 import { FileDown } from 'lucide-react'
 import { Badge, Card, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, badgeCls } from '@/components/admin/kit'
+import { ChangeLog } from '@/components/admin/change-log'
 
 const PAYMENT_MODE_LABELS: Record<string, string> = {
   cash: 'Cash',
@@ -163,6 +164,7 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
               <Field label="Name" value={s.customer_name || 'Walk-in Customer'} />
             </Fields>
           </Card>
+          <ChangeLog kind="cash_sale" id={id} variant="compact" version={s.updated_at} />
         </>
       }
     />

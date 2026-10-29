@@ -192,6 +192,13 @@ export default async function SiteControlsPage() {
                         initial={c.identity.web}
                         placeholder="jeffistores.in"
                       />
+                      <TextControl
+                        settingKey="business_email_accent"
+                        label="Email accent colour"
+                        hint="Buttons and links in every email; the logo above heads them."
+                        type="color"
+                        initial={c.identity.emailAccent || '#2563eb'}
+                      />
                     </SectionCard>
                   </div>
                   <div>
@@ -624,6 +631,38 @@ export default async function SiteControlsPage() {
               label: 'AI & shortcuts',
               content: (
                 <>
+                  <div>
+                    <SectionCard title="Admin Assistant" description="The AI assistant in the admin panel." columns>
+                      <FullSpan>
+                        <ToggleControl
+                          settingKey="feature_agent_dock_enabled"
+                          label="Floating assistant button"
+                          hint="A chat button at the bottom-right of every admin page. When off, the assistant still opens from the robot icon in the top bar."
+                          initial={c.flags.agentDockEnabled}
+                        />
+                      </FullSpan>
+                    </SectionCard>
+                  </div>
+                  <div>
+                    <SectionCard title="Customer replies" description="When the store asks a customer something (an order change, a quotation or RFQ offer, an invoice or failed payment, a delay or unavailable item, a subscription renewal), they can answer by replying to the WhatsApp or email." columns>
+                      <FullSpan>
+                        <ToggleControl
+                          settingKey="feature_reply_actions_enabled"
+                          label="Act on customer replies"
+                          hint="The AI reads the reply, links it to the order or quotation, and acts on it. Off: replies go to the support inbox only."
+                          initial={c.flags.replyActionsEnabled}
+                        />
+                      </FullSpan>
+                      <FullSpan>
+                        <ToggleControl
+                          settingKey="feature_reply_auto_apply"
+                          label="Apply clear answers automatically"
+                          hint="A clear yes/no on something low-risk (approving an order change with no extra payment, accepting a quotation) is applied straight away. Refunds and anything unusual always wait for an admin. Off: an admin approves every reply."
+                          initial={c.flags.replyAutoApply}
+                        />
+                      </FullSpan>
+                    </SectionCard>
+                  </div>
                   <div>
                     <SectionCard
                       title="On-device AI"

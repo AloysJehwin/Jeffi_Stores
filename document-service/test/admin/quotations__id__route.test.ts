@@ -13,6 +13,7 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(async (fn: any) => fn({ query: txQuery })),
 }))
 vi.mock('@/lib/email', () => ({ sendQuotationFinalizedEmail: vi.fn() }))
+vi.mock('../../src/lib/reply-context', () => ({ quotationReply: async () => null, recordEmailSend: async () => {} }))
 vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: async () => ({ gstEnabled: true }) }))
 vi.mock('@/lib/shared/customer-links', () => ({ documentUrl: async (_k: string, t: string) => `https://x/${t}` }))
 
@@ -265,7 +266,8 @@ describe('PATCH /api/admin/quotations/[id]', () => {
       'Buyer Corp',
       'QT/24-25/001',
       1200,
-      expect.stringContaining('tok-abc')
+      expect.stringContaining('tok-abc'),
+      null
     )
   })
 

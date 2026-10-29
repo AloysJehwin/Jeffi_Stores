@@ -1,34 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ChevronRight, Headset } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
+import { ago } from '@/components/chat/format'
+import type { SupportSession } from '@/lib/support/types'
 
-interface SupportSession {
-  id: string
-  user_id: string
-  customer_name: string
-  customer_email: string
-  created_at: string
-  admin_name: string | null
-}
-
+/** Dashboard card: chats the assistant handed to a person that nobody has picked up yet. */
 export default function SupportRequestsAlert() {
   const [sessions, setSessions] = useState<SupportSession[]>([])
 
   useEffect(() => {
-    fetchSessions()
-    const interval = setInterval(fetchSessions, 10000)
-    return () => clearInterval(interval)
+    const load = () =>
+      fetch('/api/admin/support/sessions?filter=needs_human&limit=8')
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => d && setSessions(d.sessions ?? []))
+        .catch(() => {})
+    load()
+    const t = setInterval(load, 15_000)
+    return () => clearInterval(t)
   }, [])
-
-  async function fetchSessions() {
-    try {
-      const res = await fetch('/api/admin/support/sessions')
-      if (!res.ok) return
-      const data = await res.json()
-      setSessions(data.sessions || [])
-    } catch {}
-  }
 
   if (sessions.length === 0) return null
 
@@ -40,61 +31,32 @@ export default function SupportRequestsAlert() {
           <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
         </span>
         <h2 className="text-lg font-bold text-foreground">
-          Support Requests
-          <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-            {sessions.length}
-          </span>
+          Customers waiting for a person
+          <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{sessions.length}</span>
         </h2>
+        <a href={ap('/admin/support')} className="ml-auto text-xs font-medium text-primary-600 hover:underline">
+          Open inbox
+        </a>
       </div>
       <div className="space-y-2">
         {sessions.map(s => (
           <a
             key={s.id}
-            href={ap(`/admin/customers/${s.user_id}/view?chat=true`)}
+            href={ap(`/admin/support?s=${s.id}`)}
             className="flex items-center justify-between p-3 rounded-lg border border-border-default hover:border-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors group"
           >
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
-                <svg
-                  className="w-4 h-4 text-red-600 dark:text-red-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                  />
-                </svg>
+                <Headset className="w-4 h-4 text-red-600 dark:text-red-400" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">{s.customer_name}</p>
-                <p className="text-xs text-foreground-muted truncate">{s.customer_email}</p>
+                <p className="text-sm font-semibold text-foreground truncate">{s.customer.name}</p>
+                <p className="text-xs text-foreground-muted truncate">{s.handoffReason || s.lastMessage?.text || s.customer.email || s.customer.phone}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0 ml-3">
-              {s.admin_name ? (
-                <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{s.admin_name}</span>
-              ) : (
-                <span className="text-xs text-red-600 dark:text-red-400 font-semibold">Waiting</span>
-              )}
-              <span className="text-xs text-foreground-muted">
-                {new Date(s.created_at).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  timeZone: 'Asia/Kolkata',
-                })}
-              </span>
-              <svg
-                className="w-4 h-4 text-foreground-muted group-hover:text-red-500 transition-colors"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+              <span className="text-xs text-red-600 dark:text-red-400 font-semibold">Waiting {ago(s.handoffAt ?? s.createdAt)}</span>
+              <ChevronRight className="w-4 h-4 text-foreground-muted group-hover:text-red-500 transition-colors" />
             </div>
           </a>
         ))}

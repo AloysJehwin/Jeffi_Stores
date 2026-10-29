@@ -106,7 +106,7 @@ export async function getPlanLimits(): Promise<PlanLimits> {
 
 // getCurrentTenantId() is empty in route handlers (no runWithTenantContext around them), so always
 // resolve the tenant from the request.
-async function getCommittedLimits(): Promise<PlanLimits> {
+export async function getCommittedLimits(): Promise<PlanLimits> {
   const tenantId = await resolveTenantId()
   if (!tenantId) {
     // Platform/flagship store (no tenant row): generous local defaults, usage untracked.
@@ -143,7 +143,7 @@ async function getCommittedLimits(): Promise<PlanLimits> {
  * UPDATE, so two concurrent completes can't both pass a read-then-check. True when claimed (or when
  * the store has no tenant row, whose usage is untracked).
  */
-async function claimUsage(bytes: number): Promise<boolean> {
+export async function claimUsage(bytes: number): Promise<boolean> {
   const tenantId = await resolveTenantId()
   if (!tenantId) return true
   const r = await controlPlanePool().query(
@@ -161,7 +161,7 @@ async function claimUsage(bytes: number): Promise<boolean> {
   return (r.rowCount ?? 0) > 0
 }
 
-async function bumpUsage(deltaBytes: number, deltaFiles: number): Promise<void> {
+export async function bumpUsage(deltaBytes: number, deltaFiles: number): Promise<void> {
   const tenantId = await resolveTenantId()
   if (!tenantId) return
   // Clamp at zero so a double-decrement can never drive usage negative.

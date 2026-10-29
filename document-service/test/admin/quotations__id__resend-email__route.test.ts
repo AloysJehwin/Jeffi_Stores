@@ -5,6 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendQuotationFinalizedEmail: vi.fn() }))
+vi.mock('../../src/lib/reply-context', () => ({ quotationReply: async () => null, recordEmailSend: async () => {} }))
 
 import { POST } from '@/app/api/(admin)/admin/quotations/[id]/resend-email/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -86,7 +87,8 @@ describe('POST /api/admin/quotations/[id]/resend-email', () => {
       'Buyer',
       'QT-001',
       5000,
-      'https://quotation.jeffistores.in/tok-abc'
+      'https://quotation.jeffistores.in/tok-abc',
+      null
     )
   })
 
@@ -103,7 +105,8 @@ describe('POST /api/admin/quotations/[id]/resend-email', () => {
       '',
       expect.any(String),
       expect.any(Number),
-      expect.any(String)
+      expect.any(String),
+      null
     )
   })
 

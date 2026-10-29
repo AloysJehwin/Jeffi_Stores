@@ -11,6 +11,7 @@ import {
   ACTIVE_STATUS,
   badgeCls,
 } from '@/components/admin/kit'
+import { ChangeLog } from '@/components/admin/change-log'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { formsHostForHost } from '@/lib/tenant-registry'
@@ -117,6 +118,7 @@ export default async function ReviewFormViewPage({
       }
       notices={drafts.length > 0 && <EntityDrafts drafts={drafts} start={startReviewFormDraft.bind(null, id)} back={backUrl} me={me} noun="review form" />}
       aside={
+        <>
         <Card title="Details">
           <Fields cols={1}>
             <Field label="Template" value={TYPE_LABEL[form.template_type]} />
@@ -142,6 +144,8 @@ export default async function ReviewFormViewPage({
             />
           </Fields>
         </Card>
+        <ChangeLog kind="review_form" id={id} variant="compact" />
+        </>
       }
       main={
         <Card title="Questions" hint={`${customFields.length} field${customFields.length === 1 ? '' : 's'}`}>

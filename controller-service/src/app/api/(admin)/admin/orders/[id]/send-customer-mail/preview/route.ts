@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne } from '@/lib/shared/db'
-import { renderTemplate, resolveTemplateVariables } from '@/lib/templates/variables'
-import { storeContactLine, currentBrandNameAsync } from '@/lib/catalog/brand'
+import { adminContactHtml } from '@/lib/email'
+import { renderTemplate } from '@/lib/templates/variables'
+import { applyMailTheme } from '@/lib/shared/mail-template'
+import { storeMailTheme } from '@/lib/catalog/brand'
+import { orderMailVars, unfilledTokens } from '@/lib/orders/customer-mail'
+import { PAGES } from '@/lib/messaging/placements'
 
 export const dynamic = 'force-dynamic'
 
+// POST — exactly what the customer will get (same shell, logo, colours and order details), plus the
+// tokens that are still unfilled; Send refuses until they are filled or removed.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
-  const storeName = await (await import('@/lib/catalog/site-controls')).getStoreIdentity().then(i => i.name)
-  const brand = await currentBrandNameAsync()
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,55 +23,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!hasScope(admin.role, admin.scopes, 'mailer:write'))
     return NextResponse.json({ error: 'Custom customer emails are not included in your plan.' }, { status: 403 })
 
-  const { subject, body } = await request.json().catch(() => ({}))
+  const b = await request.json().catch(() => ({}))
+  const subject = String(b.subject ?? '')
+  const body = String(b.body ?? '')
+  const preheader = String(b.preheader ?? '')
+  const texts = [subject, body, preheader]
+  const ctx = await orderMailVars(id, { itemId: b.itemId || null, usesPaymentLink: texts.some(t => /payment_url/i.test(t)) })
+  if (!ctx) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
-  const order = await queryOne<any>(
-    `SELECT o.order_number, o.customer_name, o.customer_email,
-       json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
-     FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
-    [id]
-  )
-  if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-
-  const email = order.users?.email || order.customer_email || ''
-  const firstName = order.users?.first_name || (order.customer_name?.split(' ')[0] ?? '')
-  const lastName = order.users?.last_name || ''
-  const name = order.users?.first_name
-    ? `${order.users.first_name} ${order.users.last_name || ''}`.trim()
-    : order.customer_name || 'Valued Customer'
-
-  const vars = await resolveTemplateVariables({
-    recipient: { email, first_name: firstName, last_name: lastName },
-    extra: { order_number: order.order_number || '' },
+  const scenario = PAGES.order.scenarios.find(s => s.id === b.scenario) ?? null
+  const finalSubject = renderTemplate(subject.trim(), ctx.vars)
+  const html = await adminContactHtml(finalSubject, renderTemplate(body.trim(), ctx.vars, { escape: true }), {
+    isHtml: true,
+    layout: b.layout === 'template' ? 'template' : 'message',
+    preheader: renderTemplate(preheader, ctx.vars),
   })
-
-  const finalBody = renderTemplate((body || '').trim(), vars, { escape: true })
-
-  const html = `<!DOCTYPE html>
-<html>
-  <head>
-    <style>
-      body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-      .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
-      .header { text-align: center; padding-bottom: 20px; margin-bottom: 30px; }
-      .message-box { background-color: #fff; border-left: 4px solid #f97316; padding: 20px; border-radius: 4px; margin: 20px 0; }
-      .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 13px; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">${brand}</div>
-        <p style="color:#666;margin:4px 0 0;">Hardware &amp; Tools</p>
-      </div>
-      <div class="message-box">${finalBody}</div>
-      <div class="footer">
-        <p>This message was sent by the ${brand} admin team. Please do not reply directly to this email.</p>
-        <p><strong>${storeName}</strong></p>${contactLine}
-      </div>
-    </div>
-  </body>
-</html>`
-
-  return NextResponse.json({ html })
+  return NextResponse.json({
+    subject: finalSubject,
+    html: applyMailTheme(html, { ...(await storeMailTheme()), replyHint: !!scenario?.reply }),
+    missing: unfilledTokens(texts, ctx.vars),
+  })
 }
