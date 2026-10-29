@@ -94,14 +94,14 @@ export const CRON_JOBS: readonly CronJob[] = [
   },
   {
     id: 'daily_briefing',
-    name: 'Daily briefing email',
+    name: 'Daily ops email',
     path: '/api/cron/daily-briefing',
     method: 'GET',
-    intervalMs: DAY,
-    intervalLabel: 'every 24 h',
-    startDelayMs: 180 * SEC,
-    lockTtlMs: DAY - MIN,
-    tenantScope: 'agent:read',
+    intervalMs: HOUR,
+    intervalLabel: 'hourly (sends at the hour set in Site Controls)',
+    startDelayMs: 3 * MIN,
+    lockTtlMs: HOUR - MIN,
+    tenantScope: 'dashboard:read',
   },
   {
     id: 'provisioning_worker',
@@ -471,7 +471,6 @@ export function inProcessCronEnabled(env: Record<string, string | undefined> = p
 
 // Daily jobs fire at a fixed IST time under k8s instead of a few minutes after every restart.
 const DAILY_AT_IST: Record<string, string> = {
-  daily_briefing: '0 8',
   customer_notes_digest: '30 9',
   // After midnight in the account zone so yesterday is final in Google Ads.
   google_ads_sync: '30 4',

@@ -7,6 +7,7 @@ import { query } from '@/lib/shared/db'
 import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
 import { invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
 import { isGoogleTagSettingKey, validateGoogleTagSetting } from '@/lib/analytics/google-tag'
+import { OPS_EMAIL_KEY, parseOpsEmailInput } from '@/lib/shared/ops-email-config'
 
 // All keys editable via this endpoint. Grouped for readability.
 const EDITABLE_KEYS = [
@@ -100,6 +101,8 @@ const EDITABLE_KEYS = [
   'shortcut_reviews',
   'shortcut_ai_agent',
   'shortcut_custom',
+  // Daily ops email settings (JSON, validated below)
+  OPS_EMAIL_KEY,
 ]
 
 const EDITABLE_SET = new Set(EDITABLE_KEYS)
@@ -160,6 +163,17 @@ function normaliseTagSettings(updates: Array<{ key: string; value: unknown }>): 
   return null
 }
 
+// Validates JSON settings in place and stamps who saved them; returns the first validation error.
+function normaliseJsonSettings(updates: Array<{ key: string; value: unknown }>, adminId: string): string | null {
+  for (const u of updates) {
+    if (u.key !== OPS_EMAIL_KEY) continue
+    const r = parseOpsEmailInput(u.value)
+    if (!r.ok) return r.error
+    u.value = JSON.stringify({ ...r.value, updatedBy: adminId })
+  }
+  return null
+}
+
 function invalidateFor(keys: string[]) {
   if (keys.some(k => k.startsWith('delivery_'))) invalidateDeliverySettingsCache()
   // Any non-delivery key may be part of site-controls; invalidate broadly (cheap).
@@ -185,7 +199,7 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
       if (await referralNeedsLoyalty(updates))
         return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
-      const tagError = normaliseTagSettings(updates)
+      const tagError = normaliseTagSettings(updates) ?? normaliseJsonSettings(updates, admin.adminId)
       if (tagError) return NextResponse.json({ error: tagError }, { status: 400 })
       for (const u of updates) await upsert(u.key, String(u.value))
       invalidateFor(updates.map(u => u.key))
@@ -209,6 +223,12 @@ export async function PATCH(request: NextRequest) {
       const r = validateGoogleTagSetting(key, value)
       if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 })
       value = r.value
+    }
+    if (key === OPS_EMAIL_KEY) {
+      const single = [{ key, value }]
+      const err = normaliseJsonSettings(single, admin.adminId)
+      if (err) return NextResponse.json({ error: err }, { status: 400 })
+      value = single[0].value
     }
     await upsert(key, String(value))
     invalidateFor([key])
