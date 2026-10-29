@@ -68,28 +68,37 @@ export async function relayToWhatsApp(s: SessionRow, m: SupportMessage, textForC
     else failed = 'WhatsApp send failed'
   }
   for (const a of m.attachments) {
-    const f = await getFileRow(a.id ? (await attachmentFileId(a.id)) ?? '' : '', { withDeleted: true })
-    if (!f) continue
-    const url = await signFile(f, { ttlSeconds: 15 * 60 })
-    const sid = await sendWhatsAppDirect({
-      phone,
-      kind: 'support_reply',
-      media: {
-        kind: cloudMediaKind(f.mime_type),
-        mime: f.mime_type,
-        filename: f.name,
-        url,
-        ...(provider.name === 'aws' && s3Location(f) ? { s3: s3Location(f)! } : {}),
-      },
-    })
-    if (sid) firstSid ??= sid
-    else failed = `Couldn't send ${f.name} on WhatsApp`
+    const fileId = a.id ? await attachmentFileId(a.id) : null
+    if (!fileId) continue
+    const out = await sendDriveFileWhatsApp(phone, fileId, 'support_reply')
+    if (out.sid) firstSid ??= out.sid
+    else failed = `Couldn't send ${out.name ?? 'a file'} on WhatsApp`
   }
   if (firstSid) {
     await query(`UPDATE support_messages SET provider = $2, provider_sid = $3 WHERE id = $1`, [m.id, provider.name, firstSid])
     await setMessageStatus(m.id, 'sent')
   }
   if (failed) await setMessageStatus(m.id, 'failed', failed)
+}
+
+/** One Drive file as WhatsApp media (inside the 24h window), through a short-lived signed link. */
+export async function sendDriveFileWhatsApp(phone: string, fileId: string, kind: string): Promise<{ sid: string | null; name: string | null }> {
+  const f = await getFileRow(fileId, { withDeleted: true })
+  if (!f) return { sid: null, name: null }
+  const provider = await getWhatsAppProvider()
+  const url = await signFile(f, { ttlSeconds: 15 * 60 })
+  const sid = await sendWhatsAppDirect({
+    phone,
+    kind,
+    media: {
+      kind: cloudMediaKind(f.mime_type),
+      mime: f.mime_type,
+      filename: f.name,
+      url,
+      ...(provider.name === 'aws' && s3Location(f) ? { s3: s3Location(f)! } : {}),
+    },
+  })
+  return { sid, name: f.name }
 }
 
 async function attachmentFileId(attachmentId: string): Promise<string | null> {

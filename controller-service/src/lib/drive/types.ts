@@ -27,6 +27,9 @@ export interface DriveFile {
   /** What the viewer may do with it. */
   access?: DriveLevel
   deletedAt?: string | null
+  /** Documents (invoices, quotations, POs): a line under the name, and the record's admin page. */
+  meta?: string
+  href?: string
 }
 
 export interface DriveFolder {
@@ -53,6 +56,20 @@ export interface DriveShare {
 
 /** The virtual folder that lists the public media gallery. */
 export const GALLERY_FOLDER_ID = 'gallery'
+
+/** Read-only sections listing the store's generated documents (each needs its own read scope). */
+export type DocFolder = 'invoices' | 'cash-sales' | 'quotations' | 'purchase-orders' | 'packing-slips' | 'shipping-labels'
+
+export const DOC_FOLDERS: Record<DocFolder, { name: string; scope: string }> = {
+  invoices: { name: 'Invoices', scope: 'invoices:read' },
+  'cash-sales': { name: 'Cash sale receipts', scope: 'invoices:read' },
+  quotations: { name: 'Quotations', scope: 'quotations:read' },
+  'purchase-orders': { name: 'Purchase orders', scope: 'inventory:read' },
+  'packing-slips': { name: 'Packing slips', scope: 'packing_slips:read' },
+  'shipping-labels': { name: 'Shipping labels', scope: 'orders:read' },
+}
+
+export const isDocFolder = (id: string): id is DocFolder => Object.prototype.hasOwnProperty.call(DOC_FOLDERS, id)
 
 export const DRIVE_MAX_FILE_BYTES = 100 * 1024 * 1024
 

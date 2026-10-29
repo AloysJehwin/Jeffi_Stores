@@ -16,6 +16,7 @@
     "wa:brand-token": "node --env-file=.env.local --import tsx scripts/wa-brand-token.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-pinpoint-sms-voice-v2": "3.1071.0",
     "@aws-sdk/client-secrets-manager": "^3.1110.0",
     "@aws-sdk/client-socialmessaging": "3.1071.0",
     "@fastify/formbody": "^8.0.2",

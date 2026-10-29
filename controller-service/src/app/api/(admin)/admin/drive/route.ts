@@ -4,6 +4,8 @@ import { driveActor, driveFailure } from '@/lib/drive/http'
 import { folderPath, getFolder, listFolders } from '@/lib/drive/folders'
 import { listFolderFiles, searchFiles } from '@/lib/drive/listing'
 import { listGalleryAsFiles } from '@/lib/drive/gallery'
+import { DOC_FOLDERS, isDocFolder, listDocuments, type DocFolder } from '@/lib/drive/documents'
+import { hasScope } from '@/lib/auth/scopes'
 import { toDriveFile, type DriveFileRow } from '@/lib/drive/files'
 import { GALLERY_FOLDER_ID, type DriveFolder, type DriveKind } from '@/lib/drive/types'
 
@@ -12,7 +14,7 @@ export const dynamic = 'force-dynamic'
 const KINDS: DriveKind[] = ['image', 'video', 'audio', 'pdf', 'doc', 'other']
 const PAGE = 60
 
-// One Drive view: ?folder=<id> (or root / gallery), ?q= searches everything visible, ?trash=1.
+// One Drive view: ?folder=<id> (or root / gallery / a document section), ?q= searches everything visible, ?trash=1.
 export async function GET(request: NextRequest) {
   const actor = await driveActor(request, 'drive:read')
   if (actor instanceof NextResponse) return actor
@@ -26,6 +28,11 @@ export async function GET(request: NextRequest) {
     const opts = { search: q, kind, limit: PAGE, offset: page * PAGE }
 
     if (sp.get('trash') === '1') return NextResponse.json({ folders: [], ...(await searchFiles(actor, { ...opts, trash: true })), path: [] })
+    if (isDocFolder(folder)) {
+      if (!hasScope(actor.role, actor.scopes, DOC_FOLDERS[folder].scope)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      const d = kind && kind !== 'pdf' ? { files: [], total: 0 } : await listDocuments(folder, opts)
+      return NextResponse.json({ folder: docFolder(folder), folders: [], ...d, path: [{ id: folder, name: DOC_FOLDERS[folder].name }] })
+    }
     if (folder === GALLERY_FOLDER_ID) {
       const g = await listGalleryAsFiles({ search: q ?? undefined, kind: kind === 'image' || kind === 'video' ? kind : null, limit: PAGE, offset: page * PAGE })
       return NextResponse.json({ folder: galleryFolder(), folders: [], files: g.files, total: g.total, path: [{ id: GALLERY_FOLDER_ID, name: 'Gallery' }] })
@@ -59,4 +66,8 @@ export async function GET(request: NextRequest) {
 
 function galleryFolder(): DriveFolder {
   return { id: GALLERY_FOLDER_ID, parentId: null, name: 'Gallery', visibility: 'team', systemKey: 'gallery', ownerAdminId: null, ownerName: null, createdAt: new Date(0).toISOString(), access: 'view' }
+}
+
+function docFolder(id: DocFolder): DriveFolder {
+  return { id, parentId: null, name: DOC_FOLDERS[id].name, visibility: 'team', systemKey: id, ownerAdminId: null, ownerName: null, createdAt: new Date(0).toISOString(), access: 'view' }
 }

@@ -174,7 +174,7 @@ export function useAdminAgentChat() {
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [conversations, setConversations] = useState<ConversationListItem[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingFile, setPendingFile] = useState<Pick<File, 'name' | 'size' | 'type'> | null>(null)
   const [uploading, setUploading] = useState(false)
   const [attachmentId, setAttachmentId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -213,13 +213,38 @@ export function useAdminAgentChat() {
     setAttachmentId(null)
   }
 
+  // A Drive file the admin can open, copied server-side into the assistant's attachments.
+  async function attachFromDrive(f: { id: string; name: string; size: number; mime: string }) {
+    setUploading(true)
+    try {
+      const res = await fetch('/api/admin/agent/attach-drive', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId: f.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Could not attach the file', 'error')
+        return
+      }
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setPendingFile({ name: f.name, size: f.size, type: data.mime_type || f.mime })
+      setAttachmentId(data.attachment_id)
+    } catch (e: any) {
+      showToast(e?.message || 'Could not attach the file', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   async function uploadPendingFile(): Promise<string | null> {
     if (!pendingFile) return null
     if (attachmentId) return attachmentId
     setUploading(true)
     try {
       const fd = new FormData()
-      fd.append('file', pendingFile)
+      fd.append('file', pendingFile as File)
       const res = await fetch('/api/admin/agent/upload', { method: 'POST', credentials: 'include', body: fd })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -585,6 +610,7 @@ export function useAdminAgentChat() {
     attachmentId,
     fileInputRef,
     onPickFile,
+    attachFromDrive,
     clearAttachment,
     loadConversations,
     loadConversation,
