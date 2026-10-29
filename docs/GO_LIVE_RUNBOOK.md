@@ -40,7 +40,7 @@ command, and logs to `~/Documents/db-backups/go-live-<stamp>/`. `--skip-rehearsa
 | `deploy/k8s/db/20-merge-control-plane.sh` | Creates the control-plane tables in `jeffi_stores`, copies the rows, validates the foreign keys, seeds plans |
 | `deploy/k8s/db/30-secrets.sh` | Patches only the DB keys, the bucket and `SERVICE_AUTH_SECRET`; creates the bucket; writes a rollback file |
 | `deploy/k8s/bootstrap/release.sh` | Builds and pushes the four images, then `rollout.sh`: platform, tenant schema fan-out (`db/40-tenant-fanout.sh`), every store, smoke test |
-| `deploy/k8s/db/50-seeds.sh` | Seeds the platform's message-template catalog (existing templates are skipped) and moves stored WhatsApp bodies to `{{brand_name}}` (idempotent) |
+| `deploy/k8s/db/50-seeds.sh` | Seeds the platform's message-template catalog (existing templates are skipped), brings unedited emails up to the catalog and moves stored WhatsApp bodies to `{{brand_name}}` (idempotent; every release runs it after the rollout) |
 | `deploy/k8s/bootstrap/doc-hosts-dns.sh` | Points the three document hosts at the cluster; writes a rollback change batch |
 | `deploy/k8s/db/verify.sql` | Post-release checks |
 
