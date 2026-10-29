@@ -32,7 +32,7 @@ const bye = (line = 'Warm regards') => `<p>${line},<br>Team {{store_name}}</p>`
 const order = (scenario: string) => ['page:order', `scenario:order.${scenario}`]
 
 /** Order details the order page fills in for its templates, on top of the store and customer ones. */
-export const ORDER_PAGE_VARS = ['order_number', 'order_date', 'total', 'order_url', 'items_table', 'tracking_url', 'courier', 'awb', 'expected_delivery', 'refund_amount', 'payment_url', 'item_name', 'delivery_address']
+export const ORDER_PAGE_VARS = ['order_number', 'order_date', 'total', 'order_url', 'tracking_url', 'courier', 'awb', 'expected_delivery', 'refund_amount', 'payment_url', 'item_name', 'delivery_address']
 
 const sms = (slug: string, name: string, category: string, body: string, tags?: string[]): TemplateSeed =>
   ({ slug, channel: 'sms', name, category, body, blocks_format: 'sms-text', tags })

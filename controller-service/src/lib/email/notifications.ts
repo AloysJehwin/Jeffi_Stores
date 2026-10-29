@@ -203,39 +203,40 @@ export async function sendPaymentFailedAdminNotification(
   }
 }
 
+/**
+ * A message from the store team to a customer. 'message' frames the text under the subject in a box;
+ * 'template' sends a library template's body as written (it carries its own greeting and headline).
+ */
+export async function adminContactHtml(subject: string, message: string, opts: { isHtml?: boolean; layout?: 'template' | 'message'; preheader?: string } = {}) {
+  const [contactLine, brand, address] = await Promise.all([storeContactLine(), currentBrandNameAsync(), storeAddressLine()])
+  const messageHtml = opts.isHtml ? message : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const asTemplate = opts.layout === 'template'
+  return mailShell({
+    brand,
+    kicker: asTemplate ? undefined : 'Message from our team',
+    title: asTemplate ? undefined : subject,
+    preheader: opts.preheader || undefined,
+    extraCss: `
+      .message-box { background-color: #fff; border-left: 4px solid #2563eb; padding: 20px; border-radius: 4px; margin: 20px 0;${opts.isHtml ? '' : ' white-space: pre-wrap;'} }
+    `,
+    content: asTemplate ? messageHtml : `<div class="message-box">${messageHtml}</div>`,
+    footerLines: [address, contactLine],
+  })
+}
+
 export async function sendAdminContactEmail(
   email: string,
   name: string,
   subject: string,
   message: string,
-  opts: { isHtml?: boolean; entityType?: string; entityId?: string } = {}
+  opts: { isHtml?: boolean; layout?: 'template' | 'message'; preheader?: string; entityType?: string; entityId?: string } = {}
 ) {
-  const contactLine = await storeContactLine()
-  const brand = await currentBrandNameAsync()
-  const address = await storeAddressLine()
-  const messageHtml = opts.isHtml ? message : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const mailOptions = {
-    from: await customerMailFromAsync(),
-    to: email,
-    subject,
-    html: mailShell({
-      brand,
-      kicker: 'Message from our team',
-      title: subject,
-      extraCss: `
-        .message-box { background-color: #fff; border-left: 4px solid #2563eb; padding: 20px; border-radius: 4px; margin: 20px 0;${opts.isHtml ? '' : ' white-space: pre-wrap;'} }
-      `,
-      content: `<div class="message-box">${messageHtml}</div>`,
-      footerLines: [
-        address,
-        contactLine,
-      ],
-    }),
-  }
-
   try {
     const info = await sendAuditedMail({
-      ...mailOptions,
+      from: await customerMailFromAsync(),
+      to: email,
+      subject,
+      html: await adminContactHtml(subject, message, opts),
       kind: 'admin_notification',
       templateName: 'admin_contact',
       ...(opts.entityType && opts.entityId ? { entityType: opts.entityType, entityId: opts.entityId } : {}),

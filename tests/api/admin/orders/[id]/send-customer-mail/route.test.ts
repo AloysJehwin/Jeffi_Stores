@@ -1,174 +1,97 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-// ── Mocks (must precede imports) ───────────────────────────────────────────
-
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/shared/db', () => ({
-  query: vi.fn(),
-  queryOne: vi.fn(),
-  queryMany: vi.fn(),
-}))
-vi.mock('@/lib/email', () => ({
-  sendAdminContactEmail: vi.fn(),
-}))
-vi.mock('@/lib/shared/validate', () => ({
-  parseBody: vi.fn(),
-  zNonEmpty: { _def: {} },
-}))
-vi.mock('@/lib/templates/variables', async () => {
-  const shared = await vi.importActual<typeof import('@/lib/templates/variables-shared')>(
-    '@/lib/templates/variables-shared'
-  )
-  return {
-    ...shared,
-    resolveTemplateVariables: vi.fn(async () => ({ customer_first_name: 'Alice', store_name: 'Acme' })),
-    createTemplateVariableResolver: vi.fn(async () => () => ({ customer_first_name: 'Alice', store_name: 'Acme' })),
-  }
+vi.mock('@/lib/email', () => ({ sendAdminContactEmail: vi.fn() }))
+vi.mock('@/lib/replies/ask', () => ({ askAboutOrder: vi.fn((_s, _o, send) => send()) }))
+vi.mock('@/lib/orders/customer-mail', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/orders/customer-mail')>('@/lib/orders/customer-mail')
+  return { unfilledTokens: actual.unfilledTokens, orderMailVars: vi.fn() }
 })
-
-// ── Imports ────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne } from '@/lib/shared/db'
 import { sendAdminContactEmail } from '@/lib/email'
-import { parseBody } from '@/lib/shared/validate'
+import { askAboutOrder } from '@/lib/replies/ask'
+import { orderMailVars } from '@/lib/orders/customer-mail'
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['orders'] }
 const ORDER_ID = 'order-uuid-1'
 const PARAMS = { params: Promise.resolve({ id: ORDER_ID }) }
+const ITEM = '7f0c1b9e-3f7a-4a51-9a5e-2d3c4b5a6f70'
+const CTX = {
+  vars: { customer_first_name: 'Alice', store_name: 'Acme', order_number: 'ORD-001', tracking_url: '', payment_url: 'https://rzp.io/x' },
+  recipient: { email: 'alice@example.com', first: 'Alice', last: 'Smith', name: 'Alice Smith' },
+  orderNumber: 'ORD-001',
+}
 
-function makeReq(body: object) {
-  return new NextRequest(`http://localhost/api/admin/orders/${ORDER_ID}/send-customer-mail`, {
+const req = (body: unknown) =>
+  new NextRequest(`http://localhost/api/admin/orders/${ORDER_ID}/send-customer-mail`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: typeof body === 'string' ? body : JSON.stringify(body),
   })
-}
-
-const mockAuth = vi.mocked(authenticateAdmin)
-const mockHasScope = vi.mocked(hasScope)
-const mockQueryOne = vi.mocked(queryOne)
-const mockSendEmail = vi.mocked(sendAdminContactEmail)
-const mockParseBody = vi.mocked(parseBody)
-
-const ORDER = {
-  id: ORDER_ID,
-  order_number: 'ORD-001',
-  customer_name: 'Alice Smith',
-  customer_email: 'alice@example.com',
-  users: { email: 'alice@example.com', first_name: 'Alice', last_name: 'Smith' },
-}
-
-// ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('POST /api/admin/orders/[id]/send-customer-mail', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
-    mockAuth.mockResolvedValue(ADMIN as any)
-    mockHasScope.mockReturnValue(true)
-    mockParseBody.mockReturnValue({
-      ok: true,
-      data: { subject: 'Your Order Update', body: 'Hello {{firstName}}', isHtml: false },
-    } as any)
-    mockQueryOne.mockResolvedValue(ORDER as any)
-    mockSendEmail.mockResolvedValue({ success: true } as any)
+    vi.clearAllMocks()
+    vi.mocked(authenticateAdmin).mockResolvedValue({ adminId: 'a1', role: 'super_admin', scopes: [] } as any)
+    vi.mocked(hasScope).mockReturnValue(true)
+    vi.mocked(orderMailVars).mockResolvedValue(CTX as any)
+    vi.mocked(sendAdminContactEmail).mockResolvedValue({ success: true } as any)
   })
 
-  // ── Auth / authz ────────────────────────────────────────────────────────
-
-  it('returns 401 when not authenticated', async () => {
-    mockAuth.mockResolvedValue(null)
-    const res = await POST(makeReq({ subject: 'Hi', body: 'Hello' }), PARAMS)
-    expect(res.status).toBe(401)
+  it('401 when not signed in, 403 without the scopes', async () => {
+    vi.mocked(authenticateAdmin).mockResolvedValueOnce(null)
+    expect((await POST(req({ subject: 'Hi', body: 'Hello' }), PARAMS)).status).toBe(401)
+    vi.mocked(hasScope).mockReturnValue(false)
+    expect((await POST(req({ subject: 'Hi', body: 'Hello' }), PARAMS)).status).toBe(403)
   })
 
-  it('returns 403 when orders scope missing', async () => {
-    mockHasScope.mockReturnValue(false)
-    const res = await POST(makeReq({ subject: 'Hi', body: 'Hello' }), PARAMS)
-    expect(res.status).toBe(403)
+  it('400 on a bad body', async () => {
+    expect((await POST(req('not-json'), PARAMS)).status).toBe(400)
+    expect((await POST(req({ body: 'Hello' }), PARAMS)).status).toBe(400)
   })
 
-  // ── Request body validation ───────────────────────────────────────────────
-
-  it('returns 400 when request body is invalid JSON', async () => {
-    const req = new NextRequest(`http://localhost/api/admin/orders/${ORDER_ID}/send-customer-mail`, {
-      method: 'POST',
-      body: 'not-json',
-    })
-    const res = await POST(req, PARAMS)
-    expect(res.status).toBe(400)
-    expect((await res.json()).error).toMatch(/invalid json/i)
+  it('404 without the order, 400 without an email', async () => {
+    vi.mocked(orderMailVars).mockResolvedValueOnce(null)
+    expect((await POST(req({ subject: 'Hi', body: 'Hello' }), PARAMS)).status).toBe(404)
+    vi.mocked(orderMailVars).mockResolvedValueOnce({ ...CTX, recipient: { ...CTX.recipient, email: '' } } as any)
+    expect((await POST(req({ subject: 'Hi', body: 'Hello' }), PARAMS)).status).toBe(400)
   })
 
-  it('returns schema validation error when parseBody fails', async () => {
-    mockParseBody.mockReturnValue({
-      ok: false,
-      response: new Response(JSON.stringify({ error: 'subject is required' }), { status: 422 }),
-    } as any)
-    const res = await POST(makeReq({ body: 'Hello' }), PARAMS)
+  it('fills the order details and sends', async () => {
+    const res = await POST(req({ subject: 'Order {{order_number}}', body: '<p>Hi {{customer_first_name}}</p>', isHtml: true, layout: 'template' }), PARAMS)
+    expect(res.status).toBe(200)
+    const [to, , subject, body, opts] = vi.mocked(sendAdminContactEmail).mock.calls[0]
+    expect(to).toBe('alice@example.com')
+    expect(subject).toBe('Order ORD-001')
+    expect(body).toBe('<p>Hi Alice</p>')
+    expect(opts).toMatchObject({ layout: 'template', entityType: 'orders', entityId: ORDER_ID })
+  })
+
+  it('refuses to send with an unfilled token', async () => {
+    const res = await POST(req({ subject: 'Hi', body: 'Track it: {{tracking_url}}' }), PARAMS)
     expect(res.status).toBe(422)
+    expect((await res.json()).missing).toEqual(['tracking_url'])
+    expect(sendAdminContactEmail).not.toHaveBeenCalled()
   })
 
-  // ── Order not found ───────────────────────────────────────────────────────
-
-  it('returns 404 when order not found', async () => {
-    mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeReq({ subject: 'Hi', body: 'Hello' }), PARAMS)
-    expect(res.status).toBe(404)
-    expect((await res.json()).error).toBe('Order not found')
+  it('creates a payment link only for a real send that uses it', async () => {
+    await POST(req({ subject: 'Pay', body: '<a href="{{payment_url}}">Pay</a>', isHtml: true }), PARAMS)
+    expect(vi.mocked(orderMailVars).mock.calls.map(c => c[1]?.createPaymentLink)).toEqual([undefined, true])
   })
 
-  // ── No email guard ────────────────────────────────────────────────────────
-
-  it('returns 400 when order has no customer email', async () => {
-    mockQueryOne.mockResolvedValue({
-      ...ORDER,
-      customer_email: null,
-      users: { email: '', first_name: 'Alice', last_name: 'Smith' },
-    } as any)
-    const res = await POST(makeReq({ subject: 'Hi', body: 'Hello' }), PARAMS)
-    expect(res.status).toBe(400)
-    expect((await res.json()).error).toMatch(/no customer email/i)
+  it('sends a reply-read scenario inside its reply context', async () => {
+    expect((await POST(req({ subject: 'Hi', body: 'Hello', scenario: 'out_of_stock' }), PARAMS)).status).toBe(400)
+    await POST(req({ subject: 'Hi', body: 'Hello', scenario: 'out_of_stock', itemId: ITEM }), PARAMS)
+    expect(askAboutOrder).toHaveBeenCalledWith('out_of_stock', ORDER_ID, expect.any(Function), { refId: ITEM })
+    expect(sendAdminContactEmail).toHaveBeenCalledOnce()
   })
 
-  // ── Happy path ───────────────────────────────────────────────────────────
-
-  it('sends email and returns success', async () => {
-    const res = await POST(makeReq({ subject: 'Order Update', body: 'Hello Alice' }), PARAMS)
-    expect(res.status).toBe(200)
-    expect((await res.json()).success).toBe(true)
-    expect(mockSendEmail).toHaveBeenCalledOnce()
-  })
-
-  it('uses customer_email fallback when users.email is missing', async () => {
-    mockQueryOne.mockResolvedValue({
-      ...ORDER,
-      customer_email: 'fallback@example.com',
-      users: { email: '', first_name: '', last_name: '' },
-    } as any)
-    const res = await POST(makeReq({ subject: 'Hi', body: 'Hello' }), PARAMS)
-    expect(res.status).toBe(200)
-    expect(mockSendEmail).toHaveBeenCalledWith(
-      'fallback@example.com',
-      expect.any(String),
-      expect.any(String),
-      expect.any(String),
-      expect.any(Object)
-    )
-  })
-
-  // ── Email send failure ────────────────────────────────────────────────────
-
-  it('returns 500 when email sending fails', async () => {
-    mockSendEmail.mockResolvedValue({ success: false } as any)
-    const res = await POST(makeReq({ subject: 'Hi', body: 'Hello' }), PARAMS)
-    expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/failed to send email/i)
+  it('500 when the send fails', async () => {
+    vi.mocked(sendAdminContactEmail).mockResolvedValue({ success: false } as any)
+    expect((await POST(req({ subject: 'Hi', body: 'Hello' }), PARAMS)).status).toBe(500)
   })
 })

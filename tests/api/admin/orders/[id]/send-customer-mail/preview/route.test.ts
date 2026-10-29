@@ -3,102 +3,68 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/templates/variables', async () => {
-  const shared = await vi.importActual<typeof import('@/lib/templates/variables-shared')>(
-    '@/lib/templates/variables-shared'
-  )
-  return {
-    ...shared,
-    resolveTemplateVariables: vi.fn(async () => ({ customer_first_name: 'Alice', store_name: 'Acme' })),
-    createTemplateVariableResolver: vi.fn(async () => () => ({ customer_first_name: 'Alice', store_name: 'Acme' })),
-  }
+vi.mock('@/lib/catalog/brand', () => ({
+  storeMailTheme: vi.fn(async () => ({ logoUrl: 'https://cdn.example/logo.png', accent: '#0f766e' })),
+}))
+vi.mock('@/lib/email', () => ({
+  adminContactHtml: vi.fn(async (subject: string, body: string) => `<!DOCTYPE html><html><head></head><body><!--mail-brand--><b>Acme</b><!--/mail-brand--><h1>${subject}</h1>${body}</body></html>`),
+}))
+vi.mock('@/lib/orders/customer-mail', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/orders/customer-mail')>('@/lib/orders/customer-mail')
+  return { unfilledTokens: actual.unfilledTokens, orderMailVars: vi.fn() }
 })
 
 import { POST } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/preview/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne } from '@/lib/shared/db'
+import { orderMailVars } from '@/lib/orders/customer-mail'
 
-const ADMIN = { adminId: 'a1', role: 'super_admin', scopes: ['orders:read'] }
 const params = Promise.resolve({ id: 'ord-1' })
-const ORDER = {
-  order_number: '1001',
-  customer_name: 'Alice Smith',
-  customer_email: 'alice@example.com',
-  users: { email: 'alice@example.com', first_name: 'Alice', last_name: 'Smith' },
+const CTX = {
+  vars: { customer_first_name: 'Alice', store_name: 'Acme', order_number: '1001', tracking_url: '' },
+  recipient: { email: 'alice@example.com', first: 'Alice', last: 'Smith', name: 'Alice Smith' },
+  orderNumber: '1001',
 }
+const req = (body: unknown) =>
+  new NextRequest('http://localhost', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  })
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
+  vi.mocked(authenticateAdmin).mockResolvedValue({ adminId: 'a1', role: 'super_admin', scopes: [] } as any)
   vi.mocked(hasScope).mockReturnValue(true)
-  vi.mocked(queryOne).mockResolvedValue(ORDER as any)
+  vi.mocked(orderMailVars).mockResolvedValue(CTX as any)
 })
 
-function makeReq(body: unknown) {
-  return new NextRequest('http://localhost', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-}
-
 describe('POST /api/admin/orders/[id]/send-customer-mail/preview', () => {
-  it('returns 401 when unauthenticated', async () => {
-    vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-    const res = await POST(makeReq({ subject: 'Hi', body: 'Hello' }), { params })
-    expect(res.status).toBe(401)
+  it('401 / 403 / 404', async () => {
+    vi.mocked(authenticateAdmin).mockResolvedValueOnce(null as any)
+    expect((await POST(req({ subject: 'Hi', body: 'Hello' }), { params })).status).toBe(401)
+    vi.mocked(hasScope).mockReturnValueOnce(false)
+    expect((await POST(req({ subject: 'Hi', body: 'Hello' }), { params })).status).toBe(403)
+    vi.mocked(orderMailVars).mockResolvedValueOnce(null)
+    expect((await POST(req({ subject: 'Hi', body: 'Hello' }), { params })).status).toBe(404)
   })
 
-  it('returns 403 when scope missing', async () => {
-    vi.mocked(hasScope).mockReturnValue(false)
-    const res = await POST(makeReq({ subject: 'Hi', body: 'Hello' }), { params })
-    expect(res.status).toBe(403)
-  })
-
-  it('returns 404 when order not found', async () => {
-    vi.mocked(queryOne).mockResolvedValue(null as any)
-    const res = await POST(makeReq({ subject: 'Hi', body: 'Hello' }), { params })
-    expect(res.status).toBe(404)
-  })
-
-  it('returns html preview on happy path', async () => {
-    const res = await POST(makeReq({ subject: 'Test', body: 'Hello {{recipient_first_name}}' }), { params })
-    expect(res.status).toBe(200)
+  it('renders the order details through the store theme', async () => {
+    const res = await POST(req({ subject: 'Order {{order_number}}', body: '<p>Hi {{customer_first_name}}</p>' }), { params })
     const json = await res.json()
-    expect(json.html).toContain('<!DOCTYPE html>')
+    expect(json.subject).toBe('Order 1001')
+    expect(json.html).toContain('<p>Hi Alice</p>')
+    expect(json.html).toContain('logo.png')
+    expect(json.html).toContain('#0f766e')
+    expect(json.missing).toEqual([])
   })
 
-  it('handles order with no users (fallback to customer_name)', async () => {
-    vi.mocked(queryOne).mockResolvedValue({
-      order_number: '1002',
-      customer_name: 'Bob Jones',
-      customer_email: 'bob@example.com',
-      users: null,
-    } as any)
-    const res = await POST(makeReq({ body: 'Hi' }), { params })
-    expect(res.status).toBe(200)
+  it('lists the unfilled tokens', async () => {
+    const json = await (await POST(req({ subject: 'Hi', body: 'Track: {{tracking_url}} {{courier}}' }), { params })).json()
+    expect(json.missing).toEqual(['tracking_url', 'courier'])
   })
 
-  it('handles malformed JSON body (empty body fallback)', async () => {
-    const req = new NextRequest('http://localhost', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: 'not-json',
-    })
-    const res = await POST(req, { params })
-    expect(res.status).toBe(200)
-  })
-
-  it('handles order with no users.last_name', async () => {
-    vi.mocked(queryOne).mockResolvedValue({
-      order_number: '1003',
-      customer_name: 'Carol',
-      customer_email: 'carol@example.com',
-      users: { email: 'carol@example.com', first_name: 'Carol', last_name: null },
-    } as any)
-    const res = await POST(makeReq({ body: 'Hi' }), { params })
-    expect(res.status).toBe(200)
+  it('treats a malformed body as empty', async () => {
+    expect((await POST(req('not-json'), { params })).status).toBe(200)
   })
 })
