@@ -2,8 +2,8 @@ import 'server-only'
 import { z } from 'zod'
 import { queryOne } from '@/lib/shared/db'
 import { createOrderPaymentLink } from '@/lib/payments/payment-link'
-import { cancelOrder } from '@/lib/orders/orders'
 import type { IntentDef, Scenario } from '../types'
+import { cancelForCustomer } from './cancel'
 
 // An unpaid invoice, or a payment that failed: the customer asks to pay (gets a payment link),
 // says they already paid (an admin checks, with their screenshot), disputes it, or cancels.
@@ -107,11 +107,7 @@ export const paymentFailed: Scenario<Snap> = {
   async execute(intent, _args, s, ctx) {
     if (intent === 'pay_link') return sendLink(s)
     if (intent === 'already_paid') return { ok: true, text: `Thanks! We'll check the payment for order ${s.number} and confirm shortly.` }
-    if (intent === 'cancel') {
-      const r = await cancelOrder(s.orderId, { reason: 'user_request', expectedUserId: ctx.userId ?? undefined })
-      if (!r.success) return { ok: false, text: r.error }
-      return { ok: true, close: true, text: r.directCancel ? `Order ${s.number} is cancelled.` : `We've asked our team to cancel order ${s.number}; you'll get a confirmation shortly.` }
-    }
+    if (intent === 'cancel') return cancelForCustomer(s.orderId, s.number, ctx.userId)
     return { ok: false, text: 'Unknown request' }
   },
 }
