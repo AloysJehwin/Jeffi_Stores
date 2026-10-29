@@ -20,6 +20,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/AdminSessionController.tsx',
   'controller-service/src/components/admin/AccessDenied.tsx',
   'controller-service/src/components/admin/TwoFactorCard.tsx',
+  'controller-service/src/components/admin/MobileNumberCard.tsx',
   'controller-service/src/components/admin/AdminSupportChat.tsx',
   // Self-service: marks the member's own notification bell read; no scoped record mutation.
   'controller-service/src/components/admin/NotificationBell.tsx',
