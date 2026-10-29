@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1793263972.7569907,
-    "ast_hash": "a656fdac0895eb766cedd09a0240c91f",
+    "mtime": 1793286345.5325868,
+    "ast_hash": "0e8e887c6b0d4fd921bbac8c2f91a52b",
     "semantic_hash": ""
   },
   "store_documents/.claude/settings.local.json": {
@@ -85,8 +85,8 @@
     "semantic_hash": ""
   },
   "database/constraints.sql": {
-    "mtime": 1793283878.0632725,
-    "ast_hash": "3a323acddcf7524e860fa70d7db05715",
+    "mtime": 1793287824.0174372,
+    "ast_hash": "7bf70bd94497bda1e2d83912f659539f",
     "semantic_hash": ""
   },
   "database/crm.sql": {
@@ -105,8 +105,8 @@
     "semantic_hash": ""
   },
   "database/indexes.sql": {
-    "mtime": 1793283878.0641081,
-    "ast_hash": "7367048061b83dc48e6b39216612acd0",
+    "mtime": 1793286179.615729,
+    "ast_hash": "7d3ffe2fea81de96de6649e49cd97abe",
     "semantic_hash": ""
   },
   "database/inventory.sql": {
@@ -140,8 +140,8 @@
     "semantic_hash": ""
   },
   "database/quotations.sql": {
-    "mtime": 1793205324.862452,
-    "ast_hash": "a516a313cf35efae5c78a093125f2edd",
+    "mtime": 1793287824.0225208,
+    "ast_hash": "39fca03f44e689edac774dfc7374bdd2",
     "semantic_hash": ""
   },
   "database/reviews.sql": {
@@ -155,8 +155,8 @@
     "semantic_hash": ""
   },
   "database/support.sql": {
-    "mtime": 1793283878.0318937,
-    "ast_hash": "5bb6ba543eea1f82e63bb8c3c022bfe0",
+    "mtime": 1793286280.4016042,
+    "ast_hash": "6f8751af8928499173bc79504394c25c",
     "semantic_hash": ""
   },
   "database/triggers.sql": {
@@ -560,8 +560,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/support/sessions/[sessionId]/messages/route.test.ts": {
-    "mtime": 1793267541.594929,
-    "ast_hash": "4d0b33fd006a99061df9cc598263663f",
+    "mtime": 1793286799.4436364,
+    "ast_hash": "e4007c96dba2dfb536b5041987ee8acc",
     "semantic_hash": ""
   },
   "tests/api/admin/support/sessions/route.test.ts": {
@@ -740,18 +740,18 @@
     "semantic_hash": ""
   },
   "tests/api/support/sessions/[sessionId]/messages/route.test.ts": {
-    "mtime": 1793267475.2779949,
-    "ast_hash": "8bd8a864cd80af93b1b282173a19a2e4",
+    "mtime": 1793286799.5151477,
+    "ast_hash": "5a860e0782398a53387744832aac8460",
     "semantic_hash": ""
   },
   "tests/api/support/sessions/[sessionId]/route.test.ts": {
-    "mtime": 1793267430.7131863,
-    "ast_hash": "8481261198e3a746c8a4a7e7054e3374",
+    "mtime": 1793286799.491008,
+    "ast_hash": "15c120b8596653bfabb4aef5c5e2eaa1",
     "semantic_hash": ""
   },
   "tests/api/support/sessions/route.test.ts": {
-    "mtime": 1793267844.2659934,
-    "ast_hash": "75aee6263064ecd37c0cba69a140b5fb",
+    "mtime": 1793286799.467325,
+    "ast_hash": "583891ee12ccdc741bbef37f03a834a4",
     "semantic_hash": ""
   },
   "tests/api/track/route.test.ts": {
@@ -3530,8 +3530,8 @@
     "semantic_hash": ""
   },
   "deploy/aws/aws-infrastructure.yaml": {
-    "mtime": 1790931247.6026587,
-    "ast_hash": "d9e9e83a45090cb1aa52f196a123bb46",
+    "mtime": 1793286463.0482688,
+    "ast_hash": "af7de4bcd43c322478f11bf59281d218",
     "semantic_hash": ""
   },
   "docs/adr/0008-on-device-summary.md": {
@@ -4555,8 +4555,8 @@
     "semantic_hash": ""
   },
   "messaging-service/src/providers/email.ts": {
-    "mtime": 1792943293.1833546,
-    "ast_hash": "7e9a8463543e1a1f038f633fc9c3e974",
+    "mtime": 1793286158.804619,
+    "ast_hash": "196c44943728ddbee89f8331d749dcd7",
     "semantic_hash": ""
   },
   "messaging-service/src/providers/twilio.ts": {
@@ -4570,8 +4570,8 @@
     "semantic_hash": ""
   },
   "messaging-service/src/send.ts": {
-    "mtime": 1793284108.3377256,
-    "ast_hash": "2eb5268b264ef026cb860388016b284b",
+    "mtime": 1793286138.6773355,
+    "ast_hash": "cb194999ce4b43c5791d280463590185",
     "semantic_hash": ""
   },
   "messaging-service/src/server.ts": {
@@ -4605,8 +4605,8 @@
     "semantic_hash": ""
   },
   "packages/api-contracts/src/index.ts": {
-    "mtime": 1793284134.5501738,
-    "ast_hash": "b2d0e859b06e68e087d79a1dfee3e473",
+    "mtime": 1793286138.6763935,
+    "ast_hash": "77155225f81c5228942a81350605851e",
     "semantic_hash": ""
   },
   "packages/gst/package.json": {
@@ -4715,8 +4715,8 @@
     "semantic_hash": ""
   },
   "document-service/src/admin/invoices/edit.ts": {
-    "mtime": 1793077243.3198848,
-    "ast_hash": "9a4eef0ef61a6465c73fea969f786051",
+    "mtime": 1793288307.8590145,
+    "ast_hash": "c97aab6ffef9ec61f2d27b79310379b9",
     "semantic_hash": ""
   },
   "document-service/src/admin/invoices/einvoice.ts": {
@@ -4725,8 +4725,8 @@
     "semantic_hash": ""
   },
   "document-service/src/admin/invoices/finalize.ts": {
-    "mtime": 1793201232.6773205,
-    "ast_hash": "250e51b6069bb6dd64c37e6d68b31b97",
+    "mtime": 1793288307.8584905,
+    "ast_hash": "92f1fb1258e1e5dbad0e790ee18a8243",
     "semantic_hash": ""
   },
   "document-service/src/admin/invoices/list.ts": {
@@ -4745,8 +4745,8 @@
     "semantic_hash": ""
   },
   "document-service/src/admin/invoices/resend-email.ts": {
-    "mtime": 1792943292.3173988,
-    "ast_hash": "65f66d3fd469a50be96f6ebc410d0902",
+    "mtime": 1793288307.8595438,
+    "ast_hash": "c8b5d3caeaa6664049442ad9966f827d",
     "semantic_hash": ""
   },
   "document-service/src/admin/invoices/system.ts": {
@@ -4785,13 +4785,13 @@
     "semantic_hash": ""
   },
   "document-service/src/admin/quotations/convert-to-invoice.ts": {
-    "mtime": 1793077243.3252838,
-    "ast_hash": "6048baa2252197180c7d836bd9c4212e",
+    "mtime": 1793288307.859908,
+    "ast_hash": "8d2660ceb5ea2bb79caaa0031106dd96",
     "semantic_hash": ""
   },
   "document-service/src/admin/quotations/item.ts": {
-    "mtime": 1793201170.9795673,
-    "ast_hash": "bf4d31f2d2fe2a90a27b3cdf4f3c47a7",
+    "mtime": 1793287824.03474,
+    "ast_hash": "d6b97603f46f705eb0fb7a41a50b0945",
     "semantic_hash": ""
   },
   "document-service/src/admin/quotations/list.ts": {
@@ -4810,8 +4810,8 @@
     "semantic_hash": ""
   },
   "document-service/src/admin/quotations/resend-email.ts": {
-    "mtime": 1793077243.3271701,
-    "ast_hash": "66e2c35282bd59e9fbfe8a304db31c8a",
+    "mtime": 1793287824.0497258,
+    "ast_hash": "192e1b817af3ebc7cccf058c85c0fe16",
     "semantic_hash": ""
   },
   "document-service/src/lib/brand.ts": {
@@ -4880,8 +4880,8 @@
     "semantic_hash": ""
   },
   "document-service/src/lib/mail.ts": {
-    "mtime": 1792943292.3305168,
-    "ast_hash": "3937b06527a9f37db36c52513184dd31",
+    "mtime": 1793288307.857896,
+    "ast_hash": "be51896569a5d852f1d5fcfb464e0547",
     "semantic_hash": ""
   },
   "document-service/src/lib/number-display.ts": {
@@ -5110,8 +5110,8 @@
     "semantic_hash": ""
   },
   "document-service/test/admin/invoices__drafts__id__finalize__route.test.ts": {
-    "mtime": 1793201257.5511956,
-    "ast_hash": "a9f0f2eeac6593373a0ef88768971dcf",
+    "mtime": 1793288523.3008082,
+    "ast_hash": "7de1dc0ee2b32f6bdd1397513d538955",
     "semantic_hash": ""
   },
   "document-service/test/admin/invoices__drafts__id__publish__route.test.ts": {
@@ -5135,13 +5135,13 @@
     "semantic_hash": ""
   },
   "document-service/test/admin/invoices__id__resend-email__route.test.ts": {
-    "mtime": 1792943292.3395703,
-    "ast_hash": "cacd0fce22d449e429a332fd5677b476",
+    "mtime": 1793288523.300495,
+    "ast_hash": "1eca9009cca0a6061cb3c78cbccf678b",
     "semantic_hash": ""
   },
   "document-service/test/admin/invoices__id__route.test.ts": {
-    "mtime": 1792943292.339782,
-    "ast_hash": "b2e00e0f62318bcbd71b989c205c8c66",
+    "mtime": 1793288523.301089,
+    "ast_hash": "1415b1beb52cb9a0f80df0e18285c3bd",
     "semantic_hash": ""
   },
   "document-service/test/admin/invoices__route.test.ts": {
@@ -5185,13 +5185,13 @@
     "semantic_hash": ""
   },
   "document-service/test/admin/quotations__id__convert-to-invoice__route.stock-and-numbering.test.ts": {
-    "mtime": 1792943292.3430178,
-    "ast_hash": "e537f2dee20860b09354b04f7e45e5c8",
+    "mtime": 1793288509.5811589,
+    "ast_hash": "076435b0b270b2e42d8ee4617a185975",
     "semantic_hash": ""
   },
   "document-service/test/admin/quotations__id__convert-to-invoice__route.test.ts": {
-    "mtime": 1792943292.343221,
-    "ast_hash": "f9709ff5f8813ca517112dcb246c071f",
+    "mtime": 1793288509.6036558,
+    "ast_hash": "ac106a0628dc8b0f29f702a262bba5f2",
     "semantic_hash": ""
   },
   "document-service/test/admin/quotations__id__pdf__route.test.ts": {
@@ -5200,13 +5200,13 @@
     "semantic_hash": ""
   },
   "document-service/test/admin/quotations__id__resend-email__route.test.ts": {
-    "mtime": 1792943292.3435922,
-    "ast_hash": "d22ba8b037fe54fb96a2fb6556c4665c",
+    "mtime": 1793287883.2695532,
+    "ast_hash": "d0f9a0dcf5eaa3f048288ee6119f3c8a",
     "semantic_hash": ""
   },
   "document-service/test/admin/quotations__id__route.test.ts": {
-    "mtime": 1793202228.9429052,
-    "ast_hash": "dda98591866f631c07404bc04bd13593",
+    "mtime": 1793287883.2683647,
+    "ast_hash": "07942fe488fee0ed3d3b8b63be804fd2",
     "semantic_hash": ""
   },
   "document-service/test/admin/quotations__products__route.test.ts": {
@@ -5810,8 +5810,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/business/rfqs/[id]/RFQDetailClient.tsx": {
-    "mtime": 1793260013.7181916,
-    "ast_hash": "9e855e65edc9203600b8284797b9ff8c",
+    "mtime": 1793287823.9484158,
+    "ast_hash": "e74beb462c30119e5313dfb0f6d4cf4f",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/business/rfqs/[id]/loading.tsx": {
@@ -6465,8 +6465,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/dashboard/page.tsx": {
-    "mtime": 1792943291.5570471,
-    "ast_hash": "de4db0bd037e0e27a8c39a933e5e8ce3",
+    "mtime": 1793289917.2046113,
+    "ast_hash": "55f49ec9cf6f71b2c480f239453656fc",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/data-source/_components/DataSourceClient.tsx": {
@@ -6770,8 +6770,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/invoices/[id]/InvoiceDetailClient.tsx": {
-    "mtime": 1793259800.610356,
-    "ast_hash": "629320c5fc779fc38f87a3d60d9f65bc",
+    "mtime": 1793288362.0252588,
+    "ast_hash": "25bbe810ba5592362b4f9f2227102809",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/invoices/[id]/loading.tsx": {
@@ -7055,8 +7055,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/orders/[id]/view/page.tsx": {
-    "mtime": 1793284831.9877214,
-    "ast_hash": "70cbc46c4f8896d1748d9a203f01d7f3",
+    "mtime": 1793289268.672648,
+    "ast_hash": "83ef4f25efe74cb26ecf72f9a83b9262",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/orders/_components/OrdersMobileList.tsx": {
@@ -7230,8 +7230,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/quotations/[id]/QuotationDetailClient.tsx": {
-    "mtime": 1793259805.784999,
-    "ast_hash": "768b214a13023ad56eab846d12c0fde7",
+    "mtime": 1793287823.9591317,
+    "ast_hash": "a23330dca23c1e49b9c93a6607536979",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/quotations/[id]/loading.tsx": {
@@ -7425,8 +7425,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/settings/site-controls/page.tsx": {
-    "mtime": 1793284469.2653275,
-    "ast_hash": "653dc0378b3fcb31a61a72aa0e84ee5d",
+    "mtime": 1793289931.034544,
+    "ast_hash": "784107b35ee4ed1b3816d5466ef1d0cc",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/shelving/ShelvingClient.tsx": {
@@ -7470,8 +7470,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/subscriptions/[id]/view/page.tsx": {
-    "mtime": 1793259776.5013049,
-    "ast_hash": "be0a497bb65c31a67a958df55bc326bf",
+    "mtime": 1793289334.481127,
+    "ast_hash": "c9a8520af70de852c9179cbfa2d9d895",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/subscriptions/_status.ts": {
@@ -8920,8 +8920,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/actions/[id]/approve/_lib/messaging.ts": {
-    "mtime": 1792943291.7170038,
-    "ast_hash": "32d4a73b57bcfa2db749cadd92a8cb50",
+    "mtime": 1793289277.673421,
+    "ast_hash": "cdec823fb13fb72ef06fdb3e10818c44",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/actions/[id]/approve/_lib/ops.ts": {
@@ -8935,8 +8935,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/actions/[id]/approve/_lib/quotations.ts": {
-    "mtime": 1793185689.800236,
-    "ast_hash": "a116e5ecba0fd80fe9f9b17021367856",
+    "mtime": 1793287823.9643686,
+    "ast_hash": "bccd6a22c79f4b6b412dbb15b9c2d9cc",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/actions/[id]/approve/_lib/shared.ts": {
@@ -9095,8 +9095,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/business/rfqs/[id]/messages/route.ts": {
-    "mtime": 1793205368.3509574,
-    "ast_hash": "2cacd3930bf3ba8ae7069bf2bb6bcca6",
+    "mtime": 1793287823.9694872,
+    "ast_hash": "d1d62431d46f2deb4e8d1114082aac4d",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/business/rfqs/[id]/route.ts": {
@@ -10215,8 +10215,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/orders/[id]/retry-email/route.ts": {
-    "mtime": 1792943291.832793,
-    "ast_hash": "ec5cbf4d72221d145c43d23843f459fb",
+    "mtime": 1793288344.3670678,
+    "ast_hash": "48facdafb6a7fa779beff0390c7207df",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/orders/[id]/route.ts": {
@@ -10745,8 +10745,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/support/sessions/route.ts": {
-    "mtime": 1793265547.4216511,
-    "ast_hash": "ca7370e25b5a7072ef225830dfc4e8f6",
+    "mtime": 1793289876.2601388,
+    "ast_hash": "1a8d15f6b37cb6620b7cb90e79722206",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/tasks/route.ts": {
@@ -11220,8 +11220,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/business/rfqs/[id]/respond/route.ts": {
-    "mtime": 1792943291.9355693,
-    "ast_hash": "145114d2d1473364e157974cc3c4951f",
+    "mtime": 1793287823.9756355,
+    "ast_hash": "72768753486b99ced1f45fce0460e19f",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/business/rfqs/[id]/resubmit/route.ts": {
@@ -11485,8 +11485,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/orders/[id]/route.ts": {
-    "mtime": 1793185801.4907322,
-    "ast_hash": "f626cc674727e8796deba192e9a01796",
+    "mtime": 1793288351.1368194,
+    "ast_hash": "c86bbaa7fa6859a82f4a6b8dca3dfef5",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/orders/[id]/track-rvp/route.ts": {
@@ -11600,8 +11600,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/razorpay/payment-link/route.ts": {
-    "mtime": 1792943291.9593287,
-    "ast_hash": "ea4ed8d5803ec68bc7ef53794520eb3b",
+    "mtime": 1793288041.520077,
+    "ast_hash": "9830ea3911abfb8e8bf73744fb766ee5",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/razorpay/verify/route.ts": {
@@ -13950,8 +13950,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/campaigns/scenarios/subscription-renewal.ts": {
-    "mtime": 1792943292.1028354,
-    "ast_hash": "c410787c230fc42c9788135200cc458b",
+    "mtime": 1793289396.5507283,
+    "ast_hash": "61f27968d0f8c26ee1ab08a33887600e",
     "semantic_hash": ""
   },
   "controller-service/src/lib/campaigns/scenarios/viewed-category.ts": {
@@ -15000,8 +15000,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/dashboard-insights.ts": {
-    "mtime": 1792943292.2029445,
-    "ast_hash": "223ece76c3e990e91e226c7554afe4e3",
+    "mtime": 1793289917.2040496,
+    "ast_hash": "628b6101c43f251a4e54fc4c13bf26e5",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/db.ts": {
@@ -15070,8 +15070,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/mail-audit.ts": {
-    "mtime": 1793284108.3370974,
-    "ast_hash": "bff542c7c2aa69d1b60d5fd8016f29db",
+    "mtime": 1793286138.6889596,
+    "ast_hash": "d1fa8c1ca1e0b5775c3e70733862b9f9",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/mail-template.ts": {
@@ -15110,8 +15110,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/messaging/remote.ts": {
-    "mtime": 1793284108.336494,
-    "ast_hash": "a11c966347d165d00d0b715e7ecd6183",
+    "mtime": 1793286138.6776426,
+    "ast_hash": "b03d25b125ef38f7ef9a066332f512cf",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/messaging/twilio-provider.ts": {
@@ -15195,8 +15195,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/send-by-template.ts": {
-    "mtime": 1793284134.5512705,
-    "ast_hash": "7c58b1d373e4ff18ae85feaeb82b598a",
+    "mtime": 1793289136.942683,
+    "ast_hash": "f67d10c26844eaedea5fe46650ea8aa7",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/sms.ts": {
@@ -23625,8 +23625,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/support/page.tsx": {
-    "mtime": 1793268528.206454,
-    "ast_hash": "98a98b6041b1798f2e18d4fa606ae195",
+    "mtime": 1793289917.2054057,
+    "ast_hash": "07cf12fb525fb3dd05b108e52092bc50",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/drive/files/[id]/content/route.ts": {
@@ -23790,8 +23790,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/support/SupportInbox.tsx": {
-    "mtime": 1793268996.644229,
-    "ast_hash": "52907943d358c7b99453581511b1ef00",
+    "mtime": 1793289917.2061486,
+    "ast_hash": "de18ab89848f3227eb1dbf772afc4096",
     "semantic_hash": ""
   },
   "controller-service/src/components/chat/AttachmentView.tsx": {
@@ -23865,8 +23865,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/drive/files.ts": {
-    "mtime": 1793265904.0647044,
-    "ast_hash": "e9df19fb44a1abe29f3cd0e78011b086",
+    "mtime": 1793286239.439884,
+    "ast_hash": "3fb6fa0b631e9c8e12c0271a67218536",
     "semantic_hash": ""
   },
   "controller-service/src/lib/drive/folders.ts": {
@@ -23930,13 +23930,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/support/agent/actions.ts": {
-    "mtime": 1793285701.439654,
-    "ast_hash": "ebe970fea7099f5d777d3a2f490be2d9",
+    "mtime": 1793288885.4660273,
+    "ast_hash": "7c31d687ad025a64133dc468f6583510",
     "semantic_hash": ""
   },
   "controller-service/src/lib/support/agent/index.ts": {
-    "mtime": 1793285701.4401119,
-    "ast_hash": "7135a236aca5a5dbf18cb0d3a574db2c",
+    "mtime": 1793288885.4684615,
+    "ast_hash": "4e2db5c002e0b840ca0dbffaa824aea6",
     "semantic_hash": ""
   },
   "controller-service/src/lib/support/agent/run.ts": {
@@ -23950,8 +23950,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/support/delivery.ts": {
-    "mtime": 1793263929.674272,
-    "ast_hash": "751031058c8ee63854bfb887988a22ea",
+    "mtime": 1793286305.3987548,
+    "ast_hash": "729b8859b4c3963fb83289176173636c",
     "semantic_hash": ""
   },
   "controller-service/src/lib/support/events.ts": {
@@ -23985,8 +23985,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/support/sessions.ts": {
-    "mtime": 1793266165.9914382,
-    "ast_hash": "b57feec7ccdebf43cbfda02fff9c7928",
+    "mtime": 1793289876.2557998,
+    "ast_hash": "659acdbe586a1a72adcdd0a4e9302bf7",
     "semantic_hash": ""
   },
   "controller-service/src/lib/support/translate.ts": {
@@ -23995,8 +23995,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/support/types.ts": {
-    "mtime": 1793284213.2942913,
-    "ast_hash": "af0620cedb69949a19e9c65ce55c2b97",
+    "mtime": 1793289876.2597113,
+    "ast_hash": "36b3d20a530ea634dd334fd19135e16e",
     "semantic_hash": ""
   },
   "controller-service/src/lib/support/whatsapp.ts": {
@@ -24190,18 +24190,18 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/replies/context.ts": {
-    "mtime": 1793285302.0651202,
-    "ast_hash": "df6953fdb35d44cef32b0e6b6c2310d1",
+    "mtime": 1793289744.3032315,
+    "ast_hash": "ce871cba040e22db5c0c10f78614aca6",
     "semantic_hash": ""
   },
   "controller-service/src/lib/replies/engine.ts": {
-    "mtime": 1793285645.532838,
-    "ast_hash": "56b95470cc676d90b4ea56a42702c676",
+    "mtime": 1793287823.980276,
+    "ast_hash": "b23eb1d70bef4ecbedbca24c2ae8d254",
     "semantic_hash": ""
   },
   "controller-service/src/lib/replies/execute.ts": {
-    "mtime": 1793285645.5332775,
-    "ast_hash": "724819fb3f9f03ca8416bdbdd5b11c56",
+    "mtime": 1793287823.9858785,
+    "ast_hash": "2b8fb71e74cbb70f0b623a67cadb9ca9",
     "semantic_hash": ""
   },
   "controller-service/src/lib/replies/policy.ts": {
@@ -24215,8 +24215,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/replies/scenarios/index.ts": {
-    "mtime": 1793284425.8735294,
-    "ast_hash": "a9bfe50fe055e2bd4f2436455b832424",
+    "mtime": 1793289312.5267568,
+    "ast_hash": "f0abf2f2d4df5e974cecd5a0d4540774",
     "semantic_hash": ""
   },
   "controller-service/src/lib/replies/scenarios/order-adjustment.ts": {
@@ -24230,8 +24230,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/replies/types.ts": {
-    "mtime": 1793284380.991293,
-    "ast_hash": "0ac790d268c1821894b6c70c2c5db8e7",
+    "mtime": 1793287823.9999137,
+    "ast_hash": "4af1f157c2c7fe40f3e772967a45ed11",
     "semantic_hash": ""
   },
   "database/migrations/2026-10-29_reply_contexts.sql": {
@@ -24242,6 +24242,106 @@
   "database/replies.sql": {
     "mtime": 1793283878.0408127,
     "ast_hash": "ad749be9c518ed35a2d4c07f61e0f605",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/orders/[id]/_components/AskItemUnavailableButton.tsx": {
+    "mtime": 1793289257.1111739,
+    "ast_hash": "4a93e9580cd12e198cd10e3fc30a34dd",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/orders/[id]/items/[itemId]/ask-unavailable/route.ts": {
+    "mtime": 1793289227.8776925,
+    "ast_hash": "07d00b34fbe4a9d133c05cb753f1eeae",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(public)/webhooks/ses-inbound/route.ts": {
+    "mtime": 1793286379.593319,
+    "ast_hash": "da463ec9a96f3353fd1bae2fcfc4d213",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/business/rfq-notify.ts": {
+    "mtime": 1793287103.994782,
+    "ast_hash": "05ada4a8f6a8715f7622bd95aec6e70e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/business/rfq-respond.ts": {
+    "mtime": 1793287001.440782,
+    "ast_hash": "dc5d3dd997a54a1d909a40cc2efe7e96",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/orders/ask-unavailable.ts": {
+    "mtime": 1793289227.8650937,
+    "ast_hash": "92c249325013427f15effc316c92b73f",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/payments/payment-link.ts": {
+    "mtime": 1793288594.2899013,
+    "ast_hash": "233adb864c02eef277c3dfdd41082c7b",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/ask.ts": {
+    "mtime": 1793288130.3306112,
+    "ast_hash": "1797fcab4ed3e5a42c864d1c84957e08",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/email-text.ts": {
+    "mtime": 1793286206.332035,
+    "ast_hash": "213d3cd0bff787dc26ac008c77ea6018",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/scenarios/cancel.ts": {
+    "mtime": 1793289196.3278563,
+    "ast_hash": "640befbdbb83ceee7692c277b7451957",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/scenarios/order-delay.ts": {
+    "mtime": 1793289196.3342338,
+    "ast_hash": "245c3a6084492dabb197f113c45fd9a0",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/scenarios/out-of-stock.ts": {
+    "mtime": 1793289196.343473,
+    "ast_hash": "eb9a0f15a5cfe36e1265e6521f158b8c",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/scenarios/payment.ts": {
+    "mtime": 1793289196.3923383,
+    "ast_hash": "36ed72969777dc7a158f6fa7b58fbfe7",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/scenarios/quotation.ts": {
+    "mtime": 1793287395.3947382,
+    "ast_hash": "64c06af78938dea60c6f7fbd7a11ee73",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/scenarios/rfq-offer.ts": {
+    "mtime": 1793287395.3959398,
+    "ast_hash": "698cce82e55e6b629cd806d6e77d8e8e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/scenarios/subscription-renewal.ts": {
+    "mtime": 1793289744.3026938,
+    "ast_hash": "3c6c6b1ac9cc69ca13c9bb064cdff9d6",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/support/email-inbound.ts": {
+    "mtime": 1793287824.009231,
+    "ast_hash": "f3c66b10afb8c1e2675a577fb7b23ae4",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/support/email.ts": {
+    "mtime": 1793286293.2123175,
+    "ast_hash": "ab41197ed331dc743fb462ea7fe441b4",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/bootstrap/ses-inbound.sh": {
+    "mtime": 1793286453.6670923,
+    "ast_hash": "d9618099c3a972145c5c971630dd6469",
+    "semantic_hash": ""
+  },
+  "document-service/src/lib/reply-context.ts": {
+    "mtime": 1793288307.8574746,
+    "ast_hash": "29aefae49f548654e3e8cb11663e5242",
     "semantic_hash": ""
   }
 }
