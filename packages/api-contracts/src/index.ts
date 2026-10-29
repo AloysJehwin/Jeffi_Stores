@@ -159,6 +159,7 @@ export const UpsertLibraryTemplateRequest = z.object({
   description: z.string().max(500).optional(),
   locale: z.string().max(10).optional(),
   subject: z.string().max(200).optional(),
+  preheader: z.string().max(200).nullable().optional().describe('Email: the preview line inboxes show after the subject'),
   body: z.string().min(1).max(20000),
   blocks: z.union([TemplateBlocks, z.array(z.unknown()), z.string()]).optional(),
   blocks_format: z.enum(['tiptap', 'tiptap-html', 'email-blocks', 'maily', 'mjml', 'wa-content', 'sms-text']).optional(),

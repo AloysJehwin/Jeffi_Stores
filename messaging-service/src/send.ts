@@ -98,7 +98,7 @@ export async function resolveTemplate(tenantId: string, channel: string, slug: s
     const live = channel === 'whatsapp' && t.variant.provider_ref
       ? (await tpl.liveVersion(pool, t.variant.id, t.variant.provider_ref)) ?? t.version
       : t.version
-    return { subject: live.subject, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any, layout: live.layout, meta_category: t.variant.meta_category ?? undefined }
+    return { subject: live.subject, preheader: live.preheader ?? null, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any, layout: live.layout, meta_category: t.variant.meta_category ?? undefined }
   }
   return null
 }
@@ -198,16 +198,18 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
   let layout: 'store' | 'none' = 'store'
+  let preheader: string | null = null
   let mediaHosted = false
   let waVars: Record<string, string> | null = null
   let waHeader: string | undefined
   if (req.template) {
     const t = await resolveTemplate(ctx.tenantId, req.channel, req.template, ctx.space)
     if (!t) throw new SendError(404, 'template_not_found', `No ${req.channel} template '${req.template}'`)
-    const missing = missingKeys(t.body + ' ' + (t.subject ?? ''), vars)
+    const missing = missingKeys(t.body + ' ' + (t.subject ?? '') + ' ' + (t.preheader ?? ''), vars)
     if (missing.length) throw new SendError(422, 'missing_variables', `Template needs: ${missing.join(', ')}`, { missing })
     subject = subject ?? t.subject
     body = t.body
+    preheader = t.preheader
     providerRef = providerRef ?? t.provider_ref ?? undefined
     layout = (t as any).layout === 'none' ? 'none' : 'store'
     if (req.channel === 'whatsapp') {
@@ -224,7 +226,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     }
   }
   const html = req.channel === 'email'
-  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, waVars, waHeader, layout, mediaHosted }
+  return { subject: subject ? render(subject, vars) : null, preheader: preheader ? render(preheader, vars) : null, body: render(body, vars, html), providerRef, vars, waVars, waHeader, layout, mediaHosted }
 }
 
 // The store's Site Controls switches (feature_sms_enabled / feature_whatsapp_enabled) have the last word on
@@ -255,7 +257,7 @@ export async function assertChannelOn(tenantId: string, channel: string, space: 
 
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
   await assertChannelOn(ctx.tenantId, req.channel, ctx.space)
-  const { subject, body, providerRef, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
+  const { subject, preheader, body, providerRef, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
 
   const id = randomUUID()
@@ -291,7 +293,7 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     if (req.channel === 'email') {
       provider = 'ses'
       // layout 'none': the template's HTML exactly as written, no store header/footer.
-      const html = layout === 'none' ? body : wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact, logoUrl: req.logo_url, accent: req.accent, replyHint: !!req.reply_to })
+      const html = layout === 'none' ? body : wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact, logoUrl: req.logo_url, accent: req.accent, replyHint: !!req.reply_to, preheader })
       ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html, replyTo: req.reply_to, inReplyTo: req.in_reply_to })
     } else if (req.channel === 'sms') {
       // The tenant's provider policy decides; a tenant on AWS never falls back to Twilio.
