@@ -6380,13 +6380,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/customers/[id]/_components/CustomerTags.tsx": {
-    "mtime": 1792943291.5531821,
-    "ast_hash": "391bb6b0353f436d4aa666c730d20546",
+    "mtime": 1793255267.9753985,
+    "ast_hash": "19d408853673d25f8eb52b9bc13a5526",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/customers/[id]/_components/CustomerTasks.tsx": {
-    "mtime": 1792943291.5533462,
-    "ast_hash": "e7b4fd43586fb37bf70c168319ec906c",
+    "mtime": 1793255267.976247,
+    "ast_hash": "07ee996f0a5c8f096c87643efc87d547",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/customers/[id]/_components/CustomerTimeline.tsx": {
@@ -6770,8 +6770,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/invoices/[id]/InvoiceDetailClient.tsx": {
-    "mtime": 1793077243.5185819,
-    "ast_hash": "44a42ca8a8e56bc9af91fa2f35853276",
+    "mtime": 1793254955.8101692,
+    "ast_hash": "efaa047b2145c99a89ffc5de3f376569",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/invoices/[id]/loading.tsx": {
@@ -7105,8 +7105,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/products/[id]/ProductDetailClient.tsx": {
-    "mtime": 1793177900.526689,
-    "ast_hash": "59f0b7fa591ce114b1a27ace928db4fe",
+    "mtime": 1793254955.809059,
+    "ast_hash": "d2e4bfb8cb1c88266f068f1f89cfe273",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/products/[id]/analytics/ProductAnalyticsClient.tsx": {
@@ -7230,8 +7230,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/quotations/[id]/QuotationDetailClient.tsx": {
-    "mtime": 1792943291.6197798,
-    "ast_hash": "222ce9cf27e33490fbb506291b50ae17",
+    "mtime": 1793254955.8111093,
+    "ast_hash": "57435fb9000f4b74d98809a54059327b",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/quotations/[id]/loading.tsx": {
@@ -8960,8 +8960,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/chat/route.ts": {
-    "mtime": 1793252252.6077027,
-    "ast_hash": "0a5037cccb399726d9525cd1901a577c",
+    "mtime": 1793254822.8822665,
+    "ast_hash": "b450d3ed8efcc1cde746c5ca85ecca13",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/agent/conversations/[id]/messages/route.ts": {
@@ -12005,7 +12005,7 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/AdminShell.tsx": {
-    "mtime": 1793252818.3018973,
+    "mtime": 1793255512.5159044,
     "ast_hash": "2d0e216672027bc8cb5d8ad623e305c6",
     "semantic_hash": ""
   },
@@ -12135,8 +12135,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/CustomerNotes.tsx": {
-    "mtime": 1792943292.0018835,
-    "ast_hash": "50d4acffc86123e0dde0763d8aa91330",
+    "mtime": 1793255267.974358,
+    "ast_hash": "5e964f2df6e13823db307347045b7a5a",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/CustomerTagDefinitionsCard.tsx": {
@@ -13570,8 +13570,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/index.ts": {
-    "mtime": 1793186143.9061587,
-    "ast_hash": "c4a7d9d671ab2651ff08aaaf94748503",
+    "mtime": 1793255406.4009497,
+    "ast_hash": "5e89c571aaeb2362f265cd0a1242abe8",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/marketing.ts": {
@@ -19770,8 +19770,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/kit/infinite.tsx": {
-    "mtime": 1793080546.2315035,
-    "ast_hash": "4fe5ed9ad7addcdb55797eb310ddf46b",
+    "mtime": 1793254955.8078845,
+    "ast_hash": "863d1733013919891a8541cf8d49357e",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin/page-urls.ts": {
@@ -22005,8 +22005,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/filters/run.ts": {
-    "mtime": 1792991160.2220623,
-    "ast_hash": "1db10a05579f89081189a04e7fcdd7b6",
+    "mtime": 1793255406.4000878,
+    "ast_hash": "36934c03d0cf1a955788e30b5b1d6971",
     "semantic_hash": ""
   },
   "controller-service/src/lib/filters/window.ts": {
@@ -23310,8 +23310,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/agent/AgentChatPanel.tsx": {
-    "mtime": 1793253467.319539,
-    "ast_hash": "601a822951e95f106d87854cf6871e1f",
+    "mtime": 1793254971.1455343,
+    "ast_hash": "ba6137128fe1b9a085c045e64930b6fa",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/drafts/DraftBehindBanner.tsx": {
@@ -23335,8 +23335,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/hooks/useAdminAgentChat.ts": {
-    "mtime": 1793252681.2745461,
-    "ast_hash": "465859cca59f9cf2f07e3b5c60daffa5",
+    "mtime": 1793254939.8321683,
+    "ast_hash": "64f9f9e76d50b6460b169696dd125382",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin/draft-branches.ts": {
@@ -23425,8 +23425,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/permissions.ts": {
-    "mtime": 1793186786.7758243,
-    "ast_hash": "e25f20d35babaf43671dd9d3611a4561",
+    "mtime": 1793254861.9427652,
+    "ast_hash": "4fdf7fa12351a4c1c80c1240d1ac2252",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/tools/orders.ts": {
@@ -23550,8 +23550,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/agent/AgentDock.tsx": {
-    "mtime": 1793252975.3820605,
-    "ast_hash": "d0df0ac34977a1fe9ffcf70b827c8b61",
+    "mtime": 1793255618.0903928,
+    "ast_hash": "d10adb0812ca36491773a71f7b3dd090",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/agent/RecordCard.tsx": {
@@ -23560,18 +23560,28 @@
     "semantic_hash": ""
   },
   "controller-service/src/contexts/AdminAgentContext.tsx": {
-    "mtime": 1793253301.9018037,
-    "ast_hash": "6fac04af66d8abc00309d7f70b0c1b75",
+    "mtime": 1793254955.8015568,
+    "ast_hash": "165184201b5d1606bcec5f5b566c41ea",
     "semantic_hash": ""
   },
   "controller-service/src/lib/admin-agent/conversations.ts": {
-    "mtime": 1793252220.7867255,
-    "ast_hash": "283f92acb30faa9cc8a43f7c095a8bec",
+    "mtime": 1793254822.8828433,
+    "ast_hash": "e825b8c19f9df39d357c354073533fbd",
     "semantic_hash": ""
   },
   "database/migrations/agent-conversations.sql": {
     "mtime": 1793252149.5502129,
     "ast_hash": "1b2c220792824dcae5df949a90c17178",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/admin-agent/page-context.ts": {
+    "mtime": 1793254798.1014085,
+    "ast_hash": "dff8aaad5236d82e19f7795eaf2d3def",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/client/agent-events.ts": {
+    "mtime": 1793254924.1105676,
+    "ast_hash": "f70c5b8b014110fb758614fb65d2f06f",
     "semantic_hash": ""
   }
 }
