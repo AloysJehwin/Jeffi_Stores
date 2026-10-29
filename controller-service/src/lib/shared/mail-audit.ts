@@ -3,6 +3,7 @@ import { messagingInline, remoteSend } from '@/lib/shared/messaging/remote'
 import { queryOne } from '@/lib/shared/db'
 import { findTokenKeys } from '@/lib/templates/variables-shared'
 import { messagingGateAllows, debitEmailCost } from '@/lib/shared/messaging/billing'
+import { currentReplyScope, recordScopedSend, sesMessageId } from '@/lib/replies/scope'
 
 // Single chokepoint for outbound mail. Wraps transporter.sendMail and writes
 // a row to email_logs (status, body, kind, entity link) so admins can see
@@ -132,7 +133,10 @@ async function guardTokens(o: SendAuditedMailOptions): Promise<SendAuditedMailOp
 }
 
 export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ messageId?: string }> {
-  const o = await guardTokens(input)
+  const guarded = await guardTokens(input)
+  // Inside withReplyContext(): the customer's reply comes back to this question.
+  const scope = currentReplyScope()
+  const o = scope && !guarded.replyTo ? { ...guarded, replyTo: scope.replyTo, entityType: guarded.entityType ?? scope.entityType, entityId: guarded.entityId ?? scope.entityId } : guarded
   // No explicit from → use the CURRENT store's customer sender (tenant on a tenant host, platform
   // off-tenant) instead of a hardcoded "Jeffi Store's", which leaked into tenant-facing mail.
   const from = o.from || (await resolveDefaultFrom())
@@ -187,9 +191,10 @@ export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ 
       return {}
     }
     if (!messagingInline() && !o.cc && !o.bcc && !o.amp && !o.attachments?.length && typeof o.to === 'string') {
-      const r = await remoteSend({ channel: 'email', to: o.to, from, subject: o.subject, body: o.html ?? o.text ?? '', metadata: { kind: o.kind } })
+      const r = await remoteSend({ channel: 'email', to: o.to, from, subject: o.subject, body: o.html ?? o.text ?? '', reply_to: o.replyTo, metadata: { kind: o.kind } })
       await logMail({ to, from, cc, bcc, subject: o.subject, html: o.redactBody ? null : (o.html ?? null), text: o.redactBody ? null : (o.text ?? null), kind: o.kind, entityType: o.entityType ?? null, entityId: o.entityId ?? null, userId: o.userId ?? null, templateName: o.templateName ?? null, metadata: { ...(o.metadata ?? {}), via: 'messaging-service' }, status: r.ok ? 'sent' : 'failed', error: r.error ?? null, messageId: r.providerRef ?? null })
       if (!r.ok) throw new Error(r.error ?? 'messaging-service send failed')
+      await recordScopedSend({ channel: 'email', emailMessageIds: [r.providerRef && `${r.providerRef}@email.amazonses.com`] })
       return { messageId: r.providerRef }
     }
     const info = await getTransporter().sendMail({
@@ -224,6 +229,7 @@ export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ 
       messageId: info.messageId ?? null,
     })
     await debitEmailCost(info.messageId)
+    await recordScopedSend({ channel: 'email', emailMessageIds: [info.messageId, sesMessageId(info.response)] })
     return { messageId: info.messageId }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

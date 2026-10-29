@@ -26,6 +26,7 @@ import CreateShipmentButton from '@/app/(admin)/admin/orders/[id]/_components/Cr
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductAdjustments from '@/app/(admin)/admin/orders/[id]/_components/ProductAdjustments'
 import AddressChangeReview from '@/app/(admin)/admin/orders/[id]/_components/AddressChangeReview'
+import RecordReplies from '@/components/admin/replies/RecordReplies'
 import { listAddressChangeRequests, addressChangeBlockReason } from '@/lib/orders/address-change'
 import CustomerMailPanel from '@/app/(admin)/admin/orders/[id]/_components/CustomerMailPanel'
 import MailLogsPanel from '@/app/(admin)/admin/orders/[id]/_components/MailLogsPanel'
@@ -692,6 +693,8 @@ export default async function OrderDetailsPage({
             canWrite={canWrite}
             blockReason={addressChangeBlockReason(order)}
           />
+
+          <RecordReplies entityType="orders" entityId={order.id} canWrite={canWrite} />
 
           {order.status === 'confirmed' && !order.awb_number && canWrite && (
             <ProductAdjustments

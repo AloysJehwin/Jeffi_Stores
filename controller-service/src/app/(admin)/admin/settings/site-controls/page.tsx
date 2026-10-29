@@ -637,6 +637,26 @@ export default async function SiteControlsPage() {
                     </SectionCard>
                   </div>
                   <div>
+                    <SectionCard title="Customer replies" description="When the store asks a customer something (order changes, a quotation, a payment), they can answer by replying to the WhatsApp or email." columns>
+                      <FullSpan>
+                        <ToggleControl
+                          settingKey="feature_reply_actions_enabled"
+                          label="Act on customer replies"
+                          hint="The AI reads the reply, links it to the order or quotation, and acts on it. Off: replies go to the support inbox only."
+                          initial={c.flags.replyActionsEnabled}
+                        />
+                      </FullSpan>
+                      <FullSpan>
+                        <ToggleControl
+                          settingKey="feature_reply_auto_apply"
+                          label="Apply clear answers automatically"
+                          hint="A clear yes/no on something low-risk (approving an order change with no extra payment, accepting a quotation) is applied straight away. Refunds and anything unusual always wait for an admin. Off: an admin approves every reply."
+                          initial={c.flags.replyAutoApply}
+                        />
+                      </FullSpan>
+                    </SectionCard>
+                  </div>
+                  <div>
                     <SectionCard
                       title="On-device AI"
                       description="Experimental browser-based AI features. Per-platform switches control where the in-browser model runs; when it's off (or unsupported) on a platform, that device falls back to server-generated AI instead."

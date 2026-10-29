@@ -1774,6 +1774,25 @@ ALTER TABLE ONLY public.support_ai_actions
 ALTER TABLE public.support_ai_actions
     ADD CONSTRAINT support_ai_actions_status_check CHECK (status IN ('pending','confirmed','declined','done','failed','expired'));
 
+ALTER TABLE public.support_ai_actions
+    ADD CONSTRAINT support_ai_actions_awaiting_check CHECK (awaiting IN ('customer','admin','none'));
+
+--
+-- Name: reply_contexts reply_contexts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reply_contexts
+    ADD CONSTRAINT reply_contexts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.reply_contexts
+    ADD CONSTRAINT reply_contexts_token_key UNIQUE (token);
+
+ALTER TABLE public.reply_contexts
+    ADD CONSTRAINT reply_contexts_status_check CHECK (status IN ('open','answered','closed','expired'));
+
+ALTER TABLE ONLY public.reply_context_sends
+    ADD CONSTRAINT reply_context_sends_pkey PRIMARY KEY (id);
+
 ALTER TABLE ONLY public.drive_folders
     ADD CONSTRAINT drive_folders_pkey PRIMARY KEY (id);
 
@@ -3494,6 +3513,12 @@ ALTER TABLE ONLY public.support_message_attachments
 
 ALTER TABLE ONLY public.support_ai_actions
     ADD CONSTRAINT support_ai_actions_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.support_sessions(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.reply_context_sends
+    ADD CONSTRAINT reply_context_sends_context_id_fkey FOREIGN KEY (context_id) REFERENCES public.reply_contexts(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.reply_contexts
+    ADD CONSTRAINT reply_contexts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.drive_files
     ADD CONSTRAINT drive_files_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES public.drive_folders(id) ON DELETE SET NULL;

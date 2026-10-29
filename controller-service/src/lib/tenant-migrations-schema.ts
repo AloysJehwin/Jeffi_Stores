@@ -23,6 +23,7 @@ export const APPLY_ORDER = [
   'reviews.sql',
   'support.sql',
   'drive.sql',
+  'replies.sql',
   'logs.sql',
   'settings.sql',
   'editor-sessions.sql',

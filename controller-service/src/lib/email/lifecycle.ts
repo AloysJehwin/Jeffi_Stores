@@ -379,7 +379,7 @@ export async function sendOrderAdjustmentEmail(params: {
       <div class="card">${rows}</div>
       <p>${money}</p>
       <div class="cta"><a href="${orderUrl}" class="button">Review &amp; Confirm</a></div>
-      <p class="muted" style="text-align:center;">Nothing changes until you confirm. You can also decline.</p>
+      <p class="muted" style="text-align:center;">Nothing changes until you confirm. You can also decline, or simply reply to this email — "yes, go ahead" or "no thanks" works.</p>
     `,
   })
   try {

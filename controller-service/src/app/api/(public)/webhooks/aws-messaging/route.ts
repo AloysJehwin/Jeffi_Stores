@@ -87,7 +87,7 @@ async function handle(raw: string): Promise<void> {
         profileName: profile,
         media: media ? [{ ref: media.id, mime: media.mime, filename: media.filename ?? null }] : [],
       })
-      if (r) await onCustomerMessage(r.session, r.message)
+      if (r) await onCustomerMessage(r.session, r.message, { repliedToSid: m.context?.id ?? null, phone: m.from })
     }
   }
 }

@@ -101,6 +101,8 @@ export interface CloudInboundMessage {
   button?: { text?: string; payload?: string }
   interactive?: { type: string; button_reply?: { id: string; title: string }; list_reply?: { id: string; title: string } }
   location?: { latitude: number; longitude: number; name?: string; address?: string }
+  /** Set when the customer used "reply" on one of our messages: that message's id. */
+  context?: { from?: string; id?: string }
 }
 
 export interface CloudStatus {

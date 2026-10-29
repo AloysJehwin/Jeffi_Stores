@@ -3,6 +3,7 @@
 // Wrappers keep their public shape so callers don't change; they now one-line into here.
 
 import { messagingTenant, serviceToken } from '@/lib/messaging/library'
+import { recordScopedSend } from '@/lib/replies/scope'
 
 const MESSAGING_URL = (process.env.MESSAGING_URL || 'http://localhost:3101').replace(/\/$/, '')
 
@@ -22,6 +23,9 @@ export interface SendResult {
   id?: string
   status: string
   error?: string
+  /** The provider's own message id (Twilio SID / WhatsApp message id). */
+  providerSid?: string | null
+  body?: string
 }
 
 export async function brandFields(channel: Channel): Promise<{ brand?: string; kicker?: string; footer_contact?: string }> {
@@ -68,7 +72,8 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { status: 'failed', error: data?.message || data?.error || `HTTP ${res.status}` }
-    return { id: data.id, status: data.status ?? 'sent' }
+    if (i.channel !== 'email' && data.provider_ref) await recordScopedSend({ channel: i.channel, providerSid: data.provider_ref })
+    return { id: data.id, status: data.status ?? 'sent', providerSid: data.provider_ref ?? null, body: data.body }
   } catch (e: any) {
     return { status: 'failed', error: e?.message || 'network error' }
   }

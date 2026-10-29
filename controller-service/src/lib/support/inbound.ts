@@ -26,10 +26,19 @@ export interface InboundWhatsApp {
   media: Array<{ ref: string; mime: string; filename?: string | null }>
 }
 
-const STOP_CMDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'])
+const STOP_CMDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'END', 'QUIT'])
 const START_CMDS = new Set(['START', 'UNSTOP', 'SUBSCRIBE'])
 
 const bare = (addr: string) => addr.replace(/^whatsapp:/i, '').trim()
+
+async function hasOrdersOrQuestions(userId: string | null, last10: string): Promise<boolean> {
+  const r = await queryOne(
+    `SELECT 1 WHERE EXISTS (SELECT 1 FROM orders WHERE $1::uuid IS NOT NULL AND user_id = $1)
+        OR EXISTS (SELECT 1 FROM reply_contexts WHERE status = 'open' AND (($1::uuid IS NOT NULL AND user_id = $1) OR contact_phone = $2))`,
+    [userId, last10 || null]
+  ).catch(() => null)
+  return !!r
+}
 
 export async function handleInboundWhatsApp(m: InboundWhatsApp): Promise<{ session: SessionRow; message: SupportMessage } | null> {
   // Webhook retries: the provider's message id is seen once.
@@ -59,8 +68,10 @@ export async function handleInboundWhatsApp(m: InboundWhatsApp): Promise<{ sessi
   })
 
   const cmd = m.text.trim().toUpperCase()
-  if (!m.media.length && (STOP_CMDS.has(cmd) || START_CMDS.has(cmd))) {
-    const stop = STOP_CMDS.has(cmd)
+  // "Cancel" from someone with orders or an open question means their order, not our messages.
+  const cancelIsStop = cmd === 'CANCEL' && !(await hasOrdersOrQuestions(userId, last10))
+  if (!m.media.length && (STOP_CMDS.has(cmd) || START_CMDS.has(cmd) || cancelIsStop)) {
+    const stop = STOP_CMDS.has(cmd) || cancelIsStop
     if (userId) {
       await query(
         stop

@@ -30,6 +30,7 @@ const LABELS: Record<string, string> = {
   storefront_assistant: 'Storefront assistant',
   support_agent: 'Support assistant',
   support_translate: 'Support translation',
+  reply_reader: 'Customer reply reading',
   campaign_scenario: 'Campaign scenario',
   form_fill: 'AI form fill',
   vision: 'Vision / OCR',
