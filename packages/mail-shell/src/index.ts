@@ -165,7 +165,7 @@ export function applyMailTheme(html: string, t: StoreMailTheme): string {
   if (accent) {
     out = out
       .replace(/(<div class="brand" style="[^"]*?)color:#[0-9a-f]{6}/i, `$1color:${accent}`)
-      .replace('</head>', `<style>.code-box,.button{background-color:${accent} !important}.info{border-left-color:${accent}}a{color:${accent}}.button{color:#ffffff !important}</style></head>`)
+      .replace('</head>', `<style>.code-box,.button{background-color:${accent} !important}.info{border-left-color:${accent} !important}a{color:${accent}}.button{color:#ffffff !important}</style></head>`)
   }
   if (t.replyHint && !out.includes(REPLY_HINT)) out = out.replace('<!--/mail-footer-->', `<p>${REPLY_HINT}</p><!--/mail-footer-->`)
   return out
