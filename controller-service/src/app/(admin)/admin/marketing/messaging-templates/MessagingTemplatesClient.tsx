@@ -13,6 +13,7 @@ import TemplateEditor, {
 } from '@/components/admin/messaging-templates/TemplateEditor'
 import { PageHeader, fieldInputCls } from '@/components/admin/kit'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
+import { PAGES, pagesOf, scenarioOf } from '@/lib/messaging/placements'
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
 const CHANNEL_LABEL: Record<Channel, string> = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' }
@@ -28,7 +29,12 @@ type ListItem = {
   approval_status?: string | null
   source?: 'tenant' | 'platform'
   updated_at?: string
+  tags?: string[]
 }
+
+// Where the template is offered ("Show on"), e.g. "Order page · Processing delay".
+const showOn = (tags?: string[]) =>
+  pagesOf(tags).map(p => [PAGES[p].label, p === 'order' ? scenarioOf('order', tags)?.label : null].filter(Boolean).join(' · '))
 
 function parseChannel(v: string | null, shown: Channel[]): Channel {
   return (shown as string[]).includes(v || '') ? (v as Channel) : 'email'
@@ -290,6 +296,11 @@ export default function MessagingTemplatesClient() {
                             </div>
                             <div className="mt-0.5 flex gap-2 items-center text-xs text-foreground-muted">
                               <code className="truncate">{it.slug}</code>
+                              {showOn(it.tags).map(l => (
+                                <span key={l} className="shrink-0 px-1.5 rounded text-[10px] font-medium bg-sky-500/10 text-sky-700 dark:text-sky-400">
+                                  {l}
+                                </span>
+                              ))}
                               {it.channel === 'whatsapp' && it.approval_status && (
                                 <span
                                   className={`px-1.5 rounded text-[10px] font-medium ${

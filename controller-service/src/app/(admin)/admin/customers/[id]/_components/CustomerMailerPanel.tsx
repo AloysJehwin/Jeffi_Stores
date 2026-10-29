@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Mail, Tag, Package, X, ChevronDown, Wand2 } from 'lucide-react'
+import { Mail, Tag, Package, X, ChevronDown, Wand2, LayoutTemplate } from 'lucide-react'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import Link from 'next/link'
@@ -54,6 +54,15 @@ interface QuickTemplate {
   subject: string
   headline: string
   body: string
+}
+
+type StoreTemplate = { slug: string; name: string; subject: string; body: string }
+
+// The layout adds its own headline, so a library template's first <h2> becomes the Headline field.
+function splitHeadline(html: string): { headline: string; body: string } {
+  const m = html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)
+  if (!m) return { headline: '', body: html }
+  return { headline: m[1].replace(/<[^>]+>/g, '').trim(), body: html.replace(m[0], '').trim() }
 }
 
 function fmtDate(iso: string) {
@@ -386,6 +395,14 @@ export default function CustomerMailerPanel({
   const [sendError, setSendError] = useState<string | null>(null)
 
   const { showToast, showConfirm } = useToast()
+  const [storeTemplates, setStoreTemplates] = useState<StoreTemplate[]>([])
+
+  useEffect(() => {
+    fetch('/api/admin/customers/mail-templates', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : { templates: [] }))
+      .then(d => setStoreTemplates(d.templates ?? []))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (attachMode !== 'coupon') return
@@ -630,6 +647,31 @@ export default function CustomerMailerPanel({
 
       {tab === 'compose' && (
         <>
+          {storeTemplates.length > 0 && (
+            <div>
+              <label className="text-xs font-semibold text-foreground-muted uppercase tracking-wide flex items-center gap-1.5">
+                <LayoutTemplate className="w-3 h-3" /> Your templates
+              </label>
+              <div className="flex gap-2 flex-wrap mt-2">
+                {storeTemplates.map(t => (
+                  <button
+                    key={t.slug}
+                    type="button"
+                    onClick={() => {
+                      const { headline, body } = splitHeadline(t.body)
+                      setSubject(t.subject)
+                      setHeadline(headline)
+                      setBody(body)
+                    }}
+                    className="px-3 h-control-sm rounded-lg text-xs font-semibold border border-border-secondary bg-surface text-foreground-muted hover:text-foreground hover:border-accent-500 hover:bg-accent-500/5 transition-colors"
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Quick templates */}
           <div>
             <label className="text-xs font-semibold text-foreground-muted uppercase tracking-wide flex items-center gap-1.5">
