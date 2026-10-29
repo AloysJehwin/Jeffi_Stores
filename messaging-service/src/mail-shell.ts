@@ -7,7 +7,6 @@ export interface WrapOpts {
   kicker?: string
   footerContact?: string
   preheader?: string | null
-  logoUrl?: string
   accent?: string
   /** The mail carries a reply address that is read: invite the customer to reply. */
   replyHint?: boolean
@@ -22,5 +21,5 @@ export function wrapEmail(body: string, opts: WrapOpts): string {
     footerLines: opts.footerContact ? [escapeHtml(opts.footerContact)] : [],
     preheader: opts.preheader || undefined,
   })
-  return applyMailTheme(html, { logoUrl: opts.logoUrl, accent: opts.accent, replyHint: opts.replyHint })
+  return applyMailTheme(html, { accent: opts.accent, replyHint: opts.replyHint })
 }

@@ -28,7 +28,7 @@ export interface SendResult {
   body?: string
 }
 
-export async function brandFields(channel: Channel): Promise<{ brand?: string; kicker?: string; footer_contact?: string; logo_url?: string; accent?: string }> {
+export async function brandFields(channel: Channel): Promise<{ brand?: string; kicker?: string; footer_contact?: string; accent?: string }> {
   if (channel !== 'email') return {}
   try {
     const { currentBrandNameAsync, storeContactLine, storeMailTheme } = await import('@/lib/catalog/brand')
@@ -37,7 +37,6 @@ export async function brandFields(channel: Channel): Promise<{ brand?: string; k
       brand,
       kicker: 'Notifications',
       footer_contact: footer_contact || undefined,
-      logo_url: /^https?:\/\//.test(theme.logoUrl) ? theme.logoUrl : undefined,
       accent: /^#[0-9a-f]{6}$/i.test(theme.accent) ? theme.accent : undefined,
     }
   } catch { return {} }
