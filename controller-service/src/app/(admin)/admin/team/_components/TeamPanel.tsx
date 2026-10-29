@@ -27,6 +27,8 @@ async function getAllAdmins() {
   return queryMany(`
     SELECT a.id, a.role, a.scopes, a.is_active, a.created_at, a.last_login,
       a.mfa_enabled, a.idle_timeout_minutes,
+      CASE WHEN a.mobile_verified_at IS NOT NULL
+        THEN TRIM(LEFT(a.mobile, GREATEST(LENGTH(a.mobile) - 10, 0)) || ' ••••••' || RIGHT(a.mobile, 4)) END AS mobile_hint,
       (SELECT COUNT(*) FROM admin_mfa_recovery_codes WHERE admin_id = a.id AND used_at IS NULL) AS mfa_recovery_codes_remaining,
       u.first_name, u.last_name,
       COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS username,

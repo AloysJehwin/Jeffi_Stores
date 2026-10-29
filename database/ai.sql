@@ -19,7 +19,8 @@ CREATE TABLE public.admin_agent_actions (
     decided_by_admin_id uuid,
     executed_at timestamp with time zone,
     result jsonb,
-    error text
+    error text,
+    decided_via character varying(16)
 );
 
 
@@ -52,7 +53,8 @@ CREATE TABLE public.admin_agent_conversations (
     shared_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    last_message_at timestamp with time zone DEFAULT now() NOT NULL
+    last_message_at timestamp with time zone DEFAULT now() NOT NULL,
+    channel character varying(16) DEFAULT 'web'::character varying NOT NULL
 );
 
 
@@ -70,7 +72,8 @@ CREATE TABLE public.admin_agent_messages (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     ui_blocks jsonb DEFAULT '[]'::jsonb NOT NULL,
     proposed_actions jsonb DEFAULT '[]'::jsonb NOT NULL,
-    pickers jsonb DEFAULT '[]'::jsonb NOT NULL
+    pickers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    provider_sid character varying(64)
 );
 
 

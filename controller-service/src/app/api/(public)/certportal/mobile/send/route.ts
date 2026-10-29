@@ -1,0 +1,26 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { verifyPortalToken, PORTAL_COOKIE } from '@/lib/auth/portal-session'
+import { downloadableCert, inCertStore } from '@/lib/auth/cert-mobile'
+import { sendAdminMobileCode } from '@/lib/auth/admin-mobile'
+import { parseBody } from '@/lib/shared/validate'
+
+export const dynamic = 'force-dynamic'
+
+const Schema = z.object({ serial: z.string().min(1).max(64), phone: z.string().min(6).max(24) })
+
+// Sends a code to the number the admin enters before their first certificate download.
+export async function POST(request: NextRequest) {
+  const session = await verifyPortalToken(request.cookies.get(PORTAL_COOKIE)?.value).catch(() => null)
+  if (!session) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+  const parsed = parseBody(Schema, await request.json().catch(() => null))
+  if (!parsed.ok) return parsed.response
+  const cert = await downloadableCert(parsed.data.serial, session.email)
+  if (!cert) return NextResponse.json({ error: 'Certificate not found for this account' }, { status: 404 })
+  const r = await inCertStore(cert.tenant_id, cert.store_name, session.email, async ({ store, storeName, admin }) =>
+    admin ? sendAdminMobileCode(store, admin.id, parsed.data.phone, storeName) : null
+  )
+  if (!r) return NextResponse.json({ error: 'No active admin account for this certificate. Ask your store owner.' }, { status: 404 })
+  if (!r.ok) return NextResponse.json({ error: r.error, retryAfter: r.retryAfter }, { status: r.status })
+  return NextResponse.json({ channel: r.channel, retryAfter: r.retryAfter })
+}

@@ -7,6 +7,7 @@ import { assignableScopeKeys } from '@/lib/auth/scopes-server'
 import { resolveRequestTenantId } from '@/lib/tenancy/request-tenant'
 import { revokeAllForPrincipal } from '@/lib/auth/auth-sessions'
 import { revokePortalCerts } from '@/lib/tenancy/portal-certs'
+import { clearAdminMobile } from '@/lib/auth/admin-mobile'
 
 // Free the admin's drafts for others to claim: all of them, or (scoped) only the types they can
 // no longer write. Best effort; the sweep also frees locks held by inactive admins.
@@ -30,7 +31,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const { id } = await params
     const body = await request.json()
-    const { scopes, role, is_active, reset_mfa, idle_timeout_minutes } = body
+    const { scopes, role, is_active, reset_mfa, reset_mobile, idle_timeout_minutes } = body
+
+    // The admin is asked for a number again before their next certificate download.
+    if (reset_mobile === true) {
+      const target = await queryOne('SELECT id FROM admins WHERE id = $1', [id])
+      if (!target) return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
+      await clearAdminMobile(await resolveRequestTenantId(), id)
+      return NextResponse.json({ success: true })
+    }
 
     if (reset_mfa === true) {
       if (id === admin.adminId) {
@@ -113,6 +122,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
       // Mirror into the central portal registry so certificate.jeffistores.in refuses these serials.
       await revokePortalCerts((revoked.rows || []).map(r => r.serial_number))
+      await clearAdminMobile(await resolveRequestTenantId(), id).catch(() => {})
       await releaseDrafts(id, admin.adminId)
     } else if (role !== undefined || scopes !== undefined) {
       await releaseDrafts(id, admin.adminId, {
@@ -150,6 +160,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await revokePortalCerts((certRows.rows || []).map(r => r.serial_number))
     // Before the delete: the FK would only null the owner, without a lock event or session cleanup.
     await releaseDrafts(id, admin.adminId)
+    await clearAdminMobile(await resolveRequestTenantId(), id).catch(() => {})
 
     const deleted = await queryOne('DELETE FROM admins WHERE id = $1 RETURNING id, user_id', [id])
 
