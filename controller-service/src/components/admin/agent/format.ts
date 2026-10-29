@@ -56,3 +56,29 @@ export const TEXT_TONE: Record<BlockTone, string> = {
 }
 
 export const toneOf = (t: unknown): BlockTone => (typeof t === 'string' && t in KIT_TONE ? (t as BlockTone) : 'neutral')
+
+export const ENTITY_ROUTES: Record<string, (id: string) => string> = {
+  product: id => `/admin/products/${id}`,
+  order: id => `/admin/orders/${id}/view`,
+  customer: id => `/admin/customers/${id}/view`,
+  invoice: id => `/admin/invoices/${id}/view`,
+  quotation: id => `/admin/quotations/${id}/view`,
+  coupon: id => `/admin/coupons/${id}/view`,
+  supplier: id => `/admin/suppliers/${id}/view`,
+  rfq: id => `/admin/business/rfqs/${id}/view`,
+  category: id => `/admin/categories/${id}/view`,
+  brand: id => `/admin/brands/${id}/view`,
+  campaign: kind => `/admin/campaigns/${kind}`,
+}
+
+/** A link a block may carry: an entity ref, an app path, or an https URL; anything else is dropped. */
+export function safeHref(href: unknown, entity?: { kind?: unknown; id?: unknown } | null): string | null {
+  if (entity && typeof entity.kind === 'string' && typeof entity.id === 'string' && entity.id.trim()) {
+    const route = ENTITY_ROUTES[entity.kind]
+    if (route) return adminHref(route(encodeURIComponent(entity.id.trim())))
+  }
+  if (typeof href !== 'string') return null
+  const h = href.trim()
+  if (h.startsWith('/') && !h.startsWith('//') && !h.startsWith('/\\')) return adminHref(h)
+  return /^https:\/\//i.test(h) ? h : null
+}
