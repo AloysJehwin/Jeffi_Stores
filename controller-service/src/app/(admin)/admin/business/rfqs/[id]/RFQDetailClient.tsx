@@ -14,6 +14,7 @@ import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { assertDraftResponse } from '@/lib/client/draft-lock-client'
 import { ChangeLog } from '@/components/admin/change-log'
+import RecordReplies from '@/components/admin/replies/RecordReplies'
 
 interface RFQMessage {
   id: string
@@ -1140,6 +1141,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
               )}
             </Card>
           ) : null}
+          <RecordReplies entityType="business_rfqs" entityId={id} canWrite={canWrite} />
           <ChangeLog kind="rfq" id={id} variant="compact" version={rfq.status} />
         </>
       }

@@ -34,10 +34,12 @@ export async function handleInboundEmail(m: InboundEmail): Promise<{ session: Se
     `SELECT id FROM users WHERE lower(email) = $1 ORDER BY (SELECT count(*) FROM orders o WHERE o.user_id = users.id) DESC, created_at DESC LIMIT 1`,
     [from]
   )
-  const userId = user?.id ?? null
+  // The question's own account wins when it has this address (a business and a shop account can share one).
+  const ctx = m.token ? await contextByToken(m.token) : null
+  const owner = ctx?.user_id ? await queryOne<{ id: string }>(`SELECT id FROM users WHERE id = $1 AND lower(email) = $2`, [ctx.user_id, from]) : null
+  const userId = owner?.id ?? user?.id ?? null
 
   // A reply to one of our support emails continues that chat.
-  const ctx = m.token ? await contextByToken(m.token) : null
   let session = ctx?.scenario === 'support' && ctx.entity_type === 'support_sessions' ? await getSessionRow(ctx.entity_id) : null
   if (session && (session.status !== 'open' || (session.user_id && userId && session.user_id !== userId))) session = null
   session ??= userId ? await openSessionFor(userId) : await openEmailSession(from)
