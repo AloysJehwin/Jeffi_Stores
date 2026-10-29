@@ -14,6 +14,7 @@ const PAGE_KINDS = new Set(['product', 'order', 'customer', 'invoice', 'quotatio
 const TOOLS_FOR_KIND: Record<string, string[]> = {
   order: [
     'get_order',
+    'get_change_log',
     'propose_update_order_status',
     'mark_order_shipped',
     'propose_set_payment_status',
@@ -22,9 +23,10 @@ const TOOLS_FOR_KIND: Record<string, string[]> = {
     'get_order_refund_options',
     'propose_refund_order',
   ],
-  product: ['get_product_full', 'propose_update_product', 'propose_adjust_inventory', 'propose_set_product_featured'],
+  product: ['get_product_full', 'get_change_log', 'propose_update_product', 'propose_adjust_inventory', 'propose_set_product_featured'],
   customer: [
     'get_customer',
+    'get_change_log',
     'get_customer_notes',
     'get_customer_tasks',
     'get_customer_tags',
@@ -35,12 +37,14 @@ const TOOLS_FOR_KIND: Record<string, string[]> = {
     'propose_close_customer_task',
     'propose_toggle_marketing_opt_out',
   ],
-  quotation: ['get_quotation', 'propose_send_quotation_email'],
-  invoice: ['get_invoice'],
-  coupon: ['get_coupon'],
-  brand: ['get_brand'],
-  category: ['get_category'],
-  campaign: ['get_campaign', 'propose_update_campaign_template'],
+  quotation: ['get_change_log', 'get_quotation', 'propose_send_quotation_email'],
+  invoice: ['get_change_log', 'get_invoice'],
+  coupon: ['get_change_log', 'get_coupon'],
+  brand: ['get_change_log', 'get_brand'],
+  category: ['get_change_log', 'get_category'],
+  campaign: ['get_change_log', 'get_campaign', 'propose_update_campaign_template'],
+  supplier: ['get_change_log'],
+  rfq: ['get_change_log'],
 }
 
 // Admin list pages: their filter list and the kind of record each row is.
@@ -118,6 +122,7 @@ export function pageContextNote(pc: PageContext | null): string {
     lines.push(`The admin is viewing the ${kind} ${id}${pc.path ? ` (${pc.path})` : ''}. "This" or "here" refers to it unless they say otherwise.`)
     const changes = (TOOLS_FOR_KIND[kind] ?? []).filter(isChange)
     if (changes.length) lines.push(`To change it, use ${changes.join(', ')} with this id; each change waits for the admin's approval.`)
+    lines.push(`For who changed it and when, use get_change_log with kind="${kind}" and this id.`)
   } else if (list) {
     const filters = describeFilters(list.entity, list.q)
     lines.push(

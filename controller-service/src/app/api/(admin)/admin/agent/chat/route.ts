@@ -84,6 +84,7 @@ const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
     ],
   },
   { test: /\b(ship|shipped|dispatch|delivery|delivered|track|awb|fulfil)\b/i, tools: ['mark_order_shipped'] },
+  { test: /\b(history|changed|change log|changelog|who (changed|edited|updated)|when did)\b/i, tools: ['get_change_log'] },
   { test: /\b(schema|table|column|sql|query|database|db)\b/i, tools: ['describe_schema'] },
   {
     test: /\b(file|repo|code|route|api|endpoint|source)\b/i,

@@ -7,6 +7,7 @@ const { mockQuery } = vi.hoisted(() => ({ mockQuery: vi.fn() }))
 
 vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
+  requestActor: vi.fn().mockResolvedValue(null),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),

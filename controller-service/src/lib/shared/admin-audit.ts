@@ -1,4 +1,4 @@
-import { query } from '@/lib/shared/db'
+import { query, requestActor } from '@/lib/shared/db'
 import type { NextRequest } from 'next/server'
 
 export type AuditAction =
@@ -59,6 +59,15 @@ export async function logAdminAudit(params: AuditParams): Promise<void> {
       params.request?.headers.get('x-real-ip') ||
       null
     const ua = params.request?.headers.get('user-agent') || null
+    let actor: string | null = null
+    if (!params.adminId) {
+      try {
+        actor = await requestActor()
+      } catch {
+        /* unknown source; still record the change */
+      }
+    }
+    const metadata = actor ? { ...params.metadata, actor } : params.metadata
     await query(
       `INSERT INTO admin_audit_log
          (admin_id, action, entity_type, entity_id, summary, diff, metadata, ip_address, user_agent)
@@ -70,7 +79,7 @@ export async function logAdminAudit(params: AuditParams): Promise<void> {
         params.entityId ?? null,
         params.summary,
         params.diff ? JSON.stringify(params.diff) : null,
-        JSON.stringify(params.metadata ?? {}),
+        JSON.stringify(metadata ?? {}),
         ip,
         ua,
       ]

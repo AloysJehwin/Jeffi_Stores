@@ -8,6 +8,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useAgentChanges } from '@/lib/client/agent-events'
 import { formatINR, formatDate } from '@/lib/shared/format'
 import { ActionButton, Card, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, PageBody, QUOTATION_STATUS, StatusBadge, badgeCls, useActionToast, type KitAction } from '@/components/admin/kit'
+import { ChangeLog } from '@/components/admin/change-log'
 
 const th = 'px-4 py-2.5 text-xs font-medium text-foreground-muted whitespace-nowrap'
 
@@ -198,6 +199,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
               <p className="text-sm text-foreground break-words">{q.notes}</p>
             </Card>
           )}
+          <ChangeLog kind="quotation" id={id} version={q.updated_at} />
         </>
       }
       aside={

@@ -29,6 +29,7 @@ const FOR_ENTITY: Record<string, Suggestion[]> = {
   order: [
     { label: 'Summarise this order', prompt: 'Summarise this order' },
     { label: 'Where is it?', prompt: 'What is the shipping status of this order?' },
+    { label: 'Status history', prompt: "When did this order's status change, and who changed it?" },
     { label: 'Mark as shipped', prompt: 'Mark this order as shipped with AWB ', fill: true },
     { label: 'Cancel this order', prompt: 'Cancel this order. Reason: ', fill: true },
     { label: 'Draft a refund', prompt: 'Draft a refund for this order' },
@@ -37,6 +38,7 @@ const FOR_ENTITY: Record<string, Suggestion[]> = {
     { label: 'Stock and sales', prompt: 'Show stock and the last 30 days of sales for this product' },
     { label: 'Change the price', prompt: 'Set the price of this product to ₹', fill: true },
     { label: 'Adjust stock', prompt: 'Adjust the stock of this product by ', fill: true },
+    { label: 'Recent edits', prompt: 'Who changed this product recently, and what did they change?' },
     { label: 'Similar products', prompt: 'Find products similar to this one' },
   ],
   customer: [

@@ -29,6 +29,7 @@ import {
   useActionToast,
   type KitAction,
 } from '@/components/admin/kit'
+import { ChangeLog } from '@/components/admin/change-log'
 
 const th = 'px-4 py-2.5 text-xs font-medium text-foreground-muted whitespace-nowrap'
 
@@ -368,6 +369,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                 <p className="text-sm text-foreground break-words">{o.notes}</p>
               </Card>
             )}
+            <ChangeLog kind="invoice" id={id} version={o.updated_at} />
           </>
         }
         aside={

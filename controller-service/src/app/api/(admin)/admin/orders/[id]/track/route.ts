@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { runWithAuditActor } from '@/lib/auth/audit-context'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
@@ -59,7 +60,7 @@ const STATUS_SYNC: Record<
   'RTO-DL': { orderStatus: 'returned', clearAwb: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
 }
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handle(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -331,3 +332,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }
+
+// Whatever this writes comes from the courier, not the person viewing tracking.
+export const GET = (request: NextRequest, ctx: { params: Promise<{ id: string }> }) =>
+  runWithAuditActor('delhivery', () => handle(request, ctx))

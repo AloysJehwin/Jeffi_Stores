@@ -30,6 +30,7 @@ import {
   type WhatsAppLog,
 } from '@/app/(admin)/admin/campaigns/[kind]/_components/CampaignOpsPanels'
 import { startCampaignDraft } from './actions'
+import { ChangeLog } from '@/components/admin/change-log'
 
 // Same sample values the editor preview uses, so the view mirrors what a recipient sees.
 const SAMPLE_VARS: Record<string, string | number> = {
@@ -279,6 +280,8 @@ export default function CampaignViewClient({
           )}
         </div>
       </div>
+
+      <ChangeLog kind="campaign" id={kind} version={c.updated_at} />
     </div>
   )
 }

@@ -13,6 +13,7 @@ import { fmtQty } from '@/lib/shared/number-display'
 import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { assertDraftResponse } from '@/lib/client/draft-lock-client'
+import { ChangeLog } from '@/components/admin/change-log'
 
 interface RFQMessage {
   id: string
@@ -1139,6 +1140,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
               )}
             </Card>
           ) : null}
+          <ChangeLog kind="rfq" id={id} variant="compact" version={rfq.status} />
         </>
       }
       />

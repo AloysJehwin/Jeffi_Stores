@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { runWithAuditActor } from '@/lib/auth/audit-context'
 import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { queryOne, query } from '@/lib/shared/db'
 import { resolveShipmentStatus, isAdvancement } from '@/lib/shipping/shipment-status'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { applyCourierEdd, extractCourierEdd } from '@/lib/shipping/courier-edd'
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handle(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const authUser = await authenticateUser(request)
@@ -97,3 +98,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+// Whatever this writes comes from the courier, not the person viewing tracking.
+export const GET = (request: NextRequest, ctx: { params: Promise<{ id: string }> }) =>
+  runWithAuditActor('delhivery', () => handle(request, ctx))
