@@ -54,7 +54,7 @@ import { POST as orderMail } from '@/app/api/(admin)/admin/orders/[id]/send-cust
 import { POST as orderMailPreview } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/preview/route'
 import { POST as customerContact } from '@/app/api/(public)/customers/[id]/contact/route'
 
-const IDENTITY = { name: 'Acme Tools', email: 'hi@acme.in', phone: '+91 90000 11111', web: 'acme.in', logoUrl: '' }
+const IDENTITY = { name: 'Acme Tools', email: 'hi@acme.in', phone: '+91 90000 11111', web: 'acme.in', logoUrl: '', emailAccent: '' }
 
 // Any token (either syntax, any case) whose key is registered.
 function registeredLeaks(s: string | undefined): string[] {

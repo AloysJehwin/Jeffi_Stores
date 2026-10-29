@@ -4,6 +4,8 @@ import { queryOne } from '@/lib/shared/db'
 import { findTokenKeys } from '@/lib/templates/variables-shared'
 import { messagingGateAllows, debitEmailCost } from '@/lib/shared/messaging/billing'
 import { currentReplyScope, recordScopedSend, sesMessageId } from '@/lib/replies/scope'
+import { applyMailTheme } from '@/lib/shared/mail-template'
+import { storeMailTheme } from '@/lib/catalog/brand'
 
 // Single chokepoint for outbound mail. Wraps transporter.sendMail and writes
 // a row to email_logs (status, body, kind, entity link) so admins can see
@@ -134,11 +136,22 @@ async function guardTokens(o: SendAuditedMailOptions): Promise<SendAuditedMailOp
   }
 }
 
+// A theming failure must never stop the mail: send it in the default look instead.
+async function themed(html: string, replyHint: boolean): Promise<string> {
+  try {
+    return applyMailTheme(html, { ...(await storeMailTheme()), replyHint })
+  } catch {
+    return html
+  }
+}
+
 export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ messageId?: string }> {
   const guarded = await guardTokens(input)
   // Inside withReplyContext(): the customer's reply comes back to this question.
   const scope = currentReplyScope()
-  const o = scope && !guarded.replyTo ? { ...guarded, replyTo: scope.replyTo, entityType: guarded.entityType ?? scope.entityType, entityId: guarded.entityId ?? scope.entityId } : guarded
+  const scoped = scope && !guarded.replyTo ? { ...guarded, replyTo: scope.replyTo, entityType: guarded.entityType ?? scope.entityType, entityId: guarded.entityId ?? scope.entityId } : guarded
+  // The store's logo and accent colour, and a reply line when replies come back to us.
+  const o = scoped.html ? { ...scoped, html: await themed(scoped.html, !!scoped.replyTo) } : scoped
   // No explicit from → use the CURRENT store's customer sender (tenant on a tenant host, platform
   // off-tenant) instead of a hardcoded "Jeffi Store's", which leaked into tenant-facing mail.
   const from = o.from || (await resolveDefaultFrom())

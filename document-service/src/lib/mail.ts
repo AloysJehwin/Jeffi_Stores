@@ -1,8 +1,8 @@
 import { signServiceToken } from '@jeffi/service-auth'
 import { currentTenant, PLATFORM_TENANT_ID } from '@jeffi/tenancy'
-import { mailShell } from './mail-template'
+import { applyMailTheme, mailShell } from './mail-template'
 import { recordEmailSend, type ReplyTarget } from './reply-context'
-import { currentBrandNameAsync, customerMailFromAsync, storeAddressLine, storeContactLine } from './brand'
+import { currentBrandNameAsync, customerMailFromAsync, storeAddressLine, storeContactLine, storeMailTheme } from './brand'
 
 const MESSAGING_URL = process.env.MESSAGING_URL || 'http://localhost:3101'
 const inr = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -11,6 +11,7 @@ type Result = { success: boolean; messageId?: string; error?: unknown }
 
 async function send(to: string, subject: string, html: string, templateName: string, metadata: Record<string, unknown>, reply?: ReplyTarget | null): Promise<Result> {
   const t = currentTenant() ?? { tenantId: PLATFORM_TENANT_ID, slug: 'platform' }
+  html = applyMailTheme(html, { ...(await storeMailTheme()), replyHint: !!reply })
   try {
     const res = await fetch(`${MESSAGING_URL}/messages`, {
       method: 'POST',

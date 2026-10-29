@@ -16,7 +16,7 @@ import {
   guardTemplateTokens,
 } from '@/lib/templates/variables'
 
-const IDENTITY = { name: 'Acme Tools', email: 'hi@acme.in', phone: '+91 90000 11111', web: 'acme.in', logoUrl: '' }
+const IDENTITY = { name: 'Acme Tools', email: 'hi@acme.in', phone: '+91 90000 11111', web: 'acme.in', logoUrl: '', emailAccent: '' }
 const CUSTOM = [
   { id: 'v1', key: 'support_hours', label: 'Support hours', description: '', value: '9–6 IST', is_enabled: true },
   { id: 'v2', key: 'old_promo', label: 'Old', description: '', value: 'gone', is_enabled: false },
