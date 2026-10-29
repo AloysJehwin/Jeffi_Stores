@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { query, queryOne } from '@/lib/shared/db'
+import { rejectAgentAction } from '@/lib/admin-agent/actions/approve'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,22 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!hasScope(admin.role, admin.scopes, 'agent:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-
-  const action = await queryOne<{ admin_id: string; status: string }>(
-    `SELECT admin_id::text, status FROM admin_agent_actions WHERE id = $1::uuid LIMIT 1`,
-    [id]
-  )
-  if (!action) return NextResponse.json({ error: 'Action not found' }, { status: 404 })
-  if (action.admin_id !== admin.adminId) return NextResponse.json({ error: 'Not your action' }, { status: 403 })
-  if (action.status !== 'proposed') {
-    return NextResponse.json({ error: `Action already ${action.status}` }, { status: 400 })
-  }
-
-  await query(
-    `UPDATE admin_agent_actions
-     SET status = 'rejected', decided_at = NOW(), decided_by_admin_id = $1
-     WHERE id = $2::uuid`,
-    [admin.adminId, id]
-  )
+  const out = await rejectAgentAction(id, { adminId: admin.adminId, role: admin.role, scopes: admin.scopes || [] }, 'web')
+  if (!out.ok) return NextResponse.json({ error: out.error }, { status: out.code })
   return NextResponse.json({ ok: true, status: 'rejected' })
 }
