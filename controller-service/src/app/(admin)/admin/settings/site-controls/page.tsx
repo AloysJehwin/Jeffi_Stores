@@ -161,6 +161,7 @@ export default async function SiteControlsPage() {
   // full set, so hasScope alone would never lock them. hasPlanScope folds in getTenantPlan (and
   // returns true for the flagship, which has no plan limit).
   const hasCustomerPrograms = await hasPlanScope(admin.role, admin.scopes || [], 'campaigns:read')
+  const hasAgentWrite = await hasPlanScope(admin.role, admin.scopes || [], 'agent:write')
 
   let customShortcuts: CustomShortcut[] = []
   try {
@@ -687,6 +688,16 @@ export default async function SiteControlsPage() {
                           initial={c.flags.agentDockEnabled}
                         />
                       </FullSpan>
+                      {hasAgentWrite && (
+                        <FullSpan>
+                          <ToggleControl
+                            settingKey="feature_agent_whatsapp_enabled"
+                            label="Assistant on WhatsApp"
+                            hint="Admins message the store's WhatsApp number from the mobile they verified (Account) and the assistant answers. Changes it prepares are approved by replying YES; refunds, payments, cancellations, bulk emails and ads changes are approved in the panel only."
+                            initial={c.flags.agentWhatsappEnabled}
+                          />
+                        </FullSpan>
+                      )}
                     </SectionCard>
                   </div>
                   <div>
