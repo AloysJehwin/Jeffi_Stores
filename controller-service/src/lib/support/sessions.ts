@@ -27,6 +27,9 @@ export interface SessionRow {
   last_message_at: string | null
   customer_notified_at: string | null
   wa_window_expires_at: string | null
+  contact_email: string | null
+  /** Subject of the customer's latest email, so replies thread in their mail app. */
+  email_subject: string | null
 }
 
 const iso = (v: unknown): string | null => (v ? new Date(v as string).toISOString() : null)
@@ -55,8 +58,8 @@ export function toSessionDto(r: any): SupportSession {
     lastMessageAt: iso(r.last_message_at),
     customer: {
       id: r.user_id ?? null,
-      name: name || r.contact_name || r.contact_phone || r.user_email || 'Customer',
-      email: r.user_email ?? null,
+      name: name || r.contact_name || r.contact_phone || r.user_email || r.contact_email || 'Customer',
+      email: r.user_email ?? r.contact_email ?? null,
       phone: r.user_phone ?? r.contact_phone ?? null,
     },
     adminName: r.admin_name ?? null,
@@ -100,22 +103,31 @@ export async function openContactSession(phone10: string): Promise<SessionRow | 
   )
 }
 
+/** The open email chat for an address with no account. */
+export async function openEmailSession(email: string): Promise<SessionRow | null> {
+  return queryOne<SessionRow>(
+    `SELECT * FROM support_sessions WHERE user_id IS NULL AND status = 'open' AND lower(contact_email) = lower($1) ORDER BY created_at DESC LIMIT 1`,
+    [email]
+  )
+}
+
 export async function createSession(input: {
   userId: string | null
   channel: SupportChannel
   handler?: 'ai' | 'human'
   contactPhone?: string | null
   contactName?: string | null
+  contactEmail?: string | null
   customerLang?: string | null
 }): Promise<SessionRow> {
   const tenantId = await resolveTenantId().catch(() => null)
   const row = await queryOne<SessionRow>(
     `INSERT INTO support_sessions
-       (user_id, tenant_id, channel, handler, contact_phone, contact_name, customer_lang, last_message_at, customer_last_seen_at, ticket_number)
-     VALUES ($1, $2, $3::varchar, $4, $5, $6, $7, now(), CASE WHEN $3::varchar = 'whatsapp' THEN NULL ELSE now() END,
+       (user_id, tenant_id, channel, handler, contact_phone, contact_name, customer_lang, contact_email, last_message_at, customer_last_seen_at, ticket_number)
+     VALUES ($1, $2, $3::varchar, $4, $5, $6, $7, $8, now(), CASE WHEN $3::varchar IN ('whatsapp', 'email') THEN NULL ELSE now() END,
              'SUP-' || to_char(now() AT TIME ZONE 'Asia/Kolkata', 'YYMM') || '-' || lpad(nextval('support_ticket_seq')::text, 4, '0'))
      RETURNING *`,
-    [input.userId, tenantId, input.channel, input.handler ?? 'ai', input.contactPhone ?? null, input.contactName ?? null, input.customerLang ?? null]
+    [input.userId, tenantId, input.channel, input.handler ?? 'ai', input.contactPhone ?? null, input.contactName ?? null, input.customerLang ?? null, input.contactEmail ?? null]
   )
   if (!row) throw new Error('support session insert failed')
   void emitSession(row.id)

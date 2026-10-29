@@ -58,7 +58,9 @@ CREATE TABLE public.support_sessions (
     admin_last_seen_at timestamp with time zone,
     last_message_at timestamp with time zone,
     customer_notified_at timestamp with time zone,
-    wa_window_expires_at timestamp with time zone
+    wa_window_expires_at timestamp with time zone,
+    contact_email character varying(255),
+    email_subject character varying(255)
 );
 
 

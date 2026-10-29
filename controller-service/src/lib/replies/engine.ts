@@ -72,7 +72,8 @@ export async function handleCustomerReply(r: IncomingReply): Promise<'handled' |
   await linkMessage(r.message.id, c.context)
   const def = c.scenario.intents[reading.intent]
   const tier: Tier = typeof def.tier === 'function' ? def.tier(c.snapshot, reading.args) : def.tier
-  const outcome = decideOutcome({ tier, confidence: reading.confidence, verified: r.verified, autoApply: flags?.replyAutoApply !== false })
+  // Only the person we asked (not just whoever holds the Reply-To token) gets things applied.
+  const outcome = decideOutcome({ tier, confidence: reading.confidence, verified: r.verified && identifies(c.context, r), autoApply: flags?.replyAutoApply !== false })
   const title = def.title(c.snapshot, reading.args)
   const action = await createReplyAction(r.session.id, c.context, reading, title, outcome === 'admin' ? 'admin' : outcome === 'ask' ? 'customer' : 'none')
 
@@ -131,10 +132,15 @@ async function candidatesFor(r: IncomingReply): Promise<Matched[]> {
 /** A token or a quoted message proves which question; it must still be the same customer's. */
 function belongs(c: ReplyContextRow, r: IncomingReply): boolean {
   if (c.user_id && r.userId) return c.user_id === r.userId
+  return identifies(c, r) || !!r.token
+}
+
+/** The sender is the account, number or address the question went to. */
+function identifies(c: ReplyContextRow, r: IncomingReply): boolean {
+  if (c.user_id && r.userId) return c.user_id === r.userId
   const phone = r.phone?.replace(/\D/g, '').slice(-10)
-  if (c.contact_phone && phone) return c.contact_phone === phone
-  if (c.contact_email && r.email) return c.contact_email.toLowerCase() === r.email.toLowerCase()
-  return !!r.token
+  if (c.contact_phone && phone && c.contact_phone === phone) return true
+  return !!(c.contact_email && r.email && c.contact_email.toLowerCase() === r.email.toLowerCase())
 }
 
 async function linkMessage(messageId: string, ctx: ReplyContextRow): Promise<void> {

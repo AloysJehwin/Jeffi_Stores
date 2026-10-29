@@ -23,6 +23,8 @@ export interface SendAuditedMailOptions {
   cc?: string | string[]
   bcc?: string | string[]
   replyTo?: string
+  /** The message this answers (threads the conversation in the customer's mail app). */
+  inReplyTo?: string
   attachments?: any[]
   headers?: Record<string, string>
   // Audit metadata — describe what kind of mail this is so the audit log can
@@ -191,10 +193,10 @@ export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ 
       return {}
     }
     if (!messagingInline() && !o.cc && !o.bcc && !o.amp && !o.attachments?.length && typeof o.to === 'string') {
-      const r = await remoteSend({ channel: 'email', to: o.to, from, subject: o.subject, body: o.html ?? o.text ?? '', reply_to: o.replyTo, metadata: { kind: o.kind } })
+      const r = await remoteSend({ channel: 'email', to: o.to, from, subject: o.subject, body: o.html ?? o.text ?? '', reply_to: o.replyTo, in_reply_to: o.inReplyTo, metadata: { kind: o.kind } })
       await logMail({ to, from, cc, bcc, subject: o.subject, html: o.redactBody ? null : (o.html ?? null), text: o.redactBody ? null : (o.text ?? null), kind: o.kind, entityType: o.entityType ?? null, entityId: o.entityId ?? null, userId: o.userId ?? null, templateName: o.templateName ?? null, metadata: { ...(o.metadata ?? {}), via: 'messaging-service' }, status: r.ok ? 'sent' : 'failed', error: r.error ?? null, messageId: r.providerRef ?? null })
       if (!r.ok) throw new Error(r.error ?? 'messaging-service send failed')
-      await recordScopedSend({ channel: 'email', emailMessageIds: [r.providerRef && `${r.providerRef}@email.amazonses.com`] })
+      await recordScopedSend({ channel: 'email', emailMessageIds: [r.providerRef && (r.providerRef.includes('@') ? r.providerRef : `${r.providerRef}@email.amazonses.com`)] })
       return { messageId: r.providerRef }
     }
     const info = await getTransporter().sendMail({
@@ -207,6 +209,8 @@ export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ 
       cc: o.cc,
       bcc: o.bcc,
       replyTo: o.replyTo,
+      inReplyTo: o.inReplyTo,
+      references: o.inReplyTo,
       attachments: o.attachments,
       headers: o.headers,
     })
