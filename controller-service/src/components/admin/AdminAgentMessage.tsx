@@ -4,17 +4,10 @@ import Link from 'next/link'
 import { Fragment, ReactNode } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
-import { fmtQty } from './agent/format'
+import { ENTITY_ROUTES, fmtQty } from './agent/format'
 import type { QuotationConfirmItem } from './agent/QuotationResolver'
 
-const ENTITY_ROUTES: Record<string, (id: string) => string> = {
-  product: id => `/admin/products/${id}`,
-  order: id => `/admin/orders/${id}/view`,
-  customer: id => `/admin/customers/${id}/view`,
-  campaign: kind => `/admin/campaigns/${kind}`,
-}
-
-const ENTITY_RE = /\[\[(product|order|customer|campaign):([^|\]]+)\|([^\]]+)\]\]/g
+const ENTITY_RE = new RegExp(`\\[\\[(${Object.keys(ENTITY_ROUTES).join('|')}):([^|\\]]+)\\|([^\\]]+)\\]\\]`, 'g')
 // Bold, italic and inline code, in one pass so their markers never nest wrongly.
 const EMPH_RE = /`([^`\n]+)`|\*\*([^*]+)\*\*|(?<![\w*])\*([^*\s][^*\n]*?)\*(?![\w*])|(?<![\w_])_([^_\s][^_\n]*?)_(?![\w_])/g
 const IMAGE_MD_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g

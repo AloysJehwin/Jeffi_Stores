@@ -201,11 +201,13 @@ Output format — use ui_blocks for any data display:
   {"type":"table","headers":["Col1","Col2"],"rows":[["a","b"]]},
   {"type":"order_list","orders":[{"id":"<uuid>","order_number":"ORD-001","status":"shipped","total":5000}]},
   {"type":"customer_list","customers":[{"id":"<uuid>","email":"x@y.com","name":"Name"}]},
-  {"type":"callout","tone":"warn","message":"Note"}
+  {"type":"callout","tone":"warn","message":"Note"},
+  {"type":"card","title":"INV-0042","subtitle":"Acme Traders","icon":"invoice","entity":{"kind":"invoice","id":"<uuid>"},"badges":[{"label":"Unpaid","tone":"warn"}],"stats":[{"label":"Total","value":24975,"format":"inr"}],"fields":[{"label":"Due","value":"2026-11-05","format":"date"}]}
 ]</ui_blocks>
 - IDs must be real UUIDs from tool output — they become deep links.
 - Numbers must be raw (no ₹, no commas). price:1234 not "₹1,234".
 - 2+ products → always product_grid, never bullet lists.
+- One record or summary of anything else (invoice, quotation, coupon, campaign, KPIs) → card; several → {"type":"cards","cards":[...]}.
 - Free text outside ui_blocks renders above the blocks — use it for brief framing or questions only.
 
 ## QUOTATION FLOW — MANDATORY (violations waste all iterations)
@@ -338,6 +340,8 @@ const UI_BLOCK_TYPES = [
   'link_button',
   'image_card',
   'code_block',
+  'card',
+  'cards',
 ]
 
 // Structured display instead of <ui_blocks> in prose; the prose parser stays as a fallback.
@@ -357,6 +361,20 @@ const RENDER_UI_TOOL: AiToolDef = {
       '- {"type":"customer_list","customers":[{"id":"<uuid>","email":"x@y.com","name":"Name","total_orders":3,"lifetime_value":12000}]}\n' +
       '- {"type":"callout","tone":"info|warn|error|success","title":"...","message":"..."}\n' +
       '- {"type":"link_button","label":"Open orders","href":"/admin/orders"}\n' +
+      '- {"type":"card", ...} for ONE record or summary of anything else (invoice, quotation, coupon, campaign, supplier, ' +
+      'an order or customer in detail, KPIs). Every key except title is optional: ' +
+      '{"type":"card","title":"INV-0042","subtitle":"Acme Traders","eyebrow":"Invoice","icon":"invoice",' +
+      '"entity":{"kind":"invoice","id":"<uuid>"},"tone":"warn","badges":[{"label":"Overdue","tone":"danger"}],' +
+      '"stats":[{"label":"Total","value":24975,"format":"inr"},{"label":"Paid","value":10000,"format":"inr","delta":-12,"hint":"vs last month"}],' +
+      '"fields":[{"label":"Due","value":"2026-11-05","format":"date"},{"label":"Customer","value":"Acme","entity":{"kind":"customer","id":"<uuid>"}}],' +
+      '"items":[{"title":"Drill 13mm","subtitle":"5 box × 10 pcs","value":4995,"format":"inr","entity":{"kind":"product","id":"<uuid>"}}],' +
+      '"progress":{"label":"Collected","value":10000,"max":24975},"note":"Due in 7 days.",' +
+      '"actions":[{"label":"Open invoice","entity":{"kind":"invoice","id":"<uuid>"},"primary":true},{"label":"Draft a reminder","prompt":"Draft a payment reminder for INV-0042"}]}\n' +
+      '  formats: inr|number|percent|date|datetime|text; tones: neutral|info|success|warn|danger; entity kinds: ' +
+      'product, order, customer, invoice, quotation, coupon, supplier, rfq, category, brand, campaign (id = kind slug); ' +
+      'icons: those kinds plus payment, shipment, email, report, inventory, alert. href only for app paths ("/admin/...") or https URLs. ' +
+      'An action with "prompt" sends that text as the admin\'s next message; it never changes data itself.\n' +
+      '- {"type":"cards","layout":"grid|list","cards":[<card without "type">, ...]} for several such records.\n' +
       'IDs must be real UUIDs from tool output (they become links). Numbers raw: price 1234, not "₹1,234".',
     parameters: {
       type: 'object',
@@ -408,7 +426,10 @@ ${STOCK_RULES}
 
 ## Answers
 - Lead with the answer. Be concise: short sentences, bullets and numbers; no filler and no restating the question.
-- Show records and lists with the render_ui tool (product_grid for 2+ products, order_list, customer_list, table, kv_pairs, callout), then add at most a sentence or two of text. Do not repeat in prose what render_ui shows.
+- Show records and lists with the render_ui tool, then add at most a sentence or two of text. Do not repeat in prose what render_ui shows.
+  - Lists of products, orders or customers: product_grid (2+ products), order_list, customer_list.
+  - One record or summary of anything (an invoice, quotation, coupon, campaign, supplier, an order or customer in detail, KPIs for a period): card, with stats for the headline numbers, fields for the details, items for its lines, and actions to open it or ask the obvious next question. Several such records: cards.
+  - Wide comparisons: table. Warnings and outcomes: callout.
 - Link records inline as [[product:<uuid>|Name]], [[order:<uuid>|ORD-001]], [[customer:<uuid>|Name]] or [[campaign:<kind>|Label]], using real ids from tool output only.
 - Short markdown (bold, lists, \`code\`) is fine.
 
