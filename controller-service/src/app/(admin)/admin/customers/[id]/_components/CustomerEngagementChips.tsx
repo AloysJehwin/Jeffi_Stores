@@ -91,10 +91,10 @@ function SupportChatChip({ customerId, autoOpen }: { customerId: string; autoOpe
     let cancelled = false
     async function check() {
       try {
-        const res = await fetch(`/api/admin/support/sessions?customerId=${customerId}`, { credentials: 'include' })
+        const res = await fetch(`/api/admin/support/sessions?customerId=${customerId}&filter=open&limit=1`, { credentials: 'include' })
         if (!res.ok) return
         const data = await res.json()
-        if (!cancelled) setHasActive(!!(data.session && data.session.status === 'open'))
+        if (!cancelled) setHasActive((data.sessions?.length ?? 0) > 0)
       } catch {
         /* ignore */
       }
@@ -140,7 +140,7 @@ function SupportChatChip({ customerId, autoOpen }: { customerId: string; autoOpe
       </button>
 
       <Modal open={open} onClose={handleClose} title="Support Chat">
-        <AdminSupportChat customerId={customerId} autoOpen />
+        <AdminSupportChat customerId={customerId} />
       </Modal>
     </>
   )

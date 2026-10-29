@@ -424,6 +424,28 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'dashboard:read',
   },
   {
+    id: 'support_away_notify',
+    name: 'Support replies the customer has not seen',
+    path: '/api/cron/support-away-notify',
+    method: 'GET',
+    intervalMs: MIN,
+    intervalLabel: 'every 1 min',
+    startDelayMs: 75 * SEC,
+    lockTtlMs: MIN - 5 * SEC,
+    tenantScope: 'customers:read',
+  },
+  {
+    id: 'drive_purge_trash',
+    name: 'Empty Drive trash (30 days)',
+    path: '/api/cron/drive-purge-trash',
+    method: 'GET',
+    intervalMs: DAY,
+    intervalLabel: 'daily',
+    startDelayMs: 615 * SEC,
+    lockTtlMs: DAY - MIN,
+    tenantScope: 'dashboard:read',
+  },
+  {
     id: 'ai_health',
     name: 'AI platform health',
     path: '/api/internal/ai/health',
@@ -457,6 +479,7 @@ const DAILY_AT_IST: Record<string, string> = {
   google_ads_audiences: '0 6',
   // Early morning IST, so a lapsing month is charged before most store traffic.
   ad_free_renew: '0 5',
+  drive_purge_trash: '15 3',
 }
 
 // Weekly jobs: minute hour * * day-of-week (IST).

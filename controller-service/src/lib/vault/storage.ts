@@ -39,6 +39,12 @@ export interface StorageDriver {
   size(key: string): Promise<number>
   /** Move an object to a new key (used to promote a checked upload out of staging). */
   move(from: string, to: string): Promise<void>
+  /** Server-side write of already-checked bytes. */
+  put(key: string, body: Buffer, contentType: string): Promise<void>
+  /** Server-side read of a whole object. */
+  get(key: string): Promise<Buffer>
+  /** The bucket, for services that read straight from S3 (null for the local driver). */
+  readonly bucket: string | null
 }
 
 function keyTail(tenantId: string | null, productId: string, fileId: string, ext: string): string {
@@ -70,7 +76,7 @@ const s3 = new S3Client({
 
 class S3StorageDriver implements StorageDriver {
   readonly name = 's3' as const
-  constructor(private bucket: string) {}
+  constructor(readonly bucket: string) {}
 
   signUpload(key: string, contentType: string, ttlSeconds = DEFAULT_PUT_TTL): Promise<string> {
     return getSignedUrl(s3, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }), {
@@ -108,6 +114,15 @@ class S3StorageDriver implements StorageDriver {
       new CopyObjectCommand({ Bucket: this.bucket, Key: to, CopySource: `${this.bucket}/${encodeURI(from)}` })
     )
     await this.delete(from)
+  }
+
+  async put(key: string, body: Buffer, contentType: string): Promise<void> {
+    await s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }))
+  }
+
+  async get(key: string): Promise<Buffer> {
+    const r = await s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }))
+    return Buffer.from(await r.Body!.transformToByteArray())
   }
 }
 

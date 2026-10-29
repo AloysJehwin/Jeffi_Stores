@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { deleteGalleryImage } from '@/lib/shared/s3'
 import { queryOne, query } from '@/lib/shared/db'
 
@@ -7,6 +8,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Same editors who may add to the gallery may remove from it.
+  const canEdit = ['products:write', 'settings:write', 'coupons:write', 'social:write'].some(s => hasScope(admin.role, admin.scopes, s))
+  if (!canEdit) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const record = await queryOne('SELECT * FROM gallery_images WHERE id = $1', [id])
   if (!record) return NextResponse.json({ error: 'Not found' }, { status: 404 })

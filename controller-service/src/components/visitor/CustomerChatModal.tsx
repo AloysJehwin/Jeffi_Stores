@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Send, ThumbsUp, ThumbsDown, X, Bot, User } from 'lucide-react'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import AutoGrowTextarea from '@/components/ui/AutoGrowTextarea'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -432,9 +433,10 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
               }}
               className="flex items-end gap-2"
             >
-              <textarea
+              <AutoGrowTextarea
                 ref={inputRef}
                 value={input}
+                maxRows={6}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -443,11 +445,9 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
                   }
                 }}
                 placeholder="Ask about products or your orders…"
-                rows={1}
                 maxLength={2000}
                 disabled={loading}
-                className="flex-1 text-sm bg-transparent text-foreground placeholder:text-foreground-muted focus:outline-none resize-none py-1.5 max-h-32 overflow-y-auto"
-                style={{ fieldSizing: 'content' } as React.CSSProperties}
+                className="flex-1 text-sm leading-5 bg-transparent text-foreground placeholder:text-foreground-muted focus:outline-none py-1.5"
               />
               <button
                 type="submit"

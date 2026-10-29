@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runWithAuditActor } from '@/lib/auth/audit-context'
 import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
-import { queryOne, query } from '@/lib/shared/db'
-import { resolveShipmentStatus, isAdvancement } from '@/lib/shipping/shipment-status'
-import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
-import { applyCourierEdd, extractCourierEdd } from '@/lib/shipping/courier-edd'
+import { queryOne } from '@/lib/shared/db'
+import { trackOrder, TrackingError } from '@/lib/shipping/track'
 
 async function handle(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    console.log('[track] userId:', authUser.userId, 'isBusiness:', authUser.isBusiness)
 
     const isBusiness = authUser.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
 
@@ -41,59 +37,12 @@ async function handle(request: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-    if (!order.awb_number) return NextResponse.json({ tracking: null })
-
-    const TOKEN = await resolveDelhiveryToken()
-    if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
-
-    const res = await fetch(`https://track.delhivery.com/api/v1/packages/json/?waybill=${order.awb_number}`, {
-      headers: { Authorization: `Token ${TOKEN}` },
-      next: { revalidate: 60 },
-    })
-
-    if (!res.ok) return NextResponse.json({ error: 'Tracking unavailable' }, { status: 502 })
-
-    const data = await res.json()
-    const shipment = data?.ShipmentData?.[0]?.Shipment
-
-    if (!shipment) return NextResponse.json({ tracking: null })
-
-    const rawStatusType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
-    const scans = (shipment.Scans ?? []).map((s: any) => ({
-      date: s.ScanDetail?.ScanDateTime ?? null,
-      location: s.ScanDetail?.ScannedLocation ?? null,
-      activity: s.ScanDetail?.Scan ?? null,
-      instructions: s.ScanDetail?.Instructions ?? null,
-      scanType: s.ScanDetail?.ScanType ?? null,
-    }))
-
-    const newShipmentStatus = resolveShipmentStatus(rawStatusType, scans)
-
-    if (isAdvancement(order.shipment_status as any, newShipmentStatus)) {
-      await query(`UPDATE orders SET shipment_status = $2, updated_at = NOW() WHERE id = $1`, [
-        id,
-        newShipmentStatus,
-      ]).catch(() => {})
+    try {
+      return NextResponse.json({ tracking: await trackOrder({ id, ...order }) })
+    } catch (e) {
+      if (e instanceof TrackingError) return NextResponse.json({ error: e.message }, { status: e.status })
+      throw e
     }
-
-    const courierEdd = extractCourierEdd(shipment)
-    await applyCourierEdd(id, courierEdd, newShipmentStatus).catch(() => {})
-
-    return NextResponse.json({
-      tracking: {
-        awb: shipment.AWB,
-        status: shipment.Status?.Status ?? null,
-        statusType: shipment.Status?.StatusType ?? null,
-        shipmentStatus: newShipmentStatus,
-        statusDateTime: shipment.Status?.StatusDateTime ?? null,
-        instructions: shipment.Status?.Instructions ?? null,
-        pickUpDate: shipment.PickUpDate ?? null,
-        expectedDelivery: courierEdd,
-        origin: shipment.Origin ?? null,
-        destination: shipment.Destination ?? null,
-        scans,
-      },
-    })
   } catch (err) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

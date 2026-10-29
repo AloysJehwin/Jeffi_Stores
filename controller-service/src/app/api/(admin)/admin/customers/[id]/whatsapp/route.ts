@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   let thread: any[] = []
   if (digits) {
     thread = await queryMany(
-      `SELECT id, direction, to_number, from_number, body, kind, status, error, provider_sid, sent_at
+      `SELECT id, direction, to_number, from_number, body, kind, status, delivery_status, error, provider_sid, sent_at
        FROM message_logs
        WHERE channel = 'whatsapp'
          AND (regexp_replace(to_number, '\\D', '', 'g') LIKE '%' || $1

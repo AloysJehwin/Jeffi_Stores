@@ -1,89 +1,63 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/shared/db', () => ({
-  query: vi.fn(),
-  queryOne: vi.fn(),
-  queryMany: vi.fn(),
-  withTransaction: vi.fn(),
-}))
-
-vi.mock('@/lib/auth/jwt', () => ({
-  authenticateAdmin: vi.fn(),
-}))
-
-vi.mock('@/lib/auth/scopes', () => ({
-  hasScope: vi.fn(),
-}))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn(), authenticateAnyUser: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryOne: vi.fn(), queryMany: vi.fn(), withTransaction: vi.fn() }))
+vi.mock('@/lib/support/sessions', () => ({ listInbox: vi.fn(), getSessionRow: vi.fn() }))
 
 import { GET } from '@/app/api/(admin)/admin/support/customers/[userId]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne } from '@/lib/shared/db'
+import { listInbox } from '@/lib/support/sessions'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
-const mockQueryOne = vi.mocked(queryOne)
+const mockList = vi.mocked(listInbox)
 
-const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['customers'] }
-
-function makeReq(userId: string) {
-  return new NextRequest(`http://localhost/api/admin/support/customers/${userId}`)
-}
+const admin = { adminId: 'a1', email: 'a@x.com', role: 'admin', scopes: ['customers:read'] }
+const PARAMS = { params: Promise.resolve({ userId: 'u1' }) }
+const makeReq = () => new NextRequest('http://localhost/api/admin/support/customers/u1')
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
+  mockAuth.mockResolvedValue(admin)
+  mockHasScope.mockReturnValue(true)
 })
 
 describe('GET /api/admin/support/customers/[userId]', () => {
-  it('returns 401 when unauthenticated', async () => {
+  it('401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
+    const res = await GET(makeReq(), PARAMS)
     expect(res.status).toBe(401)
+    expect(mockAuth).toHaveBeenCalledWith(expect.anything(), { passive: true })
   })
 
-  it('returns 403 when scope missing', async () => {
-    mockAuth.mockResolvedValue(admin)
+  it('403 without customers:read', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
+    const res = await GET(makeReq(), PARAMS)
     expect(res.status).toBe(403)
+    expect(mockList).not.toHaveBeenCalled()
   })
 
-  it('returns session: null when no open session', async () => {
-    mockAuth.mockResolvedValue(admin)
-    mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
+  it('null when the customer has no open chat', async () => {
+    mockList.mockResolvedValue([])
+    const res = await GET(makeReq(), PARAMS)
     expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.session).toBeNull()
+    expect(await res.json()).toEqual({ session: null })
+    expect(mockList).toHaveBeenCalledWith({ filter: 'open', adminId: 'a1', customerId: 'u1', limit: 1 })
   })
 
-  it('returns open session on happy path', async () => {
-    mockAuth.mockResolvedValue(admin)
-    mockHasScope.mockReturnValue(true)
-    const session = {
-      id: 's1',
-      status: 'open',
-      created_at: '2024-01-01',
-      admin_name: 'Admin',
-      last_activity_at: '2024-01-01',
-    }
-    mockQueryOne.mockResolvedValue(session)
-    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    // Route now augments the session with a server-computed staleForClose flag.
-    // With a 2024 last_activity_at, the session is well past the stale threshold.
-    expect(body.session).toMatchObject({ id: 's1', status: 'open', admin_name: 'Admin' })
-    expect(body.session.staleForClose).toBe(true)
+  it("returns the customer's open chat", async () => {
+    const session = { id: 's1', status: 'open', ticket: 'SUP-2610-0001' } as any
+    mockList.mockResolvedValue([session])
+    const res = await GET(makeReq(), PARAMS)
+    expect(await res.json()).toEqual({ session })
   })
 
-  it('returns 500 on unexpected error', async () => {
-    mockAuth.mockResolvedValue(admin)
-    mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockRejectedValue(new Error('DB down'))
-    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
+  it('500 when the lookup fails', async () => {
+    mockList.mockRejectedValue(new Error('DB down'))
+    const res = await GET(makeReq(), PARAMS)
     expect(res.status).toBe(500)
   })
 })

@@ -781,21 +781,28 @@ describe('email.ts', () => {
 
   describe('sendSupportEscalationEmail', () => {
     it('sends escalation to specified admin emails', async () => {
-      const result = await sendSupportEscalationEmail('Alice', 'alice@example.com', 'cust-1', 'sess-1', [
-        'support@example.com',
-      ])
+      const result = await sendSupportEscalationEmail({
+        customerName: 'Alice',
+        customerEmail: 'alice@example.com',
+        sessionId: 'sess-1',
+        ticket: 'SUP-2610-0001',
+        reason: 'Refund dispute',
+        summary: 'Wants a refund for a damaged item',
+        channel: 'web',
+        adminEmails: ['support@example.com'],
+      })
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       expect(result.success).toBe(true)
     })
 
     it('falls back to SUPPORT_EMAIL when admin list is empty', async () => {
-      await sendSupportEscalationEmail('Alice', 'alice@example.com', 'c1', 's1', [])
+      await sendSupportEscalationEmail({ customerName: 'Alice', customerEmail: 'alice@example.com', sessionId: 's1', ticket: null, reason: null, summary: null, channel: 'web', adminEmails: [] })
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
     })
 
     it('returns error object on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('fail'))
-      const result = await sendSupportEscalationEmail('Alice', 'a@b.com', 'c', 's', ['x@y.com'])
+      const result = await sendSupportEscalationEmail({ customerName: 'Alice', customerEmail: 'a@b.com', sessionId: 's', ticket: null, reason: null, summary: null, channel: 'web', adminEmails: ['x@y.com'] })
       expect(result.success).toBe(false)
     })
   })

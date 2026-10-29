@@ -1,29 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/auth/jwt'
-import { hasScope } from '@/lib/auth/scopes'
-import { queryMany } from '@/lib/shared/db'
+import { inboxCounts, listInbox, type InboxFilter } from '@/lib/support/sessions'
+import { adminFor } from '@/lib/support/http'
+import type { SupportChannel } from '@/lib/support/types'
 
+export const dynamic = 'force-dynamic'
+
+const FILTERS: InboxFilter[] = ['needs_human', 'mine', 'ai', 'open', 'closed']
+
+// The support inbox: ?filter=needs_human|mine|ai|open|closed, ?channel=, ?q=, ?customerId=.
 export async function GET(request: NextRequest) {
   try {
-    const admin = await authenticateAdmin(request, { passive: true })
-    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'customers:read'))
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-
-    const sessions = await queryMany(
-      `SELECT ss.id, ss.user_id, ss.created_at, ss.admin_name,
-              CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
-              u.email AS customer_email
-       FROM support_sessions ss
-       JOIN users u ON u.id = ss.user_id
-       WHERE ss.status = 'open'
-       ORDER BY ss.created_at ASC`,
-      []
-    )
-
-    return NextResponse.json({ sessions })
+    const admin = await adminFor(request, 'customers:read', { passive: true })
+    if (admin instanceof NextResponse) return admin
+    const sp = request.nextUrl.searchParams
+    const f = sp.get('filter') as InboxFilter | null
+    const channel = sp.get('channel') as SupportChannel | null
+    const [sessions, counts] = await Promise.all([
+      listInbox({
+        filter: f && FILTERS.includes(f) ? f : 'open',
+        adminId: admin.adminId,
+        channel: channel && ['web', 'app', 'whatsapp'].includes(channel) ? channel : undefined,
+        search: sp.get('q')?.trim() || undefined,
+        customerId: sp.get('customerId') || undefined,
+        limit: Math.min(Number(sp.get('limit')) || 100, 200),
+      }),
+      inboxCounts(admin.adminId),
+    ])
+    return NextResponse.json({ sessions, counts })
   } catch (err) {
-    console.error('[route]', err)
+    console.error('[support] inbox', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

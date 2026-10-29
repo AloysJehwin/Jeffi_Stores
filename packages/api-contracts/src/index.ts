@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 export * from './whatsapp-rules'
+export * from './wa-cloud'
 export * from './google-tag'
 export * from './product-sort'
 

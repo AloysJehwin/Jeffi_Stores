@@ -25,6 +25,7 @@ import AdminAgentMessage, { AdminAgentUserMessage, internalMessageLabel } from '
 import AdminAgentBlocks from '../AdminAgentBlocks'
 import ProposedActionCard, { splitProposalBlocks } from './ProposedActionCard'
 import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
+import AutoGrowTextarea from '@/components/ui/AutoGrowTextarea'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 import { useAdminHost } from '@/contexts/AdminHostContext'
@@ -543,9 +544,10 @@ function Composer({
           onChange={chat.onPickFile}
           className="hidden"
         />
-        <textarea
+        <AutoGrowTextarea
           ref={inputRef}
           value={input}
+          maxRows={10}
           onChange={e => chat.setInput(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -553,11 +555,10 @@ function Composer({
               chat.sendMessage(input)
             }
           }}
-          rows={1}
           maxLength={2000}
           disabled={loading}
           placeholder={pendingFile ? 'Add an instruction (optional) and send' : 'Ask anything about the store'}
-          className="flex-1 min-w-0 px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none"
+          className="flex-1 min-w-0 px-3 py-2 text-sm leading-5 bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
         <button
           type="button"
