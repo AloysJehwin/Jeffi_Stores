@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
 import { sendPaymentRetryEmail } from '@/lib/email'
+import { askAboutOrder } from '@/lib/replies/ask'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -35,12 +36,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Order is older than 24 hours' }, { status: 400 })
   }
 
-  const result = await sendPaymentRetryEmail(
-    order.customer_email,
-    order.customer_name,
-    order.order_number,
-    Number(order.total_amount),
-    order.id
+  const result = await askAboutOrder('payment_failed', order.id, () =>
+    sendPaymentRetryEmail(order.customer_email, order.customer_name, order.order_number, Number(order.total_amount), order.id)
   )
 
   if (!result.success) {

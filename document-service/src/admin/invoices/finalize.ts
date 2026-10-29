@@ -7,6 +7,7 @@ import { queryOne, queryMany, withTransaction } from '@jeffi/tenancy'
 import { deductOrderStock, InsufficientStockError } from '../../lib/inventory-deduct'
 import { getFeatureFlags } from '../../lib/site-controls'
 import { sendInvoiceFinalizedEmail } from '../../lib/mail'
+import { invoiceReply } from '../../lib/reply-context'
 import { generateOrderInvoice, assignInvoiceNumber } from '../../lib/invoice'
 import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
 import { assertCompleteLines, IncompleteLinesError } from '../../lib/invoice-line-items'
@@ -107,7 +108,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             result.invoiceNumber,
             Number(order.total_amount),
             order.order_number,
-            await invoiceUrlForOrder(id)
+            await invoiceUrlForOrder(id),
+            await invoiceReply(id)
           )
         } catch (_) {}
       }

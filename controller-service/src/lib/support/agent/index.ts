@@ -4,7 +4,7 @@ import { resolveTenant, runWithTenantContext } from '@/lib/tenancy/tenant-contex
 import type { SessionRow } from '../sessions'
 import type { SupportMessage } from '../types'
 import { runSupportTurn } from './run'
-import { decideAction, pendingActionForReply, yesNo } from './actions'
+import { decideAction, leadingYesNo, pendingActionForReply, yesNo } from './actions'
 
 /** Run work after the response is sent, in the request's store; inline when there is no request. */
 export async function afterResponse(job: () => Promise<unknown>): Promise<void> {
@@ -34,7 +34,7 @@ export interface ReplyHints {
  * replies while the chat is with the AI.
  */
 export async function onCustomerMessage(session: SessionRow, m: SupportMessage, hints: ReplyHints = {}): Promise<void> {
-  const decision = !m.attachments.length ? yesNo(m.text) : null
+  const decision = !m.attachments.length ? (yesNo(m.text) ?? leadingYesNo(m.text)) : null
   if (decision) {
     const pending = await pendingActionForReply(session.id)
     if (pending) {

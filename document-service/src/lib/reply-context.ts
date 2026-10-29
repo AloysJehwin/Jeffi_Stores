@@ -59,6 +59,17 @@ export async function quotationReply(q: { id: string; consignee_email: string | 
   return openReplyContext({ scenario: 'quotation', entityType: 'quotations', entityId: q.id, userId: user?.user_id ?? null, email: q.consignee_email.toLowerCase(), phone: q.consignee_phone ?? null })
 }
 
+/** An invoice (an order with an invoice number) emailed to its customer: they can pay, query or dispute it by replying. */
+export async function invoiceReply(orderId: string): Promise<ReplyTarget | null> {
+  const o = await queryOne<{ user_id: string | null; email: string | null; phone: string | null }>(
+    `SELECT o.user_id, COALESCE(NULLIF(u.email, ''), o.customer_email) AS email, COALESCE(NULLIF(u.phone, ''), o.customer_phone) AS phone
+       FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1 AND o.invoice_number IS NOT NULL`,
+    [orderId]
+  ).catch(() => null)
+  if (!o?.email) return null
+  return openReplyContext({ scenario: 'invoice_payment', entityType: 'invoices', entityId: orderId, userId: o.user_id, email: o.email.toLowerCase(), phone: o.phone })
+}
+
 /** The sent mail's SES id, so a reply quoting it (In-Reply-To) finds the question without the token. */
 export async function recordEmailSend(contextId: string, providerRef: string | null | undefined): Promise<void> {
   if (!providerRef) return

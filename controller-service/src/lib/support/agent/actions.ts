@@ -185,3 +185,11 @@ export function yesNo(text: string): 'confirm' | 'decline' | null {
   if (NO.test(t)) return 'decline'
   return null
 }
+
+/** A short answer that opens with yes/no ("No, keep it", "yes please go ahead"): only for a pending card. */
+export function leadingYesNo(text: string): 'confirm' | 'decline' | null {
+  const t = text.trim()
+  if (t.split(/\s+/).length > 6 || /\b(but|though|instead|except|however)\b|^no (problem|worries|issue)/i.test(t)) return null
+  const first = t.split(/[\s,.!-]+/)[0]
+  return first.toLowerCase() === 'cancel' ? null : yesNo(first)
+}

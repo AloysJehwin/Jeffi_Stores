@@ -36,7 +36,7 @@ async function shell(kicker: string, title: string, content: string) {
   return { brand, html: mailShell({ brand, kicker, title, content: content + (contact ? `<p>${contact}</p>` : ''), footerLines: [address] }) }
 }
 
-export async function sendInvoiceFinalizedEmail(toEmail: string, customerName: string, invoiceNumber: string, totalAmount: number, orderNumber?: string, viewUrl?: string): Promise<Result> {
+export async function sendInvoiceFinalizedEmail(toEmail: string, customerName: string, invoiceNumber: string, totalAmount: number, orderNumber?: string, viewUrl?: string, reply?: ReplyTarget | null): Promise<Result> {
   const { brand, html } = await shell('Invoice', `Invoice ${invoiceNumber}`, `
     <p>Dear ${customerName},</p>
     <p>Thank you for your purchase! Your invoice has been generated.</p>
@@ -46,8 +46,8 @@ export async function sendInvoiceFinalizedEmail(toEmail: string, customerName: s
       <p style="margin:0"><strong>Total Amount:</strong> ₹${inr(totalAmount)}</p>
     </div>
     ${viewUrl ? `<div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>` : ''}
-    <p>For any queries, please contact us.</p>`)
-  return send(toEmail, `Invoice ${invoiceNumber} from ${brand}`, html, 'invoice_finalized', { invoiceNumber, orderNumber: orderNumber ?? null, totalAmount })
+    <p>${reply ? 'To pay, ask a question or tell us something needs correcting, simply reply to this email.' : 'For any queries, please contact us.'}</p>`)
+  return send(toEmail, `Invoice ${invoiceNumber} from ${brand}`, html, 'invoice_finalized', { invoiceNumber, orderNumber: orderNumber ?? null, totalAmount }, reply)
 }
 
 export async function sendQuotationFinalizedEmail(toEmail: string, consigneeName: string, quoteNumber: string, totalAmount: number, viewUrl: string, reply?: ReplyTarget | null): Promise<Result> {
@@ -85,7 +85,7 @@ export async function sendPurchaseOrderEmail(
   return send(toEmail, `Purchase Order ${poNumber} from ${brand}`, html, 'purchase_order', { poNumber, supplierName, totalAmount })
 }
 
-export async function sendBusinessInvoiceGeneratedEmail(toEmail: string, name: string, invoiceNumber: string, orderNumber: string, totalAmount: number, viewUrl: string): Promise<Result> {
+export async function sendBusinessInvoiceGeneratedEmail(toEmail: string, name: string, invoiceNumber: string, orderNumber: string, totalAmount: number, viewUrl: string, reply?: ReplyTarget | null): Promise<Result> {
   const { brand, html } = await shell('Invoice', `Invoice ${invoiceNumber}`, `
     <p>Dear ${name},</p>
     <p>Your invoice has been generated. Please find the details below.</p>
@@ -94,8 +94,9 @@ export async function sendBusinessInvoiceGeneratedEmail(toEmail: string, name: s
       <p style="margin:0 0 6px"><strong>Order No.:</strong> ${orderNumber}</p>
       <p style="margin:0"><strong>Amount Due:</strong> ₹${inr(totalAmount)}</p>
     </div>
-    <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>`)
-  return send(toEmail, `Invoice ${invoiceNumber} — ${brand}`, html, 'business_invoice_generated', { invoiceNumber, orderNumber, totalAmount })
+    <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>
+    ${reply ? '<p>To pay, ask a question or tell us something needs correcting, simply reply to this email.</p>' : ''}`)
+  return send(toEmail, `Invoice ${invoiceNumber} — ${brand}`, html, 'business_invoice_generated', { invoiceNumber, orderNumber, totalAmount }, reply)
 }
 
 export async function sendPOReceiveNotificationEmail(

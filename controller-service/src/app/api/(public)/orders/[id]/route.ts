@@ -19,6 +19,7 @@ import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { parseBody } from '@/lib/shared/validate'
 import { isPlatformOwner } from '@/lib/auth/scopes'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
+import { askAboutOrder } from '@/lib/replies/ask'
 import { ORDER_STATUSES, orderLockedError, orderTransitionError, paymentStatusError } from '@/lib/orders/status-flow'
 import {
   notifyOrderConfirmed,
@@ -697,17 +698,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           }
         }
         if (paymentStatusChanged) {
-          await sendPaymentStatusUpdate(
-            userEmail,
-            userName,
-            currentOrder.order_number,
-            orderId,
-            payment_status,
-            parseFloat(currentOrder.total_amount)
-          ).catch(() => {})
-          if (payment_status === 'failed') {
-            notifyPaymentFailed(currentOrder.user_id, currentOrder.order_number).catch(() => {})
+          // A failed payment asks the customer to pay again: their reply comes back to the order.
+          const tell = async () => {
+            await sendPaymentStatusUpdate(
+              userEmail,
+              userName,
+              currentOrder.order_number,
+              orderId,
+              payment_status,
+              parseFloat(currentOrder.total_amount)
+            ).catch(() => {})
+            if (payment_status === 'failed') {
+              await notifyPaymentFailed(currentOrder.user_id, currentOrder.order_number).catch(() => {})
+            }
           }
+          await (payment_status === 'failed' ? askAboutOrder('payment_failed', orderId, tell) : tell())
         }
       }
     }
