@@ -192,6 +192,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     ...(await systemVars(ctx.tenantId)),
     ...(req.channel === 'email' ? { customer_email: req.to } : {}),
     ...(given.customer_first_name && !given.customer_name ? { customer_name: given.customer_first_name } : {}),
+    ...(given.customer_name && !given.customer_first_name ? { customer_first_name: String(given.customer_name).trim().split(/\s+/)[0] } : {}),
     ...given,
   }
   let subject = req.subject ?? null
