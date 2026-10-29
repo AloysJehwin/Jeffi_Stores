@@ -292,7 +292,7 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
       provider = 'ses'
       // layout 'none': the template's HTML exactly as written, no store header/footer.
       const html = layout === 'none' ? body : wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact })
-      ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html, replyTo: req.reply_to })
+      ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html, replyTo: req.reply_to, inReplyTo: req.in_reply_to })
     } else if (req.channel === 'sms') {
       // The tenant's provider policy decides; a tenant on AWS never falls back to Twilio.
       provider = await messagingProvider(ctx.tenantId, 'sms')

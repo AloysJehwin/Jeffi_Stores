@@ -293,6 +293,12 @@ ses:
     recipients: verified_only  # Can only send to verified email addresses
   # To move to production: AWS Console > SES > Account dashboard > Request production access
   # NOTE: Also verify sender email noreply@jeffistores.in once domain is verified
+  receiving:  # customer replies (reply+<store>.<token>@reply.jeffistores.in) — deploy/k8s/bootstrap/ses-inbound.sh
+    domain: reply.jeffistores.in
+    mx: 10 inbound-smtp.us-east-1.amazonaws.com
+    rule: customer-replies  # in the active receipt rule set (jeffi-inbound if none)
+    store: s3://jeffi-mail-inbound-<account>/inbound/  # 30-day lifecycle; node role JeffiMailInboundRead
+    notify: sns jeffi-ses-inbound -> https://jeffistores.in/api/webhooks/ses-inbound
 
 # -----------------------------------------------------------------------------
 # Scheduling - Auto Start/Stop (Cost Optimization)

@@ -1980,6 +1980,8 @@ CREATE INDEX idx_support_sessions_open_activity ON public.support_sessions USING
 
 CREATE INDEX idx_support_sessions_contact_phone ON public.support_sessions USING btree (contact_phone) WHERE (contact_phone IS NOT NULL);
 
+CREATE INDEX idx_support_sessions_contact_email ON public.support_sessions USING btree (lower((contact_email)::text)) WHERE (contact_email IS NOT NULL);
+
 CREATE INDEX idx_support_messages_session_created ON public.support_messages USING btree (session_id, created_at);
 
 CREATE UNIQUE INDEX idx_support_messages_client_id ON public.support_messages USING btree (session_id, client_id) WHERE (client_id IS NOT NULL);

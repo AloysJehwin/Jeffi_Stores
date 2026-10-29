@@ -107,7 +107,7 @@ export interface StoreInput {
   name: string | null
   mime: string
   folderId: string | null
-  source: 'upload' | 'support' | 'whatsapp' | 'agent' | 'gallery'
+  source: 'upload' | 'support' | 'whatsapp' | 'email' | 'agent' | 'gallery'
   adminId?: string | null
   userId?: string | null
   /** Tighter per-call cap (e.g. customer chat uploads). */
