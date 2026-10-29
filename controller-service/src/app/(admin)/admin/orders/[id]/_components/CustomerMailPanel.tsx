@@ -1,67 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ChevronDown, Mail, Send, Sparkles } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, ChevronDown, Eye, EyeOff, Loader2, Mail, MessageSquareReply, Send, Sparkles, User } from 'lucide-react'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { fieldInputCls } from '@/components/admin/kit/form'
+import AdminSelect from '@/components/admin/AdminSelect'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
-import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
+import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
+import type { OrderMailTemplate } from '@/lib/orders/customer-mail'
 
-type TemplateOption = { id: string; label: string; subject: string; body: string }
+type Loaded = {
+  order: { status: string; paymentStatus: string | null; email: string }
+  items: { id: string; name: string; quantity: number }[]
+  templates: OrderMailTemplate[]
+}
 
-const FALLBACK_TEMPLATES: TemplateOption[] = [
-  {
-    id: 'delay_processing',
-    label: 'Processing Delay',
-    subject: 'Update on Your Order #{order_number}',
-    body: `<p>Dear {customer_first_name},</p>
-<p>Thank you for your order with {store_name}.</p>
-<p>We wanted to let you know that your order <strong>#{order_number}</strong> is currently in the final stages of processing. Our team is ensuring everything is packed perfectly before it heads your way.</p>
-<p>We expect your order to be dispatched within the next 1–2 business days. You'll receive a shipping confirmation with tracking details as soon as it's on the way.</p>
-<p>We sincerely appreciate your patience and look forward to getting your order to you soon.</p>
-<p>Warm regards,<br>Team {store_name}</p>`,
-  },
-  {
-    id: 'delay_shipping',
-    label: 'Shipping Delay',
-    subject: 'Shipping Update for Your Order #{order_number}',
-    body: `<p>Dear {customer_first_name},</p>
-<p>We hope you're doing well. We're writing to share a brief update about your order <strong>#{order_number}</strong>.</p>
-<p>Due to some logistical factors outside our control, there has been a slight delay in the delivery timeline. We sincerely apologise for any inconvenience this may have caused.</p>
-<p>Your order is still on its way and we expect it to reach you soon. We'll keep you updated and notify you as soon as there's any further progress.</p>
-<p>Thank you so much for your understanding — it truly means a lot to us.</p>
-<p>Warm regards,<br>Team {store_name}</p>`,
-  },
-  {
-    id: 'out_of_stock',
-    label: 'Item Unavailable',
-    subject: 'Important Update About Your Order #{order_number}',
-    body: `<p>Dear {customer_first_name},</p>
-<p>Thank you for choosing {store_name}. We're reaching out regarding your order <strong>#{order_number}</strong>.</p>
-<p>Unfortunately, one of the items in your order has become temporarily unavailable due to higher-than-expected demand. We completely understand how frustrating this can be and we are truly sorry for the inconvenience.</p>
-<p>Our team is actively working to source the item at the earliest. We will reach out to you as soon as it is available. In the meantime, if you'd prefer a full refund or would like to explore alternative options, please don't hesitate to reply to this email or contact our support team.</p>
-<p>We value your trust in us and will do our best to make this right.</p>
-<p>Warm regards,<br>Team {store_name}</p>`,
-  },
-  {
-    id: 'quality_check',
-    label: 'Quality Check Hold',
-    subject: 'Brief Hold on Your Order #{order_number}',
-    body: `<p>Dear {customer_first_name},</p>
-<p>We appreciate your order with {store_name}.</p>
-<p>We wanted to inform you that your order <strong>#{order_number}</strong> is currently undergoing our quality verification process. This is a standard check we carry out to ensure that every product we send meets our quality standards.</p>
-<p>This should be resolved within 24 hours and your order will be dispatched promptly thereafter. We'll notify you as soon as it's on the way.</p>
-<p>Thank you for your patience and continued trust in us.</p>
-<p>Warm regards,<br>Team {store_name}</p>`,
-  },
-  {
-    id: 'custom',
-    label: 'Custom Message',
-    subject: 'Message from {store_name}',
-    body: '',
-  },
-]
+const CUSTOM = 'custom'
 
 interface Props {
   orderId: string
@@ -72,125 +27,144 @@ interface Props {
 
 export default function CustomerMailPanel({ orderId, orderNumber, customerName, customerEmail }: Props) {
   const [open, setOpen] = useState(false)
-  const [templates, setTemplates] = useState<TemplateOption[]>(FALLBACK_TEMPLATES)
-  const [selectedTemplate, setSelectedTemplate] = useState(FALLBACK_TEMPLATES[0].id)
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/admin/messaging-templates?channel=email')
-      .then(r => (r.ok ? r.json() : null))
-      .then(async data => {
-        if (cancelled || !data?.items?.length) return
-        const items: TemplateOption[] = []
-        for (const row of data.items) {
-          if (row.category && !['transactional', 'automation'].includes(row.category)) continue
-          const full = await fetch(`/api/admin/messaging-templates/email/${encodeURIComponent(row.slug)}`)
-            .then(r => (r.ok ? r.json() : null)).catch(() => null)
-          if (!full) continue
-          items.push({ id: row.slug, label: row.name ?? row.slug, subject: full.subject ?? '', body: full.body ?? '' })
-        }
-        if (items.length) {
-          items.push({ id: 'custom', label: 'Custom Message', subject: `Message from {store_name}`, body: '' })
-          setTemplates(items)
-        }
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
-
+  const [data, setData] = useState<Loaded | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null)
   const [subject, setSubject] = useState('')
+  const [preheader, setPreheader] = useState('')
   const [body, setBody] = useState('')
+  const [itemId, setItemId] = useState('')
   const [sending, setSending] = useState(false)
-  const toast = useActionToast()
+  const [missing, setMissing] = useState<string[]>([])
+  const [checking, setChecking] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [scenarioPrompt, setScenarioPrompt] = useState('')
   const [scenarioLoading, setScenarioLoading] = useState(false)
   const [scenarioError, setScenarioError] = useState<string | null>(null)
-  const [streamingTokens, setStreamingTokens] = useState('')
-  const [showPreview, setShowPreview] = useState(false)
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
+  const toast = useActionToast()
   const canUseAi = useCanUseAi('mailer:write')
+  const canWriteOrders = useCanWrite('orders')
+  const canWriteMailer = useCanWrite('mailer')
+  const canSend = canWriteOrders && canWriteMailer
+  const checkSeq = useRef(0)
 
-  function applyTemplate(templateId: string) {
-    const t = templates.find(t => t.id === templateId)
+  const template = data?.templates.find(t => t.slug === selected) ?? null
+  const scenario = template?.scenario ?? null
+  const isCustom = selected === CUSTOM
+  const fitting = data?.templates.filter(t => t.fits) ?? []
+  const others = data?.templates.filter(t => !t.fits) ?? []
+
+  function choose(slug: string, list = data?.templates ?? []) {
+    setSelected(slug)
+    setItemId('')
+    setScenarioError(null)
+    if (slug === CUSTOM) {
+      setSubject('Message from {{store_name}}')
+      setPreheader('')
+      setBody('')
+      return
+    }
+    const t = list.find(x => x.slug === slug)
     if (!t) return
-    setSelectedTemplate(templateId)
-    const filled = (s: string) => s.replace(/\{order_number\}/g, orderNumber)
-    setSubject(filled(t.subject))
-    setBody(filled(t.body))
+    setSubject(t.subject)
+    setPreheader(t.preheader)
+    setBody(t.body)
   }
 
-  function handleTemplateChange(templateId: string) {
-    applyTemplate(templateId)
+  async function load() {
+    setLoadError(false)
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/mail-templates`)
+      if (!res.ok) throw new Error()
+      const d = (await res.json()) as Loaded
+      setData(d)
+      choose(d.templates.find(t => t.fits)?.slug ?? CUSTOM, d.templates)
+    } catch {
+      setLoadError(true)
+      choose(CUSTOM, [])
+    }
   }
+
+  // Fill the order details server-side: the preview and the list of tokens that would go out empty.
+  useEffect(() => {
+    if (!open || !selected || !body.trim()) {
+      setMissing([])
+      setPreviewHtml(null)
+      return
+    }
+    const seq = ++checkSeq.current
+    setChecking(true)
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/orders/${orderId}/send-customer-mail/preview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject, body, preheader, scenario: scenario?.id, itemId: itemId || undefined, layout: isCustom ? 'message' : 'template' }),
+        })
+        const d = await res.json()
+        if (seq !== checkSeq.current) return
+        setMissing(res.ok ? d.missing ?? [] : [])
+        setPreviewHtml(res.ok ? d.html ?? '' : '')
+      } catch {
+        if (seq === checkSeq.current) setPreviewHtml('')
+      } finally {
+        if (seq === checkSeq.current) setChecking(false)
+      }
+    }, 500)
+    return () => clearTimeout(t)
+  }, [open, selected, subject, body, preheader, itemId, orderId, scenario?.id, isCustom])
 
   async function generateFromScenario() {
     if (scenarioPrompt.trim().length < 10 || scenarioLoading) return
     setScenarioLoading(true)
     setScenarioError(null)
-    setStreamingTokens('')
-    setBody('')
     try {
-      const ctx = `Order #${orderNumber} for ${customerName}.`
       const res = await fetch('/api/admin/ai-generate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: `${ctx} ${scenarioPrompt}`, subject }),
+        body: JSON.stringify({ scenario: `Order #${orderNumber} for ${customerName}. ${scenarioPrompt}`, subject }),
       })
-      const data = (await res.json()) as { html?: string; error?: string }
-      if (!res.ok || !data.html) {
-        setScenarioError(data.error || 'Generation failed')
-        return
-      }
-      setBody(data.html)
+      const d = (await res.json()) as { html?: string; error?: string }
+      if (!res.ok || !d.html) setScenarioError(d.error || 'Generation failed')
+      else setBody(d.html)
     } catch {
       setScenarioError('Network error')
     } finally {
       setScenarioLoading(false)
-      setStreamingTokens('')
     }
   }
 
-  async function handlePreview() {
-    if (showPreview) {
-      setShowPreview(false)
-      return
-    }
-    setShowPreview(true)
-    setPreviewHtml(null)
-    setPreviewLoading(true)
-    try {
-      const res = await fetch(`/api/admin/orders/${orderId}/send-customer-mail/preview`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, body }),
-      })
-      const data = await res.json()
-      setPreviewHtml(data.html || '')
-    } catch {
-      setPreviewHtml('')
-    } finally {
-      setPreviewLoading(false)
-    }
-  }
+  const needsItem = !!scenario?.pickItem && !itemId
+  // The item's name comes from the picker, so ask for that rather than calling it missing.
+  const gaps = needsItem ? missing.filter(k => k !== 'item_name') : missing
+  const blocked = sending || checking || !subject.trim() || !body.trim() || missing.length > 0 || needsItem
 
   async function handleSend() {
-    if (!subject.trim() || !body.trim()) return
+    if (blocked) return
     setSending(true)
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/send-customer-mail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, body, isHtml: true }),
+        body: JSON.stringify({
+          subject,
+          body,
+          preheader: preheader || undefined,
+          isHtml: true,
+          layout: isCustom ? 'message' : 'template',
+          scenario: scenario?.id,
+          itemId: itemId || undefined,
+        }),
       })
-      const data = await res.json()
+      const d = await res.json()
       if (res.ok) {
-        toast.success('Email sent successfully.')
-        setSubject('')
-        setBody('')
-        setSelectedTemplate(templates[0].id)
+        toast.success(scenario?.reply ? 'Email sent. Their reply will show on this order.' : 'Email sent.')
+        setOpen(false)
+        setSelected(null)
       } else {
-        toast.error(data.error || 'Failed to send email.')
+        if (d.missing) setMissing(d.missing)
+        toast.error(d.error || 'Failed to send email.')
       }
     } catch {
       toast.error('Network error. Please try again.')
@@ -199,16 +173,31 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
     }
   }
 
+  const chip = (slug: string, label: string) => (
+    <button
+      key={slug}
+      type="button"
+      onClick={() => choose(slug)}
+      className={`px-3 h-control-sm rounded-lg border text-xs font-medium transition-colors ${
+        selected === slug
+          ? 'border-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
+          : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'
+      }`}
+    >
+      {label}
+    </button>
+  )
+  const label = (t: OrderMailTemplate) => t.scenario?.label ?? t.name
+
   return (
     <section className="rounded-xl border border-border-default bg-surface-elevated">
       <button
         type="button"
         onClick={() => {
+          if (!open && !data) void load()
           setOpen(o => !o)
-          if (!open) applyTemplate(templates[0].id)
         }}
-        className="flex w-full items-center justify-between px-5 py-4 text-left"
-      >
+        className="flex w-full items-center justify-between px-5 py-4 text-left">
         <div className="flex items-center gap-2">
           <Mail className="h-4 w-4 shrink-0 text-accent-500" />
           <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Customer Mail</h2>
@@ -219,40 +208,63 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
       {open && (
         <div className="space-y-4 border-t border-border-default px-5 pb-5 pt-4">
           <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
+            <User className="h-4 w-4 shrink-0" />
             <span className="min-w-0 break-words">
-              To: <strong className="text-foreground">{customerName}</strong> &lt;{customerEmail}&gt;
+              To: <strong className="text-foreground">{customerName}</strong> &lt;{data?.order.email || customerEmail}&gt;
             </span>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-foreground-muted mb-1.5">Template</label>
-            <div className="flex flex-wrap gap-2">
-              {templates.map(t => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => handleTemplateChange(t.id)}
-                  className={`px-3 h-control-sm rounded-lg border text-xs font-medium transition-colors ${
-                    selectedTemplate === t.id
-                      ? 'border-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
-                      : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+          {!data && !loadError ? (
+            <div className="flex items-center gap-2 text-xs text-foreground-muted">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading templates…
             </div>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              {fitting.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-foreground-muted">For this order</p>
+                  <div className="flex flex-wrap gap-2">{fitting.map(t => chip(t.slug, label(t)))}</div>
+                </div>
+              )}
+              {others.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-foreground-muted">Other order templates</p>
+                  <div className="flex flex-wrap gap-2">{others.map(t => chip(t.slug, label(t)))}</div>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">{chip(CUSTOM, 'Custom message')}</div>
+              {loadError && <p className="text-[11px] text-red-500">Could not load the templates. You can still write a custom message.</p>}
+            </div>
+          )}
 
-          {selectedTemplate === 'custom' && canUseAi && (
+          {template && !template.fits && scenario && (
+            <p className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+              This template is meant for orders in a different state ({data?.order.status}).
+            </p>
+          )}
+          {scenario?.reply && (
+            <p className="flex items-start gap-1.5 text-[11px] text-foreground-muted">
+              <MessageSquareReply className="mt-px h-3.5 w-3.5 shrink-0" />
+              The customer can reply to this email; their answer is recorded on this order.
+            </p>
+          )}
+
+          {scenario?.pickItem && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-foreground-muted">Which item?</label>
+              <AdminSelect
+                value={itemId}
+                onChange={setItemId}
+                options={[
+                  { value: '', label: 'Choose the item' },
+                  ...(data?.items ?? []).map(i => ({ value: i.id, label: i.quantity > 1 ? `${i.name} (x${i.quantity})` : i.name })),
+                ]}
+              />
+            </div>
+          )}
+
+          {isCustom && canUseAi && (
             <div className="space-y-2 rounded-lg border border-accent-500/40 bg-accent-500/5 p-3">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-accent-600">
                 <Sparkles className="h-3.5 w-3.5" />
@@ -263,7 +275,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
                 onChange={e => setScenarioPrompt(e.target.value)}
                 rows={2}
                 className={`${fieldInputCls} resize-none py-2`}
-                placeholder="Describe the situation — e.g. 'Apologize for shipping delay and offer 10% off next order'"
+                placeholder="Describe the situation, e.g. 'Apologise for the shipping delay and offer 10% off the next order'"
               />
               <div className="flex items-center gap-2">
                 <button
@@ -272,142 +284,134 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
                   disabled={scenarioLoading || scenarioPrompt.trim().length < 10}
                   className="control-sm bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:opacity-50"
                 >
+                  {scenarioLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                   {scenarioLoading ? 'Generating…' : body ? 'Regenerate' : 'Generate'}
                 </button>
                 {scenarioError && <span className="text-[11px] text-red-500">{scenarioError}</span>}
-                {scenarioLoading && !streamingTokens && (
-                  <span className="inline-flex items-center gap-1.5 text-[11px] text-foreground-muted">
-                    <svg className="w-3 h-3 animate-spin text-accent-500" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                    AI is thinking…
-                  </span>
-                )}
               </div>
-              {scenarioLoading && streamingTokens && (
-                <div className="mt-2 rounded border border-accent-500/30 bg-surface p-2">
-                  <p className="line-clamp-3 whitespace-pre-wrap font-mono text-[11px] text-foreground-secondary">
-                    {streamingTokens}
-                    <span className="animate-pulse">▍</span>
-                  </p>
-                </div>
-              )}
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-medium text-foreground-muted mb-1.5">Subject</label>
-            <AIEnrichButton
-              fieldLabel="Email subject"
-              value={subject}
-              onChange={setSubject}
-              scope="mailer:write"
-              format="subject"
-              write
-              context={`Email to the customer about order #${orderNumber}.`}
-            >
-              <input
-                type="text"
-                value={subject}
-                onChange={e => setSubject(e.target.value)}
-                className={`${fieldInputCls} pr-8`}
-              />
-            </AIEnrichButton>
-          </div>
+          {selected && (
+            <>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground-muted">Subject</label>
+                <AIEnrichButton
+                  fieldLabel="Email subject"
+                  value={subject}
+                  onChange={setSubject}
+                  scope="mailer:write"
+                  format="subject"
+                  write
+                  context={`Email to the customer about order #${orderNumber}.`}
+                >
+                  <input type="text" value={subject} onChange={e => setSubject(e.target.value)} className={`${fieldInputCls} pr-8`} />
+                </AIEnrichButton>
+              </div>
 
-          <div>
-            <label className="block text-xs font-medium text-foreground-muted mb-1.5">Message</label>
-            <div className="relative">
-              <EmailComposer value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
-              <AIEnrichButton
-                placement="in-field"
-                anchorClassName="absolute right-3 bottom-3 z-10"
-                fieldLabel="Email message (HTML)"
-                value={body}
-                onChange={setBody}
-                scope="mailer:write"
-                format="html"
-                write
-                context={`Email to the customer about order #${orderNumber}. Subject: "${subject}".`}
-              />
-            </div>
-            <p className="text-[11px] text-foreground-muted mt-1.5">
-              Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
-              are replaced with the actual customer details when the email is sent.
-            </p>
-          </div>
-
-          {body && (
-            <div>
-              <button
-                type="button"
-                onClick={handlePreview}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-500 hover:text-accent-600"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+              {!isCustom && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-foreground-muted">Preview text</label>
+                  <input
+                    type="text"
+                    value={preheader}
+                    maxLength={200}
+                    onChange={e => setPreheader(e.target.value)}
+                    className={fieldInputCls}
+                    placeholder="Shown next to the subject in the inbox"
                   />
-                </svg>
-                {showPreview ? 'Hide Preview' : 'Preview Email'}
-              </button>
-              {showPreview && (
-                <div className="mt-2 border border-border-default rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-surface-secondary border-b border-border-default text-xs text-foreground-muted">
-                    Preview — as the customer will see it
-                  </div>
-                  {previewLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-foreground-muted p-4">
-                      <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
-                      </svg>
-                      Loading preview…
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground-muted">Message</label>
+                <div className="relative">
+                  <EmailComposer value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
+                  <AIEnrichButton
+                    placement="in-field"
+                    anchorClassName="absolute right-3 bottom-3 z-10"
+                    fieldLabel="Email message (HTML)"
+                    value={body}
+                    onChange={setBody}
+                    scope="mailer:write"
+                    format="html"
+                    write
+                    context={`Email to the customer about order #${orderNumber}. Subject: "${subject}".`}
+                  />
+                </div>
+                <p className="mt-1.5 text-[11px] text-foreground-muted">
+                  Tokens like <code className="rounded bg-surface-secondary px-1 font-mono">{'{{order_number}}'}</code> are filled in
+                  from this order when the email is sent.
+                </p>
+              </div>
+
+              {needsItem && (
+                <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+                  <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+                  Choose the item this email is about.
+                </p>
+              )}
+              {gaps.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300">
+                  <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    This order has nothing for {gaps.map(k => `{{${k}}}`).join(', ')} yet. Remove {gaps.length > 1 ? 'them' : 'it'} or
+                    fill in the text before sending.
+                  </span>
+                </div>
+              )}
+
+              {body.trim() && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPreview(s => !s)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-500 hover:text-accent-600"
+                  >
+                    {showPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    {showPreview ? 'Hide preview' : 'Preview email'}
+                  </button>
+                  {showPreview && (
+                    <div className="mt-2 overflow-hidden rounded-lg border border-border-default">
+                      <div className="border-b border-border-default bg-surface-secondary px-3 py-2 text-xs text-foreground-muted">
+                        As the customer will see it
+                      </div>
+                      {previewHtml === null || (checking && !previewHtml) ? (
+                        <div className="flex items-center gap-2 p-4 text-xs text-foreground-muted">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Loading preview…
+                        </div>
+                      ) : previewHtml ? (
+                        <iframe srcDoc={previewHtml} className="w-full border-0" style={{ height: 520 }} sandbox="allow-same-origin" title="Email preview" />
+                      ) : (
+                        <p className="p-4 text-xs text-foreground-muted">Preview unavailable.</p>
+                      )}
                     </div>
-                  ) : previewHtml ? (
-                    <iframe
-                      srcDoc={previewHtml}
-                      className="w-full border-0"
-                      style={{ height: 480 }}
-                      sandbox="allow-same-origin"
-                      title="Email preview"
-                    />
-                  ) : (
-                    <p className="text-xs text-foreground-muted p-4">Preview unavailable.</p>
                   )}
                 </div>
               )}
-            </div>
-          )}
 
-          <div className="flex gap-3">
-            <RequireWrite scope="customers:write">
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={sending || !subject.trim() || !body.trim()}
-                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
-              >
-                <Send className="h-4 w-4" />
-                {sending ? 'Sending...' : 'Send Email'}
-              </button>
-            </RequireWrite>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="control-md border border-border-default font-semibold text-foreground-secondary hover:bg-surface-secondary"
-            >
-              Close
-            </button>
-          </div>
+              <div className="flex gap-3">
+                {canSend && (
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={blocked}
+                    className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
+                  >
+                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {sending ? 'Sending…' : 'Send email'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="control-md border border-border-default font-semibold text-foreground-secondary hover:bg-surface-secondary"
+                >
+                  Close
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </section>

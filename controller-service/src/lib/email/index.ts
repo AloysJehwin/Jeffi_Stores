@@ -9,6 +9,7 @@ export {
   sendNewReviewNotification,
   sendPaymentFailedAdminNotification,
   sendAdminContactEmail,
+  adminContactHtml,
   sendSupportEscalationEmail,
   sendAgentConnectedEmail,
   sendSupportReplyEmail,
