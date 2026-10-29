@@ -7,6 +7,7 @@ import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { Card, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, TextArea, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { APPROVAL_STATUS, fmtDay } from '../../_status'
+import { ChangeLog } from '@/components/admin/change-log'
 
 interface Customer {
   id: string
@@ -303,6 +304,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
         </>
       }
       aside={
+        <>
         <Card title="Approval">
           {customer.approval_status === 'pending' && (
             <div className="space-y-3">
@@ -333,6 +335,8 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
             </div>
           )}
         </Card>
+        <ChangeLog kind="business_customer" id={id} variant="compact" version={`${customer.approval_status}|${customer.approved_at ?? ""}`} />
+        </>
       }
     />
   )

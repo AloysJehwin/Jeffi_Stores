@@ -17,6 +17,7 @@ import {
   type Tone,
 } from '@/components/admin/kit'
 import { businessLabel, businessTone } from '../../_components/status-maps'
+import { ChangeLog } from '@/components/admin/change-log'
 import { headers } from 'next/headers'
 import { getCustomerById } from '@/lib/queries'
 import { ap } from '@/lib/shared/admin-path'
@@ -246,6 +247,8 @@ export default async function CustomerDetailPage({
           </div>
         </Card>
       )}
+
+      <ChangeLog kind="customer" id={customer.id} variant="compact" title="Profile changes" version={customer.updated_at ? String(customer.updated_at) : undefined} />
     </>
   )
 

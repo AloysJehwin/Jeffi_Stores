@@ -139,6 +139,14 @@ CREATE INDEX idx_admin_audit_entity ON public.admin_audit_log USING btree (entit
 
 
 --
+-- Name: idx_admin_audit_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_parent ON public.admin_audit_log USING btree (((metadata ->> 'parent_id'::text)), created_at DESC) WHERE (metadata ? 'parent_id'::text);
+
+
+
+--
 -- Name: idx_admin_certs_admin_id; Type: INDEX; Schema: public; Owner: -
 --
 

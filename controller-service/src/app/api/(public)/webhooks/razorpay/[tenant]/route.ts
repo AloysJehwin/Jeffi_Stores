@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { runWithAuditActor } from '@/lib/auth/audit-context'
 import crypto from 'crypto'
 import { lookupTenantContextBySlug } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
@@ -16,7 +17,7 @@ function safeEqual(a: string, b: string): boolean {
  * never touch the platform index; the tenant is the URL slug and its DB is the only one written.
  * Only subscription events are handled here; anything else is acked.
  */
-export async function POST(request: NextRequest, { params }: { params: Promise<{ tenant: string }> }) {
+async function handle(request: NextRequest, { params }: { params: Promise<{ tenant: string }> }) {
   const { tenant: slug } = await params
   const rawBody = await request.text()
   const signature = request.headers.get('x-razorpay-signature')
@@ -62,3 +63,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ status: 'ok' })
   })
 }
+
+export const POST = (request: NextRequest, ctx: { params: Promise<{ tenant: string }> }) =>
+  runWithAuditActor('razorpay', () => handle(request, ctx))

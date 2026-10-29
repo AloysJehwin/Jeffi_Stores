@@ -4,6 +4,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { getAdminSubscriptionDetail } from '@/lib/queries/subscriptions'
 import { Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, StatusBadge } from '@/components/admin/kit'
+import { ChangeLog } from '@/components/admin/change-log'
 import { SUBSCRIPTION_STATUS, fmtDate, inr } from '../../_status'
 import SubscriptionActions from '../SubscriptionActions'
 
@@ -138,6 +139,7 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
               <p className="text-sm text-foreground-secondary">{[address.line1, address.city, address.state, address.pincode].filter(Boolean).join(', ')}</p>
             </Card>
           )}
+          <ChangeLog kind="subscription" id={id} variant="compact" />
         </>
       }
     />

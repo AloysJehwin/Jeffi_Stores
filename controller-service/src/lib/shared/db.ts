@@ -2,7 +2,7 @@ import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
 import path from 'path'
 import fs from 'fs'
 import { createPgPool, rdsSslOption, rdsIamPassword } from '@/lib/shared/pg-pool'
-import { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext } from '@/lib/auth/audit-context'
+import { getCurrentAuditActor, getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext, runWithAuditActor } from '@/lib/auth/audit-context'
 import { getCurrentTenant, getCurrentTenantId, runWithTenantContext, setTenantContext } from '@/lib/tenancy/tenant-context'
 import type { TenantContext as TenantContextType } from '@/lib/tenancy/tenant-context'
 import { repoPath } from '@/lib/shared/paths'
@@ -19,7 +19,7 @@ const dbGlobal = globalThis as unknown as { __appPool?: Pool | null; __tenantPoo
 let pool: Pool | null = dbGlobal.__appPool ?? null
 const tenantPools: Map<string, Pool> = dbGlobal.__tenantPools ?? (dbGlobal.__tenantPools = new Map<string, Pool>())
 
-export { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext }
+export { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext, runWithAuditActor }
 export { getCurrentTenant, getCurrentTenantId, runWithTenantContext }
 export { ensureTenantContext as resolveRequestTenant }
 
@@ -202,16 +202,56 @@ async function getRequestAdminId(): Promise<string | null> {
   }
 }
 
+// Who a write is recorded against when no admin made it: an explicit runWithAuditActor, else the
+// signed-in customer, else a cron call. Customer sessions are cached briefly to keep writes cheap.
+const customerSids = new Map<string, { id: string | null; at: number }>()
+
+export async function requestActor(): Promise<string | null> {
+  const explicit = getCurrentAuditActor()
+  if (explicit) return explicit
+  try {
+    const { cookies, headers } = await import('next/headers')
+    const jar = await cookies()
+    const sid = jar.get('user_sid')?.value || jar.get('business_sid')?.value
+    if (sid) {
+      const hit = customerSids.get(sid)
+      if (hit && Date.now() - hit.at < 60_000) return hit.id && `customer:${hit.id}`
+      const { resolveSession } = await import('@/lib/auth/auth-sessions')
+      const s = await resolveSession(sid, undefined, { touch: false }).catch(() => null)
+      const id = s && s.principalType === 'customer' ? s.principalId : null
+      if (customerSids.size > 500) customerSids.clear()
+      customerSids.set(sid, { id, at: Date.now() })
+      if (id) return `customer:${id}`
+    }
+    const auth = (await headers()).get('authorization')
+    if (auth && process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return 'cron'
+  } catch {
+    /* outside a request */
+  }
+  return null
+}
+
+// An explicit source (runWithAuditActor) made the change even when an admin's request carried it,
+// e.g. a courier status picked up while an admin views tracking.
+async function requestAudit(): Promise<{ adminId: string | null; actor: string | null }> {
+  const explicit = getCurrentAuditActor()
+  if (explicit) return { adminId: null, actor: explicit }
+  const adminId = await getRequestAdminId()
+  return { adminId, actor: adminId ? null : await requestActor() }
+}
+
+const SET_AUDIT = `SELECT set_config('audit.admin_id', $1, $3), set_config('audit.actor', $2, $3)`
+
 export async function query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
   const tenant = await ensureTenantContext()
   const p = getPool(tenant)
   if (isMutation(text)) {
-    const adminId = await getRequestAdminId()
-    if (adminId) {
+    const { adminId, actor } = await requestAudit()
+    if (adminId || actor) {
       const client = await p.connect()
       try {
         await client.query('BEGIN')
-        await client.query(`SELECT set_config('audit.admin_id', $1, true)`, [adminId])
+        await client.query(SET_AUDIT, [adminId ?? '', actor ?? '', true])
         const result = await client.query<T>(text, params)
         await client.query('COMMIT')
         return result
@@ -244,13 +284,13 @@ export async function queryCount(text: string, params?: any[]): Promise<number> 
 export async function getClient(): Promise<PoolClient> {
   const tenant = await ensureTenantContext()
   const client = await getPool(tenant).connect()
-  const adminId = await getRequestAdminId()
-  if (adminId) {
-    await client.query(`SELECT set_config('audit.admin_id', $1, false)`, [adminId]).catch(() => {})
+  const { adminId, actor } = await requestAudit()
+  if (adminId || actor) {
+    await client.query(SET_AUDIT, [adminId ?? '', actor ?? '', false]).catch(() => {})
     const originalRelease = client.release.bind(client)
     ;(client as any).release = (err?: Error | boolean) => {
       client
-        .query(`SELECT set_config('audit.admin_id', '', false)`)
+        .query(SET_AUDIT, ['', '', false])
         .catch(() => {})
         .finally(() => {
           originalRelease(err as any)
@@ -264,10 +304,8 @@ export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>)
   const client = await getClient()
   try {
     await client.query('BEGIN')
-    const adminId = await getRequestAdminId()
-    if (adminId) {
-      await client.query(`SELECT set_config('audit.admin_id', $1, true)`, [adminId])
-    }
+    const { adminId, actor } = await requestAudit()
+    if (adminId || actor) await client.query(SET_AUDIT, [adminId ?? '', actor ?? '', true])
     const result = await fn(client)
     await client.query('COMMIT')
     return result

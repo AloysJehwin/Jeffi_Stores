@@ -37,6 +37,7 @@ import DigitalAccessCard, {
 } from '@/app/(admin)/admin/orders/[id]/_components/DigitalAccessCard'
 import { Download, Eye, ImageIcon, Printer, Truck } from 'lucide-react'
 import { Badge, Card, DetailHeader, EntityPage, Field, Fields, StatusBadge } from '@/components/admin/kit'
+import { ChangeLog, OrderStatusHistory } from '@/components/admin/change-log'
 import { ORDER_STATUS_FULL, PAYMENT_STATUS_FULL, inr } from '../../_components/status-maps'
 
 const pill = 'control-md border border-border-default bg-surface-elevated text-foreground hover:bg-surface-secondary'
@@ -205,6 +206,7 @@ export default async function OrderDetailsPage({
   const customerName = order.users
     ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest'
     : order.customer_name || 'Guest'
+  const changeVersion = order.updated_at ? new Date(order.updated_at).toISOString() : null
   const placedAt = `${new Date(order.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} ${new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`
   const canGenerateInvoice =
     canWrite &&
@@ -751,12 +753,15 @@ export default async function OrderDetailsPage({
             />
           )}
 
+          <ChangeLog kind="order" id={order.id} preset="order" version={changeVersion} />
+
           <MailLogsPanel orderId={order.id} />
     </>
   )
 
   const aside = (
     <>
+          <OrderStatusHistory orderId={order.id} placedAt={new Date(order.created_at).toISOString()} version={changeVersion} />
           <Card title="Customer">
               <Fields cols={1}>
                 <Field label="Name" value={<span className="font-medium">{customerName}</span>} />

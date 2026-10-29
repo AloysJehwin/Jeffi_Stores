@@ -13,6 +13,7 @@ import { DetailSkeleton, ErrorState } from '@/components/admin/kit/states'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
 import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
+import { ChangeLog } from '@/components/admin/change-log'
 
 const formatINR = (n: number) => formatINRBase(n, 0)
 
@@ -28,8 +29,8 @@ const DOC_STATUS: StatusMap = {
   cancelled: { label: 'Cancelled', tone: 'red' },
 }
 
-type Tab = 'pos' | 'expenses' | 'products'
-const VALID_TABS: Tab[] = ['pos', 'expenses', 'products']
+type Tab = 'pos' | 'expenses' | 'products' | 'changes'
+const VALID_TABS: Tab[] = ['pos', 'expenses', 'products', 'changes']
 
 const muted = 'text-foreground-secondary'
 const money = (v: unknown) => <span className="font-semibold text-foreground">{formatINR(parseFloat(String(v || '0')))}</span>
@@ -255,6 +256,7 @@ export default function SupplierDetailClient({
             { id: 'pos' as Tab, label: `Purchase Orders (${pos.length})` },
             { id: 'expenses' as Tab, label: `Bills / Expenses (${expenses.length})` },
             { id: 'products' as Tab, label: `Products (${linkedProducts.length})` },
+            { id: 'changes' as Tab, label: 'Change log' },
           ]}
           value={tab}
           onChange={setTab}
@@ -295,6 +297,14 @@ export default function SupplierDetailClient({
               />
             </Card>
           </div>
+        )}
+
+        {tab === 'changes' && (
+          <Card flush>
+            <div className="p-5">
+              <ChangeLog kind="supplier" id={id} variant="plain" />
+            </div>
+          </Card>
         )}
       </div>
 

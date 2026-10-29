@@ -103,6 +103,11 @@ DECLARE
   v_field_obj JSONB;
   v_inflation_id TEXT;
   v_extra_meta JSONB;
+  v_cols TEXT[];
+  v_parent_col TEXT;
+  v_parent TEXT;
+  v_actor TEXT;
+  v_row JSONB;
 BEGIN
   BEGIN
     v_admin_id := NULLIF(current_setting('audit.admin_id', true), '')::uuid;
@@ -111,10 +116,16 @@ BEGIN
   END;
 
   v_inflation_id := NULLIF(current_setting('audit.inflation_id', true), '');
+  v_actor := NULLIF(current_setting('audit.actor', true), '');
 
   IF NULLIF(current_setting('audit.skip', true), '') = 'true' THEN
     RETURN COALESCE(NEW, OLD);
   END IF;
+
+  -- Optional args: the only columns to diff (comma list), and the parent column(s) ('a|b' = first set)
+  -- whose value goes in metadata.parent_id so the row shows on its parent's change log.
+  IF TG_NARGS > 0 AND TG_ARGV[0] <> '' THEN v_cols := string_to_array(TG_ARGV[0], ','); END IF;
+  IF TG_NARGS > 1 AND TG_ARGV[1] <> '' THEN v_parent_col := TG_ARGV[1]; END IF;
 
   IF TG_OP = 'INSERT' THEN
     v_action := 'create';
@@ -126,17 +137,20 @@ BEGIN
     v_new_json := to_jsonb(NEW);
     v_entity_id := COALESCE(v_new_json->>'id', v_new_json->>'kind', v_new_json->>'key', '');
     FOR k IN SELECT jsonb_object_keys(v_new_json) LOOP
-      IF k IN ('updated_at', 'created_at') THEN CONTINUE; END IF;
-      IF k IN (
+      IF v_cols IS NOT NULL THEN
+        IF NOT (k = ANY(v_cols)) THEN CONTINUE; END IF;
+      ELSIF k IN ('updated_at', 'created_at') THEN CONTINUE;
+      ELSIF k IN (
         'views_count', 'sales_count', 'search_vector',
         'ai_description', 'ai_use_cases', 'ai_enriched_at', 'ai_score',
         'last_viewed_at', 'last_login', 'last_purchased_at', 'last_computed_at',
         'embedding', 'embedding_text', 'content_hash',
         'inventory_quantity'
-      ) THEN CONTINUE; END IF;
-      IF k LIKE 'last\_%' ESCAPE '\' THEN CONTINUE; END IF;
-      IF k LIKE '%\_count' ESCAPE '\' THEN CONTINUE; END IF;
-      IF k LIKE 'ai\_%' ESCAPE '\' THEN CONTINUE; END IF;
+      ) THEN CONTINUE;
+      ELSIF k LIKE 'last\_%' ESCAPE '\' THEN CONTINUE;
+      ELSIF k LIKE '%\_count' ESCAPE '\' THEN CONTINUE;
+      ELSIF k LIKE 'ai\_%' ESCAPE '\' THEN CONTINUE;
+      END IF;
       v_old_val := v_old_json -> k;
       v_new_val := v_new_json -> k;
       IF v_old_val IS DISTINCT FROM v_new_val THEN
@@ -162,12 +176,22 @@ BEGIN
   v_name := COALESCE(
     (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'name',
     (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'title',
+    (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'product_name',
     (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'variant_name',
     (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'sub_variant_name',
     (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'sku',
     (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'code',
     (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'slug',
     (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'file_name',
+    (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'order_number',
+    (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'invoice_number',
+    (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'quote_number',
+    (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'rfq_number',
+    (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'sale_number',
+    (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'expense_number',
+    (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'email',
+    (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'company_name',
+    left((CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'description', 60),
     v_entity_id
   );
 
@@ -190,8 +214,8 @@ BEGIN
     BEGIN
       v_vid := (CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END)->>'variant_id';
       IF v_vid IS NOT NULL THEN
-        EXECUTE 'SELECT p.name, v.variant_name FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.id = $1'
-          INTO v_pname, v_vname USING v_vid::uuid;
+        EXECUTE 'SELECT p.name, v.variant_name, p.id::text FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.id = $1'
+          INTO v_pname, v_vname, v_parent USING v_vid::uuid;
       END IF;
       v_summary := initcap(v_action) || ' variant image for "' || COALESCE(v_pname, 'unknown product') ||
         '" / ' || COALESCE(v_vname, 'unknown variant');
@@ -270,6 +294,17 @@ BEGIN
 
   IF v_inflation_id IS NOT NULL THEN
     v_extra_meta := v_extra_meta || jsonb_build_object('inflation_id', v_inflation_id);
+  END IF;
+
+  IF v_parent_col IS NOT NULL THEN
+    v_row := CASE TG_OP WHEN 'DELETE' THEN v_old_json ELSE v_new_json END;
+    SELECT v_row->>c INTO v_parent FROM unnest(string_to_array(v_parent_col, '|')) c WHERE v_row->>c IS NOT NULL LIMIT 1;
+  END IF;
+  IF v_parent IS NOT NULL THEN
+    v_extra_meta := v_extra_meta || jsonb_build_object('parent_id', v_parent);
+  END IF;
+  IF v_actor IS NOT NULL THEN
+    v_extra_meta := v_extra_meta || jsonb_build_object('actor', v_actor);
   END IF;
 
   INSERT INTO admin_audit_log (admin_id, action, entity_type, entity_id, summary, diff, metadata)

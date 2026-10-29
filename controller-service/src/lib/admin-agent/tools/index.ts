@@ -17,6 +17,8 @@ import { hasScope } from '@/lib/auth/scopes'
 import { getEntity } from '@/lib/filters/registry'
 import { listRows } from '@/lib/filters/run'
 import { withDefaultWindow } from '@/lib/filters/window'
+import { CHANGE_LOG_KINDS, getChangeLog } from '@/lib/admin/change-log'
+import { KIND_NOUN, fieldLabel, formatWhen, headline, showValue, textOf } from '@/lib/admin/change-log-format'
 
 function vec(arr: number[]) {
   return '[' + arr.join(',') + ']'
@@ -553,6 +555,50 @@ export const TOOLS: ToolDef[] = [
         summary: `${capped ? `Over ${count}` : count} ${entity.noun.toLowerCase()} match; showing the first ${compact.length}${compact.length < rows.length ? ' (pass columns for more)' : ''}.`,
         count,
         data: { list: entity.key, query: new URLSearchParams(q).toString(), capped, columns: entity.export.columns.map(c => c.key), rows: compact },
+      })
+    },
+  },
+  {
+    name: 'get_change_log',
+    description:
+      "Who changed a record and when: status, payment and shipment moves, edits, items added or removed, each with the admin, customer or system (Razorpay, Delhivery) that made it. Use for \"when did this order's status change\", \"who edited this product\", \"what changed on this quotation\".",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: Object.keys(CHANGE_LOG_KINDS), description: 'Record kind, e.g. order' },
+        id: { type: 'string', description: 'Record id (the campaign kind for campaigns)' },
+        fields: { type: 'string', description: 'Comma-separated fields to keep to, e.g. "status,payment_status"; all when omitted' },
+        limit: { type: 'number', description: 'Changes to return, newest first', minimum: 1, maximum: 20, default: 10 },
+      },
+      required: ['kind', 'id'],
+    },
+    mutating: false,
+    handler: async (input, actor) => {
+      const kind = String(input.kind ?? '')
+      const def = CHANGE_LOG_KINDS[kind]
+      if (!def) return err(`Unknown record kind: ${kind.slice(0, 40)}`)
+      if (!actor || !hasScope(actor.role, actor.scopes, def.scope)) return err(`You don't have access to ${kind} records.`)
+      const id = String(input.id ?? '').trim()
+      if (!/^[\w-]{1,64}$/.test(id)) return err('A record id is required.')
+      const fields = String(input.fields ?? '').split(',').map(f => f.trim()).filter(Boolean)
+      const { items, next } = await getChangeLog(kind, id, { fields: fields.length ? fields : undefined, limit: 60 })
+      const noun = KIND_NOUN[kind] ?? kind
+      const rows = items.slice(0, clamp(Number(input.limit) || 10, 1, 20)).map(i => ({
+        at: formatWhen(i.at),
+        by: i.actor.name,
+        what: headline(i, noun),
+        changes: i.parts.flatMap(p =>
+          p.changes.map(c => {
+            const from = textOf(showValue(p.entityType, c.field, c.from, c.fromLabel))
+            const to = textOf(showValue(p.entityType, c.field, c.to, c.toLabel))
+            return `${p.child ? `${p.child.label}${p.child.name ? ` "${p.child.name}"` : ''} · ` : ''}${fieldLabel(c.field)}: ${from} → ${to}`
+          })
+        ),
+      }))
+      return ok({
+        summary: rows.length ? `${rows.length} change${rows.length === 1 ? '' : 's'}, newest first${next || items.length > rows.length ? '; older ones exist' : ''}.` : 'No changes recorded for this record.',
+        count: rows.length,
+        data: { kind, id, changes: rows },
       })
     },
   },
