@@ -625,6 +625,18 @@ export default async function SiteControlsPage() {
               content: (
                 <>
                   <div>
+                    <SectionCard title="Admin Assistant" description="The AI assistant in the admin panel." columns>
+                      <FullSpan>
+                        <ToggleControl
+                          settingKey="feature_agent_dock_enabled"
+                          label="Floating assistant button"
+                          hint="A chat button at the bottom-right of every admin page. When off, the assistant still opens from the robot icon in the top bar."
+                          initial={c.flags.agentDockEnabled}
+                        />
+                      </FullSpan>
+                    </SectionCard>
+                  </div>
+                  <div>
                     <SectionCard
                       title="On-device AI"
                       description="Experimental browser-based AI features. Per-platform switches control where the in-browser model runs; when it's off (or unsupported) on a platform, that device falls back to server-generated AI instead."

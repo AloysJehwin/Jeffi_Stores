@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryOne } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
+import { conversationAccess, conversationMeta } from '@/lib/admin-agent/conversations'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,15 +14,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const owner = await queryOne<{ admin_id: string }>(
-    `SELECT admin_id::text FROM admin_agent_messages
-      WHERE conversation_id = $1::uuid LIMIT 1`,
-    [id]
-  )
-  if (!owner) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
-  if (owner.admin_id !== admin.adminId) {
-    return NextResponse.json({ error: 'Not your conversation' }, { status: 403 })
-  }
+  // Own chats, or one another admin has shared (read-only).
+  const access = await conversationAccess(admin.adminId, id)
+  if (access === 'none') return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+  if (access === 'denied') return NextResponse.json({ error: 'Not your conversation' }, { status: 403 })
 
   const messages = await queryMany<{
     id: string
@@ -40,5 +36,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     [id]
   )
 
-  return NextResponse.json({ messages })
+  const meta = await conversationMeta(id)
+  return NextResponse.json({
+    messages,
+    title: meta?.title ?? null,
+    shared: meta?.shared ?? false,
+    readOnly: access === 'shared',
+    ownerName: access === 'shared' ? (meta?.owner_name ?? null) : null,
+  })
 }

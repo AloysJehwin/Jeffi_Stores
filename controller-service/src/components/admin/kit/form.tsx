@@ -242,7 +242,8 @@ export function FormFooter({
     await cancel()
   }
 
-  const shell = `${sticky ? 'sticky bottom-0 z-10 !mt-3' : ''} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`
+  // A sticky bar keeps its buttons clear of the assistant's floating button (--dock-offset).
+  const shell = `${sticky ? 'sticky bottom-0 z-10 !mt-3 pr-[calc(1rem+var(--dock-offset,0px))]' : ''} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`
 
   if (readOnly && lock) {
     return (

@@ -230,6 +230,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         scopes={scopes}
         host={host}
         canUseAgent={hasScope(role, scopes, 'agent:write')}
+        adminId={session.adminId}
+        agentDockButton={controls.flags.agentDockEnabled}
         logoutForm={logoutForm}
         initialCollapsed={sidebarCollapsed}
         wallet={wallet}

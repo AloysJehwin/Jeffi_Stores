@@ -147,7 +147,7 @@ export function RecordCard({ card, onSendMessage }: { card: CardData; onSendMess
         tone === 'neutral' ? 'border-border-default' : `border-border-default border-l-4 ${TONE_BORDER[tone]}`
       }`}
     >
-      <div className="flex items-start gap-2.5 px-3 py-2.5">
+      <div className="flex flex-wrap items-start gap-2.5 px-3 py-2.5">
         {img ? (
           <img src={img} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
         ) : (
@@ -155,7 +155,7 @@ export function RecordCard({ card, onSendMessage }: { card: CardData; onSendMess
             <Icon className="h-4 w-4" />
           </div>
         )}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[9rem] flex-1">
           {card.eyebrow && <p className={label}>{card.eyebrow}</p>}
           <MaybeLink href={href} className={`text-sm font-semibold leading-snug [overflow-wrap:anywhere] ${href ? 'hover:text-accent-600 dark:hover:text-accent-400' : ''}`}>
             {card.title}
@@ -164,7 +164,7 @@ export function RecordCard({ card, onSendMessage }: { card: CardData; onSendMess
           {card.subtitle && <p className="mt-0.5 text-foreground-muted [overflow-wrap:anywhere]">{card.subtitle}</p>}
         </div>
         {badges.length > 0 && (
-          <div className="flex shrink-0 flex-wrap justify-end gap-1">
+          <div className="ml-auto flex shrink-0 flex-wrap justify-end gap-1">
             {badges.map((b, i) => (
               <span key={i} className={badgeCls(KIT_TONE[toneOf(b.tone)])}>
                 {b.label}
@@ -175,7 +175,7 @@ export function RecordCard({ card, onSendMessage }: { card: CardData; onSendMess
       </div>
 
       {stats.length > 0 && (
-        <div className="grid grid-cols-2 gap-px border-t border-border-default bg-border-default sm:grid-cols-[repeat(auto-fit,minmax(7rem,1fr))]">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-px border-t border-border-default bg-border-default">
           {stats.map((s, i) => (
             <div key={i} className="bg-surface-elevated px-3 py-2">
               <p className={label}>{s.label}</p>
@@ -197,7 +197,7 @@ export function RecordCard({ card, onSendMessage }: { card: CardData; onSendMess
       )}
 
       {fields.length > 0 && (
-        <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-border-default px-3 py-2.5 sm:grid-cols-2">
+        <dl className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-4 gap-y-1.5 border-t border-border-default px-3 py-2.5">
           {fields.map((f, i) => {
             const fh = safeHref(f.href, f.entity)
             return (
@@ -299,7 +299,7 @@ const TONE_BORDER: Record<BlockTone, string> = {
 export function RecordCards({ block, onSendMessage }: { block: CardsBlockData; onSendMessage?: (msg: string) => void }) {
   const cards = arr(block.cards).filter(c => c?.title)
   return (
-    <div className={block.layout === 'list' ? 'space-y-2' : 'grid grid-cols-1 gap-2 sm:grid-cols-2'}>
+    <div className={block.layout === 'list' ? 'space-y-2' : 'grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2'}>
       {cards.map((c, i) => (
         <RecordCard key={i} card={c} onSendMessage={onSendMessage} />
       ))}

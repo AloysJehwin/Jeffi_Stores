@@ -227,7 +227,7 @@ function renderBlock(
       )
     case 'product_grid':
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
           {b.products.map(p => {
             const stockInfo = fmtStockStatus(p)
             return (
