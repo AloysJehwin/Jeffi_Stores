@@ -126,6 +126,10 @@ export default function TeamMobileList({ admins, currentAdminId, scopeLabels }: 
                 <p className="text-sm text-foreground font-medium">{selected.mfa_enabled ? 'Enabled' : 'Disabled'}</p>
               </div>
               <div>
+                <p className="text-xs text-foreground-muted">Mobile</p>
+                <p className="text-sm text-foreground font-medium">{selected.mobile_hint ?? 'Not verified'}</p>
+              </div>
+              <div>
                 <p className="text-xs text-foreground-muted">Last login</p>
                 <p className="text-sm text-foreground font-medium">
                   {selected.last_login ? new Date(selected.last_login).toLocaleDateString('en-IN') : 'Never'}

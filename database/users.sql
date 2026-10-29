@@ -97,7 +97,9 @@ CREATE TABLE public.admins (
     mfa_enabled boolean DEFAULT false NOT NULL,
     mfa_enrolled_at timestamp with time zone,
     idle_timeout_minutes integer,
-    support_language character varying(10) DEFAULT 'en'::character varying NOT NULL
+    support_language character varying(10) DEFAULT 'en'::character varying NOT NULL,
+    mobile character varying(16),
+    mobile_verified_at timestamp with time zone
 );
 
 
