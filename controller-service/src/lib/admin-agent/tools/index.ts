@@ -12,6 +12,11 @@ import { ORDER_TOOLS } from './orders'
 import { dedicatedOrderTool, type AgentActor } from '../permissions'
 import { ok, err } from '../tool-envelope'
 import { appPath, repoRoot } from '@/lib/shared/paths'
+import { normalizeQuery } from '@jeffi/list-filters'
+import { hasScope } from '@/lib/auth/scopes'
+import { getEntity } from '@/lib/filters/registry'
+import { listRows } from '@/lib/filters/run'
+import { withDefaultWindow } from '@/lib/filters/window'
 
 function vec(arr: number[]) {
   return '[' + arr.join(',') + ']'
@@ -509,6 +514,46 @@ export const TOOLS: ToolDef[] = [
         })),
         count: TOOLS.length,
       }
+    },
+  },
+  {
+    name: 'get_page_rows',
+    description:
+      "The rows of an admin list as the admin's filters show them: how many match, and the first rows (each row's id plus the list's export columns). Use the list and query from the page context for \"these\", \"this list\" or \"how many am I looking at\", and before proposing changes to those rows.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        list: { type: 'string', description: 'List key from the page context, e.g. orders' },
+        query: { type: 'string', description: 'Filter query from the page context, e.g. status=confirmed&from=2026-10-01' },
+        limit: { type: 'number', description: 'Rows to return', minimum: 1, maximum: 50, default: 20 },
+        columns: { type: 'string', description: 'Comma-separated columns to keep, e.g. "sku,name"; all when omitted' },
+      },
+      required: ['list'],
+    },
+    mutating: false,
+    handler: async (input, actor) => {
+      const entity = getEntity(String(input.list ?? ''))
+      if (!entity?.export) return err(`Unknown list: ${String(input.list).slice(0, 40)}`)
+      if (!actor || !hasScope(actor.role, actor.scopes, entity.scope)) {
+        return err(`You don't have access to the ${entity.noun.toLowerCase()} list.`)
+      }
+      const q = withDefaultWindow(entity, normalizeQuery(entity, new URLSearchParams(String(input.query ?? ''))))
+      const { count, capped, rows } = await listRows(entity, q, clamp(Number(input.limit) || 20, 1, 50))
+      const keep = String(input.columns ?? '').split(',').map(c => c.trim()).filter(Boolean)
+      const compact = rows.map(r =>
+        Object.fromEntries(
+          Object.entries(r)
+            .filter(([k, v]) => v != null && v !== '' && (!keep.length || k === 'id' || keep.includes(k)))
+            .map(([k, v]) => [k, typeof v === 'string' && v.length > 80 ? `${v.slice(0, 80)}…` : v])
+        )
+      )
+      // Wide rows: fewer of them rather than a cut-off result.
+      while (compact.length > 5 && JSON.stringify(compact).length > 6000) compact.pop()
+      return ok({
+        summary: `${capped ? `Over ${count}` : count} ${entity.noun.toLowerCase()} match; showing the first ${compact.length}${compact.length < rows.length ? ' (pass columns for more)' : ''}.`,
+        count,
+        data: { list: entity.key, query: new URLSearchParams(q).toString(), capped, columns: entity.export.columns.map(c => c.key), rows: compact },
+      })
     },
   },
   {

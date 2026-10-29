@@ -5,6 +5,7 @@ import { Download, ExternalLink, Pencil } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useAgentChanges } from '@/lib/client/agent-events'
 import { formatINR, formatDate } from '@/lib/shared/format'
 import { ActionButton, Card, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, PageBody, QUOTATION_STATUS, StatusBadge, badgeCls, useActionToast, type KitAction } from '@/components/admin/kit'
 
@@ -17,6 +18,8 @@ export default function QuotationDetailClient({ id }: { id: string }) {
   const toast = useActionToast()
   const confirm = useConfirm()
   const canWrite = useCanWrite('quotations')
+  const [nonce, setNonce] = useState(0)
+  useAgentChanges(() => setNonce(n => n + 1))
 
   useEffect(() => {
     fetch(`/api/admin/quotations/${id}`)
@@ -26,7 +29,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [id])
+  }, [id, nonce])
 
   async function finalize() {
     const ok = await confirm({

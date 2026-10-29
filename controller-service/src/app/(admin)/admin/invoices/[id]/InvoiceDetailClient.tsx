@@ -8,6 +8,7 @@ import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useAgentChanges } from '@/lib/client/agent-events'
 import { formatINR, formatDate } from '@/lib/shared/format'
 import { fmtQty } from '@/lib/shared/number-display'
 import {
@@ -79,6 +80,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   useEffect(() => {
     loadData()
   }, [id, router])
+  useAgentChanges(loadData)
 
   // Poll every 4s while QR is shown and payment is unpaid
   useEffect(() => {

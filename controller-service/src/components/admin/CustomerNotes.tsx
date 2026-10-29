@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -31,6 +31,8 @@ export default function CustomerNotes({
   const canWriteScope = useCanWrite('customers:write')
   const canWrite = canWriteProp && canWriteScope
   const [notes, setNotes] = useState<CustomerNote[]>(initialNotes)
+  // A refresh (e.g. after an approved agent change) brings new notes.
+  useEffect(() => setNotes(initialNotes), [initialNotes])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [tags, setTags] = useState<string[]>([])
