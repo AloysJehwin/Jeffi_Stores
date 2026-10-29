@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
+import { useAgentChanges } from '@/lib/client/agent-events'
 
 // Infinite lists. Three sources, one footer:
 // - useInfiniteList: client fetch of page N from an API (page/limit or offset), appended on scroll.
@@ -170,6 +171,7 @@ export function useInfiniteList<T>({ key, pageSize, fetchPage, getKey }: { key: 
     void run(pageRef.current + 1 || 1)
   }, [run, key])
   const reload = useCallback(() => setNonce(n => n + 1), [])
+  useAgentChanges(reload)
   const setRows = useCallback((fn: (r: T[]) => T[]) => setRowsState(fn), [])
 
   return { rows, total, hasMore: hasMore && !loading, loading, loadingMore, error, loadMore, retry, reload, setRows }

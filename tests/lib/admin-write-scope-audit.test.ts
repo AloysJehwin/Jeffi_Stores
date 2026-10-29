@@ -89,6 +89,16 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // gated on audit:read — the read-tier sibling of cron/trigger (which is CRON_SECRET-exempt above).
   // It writes only this store's own cron_enabled_* flag; no cross-tenant or privileged effect.
   'cron/config',
+  // Support chat on screen: presence beats, read receipts and translation into the viewer's own
+  // language. They record what this member saw; anyone who can read the chat may do them.
+  'support/sessions/[sessionId]/heartbeat',
+  'support/sessions/[sessionId]/receipts',
+  'support/sessions/[sessionId]/translate',
+  // The member's own chat language, like their own session or MFA.
+  'support/preferences',
+  // Approving a customer's reply: decideAsAdmin checks the scenario's record :write scope
+  // (orders, quotations, invoices, business_rfqs, subscriptions) before acting.
+  'replies/actions/[id]',
 ])
 
 function mutatingRoutesWithoutWriteScope(): string[] {
@@ -101,6 +111,9 @@ function mutatingRoutesWithoutWriteScope(): string[] {
     // proxyAdminDocs(req, path, '...:write') (document-service proxy; checks hasScope before forwarding),
     // or aiDenial on a resolveAiScope() result, which only yields AI_ACTION_SCOPES (all :write).
     if (/hasScope\([^)]*:write'\)|requireAdminScope\([^)]*:write'\)|aiDenial\([^)]*:write'\)|proxyAdminDocs\([^)]*:write'\)/.test(src)) continue
+    // Drive and support route helpers that authenticate and check the named scope (lib/drive/http,
+    // lib/support/http).
+    if (/(driveActor|adminChat|adminFor)\([^)]*:write'/.test(src)) continue
     // hasScope over a const list/map whose scope literals are all :write (uploads/image EDIT_SCOPES.some(...),
     // editor-sessions WRITE_SCOPE[resourceType]).
     const lits = src.match(/'[a-z_]+:(?:read|write)'/g) ?? []

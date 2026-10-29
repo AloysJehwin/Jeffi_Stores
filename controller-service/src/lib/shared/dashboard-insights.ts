@@ -55,6 +55,7 @@ export interface DashboardInsights {
     pendingReviews: number
     backInStockWaitlist: number
     supportOpen: number
+    replyApprovals: number
     overdueTasks: number
     openTasks: number
     pendingRfqs: number
@@ -288,6 +289,7 @@ export async function getDashboardInsights(
         (SELECT COUNT(*) FROM search_logs WHERE created_at >= ${startExpr}) AS searches,
         (SELECT COUNT(*) FROM search_logs WHERE created_at >= ${startExpr} AND results_count = 0) AS zero_searches,
         (SELECT COUNT(*) FROM support_sessions WHERE status = 'open') AS support_open,
+        (SELECT COUNT(*) FROM support_ai_actions WHERE kind = 'reply' AND status = 'pending' AND awaiting = 'admin') AS reply_approvals,
         (SELECT COUNT(*) FROM support_sessions WHERE created_at >= ${startExpr}) AS support_in_range,
         (SELECT AVG(EXTRACT(EPOCH FROM (closed_at - created_at)) / 3600) FROM support_sessions WHERE closed_at IS NOT NULL AND created_at >= ${startExpr}) AS support_hours,
         (SELECT COUNT(*) FROM customer_tasks WHERE status IN ('pending', 'in_progress') AND due_date < CURRENT_DATE) AS overdue_tasks,
@@ -480,6 +482,7 @@ export async function getDashboardInsights(
       pendingReviews: int(eng?.pending_reviews),
       backInStockWaitlist: int(eng?.back_in_stock),
       supportOpen: int(eng?.support_open),
+      replyApprovals: int(eng?.reply_approvals),
       overdueTasks: int(eng?.overdue_tasks),
       openTasks: int(eng?.open_tasks),
       pendingRfqs: int(eng?.pending_rfqs),

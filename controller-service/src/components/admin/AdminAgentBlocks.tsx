@@ -9,6 +9,7 @@ import { fmtINR, parseNumber } from './agent/format'
 import DocumentBlock, { type DocumentBlockData } from './agent/DocumentBlock'
 import ChangeSummaryBlock, { type ChangeSummaryBlockData } from './agent/ChangeSummaryBlock'
 import QuotationResolver, { type QuotationResolverBlock } from './agent/QuotationResolver'
+import { RecordCard, RecordCards, type CardBlockData, type CardsBlockData } from './agent/RecordCard'
 
 function fmtPriceOrAsk(input: unknown): string {
   const n = parseNumber(input)
@@ -142,6 +143,8 @@ export type UiBlock =
   | QuotationResolverBlock
   | DocumentBlockData
   | ChangeSummaryBlockData
+  | CardBlockData
+  | CardsBlockData
 
 interface Props {
   blocks: UiBlock[]
@@ -224,7 +227,7 @@ function renderBlock(
       )
     case 'product_grid':
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
           {b.products.map(p => {
             const stockInfo = fmtStockStatus(p)
             return (
@@ -409,6 +412,10 @@ function renderBlock(
       return <DocumentBlock block={b} />
     case 'change_summary':
       return <ChangeSummaryBlock block={b} />
+    case 'card':
+      return <RecordCard card={b} onSendMessage={ctx.onSendMessage} />
+    case 'cards':
+      return <RecordCards block={b} onSendMessage={ctx.onSendMessage} />
     default:
       return <p className="text-xs text-foreground-muted">[unknown block type: {(b as any).type}]</p>
   }

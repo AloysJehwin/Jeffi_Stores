@@ -1,95 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/auth/jwt'
-import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryOne } from '@/lib/shared/db'
-import { sendAgentConnectedEmail } from '@/lib/email'
-import { logActivity } from '@/lib/shared/activity'
+import { z } from 'zod'
+import { parseBody } from '@/lib/shared/validate'
+import { currentBrandNameAsync } from '@/lib/catalog/brand'
+import { getSessionDto } from '@/lib/support/sessions'
+import { listMessages, localize } from '@/lib/support/messages'
+import { ensureTranslations } from '@/lib/support/translate'
+import { agentAttachments, agentReply } from '@/lib/support/admin'
+import { adminChat, adminLanguage, agentRef } from '@/lib/support/http'
 
+export const dynamic = 'force-dynamic'
+
+const postSchema = z
+  .object({
+    message: z.string().max(4000).optional(),
+    clientId: z.string().max(64).nullish(),
+    attachmentIds: z.array(z.string().uuid()).max(10).optional(),
+  })
+  .refine(b => !!b.message?.trim() || !!b.attachmentIds?.length, { message: 'Write a message or attach a file' })
+
+// The conversation in the agent's language (translations are fetched for what's missing, briefly;
+// late ones arrive on the stream).
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
+  const { sessionId } = await params
   try {
-    const { sessionId } = await params
-    const admin = await authenticateAdmin(request)
-    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'customers:read'))
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-
-    const messages = await queryMany(
-      `SELECT id, sender, message, created_at FROM support_messages
-       WHERE session_id = $1 ORDER BY created_at ASC`,
-      [sessionId]
-    )
-
-    return NextResponse.json({ messages })
+    const ctx = await adminChat(request, sessionId, 'customers:read', { passive: true })
+    if (ctx instanceof NextResponse) return ctx
+    const lang = await adminLanguage(ctx.admin.adminId)
+    const after = request.nextUrl.searchParams.get('after')
+    const pending = ensureTranslations(sessionId, lang, 40).catch(() => 0)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([pending, new Promise(r => (timer = setTimeout(r, 6000)))])
+    clearTimeout(timer)
+    const brand = await currentBrandNameAsync()
+    const listed = await listMessages(sessionId, { after, brand })
+    return NextResponse.json({
+      messages: listed.map(l => localize(l.message, l.translations, lang)),
+      session: after ? undefined : await getSessionDto(sessionId),
+      lang,
+      me: ctx.admin.adminId,
+    })
   } catch (err) {
-    console.error('[route]', err)
+    console.error('[support] admin messages GET', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
+  const { sessionId } = await params
   try {
-    const { sessionId } = await params
-    const admin = await authenticateAdmin(request)
-    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'customers:write'))
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-
-    const session = await queryOne<{ id: string; admin_name: string | null; user_id: string }>(
-      `SELECT id, admin_name, user_id FROM support_sessions WHERE id = $1 AND status = 'open'`,
-      [sessionId]
+    const ctx = await adminChat(request, sessionId, 'customers:write')
+    if (ctx instanceof NextResponse) return ctx
+    if (ctx.session.status !== 'open') return NextResponse.json({ error: 'This chat is closed' }, { status: 409 })
+    const parsed = parseBody(postSchema, await request.json().catch(() => ({})))
+    if (!parsed.ok) return parsed.response
+    const attachments = await agentAttachments({ adminId: ctx.admin.adminId, role: ctx.admin.role, scopes: ctx.admin.scopes ?? [] }, parsed.data.attachmentIds ?? [])
+    if (!attachments) return NextResponse.json({ error: 'Attachment not found' }, { status: 400 })
+    const message = await agentReply(
+      ctx.session,
+      await agentRef(ctx.admin),
+      { text: (parsed.data.message ?? '').trim(), clientId: parsed.data.clientId ?? null, attachments }
     )
-    if (!session) {
-      return NextResponse.json({ error: 'Session not found or closed' }, { status: 404 })
-    }
-
-    const { message, isClosingMessage } = await request.json()
-    if (!message?.trim()) {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 })
-    }
-
-    const isFirstAgentMessage = !session.admin_name
-
-    const adminDisplayName =
-      admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.email || 'Support'
-
-    await queryOne(`UPDATE support_sessions SET admin_name = COALESCE(admin_name, $1) WHERE id = $2`, [
-      adminDisplayName,
-      sessionId,
-    ])
-
-    const msg = await queryOne(
-      `INSERT INTO support_messages (session_id, sender, message)
-       VALUES ($1, 'admin', $2)
-       RETURNING id, sender, message, created_at`,
-      [sessionId, message.trim()]
-    )
-
-    logActivity({
-      userId: session.user_id,
-      actorId: admin.adminId,
-      kind: 'support_message',
-      referenceId: sessionId,
-      referenceType: 'support_sessions',
-      summary: `Admin replied: ${message.trim().length > 100 ? message.trim().slice(0, 100) + '…' : message.trim()}`,
-      metadata: { from: 'admin' },
-    }).catch(() => {})
-
-    if (isFirstAgentMessage) {
-      const customer = await queryOne<{ first_name: string; last_name: string; email: string }>(
-        `SELECT first_name, last_name, email FROM users WHERE id = $1`,
-        [session.user_id]
-      )
-      if (customer) {
-        const customerName = `${customer.first_name} ${customer.last_name}`.trim()
-        sendAgentConnectedEmail(customerName, customer.email, adminDisplayName).catch(() => {})
-      }
-    }
-
-    return NextResponse.json({
-      message: { ...msg, sender_name: adminDisplayName, is_closing: isClosingMessage || false },
-    })
+    return NextResponse.json({ message })
   } catch (err) {
-    console.error('[route]', err)
+    console.error('[support] admin messages POST', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

@@ -6,6 +6,7 @@ import { queryOne, withTransaction } from '@jeffi/tenancy'
 import { isInterState, round2 } from '../../lib/gst'
 import { logStockMovement } from '../../lib/inventory'
 import { sendInvoiceFinalizedEmail } from '../../lib/mail'
+import { invoiceReply } from '../../lib/reply-context'
 import { syncPerishableStock, decrementNonPerishableShelfStock } from '../../lib/shelf'
 import { deleteBatchIfEmpty, resolveLineUnit, readAvailableStock } from '../../lib/inventory-deduct'
 import { getFeatureFlags, getBusinessValues } from '../../lib/site-controls'
@@ -394,7 +395,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           order.invoice_number,
           totalAmount,
           undefined,
-          await invoiceUrlForOrder(id)
+          await invoiceUrlForOrder(id),
+          await invoiceReply(id)
         )
       } catch (_) {}
     }

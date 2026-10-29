@@ -29,6 +29,7 @@ import type {
 import { emailPreviewDoc, emailBodyDoc, previewSubject } from '@/lib/templates/email-preview'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
 import { BRAND_VAR, rejectionHints, withBrandToken } from '@jeffi/api-contracts'
+import { PAGES, pagesOf, placementTags, scenarioOf, type PageKey } from '@/lib/messaging/placements'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
 
@@ -39,6 +40,10 @@ export type EditorTemplate = {
   name: string
   category?: string | null
   subject?: string | null
+  /** Email: the preview line inboxes show after the subject. */
+  preheader?: string | null
+  /** Pages/scenarios it is offered on (lib/messaging/placements). */
+  tags?: string[]
   body: string
   blocks?: unknown
   blocks_format?: string | null
@@ -61,6 +66,8 @@ export function toEditorTemplate(api: any): EditorTemplate {
     name: api.name ?? '',
     category: api.category ?? null,
     subject: v.subject ?? api.subject ?? '',
+    preheader: v.preheader ?? '',
+    tags: api.tags ?? [],
     body: api.channel === 'whatsapp' ? withBrandToken(v.body ?? api.body ?? '') : (v.body ?? api.body ?? ''),
     blocks: v.blocks ?? api.blocks,
     blocks_format: v.blocks_format ?? api.blocks_format ?? null,
@@ -682,6 +689,19 @@ export default function TemplateEditor({
                 ),
               })}
             </div>
+            <div>
+              <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">
+                Preview text
+              </label>
+              <input
+                className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                value={value.preheader ?? ''}
+                maxLength={200}
+                onChange={e => onChange({ ...value, preheader: e.target.value })}
+                placeholder="The line inboxes show after the subject"
+              />
+            </div>
+            {!kind && <ShowOn tags={value.tags ?? []} onChange={tags => onChange({ ...value, tags })} />}
             {!kind && (
               <div>
                 <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">
@@ -1438,5 +1458,42 @@ export default function TemplateEditor({
       />
     )}
     </>
+  )
+}
+
+// Which admin pages offer this template, and on the order page, the situation it is for.
+function ShowOn({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const pages = pagesOf(tags)
+  const scenario = scenarioOf('order', tags)?.id ?? null
+  const keep = tags.filter(t => !t.startsWith('page:') && !t.startsWith('scenario:'))
+  const set = (p: PageKey[], s: string | null) => onChange([...keep, ...placementTags(p, s)])
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Show on</label>
+      <div className="flex flex-wrap gap-x-5 gap-y-2">
+        {(Object.keys(PAGES) as PageKey[]).map(p => (
+          <label key={p} className="flex items-center gap-2 text-sm text-foreground" title={PAGES[p].hint}>
+            <input
+              type="checkbox"
+              checked={pages.includes(p)}
+              onChange={e => set(e.target.checked ? [...pages, p] : pages.filter(x => x !== p), scenario)}
+            />
+            {PAGES[p].label}
+          </label>
+        ))}
+      </div>
+      {pages.includes('order') && (
+        <div className="mt-2 max-w-sm">
+          <AdminSelect
+            value={scenario ?? ''}
+            onChange={v => set(pages, v || null)}
+            options={[
+              { value: '', label: 'Any order', hint: 'Offered on every order' },
+              ...PAGES.order.scenarios.map(s => ({ value: s.id, label: s.label, hint: 'Offered when the order is in a state it suits' })),
+            ]}
+          />
+        </div>
+      )}
+    </div>
   )
 }

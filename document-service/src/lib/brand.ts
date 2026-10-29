@@ -37,6 +37,16 @@ export async function currentAdminBaseUrlAsync(): Promise<string> {
   return t?.slug ? `https://admin-${t.slug}.${PLATFORM_DOMAIN}` : process.env.ADMIN_BASE_URL || `https://admin.${PLATFORM_DOMAIN}`
 }
 
+/** The store's email accent colour for outgoing mail. */
+export async function storeMailTheme(): Promise<{ accent: string }> {
+  try {
+    const id = await getStoreIdentity()
+    return { accent: id.emailAccent ?? '' }
+  } catch {
+    return { accent: '' }
+  }
+}
+
 export async function storeContactLine(): Promise<string> {
   try {
     const id = await getStoreIdentity()

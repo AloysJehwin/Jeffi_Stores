@@ -7,6 +7,8 @@ import { WA_TEMPLATE_REGISTRY, sendTemplateByKey, sendFreeTextWhatsApp } from '@
 import { storeBaseUrlAsync } from '@/lib/catalog/brand'
 import { getHost } from '@/lib/tenancy/get-host'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
+import { agentAttachments } from '@/lib/support/admin'
+import { sendDriveFileWhatsApp } from '@/lib/support/whatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   let thread: any[] = []
   if (digits) {
     thread = await queryMany(
-      `SELECT id, direction, to_number, from_number, body, kind, status, error, provider_sid, sent_at
+      `SELECT id, direction, to_number, from_number, body, kind, status, delivery_status, error, provider_sid, sent_at
        FROM message_logs
        WHERE channel = 'whatsapp'
          AND (regexp_replace(to_number, '\\D', '', 'g') LIKE '%' || $1
@@ -161,7 +163,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!hasScope(admin.role, admin.scopes, 'crm:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const { templateKey, variables, text } = await req.json()
+  const { templateKey, variables, text, attachmentIds } = await req.json()
+  const fileIds: string[] = Array.isArray(attachmentIds) ? attachmentIds.filter((x: unknown) => typeof x === 'string').slice(0, 10) : []
 
   const user = await queryOne<{ phone: string | null }>('SELECT phone FROM users WHERE id = $1', [id])
   const phone = user?.phone ?? null
@@ -170,8 +173,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let ok = false
   if (templateKey) {
     ok = await sendTemplateByKey(phone, String(templateKey), variables || {})
-  } else if (text && String(text).trim()) {
-    ok = await sendFreeTextWhatsApp({ phone, body: String(text).trim() })
+  } else if ((text && String(text).trim()) || fileIds.length) {
+    // Drive files the admin can open, as media after the text (all inside the 24h window).
+    if (fileIds.length && !(await agentAttachments({ adminId: admin.adminId, role: admin.role, scopes: admin.scopes ?? [] }, fileIds).catch(() => null))) {
+      return NextResponse.json({ error: 'Attachment not found' }, { status: 400 })
+    }
+    ok = text && String(text).trim() ? await sendFreeTextWhatsApp({ phone, body: String(text).trim() }) : true
+    for (const fid of fileIds) if (ok) ok = !!(await sendDriveFileWhatsApp(phone, fid, 'crm_whatsapp')).sid
   } else {
     return NextResponse.json({ error: 'templateKey or text is required' }, { status: 400 })
   }

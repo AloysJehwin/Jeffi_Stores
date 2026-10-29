@@ -95,7 +95,6 @@ export async function sendReturnStatusEmail(
         ${event !== 'requested_admin' ? `<p>Hi ${recipientName},</p>` : ''}
         ${bodies[event]}
       `,
-      footerLines: [`${brand} — do not reply to this email.`],
     }),
   }
 

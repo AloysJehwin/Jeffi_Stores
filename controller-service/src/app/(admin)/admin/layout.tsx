@@ -50,12 +50,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/amazon', label: 'Amazon', scope: 'amazon:read', group: 'Catalogue' },
     { href: '/admin/data-source', label: 'Data Source', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/social-posts', label: 'Social Posts', scope: 'social:read', group: 'Catalogue' },
+    { href: '/admin/drive', label: 'Drive', scope: 'drive:read', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },
     { href: '/admin/subscriptions', label: 'Subscriptions', scope: 'subscriptions:read', group: 'Sales' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations:read', group: 'Sales' },
     { href: '/admin/invoices', label: 'Invoices', scope: 'invoices:read', group: 'Sales' },
     { href: '/admin/cash-sale', label: 'Cash Sale', scope: 'invoices:read', group: 'Sales' },
     { href: '/admin/customers', label: 'Customers', scope: 'customers:read', group: 'Sales' },
+    { href: '/admin/support', label: 'Support', scope: 'customers:read', group: 'Sales' },
     { href: '/admin/crm', label: 'CRM', scope: 'crm:read', group: 'Sales' },
     { href: '/admin/tasks', label: 'Tasks', scope: 'tasks:read', group: 'Sales' },
     { href: '/admin/returns', label: 'Returns', scope: 'returns:read', group: 'Actions' },
@@ -230,6 +232,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         scopes={scopes}
         host={host}
         canUseAgent={hasScope(role, scopes, 'agent:write')}
+        adminId={session.adminId}
+        agentDockButton={controls.flags.agentDockEnabled}
         logoutForm={logoutForm}
         initialCollapsed={sidebarCollapsed}
         wallet={wallet}

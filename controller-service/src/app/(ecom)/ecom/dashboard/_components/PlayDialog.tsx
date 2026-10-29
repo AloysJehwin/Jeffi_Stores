@@ -8,7 +8,7 @@ import { AUTO_VARIABLES, curlFor, templateCallFields } from '@/components/admin/
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import { PhoneInput, isValidPhone } from '../../_ui/phone'
-import PdfPreview from '../documents/PdfPreview'
+import PdfPreview from '@/components/ui/PdfPreview'
 import { fmt } from './finance'
 
 // ▶ Play: one real send/render through POST /api/ecom/play on behalf of a chosen live API key.

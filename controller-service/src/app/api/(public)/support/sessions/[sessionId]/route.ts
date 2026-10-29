@@ -1,30 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser } from '@/lib/auth/jwt'
-import { query, queryOne } from '@/lib/shared/db'
+import { logActivity } from '@/lib/shared/activity'
+import { closeSession, getSessionDto } from '@/lib/support/sessions'
+import { customerChat } from '@/lib/support/http'
 
+export const dynamic = 'force-dynamic'
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
+  const { sessionId } = await params
+  try {
+    const ctx = await customerChat(request, sessionId)
+    if (ctx instanceof NextResponse) return ctx
+    return NextResponse.json({ session: await getSessionDto(sessionId) })
+  } catch (err) {
+    console.error('[support] session GET', err)
+    return NextResponse.json({ error: 'Failed' }, { status: 500 })
+  }
+}
+
+// The customer ends their chat.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
   try {
-    const authUser = await authenticateAnyUser(request)
-    if (!authUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const ctx = await customerChat(request, sessionId)
+    if (ctx instanceof NextResponse) return ctx
+    const body = await request.json().catch(() => ({}))
+    if (body?.status && body.status !== 'closed') return NextResponse.json({ error: 'Only closing a chat is supported' }, { status: 400 })
+    if (await closeSession(sessionId)) {
+      logActivity({ userId: ctx.user.userId, kind: 'support_message', referenceId: sessionId, referenceType: 'support_sessions', summary: 'Customer ended the support chat' }).catch(() => {})
     }
-
-    const session = await queryOne(`SELECT id FROM support_sessions WHERE id = $1 AND user_id = $2`, [
-      sessionId,
-      authUser.userId,
-    ])
-    if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
-    }
-
-    await query(`UPDATE support_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1`, [sessionId])
-
-    await query(`DELETE FROM websocket_connections WHERE session_id = $1`, [sessionId])
-
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('[route]', err)
+    console.error('[support] close', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

@@ -6,6 +6,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useAgentChanges } from '@/lib/client/agent-events'
 
 interface Task {
   id: string
@@ -63,6 +64,8 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
   const [dueDate, setDueDate] = useState('')
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium')
   const [assignedTo, setAssignedTo] = useState<string>('')
+
+  useAgentChanges(() => load())
 
   async function load() {
     const res = await fetch(`/api/admin/customers/${customerId}/tasks?status=${showCompleted ? 'completed' : 'open'}`, {

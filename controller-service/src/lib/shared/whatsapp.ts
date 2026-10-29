@@ -6,6 +6,8 @@ import { getWhatsAppProvider } from '@/lib/shared/messaging'
 import { messagingGateAllows, debitMessageEstimate } from '@/lib/shared/messaging/billing'
 import { estimateFor } from '@/lib/shared/messaging/pricing'
 import { sendByTemplate } from '@/lib/shared/send-by-template'
+import type { OutboundMedia } from '@/lib/shared/messaging/types'
+import { currentReplyScope } from '@/lib/replies/scope'
 
 // WhatsApp wrappers now dispatch via sendByTemplate (slug → messaging-service).
 // Variable numbering must match the Meta-approved Twilio Content templates (see seed/catalog.ts).
@@ -36,7 +38,24 @@ async function sendBySlug(
   if (!normalized) return false
   if (!(await whatsappChannelEnabled())) return false
   const res = await sendByTemplate({ channel: 'whatsapp', slug, to: normalized, variables, reference })
-  return res.status !== 'failed' && res.status !== 'skipped'
+  const ok = res.status !== 'failed' && res.status !== 'skipped'
+  if (res.status !== 'skipped') {
+    const scope = currentReplyScope()
+    logMessage({
+      channel: 'whatsapp',
+      to: normalized,
+      from: 'messaging-service',
+      body: res.body ?? `[${slug}]`,
+      kind: slug.startsWith('otp/') ? 'otp' : slug,
+      status: ok ? 'sent' : 'failed',
+      error: res.error,
+      providerSid: res.providerSid ?? null,
+      provider: 'messaging-service',
+      entityType: scope?.entityType,
+      entityId: scope?.entityId,
+    })
+  }
+  return ok
 }
 
 export async function sendOTPWhatsApp(p: { phone?: string | null; otp: string }): Promise<boolean> {
@@ -124,23 +143,49 @@ export async function sendFreeTextWhatsApp(params: {
   body: string
   kind?: string
 }): Promise<boolean> {
+  return !!(await sendWhatsAppDirect({ phone: params.phone, text: params.body, kind: params.kind }))
+}
+
+/**
+ * One free-form WhatsApp message (text, or media with an optional caption) inside the 24h window,
+ * through the channel gate, wallet gate and audit log. Returns the provider message id, or null
+ * when not sent.
+ */
+export async function sendWhatsAppDirect(params: {
+  phone?: string | null
+  text?: string
+  media?: OutboundMedia
+  kind?: string
+}): Promise<string | null> {
   const normalized = normalizePhone(params.phone)
-  if (!normalized) return false
-  if (!(await whatsappChannelEnabled())) return false
-  if (!(await messagingGateAllows('whatsapp', false))) return false
+  if (!normalized) return null
+  if (!(await whatsappChannelEnabled())) return null
+  if (!(await messagingGateAllows('whatsapp', false))) return null
   const provider = await getWhatsAppProvider()
-  if (!provider.configured) return false
+  if (!provider.configured) return null
   const kind = params.kind || 'support_reply'
+  const body = params.media ? params.media.caption || `[${params.media.filename || params.media.kind}]` : params.text || ''
   try {
-    const sid = await provider.sendText(normalized, params.body)
+    const sid = params.media ? await provider.sendMedia(normalized, params.media) : await provider.sendText(normalized, params.text || '')
     debitMessageEstimate({ channel: 'whatsapp', providerSid: sid }).catch(() => {})
-    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body: params.body, kind, status: 'sent', providerSid: sid, provider: provider.name, price: estimateFor('whatsapp'), deliveryStatus: 'estimated' })
-    return true
+    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body, kind, status: 'sent', providerSid: sid, provider: provider.name, price: estimateFor('whatsapp'), deliveryStatus: 'estimated' })
+    return sid
   } catch (err: any) {
-    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body: params.body, kind, status: 'failed', error: err?.message, provider: provider.name })
-    return false
+    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body, kind, status: 'failed', error: err?.message, provider: provider.name })
+    return null
   }
 }
+
+/** Blue ticks on an inbound WhatsApp message (no-op where the provider can't). */
+export async function markWhatsAppRead(providerMessageId: string): Promise<void> {
+  try {
+    await (await getWhatsAppProvider()).markRead(providerMessageId)
+  } catch {
+    /* best effort */
+  }
+}
+
+export { normalizePhone as normalizeWhatsAppPhone }
 
 export const WA_TEMPLATE_REGISTRY: Record<
   string,

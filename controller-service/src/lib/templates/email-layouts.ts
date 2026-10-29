@@ -9,8 +9,6 @@ export interface EmailLayoutContext {
   bodyHtml: string
   /** Document <title> / preview subject. */
   title: string
-  /** Store logo URL, when the store has one (header image instead of text brand). */
-  logoUrl?: string
   /** Footer lines (copyright, address). Tokens allowed. */
   footerLines?: string[]
   /** Optional kicker above the title. */
@@ -44,7 +42,7 @@ function layout(theme: MailTheme, extraCss?: string) {
       kicker: ctx.kicker,
       content: ctx.bodyHtml,
       footerLines: ctx.footerLines ?? DEFAULT_FOOTER,
-      theme: { ...theme, logoUrl: ctx.logoUrl ?? theme.logoUrl },
+      theme,
       extraCss,
     })
 }
@@ -179,8 +177,8 @@ export function isEmailLayoutKey(key: unknown): key is string {
 /** Client-safe full-document render for the admin PREVIEW pane: wraps already-variable-filled body HTML
  *  in the selected layout's themed shell so e.g. Fresh and Promo look visibly different. The returned
  *  HTML is a complete email document; render it in an <iframe srcDoc> so its <style> doesn't leak. */
-export function renderLayoutPreview(key: string | null | undefined, bodyHtml: string, logoUrl?: string): string {
-  return getEmailLayout(key).render({ title: '', bodyHtml, logoUrl, footerLines: DEFAULT_FOOTER })
+export function renderLayoutPreview(key: string | null | undefined, bodyHtml: string): string {
+  return getEmailLayout(key).render({ title: '', bodyHtml, footerLines: DEFAULT_FOOTER })
 }
 
 /** Client-safe metadata for the layout picker (no render fns). */

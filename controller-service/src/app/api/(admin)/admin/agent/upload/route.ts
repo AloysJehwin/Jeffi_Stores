@@ -3,12 +3,10 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
 import { formFile } from '@/lib/shared/form-file'
+import { MAX_ATTACHMENT_BYTES, resolveMime, unsupportedMessage } from '@/lib/admin-agent/file-types'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-
-const MAX_BYTES = 5 * 1024 * 1024
-const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
 
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
@@ -30,14 +28,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'file field is required' }, { status: 400 })
   }
   if (file.size === 0) return NextResponse.json({ error: 'Empty file' }, { status: 400 })
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: `File too large (max ${MAX_BYTES / (1024 * 1024)}MB)` }, { status: 413 })
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    return NextResponse.json({ error: `File too large (max ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB)` }, { status: 413 })
   }
 
-  const mime = (file.type || '').toLowerCase()
-  if (!ALLOWED_MIMES.has(mime)) {
-    return NextResponse.json({ error: `Unsupported file type: ${mime || 'unknown'}` }, { status: 415 })
-  }
+  const mime = resolveMime(file.name, file.type)
+  if (!mime) return NextResponse.json({ error: unsupportedMessage((file.type || '').toLowerCase()) }, { status: 415 })
 
   const buf = Buffer.from(await file.arrayBuffer())
 

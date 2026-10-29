@@ -83,6 +83,14 @@ CREATE INDEX idx_admin_agent_attachments_expiry ON public.admin_agent_attachment
 
 
 --
+-- Name: idx_admin_agent_conversations_admin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_agent_conversations_admin ON public.admin_agent_conversations USING btree (admin_id, last_message_at DESC);
+
+
+
+--
 -- Name: idx_admin_agent_messages_admin; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -127,6 +135,14 @@ CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON public.admin_audit_log USI
 --
 
 CREATE INDEX idx_admin_audit_entity ON public.admin_audit_log USING btree (entity_type, entity_id, created_at DESC);
+
+
+
+--
+-- Name: idx_admin_audit_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_parent ON public.admin_audit_log USING btree (((metadata ->> 'parent_id'::text)), created_at DESC) WHERE (metadata ? 'parent_id'::text);
 
 
 
@@ -1959,6 +1975,62 @@ CREATE INDEX idx_support_sessions_user_id ON public.support_sessions USING btree
 --
 
 CREATE INDEX idx_support_sessions_tenant_id ON public.support_sessions USING btree (tenant_id);
+
+CREATE INDEX idx_support_sessions_open_activity ON public.support_sessions USING btree (last_message_at DESC) WHERE ((status)::text = 'open'::text);
+
+CREATE INDEX idx_support_sessions_contact_phone ON public.support_sessions USING btree (contact_phone) WHERE (contact_phone IS NOT NULL);
+
+CREATE INDEX idx_support_sessions_contact_email ON public.support_sessions USING btree (lower((contact_email)::text)) WHERE (contact_email IS NOT NULL);
+
+CREATE INDEX idx_support_messages_session_created ON public.support_messages USING btree (session_id, created_at);
+
+CREATE UNIQUE INDEX idx_support_messages_client_id ON public.support_messages USING btree (session_id, client_id) WHERE (client_id IS NOT NULL);
+
+CREATE INDEX idx_support_messages_provider_sid ON public.support_messages USING btree (provider_sid) WHERE (provider_sid IS NOT NULL);
+
+CREATE INDEX idx_support_message_attachments_message ON public.support_message_attachments USING btree (message_id);
+
+CREATE INDEX idx_support_ai_actions_session ON public.support_ai_actions USING btree (session_id, created_at DESC);
+
+CREATE INDEX idx_support_ai_actions_awaiting_admin ON public.support_ai_actions USING btree (created_at DESC) WHERE (((awaiting)::text = 'admin'::text) AND ((status)::text = 'pending'::text));
+
+CREATE INDEX idx_support_ai_actions_entity ON public.support_ai_actions USING btree (entity_type, entity_id) WHERE (entity_id IS NOT NULL);
+
+CREATE INDEX idx_support_messages_entity ON public.support_messages USING btree (entity_type, entity_id, created_at) WHERE (entity_id IS NOT NULL);
+
+CREATE INDEX idx_support_messages_email_message_id ON public.support_messages USING btree (email_message_id) WHERE (email_message_id IS NOT NULL);
+
+CREATE INDEX idx_reply_contexts_open_user ON public.reply_contexts USING btree (user_id, last_sent_at DESC) WHERE ((status)::text = 'open'::text);
+
+CREATE INDEX idx_reply_contexts_entity ON public.reply_contexts USING btree (entity_type, entity_id, scenario);
+
+CREATE INDEX idx_reply_contexts_open_phone ON public.reply_contexts USING btree (contact_phone) WHERE (((status)::text = 'open'::text) AND (contact_phone IS NOT NULL));
+
+CREATE INDEX idx_reply_contexts_open_email ON public.reply_contexts USING btree (lower((contact_email)::text)) WHERE (((status)::text = 'open'::text) AND (contact_email IS NOT NULL));
+
+CREATE INDEX idx_reply_context_sends_context ON public.reply_context_sends USING btree (context_id);
+
+CREATE INDEX idx_reply_context_sends_provider_sid ON public.reply_context_sends USING btree (provider_sid) WHERE (provider_sid IS NOT NULL);
+
+CREATE INDEX idx_reply_context_sends_email_message_id ON public.reply_context_sends USING btree (email_message_id) WHERE (email_message_id IS NOT NULL);
+
+CREATE INDEX idx_drive_folders_parent ON public.drive_folders USING btree (parent_id) WHERE (deleted_at IS NULL);
+
+CREATE UNIQUE INDEX idx_drive_folders_system_key ON public.drive_folders USING btree (system_key) WHERE (system_key IS NOT NULL);
+
+CREATE INDEX idx_drive_files_folder ON public.drive_files USING btree (folder_id, created_at DESC) WHERE (deleted_at IS NULL);
+
+CREATE INDEX idx_drive_files_deleted ON public.drive_files USING btree (deleted_at) WHERE (deleted_at IS NOT NULL);
+
+CREATE INDEX idx_drive_files_name_trgm ON public.drive_files USING gin (name public.gin_trgm_ops);
+
+CREATE INDEX idx_drive_shares_folder ON public.drive_shares USING btree (folder_id) WHERE (folder_id IS NOT NULL);
+
+CREATE INDEX idx_drive_shares_file ON public.drive_shares USING btree (file_id) WHERE (file_id IS NOT NULL);
+
+CREATE INDEX idx_drive_shares_grantee ON public.drive_shares USING btree (grantee_admin_id) WHERE (grantee_admin_id IS NOT NULL);
+
+CREATE INDEX idx_drive_access_log_file ON public.drive_access_log USING btree (file_id, created_at DESC);
 
 
 

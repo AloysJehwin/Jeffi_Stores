@@ -11,7 +11,7 @@ import { embed, queryManyReplica, runWithHnswTuning } from '@/lib/shared/rag'
 import { aiChat } from '@/lib/shared/ai-client'
 import type { ToolDef } from '../tools'
 import { ok, err } from '../tool-envelope'
-import { ocrImage, ocrPdfPages } from '../vision'
+import { readStoredAttachment } from '../files'
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n))
@@ -813,7 +813,7 @@ const match_quotation_items: ToolDef = {
 const extract_quotation_lines_from_attachment: ToolDef = {
   name: 'extract_quotation_lines_from_attachment',
   description:
-    'Read an uploaded file (PDF, image jpg/png/webp, or scanned PDF) and return its raw text so YOU can parse line-items. Use this when the admin attaches a quotation request document. Workflow: call this tool with the attachment_id from the chat, read the returned text, parse it into [{requestedText, qty, unit}] (unit as written: pcs, box, m…; omit for a bare number), then call match_quotation_items. Falls back from pdf-parse → vision OCR for scanned PDFs. Vision OCR for images runs against the configured Razer model.',
+    'Read an attached quotation request (PDF, scanned PDF, photo or image, Word, Excel/CSV, PowerPoint or text file) and return its line items as text so YOU can parse them. Use this when the admin attaches a quotation request; for any other file use read_attachment. Workflow: call this tool with the attachment_id from the chat, read the returned text, parse it into [{requestedText, qty, unit}] (unit as written: pcs, box, m…; omit for a bare number), then call match_quotation_items. Images and scanned pages are read by the vision model.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -842,84 +842,15 @@ const extract_quotation_lines_from_attachment: ToolDef = {
     )
     if (!row) return err('Attachment not found or expired', undefined, 'Ask the admin to re-upload the file.')
 
-    if (row.extracted_text && row.extracted_text.trim()) {
-      return ok({
-        summary: `Re-using cached text from ${row.filename || row.mime_type} (${row.byte_size} bytes).`,
-        data: { text: row.extracted_text, mime_type: row.mime_type, filename: row.filename },
-        meta: { cached: true },
-      })
-    }
-
-    if (row.mime_type === 'application/pdf') {
-      let text = ''
-      try {
-        const pdfParseMod = await import('pdf-parse')
-        const pdfParse =
-          (pdfParseMod as { default?: (b: Buffer) => Promise<{ text: string }> }).default ||
-          (pdfParseMod as unknown as (b: Buffer) => Promise<{ text: string }>)
-        const parsed = await pdfParse(row.data)
-        text = (parsed?.text || '').trim()
-      } catch {
-        text = ''
-      }
-
-      if (!text) {
-        const visionResult = await ocrPdfPages(row.data, { maxPages: 10 })
-        if (!visionResult.ok) {
-          return err(
-            'Could not extract text from PDF',
-            visionResult.reason,
-            visionResult.hint || 'Try a higher-resolution scan, or retype the line-items manually.'
-          )
-        }
-        text = visionResult.text
-        await query(`UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`, [id, text]).catch(
-          () => {}
-        )
-        return ok({
-          summary: `Vision OCR extracted ${text.length} chars from ${visionResult.pages || '?'} page(s) of "${row.filename || 'PDF'}".`,
-          data: { text, mime_type: row.mime_type, filename: row.filename },
-          meta: {
-            cached: false,
-            char_count: text.length,
-            source: 'vision_ocr',
-            pages: visionResult.pages,
-            model: visionResult.model,
-          },
-        })
-      }
-
-      await query(`UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`, [id, text]).catch(
-        () => {}
-      )
-      return ok({
-        summary: `Extracted ${text.length} chars from PDF "${row.filename || 'upload'}".`,
-        data: { text, mime_type: row.mime_type, filename: row.filename },
-        meta: { cached: false, char_count: text.length, source: 'pdf_text' },
-      })
-    }
-
-    if (row.mime_type.startsWith('image/')) {
-      const visionResult = await ocrImage(row.data, row.mime_type)
-      if (!visionResult.ok) {
-        return err(
-          'Image OCR failed',
-          visionResult.reason,
-          visionResult.hint || 'Make sure the configured vision model is reachable.'
-        )
-      }
-      const text = visionResult.text
-      await query(`UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`, [id, text]).catch(
-        () => {}
-      )
-      return ok({
-        summary: `Vision OCR extracted ${text.length} chars from "${row.filename || 'image'}".`,
-        data: { text, mime_type: row.mime_type, filename: row.filename },
-        meta: { cached: false, char_count: text.length, source: 'vision_ocr', model: visionResult.model },
-      })
-    }
-
-    return err(`Unsupported attachment type: ${row.mime_type}`)
+    const r = await readStoredAttachment(row, 'quotation')
+    if (!r.ok) return err('Could not read the attachment', r.reason, r.hint || 'Try a clearer scan, or type the line-items in the chat.')
+    return ok({
+      summary: r.cached
+        ? `Re-using text read earlier from "${row.filename || row.mime_type}".`
+        : `Read ${r.text.length} chars from "${row.filename || 'upload'}"${r.pages ? ` (${r.pages} page(s))` : ''}.`,
+      data: { text: r.text, mime_type: row.mime_type, filename: row.filename },
+      meta: { cached: !!r.cached, char_count: r.text.length, source: r.source, pages: r.pages, model: r.model, truncated: r.truncated },
+    })
   },
 }
 

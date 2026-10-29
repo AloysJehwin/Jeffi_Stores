@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 export * from './whatsapp-rules'
+export * from './wa-cloud'
 export * from './google-tag'
 export * from './product-sort'
 
@@ -32,12 +33,15 @@ export const SendMessageRequest = z
     subject: z.string().max(200).optional(),
     body: z.string().max(20000).optional(),
     from: z.string().optional(),
+    reply_to: z.string().email().max(254).optional(), // email: where the customer's reply goes
+    in_reply_to: z.string().max(998).optional(), // email: the message this answers, for threading
     provider_ref: z.string().max(80).optional(), // WhatsApp: a Twilio content SID when not using a stored template
     reference: z.string().max(120).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
     brand: z.string().max(120).optional(),
     kicker: z.string().max(120).optional(),
     footer_contact: z.string().max(200).optional(),
+    accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), // email: the store's button/link colour
     // WhatsApp templates with an image header / link button: pass full URLs, the service fills their {{n}}.
     media_url: z.string().url().optional(),
     button_url: z.string().url().optional(),
@@ -57,6 +61,7 @@ export const Message = z.object({
   template: z.string().nullable(),
   status: MessageStatus,
   provider_ref: z.string().nullable(),
+  body: z.string().optional(),
   price_inr: z.number(),
   charged_inr: z.number(),
   error: z.string().nullable(),
@@ -153,6 +158,7 @@ export const UpsertLibraryTemplateRequest = z.object({
   description: z.string().max(500).optional(),
   locale: z.string().max(10).optional(),
   subject: z.string().max(200).optional(),
+  preheader: z.string().max(200).nullable().optional().describe('Email: the preview line inboxes show after the subject'),
   body: z.string().min(1).max(20000),
   blocks: z.union([TemplateBlocks, z.array(z.unknown()), z.string()]).optional(),
   blocks_format: z.enum(['tiptap', 'tiptap-html', 'email-blocks', 'maily', 'mjml', 'wa-content', 'sms-text']).optional(),

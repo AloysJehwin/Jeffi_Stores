@@ -273,9 +273,10 @@ app.get<{ Params: { id: string } }>('/v2/templates/:id/versions', async req => {
   return { items: await tpl.listVersions(pool, t.variant.id) }
 })
 
-app.get<{ Querystring: { channel?: string } }>('/v2/templates', async req => {
+// ?tag=page:order keeps one page's templates; ?with_body=1 adds each one's body (one call, no N+1).
+app.get<{ Querystring: { channel?: string; tag?: string; with_body?: string } }>('/v2/templates', async req => {
   const { pools } = await poolFor(req)
-  let items = await tpl.listTemplatesWithDefaults(pools, req.claims.tenantId, req.query.channel, spaceOf(req))
+  let items = await tpl.listTemplatesWithDefaults(pools, req.claims.tenantId, req.query.channel, spaceOf(req), { tag: req.query.tag || undefined, withBody: req.query.with_body === '1' })
   const s = await settingsFor(req)
   if (s && !isAdmin(req)) items = items.filter((i: any) => i.source !== 'platform' || gov.standardAllowed(s, i.channel, i.slug))
   return { items, settings: s ? { editing_enabled: s.editing_enabled, review_required: s.review_required } : null }
@@ -307,8 +308,14 @@ app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
   const existing = await tpl.findById(pool, req.claims.tenantId, req.params.id, spaceOf(req))
     ?? (req.claims.tenantId !== tpl.PLATFORM_TENANT_ID ? await tpl.findById(db, tpl.PLATFORM_TENANT_ID, req.params.id) : null)
   if (!existing) return reply.code(404).send({ error: 'not_found' })
+  const patch = upsertBody(req, true) as any
+  // An update that leaves out the content (e.g. only tags or the name) keeps the current content.
+  const v = existing.version
+  const keep = v && patch.body === undefined ? { body: v.body, blocks: v.blocks ?? undefined, blocks_format: v.blocks_format ?? undefined, layout: v.layout } : {}
   const input: tpl.UpsertInput = {
-    ...(upsertBody(req, true) as any),
+    ...keep,
+    ...(v && patch.subject === undefined && v.subject != null ? { subject: v.subject } : {}),
+    ...patch,
     slug: existing.family.slug,
     channel: existing.template.channel as any,
     name: (req.body as any).name ?? existing.family.name,
@@ -348,13 +355,14 @@ app.post<{ Body: { channel: string; slug: string; locale?: string; versionId?: s
     if (!t?.version) return reply.code(404).send({ error: 'not_found' })
     const given = { ...(await systemVars(req.claims.tenantId)), ...(req.body.variables ?? {}) }
     // Preview = sample data: anything the caller didn't supply gets a sample value.
-    const missing = [...new Set([...missingKeys(t.version.subject ?? '', given), ...missingKeys(t.version.body, given)])]
+    const missing = [...new Set([...missingKeys(t.version.subject ?? '', given), ...missingKeys(t.version.body, given), ...missingKeys(t.version.preheader ?? '', given)])]
     const vars = { ...Object.fromEntries(missing.map(k => [k, sampleFor(k)])), ...given }
     const isEmail = t.template.channel === 'email'
     const subject = t.version.subject ? renderVars(t.version.subject, vars) : null
     let body = renderVars(t.version.body, vars, isEmail)
     const b = req.body as any
-    if (isEmail && t.version.layout !== 'none') body = wrapEmail(body, { brand: b.brand ?? req.claims.tenantSlug, kicker: b.kicker, footerContact: b.footer_contact })
+    const preheader = t.version.preheader ? renderVars(t.version.preheader, vars) : null
+    if (isEmail && t.version.layout !== 'none') body = wrapEmail(body, { brand: b.brand ?? req.claims.tenantSlug, kicker: b.kicker, footerContact: b.footer_contact, accent: b.accent, preheader })
     return { channel: t.template.channel, subject, body, missing, sampled: missing }
   }
 )

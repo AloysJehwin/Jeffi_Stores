@@ -9,6 +9,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { TONE_CLS, type Tone } from '@/components/admin/kit/tones'
 import { Card, DetailHeader, Field, Fields, Kpi, KpiGrid, PageBody, badgeCls } from '@/components/admin/kit'
 import { campaignPushReport } from '@/lib/push/broadcast'
+import { ChangeLog } from '@/components/admin/change-log'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -281,6 +282,8 @@ export default async function CampaignDetailPage({
           </Card>
         </div>
       )}
+
+      <ChangeLog kind="email_campaign" id={id} />
     </PageBody>
   )
 }

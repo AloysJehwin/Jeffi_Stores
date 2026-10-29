@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { runWithAuditActor } from '@/lib/auth/audit-context'
 import { query, queryMany } from '@/lib/shared/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
@@ -63,7 +64,7 @@ const STATUS_SYNC: Record<
   'RTO-DL': { orderStatus: 'returned', clearAwb: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
 }
 
-export async function POST(request: NextRequest) {
+async function handle(request: NextRequest) {
   if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -463,3 +464,6 @@ export async function POST(request: NextRequest) {
     },
   })
 }
+
+// Status moves this sync makes show as Delhivery's on each order's change log.
+export const POST = (request: NextRequest) => runWithAuditActor('delhivery', () => handle(request))

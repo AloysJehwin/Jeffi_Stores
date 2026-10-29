@@ -21,7 +21,6 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/AccessDenied.tsx',
   'controller-service/src/components/admin/TwoFactorCard.tsx',
   'controller-service/src/components/admin/AdminSupportChat.tsx',
-  'controller-service/src/components/admin/AdminAgentModal.tsx',
   // Self-service: marks the member's own notification bell read; no scoped record mutation.
   'controller-service/src/components/admin/NotificationBell.tsx',
   // Self-service: the member's own saved filter views. Sharing one is offered only when the
@@ -85,6 +84,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Image-URL field feeding onChange; its upload POST is a CDN asset write the server gates on the
   // parent form's :write scope (uploads/image EDIT_SCOPES). The record mutation lives in the parent.
   'controller-service/src/components/admin/ImageUrlInput.tsx',
+  // Approve/Reject render only when the page passes a server-derived canWrite for the record.
+  'controller-service/src/components/admin/replies/RecordReplies.tsx',
   // Gated on the stricter isSuperAdmin, which no tenant :write scope expresses.
   'controller-service/src/components/admin/CustomerTagDefinitionsCard.tsx',
 ])

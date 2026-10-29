@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import AdminSidebarNav from './AdminSidebarNav'
 import AdminMobileNav from './AdminMobileNav'
 import AdminAgentTrigger from './AdminAgentTrigger'
+import AgentDock from './agent/AgentDock'
 import NotificationBell from './NotificationBell'
 import WalletBadge from './WalletBadge'
 import ScanActionPopup from './ScanActionPopup'
@@ -11,6 +12,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 import AdminSessionController from './AdminSessionController'
 import { AdminScopesProvider } from '@/contexts/AdminScopesContext'
 import { AdminHostProvider } from '@/contexts/AdminHostContext'
+import { AdminAgentProvider } from '@/contexts/AdminAgentContext'
 
 const COOKIE_NAME = 'sidebar_collapsed'
 
@@ -33,6 +35,8 @@ interface Props {
   scopes: string[]
   host: string
   canUseAgent: boolean
+  adminId: string
+  agentDockButton: boolean
   logoutForm: React.ReactNode
   initialCollapsed: boolean
   wallet?: { balance: number; minBalance: number } | null
@@ -49,6 +53,8 @@ export default function AdminShell({
   scopes,
   host,
   canUseAgent,
+  adminId,
+  agentDockButton,
   logoutForm,
   initialCollapsed,
   wallet,
@@ -70,6 +76,8 @@ export default function AdminShell({
 
   return (
     <AdminHostProvider host={host}>
+      <AdminScopesProvider role={role} scopes={scopes}>
+      <AdminAgentProvider adminId={adminId} enabled={canUseAgent} showButton={agentDockButton}>
       <div className="admin-shell fixed inset-0 flex flex-col bg-surface-secondary">
         {/* Top bar — full width, spans above sidebar + content */}
         <div className="flex items-center px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0 gap-3">
@@ -116,7 +124,7 @@ export default function AdminShell({
             <NotificationBell />
             {wallet && <WalletBadge initialBalance={wallet.balance} initialMinBalance={wallet.minBalance} />}
             <ThemeToggle variant="admin" />
-            <AdminAgentTrigger canUse={canUseAgent} />
+            <AdminAgentTrigger />
             {logoutForm}
           </div>
         </div>
@@ -127,16 +135,17 @@ export default function AdminShell({
           <AdminSidebarNav navLinks={desktopNavLinks} collapsed={collapsed} />
 
           <main className="flex-1 min-w-0 bg-surface-secondary overflow-y-auto overflow-x-clip relative z-0">
-            <AdminScopesProvider role={role} scopes={scopes}>
-              {children}
-            </AdminScopesProvider>
+            {children}
           </main>
         </div>
 
+        <AgentDock />
         <AdminSessionController />
         <ScanActionPopup role={role} scopes={scopes} host={host} />
         <div id="dropdown-portal" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }} />
       </div>
+      </AdminAgentProvider>
+      </AdminScopesProvider>
     </AdminHostProvider>
   )
 }

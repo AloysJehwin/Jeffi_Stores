@@ -1,10 +1,19 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { MessageCircle, Send, ChevronDown, Check, X } from 'lucide-react'
+import { MessageCircle, ChevronDown, LayoutTemplate } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
-import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
+import { driveToAttachment } from '@/components/admin/drive/api'
+import { useDrivePicker } from '@/components/admin/drive/DrivePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import ChatShell from '@/components/chat/ChatShell'
+import Composer from '@/components/chat/Composer'
+import MessageList from '@/components/chat/MessageList'
+import type { SupportMessage } from '@/lib/support/types'
+
+const isMine = (m: SupportMessage) => m.sender === 'admin'
+const labelFor = (m: SupportMessage) => (m.sender === 'admin' ? m.senderName : null)
 
 interface ThreadMessage {
   id: string
@@ -14,6 +23,7 @@ interface ThreadMessage {
   body: string | null
   kind: string | null
   status: string | null
+  delivery_status: string | null
   error: string | null
   provider_sid: string | null
   sent_at: string | null
@@ -45,13 +55,6 @@ interface Props {
   forceOpen?: boolean
 }
 
-function formatTime(ts: string | null): string {
-  if (!ts) return ''
-  const d = new Date(ts)
-  if (isNaN(d.getTime())) return ''
-  return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-}
-
 export default function WhatsAppEngagement({ customerId, phone, marketingOptOut, forceOpen }: Props) {
   const [isOpen, setIsOpen] = useState(!!forceOpen)
   const [isLoading, setIsLoading] = useState(false)
@@ -65,7 +68,11 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
   const [freeText, setFreeText] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sendError, setSendError] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const tplBox = useRef<HTMLDivElement>(null)
+  const canWrite = useCanWrite('customers')
+  const canDrive = useHasScope('drive:read')
+  const drive = useDrivePicker()
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -79,8 +86,15 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
   }, [isOpen, phone, customerId])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [thread])
+    if (!templatesOpen) return
+    const off = (e: MouseEvent) => {
+      const t = e.target as HTMLElement
+      // AdminSelect's list is portalled; clicks inside it are still "in" the panel.
+      if (!tplBox.current?.contains(t) && !t.closest?.('[role=listbox]')) setTemplatesOpen(false)
+    }
+    document.addEventListener('mousedown', off)
+    return () => document.removeEventListener('mousedown', off)
+  }, [templatesOpen])
 
   async function loadThread(showLoading: boolean) {
     if (showLoading) setIsLoading(true)
@@ -97,7 +111,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
     if (showLoading) setIsLoading(false)
   }
 
-  async function send(payload: { templateKey?: string; variables?: Record<string, string>; text?: string }) {
+  async function send(payload: { templateKey?: string; variables?: Record<string, string>; text?: string; attachmentIds?: string[] }) {
     if (isSending) return
     setIsSending(true)
     setSendError('')
@@ -116,9 +130,11 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
         await loadThread(false)
       } else {
         setSendError(data.error || 'Send failed')
+        if (payload.text) setFreeText(payload.text)
       }
     } catch {
       setSendError('Send failed')
+      if (payload.text) setFreeText(payload.text)
     }
     setIsSending(false)
   }
@@ -165,15 +181,9 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
     setSendError('')
   }
 
-  function handleSendTemplate() {
+  async function handleSendTemplate() {
     if (!selectedTemplate || availability[selectedTemplate] === false) return
-    send({ templateKey: selectedTemplate, variables: templateVars })
-  }
-
-  function handleSendFreeText() {
-    const text = freeText.trim()
-    if (!text) return
-    send({ text })
+    await send({ templateKey: selectedTemplate, variables: templateVars })
   }
 
   const groupedTemplates = Object.entries(templates).reduce<Record<string, [string, TemplateEntry][]>>((acc, entry) => {
@@ -186,118 +196,105 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
   const isSelectedUnavailable = !!selectedTemplate && availability[selectedTemplate] === false
   const showOptOutWarning = !!marketingOptOut && activeTemplate?.category === 'marketing'
 
-  // Shared compose + thread markup (used in both forceOpen and accordion modes)
-  const threadArea = (tall: boolean) => (
-    <div
-      className={`overflow-y-auto px-4 py-3 space-y-2.5 border-t border-border-default bg-surface ${tall ? 'flex-1' : 'h-80'}`}
-    >
-      {isLoading ? (
-        <div className="flex items-center justify-center h-full text-sm text-foreground-muted py-8">
-          Loading conversation...
-        </div>
-      ) : thread.length === 0 ? (
-        <div className="flex items-center justify-center h-full text-sm text-foreground-muted py-8">
-          No WhatsApp messages yet.
-        </div>
-      ) : (
-        thread.map(msg => (
-          <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                msg.direction === 'outbound'
-                  ? 'bg-accent-500 text-white rounded-br-sm'
-                  : 'bg-surface-elevated border border-border-default text-foreground rounded-bl-sm'
-              }`}
-            >
-              <div
-                className={`flex items-center gap-1.5 mb-0.5 text-xs ${msg.direction === 'outbound' ? 'text-white/70' : 'text-foreground-muted'}`}
-              >
-                {msg.kind && <span className="font-semibold">{msg.kind}</span>}
-              </div>
-              {msg.body}
-              <div
-                className={`flex items-center gap-1 mt-0.5 text-[11px] ${msg.direction === 'outbound' ? 'text-white/70' : 'text-foreground-muted'}`}
-              >
-                <span>{formatTime(msg.sent_at)}</span>
-                {msg.direction === 'outbound' && msg.status === 'sent' && <Check className="w-3 h-3" />}
-                {msg.direction === 'outbound' && msg.status === 'failed' && <X className="w-3 h-3 text-red-300" />}
-              </div>
-            </div>
-          </div>
-        ))
+  const messages: SupportMessage[] = thread.map(m => {
+    const out = m.direction === 'outbound'
+    const st = (m.delivery_status || m.status || '').toLowerCase()
+    return {
+      id: m.id,
+      sessionId: '',
+      sender: out ? 'admin' : 'customer',
+      senderName: out ? (m.kind ? m.kind.replace(/_/g, ' ') : null) : null,
+      text: m.body ?? '',
+      original: null,
+      lang: null,
+      at: m.sent_at ?? new Date(0).toISOString(),
+      status: st === 'read' ? 'read' : st === 'delivered' ? 'delivered' : st === 'failed' || st === 'undelivered' ? 'failed' : 'sent',
+      channel: 'whatsapp',
+      payloads: [],
+      attachments: [],
+      clientId: null,
+      error: m.error,
+    }
+  })
+
+  const templatePanel = (
+    <div className="absolute bottom-12 left-0 z-20 w-[min(24rem,85vw)] rounded-xl border border-border-default bg-surface-elevated shadow-xl p-3 space-y-2">
+      <AdminSelect
+        value={selectedTemplate}
+        onChange={handleTemplateSelect}
+        placeholder="Select a template…"
+        options={Object.entries(groupedTemplates).flatMap(([cat, entries]) =>
+          entries.map(([key, tpl]) => ({
+            value: key,
+            label: availability[key] === false ? `${tpl.label}${unavailableNote(key)}` : tpl.label,
+            group: cat === 'marketing' ? 'Marketing' : 'Support',
+          }))
+        )}
+      />
+      {activeTemplate &&
+        activeTemplate.fields.map(field => (
+          <input
+            key={field}
+            type="text"
+            value={templateVars[field] || ''}
+            onChange={e => setTemplateVars(v => ({ ...v, [field]: e.target.value }))}
+            placeholder={field}
+            className="w-full px-3 h-control rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+          />
+        ))}
+      {showOptOutWarning && (
+        <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-xl border border-amber-400/40 leading-snug">
+          This customer opted out of marketing. Sending anyway will override their preference.
+        </p>
       )}
-      <div ref={bottomRef} />
+      {activeTemplate && (
+        <button
+          type="button"
+          onClick={async () => {
+            await handleSendTemplate()
+            setTemplatesOpen(false)
+          }}
+          disabled={isSending || isSelectedUnavailable}
+          className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSending ? 'Sending…' : isSelectedUnavailable ? `Unavailable${unavailableNote(selectedTemplate)}` : 'Send template'}
+        </button>
+      )}
     </div>
   )
 
-  const composeArea = (
-    <RequireWrite scope="customers:write">
-      <div className="px-4 py-3 border-t border-border-default space-y-3 shrink-0">
-        {sendError && <p className="text-xs text-red-600 dark:text-red-400 leading-snug">{sendError}</p>}
-        <div className="space-y-2">
-          <AdminSelect
-            value={selectedTemplate}
-            onChange={handleTemplateSelect}
-            placeholder="Select a template…"
-            options={Object.entries(groupedTemplates).flatMap(([cat, entries]) =>
-              entries.map(([key, tpl]) => ({
-                value: key,
-                label: availability[key] === false ? `${tpl.label}${unavailableNote(key)}` : tpl.label,
-                group: cat === 'marketing' ? 'Marketing' : 'Support',
-              }))
-            )}
-          />
-          {activeTemplate &&
-            activeTemplate.fields.map(field => (
-              <input
-                key={field}
-                type="text"
-                value={templateVars[field] || ''}
-                onChange={e => setTemplateVars(v => ({ ...v, [field]: e.target.value }))}
-                placeholder={field}
-                className="w-full px-3 h-control rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-              />
-            ))}
-          {activeTemplate && (
-            <>
-              {showOptOutWarning && (
-                <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-xl border border-amber-400/40 leading-snug">
-                  This customer opted out of marketing. Sending anyway will override their preference.
-                </p>
-              )}
-              <button
-                onClick={handleSendTemplate}
-                disabled={isSending || isSelectedUnavailable}
-                className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSending
-                  ? 'Sending…'
-                  : isSelectedUnavailable
-                    ? `Unavailable${unavailableNote(selectedTemplate)}`
-                    : 'Send Template'}
-              </button>
-            </>
-          )}
-        </div>
-        <div className="pt-3 border-t border-border-default">
-          <div className="flex gap-2">
-            <div className="relative flex-1 min-w-0">
-              <input
-                type="text"
-                value={freeText}
-                onChange={e => setFreeText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSendFreeText()
-                  }
-                }}
-                placeholder="Free text message…"
-                className="w-full px-3.5 pr-10 h-control rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-              />
+  const conversation = (
+    <ChatShell
+      banner={
+        sendError ? <p className="px-4 py-1.5 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-900/40">{sendError}</p> : undefined
+      }
+      composer={
+        canWrite ? (
+          <Composer
+            text={freeText}
+            setText={setFreeText}
+            onSend={(t, a) => send({ text: t, attachmentIds: a.map(x => x.id) })}
+            onPickFromDrive={canDrive ? async () => (await drive.pick({ title: 'Send from Drive', kinds: ['image', 'video', 'audio', 'pdf', 'doc'] }))?.map(driveToAttachment) ?? null : undefined}
+            disabled={isSending}
+            placeholder="Message (delivers within 24h of their last message; use a template otherwise)"
+            accessory={
+              <div ref={tplBox} className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setTemplatesOpen(v => !v)}
+                  title="Send a template"
+                  aria-label="Send a template"
+                  className={`h-10 w-10 rounded-full flex items-center justify-center hover:bg-surface-secondary ${templatesOpen ? 'text-accent-600 bg-surface-secondary' : 'text-foreground-secondary'}`}
+                >
+                  <LayoutTemplate className="w-5 h-5" />
+                </button>
+                {templatesOpen && templatePanel}
+              </div>
+            }
+            inField={
               <AIEnrichButton
                 placement="in-field"
-                anchorClassName="absolute right-2 top-1/2 -translate-y-1/2"
+                anchorClassName="absolute right-2 bottom-1.5"
                 fieldLabel="WhatsApp message"
                 value={freeText}
                 onChange={setFreeText}
@@ -305,21 +302,20 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
                 write={!!lastInbound}
                 context={`A one-to-one WhatsApp reply from the store to a customer; short, friendly, plain text.${lastInbound ? ` The customer wrote: "${lastInbound.slice(0, 600)}"` : ''}`}
               />
-            </div>
-            <button
-              onClick={handleSendFreeText}
-              disabled={isSending || !freeText.trim()}
-              className="px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="mt-1.5 text-[11px] text-foreground-muted leading-snug">
-            Free text only delivers within 24h of the customer&apos;s last message.
-          </p>
-        </div>
-      </div>
-    </RequireWrite>
+            }
+          />
+        ) : undefined
+      }
+    >
+      <MessageList
+        messages={messages}
+        isMine={isMine}
+        labelFor={labelFor}
+        showTicks={isMine}
+        empty={<p className="text-center text-xs text-foreground-muted pt-8">{isLoading ? 'Loading conversation…' : 'No WhatsApp messages yet.'}</p>}
+      />
+      {drive.node}
+    </ChatShell>
   )
 
   if (!phone) {
@@ -335,14 +331,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
   }
 
   // Modal mode: no accordion, content fills the modal height
-  if (forceOpen) {
-    return (
-      <div className="flex flex-col h-full">
-        {threadArea(true)}
-        {composeArea}
-      </div>
-    )
-  }
+  if (forceOpen) return <div className="h-full">{conversation}</div>
 
   // Standalone accordion mode (original behaviour)
   return (
@@ -363,12 +352,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
         </div>
         <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      {isOpen && (
-        <>
-          {threadArea(false)}
-          {composeArea}
-        </>
-      )}
+      {isOpen && <div className="h-[28rem] border-t border-border-default">{conversation}</div>}
     </div>
   )
 }

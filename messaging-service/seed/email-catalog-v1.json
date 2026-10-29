@@ -1,0 +1,472 @@
+[
+ {
+  "slug": "order/confirmed",
+  "subject": "Order #{{order_number}} confirmed — thanks, {{customer_name}} 🎉",
+  "body": "Hi {{customer_name}}, your order #{{order_number}} for ₹{{total}} is confirmed. Track it any time at {{tracking_url}}. — Team {{store_name}}"
+ },
+ {
+  "slug": "order/payment-received",
+  "subject": "✅ Payment received for order #{{order_number}}",
+  "body": "Hi {{customer_name}}, we received ₹{{amount}} for order #{{order_number}}. We will send the shipping details once it leaves our warehouse."
+ },
+ {
+  "slug": "order/processing",
+  "subject": "Your order #{{order_number}} is being prepared",
+  "body": "Hi {{customer_name}}, our team is packing order #{{order_number}}. Expected dispatch: {{dispatch_eta}}."
+ },
+ {
+  "slug": "order/shipped",
+  "subject": "📦 Order #{{order_number}} is on the way",
+  "body": "Your order #{{order_number}} shipped via {{courier}}. AWB {{awb}} — track at {{tracking_url}}."
+ },
+ {
+  "slug": "order/out-for-delivery",
+  "subject": "🚚 Out for delivery today — order #{{order_number}}",
+  "body": "Hi {{customer_name}}, your order #{{order_number}} is out for delivery. The courier may call {{customer_phone}} — please keep it handy."
+ },
+ {
+  "slug": "order/delivered",
+  "subject": "Delivered — enjoy your order #{{order_number}}",
+  "body": "Hi {{customer_name}}, order #{{order_number}} has been delivered. Love it? Leave a review: {{review_url}}"
+ },
+ {
+  "slug": "order/cancelled",
+  "subject": "Order #{{order_number}} cancelled",
+  "body": "Hi {{customer_name}}, we have cancelled order #{{order_number}} as requested. Refund of ₹{{refund_amount}} will reach you in 5–7 working days."
+ },
+ {
+  "slug": "order/refunded",
+  "subject": "💰 Refund processed for order #{{order_number}}",
+  "body": "Hi {{customer_name}}, we have refunded ₹{{refund_amount}} for order #{{order_number}} to your original payment method."
+ },
+ {
+  "slug": "order/delay-processing",
+  "subject": "Update on your order #{{order_number}}",
+  "body": "Hi {{customer_name}}, order #{{order_number}} is in the final stages of processing. Dispatch is expected in the next 1–2 business days."
+ },
+ {
+  "slug": "order/delay-shipping",
+  "subject": "Shipping update for your order #{{order_number}}",
+  "body": "Hi {{customer_name}}, a slight courier delay has affected order #{{order_number}}. We are tracking it closely and will update you soon."
+ },
+ {
+  "slug": "order/quality-check",
+  "subject": "Brief hold on your order #{{order_number}}",
+  "body": "Order #{{order_number}} is undergoing our standard quality check and will dispatch within 24 hours."
+ },
+ {
+  "slug": "order/out-of-stock",
+  "subject": "Important update about your order #{{order_number}}",
+  "body": "Hi {{customer_name}}, one item in order #{{order_number}} is temporarily unavailable. Reply to this email for a refund or an alternative."
+ },
+ {
+  "slug": "otp/verify",
+  "subject": "Your verification code: {{code}}",
+  "body": "Your code is {{code}}. It expires in {{ttl_minutes}} minutes. Do not share this code."
+ },
+ {
+  "slug": "account/welcome",
+  "subject": "Welcome to {{store_name}} 👋",
+  "body": "Hi {{customer_name}}, welcome aboard. Explore new arrivals: {{store_url}}"
+ },
+ {
+  "slug": "account/password-reset",
+  "subject": "Reset your {{store_name}} password",
+  "body": "Click {{reset_url}} to set a new password. The link expires in {{ttl_minutes}} minutes."
+ },
+ {
+  "slug": "account/password-changed",
+  "subject": "Your {{store_name}} password was changed",
+  "body": "Hi {{customer_name}}, your password was updated on {{changed_at}}. If this was not you, contact support immediately."
+ },
+ {
+  "slug": "account/address-changed",
+  "subject": "Your {{store_name}} address was updated",
+  "body": "Hi {{customer_name}}, your delivery address was changed on {{changed_at}}. If this was not you, contact support."
+ },
+ {
+  "slug": "account/email-changed",
+  "subject": "Email changed on your {{store_name}} account",
+  "body": "Hi {{customer_name}}, your account email was changed to {{new_email}}. If this was not you, contact support."
+ },
+ {
+  "slug": "order/address-change-approved",
+  "subject": "Delivery address updated for order {{order_number}}",
+  "body": "Hi {{customer_name}}, your request to change the delivery address for order {{order_number}} has been approved. New address: {{address_block}}. View order: {{order_url}}"
+ },
+ {
+  "slug": "order/address-change-rejected",
+  "subject": "Address change declined for order {{order_number}}",
+  "body": "Hi {{customer_name}}, we could not approve your request to change the delivery address for order {{order_number}} to: {{address_block}}. {{reason}} Your order will be delivered to the original address. View order: {{order_url}}"
+ },
+ {
+  "slug": "kyc/submitted",
+  "subject": "We received your KYC — review in 24-48 hours",
+  "body": "Hi {{customer_name}}, thanks for submitting your KYC documents. Our team will review and get back within 48 hours."
+ },
+ {
+  "slug": "kyc/approved",
+  "subject": "✅ KYC approved — welcome aboard",
+  "body": "Hi {{customer_name}}, your KYC is approved. You now have full B2B wholesale access."
+ },
+ {
+  "slug": "kyc/rejected",
+  "subject": "KYC verification unsuccessful",
+  "body": "Hi {{customer_name}}, we could not verify your KYC: {{reason}}. Please re-submit: {{resubmit_url}}"
+ },
+ {
+  "slug": "b2b/rfq-submitted",
+  "subject": "Your RFQ #{{rfq_number}} is being quoted",
+  "body": "Hi {{customer_name}}, we received your request for quotation #{{rfq_number}}. Expect our quote within 24 hours. View: {{rfq_url}}"
+ },
+ {
+  "slug": "b2b/rfq-submitted-admin",
+  "subject": "New RFQ #{{rfq_number}} from {{customer_name}}",
+  "body": "A new RFQ #{{rfq_number}} was submitted by {{customer_name}} ({{customer_email}}). Review: {{rfq_url}}"
+ },
+ {
+  "slug": "b2b/account-approved",
+  "subject": "Business account approved — {{company_name}}",
+  "body": "Hi {{customer_name}}, your business account for {{company_name}} has been approved. Log in: {{signin_url}}"
+ },
+ {
+  "slug": "b2b/account-rejected",
+  "subject": "Business account application update",
+  "body": "Hi {{customer_name}}, your business account application for {{company_name}} could not be approved at this time. {{reason}}"
+ },
+ {
+  "slug": "b2b/order-status",
+  "subject": "Order {{order_number}} — {{status_label}}",
+  "body": "Hi {{customer_name}}, your order {{order_number}} is now {{status_label}}. {{extra_cta}}"
+ },
+ {
+  "slug": "b2b/quotation-ready",
+  "subject": "Quotation #{{quotation_number}} is ready",
+  "body": "Hi {{customer_name}}, your quotation is ready. View and approve at {{quotation_url}}."
+ },
+ {
+  "slug": "b2b/quotation-converted",
+  "subject": "Quotation #{{quotation_number}} converted to invoice",
+  "body": "Hi {{customer_name}}, your quotation #{{quotation_number}} has been converted to invoice #{{invoice_number}}."
+ },
+ {
+  "slug": "b2b/invoice-generated",
+  "subject": "Invoice #{{invoice_number}} is ready",
+  "body": "Hi {{customer_name}}, invoice #{{invoice_number}} for ₹{{total}} is ready. Download: {{invoice_url}}"
+ },
+ {
+  "slug": "b2b/purchase-order",
+  "subject": "Purchase order #{{po_number}}",
+  "body": "Hi {{customer_name}}, please find PO #{{po_number}} attached. Terms: {{terms}}."
+ },
+ {
+  "slug": "document/invoice-finalized",
+  "subject": "Invoice #{{invoice_number}} — ₹{{total}}",
+  "body": "Hi {{customer_name}}, your invoice is attached. Any questions, reply to this email."
+ },
+ {
+  "slug": "document/quotation-finalized",
+  "subject": "Quotation #{{quotation_number}}",
+  "body": "Hi {{customer_name}}, please find quotation #{{quotation_number}} attached. Valid for {{validity_days}} days."
+ },
+ {
+  "slug": "document/po-received",
+  "subject": "We received your PO #{{po_number}}",
+  "body": "Hi {{customer_name}}, PO #{{po_number}} is on file. Expected dispatch: {{dispatch_eta}}."
+ },
+ {
+  "slug": "cart/abandoned",
+  "subject": "You left something behind 🛒",
+  "body": "Hi {{customer_name}}, your cart (₹{{cart_total}}) is waiting. Resume: {{cart_url}}"
+ },
+ {
+  "slug": "cart/abandoned-reminder",
+  "subject": "Still thinking it over?",
+  "body": "Hi {{customer_name}}, here is 5% off to help you decide — code {{coupon_code}}. {{cart_url}}"
+ },
+ {
+  "slug": "cart/abandoned-final",
+  "subject": "Last chance — your cart will expire soon",
+  "body": "Hi {{customer_name}}, we will release the stock in your cart in 24 hours. {{cart_url}}"
+ },
+ {
+  "slug": "review/reminder",
+  "subject": "How was your order #{{order_number}}?",
+  "body": "Hi {{customer_name}}, we would love your feedback on order #{{order_number}}. Leave a review: {{review_url}}"
+ },
+ {
+  "slug": "review/form-share",
+  "subject": "Share a quick review and get {{discount_percent}}% off",
+  "body": "Hi {{customer_name}}, write us a quick review and we will send you {{discount_percent}}% off your next order. {{form_url}}"
+ },
+ {
+  "slug": "winback",
+  "subject": "We miss you — {{discount_percent}}% off, just for you",
+  "body": "Hi {{customer_name}}, it has been a while. Here is {{discount_percent}}% off with code {{coupon_code}}. {{store_url}}"
+ },
+ {
+  "slug": "restock",
+  "subject": "{{product_name}} is back in stock",
+  "body": "Hi {{customer_name}}, {{product_name}} is back. Grab yours before it sells out again: {{product_url}}"
+ },
+ {
+  "slug": "price-drop",
+  "subject": "Price dropped on {{product_name}}",
+  "body": "Hi {{customer_name}}, {{product_name}} is now ₹{{new_price}} (was ₹{{old_price}}). {{product_url}}"
+ },
+ {
+  "slug": "wishlist/price-drop",
+  "subject": "An item on your wishlist just got cheaper",
+  "body": "Hi {{customer_name}}, {{product_name}} in your wishlist is now ₹{{new_price}}. {{product_url}}"
+ },
+ {
+  "slug": "birthday",
+  "subject": "🎂 Happy birthday, {{customer_name}}",
+  "body": "Hi {{customer_name}}, happy birthday from all of us at {{store_name}}! Here is {{discount_percent}}% off with code {{coupon_code}}."
+ },
+ {
+  "slug": "anniversary",
+  "subject": "One year with {{store_name}} 🎉",
+  "body": "Hi {{customer_name}}, thank you for a wonderful year with us. Enjoy {{discount_percent}}% off with code {{coupon_code}}."
+ },
+ {
+  "slug": "loyalty/points-earned",
+  "subject": "You earned {{points}} loyalty points",
+  "body": "Hi {{customer_name}}, order #{{order_number}} earned you {{points}} points. Balance: {{balance}} points."
+ },
+ {
+  "slug": "loyalty/points-expiring",
+  "subject": "⏰ {{points}} points expire on {{expiry_date}}",
+  "body": "Hi {{customer_name}}, use your {{points}} points before {{expiry_date}}: {{redeem_url}}"
+ },
+ {
+  "slug": "referral/invite",
+  "subject": "{{inviter_name}} invited you to {{store_name}}",
+  "body": "{{inviter_name}} thinks you will love {{store_name}}. Join and get ₹{{credit}} off: {{join_url}}"
+ },
+ {
+  "slug": "referral/credit",
+  "subject": "You earned a referral credit of ₹{{credit}}",
+  "body": "Hi {{customer_name}}, {{friend_name}} just placed their first order. You both earned ₹{{credit}} store credit."
+ },
+ {
+  "slug": "promo/offer",
+  "subject": "🔥 {{discount_percent}}% off — this weekend only",
+  "body": "Hi {{customer_name}}, enjoy {{discount_percent}}% off storewide with code {{coupon_code}} until {{expiry_date}}. {{store_url}}"
+ },
+ {
+  "slug": "promo/new-arrivals",
+  "subject": "Just in: {{collection_name}}",
+  "body": "Hi {{customer_name}}, our newest {{collection_name}} is live. Shop first: {{collection_url}}"
+ },
+ {
+  "slug": "promo/festive",
+  "subject": "🎁 {{festival_name}} sale — up to {{max_discount}}% off",
+  "body": "Hi {{customer_name}}, celebrate {{festival_name}} with up to {{max_discount}}% off storewide. {{store_url}}"
+ },
+ {
+  "slug": "promo/reorder",
+  "subject": "Running low? Reorder in one tap",
+  "body": "Hi {{customer_name}}, it is about time to restock {{product_name}}. Reorder: {{reorder_url}}"
+ },
+ {
+  "slug": "promo/flash-sale-24h",
+  "subject": "⚡ 24-hour flash sale",
+  "body": "Hi {{customer_name}}, 24 hours only — {{discount_percent}}% off everything. Code {{coupon_code}}. {{store_url}}"
+ },
+ {
+  "slug": "promo/flash-sale-last-call",
+  "subject": "Last few hours ⏰",
+  "body": "Hi {{customer_name}}, our flash sale ends at {{end_time}}. Last chance: {{store_url}}"
+ },
+ {
+  "slug": "promo/bundle",
+  "subject": "Save when you bundle",
+  "body": "Hi {{customer_name}}, pair {{product_a}} with {{product_b}} and save {{bundle_discount}}%. {{bundle_url}}"
+ },
+ {
+  "slug": "promo/vip-tier",
+  "subject": "🏆 You are now a VIP",
+  "body": "Hi {{customer_name}}, you have unlocked VIP perks: free shipping, early access, and exclusive deals."
+ },
+ {
+  "slug": "store/live",
+  "subject": "🚀 {{store_name}} is live",
+  "body": "Hi {{customer_name}}, {{store_name}} is officially live. Shop the opening collection: {{store_url}}"
+ },
+ {
+  "slug": "campaign/abandoned_cart",
+  "subject": "You left something in your cart, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Still thinking it over?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">You left {itemCount} item(s) in your cart. We held onto them for you.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Resume your order</a></p>"
+ },
+ {
+  "slug": "campaign/abandoned_checkout",
+  "subject": "Complete your purchase, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Your cart is waiting</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Order #{orderNumber} couldn't be completed because payment didn't go through in time. No worries — your items are still available.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Try again</a></p>"
+ },
+ {
+  "slug": "campaign/post_purchase",
+  "subject": "Hope you're enjoying your purchase, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Thanks for shopping with us</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Just checking in on your recent order #{orderNumber}. We hope everything arrived in great shape!</p>{itemsHtml}<p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">If anything's not right, just reply to this email and we'll sort it out.</p><p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">View your order</a></p>"
+ },
+ {
+  "slug": "campaign/review_reminder",
+  "subject": "How was your purchase, {firstName}?",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Mind sharing a quick review?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Your feedback on order #{orderNumber} would mean a lot. Tap any item below to leave a review (takes less than a minute).</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Leave a review</a></p>"
+ },
+ {
+  "slug": "campaign/winback_90",
+  "subject": "We miss you, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">It's been a while</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Here's {discountPercent}% off your next order to welcome you back.</p><p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Some of your past favorites:</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Browse products</a></p>"
+ },
+ {
+  "slug": "campaign/winback_180",
+  "subject": "Come back, {firstName} — {discountPercent}% off",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">We'd love to have you back</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Here's {discountPercent}% off, just for you. Code expires in 14 days.</p><p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Some of your past favorites:</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Shop now</a></p>"
+ },
+ {
+  "slug": "campaign/restock",
+  "subject": "{productName} is back in stock!",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Good news!</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\"><strong>{productName}</strong> from your wishlist is back in stock. Grab it before it's gone again.</p>{productCard}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Buy now</a></p>"
+ },
+ {
+  "slug": "campaign/price_drop",
+  "subject": "Price drop on {productName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Price just dropped</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\"><strong>{productName}</strong> from your wishlist:</p>{productCard}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">View product</a></p>"
+ },
+ {
+  "slug": "campaign/viewed_product",
+  "subject": "Still thinking about it, {firstName}?",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Still thinking it over?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You were looking at this recently. Here it is again.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Take another look</a></p>"
+ },
+ {
+  "slug": "campaign/viewed_category",
+  "subject": "Picks from what you were browsing, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">More from what caught your eye</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You browsed a few of these. A closer look might help you decide.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Keep browsing</a></p>"
+ },
+ {
+  "slug": "campaign/high_value_cart",
+  "subject": "Your cart is waiting, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">You left {itemCount} item(s) behind</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">We saved your cart for you — complete your order before anything sells out.</p>{itemsHtml}{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Complete your order</a></p>"
+ },
+ {
+  "slug": "campaign/cart_price_drop",
+  "subject": "Good news — a price drop in your cart",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">The price just dropped</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Something in your cart is now cheaper than when you added it.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Check out now</a></p>"
+ },
+ {
+  "slug": "campaign/wishlist_reminder",
+  "subject": "Still on your wishlist, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Your wishlist is waiting</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">These are still available. Grab them before they go.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">View your wishlist</a></p>"
+ },
+ {
+  "slug": "campaign/review_photo_followup",
+  "subject": "Add a photo to your review, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Help other shoppers</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Thanks for reviewing {productName}. A quick photo makes your review far more helpful.</p>{productCard}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Add a photo</a></p>"
+ },
+ {
+  "slug": "campaign/back_in_stock_wishlist",
+  "subject": "{productName} is back in stock!",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Back in stock</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">{productName} from your wishlist is available again. It may not last long.</p>{productCard}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Shop it now</a></p>"
+ },
+ {
+  "slug": "campaign/first_purchase_nudge",
+  "subject": "A little something to get you started, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Welcome — here is a treat</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You signed up but have not placed your first order yet.{#if discountPercent} Here is {discountPercent}% off to get you going.{/if}</p>{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Start shopping</a></p>"
+ },
+ {
+  "slug": "campaign/second_purchase_nudge",
+  "subject": "Come back for more, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">We hope you loved your first order</h2>{#if couponCode}<p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Here is a little something for your next one.</p>{/if}{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Shop again</a></p>"
+ },
+ {
+  "slug": "campaign/signup_anniversary",
+  "subject": "Happy anniversary with us, {firstName}!",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">It has been a year (or more)</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Thanks for being with us.{#if couponCode} Here is a token of our appreciation.{/if}</p>{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Treat yourself</a></p>"
+ },
+ {
+  "slug": "campaign/replenishment",
+  "subject": "Time to reorder, {firstName}?",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Running low?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">If you are getting close to the end, now is a good time to restock.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Reorder now</a></p>"
+ },
+ {
+  "slug": "campaign/subscription_renewal",
+  "subject": "Your subscription renews soon, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">A heads-up on your subscription</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Your subscription is coming up for renewal. No action needed unless you want to make a change.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Manage subscription</a></p>"
+ },
+ {
+  "slug": "campaign/loyalty_tier_upgrade",
+  "subject": "You reached {tier}, {firstName}!",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Welcome to {tier}</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You now have {points} points. Enjoy your new perks{#if couponCode} — starting with this{/if}.</p>{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">See your perks</a></p>"
+ },
+ {
+  "slug": "campaign/loyalty_points_reminder",
+  "subject": "You have {points} points waiting, {firstName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Your points are ready to spend</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You have {points} points — turn them into a coupon worth up to ₹{pointsWorth} off your next order.</p><p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Redeem your points</a></p>"
+ },
+ {
+  "slug": "campaign/referral_invite",
+  "subject": "Refer a friend, earn {rewardPoints} points",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Know someone who would love us?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Share your personal link. When a friend signs up with it and their first order is delivered, you get {rewardPoints} points.</p><p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:15px;color:#1a3a4a;font-weight:700;word-break:break-all;\">{shareUrl}</p><p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Share your link</a></p>"
+ },
+ {
+  "slug": "campaign/birthday",
+  "subject": "Happy birthday, {firstName}!",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Happy birthday from all of us</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">We hope your day is a great one.{#if discountPercent} Celebrate with a little gift from us — {discountPercent}% off your next order.{/if}</p>{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Claim your gift</a></p>"
+ },
+ {
+  "slug": "campaign/birthday_collect",
+  "subject": "When's your birthday, {firstName}?",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Let us celebrate with you</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Tell us your birthday and we will send you a treat every year. It takes one tap, and no sign-in is needed.</p><p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Add my birthday</a></p>"
+ },
+ {
+  "slug": "starter/classic",
+  "subject": "{store_name}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 14px;\">Hi {firstName},</p>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;\">We thought you'd want to see this. Take a look and let us know what you think.</p>\n{itemsHtml}\n<div style=\"text-align:center;margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;\">Visit the store</a></div>"
+ },
+ {
+  "slug": "starter/bold",
+  "subject": "{store_name}",
+  "body": "<h2 style=\"margin:0 0 12px;\">Hey {firstName} — don't miss this.</h2>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;\">Big things are happening. Here's what's new for you.</p>\n{itemsHtml}\n<div style=\"margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:700;\">Check it out</a></div>"
+ },
+ {
+  "slug": "starter/minimal",
+  "subject": "{store_name}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 14px;\">Hi {firstName},</p>\n<p style=\"font-size:15px;color:#333;line-height:1.7;margin:0 0 20px;\">A quick note from us. We'd love for you to take a look.</p>\n{itemsHtml}\n<p style=\"margin:20px 0;\"><a href=\"{ctaUrl}\" style=\"color:#374151;font-weight:600;\">Visit the store →</a></p>"
+ },
+ {
+  "slug": "starter/promo",
+  "subject": "{store_name}",
+  "body": "<h2 style=\"margin:0 0 10px;text-align:center;\">A special offer for you, {firstName} 🎉</h2>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;text-align:center;\">Use code <strong>{couponCode}</strong> for <strong>{discountPercent}% off</strong> — for a limited time.</p>\n{itemsHtml}\n<div style=\"text-align:center;margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#fff;text-decoration:none;padding:12px 30px;border-radius:6px;font-weight:700;\">Shop the sale</a></div>"
+ },
+ {
+  "slug": "starter/festive",
+  "subject": "{store_name}",
+  "body": "<h2 style=\"margin:0 0 10px;text-align:center;\">Season's greetings, {firstName}! ✨</h2>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;text-align:center;\">Celebrate with something special, picked just for you.</p>\n{itemsHtml}\n<div style=\"text-align:center;margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#b91c1c;color:#fff;text-decoration:none;padding:12px 30px;border-radius:6px;font-weight:700;\">Explore the collection</a></div>"
+ },
+ {
+  "slug": "starter/fresh",
+  "subject": "{store_name}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 14px;\">Good news, {firstName}!</p>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;\">It's back — and we saved you a look. Grab it before it's gone again.</p>\n{itemsHtml}\n<div style=\"text-align:center;margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#059669;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;\">See what's back</a></div>"
+ },
+ {
+  "slug": "messaging/promotion",
+  "subject": "{headline}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:24px;color:#1a3a4a;margin:0 0 16px;\">{headline}</h2><p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">{body}</p>{#if ctaUrl}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">{ctaText}</a></p>{/if}"
+ },
+ {
+  "slug": "messaging/announcement",
+  "subject": "{headline}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:24px;color:#1a3a4a;margin:0 0 16px;\">{headline}</h2><p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">{body}</p><p style=\"margin:20px 0 0;\"><a href=\"{store_web}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Visit our store</a></p>"
+ },
+ {
+  "slug": "messaging/event",
+  "subject": "You're invited: {eventName}",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:24px;color:#1a3a4a;margin:0 0 16px;\">{eventName}</h2>{#if eventDate}<p style=\"color:#e07b3f;font-weight:600;margin:0 0 16px;\">{eventDate}</p>{/if}<p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">{eventDetails}</p>{#if ctaUrl}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Learn more</a></p>{/if}"
+ },
+ {
+  "slug": "messaging/review-form-share",
+  "subject": "Share your experience — get a reward!",
+  "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:24px;color:#1a3a4a;margin:0 0 16px;\">{formTitle}</h2><p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">We'd love to hear what you think! Leave us a review and we'll send you a special discount as a thank-you.</p><p style=\"margin:20px 0 0;\"><a href=\"{formUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Leave a review & claim reward</a></p>"
+ }
+]

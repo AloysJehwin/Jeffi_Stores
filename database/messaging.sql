@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS public.template_version (
     variant_id uuid NOT NULL,
     version integer NOT NULL,
     subject character varying(200),
+    preheader character varying(200),
     body text NOT NULL,
     blocks jsonb,
     blocks_format character varying(16),

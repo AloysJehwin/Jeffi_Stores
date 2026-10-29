@@ -13,6 +13,7 @@ import {
 import { deductOrderStock, checkLineStock, InsufficientStockError } from '../../lib/inventory-deduct'
 import { CUSTOM_UNIT_MAX, formatShortfall, type Shortfall } from '../../lib/invoice-line-items'
 import { sendInvoiceFinalizedEmail } from '../../lib/mail'
+import { invoiceReply } from '../../lib/reply-context'
 import { sendBusinessInvoiceGeneratedEmail } from '../../lib/mail-business'
 import { lineItemExGst } from '../../lib/pricing'
 import { getFeatureFlags, getBusinessValues } from '../../lib/site-controls'
@@ -427,6 +428,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         // B2B (came from an RFQ) → business-specific email; regular → standard invoice email.
         // Never send both — the customer would receive two identical emails.
+        const reply = await invoiceReply(result.id)
         if (quotation.from_rfq) {
           sendBusinessInvoiceGeneratedEmail(
             customerEmail,
@@ -434,7 +436,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             result.invoice_number,
             result.order_number,
             totalAmount,
-            invoiceViewUrl
+            invoiceViewUrl,
+            reply
           ).catch(() => {})
         } else {
           sendInvoiceFinalizedEmail(
@@ -443,7 +446,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             result.invoice_number,
             totalAmount,
             result.order_number,
-            invoiceViewUrl
+            invoiceViewUrl,
+            reply
           ).catch(() => {})
         }
       }

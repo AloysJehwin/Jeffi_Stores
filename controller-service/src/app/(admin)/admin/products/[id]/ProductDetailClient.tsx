@@ -7,11 +7,13 @@ import { Star, Sparkles, CheckCircle, XCircle, Loader2, X, ChevronDown } from 'l
 import HoverCard from '@/components/ui/HoverCard'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
+import { ChangeLog } from '@/components/admin/change-log'
 import UnitsManager from '@/components/admin/UnitsManager'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useAgentChanges } from '@/lib/client/agent-events'
 import { Dialog, DetailHeader, DetailSkeleton, ErrorState, ViewDraftLink, badgeCls, useActionToast } from '@/components/admin/kit'
 import { formatINR, formatDate } from '@/lib/shared/format'
 import {
@@ -839,6 +841,7 @@ export default function ProductDetailClient({
   useEffect(() => {
     loadProduct()
   }, [loadProduct])
+  useAgentChanges(loadProduct)
 
   useEffect(() => {
     if (!canShelving) return
@@ -1707,6 +1710,9 @@ export default function ProductDetailClient({
       )}
 
       {hasInventory && <ProductStockMovements productId={id} />}
+      <div className={hasInventory ? 'mt-3' : 'mt-6'}>
+        <ChangeLog kind="product" id={id} variant="collapsible" preset="product" version={p.updated_at} />
+      </div>
     </div>
   )
 }

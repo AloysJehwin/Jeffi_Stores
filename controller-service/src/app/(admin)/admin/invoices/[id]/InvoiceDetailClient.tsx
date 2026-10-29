@@ -8,6 +8,7 @@ import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useAgentChanges } from '@/lib/client/agent-events'
 import { formatINR, formatDate } from '@/lib/shared/format'
 import { fmtQty } from '@/lib/shared/number-display'
 import {
@@ -28,6 +29,8 @@ import {
   useActionToast,
   type KitAction,
 } from '@/components/admin/kit'
+import { ChangeLog } from '@/components/admin/change-log'
+import RecordReplies from '@/components/admin/replies/RecordReplies'
 
 const th = 'px-4 py-2.5 text-xs font-medium text-foreground-muted whitespace-nowrap'
 
@@ -79,6 +82,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   useEffect(() => {
     loadData()
   }, [id, router])
+  useAgentChanges(loadData)
 
   // Poll every 4s while QR is shown and payment is unpaid
   useEffect(() => {
@@ -366,6 +370,8 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                 <p className="text-sm text-foreground break-words">{o.notes}</p>
               </Card>
             )}
+            <RecordReplies entityType="invoices" entityId={id} canWrite={canWrite} />
+            <ChangeLog kind="invoice" id={id} version={o.updated_at} />
           </>
         }
         aside={

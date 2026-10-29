@@ -40,7 +40,7 @@ export interface VariantRow {
 }
 export interface VersionRow {
   id: string; variant_id: string; version: number
-  subject: string | null; body: string; blocks: any; blocks_format: string | null
+  subject: string | null; preheader: string | null; body: string; blocks: any; blocks_format: string | null
   variables: string[]; provider_ref: string | null; note: string | null; layout: 'store' | 'none'
   created_by: string | null; created_at: string
 }
@@ -61,33 +61,38 @@ export const listFamilies = (e: Executor, tenantId: string, channel?: string, ca
       ORDER BY f.name`,
     [tenantId, channel ?? null, category ?? null, space])
 
-export const listTemplates = (e: Executor, tenantId: string, channel?: string, space: Space = 'store') =>
+export const listTemplates = (e: Executor, tenantId: string, channel?: string, space: Space = 'store', withBody = false) =>
   rows(e,
     `SELECT t.id, t.family_id, t.channel, t.status, t.current_variant_id, t.tenant_id,
-            f.slug, f.name, f.category,
+            f.slug, f.name, f.category, f.tags,
             v.id AS variant_id, v.locale, v.provider_ref, v.approval_status, v.review_status, v.review_note,
-            ver.version AS current_version, ver.subject
+            ver.version AS current_version, ver.subject, ver.preheader,
+            CASE WHEN $4 THEN ver.body END AS body, CASE WHEN $4 THEN ver.layout END AS layout
        FROM template t
        JOIN template_family f ON f.id=t.family_id
        LEFT JOIN template_variant v ON v.id=t.current_variant_id
        LEFT JOIN template_version ver ON ver.id=v.current_version_id
       WHERE t.tenant_id=$1 AND f.space=$3 AND t.status <> 'archived' AND ($2::text IS NULL OR t.channel=$2)
       ORDER BY f.name, t.channel`,
-    [tenantId, channel ?? null, space])
+    [tenantId, channel ?? null, space, withBody])
 
 // Tenant rows (tenant pool) + platform defaults (flagship pool); tenant shadows same slug+channel.
 // A tenant DB that lacks the template tables yet (42P01) just yields no overrides.
 const noTable = (e: any) => e?.code === '42P01'
-export async function listTemplatesWithDefaults(p: Pools, tenantId: string, channel?: string, space: Space = 'store') {
-  const own = await listTemplates(p.tenant, tenantId, channel, space).catch(e => { if (noTable(e)) return []; throw e })
-  if (tenantId === PLATFORM_TENANT_ID) return own.map(r => ({ ...r, source: 'platform' }))
-  const defaults = await listTemplates(p.platform, PLATFORM_TENANT_ID, channel)
+// opts.tag keeps the templates shown on a page ('page:order'); a tenant copy saved before tags existed
+// inherits its default's tags.
+export async function listTemplatesWithDefaults(p: Pools, tenantId: string, channel?: string, space: Space = 'store', opts: { tag?: string; withBody?: boolean } = {}) {
+  const own = await listTemplates(p.tenant, tenantId, channel, space, opts.withBody).catch(e => { if (noTable(e)) return []; throw e })
+  const tagged = (list: any[]) => (opts.tag ? list.filter(r => (r.tags ?? []).includes(opts.tag)) : list)
+  if (tenantId === PLATFORM_TENANT_ID) return tagged(own.map(r => ({ ...r, source: 'platform' })))
+  const defaults = await listTemplates(p.platform, PLATFORM_TENANT_ID, channel, 'store', opts.withBody)
   const key = (r: any) => `${r.slug}|${r.channel}`
+  const byKey = new Map(defaults.map(r => [key(r), r]))
   const seen = new Set(own.map(key))
-  return [
-    ...own.map(r => ({ ...r, source: 'tenant' })),
+  return tagged([
+    ...own.map(r => ({ ...r, tags: r.tags?.length ? r.tags : (byKey.get(key(r))?.tags ?? []), source: 'tenant' })),
     ...defaults.filter(r => !seen.has(key(r))).map(r => ({ ...r, source: 'platform' })),
-  ].sort((a, b) => a.name.localeCompare(b.name) || a.channel.localeCompare(b.channel))
+  ]).sort((a, b) => a.name.localeCompare(b.name) || a.channel.localeCompare(b.channel))
 }
 
 // Tenant copy first; else the platform default (flagship pool) with the same slug.
@@ -147,6 +152,8 @@ export interface UpsertInput {
   description?: string
   locale?: string
   subject?: string
+  /** Email: the line inbox previews show after the subject. Not given → keep the current one. */
+  preheader?: string | null
   body: string
   blocks?: any
   blocks_format?: 'tiptap' | 'tiptap-html' | 'email-blocks' | 'maily' | 'mjml' | 'wa-content' | 'sms-text'
@@ -158,6 +165,8 @@ export interface UpsertInput {
   publish?: boolean
   /** Email: 'store' wraps the body in the store's email layout; 'none' sends the HTML as written. */
   layout?: 'store' | 'none'
+  /** Pages/scenarios the template is offered on ('page:order', 'scenario:order.delay_processing'). Not given → keep. */
+  tags?: string[]
 }
 
 export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertInput, space: Space = 'store'): Promise<FullTemplate> {
@@ -165,14 +174,15 @@ export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertI
   try {
     await c.query('BEGIN')
     const family = (await c.query<FamilyRow>(
-      `INSERT INTO template_family (tenant_id, slug, name, category, description, space)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO template_family (tenant_id, slug, name, category, description, space, tags)
+       VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::text[], '{}'))
        ON CONFLICT (tenant_id, space, slug) DO UPDATE SET name=EXCLUDED.name,
          category=COALESCE(EXCLUDED.category, template_family.category),
          description=COALESCE(EXCLUDED.description, template_family.description),
+         tags=CASE WHEN $7::text[] IS NULL THEN template_family.tags ELSE EXCLUDED.tags END,
          updated_at=now()
        RETURNING *`,
-      [tenantId, i.slug, i.name, i.category ?? null, i.description ?? null, space])).rows[0]
+      [tenantId, i.slug, i.name, i.category ?? null, i.description ?? null, space, i.tags ?? null])).rows[0]
 
     const template = (await c.query<TemplateRow>(
       `INSERT INTO template (family_id, tenant_id, channel, status)
@@ -215,15 +225,17 @@ export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertI
     ])]
     const ver = (await c.query<VersionRow>(
       `INSERT INTO template_version
-         (variant_id, version, subject, body, blocks, blocks_format, variables, provider_ref, note, created_by, layout)
+         (variant_id, version, subject, body, blocks, blocks_format, variables, provider_ref, note, created_by, layout, preheader)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-         -- Not given → keep the current version's layout.
-         COALESCE($11, (SELECT layout FROM template_version WHERE id=$12), 'store'))
+         -- Not given → keep the current version's layout and preheader.
+         COALESCE($11, (SELECT layout FROM template_version WHERE id=$12), 'store'),
+         CASE WHEN $13::boolean THEN $14 ELSE (SELECT preheader FROM template_version WHERE id=$12) END)
        RETURNING *`,
       // JSON-encode: a raw HTML string (or an array) is not valid jsonb input as-is.
       [variant.id, version, i.subject ?? null, i.body, i.blocks == null ? null : JSON.stringify(i.blocks),
        i.blocks_format ?? defaultBlocksFormat(i.channel), variables, i.provider_ref ?? null,
-       i.note ?? null, i.createdBy ?? null, i.layout ?? null, variant.current_version_id ?? null])).rows[0]
+       i.note ?? null, i.createdBy ?? null, i.layout ?? null, variant.current_version_id ?? null,
+       i.preheader !== undefined, i.preheader || null])).rows[0]
 
     if (i.publish !== false) {
       await c.query(`UPDATE template_variant SET current_version_id=$2, updated_at=now() WHERE id=$1`, [variant.id, ver.id])
@@ -287,6 +299,7 @@ export const toApi = (t: FullTemplate) => ({
   name: t.family.name,
   category: t.family.category,
   description: t.family.description,
+  tags: t.family.tags ?? [],
   channel: t.template.channel,
   status: t.template.status,
   locale: t.variant?.locale,
@@ -305,6 +318,7 @@ export const toApi = (t: FullTemplate) => ({
     id: t.version.id,
     version: t.version.version,
     subject: t.version.subject,
+    preheader: t.version.preheader ?? null,
     body: t.version.body,
     blocks: t.version.blocks,
     blocks_format: t.version.blocks_format,

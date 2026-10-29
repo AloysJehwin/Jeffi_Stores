@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must be before imports) ────────────────────────────────────────────
 
+vi.mock('../../src/lib/reply-context', () => ({ invoiceReply: async () => null, recordEmailSend: async () => {} }))
 vi.mock('@/lib/shared/customer-links', () => ({
   documentUrl: vi.fn(async (app: string, token: string) => `https://${app}-acme.jeffistores.in/${token}`),
   orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
@@ -460,7 +461,8 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       'JS/2024-25/0001',
       1200,
       'ORD-001',
-      'https://invoice-acme.jeffistores.in/TOKEN'
+      'https://invoice-acme.jeffistores.in/TOKEN',
+      null
     )
   })
 

@@ -2,165 +2,82 @@ import { NextRequest, NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { query, queryOne } from '@/lib/shared/db'
 import { logMessage } from '@/lib/shared/message-log'
-import { logActivity } from '@/lib/shared/activity'
-import { sendFreeTextWhatsApp, sendSupportAckWhatsApp } from '@/lib/shared/whatsapp'
-import { currentBrandNameAsync } from '@/lib/catalog/brand'
+import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
+import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
+import { handleInboundWhatsApp } from '@/lib/support/inbound'
+import { onCustomerMessage } from '@/lib/support/agent'
 
 export const dynamic = 'force-dynamic'
 
-// Empty TwiML: acknowledges receipt without sending a reply. Returned in all
-// paths (including errors) so Twilio does not retry the webhook.
-const EMPTY_TWIML = '<Response></Response>'
+// Inbound Twilio messages. WhatsApp goes to the customer's support chat (the assistant answers;
+// media lands in the Drive); SMS only carries STOP/START. A store's own number posts with ?t=<tenant>.
+// Always answers with empty TwiML so Twilio doesn't retry.
 
-function twiml(): NextResponse {
-  return new NextResponse(EMPTY_TWIML, {
-    status: 200,
-    headers: { 'Content-Type': 'text/xml' },
-  })
-}
+const EMPTY_TWIML = '<Response></Response>'
+const twiml = () => new NextResponse(EMPTY_TWIML, { status: 200, headers: { 'Content-Type': 'text/xml' } })
 
 const STOP_CMDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'])
-const START_CMDS = new Set(['START', 'UNSTOP', 'SUBSCRIBE', 'YES'])
-
-// Strip the whatsapp: prefix to get a bare E.164 number.
-function stripChannelPrefix(addr: string): string {
-  return addr.replace(/^whatsapp:/i, '').trim()
-}
+const START_CMDS = new Set(['START', 'UNSTOP', 'SUBSCRIBE'])
 
 export async function POST(request: NextRequest) {
   try {
-    const signature = request.headers.get('x-twilio-signature')
-
     const authToken = process.env.TWILIO_AUTH_TOKEN
-    if (!authToken) {
-      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
-    }
+    if (!authToken) return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
 
-    // Inbound Twilio webhooks are application/x-www-form-urlencoded.
     const form = await request.formData()
     const params: Record<string, string> = {}
-    for (const [key, value] of form.entries()) {
-      params[key] = typeof value === 'string' ? value : String(value)
-    }
+    for (const [key, value] of form.entries()) params[key] = typeof value === 'string' ? value : String(value)
 
-    // Twilio signs against the exact configured public URL, NOT the internal
-    // request URL (which differs behind CloudFront).
-    const url = process.env.TWILIO_WEBHOOK_URL || 'https://jeffistores.in/api/webhooks/twilio'
-    const valid = twilio.validateRequest(authToken, signature || '', url, params)
-    if (!valid) {
+    // Twilio signs the public URL it was configured with, not the internal one behind CloudFront.
+    const tenantId = new URL(request.url).searchParams.get('t') || ''
+    const base = process.env.PUBLIC_WEBHOOK_BASE_URL || process.env.APP_URL || 'https://jeffistores.in'
+    const url = tenantId
+      ? `${base.replace(/\/$/, '')}/api/webhooks/twilio?t=${encodeURIComponent(tenantId)}`
+      : process.env.TWILIO_WEBHOOK_URL || 'https://jeffistores.in/api/webhooks/twilio'
+    if (!twilio.validateRequest(authToken, request.headers.get('x-twilio-signature') || '', url, params)) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 })
     }
 
-    const fromRaw = params.From || ''
-    const toRaw = params.To || ''
-    const body = params.Body || ''
-    const messageSid = params.MessageSid || null
-
-    const isWhatsApp = /^whatsapp:/i.test(fromRaw)
-    const channel: 'whatsapp' | 'sms' = isWhatsApp ? 'whatsapp' : 'sms'
-    const customerNumber = stripChannelPrefix(fromRaw)
-    const ourNumber = stripChannelPrefix(toRaw)
-
-    // Match user by phone: stored phone may be 10-digit local or +91 E.164.
-    // Compare on the last-10-digit form.
-    const digits = customerNumber.replace(/\D/g, '')
-    const last10 = digits.slice(-10)
-    const matchedUser = last10
-      ? await queryOne<{ id: string; marketing_opt_out: boolean }>(
-          `SELECT id, marketing_opt_out FROM users
-           WHERE regexp_replace(phone, '\\D', '', 'g') LIKE '%' || $1
-           LIMIT 1`,
-          [last10]
-        )
-      : null
-    const userId = matchedUser?.id ?? null
-
-    // Log the inbound message.
-    logMessage({
-      channel,
-      direction: 'inbound',
-      to: ourNumber,
-      from: customerNumber,
-      body,
-      kind: 'inbound',
-      status: 'received',
-      providerSid: messageSid,
-      userId,
-    })
-
-    const cmd = (body || '').trim().toUpperCase()
-    const brand = await currentBrandNameAsync()
-
-    if (STOP_CMDS.has(cmd)) {
-      if (userId) {
-        await query('UPDATE users SET marketing_opt_out = TRUE, marketing_opt_out_at = NOW() WHERE id = $1', [userId])
-      }
-      if (channel === 'whatsapp') {
-        // SMS STOP is auto-handled by Twilio; only reply on WhatsApp.
-        await sendFreeTextWhatsApp({
-          phone: customerNumber,
-          body: `${brand}: You have been unsubscribed from promotional messages. Reply START to resubscribe.`,
-        })
-      }
-      return twiml()
-    }
-
-    if (START_CMDS.has(cmd)) {
-      if (userId) {
-        await query('UPDATE users SET marketing_opt_out = FALSE, marketing_opt_out_at = NULL WHERE id = $1', [userId])
-      }
-      if (channel === 'whatsapp') {
-        await sendFreeTextWhatsApp({
-          phone: customerNumber,
-          body: `${brand}: You are resubscribed. Reply STOP to opt out anytime.`,
-        })
-      }
-      return twiml()
-    }
-
-    // Real support message: only when a user matched and channel is WhatsApp.
-    if (userId && channel === 'whatsapp') {
-      let session = await queryOne<{ id: string }>(
-        `SELECT id FROM support_sessions
-         WHERE user_id = $1 AND status = 'open'
-         ORDER BY created_at DESC LIMIT 1`,
-        [userId]
-      )
-
-      let isNewSession = false
-      if (!session) {
-        session = await queryOne<{ id: string }>(
-          `INSERT INTO support_sessions (user_id, status)
-           VALUES ($1, 'open') RETURNING id`,
-          [userId]
-        )
-        isNewSession = true
-      }
-
-      if (session) {
-        await query(
-          `INSERT INTO support_messages (session_id, sender, message)
-           VALUES ($1, 'customer', $2)`,
-          [session.id, body]
-        )
-
-        logActivity({
-          userId,
-          kind: 'support_message',
-          summary: 'Customer message via WhatsApp',
-          metadata: { channel: 'whatsapp' },
-        }).catch(() => {})
-
-        // Auto-ack once per NEW session only.
-        if (isNewSession) {
-          await sendSupportAckWhatsApp({ phone: customerNumber })
-        }
-      }
-    }
-
+    const ctx = tenantId ? await lookupTenantContextById(tenantId).catch(() => null) : null
+    if (tenantId && !ctx) return twiml()
+    const run = () => handle(params)
+    await (ctx ? runWithTenantContext(ctx, run) : run())
     return twiml()
-  } catch {
-    // Return 200 empty TwiML on any unexpected error to avoid Twilio retries.
+  } catch (err) {
+    console.error('[twilio] inbound failed', err instanceof Error ? err.message : err)
     return twiml()
+  }
+}
+
+async function handle(params: Record<string, string>): Promise<void> {
+  const from = params.From || ''
+  const to = params.To || ''
+  const body = params.Body || ''
+  const sid = params.MessageSid || null
+
+  if (/^whatsapp:/i.test(from)) {
+    const n = Math.min(Number(params.NumMedia) || 0, 10)
+    const media = Array.from({ length: n }, (_, i) => ({ ref: params[`MediaUrl${i}`], mime: params[`MediaContentType${i}`] || '' })).filter(m => m.ref)
+    const r = await handleInboundWhatsApp({ provider: 'twilio', providerSid: sid, from, to, text: body, profileName: params.ProfileName || null, media })
+    // A swipe-reply quotes the message it answers, which ties it to that order or quotation.
+    if (r) await onCustomerMessage(r.session, r.message, { repliedToSid: params.OriginalRepliedMessageSid || null, phone: from })
+    return
+  }
+
+  // SMS: Twilio answers STOP itself; we only record the preference.
+  const number = from.trim()
+  const last10 = number.replace(/\D/g, '').slice(-10)
+  const user = last10
+    ? await queryOne<{ id: string }>(`SELECT id FROM users WHERE right(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) = $1 LIMIT 1`, [last10])
+    : null
+  logMessage({ channel: 'sms', direction: 'inbound', to: to.trim(), from: number, body, kind: 'inbound', status: 'received', providerSid: sid, userId: user?.id ?? null })
+  const cmd = body.trim().toUpperCase()
+  if (user && (STOP_CMDS.has(cmd) || START_CMDS.has(cmd))) {
+    await query(
+      STOP_CMDS.has(cmd)
+        ? 'UPDATE users SET marketing_opt_out = TRUE, marketing_opt_out_at = NOW() WHERE id = $1'
+        : 'UPDATE users SET marketing_opt_out = FALSE, marketing_opt_out_at = NULL WHERE id = $1',
+      [user.id]
+    )
   }
 }
