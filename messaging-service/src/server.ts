@@ -308,8 +308,14 @@ app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
   const existing = await tpl.findById(pool, req.claims.tenantId, req.params.id, spaceOf(req))
     ?? (req.claims.tenantId !== tpl.PLATFORM_TENANT_ID ? await tpl.findById(db, tpl.PLATFORM_TENANT_ID, req.params.id) : null)
   if (!existing) return reply.code(404).send({ error: 'not_found' })
+  const patch = upsertBody(req, true) as any
+  // An update that leaves out the content (e.g. only tags or the name) keeps the current content.
+  const v = existing.version
+  const keep = v && patch.body === undefined ? { body: v.body, blocks: v.blocks ?? undefined, blocks_format: v.blocks_format ?? undefined, layout: v.layout } : {}
   const input: tpl.UpsertInput = {
-    ...(upsertBody(req, true) as any),
+    ...keep,
+    ...(v && patch.subject === undefined && v.subject != null ? { subject: v.subject } : {}),
+    ...patch,
     slug: existing.family.slug,
     channel: existing.template.channel as any,
     name: (req.body as any).name ?? existing.family.name,
