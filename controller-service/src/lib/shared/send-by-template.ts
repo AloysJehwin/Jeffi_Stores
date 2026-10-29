@@ -3,7 +3,7 @@
 // Wrappers keep their public shape so callers don't change; they now one-line into here.
 
 import { messagingTenant, serviceToken } from '@/lib/messaging/library'
-import { recordScopedSend } from '@/lib/replies/scope'
+import { currentReplyScope, recordScopedSend } from '@/lib/replies/scope'
 
 const MESSAGING_URL = (process.env.MESSAGING_URL || 'http://localhost:3101').replace(/\/$/, '')
 
@@ -61,6 +61,8 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
     subject: i.subject,
     reference: i.reference,
     locale: i.locale,
+    // Inside a reply scope the customer's email reply comes back to the record that asked.
+    reply_to: i.channel === 'email' ? currentReplyScope()?.replyTo : undefined,
     ...extra,
   }
   try {
@@ -72,7 +74,12 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { status: 'failed', error: data?.message || data?.error || `HTTP ${res.status}` }
-    if (i.channel !== 'email' && data.provider_ref) await recordScopedSend({ channel: i.channel, providerSid: data.provider_ref })
+    if (data.provider_ref && data.status !== 'failed') {
+      if (i.channel === 'email') {
+        const ref = String(data.provider_ref)
+        await recordScopedSend({ channel: 'email', emailMessageIds: [ref.includes('@') ? ref : `${ref}@email.amazonses.com`] })
+      } else await recordScopedSend({ channel: i.channel, providerSid: data.provider_ref })
+    }
     return { id: data.id, status: data.status ?? 'sent', providerSid: data.provider_ref ?? null, body: data.body }
   } catch (e: any) {
     return { status: 'failed', error: e?.message || 'network error' }

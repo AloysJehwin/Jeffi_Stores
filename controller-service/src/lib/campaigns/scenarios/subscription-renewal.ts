@@ -1,4 +1,6 @@
 import { queryMany } from '@/lib/shared/db'
+import { openReplyContextSafe } from '@/lib/replies/context'
+import { withReplyContext } from '@/lib/replies/scope'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
@@ -188,26 +190,31 @@ export const subscriptionRenewal: ScenarioModule<Params, Row> = {
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
-    const emailResult = await sendCampaignEmail({
-      campaign,
-      user,
-      referenceId: row.subscription_id,
-      vars: {
-        firstName: user.first_name || 'there',
-        productName: row.product_name,
-        itemsHtml,
-        cartItems: itemsHtml,
-        couponCode,
-        discountPercent,
-        ctaUrl: row.product_slug ? `${user.baseUrl}/products/${row.product_slug}` : `${user.baseUrl}/products`,
-      },
-    })
+    // "Pause it", "cancel" or "send it to my new address" in reply comes back to the subscription.
+    const opened = await openReplyContextSafe({ scenario: 'subscription_renewal', entityType: 'subscriptions', entityId: row.subscription_id, userId: row.user_id, email: user.email ?? null })
+    const scope = opened ? { contextId: opened.context.id, replyTo: opened.replyTo, entityType: 'subscriptions', entityId: row.subscription_id } : null
+    return withReplyContext(scope, async () => {
+      const emailResult = await sendCampaignEmail({
+        campaign,
+        user,
+        referenceId: row.subscription_id,
+        vars: {
+          firstName: user.first_name || 'there',
+          productName: row.product_name,
+          itemsHtml,
+          cartItems: itemsHtml,
+          couponCode,
+          discountPercent,
+          ctaUrl: row.product_slug ? `${user.baseUrl}/products/${row.product_slug}` : `${user.baseUrl}/products`,
+        },
+      })
 
-    if (params.whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: row.product_name, imageUrl: imageUrl ?? undefined }, cooldownMinutes(params)).catch(
-        () => {}
-      )
-    }
-    return emailResult
+      if (params.whatsappEnabled || (params as any).smsEnabled) {
+        sendCampaignWhatsApp(campaign.kind, row.user_id, { items: row.product_name, imageUrl: imageUrl ?? undefined }, cooldownMinutes(params)).catch(
+          () => {}
+        )
+      }
+      return emailResult
+    })
   },
 }

@@ -10,7 +10,7 @@ import type { ReplyContextRow, ScenarioKey } from './types'
 
 const DOMAIN = process.env.REPLY_MAIL_DOMAIN || `reply.${process.env.PLATFORM_DOMAIN || 'jeffistores.in'}`
 const ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789'
-const TTL_DAYS: Partial<Record<ScenarioKey, number>> = { quotation: 30, rfq_offer: 30, invoice_payment: 30, support: 60 }
+const TTL_DAYS: Partial<Record<ScenarioKey, number>> = { quotation: 30, rfq_offer: 30, invoice_payment: 30, subscription_renewal: 30, support: 60 }
 
 export function newToken(len = 20): string {
   const bytes = randomBytes(len)

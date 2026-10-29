@@ -5,6 +5,7 @@ import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import type { CampaignKind } from '@/lib/shared/marketing'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import { mailShell } from '@/lib/shared/mail-template'
+import { askAboutOrder } from '@/lib/replies/ask'
 import type { AgentAction, ActionResult } from './shared'
 
 export async function sendTestEmail(action: AgentAction): Promise<ActionResult> {
@@ -29,13 +30,17 @@ export async function sendOrderDelayEmail(action: AgentAction): Promise<ActionRe
   if (!customerEmail || !orderNumber || !delayDays || !reason) {
     return { result: null, error: 'Missing required fields in payload' }
   }
-  const r = await sendOrderDelayNotification({
-    toEmail: customerEmail,
-    customerName: customerName || 'there',
-    orderNumber,
-    delayDays: Number(delayDays),
-    reason: String(reason),
-  })
+  const send = () =>
+    sendOrderDelayNotification({
+      toEmail: customerEmail,
+      customerName: customerName || 'there',
+      orderNumber,
+      delayDays: Number(delayDays),
+      reason: String(reason),
+    })
+  // "Just reply" in the delay email: an "I'll wait" or "cancel it" comes back to the order.
+  const order = await queryOne<{ id: string }>(`SELECT id FROM orders WHERE order_number = $1`, [orderNumber])
+  const r = order ? await askAboutOrder('order_delay', order.id, send) : await send()
   if (!r.success) return { result: null, error: 'Send failed' }
   return { result: { sentTo: customerEmail, orderNumber, delayDays, messageId: r.messageId }, error: null }
 }
