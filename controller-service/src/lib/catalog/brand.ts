@@ -204,14 +204,14 @@ export async function storeContactLine(): Promise<string> {
   }
 }
 
-/** The store's logo and email accent colour, applied to outgoing mail (see applyMailTheme). */
-export async function storeMailTheme(): Promise<{ logoUrl: string; accent: string }> {
+/** The store's email accent colour, applied to outgoing mail (see applyMailTheme). */
+export async function storeMailTheme(): Promise<{ accent: string }> {
   try {
     const { getStoreIdentity } = await import('@/lib/catalog/site-controls')
     const id = await getStoreIdentity()
-    return { logoUrl: id.logoUrl ?? '', accent: id.emailAccent ?? '' }
+    return { accent: id.emailAccent ?? '' }
   } catch {
-    return { logoUrl: '', accent: '' }
+    return { accent: '' }
   }
 }
 

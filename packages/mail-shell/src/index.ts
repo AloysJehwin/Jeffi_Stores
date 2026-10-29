@@ -1,7 +1,7 @@
-// The one shell every mail uses (store app, documents, message templates): store name or logo, optional
-// grey kicker, title, the mail's own content, bordered footer carrying the brand. Mail-specific classes
-// go in extraCss. A mail built without an explicit theme is marked so applyMailTheme can give it the
-// store's logo and accent colour at send time.
+// The one shell every mail uses (store app, documents, message templates): the store name in bold in the
+// accent colour, optional grey kicker, title, the mail's own content, bordered footer carrying the brand.
+// Mail-specific classes go in extraCss. A mail built without an explicit theme is marked so
+// applyMailTheme can give it the store's accent colour at send time.
 
 export const MAIL_BASE_CSS = `
   body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; -webkit-font-smoothing: antialiased; }
@@ -48,8 +48,6 @@ export interface MailTheme {
   pageBg?: string
   /** Container background. */
   containerBg?: string
-  /** When set, the header shows this logo image instead of the text brand. */
-  logoUrl?: string
   /** 'card' (default rounded container) or 'full' (edge-to-edge, used by bold/hero layouts). */
   frame?: 'card' | 'full'
   /** Header alignment. */
@@ -93,13 +91,12 @@ export function escapeHtml(value: unknown): string {
 export function mailShell(o: MailShellOptions): string {
   const brand = escapeHtml(o.brand)
   const t = { ...DEFAULT_THEME, ...(o.theme ?? {}) }
-  const logoUrl = o.theme?.logoUrl
   const footer = [
     `<p><strong>${brand}</strong></p>`,
     ...(o.footerLines ?? []).filter(Boolean).map(l => `<p>${l}</p>`),
     ...(o.replyHint ? [`<p>${REPLY_HINT}</p>`] : []),
   ].join('\n              ')
-  // Untouched by a caller theme: let applyMailTheme swap in the store's logo and accent.
+  // Untouched by a caller theme: let applyMailTheme apply the store's accent and reply line.
   const mark = (name: string, html: string) => (o.theme ? html : `<!--mail-${name}-->${html}<!--/mail-${name}-->`)
   // Theme overrides applied as scoped inline-ish CSS after the base sheet so existing classes win by
   // default but the accent/background follow the selected layout.
@@ -111,9 +108,7 @@ export function mailShell(o: MailShellOptions): string {
     .code-box, .button { background-color:${t.accent}; }
     .info { border-left-color:${t.accent}; }
   `
-  const brandHeader = logoUrl
-    ? `<img src="${escapeHtml(logoUrl)}" alt="${brand}" style="max-height:48px;max-width:200px;display:inline-block;" />`
-    : `<div class="brand" style="font-size:28px;font-weight:bold;color:${t.accent};letter-spacing:0.5px;">${brand}</div>`
+  const brandHeader = `<div class="brand" style="font-size:28px;font-weight:bold;color:${t.accent};letter-spacing:0.5px;">${brand}</div>`
   return `<!DOCTYPE html>
 <html>
   <head>
@@ -142,7 +137,6 @@ export function mailShell(o: MailShellOptions): string {
 }
 
 export interface StoreMailTheme {
-  logoUrl?: string | null
   accent?: string | null
   /** Add the reply line to the footer (the mail carries a reply address that is read). */
   replyHint?: boolean
@@ -150,17 +144,10 @@ export interface StoreMailTheme {
 
 const HEX = /^#[0-9a-f]{6}$/i
 
-/** Gives a default-themed mailShell mail the store's logo and accent colour. Other HTML is returned as is. */
+/** Gives a default-themed mailShell mail the store's accent colour. Other HTML is returned as is. */
 export function applyMailTheme(html: string, t: StoreMailTheme): string {
   if (!html.includes('<!--mail-brand-->')) return html
   let out = html
-  const logo = t.logoUrl && /^https?:\/\//i.test(t.logoUrl) ? t.logoUrl : null
-  if (logo) {
-    out = out.replace(/<!--mail-brand-->([\s\S]*?)<!--\/mail-brand-->/, (_m, inner: string) => {
-      const alt = /<div class="brand"[^>]*>([\s\S]*?)<\/div>/.exec(inner)?.[1] ?? ''
-      return `<!--mail-brand--><img src="${escapeHtml(logo)}" alt="${alt}" style="max-height:48px;max-width:200px;display:inline-block;" /><!--/mail-brand-->`
-    })
-  }
   const accent = t.accent && HEX.test(t.accent) ? t.accent : null
   if (accent) {
     out = out

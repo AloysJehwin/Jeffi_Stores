@@ -150,7 +150,7 @@ export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ 
   // Inside withReplyContext(): the customer's reply comes back to this question.
   const scope = currentReplyScope()
   const scoped = scope && !guarded.replyTo ? { ...guarded, replyTo: scope.replyTo, entityType: guarded.entityType ?? scope.entityType, entityId: guarded.entityId ?? scope.entityId } : guarded
-  // The store's logo and accent colour, and a reply line when replies come back to us.
+  // The store's accent colour, and a reply line when replies come back to us.
   const o = scoped.html ? { ...scoped, html: await themed(scoped.html, !!scoped.replyTo) } : scoped
   // No explicit from → use the CURRENT store's customer sender (tenant on a tenant host, platform
   // off-tenant) instead of a hardcoded "Jeffi Store's", which leaked into tenant-facing mail.

@@ -294,7 +294,7 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     if (req.channel === 'email') {
       provider = 'ses'
       // layout 'none': the template's HTML exactly as written, no store header/footer.
-      const html = layout === 'none' ? body : wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact, logoUrl: req.logo_url, accent: req.accent, replyHint: !!req.reply_to, preheader })
+      const html = layout === 'none' ? body : wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact, accent: req.accent, replyHint: !!req.reply_to, preheader })
       ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html, replyTo: req.reply_to, inReplyTo: req.in_reply_to })
     } else if (req.channel === 'sms') {
       // The tenant's provider policy decides; a tenant on AWS never falls back to Twilio.

@@ -41,7 +41,6 @@ export const SendMessageRequest = z
     brand: z.string().max(120).optional(),
     kicker: z.string().max(120).optional(),
     footer_contact: z.string().max(200).optional(),
-    logo_url: z.string().url().max(500).optional(), // email: the store's logo for the header
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), // email: the store's button/link colour
     // WhatsApp templates with an image header / link button: pass full URLs, the service fills their {{n}}.
     media_url: z.string().url().optional(),

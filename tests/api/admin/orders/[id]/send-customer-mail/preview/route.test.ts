@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/catalog/brand', () => ({
-  storeMailTheme: vi.fn(async () => ({ logoUrl: 'https://cdn.example/logo.png', accent: '#0f766e' })),
+  storeMailTheme: vi.fn(async () => ({ accent: '#0f766e' })),
 }))
 vi.mock('@/lib/email', () => ({
   adminContactHtml: vi.fn(async (subject: string, body: string) => `<!DOCTYPE html><html><head></head><body><!--mail-brand--><b>Acme</b><!--/mail-brand--><h1>${subject}</h1>${body}</body></html>`),
@@ -54,7 +54,7 @@ describe('POST /api/admin/orders/[id]/send-customer-mail/preview', () => {
     const json = await res.json()
     expect(json.subject).toBe('Order 1001')
     expect(json.html).toContain('<p>Hi Alice</p>')
-    expect(json.html).toContain('logo.png')
+    expect(json.html).not.toContain('<img')
     expect(json.html).toContain('#0f766e')
     expect(json.missing).toEqual([])
   })
