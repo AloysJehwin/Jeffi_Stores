@@ -96,6 +96,9 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'support/sessions/[sessionId]/translate',
   // The member's own chat language, like their own session or MFA.
   'support/preferences',
+  // Approving a customer's reply: decideAsAdmin checks the scenario's record :write scope
+  // (orders, quotations, invoices, business_rfqs, subscriptions) before acting.
+  'replies/actions/[id]',
 ])
 
 function mutatingRoutesWithoutWriteScope(): string[] {

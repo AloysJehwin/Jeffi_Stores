@@ -125,7 +125,7 @@ describe('POST /api/webhooks/twilio — WhatsApp', () => {
     const res = await POST(makeReq({ From: WA_FROM, To: WA_TO, Body: 'my order is late', MessageSid: 'SM1', ProfileName: 'Ravi' }))
     await expectEmptyTwiml(res)
     expect(mockInbound).toHaveBeenCalledWith({ provider: 'twilio', providerSid: 'SM1', from: WA_FROM, to: WA_TO, text: 'my order is late', profileName: 'Ravi', media: [] })
-    expect(mockOnCustomer).toHaveBeenCalledWith(SESSION, MESSAGE)
+    expect(mockOnCustomer).toHaveBeenCalledWith(SESSION, MESSAGE, { phone: WA_FROM, repliedToSid: null })
     expect(mockRunWith).not.toHaveBeenCalled()
     expect(mockLog).not.toHaveBeenCalled()
   })
