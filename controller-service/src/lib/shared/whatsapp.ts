@@ -137,6 +137,12 @@ export async function sendVariantChangeRequestedWhatsApp(p: { phone?: string | n
   return sendBySlug(p.phone, 'order/variant-change-requested', { '1': p.orderNumber, '2': p.url }, p.entity?.entityId)
 }
 
+export async function sendItemUnavailableWhatsApp(p: { phone?: string | null; orderNumber: string; item: string }): Promise<boolean> {
+  // Meta rejects a parameter with newlines, tabs or more than 4 spaces in a row.
+  const item = p.item.replace(/[\r\n\t]+/g, ' ').replace(/ {4,}/g, '   ').trim().slice(0, 80)
+  return sendBySlug(p.phone, 'order/out-of-stock', { '1': p.orderNumber, '2': item })
+}
+
 // Free-text WA (24h customer-service window) — bypasses templates; used for support replies.
 export async function sendFreeTextWhatsApp(params: {
   phone?: string | null
