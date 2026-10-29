@@ -7,6 +7,7 @@ import { messagingGateAllows, debitMessageEstimate } from '@/lib/shared/messagin
 import { estimateFor } from '@/lib/shared/messaging/pricing'
 import { sendByTemplate } from '@/lib/shared/send-by-template'
 import type { OutboundMedia } from '@/lib/shared/messaging/types'
+import { currentReplyScope } from '@/lib/replies/scope'
 
 // WhatsApp wrappers now dispatch via sendByTemplate (slug → messaging-service).
 // Variable numbering must match the Meta-approved Twilio Content templates (see seed/catalog.ts).
@@ -37,7 +38,24 @@ async function sendBySlug(
   if (!normalized) return false
   if (!(await whatsappChannelEnabled())) return false
   const res = await sendByTemplate({ channel: 'whatsapp', slug, to: normalized, variables, reference })
-  return res.status !== 'failed' && res.status !== 'skipped'
+  const ok = res.status !== 'failed' && res.status !== 'skipped'
+  if (res.status !== 'skipped') {
+    const scope = currentReplyScope()
+    logMessage({
+      channel: 'whatsapp',
+      to: normalized,
+      from: 'messaging-service',
+      body: res.body ?? `[${slug}]`,
+      kind: slug.startsWith('otp/') ? 'otp' : slug,
+      status: ok ? 'sent' : 'failed',
+      error: res.error,
+      providerSid: res.providerSid ?? null,
+      provider: 'messaging-service',
+      entityType: scope?.entityType,
+      entityId: scope?.entityId,
+    })
+  }
+  return ok
 }
 
 export async function sendOTPWhatsApp(p: { phone?: string | null; otp: string }): Promise<boolean> {

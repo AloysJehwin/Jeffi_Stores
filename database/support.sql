@@ -24,7 +24,11 @@ CREATE TABLE public.support_messages (
     read_at timestamp with time zone,
     provider character varying(16),
     provider_sid character varying(128),
-    error text
+    error text,
+    reply_context_id uuid,
+    entity_type character varying(32),
+    entity_id uuid,
+    email_message_id character varying(255)
 );
 
 
@@ -104,5 +108,13 @@ CREATE TABLE public.support_ai_actions (
     status character varying(12) DEFAULT 'pending'::character varying NOT NULL,
     result jsonb,
     created_at timestamp with time zone DEFAULT now(),
-    decided_at timestamp with time zone
+    decided_at timestamp with time zone,
+    awaiting character varying(10) DEFAULT 'customer'::character varying NOT NULL,
+    context_id uuid,
+    entity_type character varying(32),
+    entity_id uuid,
+    confidence numeric(4,3),
+    reading text,
+    decided_by_admin_id uuid,
+    auto_applied boolean DEFAULT false NOT NULL
 );

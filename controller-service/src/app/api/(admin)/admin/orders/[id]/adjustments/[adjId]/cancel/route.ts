@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
+import { closeReplyContexts } from '@/lib/replies/context'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,5 +19,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     [adjId, orderId]
   )
   if (!row) return NextResponse.json({ error: 'This change can no longer be cancelled.' }, { status: 409 })
+  await closeReplyContexts('orders', orderId, 'order_adjustment')
   return NextResponse.json({ success: true })
 }

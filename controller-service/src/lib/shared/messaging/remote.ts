@@ -14,6 +14,7 @@ export async function remoteSend(req: {
   provider_ref?: string
   variables?: Record<string, string>
   reference?: string
+  reply_to?: string
   metadata?: Record<string, unknown>
 }): Promise<{ ok: boolean; id?: string; providerRef?: string; error?: string }> {
   const tenantId = await resolveTenantId()

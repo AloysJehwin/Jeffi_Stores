@@ -22,11 +22,15 @@ export interface ActionRow {
   id: string
   session_id: string
   message_id: string | null
-  kind: Proposal['kind']
+  kind: Proposal['kind'] | 'reply'
   args: Record<string, any>
   status: ConfirmPayload['status']
   result: Record<string, any> | null
   created_at: string
+  /** Set on replies to something the store asked (lib/replies). */
+  context_id?: string | null
+  entity_type?: string | null
+  entity_id?: string | null
 }
 
 export async function createAction(sessionId: string, p: Proposal): Promise<ActionRow> {
@@ -67,7 +71,7 @@ export async function getAction(id: string): Promise<ActionRow | null> {
 export type DecideResult = { ok: true; action: ActionRow } | { ok: false; status: number; error: string }
 
 /** The customer tapped Confirm or Decline (or replied YES/NO on WhatsApp). */
-export async function decideAction(actionId: string, sessionId: string, decision: 'confirm' | 'decline'): Promise<DecideResult> {
+export async function decideAction(actionId: string, sessionId: string, decision: 'confirm' | 'decline', customerMessageId?: string): Promise<DecideResult> {
   const a = await getAction(actionId)
   if (!a || a.session_id !== sessionId) return { ok: false, status: 404, error: 'Not found' }
   if (a.status !== 'pending') return { ok: false, status: 409, error: 'This was already answered' }
@@ -82,10 +86,14 @@ export async function decideAction(actionId: string, sessionId: string, decision
     [actionId, decision === 'confirm' ? 'confirmed' : 'declined']
   )
   if (!claimed) return { ok: false, status: 409, error: 'This was already answered' }
+  const link = claimed.context_id ? { replyContextId: claimed.context_id, entityType: claimed.entity_type, entityId: claimed.entity_id } : null
+  if (link && customerMessageId) {
+    await query(`UPDATE support_messages SET reply_context_id = $2, entity_type = $3, entity_id = $4 WHERE id = $1`, [customerMessageId, link.replyContextId, link.entityType, link.entityId])
+  }
 
   if (decision === 'decline') {
     await settle(claimed, session, 'declined', null)
-    await say(session, 'No problem, I have left it as it is. Anything else I can help with?')
+    await say(session, 'No problem, I have left it as it is. Anything else I can help with?', link)
     return { ok: true, action: claimed }
   }
 
@@ -94,7 +102,7 @@ export async function decideAction(actionId: string, sessionId: string, decision
     ? await runWithAuditActor(`customer:${userId}`, () => execute(claimed, userId)).catch(err => ({ ok: false as const, text: err instanceof Error ? err.message : 'Something went wrong' }))
     : { ok: false as const, text: 'This chat is not linked to an account.' }
   const done = await settle(claimed, session, outcome.ok ? 'done' : 'failed', outcome)
-  await say(session, outcome.ok ? outcome.text : `I couldn't do that: ${outcome.text}`)
+  await say(session, outcome.ok ? outcome.text : `I couldn't do that: ${outcome.text}`, link)
   if (outcome.ok && userId) {
     logActivity({ userId, kind: 'support_message', referenceId: session.id, referenceType: 'support_sessions', summary: `Support assistant: ${claimed.kind.replace(/_/g, ' ')} confirmed`, metadata: { actionId, ...claimed.args } }).catch(() => {})
   }
@@ -110,14 +118,19 @@ async function settle(a: ActionRow, s: SessionRow, status: ConfirmPayload['statu
   return row
 }
 
-/** An assistant message in the customer's language. */
-async function say(s: SessionRow, english: string): Promise<void> {
+/** An assistant message in the customer's language, tied to the record a reply was about. */
+async function say(s: SessionRow, english: string, link?: { replyContextId: string; entityType?: string | null; entityId?: string | null } | null): Promise<void> {
   const lang = s.customer_lang && s.customer_lang !== 'en' ? s.customer_lang : null
   const text = lang ? ((await translateOne(english, lang, 'en')) ?? english) : english
-  await postMessage({ session: s, sender: 'ai', text, lang: lang ?? 'en', translations: lang ? { en: english } : {} })
+  await postMessage({ session: s, sender: 'ai', text, lang: lang ?? 'en', translations: lang ? { en: english } : {}, ...(link ?? {}) })
 }
 
 async function execute(a: ActionRow, userId: string): Promise<{ ok: boolean; text: string }> {
+  if (a.kind === 'reply') {
+    // A reading of the customer's WhatsApp/email reply they've now confirmed (lib/replies).
+    const { runReplyAction } = await import('@/lib/replies/execute')
+    return runReplyAction(a as any, { userId })
+  }
   const args = a.args
   if (a.kind === 'cancel_order') {
     const r = await cancelOrder(String(args.orderId), { reason: 'user_request', expectedUserId: userId })
@@ -157,7 +170,7 @@ async function execute(a: ActionRow, userId: string): Promise<{ ok: boolean; tex
 /** WhatsApp has no buttons: YES/NO answers the newest pending card. */
 export async function pendingActionForReply(sessionId: string): Promise<ActionRow | null> {
   return queryOne<ActionRow>(
-    `SELECT * FROM support_ai_actions WHERE session_id = $1 AND status = 'pending' AND created_at > now() - interval '24 hours'
+    `SELECT * FROM support_ai_actions WHERE session_id = $1 AND status = 'pending' AND awaiting = 'customer' AND created_at > now() - interval '24 hours'
       ORDER BY created_at DESC LIMIT 1`,
     [sessionId]
   )

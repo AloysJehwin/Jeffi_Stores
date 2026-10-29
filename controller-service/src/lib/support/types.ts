@@ -2,7 +2,7 @@
 // mobile app's API layer (which mirrors them).
 
 export type SupportSender = 'customer' | 'admin' | 'ai' | 'bot' | 'system'
-export type SupportChannel = 'web' | 'app' | 'whatsapp'
+export type SupportChannel = 'web' | 'app' | 'whatsapp' | 'email'
 export type SupportHandler = 'ai' | 'human'
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
 export type AttachmentKind = 'image' | 'video' | 'audio' | 'pdf' | 'doc' | 'other'

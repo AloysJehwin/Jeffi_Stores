@@ -60,6 +60,10 @@ export interface FeatureFlags {
   // The admin assistant's floating button on every admin page. Off hides only the button; the
   // header icon still opens the assistant.
   agentDockEnabled: boolean
+  // Customer replies (WhatsApp / email) to a question the store asked are read by the AI and acted on.
+  replyActionsEnabled: boolean
+  // Clear, low-risk answers are applied straight away; off = an admin approves every one.
+  replyAutoApply: boolean
   // Customer subscriptions (Razorpay recurring). On by default; available on every plan.
   subscriptionsEnabled: boolean
 }
@@ -168,6 +172,8 @@ const DEFAULTS: SiteControls = {
     vaultDownloadsEnabled: false,
     subscriptionsEnabled: true,
     agentDockEnabled: true,
+    replyActionsEnabled: true,
+    replyAutoApply: true,
     ondeviceSummaryEnabled:
       envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) ||
       process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
@@ -267,6 +273,9 @@ const KEYS = [
   'feature_digital_products_enabled',
   'feature_vault_downloads_enabled',
   'feature_subscriptions_enabled',
+  'feature_agent_dock_enabled',
+  'feature_reply_actions_enabled',
+  'feature_reply_auto_apply',
   'feature_ondevice_summary_enabled',
   'feature_ondevice_finetune_enabled',
   'feature_ondevice_summary_mobile_enabled',
@@ -454,6 +463,8 @@ export async function getSiteControls(): Promise<SiteControls> {
         vaultDownloadsEnabled: bool('feature_vault_downloads_enabled', d.flags.vaultDownloadsEnabled),
         subscriptionsEnabled: bool('feature_subscriptions_enabled', d.flags.subscriptionsEnabled),
         agentDockEnabled: bool('feature_agent_dock_enabled', d.flags.agentDockEnabled),
+        replyActionsEnabled: bool('feature_reply_actions_enabled', d.flags.replyActionsEnabled),
+        replyAutoApply: bool('feature_reply_auto_apply', d.flags.replyAutoApply),
         ondeviceSummaryEnabled: bool('feature_ondevice_summary_enabled', d.flags.ondeviceSummaryEnabled),
         ondeviceFinetuneEnabled: bool('feature_ondevice_finetune_enabled', d.flags.ondeviceFinetuneEnabled),
         ondeviceSummaryMobileEnabled: bool(

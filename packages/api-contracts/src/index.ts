@@ -33,6 +33,7 @@ export const SendMessageRequest = z
     subject: z.string().max(200).optional(),
     body: z.string().max(20000).optional(),
     from: z.string().optional(),
+    reply_to: z.string().email().max(254).optional(), // email: where the customer's reply goes
     provider_ref: z.string().max(80).optional(), // WhatsApp: a Twilio content SID when not using a stored template
     reference: z.string().max(120).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
@@ -58,6 +59,7 @@ export const Message = z.object({
   template: z.string().nullable(),
   status: MessageStatus,
   provider_ref: z.string().nullable(),
+  body: z.string().optional(),
   price_inr: z.number(),
   charged_inr: z.number(),
   error: z.string().nullable(),

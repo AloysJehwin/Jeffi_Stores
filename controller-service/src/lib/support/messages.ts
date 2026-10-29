@@ -39,6 +39,11 @@ export interface PostInput {
   providerSid?: string | null
   /** Skip outbound delivery (WhatsApp relay, emails) — e.g. a message that arrived from WhatsApp. */
   inbound?: boolean
+  /** The record this message is about (a reply to an order, quotation...). */
+  replyContextId?: string | null
+  entityType?: string | null
+  entityId?: string | null
+  emailMessageId?: string | null
 }
 
 const MESSAGE_SELECT = `
@@ -138,8 +143,9 @@ export async function postMessage(input: PostInput): Promise<SupportMessage> {
   const channel = input.channel ?? s.channel
   const row = await queryOne<{ id: string; inserted: boolean }>(
     `INSERT INTO support_messages
-       (session_id, sender, message, admin_id, channel, client_id, payload, lang, translations, status, provider, provider_sid)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       (session_id, sender, message, admin_id, channel, client_id, payload, lang, translations, status, provider, provider_sid,
+        reply_context_id, entity_type, entity_id, email_message_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      ON CONFLICT (session_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
      RETURNING id, (xmax = 0) AS inserted`,
     [
@@ -155,6 +161,10 @@ export async function postMessage(input: PostInput): Promise<SupportMessage> {
       input.status ?? 'sent',
       input.provider ?? null,
       input.providerSid ?? null,
+      input.replyContextId ?? null,
+      input.entityType ?? null,
+      input.entityId ?? null,
+      input.emailMessageId ?? null,
     ]
   )
   if (!row) throw new Error('support message insert failed')

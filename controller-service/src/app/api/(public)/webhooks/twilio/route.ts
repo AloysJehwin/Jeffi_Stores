@@ -59,7 +59,8 @@ async function handle(params: Record<string, string>): Promise<void> {
     const n = Math.min(Number(params.NumMedia) || 0, 10)
     const media = Array.from({ length: n }, (_, i) => ({ ref: params[`MediaUrl${i}`], mime: params[`MediaContentType${i}`] || '' })).filter(m => m.ref)
     const r = await handleInboundWhatsApp({ provider: 'twilio', providerSid: sid, from, to, text: body, profileName: params.ProfileName || null, media })
-    if (r) await onCustomerMessage(r.session, r.message)
+    // A swipe-reply quotes the message it answers, which ties it to that order or quotation.
+    if (r) await onCustomerMessage(r.session, r.message, { repliedToSid: params.OriginalRepliedMessageSid || null, phone: from })
     return
   }
 

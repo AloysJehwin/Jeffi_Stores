@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bot, Globe, MessageSquareText, Smartphone, Sparkles, Undo2, UserRoundCheck, X } from 'lucide-react'
+import { Bot, Globe, Mail, MessageSquareText, Smartphone, Sparkles, Undo2, UserRoundCheck, X } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
@@ -40,8 +40,8 @@ const QUICK_REPLIES = [
   { category: 'Closing', replies: ['Is there anything else I can help you with?', 'Thank you for contacting {store} support. Have a great day!'] },
 ]
 
-export const CHANNEL_ICON: Record<SupportChannel, typeof Globe> = { web: Globe, app: Smartphone, whatsapp: MessageSquareText }
-export const CHANNEL_LABEL: Record<SupportChannel, string> = { web: 'Website', app: 'App', whatsapp: 'WhatsApp' }
+export const CHANNEL_ICON: Record<SupportChannel, typeof Globe> = { web: Globe, app: Smartphone, whatsapp: MessageSquareText, email: Mail }
+export const CHANNEL_LABEL: Record<SupportChannel, string> = { web: 'Website', app: 'App', whatsapp: 'WhatsApp', email: 'Email' }
 
 function QuickReplies({ onPick }: { onPick: (t: string) => void }) {
   const [open, setOpen] = useState(false)
