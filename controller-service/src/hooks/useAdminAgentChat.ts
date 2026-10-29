@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import type { UiBlock } from '@/components/admin/AdminAgentBlocks'
 import type { PageContext } from '@/lib/admin-agent/conversations'
 import { announceAgentChange } from '@/lib/client/agent-events'
+import { ATTACHMENT_PROMPT, MAX_ATTACHMENT_BYTES, resolveMime, unsupportedMessage } from '@/lib/admin-agent/file-types'
 
 // Admin agent chat state, one instance for the whole admin panel (AdminAgentContext). Talks to
 // /api/admin/agent/chat over SSE: text deltas, tool steps, ui blocks and actions stream in,
@@ -198,14 +199,13 @@ export function useAdminAgentChat() {
   function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    if (f.size > 5 * 1024 * 1024) {
-      showToast('File too large (max 5MB)', 'error')
+    if (f.size > MAX_ATTACHMENT_BYTES) {
+      showToast(`File too large (max ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB)`, 'error')
       e.target.value = ''
       return
     }
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-    if (!allowed.includes(f.type)) {
-      showToast('Only JPG, PNG, WEBP, or PDF files are supported', 'error')
+    if (!resolveMime(f.name, f.type)) {
+      showToast(unsupportedMessage(f.type), 'error')
       e.target.value = ''
       return
     }
@@ -503,19 +503,16 @@ export function useAdminAgentChat() {
       if (!attId) return
     }
 
-    const fileNote = pendingFile ? ` [attachment_id=${attId} filename="${pendingFile.name}" mime=${pendingFile.type}]` : ''
-    const finalUserText =
-      (trimmed ||
-        (hasFile
-          ? `Process the attached ${pendingFile?.type.startsWith('image/') ? 'image' : 'PDF'} as a quotation request.`
-          : '')) + fileNote
-    const displayContent = trimmed || `📎 ${pendingFile?.name || 'attachment'}`
+    const fileNote = pendingFile
+      ? ` [attachment_id=${attId} filename="${pendingFile.name}" mime=${resolveMime(pendingFile.name, pendingFile.type) ?? pendingFile.type}]`
+      : ''
+    const finalUserText = (trimmed || (hasFile ? ATTACHMENT_PROMPT : '')) + fileNote
 
     const assistantId = uid()
-    if (!convRef.current) setInfo({ ...NEW_CHAT, title: displayContent.slice(0, 160) })
+    if (!convRef.current) setInfo({ ...NEW_CHAT, title: (trimmed || pendingFile?.name || 'Attachment').slice(0, 160) })
     setTurns(t => [
       ...t,
-      { id: uid(), role: 'user', content: displayContent },
+      { id: uid(), role: 'user', content: finalUserText },
       { id: assistantId, role: 'assistant', content: '', streaming: true, timeline: [] },
     ])
     setInput('')

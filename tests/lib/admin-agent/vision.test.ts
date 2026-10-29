@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('pdf-to-img', () => ({
-  pdf: vi.fn(),
+vi.mock('@/lib/admin-agent/pdf', () => ({
+  pdfPageImages: vi.fn(async function* () {}),
+  pdfText: vi.fn(),
 }))
 vi.mock('@/lib/shared/ai-client', () => ({ aiVision: vi.fn() }))
 vi.mock('@/lib/catalog/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
 
 import { ocrImage, ocrPdfPages, isVisionConfigured } from '@/lib/admin-agent/vision'
-import * as pdfToImg from 'pdf-to-img'
+import * as pdf from '@/lib/admin-agent/pdf'
 import { aiVision } from '@/lib/shared/ai-client'
 
 const mockAiVision = vi.mocked(aiVision)
@@ -50,7 +51,7 @@ describe('vision', () => {
       mockAiVision.mockResolvedValueOnce({ ok: true, text: 'Hello from PaddleOCR', model: 'PP-OCRv5' })
       const imageBuffer = Buffer.from('fake-image')
 
-      const result = await ocrImage(imageBuffer, 'image/jpeg')
+      const result = await ocrImage(imageBuffer)
       expect(result.ok).toBe(true)
       expect((result as any).text).toBe('Hello from PaddleOCR')
       expect((result as any).model).toBe('PP-OCRv5')
@@ -69,7 +70,7 @@ describe('vision', () => {
         hint: 'retry later',
       })
 
-      const result = await ocrImage(Buffer.from('fake-image'), 'image/png')
+      const result = await ocrImage(Buffer.from('fake-image'))
       expect(result.ok).toBe(false)
       expect((result as any).reason).toBe('vision model down')
       expect((result as any).hint).toBe('retry later')
@@ -78,7 +79,7 @@ describe('vision', () => {
     it('treats NO_ITEMS_FOUND as no quotation items', async () => {
       mockAiVision.mockResolvedValueOnce({ ok: true, text: '  NO_ITEMS_FOUND  ', model: 'm' })
 
-      const result = await ocrImage(Buffer.from('fake-image'), 'image/jpeg')
+      const result = await ocrImage(Buffer.from('fake-image'))
       expect(result.ok).toBe(false)
       expect((result as any).reason).toMatch(/no quotation items/i)
     })
@@ -92,13 +93,13 @@ describe('vision', () => {
         json: async () => ({ ok: false, text: '' }),
       })
 
-      const result = await ocrImage(imageBuffer, 'image/jpeg')
+      const result = await ocrImage(imageBuffer)
       expect(typeof (result as any).ok).toBe('boolean')
     })
 
     it('returns empty string when no vision provider configured', async () => {
       const imageBuffer = Buffer.from('fake')
-      const result = await ocrImage(imageBuffer, 'image/jpeg')
+      const result = await ocrImage(imageBuffer)
       expect((result as any).ok).toBe(false)
     })
 
@@ -112,7 +113,7 @@ describe('vision', () => {
         json: async () => ({ message: { content: 'fallback text' } }),
       })
 
-      const result = await ocrImage(imageBuffer, 'image/jpeg')
+      const result = await ocrImage(imageBuffer)
       expect(typeof (result as any).ok).toBe('boolean')
     })
   })
@@ -131,18 +132,14 @@ describe('vision', () => {
       expect(typeof (result as any).ok).toBe('boolean')
     })
 
-    it('falls back to pdf-to-img + per-page ocrImage when PaddleOCR fails', async () => {
+    it('rasterizes the pages and OCRs each one when PaddleOCR fails', async () => {
       process.env.PADDLE_OCR_URL = 'http://paddle:8866'
       const pdfBuffer = Buffer.from('%PDF-fake')
 
       const fakePageBuffer = Buffer.from('fake-page-image')
-      const mockPdfIterator = {
-        [Symbol.asyncIterator]: async function* () {
-          yield fakePageBuffer
-        },
-      }
-
-      vi.mocked(pdfToImg.pdf).mockResolvedValueOnce(mockPdfIterator as any)
+      vi.mocked(pdf.pdfPageImages).mockImplementationOnce(async function* () {
+        yield fakePageBuffer
+      })
 
       mockFetch.mockRejectedValueOnce(new Error('paddle down')).mockResolvedValueOnce({
         ok: true,

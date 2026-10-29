@@ -113,10 +113,10 @@ describe('POST /api/admin/agent/upload', () => {
     expect(body.error).toMatch(/empty file|file field is required/i)
   })
 
-  it('returns 413 when file exceeds 5MB', async () => {
+  it('returns 413 when file exceeds 10MB', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const bigFile = makeFile('big.jpg', 'image/jpeg', 6 * 1024 * 1024)
+    const bigFile = makeFile('big.jpg', 'image/jpeg', 11 * 1024 * 1024)
     const res = await POST(makeRequestWithFile(bigFile))
     expect(res.status).toBe(413)
     const body = await res.json()
@@ -126,11 +126,11 @@ describe('POST /api/admin/agent/upload', () => {
   it('returns 415 for unsupported MIME type', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const txtFile = makeFile('doc.txt', 'text/plain', 100)
-    const res = await POST(makeRequestWithFile(txtFile))
+    const clip = makeFile('voice.mp3', 'audio/mpeg', 100)
+    const res = await POST(makeRequestWithFile(clip))
     expect(res.status).toBe(415)
     const body = await res.json()
-    expect(body.error).toMatch(/unsupported file type/i)
+    expect(body.error).toMatch(/cannot listen to audio/i)
   })
 
   it('returns 500 when DB insert fails', async () => {
