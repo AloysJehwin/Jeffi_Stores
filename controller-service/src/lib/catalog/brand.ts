@@ -204,6 +204,17 @@ export async function storeContactLine(): Promise<string> {
   }
 }
 
+/** The store's logo and email accent colour, applied to outgoing mail (see applyMailTheme). */
+export async function storeMailTheme(): Promise<{ logoUrl: string; accent: string }> {
+  try {
+    const { getStoreIdentity } = await import('@/lib/catalog/site-controls')
+    const id = await getStoreIdentity()
+    return { logoUrl: id.logoUrl ?? '', accent: id.emailAccent ?? '' }
+  } catch {
+    return { logoUrl: '', accent: '' }
+  }
+}
+
 /**
  * Physical address for a mail footer. A tenant's customers were shown the platform's Raipur
  * address baked into the template; a tenant that has set none gets an empty string rather than

@@ -21,6 +21,7 @@
     "@aws-sdk/client-socialmessaging": "3.1071.0",
     "@fastify/formbody": "^8.0.2",
     "@jeffi/api-contracts": "*",
+    "@jeffi/mail-shell": "*",
     "@jeffi/bulk": "*",
     "@jeffi/pricing": "*",
     "@jeffi/push": "*",

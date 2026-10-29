@@ -192,6 +192,13 @@ export default async function SiteControlsPage() {
                         initial={c.identity.web}
                         placeholder="jeffistores.in"
                       />
+                      <TextControl
+                        settingKey="business_email_accent"
+                        label="Email accent colour"
+                        hint="Buttons and links in every email; the logo above heads them."
+                        type="color"
+                        initial={c.identity.emailAccent || '#2563eb'}
+                      />
                     </SectionCard>
                   </div>
                   <div>

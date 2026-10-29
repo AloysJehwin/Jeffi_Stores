@@ -227,7 +227,6 @@ export async function sendAdminContactEmail(
       `,
       content: `<div class="message-box">${messageHtml}</div>`,
       footerLines: [
-        `This message was sent by the ${brand} team. Please do not reply directly to this email.`,
         address,
         contactLine,
       ],
@@ -365,7 +364,6 @@ export async function sendAgentConnectedEmail(
         <div class="cta"><a href="${chatLink}" class="button">Return to Chat</a></div>
         <p class="muted">If you no longer need assistance, you can close the chat from the support page.</p>
       `,
-      footerLines: [`${brand} Support — do not reply to this email.`],
     }),
   }
 

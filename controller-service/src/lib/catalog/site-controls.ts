@@ -15,6 +15,7 @@ export interface StoreIdentity {
   phone: string
   web: string
   logoUrl: string // '' means "no logo" — render the store name as text
+  emailAccent: string // '#rrggbb' for email buttons and links; '' keeps the default blue
 }
 
 export interface FeatureFlags {
@@ -154,6 +155,7 @@ const DEFAULTS: SiteControls = {
     phone: '+91 96853 54099',
     web: 'jeffistores.in',
     logoUrl: '',
+    emailAccent: '',
   },
   flags: {
     // Preserve current env-driven behavior when the DB key is unset.
@@ -259,6 +261,7 @@ const KEYS = [
   'business_phone',
   'business_web',
   'business_logo_url',
+  'business_email_accent',
   'feature_razorpay_enabled',
   'feature_cod_enabled',
   'feature_gst_enabled',
@@ -401,6 +404,7 @@ async function identityDefaults(): Promise<StoreIdentity> {
     phone: '',
     web: `${slug}.${domain}`,
     logoUrl: '',
+    emailAccent: '',
   }
 }
 
@@ -446,6 +450,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         phone: str('business_phone', id.phone),
         web: str('business_web', id.web),
         logoUrl: str('business_logo_url', id.logoUrl),
+        emailAccent: str('business_email_accent', id.emailAccent),
       },
       flags: {
         razorpayEnabled: bool('feature_razorpay_enabled', d.flags.razorpayEnabled),

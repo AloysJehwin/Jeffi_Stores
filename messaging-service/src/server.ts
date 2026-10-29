@@ -354,7 +354,7 @@ app.post<{ Body: { channel: string; slug: string; locale?: string; versionId?: s
     const subject = t.version.subject ? renderVars(t.version.subject, vars) : null
     let body = renderVars(t.version.body, vars, isEmail)
     const b = req.body as any
-    if (isEmail && t.version.layout !== 'none') body = wrapEmail(body, { brand: b.brand ?? req.claims.tenantSlug, kicker: b.kicker, footerContact: b.footer_contact })
+    if (isEmail && t.version.layout !== 'none') body = wrapEmail(body, { brand: b.brand ?? req.claims.tenantSlug, kicker: b.kicker, footerContact: b.footer_contact, logoUrl: b.logo_url, accent: b.accent })
     return { channel: t.template.channel, subject, body, missing, sampled: missing }
   }
 )
