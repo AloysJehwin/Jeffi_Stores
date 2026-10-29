@@ -19,7 +19,7 @@ RULE=customer-replies
 ZONE=$(aws route53 list-hosted-zones-by-name --dns-name "$DOMAIN" --query 'HostedZones[0].Id' --output text | sed 's#/hostedzone/##')
 
 echo "Receiving domain: $SUB  (region $REGION, account $ACCOUNT)"
-echo "Bucket:   $BUCKET $(aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null && echo '(exists)' || echo '(missing)')"
+echo "Bucket:   $BUCKET $(aws s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1 && echo '(exists)' || echo '(missing)')"
 ACTIVE=$(aws ses describe-active-receipt-rule-set --region "$REGION" --query Metadata.Name --output text 2>/dev/null || true)
 [ "$ACTIVE" = "None" ] && ACTIVE=
 echo "Active receipt rule set: ${ACTIVE:-none}"
@@ -33,7 +33,7 @@ if [ "${1:-}" != "--apply" ]; then
   exit 0
 fi
 
-if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+if ! aws s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1; then
   if [ "$REGION" = us-east-1 ]; then aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" >/dev/null
   else aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" --create-bucket-configuration LocationConstraint="$REGION" >/dev/null; fi
 fi
