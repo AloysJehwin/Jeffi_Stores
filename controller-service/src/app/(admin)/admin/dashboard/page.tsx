@@ -234,6 +234,14 @@ export default async function AdminDashboard() {
     },
     {
       group: 'Customers',
+      label: 'customer replies awaiting approval',
+      count: a.replyApprovals,
+      tone: 'red',
+      path: '/admin/support?filter=approval',
+      scope: 'customers:read',
+    },
+    {
+      group: 'Customers',
       label: 'open support chats',
       count: a.supportOpen,
       tone: 'amber',

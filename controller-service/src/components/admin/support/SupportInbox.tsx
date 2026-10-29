@@ -7,9 +7,10 @@ import { ago, previewOf } from '@/components/chat/format'
 import type { SupportChannel, SupportEvent, SupportSession } from '@/lib/support/types'
 import SupportConversation, { CHANNEL_ICON, CHANNEL_LABEL } from './SupportConversation'
 
-type Filter = 'needs_human' | 'mine' | 'ai' | 'open' | 'closed'
+type Filter = 'needs_human' | 'approval' | 'mine' | 'ai' | 'open' | 'closed'
 const TABS: Array<{ key: Filter; label: string }> = [
   { key: 'needs_human', label: 'Needs a person' },
+  { key: 'approval', label: 'Needs approval' },
   { key: 'mine', label: 'Mine' },
   { key: 'ai', label: 'Assistant' },
   { key: 'open', label: 'All open' },
@@ -24,14 +25,15 @@ function fits(s: SupportSession, f: Filter, me: string | null) {
   if (f === 'closed') return s.status === 'closed'
   if (s.status !== 'open') return false
   if (f === 'needs_human') return needsHuman(s)
+  if (f === 'approval') return (s.approvals ?? 0) > 0
   if (f === 'mine') return !!me && s.assignedAdminId === me
   if (f === 'ai') return s.handler === 'ai'
   return true
 }
 
 /** The support inbox: every conversation, the ones needing a person first, and the open one beside it. */
-export default function SupportInbox({ initialId, me }: { initialId?: string | null; me: string | null }) {
-  const [filter, setFilter] = useState<Filter>('open')
+export default function SupportInbox({ initialId, initialFilter, me }: { initialId?: string | null; initialFilter?: Filter | null; me: string | null }) {
+  const [filter, setFilter] = useState<Filter>(initialFilter ?? 'open')
   const [channel, setChannel] = useState<SupportChannel | ''>('')
   const [q, setQ] = useState('')
   const [sessions, setSessions] = useState<SupportSession[]>([])
@@ -65,8 +67,8 @@ export default function SupportInbox({ initialId, me }: { initialId?: string | n
   useEffect(() => {
     if (landed.current || !counts.open) return
     landed.current = true
-    if ((counts.needs_human ?? 0) > 0 && !initialId) setFilter('needs_human')
-  }, [counts, initialId])
+    if ((counts.needs_human ?? 0) > 0 && !initialId && !initialFilter) setFilter('needs_human')
+  }, [counts, initialId, initialFilter])
 
   useEffect(() => {
     const t = setInterval(() => tick(x => x + 1), 30_000)
@@ -182,7 +184,7 @@ export default function SupportInbox({ initialId, me }: { initialId?: string | n
               >
                 {t.label}
                 {t.key !== 'closed' && (counts[t.key] ?? 0) > 0 && (
-                  <span className={`rounded-full px-1.5 text-[10px] font-bold ${filter === t.key ? 'bg-white/25' : t.key === 'needs_human' ? 'bg-red-500 text-white' : 'bg-surface text-foreground-muted'}`}>
+                  <span className={`rounded-full px-1.5 text-[10px] font-bold ${filter === t.key ? 'bg-white/25' : t.key === 'needs_human' || t.key === 'approval' ? 'bg-red-500 text-white' : 'bg-surface text-foreground-muted'}`}>
                     {counts[t.key]}
                   </span>
                 )}
@@ -190,7 +192,7 @@ export default function SupportInbox({ initialId, me }: { initialId?: string | n
             ))}
           </div>
           <div className="flex gap-1">
-            {(['', 'web', 'app', 'whatsapp'] as const).map(c => (
+            {(['', 'web', 'app', 'whatsapp', 'email'] as const).map(c => (
               <button
                 key={c || 'all'}
                 type="button"
@@ -254,6 +256,9 @@ export default function SupportInbox({ initialId, me }: { initialId?: string | n
                         <span className="text-[10px] text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-0.5">
                           <UserRound className="w-3 h-3" /> {s.assignedAdminId === me ? 'You' : s.adminName ?? 'Agent'}
                         </span>
+                      )}
+                      {(s.approvals ?? 0) > 0 && (
+                        <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded px-1.5 py-0.5">Needs approval</span>
                       )}
                       {s.ticket && <span className="text-[10px] text-foreground-muted font-mono">{s.ticket}</span>}
                     </span>

@@ -102,6 +102,8 @@ export interface SupportSession {
   handoffAt: string | null
   waWindowExpiresAt: string | null
   unread: number
+  /** Customer replies waiting for an admin's approval. */
+  approvals?: number
   lastMessage?: { sender: SupportSender; text: string; at: string } | null
 }
 
