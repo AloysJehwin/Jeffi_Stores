@@ -637,7 +637,7 @@ export default async function SiteControlsPage() {
                     </SectionCard>
                   </div>
                   <div>
-                    <SectionCard title="Customer replies" description="When the store asks a customer something (order changes, a quotation, a payment), they can answer by replying to the WhatsApp or email." columns>
+                    <SectionCard title="Customer replies" description="When the store asks a customer something (an order change, a quotation or RFQ offer, an invoice or failed payment, a delay or unavailable item, a subscription renewal), they can answer by replying to the WhatsApp or email." columns>
                       <FullSpan>
                         <ToggleControl
                           settingKey="feature_reply_actions_enabled"

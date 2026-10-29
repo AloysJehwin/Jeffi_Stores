@@ -5,9 +5,9 @@ import type { SupportChannel } from '@/lib/support/types'
 
 export const dynamic = 'force-dynamic'
 
-const FILTERS: InboxFilter[] = ['needs_human', 'mine', 'ai', 'open', 'closed']
+const FILTERS: InboxFilter[] = ['needs_human', 'approval', 'mine', 'ai', 'open', 'closed']
 
-// The support inbox: ?filter=needs_human|mine|ai|open|closed, ?channel=, ?q=, ?customerId=.
+// The support inbox: ?filter=needs_human|approval|mine|ai|open|closed, ?channel=, ?q=, ?customerId=.
 export async function GET(request: NextRequest) {
   try {
     const admin = await adminFor(request, 'customers:read', { passive: true })
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       listInbox({
         filter: f && FILTERS.includes(f) ? f : 'open',
         adminId: admin.adminId,
-        channel: channel && ['web', 'app', 'whatsapp'].includes(channel) ? channel : undefined,
+        channel: channel && ['web', 'app', 'whatsapp', 'email'].includes(channel) ? channel : undefined,
         search: sp.get('q')?.trim() || undefined,
         customerId: sp.get('customerId') || undefined,
         limit: Math.min(Number(sp.get('limit')) || 100, 200),

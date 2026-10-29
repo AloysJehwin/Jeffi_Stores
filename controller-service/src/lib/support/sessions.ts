@@ -37,6 +37,7 @@ const iso = (v: unknown): string | null => (v ? new Date(v as string).toISOStrin
 const SESSION_SELECT = `
   SELECT s.*, u.first_name, u.last_name, u.email AS user_email, u.phone AS user_phone,
          (SELECT count(*) FROM support_messages um WHERE um.session_id = s.id AND um.sender = 'customer' AND um.read_at IS NULL)::int AS unread,
+         (SELECT count(*) FROM support_ai_actions a WHERE a.session_id = s.id AND a.status = 'pending' AND a.awaiting = 'admin')::int AS approvals,
          lm.sender AS lm_sender, lm.message AS lm_text, lm.created_at AS lm_at
     FROM support_sessions s
     LEFT JOIN users u ON u.id = s.user_id
@@ -72,6 +73,7 @@ export function toSessionDto(r: any): SupportSession {
     handoffAt: iso(r.handoff_at),
     waWindowExpiresAt: iso(r.wa_window_expires_at),
     unread: Number(r.unread ?? 0),
+    approvals: Number(r.approvals ?? 0),
     lastMessage: r.lm_at ? { sender: r.lm_sender as SupportSender, text: r.lm_text ?? '', at: iso(r.lm_at)! } : null,
   }
 }
@@ -139,7 +141,8 @@ export async function emitSession(id: string): Promise<void> {
   if (dto) await publishSupportEvent({ kind: 'session', sessionId: id, session: dto })
 }
 
-export type InboxFilter = 'needs_human' | 'mine' | 'ai' | 'open' | 'closed'
+/** approval: a customer's reply is waiting for an admin to approve what it asked for. */
+export type InboxFilter = 'needs_human' | 'approval' | 'mine' | 'ai' | 'open' | 'closed'
 
 export async function listInbox(opts: {
   filter: InboxFilter
@@ -159,6 +162,7 @@ export async function listInbox(opts: {
   else {
     where.push(`s.status = 'open'`)
     if (opts.filter === 'needs_human') where.push(`s.handler = 'human' AND s.assigned_admin_id IS NULL`)
+    if (opts.filter === 'approval') where.push(`EXISTS (SELECT 1 FROM support_ai_actions a WHERE a.session_id = s.id AND a.status = 'pending' AND a.awaiting = 'admin')`)
     if (opts.filter === 'mine') where.push(`s.assigned_admin_id = ${p(opts.adminId)}`)
     if (opts.filter === 'ai') where.push(`s.handler = 'ai'`)
   }
@@ -182,14 +186,16 @@ export async function listInbox(opts: {
 export async function inboxCounts(adminId: string): Promise<Record<InboxFilter, number>> {
   const r = await queryOne<Record<string, string>>(
     `SELECT count(*) FILTER (WHERE status = 'open' AND handler = 'human' AND assigned_admin_id IS NULL) AS needs_human,
+            count(*) FILTER (WHERE status = 'open' AND EXISTS (SELECT 1 FROM support_ai_actions a WHERE a.session_id = s.id AND a.status = 'pending' AND a.awaiting = 'admin')) AS approval,
             count(*) FILTER (WHERE status = 'open' AND assigned_admin_id = $1) AS mine,
             count(*) FILTER (WHERE status = 'open' AND handler = 'ai') AS ai,
             count(*) FILTER (WHERE status = 'open') AS open
-       FROM support_sessions`,
+       FROM support_sessions s`,
     [adminId]
   )
   return {
     needs_human: Number(r?.needs_human ?? 0),
+    approval: Number(r?.approval ?? 0),
     mine: Number(r?.mine ?? 0),
     ai: Number(r?.ai ?? 0),
     open: Number(r?.open ?? 0),
