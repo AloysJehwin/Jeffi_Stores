@@ -321,6 +321,7 @@ function TurnView({
         )}
         {turn.proposedActions && turn.proposedActions.length > 0 && (
           <div className={`${text || blocks.length ? 'mt-3' : 'mt-1'} space-y-2`}>
+            <BatchBar turn={turn} chat={chat} approveWrapper={approveWrapper} />
             {turn.proposedActions.map(action => (
               <ProposedActionCard
                 key={action.id}
@@ -336,6 +337,46 @@ function TurnView({
       {!turn.streaming && (turn.content || turn.model) && <TurnMeta turn={turn} />}
     </div>
   )
+}
+
+/** Approve or reject every change still waiting in a turn (e.g. one per row of a list). */
+function BatchBar({
+  turn,
+  chat,
+  approveWrapper,
+}: {
+  turn: ChatTurn
+  chat: AdminAgentChat
+  approveWrapper?: (node: ReactNode) => ReactNode
+}) {
+  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null)
+  const pending = turn.proposedActions?.filter(a => a.status === 'proposed').length ?? 0
+  if (pending < 2 && !busy) return null
+  const run = async (d: 'approve' | 'reject') => {
+    setBusy(d)
+    await chat.decideAll(turn.id, d)
+    setBusy(null)
+  }
+  const bar = (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent-500/40 bg-accent-500/5 px-3 py-2 text-xs">
+      <span className="flex-1 min-w-0 font-medium text-foreground">{busy ? 'Working through the changes…' : `${pending} changes waiting`}</span>
+      <button
+        onClick={() => run('reject')}
+        disabled={!!busy}
+        className="px-2.5 py-1 rounded-md border border-border-default text-foreground hover:bg-surface disabled:opacity-50"
+      >
+        {busy === 'reject' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Reject all'}
+      </button>
+      <button
+        onClick={() => run('approve')}
+        disabled={!!busy}
+        className="px-2.5 py-1 rounded-md bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50"
+      >
+        {busy === 'approve' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Approve all (${pending})`}
+      </button>
+    </div>
+  )
+  return <>{approveWrapper ? approveWrapper(bar) : bar}</>
 }
 
 function TurnMeta({ turn }: { turn: ChatTurn }) {

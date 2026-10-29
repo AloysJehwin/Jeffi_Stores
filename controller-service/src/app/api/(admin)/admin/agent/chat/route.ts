@@ -18,6 +18,7 @@ import { toolAllowed, describeActorCapabilities, type AgentActor } from '@/lib/a
 import { findSimilar } from '@/lib/shared/rag'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { startTurn, type PageContext } from '@/lib/admin-agent/conversations'
+import { MAX_PROPOSALS_PER_TURN, cleanPageContext, pageContextNote, pageTools } from '@/lib/admin-agent/page-context'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -69,7 +70,7 @@ const CORE_TOOLS = new Set([
   'list_admin_tools',
 ])
 
-// Extra tool groups, gated by keywords in the user's message.
+// Extra tool groups, gated by keywords in the user's message (plus the page's own tools, see pageTools).
 const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
   {
     test: /\b(email|campaign|mail|announce|newsletter|audience|subscriber|send|blast|promo)\b/i,
@@ -107,8 +108,8 @@ const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
 
 // Build the native tools array, selecting a query-relevant subset to keep the
 // per-turn prompt small. Falls back to core-only when nothing matches.
-function selectToolNames(userMessage: string): Set<string> {
-  const selected = new Set(CORE_TOOLS)
+function selectToolNames(userMessage: string, extra: string[]): Set<string> {
+  const selected = new Set([...CORE_TOOLS, ...extra])
   for (const g of TOOL_GROUPS) {
     if (g.test.test(userMessage)) for (const t of g.tools) selected.add(t)
   }
@@ -118,8 +119,8 @@ function selectToolNames(userMessage: string): Set<string> {
 const allowedTool = (name: string, actor: AgentActor) => (toolAllowed(name, actor) ? getTool(name) : undefined)
 
 // Only the tools the admin's role and scopes allow are offered at all.
-function buildToolsDef(actor: AgentActor, userMessage?: string): AiToolDef[] {
-  const allow = userMessage ? selectToolNames(userMessage) : null
+function buildToolsDef(actor: AgentActor, userMessage?: string, extra: string[] = []): AiToolDef[] {
+  const allow = userMessage ? selectToolNames(userMessage, extra) : null
   return TOOLS.filter(t => toolAllowed(t.name, actor) && (!allow || allow.has(t.name))).map(t => ({
     type: 'function' as const,
     function: {
@@ -518,26 +519,6 @@ interface TurnContext {
   req: NextRequest
 }
 
-const PAGE_KINDS = new Set(['product', 'order', 'customer', 'invoice', 'quotation', 'coupon', 'supplier', 'rfq', 'category', 'brand', 'campaign'])
-
-function cleanPageContext(pc: unknown): PageContext | null {
-  if (!pc || typeof pc !== 'object') return null
-  const { path, section, entity } = pc as PageContext
-  const out: PageContext = {}
-  if (typeof path === 'string' && /^\/admin(\/[\w\-./]*)?$/.test(path) && path.length <= 200) out.path = path
-  if (typeof section === 'string' && /^[\w\- ]{1,60}$/.test(section)) out.section = section
-  if (entity && PAGE_KINDS.has(entity.kind) && typeof entity.id === 'string' && /^[\w-]{1,64}$/.test(entity.id)) {
-    out.entity = { kind: entity.kind, id: entity.id }
-  }
-  return out.path || out.entity ? out : null
-}
-
-function pageContextNote(pc: PageContext | null): string {
-  if (!pc) return ''
-  const where = pc.entity ? `the ${pc.entity.kind} ${pc.entity.id}${pc.path ? ` (${pc.path})` : ''}` : `${pc.section || 'the page'} (${pc.path})`
-  return `\n\n<page_context>The admin is viewing ${where}. "This" or "here" refers to it unless they say otherwise.</page_context>`
-}
-
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -932,7 +913,8 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
   const latestUser = note ? [...messages].reverse().find(m => m.role === 'user') : undefined
   if (latestUser) latestUser.content += note
 
-  let toolsDef = claude ? [...buildToolsDef(actor), RENDER_UI_TOOL] : buildToolsDef(actor, userMessage)
+  const onPage = pageTools(pageContext)
+  let toolsDef = claude ? [...buildToolsDef(actor), RENDER_UI_TOOL] : buildToolsDef(actor, userMessage, onPage)
   let maxIterations = claude ? CLAUDE_MAX_ITERATIONS : MAX_ITERATIONS
   const toolCallRecords: ToolCallRecord[] = []
   const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
@@ -1000,7 +982,7 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
       // The gateway failed over to Ollama: fall back to the gated tool set and short loop.
       if (claude && r.provider !== 'anthropic') {
         claude = false
-        toolsDef = buildToolsDef(actor, userMessage)
+        toolsDef = buildToolsDef(actor, userMessage, onPage)
         maxIterations = Math.min(maxIterations, iter + MAX_ITERATIONS)
       }
 
@@ -1052,6 +1034,13 @@ async function runTurn(ctx: TurnContext, emit: Emit | null, signal: AbortSignal 
         const tool = getTool(tc.name)
         if (!tool || !toolAllowed(tc.name, actor)) {
           const err = tool ? `${tc.name} is not available to your role (${actor.role})` : `Unknown tool: ${tc.name}`
+          record({ tool: tc.name, input: parsed, output: err, isError: true })
+          toolMessage(tc.id, err)
+          continue
+        }
+
+        if (tool.mutating && proposedActions.length >= MAX_PROPOSALS_PER_TURN) {
+          const err = `Limit reached: ${MAX_PROPOSALS_PER_TURN} changes per answer. Stop proposing; tell the admin to approve these or narrow the list first.`
           record({ tool: tc.name, input: parsed, output: err, isError: true })
           toolMessage(tc.id, err)
           continue

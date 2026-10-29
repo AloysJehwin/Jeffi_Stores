@@ -13,6 +13,8 @@ export interface PageContext {
   path?: string
   section?: string
   entity?: { kind: string; id: string }
+  /** The page's query string (list filters, search), without the leading '?'. */
+  query?: string
 }
 
 export interface ConversationSummary {

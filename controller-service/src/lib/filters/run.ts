@@ -16,7 +16,7 @@ import { withTransaction } from '@/lib/shared/db'
 import { resolveTenant, runWithTenantContext } from '@/lib/tenancy/tenant-context'
 
 // Runs filter queries for the registry: value help under a short statement timeout, capped counts,
-// CSV export.
+// a first page of rows (the admin agent), CSV export.
 
 const VALUES_TIMEOUT = '4s'
 const EXPORT_TIMEOUT = '15s'
@@ -75,6 +75,32 @@ export async function cappedCount(
   const r = await withTimeout(entity.db, '15s', c => c.query<{ n: number }>(cq.sql, cq.params))
   const n = r.rows[0]?.n ?? 0
   return { count: Math.min(n, cap), capped: n > cap }
+}
+
+/** The first `limit` rows the filters match (the export columns), with the count up to `cap`. */
+export async function listRows(
+  entity: FilterEntity,
+  q: FilterQuery,
+  limit: number,
+  cap = 10_000
+): Promise<{ count: number; capped: boolean; rows: Record<string, unknown>[] }> {
+  const ctx = await filterContext(entity, q)
+  const eq = exportQuery(entity, q, { limit, ctx })
+  if (!eq) throw new Error(`${entity.key} has no export`)
+  const [rows, total] = await Promise.all([
+    withTimeout(entity.db, EXPORT_TIMEOUT, c => c.query<Record<string, unknown>>(eq.sql, eq.params).then(r => r.rows)),
+    cappedCount(entity, q, cap, ctx),
+  ])
+  // Keyset columns (__k0…) are paging internals; the last one is the row's id on almost every list.
+  const ks = entity.export!.keyset
+  const idKey = /(^|\.)id$/.test(ks[ks.length - 1]) ? `__k${ks.length - 1}` : null
+  return {
+    ...total,
+    rows: rows.map(r => ({
+      ...(idKey && r[idKey] != null ? { id: String(r[idKey]) } : {}),
+      ...Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith('__'))),
+    })),
+  }
 }
 
 /**

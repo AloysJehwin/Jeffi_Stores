@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import type { UiBlock } from '@/components/admin/AdminAgentBlocks'
 import type { PageContext } from '@/lib/admin-agent/conversations'
+import { announceAgentChange } from '@/lib/client/agent-events'
 
 // Admin agent chat state, one instance for the whole admin panel (AdminAgentContext). Talks to
 // /api/admin/agent/chat over SSE: text deltas, tool steps, ui blocks and actions stream in,
@@ -104,6 +105,14 @@ export interface ConversationInfo {
 const NEW_CHAT: ConversationInfo = { title: null, shared: false, readOnly: false, ownerName: null }
 
 const uid = () => crypto.randomUUID()
+
+/** The page's filters and search, read when a message is sent (the agent's own ?c= left out). */
+function pageQuery(): string | undefined {
+  const sp = new URLSearchParams(window.location.search)
+  sp.delete('c')
+  const q = sp.toString()
+  return q && q.length <= 1000 ? q : undefined
+}
 
 const STATUSES: ActionStatus[] = ['proposed', 'approving', 'approved', 'rejected', 'failed']
 
@@ -343,7 +352,12 @@ export function useAdminAgentChat() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: JSON.stringify({ conversationId: convRef.current, message: userText, retry, pageContext: pageRef.current }),
+        body: JSON.stringify({
+          conversationId: convRef.current,
+          message: userText,
+          retry,
+          pageContext: pageRef.current && { ...pageRef.current, query: pageQuery() },
+        }),
         signal: ac.signal,
       })
       if (!res.ok || !(res.headers.get('content-type') || '').includes('text/event-stream') || !res.body) {
@@ -505,8 +519,15 @@ export function useAdminAgentChat() {
     sendMessage(`Use ${kind} id ${option.id} (${option.label}) for the previous request.`)
   }
 
-  async function decideAction(turnId: string, actionId: string, decision: 'approve' | 'reject') {
-    if (info.readOnly) return
+  /** One decision; `batch` leaves the toast and the page refresh to decideAll. True when it went through. */
+  async function decideAction(
+    turnId: string,
+    actionId: string,
+    decision: 'approve' | 'reject',
+    batch = false
+  ): Promise<boolean> {
+    if (info.readOnly) return false
+    const kind = turns.find(t => t.id === turnId)?.proposedActions?.find(a => a.id === actionId)?.kind ?? ''
     const setStatus = (patch: Partial<ProposedAction>) =>
       patchTurn(turnId, t => ({
         ...t,
@@ -525,11 +546,28 @@ export function useAdminAgentChat() {
         error: data.error,
       })
       if (!res.ok) showToast(data.error || 'Action failed', 'error')
-      else showToast(decision === 'approve' ? 'Action executed' : 'Action rejected', 'success')
+      else if (!batch) {
+        showToast(decision === 'approve' ? 'Action executed' : 'Action rejected', 'success')
+        if (decision === 'approve') announceAgentChange([kind])
+      }
+      return res.ok
     } catch (err: any) {
       setStatus({ status: 'failed', error: err?.message })
       showToast(err?.message || 'Network error', 'error')
+      return false
     }
+  }
+
+  /** Every still-proposed change in a turn, one at a time; stops at the first failure. */
+  async function decideAll(turnId: string, decision: 'approve' | 'reject') {
+    const pending = turns.find(t => t.id === turnId)?.proposedActions?.filter(a => a.status === 'proposed') ?? []
+    let done = 0
+    for (const a of pending) {
+      if (!(await decideAction(turnId, a.id, decision, true))) break
+      done++
+    }
+    if (decision === 'approve' && done) announceAgentChange([...new Set(pending.slice(0, done).map(a => a.kind))])
+    if (done) showToast(`${decision === 'approve' ? 'Approved' : 'Rejected'} ${done} of ${pending.length}`, done === pending.length ? 'success' : 'warning')
   }
 
   return {
@@ -561,6 +599,7 @@ export function useAdminAgentChat() {
     retry,
     pick,
     decideAction,
+    decideAll,
   }
 }
 

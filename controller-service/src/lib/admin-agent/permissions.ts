@@ -117,6 +117,8 @@ export const TOOL_SCOPES: Record<string, string | 'owner'> = {
 
   // Agent itself
   list_admin_tools: 'agent:read',
+  // Each list's own read scope is checked in the tool.
+  get_page_rows: 'agent:read',
   render_ui: 'agent:read',
 
   // No area of their own: they reach any table, file or route

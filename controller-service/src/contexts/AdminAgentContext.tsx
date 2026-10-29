@@ -6,6 +6,7 @@ import { useAdminAgentChat, type AdminAgentChat } from '@/hooks/useAdminAgentCha
 import { ENTITY_ROUTES } from '@/components/admin/agent/format'
 import { ap } from '@/lib/shared/admin-path'
 import { useAdminHost } from './AdminHostContext'
+import { useAgentChanges } from '@/lib/client/agent-events'
 import type { PageContext } from '@/lib/admin-agent/conversations'
 
 // One assistant chat for the whole admin panel: the bottom-right dock and the /admin/agent page share
@@ -78,6 +79,9 @@ export function AdminAgentProvider({
   const [open, setOpen] = useState(false)
   const restored = useRef(false)
   const listed = useRef(false)
+
+  // Server-rendered pages pick up an approved change; client-fetched ones listen themselves.
+  useAgentChanges(() => router.refresh())
 
   const pageContext = useMemo(() => pageContextFor(pathname), [pathname])
   const onAgentPage = pageContext?.path === '/admin/agent'
