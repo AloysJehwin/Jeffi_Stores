@@ -7,6 +7,10 @@ import { getOwnerTenants, listPlans, updateTenantPlan } from '@/lib/tenant-regis
 import { upgradeSubscription, downgradeSubscription, type BillingInterval } from '@/lib/payments/razorpay-subscriptions'
 import { triggerProvisioning } from '@/lib/provisioning/trigger'
 import { dedicatedCapacityError } from '@/lib/k8s/capacity'
+import { computeSpecEnabled, planCompute } from '@/lib/compute/catalog'
+import { legacySpecFor } from '@/lib/compute/legacy'
+import { getTenantCompute } from '@/lib/compute/store'
+import { planCompatibilityError } from '@/lib/compute/validate'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,12 +54,27 @@ export async function POST(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
   const callbackUrl = `${baseUrl}/dashboard/billing?upgraded=1`
 
+  // Owners choose servers separately: the plan only has to allow the ones the store runs (or is moving to).
+  const compute = computeSpecEnabled()
+  if (compute) {
+    const row = await getTenantCompute(tenantId)
+    const spec = row?.desired ?? row?.applied ?? legacySpecFor(tenant.plan)
+    const target = await planCompute(planSlug)
+    const why = target && planCompatibilityError(spec, target)
+    if (why) {
+      return NextResponse.json(
+        { error: `Your servers don't fit the ${newPlan.name} plan: ${why} Change them on the Servers page first.`, code: 'compute' },
+        { status: 409 }
+      )
+    }
+  }
+
   const isUpgrade =
     newTier > currentTier ||
     (newTier === currentTier && billingInterval === 'yearly' && (tenant.billing_interval ?? 'monthly') === 'monthly')
 
   if (isUpgrade) {
-    const capacityError = await dedicatedCapacityError(planSlug)
+    const capacityError = compute ? null : await dedicatedCapacityError(planSlug)
     if (capacityError) return NextResponse.json({ error: capacityError, code: 'capacity' }, { status: 409 })
 
     // Cancel old sub + create new sub immediately with prorated credit.

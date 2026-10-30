@@ -17,6 +17,23 @@ export interface CreateDbInstanceArgs {
   multiAz?: boolean
 }
 
+export interface DbInstanceState {
+  status: string // available, modifying, rebooting, …
+  instanceClass: string
+  storageGb: number
+  multiAz: boolean
+  /** Class, storage or standby changes queued for the maintenance window. */
+  pending: boolean
+}
+
+export interface ModifyDbInstanceArgs {
+  instanceClass?: string
+  storageGb?: number
+  multiAz?: boolean
+  /** false queues the change for the maintenance window; true applies it (and anything queued) now. */
+  applyImmediately: boolean
+}
+
 export interface AppInstanceArgs {
   name: string // jeffi-tenant-{slug} / jeffi-pool
   instanceType: string
@@ -29,6 +46,12 @@ export interface ProvisioningProvider {
 
   /** Create the RDS instance (idempotent). Returns immediately; not yet available. */
   createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string; instanceClass?: string }>
+
+  /** The instance's current shape and whether changes are still pending; null when it does not exist. */
+  describeDbInstance(dbInstanceId: string): Promise<DbInstanceState | null>
+
+  /** Change class / storage / Multi-AZ of a running instance. */
+  modifyDbInstance(dbInstanceId: string, args: ModifyDbInstanceArgs): Promise<void>
 
   /** Poll: is the instance 'available' yet? Returns endpoint when ready, null while pending. */
   getDbEndpoint(dbInstanceId: string): Promise<string | null>

@@ -135,7 +135,7 @@ export async function updateTenantPlan(
   )
 }
 
-export async function setTenantInstanceState(tenantId: string, state: 'running' | 'stopped'): Promise<void> {
+export async function setTenantInstanceState(tenantId: string, state: 'running' | 'stopped' | 'migrating'): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(`UPDATE tenants SET instance_state=$1, updated_at=now() WHERE id=$2`, [state, tenantId])
 }

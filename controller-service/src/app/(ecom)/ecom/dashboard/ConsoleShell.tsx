@@ -18,16 +18,17 @@ interface Props {
   owner: { email: string; name: string | null }
   tenants: TenantLite[]
   current: TenantLite
+  flags?: string[]
   children: React.ReactNode
 }
 
-export default function ConsoleShell({ owner, tenants, current, children }: Props) {
+export default function ConsoleShell({ owner, tenants, current, flags = [], children }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
   const storeUrl = `https://${current.slug}.jeffistores.in`
-  const groups = navFor(current.service_types)
+  const groups = navFor(current.service_types, flags)
   const hasStore = current.service_types.includes('store')
 
   async function signOut() {

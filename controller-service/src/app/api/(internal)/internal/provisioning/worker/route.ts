@@ -57,6 +57,14 @@ async function tick() {
     results.push({ tenantId, step: 'k8s_plan', status: r.ok ? (r.error ?? 'applied') : `error: ${r.error}` })
   }
 
+  // Owners' compute changes to running stores (and old databases due to be dropped).
+  const { dueComputeChanges } = await import('@/lib/compute/store')
+  const { reconcileCompute } = await import('@/lib/provisioning/compute-reconcile')
+  for (const tenantId of await dueComputeChanges().catch(() => [])) {
+    const r = await reconcileCompute(tenantId, provider).catch((e: any) => ({ ok: false, status: 'error', error: e?.message }))
+    results.push({ tenantId, step: 'compute_change', status: r.ok ? r.status : `error: ${r.error}` })
+  }
+
   // Pool servers left empty (stores moved to their own servers or left) are terminated after an hour.
   const k8s = await import('@/lib/k8s/tenant-compute')
   if (k8s.k8sComputeEnabled()) {

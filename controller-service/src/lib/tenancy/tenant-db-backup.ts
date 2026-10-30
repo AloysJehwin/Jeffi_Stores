@@ -141,6 +141,24 @@ export async function restoreTenantDb(
       tableCount++
     }
 
+    // The archive holds rows, not sequence values: move each column-owned sequence past the
+    // highest id loaded, or the next insert collides with a restored row.
+    const seqs = await client.query(
+      `SELECT s.relname AS seq, t.relname AS tbl, a.attname AS col
+         FROM pg_class s
+         JOIN pg_namespace n ON n.oid = s.relnamespace AND n.nspname = 'public'
+         JOIN pg_depend d ON d.objid = s.oid AND d.deptype IN ('a', 'i')
+         JOIN pg_class t ON t.oid = d.refobjid
+         JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+        WHERE s.relkind = 'S'`
+    )
+    for (const s of seqs.rows) {
+      await client.query(
+        `SELECT setval($1::regclass, COALESCE((SELECT max(${quoteIdent(s.col)}) FROM public.${quoteIdent(s.tbl)}), 0) + 1, false)`,
+        [`public.${quoteIdent(s.seq)}`]
+      )
+    }
+
     await client.query(`SET session_replication_role = DEFAULT`)
     await client.query('COMMIT')
   } catch (e) {
