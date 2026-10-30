@@ -408,13 +408,6 @@ export default async function OrderDetailsPage({
                             maximumFractionDigits: 2,
                           })}
                         </p>
-                        {canWrite && ['pending', 'confirmed', 'processing'].includes(order.status) && !digitalItemIds.has(item.id) && (
-                          <AskItemUnavailableButton
-                            orderId={order.id}
-                            itemId={item.id}
-                            itemName={`${item.product_name || item.products?.name || 'this item'}${item.variant_name ? ` (${item.variant_name})` : ''}`}
-                          />
-                        )}
                       </div>
                     </div>
                   ))
@@ -591,6 +584,15 @@ export default async function OrderDetailsPage({
                             <span className="mt-0.5 inline-block">
                               <Badge tone={isOut ? 'red' : isLow ? 'amber' : 'green'}>{isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock'}</Badge>
                             </span>
+                            {isOut && canWrite && inventoryValidationEnabled && ['pending', 'confirmed'].includes(order.status) && (
+                              <div className="mt-1.5">
+                                <AskItemUnavailableButton
+                                  orderId={order.id}
+                                  itemId={item.id}
+                                  itemName={`${item.product_name || item.products?.name || 'this item'}${item.variant_name ? ` (${item.variant_name})` : ''}`}
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
                       )
@@ -716,6 +718,23 @@ export default async function OrderDetailsPage({
                 unitPrice: Number(it.unit_price),
                 totalPrice: Number(it.total_price),
                 isDigital: !!it.is_digital,
+              }))}
+            />
+          )}
+
+          {order.status === 'processing' && !isAllDigital && canWrite && (
+            <ProductAdjustments
+              mode="ask"
+              orderId={order.id}
+              items={(order.order_items || []).map((it: any) => ({
+                id: it.id,
+                productId: it.product_id,
+                productName: `${it.product_name}${it.variant_name ? ` (${it.variant_name})` : ''}`,
+                quantity: Number(it.quantity),
+                unit: it.sold_unit || (it.buy_unit && it.buy_unit !== 'unit' ? it.buy_unit : null),
+                unitPrice: Number(it.unit_price),
+                totalPrice: Number(it.total_price),
+                isDigital: !!it.is_digital || digitalItemIds.has(it.id),
               }))}
             />
           )}

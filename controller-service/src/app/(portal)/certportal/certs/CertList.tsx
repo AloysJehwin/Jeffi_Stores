@@ -10,6 +10,8 @@ interface Cert {
   expiresAt: string
   downloadedAt: string | null
   status: 'available' | 'downloaded' | 'revoked' | 'expired'
+  needsMobile?: boolean
+  mobileHint?: string | null
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -111,7 +113,9 @@ export default function CertList() {
             </span>
           </div>
 
-          {c.status === 'available' && (
+          {c.status === 'available' && c.needsMobile && <MobileStep serial={c.serial} onVerified={load} />}
+
+          {c.status === 'available' && !c.needsMobile && (
             <button
               onClick={() => download(c.serial, c.commonName)}
               disabled={busy === c.serial}
@@ -135,6 +139,74 @@ export default function CertList() {
       ))}
 
       <InstallHelp />
+    </div>
+  )
+}
+
+// Before the first download: the admin's mobile number, confirmed with a code sent on WhatsApp or SMS.
+function MobileStep({ serial, onVerified }: { serial: string; onVerified: () => void }) {
+  const [phone, setPhone] = useState('')
+  const [otp, setOtp] = useState('')
+  const [sentBy, setSentBy] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function call(path: string, body: object) {
+    setBusy(true)
+    setError(null)
+    const res = await fetch(`/api/certportal/mobile/${path}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(() => null)
+    const data = await res?.json().catch(() => ({}))
+    setBusy(false)
+    if (!res?.ok) setError(data?.error || 'Something went wrong. Try again.')
+    return res?.ok ? data : null
+  }
+
+  const input = 'w-full px-3 py-2 rounded-lg border border-border-secondary bg-surface text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
+  const button = 'px-4 py-2 bg-accent-600 hover:bg-accent-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50 whitespace-nowrap'
+  return (
+    <div className="mt-3 rounded-lg border border-border-default bg-surface p-3 space-y-2">
+      <p className="text-sm font-medium text-foreground">Verify your mobile number to download</p>
+      <p className="text-xs text-foreground-muted">
+        We send a code on WhatsApp, or by SMS. The admin assistant can also answer you on this number.
+      </p>
+      <div className="flex gap-2">
+        <input className={input} type="tel" inputMode="tel" autoComplete="tel" placeholder="+91 98765 43210" value={phone} onChange={e => setPhone(e.target.value)} disabled={busy} />
+        <button
+          type="button"
+          className={button}
+          disabled={busy || phone.replace(/\D/g, '').length < 10}
+          onClick={async () => {
+            const d = await call('send', { serial, phone })
+            if (d) setSentBy(d.channel === 'whatsapp' ? 'WhatsApp' : 'SMS')
+          }}
+        >
+          {sentBy ? 'Send again' : 'Send code'}
+        </button>
+      </div>
+      {sentBy && (
+        <>
+          <p className="text-xs text-foreground-secondary">Code sent on {sentBy}. It is valid for 10 minutes.</p>
+          <div className="flex gap-2">
+            <input className={input} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6-digit code" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))} disabled={busy} />
+            <button
+              type="button"
+              className={button}
+              disabled={busy || otp.length !== 6}
+              onClick={async () => {
+                if (await call('verify', { serial, otp })) onVerified()
+              }}
+            >
+              Verify
+            </button>
+          </div>
+        </>
+      )}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
     </div>
   )
 }

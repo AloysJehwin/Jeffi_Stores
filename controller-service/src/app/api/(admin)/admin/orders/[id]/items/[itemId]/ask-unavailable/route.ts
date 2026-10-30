@@ -11,5 +11,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   const r = await askAboutUnavailableItem(id, itemId)
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status })
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, channels: r.channels })
 }

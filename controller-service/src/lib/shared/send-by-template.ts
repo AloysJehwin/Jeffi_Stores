@@ -3,6 +3,7 @@
 // Wrappers keep their public shape so callers don't change; they now one-line into here.
 
 import { messagingTenant, serviceToken } from '@/lib/messaging/library'
+import { FLAGSHIP_TENANT_ID } from '@/lib/payments/wallet'
 import { currentReplyScope, recordScopedSend } from '@/lib/replies/scope'
 
 const MESSAGING_URL = (process.env.MESSAGING_URL || 'http://localhost:3101').replace(/\/$/, '')
@@ -17,6 +18,8 @@ export interface SendByTemplateInput {
   subject?: string
   reference?: string
   locale?: string
+  /** Sent and billed as the platform, outside the store's switches (an admin's OTP, which a store with an empty wallet must still get). */
+  asPlatform?: boolean
 }
 
 export interface SendResult {
@@ -55,8 +58,8 @@ async function channelOn(channel: Channel): Promise<boolean> {
 }
 
 export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult> {
-  if (!(await channelOn(i.channel))) return { status: 'skipped', error: 'channel_disabled' }
-  const tenant = await messagingTenant()
+  if (!i.asPlatform && !(await channelOn(i.channel))) return { status: 'skipped', error: 'channel_disabled' }
+  const tenant = i.asPlatform ? { tenantId: FLAGSHIP_TENANT_ID, slug: 'platform' } : await messagingTenant()
   const extra = await brandFields(i.channel)
   const body = {
     channel: i.channel,

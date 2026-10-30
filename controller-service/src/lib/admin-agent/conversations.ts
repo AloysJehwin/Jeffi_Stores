@@ -23,6 +23,7 @@ export interface ConversationSummary {
   shared: boolean
   last_message_at: string
   message_count: number
+  channel: string
 }
 
 const titleOf = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, TITLE_MAX) || null
@@ -77,9 +78,29 @@ export async function startTurn(
   return id
 }
 
+/** The admin's WhatsApp chat: the one used in the last 24 hours, else a new one (or a new one when asked). */
+export async function whatsappConversation(adminId: string, firstMessage: string, fresh: boolean): Promise<string> {
+  if (!fresh) {
+    const open = await queryOne<{ id: string }>(
+      `UPDATE admin_agent_conversations SET last_message_at = now()
+        WHERE id = (SELECT id FROM admin_agent_conversations
+                     WHERE admin_id = $1::uuid AND channel = 'whatsapp' AND last_message_at > now() - interval '24 hours'
+                     ORDER BY last_message_at DESC LIMIT 1)
+        RETURNING id::text`,
+      [adminId]
+    )
+    if (open) return open.id
+  }
+  const row = await queryOne<{ id: string }>(
+    `INSERT INTO admin_agent_conversations (admin_id, title, channel) VALUES ($1::uuid, $2, 'whatsapp') RETURNING id::text`,
+    [adminId, titleOf(firstMessage)]
+  )
+  return row!.id
+}
+
 export async function listConversations(adminId: string, limit: number): Promise<ConversationSummary[]> {
   return queryMany<ConversationSummary>(
-    `SELECT c.id::text, c.title, c.shared_at IS NOT NULL AS shared, c.last_message_at::text,
+    `SELECT c.id::text, c.title, c.shared_at IS NOT NULL AS shared, c.last_message_at::text, c.channel,
             (SELECT count(*)::int FROM admin_agent_messages m WHERE m.conversation_id = c.id) AS message_count
        FROM admin_agent_conversations c
       WHERE c.admin_id = $1::uuid

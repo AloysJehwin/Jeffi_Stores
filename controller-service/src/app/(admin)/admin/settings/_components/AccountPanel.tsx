@@ -1,5 +1,6 @@
 import { queryOne, queryMany } from '@/lib/shared/db'
 import TwoFactorCard from '@/components/admin/TwoFactorCard'
+import MobileNumberCard from '@/components/admin/MobileNumberCard'
 import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/auth/scopes'
@@ -110,6 +111,15 @@ export default async function AccountPanel() {
             </div>
             <div className="p-5">
               <TwoFactorCard />
+            </div>
+          </div>
+
+          <div className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
+            <div className="px-5 py-4 border-b border-border-default">
+              <h2 className="text-sm font-semibold text-foreground">Mobile number</h2>
+            </div>
+            <div className="p-5">
+              <MobileNumberCard />
             </div>
           </div>
         </section>

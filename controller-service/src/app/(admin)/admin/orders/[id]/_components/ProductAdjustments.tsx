@@ -5,10 +5,13 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import AskItemUnavailableButton from './AskItemUnavailableButton'
 
 // Product adjustments on a confirmed, unshipped order: switch lines to another product / variant / sub-variant /
 // selling unit, change quantities or remove lines in one go. The customer approves; the net difference is
 // refunded or collected when "Settle payment" is on, absorbed into the COD total, or waived when it's off.
+// Each physical line can also ask the customer what to do about it being unavailable; once packing has
+// started (mode "ask") that is all the card offers, since adjustments are closed by then.
 
 export interface AdjustableItem {
   id: string
@@ -37,7 +40,7 @@ const STATUS: Record<string, string> = {
   pending_customer: 'Waiting for customer', awaiting_payment: 'Awaiting payment', applied: 'Applied', rejected: 'Declined', cancelled: 'Cancelled',
 }
 
-export default function ProductAdjustments({ orderId, items }: { orderId: string; items: AdjustableItem[] }) {
+export default function ProductAdjustments({ orderId, items, mode = 'adjust' }: { orderId: string; items: AdjustableItem[]; mode?: 'adjust' | 'ask' }) {
   const { showToast } = useToast()
   const [open, setOpen] = useState(false)
   const [lines, setLines] = useState<Record<string, LineState>>({})
@@ -53,7 +56,7 @@ export default function ProductAdjustments({ orderId, items }: { orderId: string
     const r = await fetch(`/api/admin/orders/${orderId}/adjustments`, { credentials: 'include' })
     if (r.ok) setHistory((await r.json()).history || [])
   }, [orderId])
-  useEffect(() => { loadHistory() }, [loadHistory])
+  useEffect(() => { if (mode === 'adjust') loadHistory() }, [loadHistory, mode])
 
   const pending = history.some(h => h.status === 'pending_customer' || h.status === 'awaiting_payment')
   const line = (id: string): LineState => lines[id] ?? { action: 'keep', quantity: '', target: null, unit: '', units: [] }
@@ -124,6 +127,26 @@ export default function ProductAdjustments({ orderId, items }: { orderId: string
   }
 
   const net = preview?.netDiff ?? 0
+  if (mode === 'ask') {
+    const physical = items.filter(it => !it.isDigital)
+    return (
+      <div className="rounded-xl border border-border-default bg-surface-elevated p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Item missing at packing?</h3>
+          <p className="text-xs text-foreground-muted">Ask the customer whether they want a refund, an alternative or to wait. Their reply shows under Customer replies.</p>
+        </div>
+        {physical.map(it => (
+          <div key={it.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-default p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{it.productName}</p>
+              <p className="text-xs text-foreground-muted">{it.quantity}{it.unit ? ` ${it.unit}` : ''}</p>
+            </div>
+            <AskItemUnavailableButton orderId={orderId} itemId={it.id} itemName={it.productName} />
+          </div>
+        ))}
+      </div>
+    )
+  }
   return (
     <div className="rounded-xl border border-border-default bg-surface-elevated p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -151,6 +174,11 @@ export default function ProductAdjustments({ orderId, items }: { orderId: string
                   <div className="min-w-0">
                     <p className={`text-sm font-medium truncate ${l.action === 'remove' ? 'line-through text-foreground-muted' : 'text-foreground'}`}>{it.productName}</p>
                     <p className="text-xs text-foreground-muted">{it.quantity}{it.unit ? ` ${it.unit}` : ''} × {inr(it.unitPrice)} = {inr(it.totalPrice)}</p>
+                    {!it.isDigital && (
+                      <div className="mt-1.5">
+                        <AskItemUnavailableButton orderId={orderId} itemId={it.id} itemName={it.productName} />
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {(['keep', 'switch', 'quantity', 'remove'] as Action[])

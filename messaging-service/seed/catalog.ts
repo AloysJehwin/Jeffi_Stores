@@ -639,6 +639,8 @@ export const CATALOG: TemplateSeed[] = [
     "Your order {{1}} needs your approval for a variant change. Please review it here: {{2}} Thank you for shopping with us!\n— from {{brand_name}} team", 'UTILITY', {"1": "JS-10234", "2": "https://jeffistores.in/account/orders/b161befe-bc12-4a7c-bf3b-0772de23ac9e", "3": "Jeffi Stores"}),
   wa('order/payment-failed', 'Payment failed', 'transactional',
     "Payment for your order {{1}} did not go through. Please retry from your orders page at jeffistores.in/orders. Thank you.\n— from {{brand_name}} team", 'UTILITY', {"1": "JS-10234", "2": "Jeffi Stores"}),
+  wa('order/out-of-stock', 'Item unavailable', 'transactional',
+    "Your order {{1}}: {{2}} is temporarily out of stock. Reply to this message to tell us what you would like: a refund for it, an alternative, or to wait until it is back.\n— from {{brand_name}} team", 'UTILITY', {"1": "JS-10234", "2": "Steel drill bit 13mm × 2", "3": "Jeffi Stores"}),
   wa('promo/new-arrivals', 'New arrivals', 'marketing',
     "New arrivals just landed! {{1}} now in stock. Explore the collection at jeffistores.in\n— from {{brand_name}} team", 'MARKETING'),
   wa('restock', 'Back in stock', 'automation',

@@ -58,7 +58,7 @@ describe('cron scheduling for k8s', () => {
     expect(by.cancel_stale_orders).toBe('* * * * *')
     expect(by.provisioning_worker).toBe('* * * * *')
     expect(by.delhivery_sync).toBe('*/10 * * * *')
-    expect(by.daily_briefing).toBe('0 8 * * *')
+    expect(by.daily_briefing).toBe('3 * * * *')
     expect(by.provisioning_reconcile).toMatch(/^\d+ \* \* \* \*$/)
   })
 })

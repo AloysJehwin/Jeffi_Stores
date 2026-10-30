@@ -1,6 +1,8 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { aiChat, AiClientError } from '@/lib/shared/ai-client'
-import { mailShell } from '@/lib/shared/mail-template'
+import { mailShell, escapeHtml } from '@/lib/shared/mail-template'
+import { NEEDS_SHIP_SQL } from '@/lib/overviews/orders'
+import { defaultOpsEmail, OPS_SECTIONS, sectionOn, type OpsEmailConfig, type OpsSection } from '@/lib/shared/ops-email-config'
 
 export interface OrderSummary {
   count: number
@@ -42,6 +44,14 @@ export interface CampaignPerf {
   converted: number
 }
 
+export interface WaitingOrder {
+  id: string
+  order_number: string
+  customer_name: string | null
+  age_days: number
+  total_amount: number
+}
+
 export interface BriefingData {
   briefing_date: string
   yesterday: OrderSummary
@@ -51,12 +61,30 @@ export interface BriefingData {
   stuck_shipments: StuckShipment[]
   abandoned_checkouts_24h: number
   campaign_perf_24h: CampaignPerf[]
+  /** Confirmed / packing orders not shipped yet, oldest first (up to 100, for the attachments). */
+  to_ship?: { count: number; late: number; late_days: number; orders: WaitingOrder[] }
+  pending_payments?: WaitingOrder[]
+  support?: { open: number; awaiting_admin: number }
 }
 
-const STUCK_DAYS = 3
+const DAY_MS = 24 * 3600 * 1000
+const istDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d)
+/** Today's date in India, YYYY-MM-DD. */
+export const istToday = (now = new Date()) => istDate(now)
+/** The hour (0-23) in India. */
+export const istHour = (now = new Date()) => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hourCycle: 'h23' }).format(now))
 
-export async function collectBriefingData(): Promise<BriefingData> {
-  const [yesterday, sevenDayAvg, topProducts, lowStock, stuckShipments, abandonedCheckouts, campaignPerf] =
+const none = <T,>(v: T) => Promise.resolve(v)
+
+/** The numbers for the sections that are on (yesterday's totals always, for the subject and headline). */
+export async function collectBriefingData(cfg: OpsEmailConfig = defaultOpsEmail(true)): Promise<BriefingData> {
+  const top = sectionOn(cfg, 'top_products')
+  const low = sectionOn(cfg, 'low_stock')
+  const stuck = sectionOn(cfg, 'stuck')
+  const toShip = sectionOn(cfg, 'to_ship')
+  const pending = sectionOn(cfg, 'pending_payments')
+  const lateDays = toShip?.days ?? 2
+  const [yesterday, sevenDayAvg, abandonedCheckouts, topProducts, lowStock, stuckShipments, campaignPerf, shipRows, pendingRows, support] =
     await Promise.all([
       queryOne<{
         count: string
@@ -107,8 +135,20 @@ export async function collectBriefingData(): Promise<BriefingData> {
     `,
         []
       ),
-      queryMany<{ product_id: string; product_name: string; qty: string; revenue: string }>(
-        `
+      sectionOn(cfg, 'abandoned')
+        ? queryOne<{ count: string }>(
+            `
+      SELECT COUNT(*)::text AS count
+      FROM orders
+      WHERE status = 'cancelled' AND payment_status = 'cancelled'
+        AND updated_at >= NOW() - INTERVAL '24 hours'
+    `,
+            []
+          )
+        : none(null),
+      top
+        ? queryMany<{ product_id: string; product_name: string; qty: string; revenue: string }>(
+            `
       WITH bounds AS (
         SELECT
           (date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata') - INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata' AS lo,
@@ -125,29 +165,33 @@ export async function collectBriefingData(): Promise<BriefingData> {
         AND o.created_at >= bounds.lo AND o.created_at < bounds.hi
       GROUP BY oi.product_id, oi.product_name
       ORDER BY SUM(oi.total_price) DESC
-      LIMIT 5
+      LIMIT $1
     `,
-        []
-      ),
-      queryMany<LowStockProduct>(
-        `
+            [top.limit ?? 5]
+          )
+        : none([]),
+      low
+        ? queryMany<LowStockProduct>(
+            `
       SELECT id::text, name, sku, inventory_quantity
       FROM products
-      WHERE is_active = TRUE AND is_digital = FALSE AND inventory_quantity <= 10
+      WHERE is_active = TRUE AND is_digital = FALSE AND inventory_quantity <= $1
       ORDER BY inventory_quantity ASC, name ASC
-      LIMIT 15
+      LIMIT $2
     `,
-        []
-      ),
-      queryMany<{
-        order_number: string
-        awb_number: string | null
-        shipped_at: string
-        customer_name: string | null
-        total_amount: string
-        days_since_shipped: string
-      }>(
-        `
+            [low.threshold ?? 10, low.limit ?? 15]
+          )
+        : none([]),
+      stuck
+        ? queryMany<{
+            order_number: string
+            awb_number: string | null
+            shipped_at: string
+            customer_name: string | null
+            total_amount: string
+            days_since_shipped: string
+          }>(
+            `
       SELECT
         order_number,
         awb_number,
@@ -158,25 +202,17 @@ export async function collectBriefingData(): Promise<BriefingData> {
       FROM orders
       WHERE status = 'shipped'
         AND shipped_at IS NOT NULL
-        AND shipped_at < NOW() - INTERVAL '${STUCK_DAYS} days'
+        AND shipped_at < NOW() - make_interval(days => $1::int)
         AND delivered_at IS NULL
-        AND status != 'cancelled'
       ORDER BY shipped_at ASC
       LIMIT 20
     `,
-        []
-      ),
-      queryOne<{ count: string }>(
-        `
-      SELECT COUNT(*)::text AS count
-      FROM orders
-      WHERE status = 'cancelled' AND payment_status = 'cancelled'
-        AND updated_at >= NOW() - INTERVAL '24 hours'
-    `,
-        []
-      ),
-      queryMany<{ campaign_kind: string; sent: string; opened: string; clicked: string; converted: string }>(
-        `
+            [stuck.days ?? 3]
+          )
+        : none([]),
+      sectionOn(cfg, 'campaigns')
+        ? queryMany<{ campaign_kind: string; sent: string; opened: string; clicked: string; converted: string }>(
+            `
       SELECT
         campaign_kind,
         COUNT(*)::text AS sent,
@@ -188,8 +224,46 @@ export async function collectBriefingData(): Promise<BriefingData> {
       GROUP BY campaign_kind
       ORDER BY COUNT(*) DESC
     `,
-        []
-      ),
+            []
+          )
+        : none([]),
+      toShip || cfg.attachments.labels || cfg.attachments.slips || cfg.attachments.invoices
+        ? queryMany<{ id: string; order_number: string; customer_name: string | null; age_days: string; total_amount: string; total: string; late: string }>(
+            `
+      SELECT o.id::text, o.order_number, o.customer_name, o.total_amount::text,
+             EXTRACT(DAY FROM NOW() - COALESCE(o.confirmed_at, o.created_at))::text AS age_days,
+             COUNT(*) OVER ()::text AS total,
+             COUNT(*) FILTER (WHERE COALESCE(o.confirmed_at, o.created_at) < NOW() - make_interval(days => $1::int)) OVER ()::text AS late
+      FROM orders o
+      WHERE o.status IN ('confirmed', 'processing') AND o.shipped_at IS NULL AND ${NEEDS_SHIP_SQL}
+      ORDER BY COALESCE(o.confirmed_at, o.created_at) ASC
+      LIMIT 100
+    `,
+            [lateDays]
+          )
+        : none([]),
+      pending
+        ? queryMany<{ id: string; order_number: string; customer_name: string | null; age_days: string; total_amount: string }>(
+            `
+      SELECT id::text, order_number, customer_name, total_amount::text, EXTRACT(DAY FROM NOW() - created_at)::text AS age_days
+      FROM orders
+      WHERE COALESCE(payment_status, 'pending') IN ('pending', 'failed') AND status NOT IN ('cancelled', 'draft')
+        AND created_at >= NOW() - make_interval(days => $1::int)
+      ORDER BY created_at DESC
+      LIMIT 20
+    `,
+            [pending.days ?? 3]
+          )
+        : none([]),
+      sectionOn(cfg, 'support')
+        ? queryOne<{ open: string; awaiting_admin: string }>(
+            `
+      SELECT (SELECT COUNT(*) FROM support_sessions WHERE status = 'open')::text AS open,
+             (SELECT COUNT(*) FROM support_ai_actions WHERE status = 'pending' AND awaiting = 'admin')::text AS awaiting_admin
+    `,
+            []
+          )
+        : none(null),
     ])
 
   const y = yesterday || {
@@ -209,11 +283,16 @@ export async function collectBriefingData(): Promise<BriefingData> {
 
   const revenuePctDelta = avgRevenue > 0 ? Math.round(((yesterdayRevenue - avgRevenue) / avgRevenue) * 100) : 0
   const ordersPctDelta = avgOrders > 0 ? Math.round(((yesterdayOrders - avgOrders) / avgOrders) * 100) : 0
-
-  const istYesterday = new Date(Date.now() - 24 * 3600 * 1000).toISOString().slice(0, 10)
+  const waiting = (r: { id: string; order_number: string; customer_name: string | null; age_days: string; total_amount: string }): WaitingOrder => ({
+    id: r.id,
+    order_number: r.order_number,
+    customer_name: r.customer_name,
+    age_days: parseInt(r.age_days, 10) || 0,
+    total_amount: parseFloat(r.total_amount) || 0,
+  })
 
   return {
-    briefing_date: istYesterday,
+    briefing_date: istDate(new Date(Date.now() - DAY_MS)),
     yesterday: {
       count: yesterdayOrders,
       paid_count: parseInt(y.paid_count, 10) || 0,
@@ -246,6 +325,14 @@ export async function collectBriefingData(): Promise<BriefingData> {
       clicked: parseInt(c.clicked, 10),
       converted: parseInt(c.converted, 10),
     })),
+    to_ship: {
+      count: parseInt(shipRows[0]?.total ?? '0', 10) || 0,
+      late: parseInt(shipRows[0]?.late ?? '0', 10) || 0,
+      late_days: lateDays,
+      orders: shipRows.map(waiting),
+    },
+    pending_payments: pendingRows.map(waiting),
+    support: support ? { open: parseInt(support.open, 10) || 0, awaiting_admin: parseInt(support.awaiting_admin, 10) || 0 } : undefined,
   }
 }
 
@@ -260,6 +347,9 @@ export async function narrate(data: BriefingData): Promise<string> {
     low_stock_items: data.low_stock.length,
     stuck_shipments: data.stuck_shipments.length,
     top_product: data.top_products[0]?.product_name ?? 'none',
+    ...(data.to_ship ? { orders_to_ship: data.to_ship.count, orders_late_to_ship: data.to_ship.late } : {}),
+    ...(data.pending_payments?.length ? { unpaid_orders: data.pending_payments.length } : {}),
+    ...(data.support ? { open_support_chats: data.support.open, replies_waiting_for_admin: data.support.awaiting_admin } : {}),
   }
 
   try {
@@ -271,7 +361,7 @@ export async function narrate(data: BriefingData): Promise<string> {
       messages: [
         {
           role: 'system',
-          content: `You are a no-fluff business analyst writing the headline for a daily ops briefing. Given the numbers, write 2-3 short sentences highlighting the most important thing. Specific and concrete. No marketing speak, no encouragement, no "great work team" filler. If revenue is below average, say so. If stuck shipments need action, say so. If everything is normal, say "Numbers in line with the 7-day average." Plain text only, no markdown.`,
+          content: `You are a no-fluff business analyst writing the headline for a daily ops briefing. Given the numbers, write 2-3 short sentences highlighting the most important thing. Specific and concrete. No marketing speak, no encouragement, no "great work team" filler. If revenue is below average, say so. If stuck shipments or late orders to ship need action, say so. If everything is normal, say "Numbers in line with the 7-day average." Plain text only, no markdown.`,
         },
         { role: 'user', content: `Yesterday's data: ${JSON.stringify(summary)}` },
       ],
@@ -282,14 +372,6 @@ export async function narrate(data: BriefingData): Promise<string> {
     return ''
   }
 }
-
-const BRIEFING_BRAND = "Jeffi Store's"
-const FROM = `"${BRIEFING_BRAND} Ops" <${process.env.SES_FROM_EMAIL || 'ops@jeffistores.in'}>`
-// The admin host serves its pages at the root, so a base ending in /admin (as in .env.example)
-// must lose it or the link becomes /admin/admin. Same normalisation as currentAdminBaseUrl().
-const ADMIN_URL = (process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in')
-  .replace(/\/admin\/?$/, '')
-  .replace(/\/$/, '')
 
 const BRIEFING_CSS = `
   .section { margin: 24px 0 10px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
@@ -308,6 +390,8 @@ function fmtINR(n: number): string {
   return `₹${Math.round(n).toLocaleString('en-IN')}`
 }
 
+const e = (v: unknown) => escapeHtml(v ?? '')
+
 function deltaBadge(pct: number): string {
   if (pct === 0) return ''
   const positive = pct > 0
@@ -316,69 +400,30 @@ function deltaBadge(pct: number): string {
   return `<span style="color:${color};font-size:13px;font-weight:600;margin-left:8px;">${arrow} ${Math.abs(pct)}%</span>`
 }
 
-export function renderBriefingEmail(data: BriefingData, narration: string): { subject: string; html: string } {
-  const subject = `Ops briefing — ${data.briefing_date} — ${data.yesterday.count} orders, ${fmtINR(data.yesterday.revenue)}`
+export interface BriefingContext {
+  cfg?: OpsEmailConfig
+  brand?: string
+  /** The admin panel's base URL, for links. */
+  adminUrl?: string
+  /** A line about the attached documents, or why they were left out. */
+  attachmentNote?: string
+}
 
-  const stuckRows = data.stuck_shipments
-    .map(
-      s => `
-    <tr>
-      <td class="mono">${s.order_number}</td>
-      <td>${s.customer_name || '—'}</td>
-      <td class="red">${s.days_since_shipped}d</td>
-      <td class="num">${fmtINR(s.total_amount)}</td>
-    </tr>`
-    )
-    .join('')
+/** Fills {store} {date} {orders} {revenue} in the configured subject. */
+export function briefingSubject(template: string, data: BriefingData, brand: string): string {
+  const v: Record<string, string> = { store: brand, date: data.briefing_date, orders: String(data.yesterday.count), revenue: fmtINR(data.yesterday.revenue) }
+  return template.replace(/\{(store|date|orders|revenue)\}/g, (_, k: string) => v[k]).replace(/\s+/g, ' ').trim()
+}
 
-  const topProductRows = data.top_products
-    .map(
-      (p, i) => `
-    <tr>
-      <td class="grey" style="width:24px;">${i + 1}</td>
-      <td>${p.product_name}</td>
-      <td class="num grey">${p.qty}</td>
-      <td class="num" style="font-weight:600;">${fmtINR(p.revenue)}</td>
-    </tr>`
-    )
-    .join('')
+const table = (head: string, rows: string) => `<table class="rows"><tr>${head}</tr>${rows}</table>`
+const heading = (text: string, color?: string) => `<h3 class="section"${color ? ` style="color:${color};"` : ''}>${text}</h3>`
 
-  const lowStockRows = data.low_stock
-    .map(
-      p => `
-    <tr>
-      <td>${p.name}</td>
-      <td class="mono grey" style="font-size:12px;">${p.sku || '—'}</td>
-      <td class="num" style="color:${p.inventory_quantity === 0 ? '#dc2626' : '#ea580c'};font-weight:600;">${p.inventory_quantity}</td>
-    </tr>`
-    )
-    .join('')
-
-  const campaignRows = data.campaign_perf_24h
-    .map(c => {
-      const openRate = c.sent > 0 ? Math.round((c.opened / c.sent) * 100) : 0
-      const clickRate = c.sent > 0 ? Math.round((c.clicked / c.sent) * 100) : 0
-      return `
-    <tr>
-      <td>${c.campaign_kind}</td>
-      <td class="num">${c.sent}</td>
-      <td class="num grey">${openRate}%</td>
-      <td class="num grey">${clickRate}%</td>
-      <td class="num green">${c.converted}</td>
-    </tr>`
-    })
-    .join('')
-
-  const html = mailShell({
-    brand: BRIEFING_BRAND,
-    kicker: 'Daily Ops Briefing',
-    title: data.briefing_date,
-    documentTitle: subject,
-    extraCss: BRIEFING_CSS,
-    content: `
-      ${narration ? `<div class="info"><p style="margin:0;">${narration}</p></div>` : ''}
-
-      <h3 class="section">Yesterday</h3>
+function section(s: OpsSection, data: BriefingData, narration: string, link: (path: string) => string): string {
+  switch (s.id) {
+    case 'ai_headline':
+      return narration ? `<div class="info"><p style="margin:0;">${e(narration)}</p></div>` : ''
+    case 'kpis':
+      return `${heading('Yesterday')}
       <div class="card">
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
@@ -402,63 +447,93 @@ export function renderBriefingEmail(data: BriefingData, narration: string): { su
             </td>
           </tr>
         </table>
-      </div>
+      </div>`
+    case 'to_ship': {
+      const t = data.to_ship
+      if (!t?.count) return ''
+      const rows = t.orders
+        .slice(0, 20)
+        .map(o => `<tr><td class="mono">${e(o.order_number)}</td><td>${e(o.customer_name || '—')}</td><td class="${o.age_days >= t.late_days ? 'red' : 'grey'}">${o.age_days}d</td><td class="num">${fmtINR(o.total_amount)}</td></tr>`)
+        .join('')
+      const more = t.count > 20 ? `<p class="muted">and ${t.count - 20} more. <a href="${link('/packing-slips')}">Open Packing slips</a></p>` : ''
+      return `${heading(`To ship (${t.count}${t.late ? `, ${t.late} late` : ''})`, t.late ? '#dc2626' : undefined)}${table('<th>Order</th><th>Customer</th><th>Waiting</th><th class="num">Total</th>', rows)}${more}`
+    }
+    case 'stuck': {
+      if (!data.stuck_shipments.length) return ''
+      const rows = data.stuck_shipments
+        .map(x => `<tr><td class="mono">${e(x.order_number)}</td><td>${e(x.customer_name || '—')}</td><td class="red">${x.days_since_shipped}d</td><td class="num">${fmtINR(x.total_amount)}</td></tr>`)
+        .join('')
+      return `${heading(`Stuck shipments (${data.stuck_shipments.length})`, '#dc2626')}${table('<th>Order</th><th>Customer</th><th>Stuck</th><th class="num">Total</th>', rows)}`
+    }
+    case 'pending_payments': {
+      const p = data.pending_payments ?? []
+      if (!p.length) return ''
+      const rows = p.map(o => `<tr><td class="mono">${e(o.order_number)}</td><td>${e(o.customer_name || '—')}</td><td class="grey">${o.age_days}d</td><td class="num">${fmtINR(o.total_amount)}</td></tr>`).join('')
+      return `${heading(`Pending payments (${p.length})`, '#ea580c')}${table('<th>Order</th><th>Customer</th><th>Age</th><th class="num">Total</th>', rows)}`
+    }
+    case 'top_products': {
+      if (!data.top_products.length) return ''
+      const rows = data.top_products
+        .map((p, i) => `<tr><td class="grey" style="width:24px;">${i + 1}</td><td>${e(p.product_name)}</td><td class="num grey">${p.qty}</td><td class="num" style="font-weight:600;">${fmtINR(p.revenue)}</td></tr>`)
+        .join('')
+      return `${heading('Top products yesterday')}${table('<th style="width:24px;"></th><th>Product</th><th class="num">Qty</th><th class="num">Revenue</th>', rows)}`
+    }
+    case 'low_stock': {
+      if (!data.low_stock.length) return ''
+      const rows = data.low_stock
+        .map(p => `<tr><td>${e(p.name)}</td><td class="mono grey" style="font-size:12px;">${e(p.sku || '—')}</td><td class="num" style="color:${p.inventory_quantity === 0 ? '#dc2626' : '#ea580c'};font-weight:600;">${p.inventory_quantity}</td></tr>`)
+        .join('')
+      return `${heading(`Low stock (${data.low_stock.length})`, '#ea580c')}${table('<th>Product</th><th>SKU</th><th class="num">Stock</th>', rows)}`
+    }
+    case 'abandoned':
+      return `<p class="muted">Abandoned checkouts (24h): <span style="color:#1f2937;font-weight:600;">${data.abandoned_checkouts_24h}</span></p>`
+    case 'campaigns': {
+      if (!data.campaign_perf_24h.length) return ''
+      const rows = data.campaign_perf_24h
+        .map(c => {
+          const openRate = c.sent > 0 ? Math.round((c.opened / c.sent) * 100) : 0
+          const clickRate = c.sent > 0 ? Math.round((c.clicked / c.sent) * 100) : 0
+          return `<tr><td>${e(c.campaign_kind)}</td><td class="num">${c.sent}</td><td class="num grey">${openRate}%</td><td class="num grey">${clickRate}%</td><td class="num green">${c.converted}</td></tr>`
+        })
+        .join('')
+      return `${heading('Campaigns (last 24h)')}${table('<th>Campaign</th><th class="num">Sent</th><th class="num">Open%</th><th class="num">Click%</th><th class="num">Conv</th>', rows)}`
+    }
+    case 'support': {
+      const s2 = data.support
+      if (!s2 || (!s2.open && !s2.awaiting_admin)) return ''
+      return `${heading('Support')}<p>${s2.open} open chat${s2.open === 1 ? '' : 's'} · ${s2.awaiting_admin} customer repl${s2.awaiting_admin === 1 ? 'y' : 'ies'} waiting for an admin. <a href="${link('/support')}">Open Support</a></p>`
+    }
+  }
+}
 
-      ${
-        data.stuck_shipments.length > 0
-          ? `
-      <h3 class="section" style="color:#dc2626;">Stuck shipments (${data.stuck_shipments.length})</h3>
-      <table class="rows">
-        <tr><th>Order</th><th>Customer</th><th>Stuck</th><th class="num">Total</th></tr>
-        ${stuckRows}
-      </table>`
-          : ''
-      }
+export function renderBriefingEmail(data: BriefingData, narration: string, ctx: BriefingContext = {}): { subject: string; html: string } {
+  const cfg = ctx.cfg ?? defaultOpsEmail(true)
+  const brand = ctx.brand || 'Store'
+  // The admin host serves its pages at the root, so a base ending in /admin must lose it.
+  const base = (ctx.adminUrl || '').replace(/\/admin\/?$/, '').replace(/\/$/, '')
+  const link = (path: string) => e(`${base}${path}`)
+  const subject = briefingSubject(cfg.subject, data, brand)
+  const body = cfg.sections
+    .filter(s => s.on && s.id in OPS_SECTIONS)
+    .map(s => section(s, data, narration, link))
+    .filter(Boolean)
+    .join('\n')
 
-      ${
-        data.top_products.length > 0
-          ? `
-      <h3 class="section">Top products yesterday</h3>
-      <table class="rows">
-        <tr><th style="width:24px;"></th><th>Product</th><th class="num">Qty</th><th class="num">Revenue</th></tr>
-        ${topProductRows}
-      </table>`
-          : ''
-      }
-
-      ${
-        data.low_stock.length > 0
-          ? `
-      <h3 class="section" style="color:#ea580c;">Low stock (${data.low_stock.length})</h3>
-      <table class="rows">
-        <tr><th>Product</th><th>SKU</th><th class="num">Stock</th></tr>
-        ${lowStockRows}
-      </table>`
-          : ''
-      }
-
-      ${
-        data.campaign_perf_24h.length > 0
-          ? `
-      <h3 class="section">Campaigns (last 24h)</h3>
-      <table class="rows">
-        <tr><th>Campaign</th><th class="num">Sent</th><th class="num">Open%</th><th class="num">Click%</th><th class="num">Conv</th></tr>
-        ${campaignRows}
-      </table>`
-          : ''
-      }
-
-      <p class="muted" style="text-align:center;margin-top:24px;">
-        Abandoned checkouts (24h): <span style="color:#1f2937;font-weight:600;">${data.abandoned_checkouts_24h}</span>
-        &nbsp;·&nbsp;
-        <a href="${ADMIN_URL}/" style="color:#2563eb;text-decoration:none;">Open admin →</a>
-      </p>`,
+  const html = mailShell({
+    brand,
+    kicker: 'Daily Ops Briefing',
+    title: data.briefing_date,
+    documentTitle: subject,
+    extraCss: BRIEFING_CSS,
+    content: `
+      ${cfg.intro ? `<p>${e(cfg.intro).replace(/\n/g, '<br>')}</p>` : ''}
+      ${body}
+      ${ctx.attachmentNote ? `<p class="muted">${e(ctx.attachmentNote)}</p>` : ''}
+      ${base ? `<p class="muted" style="text-align:center;margin-top:24px;"><a href="${link('/')}" style="color:#2563eb;text-decoration:none;">Open admin →</a></p>` : ''}`,
   })
 
   return { subject, html }
 }
-
-export { FROM as BRIEFING_FROM }
 
 export async function briefingFromAsync(): Promise<string> {
   const { currentBrandNameAsync } = await import('@/lib/catalog/brand')

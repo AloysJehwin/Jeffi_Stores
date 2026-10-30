@@ -28,6 +28,8 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'mfa/enroll-confirm',
   'mfa/verify',
   'mfa/recovery-codes',
+  'account/mobile/send-otp',
+  'account/mobile/verify-otp',
   'sessions/[id]/revoke',
   'sessions/revoke-all',
   'access-request',
@@ -81,6 +83,8 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'orders/[id]/send-customer-mail/preview',
   // Delivery-estimate preview: computes a date from posted draft settings; writes nothing.
   'edd-settings/preview',
+  // Daily ops email preview from the posted draft settings; writes nothing.
+  'site-controls/ops-email/preview',
   // Pre-auth: proves identity before any session exists.
   'auth/google',
   // Mints a token whose scopes are filtered to a subset of the caller's own — cannot escalate.

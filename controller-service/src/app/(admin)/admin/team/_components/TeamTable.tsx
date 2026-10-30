@@ -75,6 +75,7 @@ export default function TeamTable({
     },
     { key: 'status', label: 'Status', sort: a => (a.is_active !== false ? 0 : 1), render: a => <StatusBadge status={a.is_active !== false ? 'true' : 'false'} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Inactive', tone: 'muted' } }} /> },
     { key: 'mfa', label: '2FA', sort: a => (a.mfa_enabled ? 0 : 1), render: a => <span className={badgeCls(a.mfa_enabled ? 'green' : 'amber')}>{a.mfa_enabled ? 'On' : 'Off'}</span> },
+    { key: 'mobile', label: 'Mobile', sort: a => a.mobile_hint ?? '~', hideBelow: 'lg', render: a => <span className="text-xs text-foreground-secondary whitespace-nowrap">{a.mobile_hint ?? '—'}</span> },
     { key: 'cert', label: 'Certificate', sort: a => certStatuses[a.id] ?? 'No Certificate', render: a => <StatusBadge status={certStatuses[a.id] ?? 'No Certificate'} map={CERT_STATUS} /> },
     {
       key: 'expiry',

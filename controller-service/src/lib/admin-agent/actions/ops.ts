@@ -1,4 +1,4 @@
-import { callInternalApi, APPROVE_ORIGIN } from './shared'
+import { callInternalApi, internalFetch } from './shared'
 import type { AgentAction, ActionResult } from './shared'
 
 export async function createPickupRequest(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
@@ -28,8 +28,7 @@ export async function createPickupRequest(action: AgentAction, cookieHeader: str
 export async function syncDelhiveryStatuses(): Promise<ActionResult> {
   const cron = process.env.CRON_SECRET
   if (!cron) return { result: null, error: 'CRON_SECRET not configured' }
-  const url = new URL('/api/admin/delhivery/sync-statuses', APPROVE_ORIGIN).toString()
-  const res = await fetch(url, {
+  const res = await internalFetch('/api/admin/delhivery/sync-statuses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${cron}`, 'Content-Type': 'application/json' },
   })
@@ -102,7 +101,7 @@ export async function exportGstr1(action: AgentAction, cookieHeader: string): Pr
   if (!from || !to) return { result: null, error: 'from/to missing in payload' }
   const fmt = format === 'csv' ? 'csv' : 'json'
   const url = `/api/admin/gst/gstr1?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&format=${fmt}`
-  const res = await fetch(new URL(url, APPROVE_ORIGIN).toString(), {
+  const res = await internalFetch(url, {
     method: 'GET',
     headers: { Cookie: cookieHeader },
   })

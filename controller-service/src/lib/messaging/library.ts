@@ -70,6 +70,12 @@ export async function getLibraryTemplate(channel: Channel, slug: string): Promis
   return t
 }
 
+/** Meta has approved the template. One that isn't goes out as free text, which Meta rejects outside the 24-hour window. */
+export async function whatsappTemplateApproved(slug: string): Promise<boolean> {
+  const t = await getLibraryTemplate('whatsapp', slug)
+  return t?.approval_status === 'approved' && !!t.provider_ref
+}
+
 export interface PageTemplate {
   slug: string
   name: string

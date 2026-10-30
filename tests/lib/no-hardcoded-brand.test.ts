@@ -63,7 +63,6 @@ const ALLOW_FILES = new Set<string>([
   'controller-service/src/lib/catalog/brand.ts', // defines platformBrandName() — the platform default lives here
   'controller-service/src/lib/catalog/site-controls.ts', // DEFAULTS block (tenant-overridable platform defaults)
   'controller-service/src/lib/auth/mfa.ts', // PLATFORM_ISSUER fallback (used only when no tenant brand resolves)
-  'controller-service/src/lib/shared/daily-briefing.ts', // operator ops briefing (platform admin)
   'controller-service/src/lib/shared/mail-audit.ts', // literal only appears in a comment (default now tenant-resolved)
   'controller-service/src/lib/email/certificates.ts', // ecom/platform-admin cert mail; tenant branch already uses tenant.storeName
   'controller-service/src/app/api/(admin)/admin/access-request/route.ts', // operator alert to the platform admin

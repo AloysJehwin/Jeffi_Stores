@@ -93,6 +93,7 @@ export interface ConversationListItem {
   shared: boolean
   last_message_at: string
   message_count: number
+  channel?: string
 }
 
 /** Whose chat is open: the caller's own, or another admin's shared one (read-only). */

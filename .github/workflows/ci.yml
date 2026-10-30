@@ -494,6 +494,21 @@ jobs:
       - name: Every running store's health at the release commit
         run: bash deploy/k8s/bootstrap/smoke.sh "${TAG#local-}" tenants ${{ env.DRY_FLAG }}
 
+  seed-templates:
+    name: Templates · catalog
+    runs-on: ubuntu-latest
+    needs: [smoke-flagship, db-tenant-schema] # the scripts run in the new messaging pod; --tenant-dbs needs the store schema
+    environment: production-release
+    concurrency: { group: deploy-production-seed-templates, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # release-setup computes the tag from history
+      - uses: ./.github/actions/release-setup
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: New catalog templates, email content for unedited copies, WhatsApp {{brand_name}} bodies
+        run: bash deploy/k8s/db/50-seeds.sh ${{ env.DRY_FLAG }}
+
   # ── Mobile ───────────────────────────────────────────────────────────────────────────────────
   # The Play Store app (mobile-service/client) rides the same approval as the web: after `production` is approved, a
   # JavaScript-only change ships as an EAS Update; a native change (new fingerprint) makes EAS build the signed app
@@ -541,7 +556,7 @@ jobs:
   post:
     name: Post
     runs-on: ubuntu-latest
-    needs: [smoke-tenants, cdn, smoke-ai-gateway, mobile-android]
+    needs: [smoke-tenants, seed-templates, cdn, smoke-ai-gateway, mobile-android]
     if: always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy))
     permissions: { actions: read, contents: read }
     steps:

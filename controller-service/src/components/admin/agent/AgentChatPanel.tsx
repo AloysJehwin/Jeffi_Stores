@@ -21,6 +21,7 @@ import {
   Pencil,
   Trash2,
   Lock,
+  MessageCircle,
 } from 'lucide-react'
 import AdminAgentMessage, { AdminAgentUserMessage, internalMessageLabel } from '../AdminAgentMessage'
 import AdminAgentBlocks from '../AdminAgentBlocks'
@@ -188,6 +189,7 @@ function HistoryItem({
         <p className="font-medium text-foreground truncate">{title}</p>
         <p className="flex items-center gap-1 text-[10px] text-foreground-muted">
           {c.shared && <Users className="w-3 h-3 text-accent-500" aria-label="Shared" />}
+          {c.channel === 'whatsapp' && <MessageCircle className="w-3 h-3 text-emerald-600" aria-label="WhatsApp" />}
           {new Date(c.last_message_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} · {c.message_count} msg
         </p>
       </button>

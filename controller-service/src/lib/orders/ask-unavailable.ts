@@ -4,13 +4,22 @@ import { sendAuditedMail, mailShell, escapeHtml } from '@/lib/email/shared'
 import { currentBrandNameAsync, customerMailFromAsync } from '@/lib/catalog/brand'
 import { orderUrlById } from '@/lib/shared/customer-links'
 import { askAboutOrder } from '@/lib/replies/ask'
+import { whatsappTemplateApproved } from '@/lib/messaging/library'
+import { sendItemUnavailableWhatsApp } from '@/lib/shared/whatsapp'
 
-// One item in an order can't be supplied: ask the customer what they'd like. Their reply (refund it,
-// an alternative, wait, cancel) is read against the order as an out_of_stock question.
+// One item in an order can't be supplied: ask the customer what they'd like, by email and (once Meta has
+// approved the template) WhatsApp. Their reply (refund it, an alternative, wait, cancel) is read against
+// the order as an out_of_stock question.
 
-export async function askAboutUnavailableItem(orderId: string, itemId: string): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+type Channel = 'email' | 'whatsapp'
+
+export async function askAboutUnavailableItem(
+  orderId: string,
+  itemId: string
+): Promise<{ ok: true; channels: Channel[] } | { ok: false; error: string; status: number }> {
   const o = await queryOne<any>(
     `SELECT o.id, o.order_number, o.status, o.user_id, COALESCE(NULLIF(u.email, ''), o.customer_email) AS email,
+            COALESCE(NULLIF(u.phone, ''), o.customer_phone) AS phone,
             COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), o.customer_name) AS name,
             oi.product_name, oi.variant_name, oi.quantity
        FROM orders o JOIN order_items oi ON oi.order_id = o.id AND oi.id = $2 LEFT JOIN users u ON u.id = o.user_id
@@ -19,7 +28,8 @@ export async function askAboutUnavailableItem(orderId: string, itemId: string): 
   )
   if (!o) return { ok: false, error: 'Item not found', status: 404 }
   if (!['pending', 'confirmed', 'processing'].includes(o.status)) return { ok: false, error: 'This order has already shipped or closed', status: 400 }
-  if (!o.email) return { ok: false, error: 'No customer email for this order', status: 400 }
+  const whatsapp = !!o.phone && (await whatsappTemplateApproved('order/out-of-stock'))
+  if (!o.email && !whatsapp) return { ok: false, error: 'No customer email or WhatsApp number for this order', status: 400 }
 
   const item = `${o.product_name}${o.variant_name ? ` (${o.variant_name})` : ''}`
   const [brand, from, link] = await Promise.all([currentBrandNameAsync(), customerMailFromAsync(), orderUrlById(orderId)])
@@ -38,10 +48,10 @@ export async function askAboutUnavailableItem(orderId: string, itemId: string): 
       </ul>
       ${link ? `<div class="cta"><a href="${link}" class="button">View your order</a></div>` : ''}`,
   })
-  try {
-    await askAboutOrder(
-      'out_of_stock',
-      orderId,
+  const sends: Array<[Channel, () => Promise<unknown>]> = []
+  if (o.email)
+    sends.push([
+      'email',
       () =>
         sendAuditedMail({
           to: o.email,
@@ -54,10 +64,20 @@ export async function askAboutUnavailableItem(orderId: string, itemId: string): 
           entityId: orderId,
           userId: o.user_id,
         }),
-      { refId: itemId }
-    )
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Could not send the email', status: 502 }
+    ])
+  if (whatsapp)
+    sends.push([
+      'whatsapp',
+      async () => {
+        if (!(await sendItemUnavailableWhatsApp({ phone: o.phone, orderNumber: o.order_number, item: `${item} × ${Number(o.quantity)}` })))
+          throw new Error('WhatsApp not sent')
+      },
+    ])
+  const results = await askAboutOrder('out_of_stock', orderId, () => Promise.allSettled(sends.map(([, send]) => send())), { refId: itemId })
+  const channels = sends.filter((_, i) => results[i].status === 'fulfilled').map(([c]) => c)
+  if (!channels.length) {
+    const err = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
+    return { ok: false, error: err?.reason instanceof Error ? err.reason.message : 'Could not ask the customer', status: 502 }
   }
+  return { ok: true, channels }
 }
