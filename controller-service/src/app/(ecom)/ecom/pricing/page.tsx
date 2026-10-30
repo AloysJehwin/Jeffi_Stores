@@ -2,6 +2,16 @@ import { Fragment } from 'react'
 import Link from 'next/link'
 import { listPlans, planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-registry'
 import PricingCards from './PricingCards'
+import { computePlans, computeSpecEnabled, getCatalog } from '@/lib/compute/catalog'
+import { presetSpec } from '@/lib/compute/presets'
+import { quoteSpec } from '@/lib/compute/pricing'
+
+/** Each plan's default server size, priced, when owners pay for servers separately. */
+async function serversFrom(): Promise<Record<string, number> | null> {
+  if (!computeSpecEnabled()) return null
+  const [catalog, plans] = await Promise.all([getCatalog(), computePlans()])
+  return Object.fromEntries(plans.filter(p => p.defaultPreset).map(p => [p.slug, quoteSpec(presetSpec(p.defaultPreset!), catalog).inrMonth]))
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +33,7 @@ function Dash() {
 }
 
 export default async function PricingPage() {
-  const [plans, matrix] = await Promise.all([listPlans(), planFeatureMatrix()])
+  const [plans, matrix, servers] = await Promise.all([listPlans(), planFeatureMatrix(), serversFrom()])
   const ordered = [...plans].sort((a, b) => a.tier - b.tier)
 
   const has = (planSlug: string, scopeKey: string | null) => {
@@ -53,7 +63,7 @@ export default async function PricingPage() {
 
       {/* Interactive plan cards with monthly/yearly toggle */}
       <section className="w-full px-4 sm:px-6 lg:px-12 pb-12 sm:pb-16">
-        <PricingCards plans={plans} />
+        <PricingCards plans={plans} serversFrom={servers} />
       </section>
 
       {/* Detailed comparison table */}

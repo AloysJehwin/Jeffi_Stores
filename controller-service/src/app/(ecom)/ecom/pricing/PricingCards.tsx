@@ -19,7 +19,7 @@ const PLAN_BLURB: Record<string, string> = {
   enterprise: 'Dedicated infra, custom domain, priority support.',
 }
 
-export default function PricingCards({ plans }: { plans: Plan[] }) {
+export default function PricingCards({ plans, serversFrom }: { plans: Plan[]; serversFrom?: Record<string, number> | null }) {
   const [interval, setInterval] = useState<Interval>('monthly')
   const ordered = [...plans].sort((a, b) => a.tier - b.tier)
 
@@ -62,6 +62,11 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
                 {interval === 'yearly' && (
                   <div className="text-xs org-sage-text font-semibold mt-0.5">
                     2 months free
+                  </div>
+                )}
+                {serversFrom?.[p.slug] != null && (
+                  <div className="text-xs text-foreground-secondary mt-1">
+                    + servers from ₹{Math.round(serversFrom[p.slug]).toLocaleString('en-IN')}/mo + GST, paid from your wallet
                   </div>
                 )}
               </div>
