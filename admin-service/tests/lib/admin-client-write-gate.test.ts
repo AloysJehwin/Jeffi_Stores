@@ -28,18 +28,18 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // server reports the list's :write scope (canShare), which the routes enforce again.
   'packages/store-core/src/components/admin/kit/saved-views.tsx',
   // Platform control plane: gated by host + isPlatformAdmin, not a tenant scope.
-  'packages/store-core/src/components/admin/ecom/tabs/KycActionButtons.tsx',
-  'packages/store-core/src/components/admin/ecom/TenantActions.tsx',
-  'packages/store-core/src/components/admin/ecom/PurgeCustomerButton.tsx',
+  'controller-service/src/components/admin/ecom/tabs/KycActionButtons.tsx',
+  'controller-service/src/components/admin/ecom/TenantActions.tsx',
+  'controller-service/src/components/admin/ecom/PurgeCustomerButton.tsx',
   'controller-service/src/app/(admin)/admin/ecom/billing/[id]/AccountModeToggle.tsx',
   'controller-service/src/app/(admin)/admin/ecom/billing/[id]/DeliveryModeToggle.tsx',
   // DNS re-sync for a tenant: platform-admin only (isPlatformAdmin), same as the sibling toggles.
   'controller-service/src/app/(admin)/admin/ecom/billing/[id]/DnsResyncButton.tsx',
   'controller-service/src/app/(admin)/admin/ecom/billing/[id]/ReconcileButton.tsx',
-  'packages/store-core/src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
-  'packages/store-core/src/components/admin/ecom/tabs/BillingReconcile.tsx',
-  'packages/store-core/src/components/admin/ecom/tabs/MessagingTab.tsx',
-  'packages/store-core/src/components/admin/ecom/tabs/ServiceApprovals.tsx',
+  'controller-service/src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
+  'controller-service/src/components/admin/ecom/tabs/BillingReconcile.tsx',
+  'controller-service/src/components/admin/ecom/tabs/MessagingTab.tsx',
+  'controller-service/src/components/admin/ecom/tabs/ServiceApprovals.tsx',
   // Google Ads manager view (unlink): the page redirects non-platform admins and the API is isPlatformAdmin-only.
   'controller-service/src/app/(admin)/admin/ecom/google-ads/ManagedAccountsClient.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
@@ -92,7 +92,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
 ])
 
 function mutatingClientComponents(): string[] {
-  const files = glob.sync(['{admin,controller}-service/src/app/\\(admin\\)/admin/**/*.tsx', 'packages/store-core/src/components/admin/**/*.tsx'], {
+  const files = glob.sync(['{admin,controller}-service/src/app/\\(admin\\)/admin/**/*.tsx', '{packages/store-core,controller-service}/src/components/admin/**/*.tsx'], {
     cwd: process.cwd(),
   })
   const out: string[] = []

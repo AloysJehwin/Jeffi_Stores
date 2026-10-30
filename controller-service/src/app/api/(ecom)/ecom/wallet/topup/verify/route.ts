@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { ownerApi } from '@/lib/ecom/owner-api'
+import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { getRazorpayInstance } from '@/lib/payments/razorpay'
 import { creditTopup } from '@/lib/billing/topup'
 

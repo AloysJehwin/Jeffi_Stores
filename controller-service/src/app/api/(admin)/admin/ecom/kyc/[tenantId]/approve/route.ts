@@ -13,7 +13,7 @@ import {
   getOwnerBankWithRoute,
   persistLinkedAccountToOwnerBank,
 } from '@/lib/tenant-registry'
-import { createRazorpaySubscription } from '@/lib/payments/razorpay-subscriptions'
+import { createRazorpaySubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import {
   createLinkedAccount,
   createRouteStakeholder,
@@ -27,9 +27,9 @@ import { sendKycApprovedEmail, sendServicesReviewedEmail } from '@/lib/shared/ec
 import { hasService, reviewServiceApproval, controlPlanePool } from '@/lib/tenant-registry'
 // TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
-import { isPaymentBypassed, bypassAuditNote } from '@/lib/payments/ecom-payment-bypass'
-import { tenantCapacityError } from '@/lib/k8s/capacity'
-import { startStore } from '@/lib/provisioning/start-store'
+import { isPaymentBypassed, bypassAuditNote } from '@controller/lib/payments/ecom-payment-bypass'
+import { tenantCapacityError } from '@controller/lib/k8s/capacity'
+import { startStore } from '@controller/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         /* never mask the original failure */
       }
       try {
-        const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+        const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
         await alertProvisioningFailure(tenant.slug, 'razorpay_linked_account', reason, tenantId)
       } catch {
         /* alerting must never mask the original failure */

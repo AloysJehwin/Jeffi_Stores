@@ -39,12 +39,9 @@ const LOCATION_ALLOW_FILES = new Set<string>([
 
 // Platform-only surfaces: Jeffi branding here is correct.
 const ALLOW_PREFIXES = [
-  'controller-service/src/app/(ecom)/',
-  'controller-service/src/app/api/(ecom)/', // the ecom portal's own API (portal prompts, service gates, platform billing)
-  'packages/store-core/src/components/admin/ecom/', // platform control plane (admin.jeffistores.in /admin/ecom, isPlatformAdmin)
+  'controller-service/src/', // the control plane: the ecom portal and console, platform admin, provisioning; no store runs it
   'packages/store-core/src/lib/billing/', // Jeffi's own invoices/top-ups billed to tenants
   'storefront-service/src/app/(marketing)/',
-  'controller-service/src/app/(portal)/',
   'storefront-service/src/app/(portal)/',
   'packages/store-core/src/lib/provisioning/',
   'packages/store-core/src/lib/legals/',

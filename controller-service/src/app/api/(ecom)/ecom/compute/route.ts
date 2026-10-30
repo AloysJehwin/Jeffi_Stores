@@ -4,9 +4,9 @@ import { z } from 'zod'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { getOwnerTenants } from '@/lib/tenant-registry'
-import { checkComputeChange } from '@/lib/compute/change'
-import { ComputeSpecSchema } from '@/lib/compute/schema'
-import { saveDesiredCompute } from '@/lib/compute/store'
+import { checkComputeChange } from '@controller/lib/compute/change'
+import { ComputeSpecSchema } from '@controller/lib/compute/schema'
+import { saveDesiredCompute } from '@controller/lib/compute/store'
 
 export const dynamic = 'force-dynamic'
 

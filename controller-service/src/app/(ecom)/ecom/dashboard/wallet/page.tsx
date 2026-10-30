@@ -1,4 +1,4 @@
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { getTenantWallet } from '@/lib/payments/wallet'
 import PageHeader from '../_components/PageHeader'
 import WalletClient from './WalletClient'

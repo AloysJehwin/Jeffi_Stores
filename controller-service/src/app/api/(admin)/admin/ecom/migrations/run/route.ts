@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { runMigrationFanout, getMigrationRuns } from '@/lib/tenant-migrations'
+import { runMigrationFanout, getMigrationRuns } from '@controller/lib/tenant-migrations'
 
 export const dynamic = 'force-dynamic'
 

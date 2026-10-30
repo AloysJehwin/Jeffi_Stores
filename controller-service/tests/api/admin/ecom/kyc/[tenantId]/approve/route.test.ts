@@ -27,7 +27,7 @@ vi.mock('@/lib/tenant-registry', () => ({
   setSubscriptionStatus: vi.fn(),
 }))
 
-vi.mock('@/lib/payments/razorpay-subscriptions', () => ({
+vi.mock('@controller/lib/payments/razorpay-subscriptions', () => ({
   createRazorpaySubscription: vi.fn(),
 }))
 
@@ -64,7 +64,7 @@ vi.mock('@/lib/shared/ecom-emails', () => ({
   sendServicesReviewedEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/provisioning/start-store', () => ({ startStore: vi.fn() }))
+vi.mock('@controller/lib/provisioning/start-store', () => ({ startStore: vi.fn() }))
 
 // ---------------------------------------------------------------------------
 // Imports after mocks
@@ -86,7 +86,7 @@ import {
   persistLinkedAccountToOwnerBank,
   reviewServiceApproval,
 } from '@/lib/tenant-registry'
-import { createRazorpaySubscription } from '@/lib/payments/razorpay-subscriptions'
+import { createRazorpaySubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import {
   createLinkedAccount,
   createRouteStakeholder,

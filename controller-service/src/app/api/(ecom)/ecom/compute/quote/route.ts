@@ -3,9 +3,9 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { getCatalog, planCompute } from '@/lib/compute/catalog'
-import { ComputeSpecSchema } from '@/lib/compute/schema'
-import { quoteForPlan } from '@/lib/compute/quote'
+import { getCatalog, planCompute } from '@controller/lib/compute/catalog'
+import { ComputeSpecSchema } from '@controller/lib/compute/schema'
+import { quoteForPlan } from '@controller/lib/compute/quote'
 
 export const dynamic = 'force-dynamic'
 

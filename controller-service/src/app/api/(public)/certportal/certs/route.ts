@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { verifyPortalToken, PORTAL_COOKIE } from '@/lib/auth/portal-session'
-import { certNeedsMobileCheck, inCertStore } from '@/lib/auth/cert-mobile'
+import { certNeedsMobileCheck, inCertStore } from '@controller/lib/auth/cert-mobile'
 import { maskMobile } from '@/lib/auth/admin-mobile'
 
 export const dynamic = 'force-dynamic'

@@ -5,7 +5,7 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import OnboardEntry from './OnboardEntry'
 import OnboardWizard from './OnboardWizard'
 import PaymentTrigger from './PaymentTrigger'
-import { computeSpecEnabled } from '@/lib/compute/catalog'
+import { computeSpecEnabled } from '@controller/lib/compute/catalog'
 
 export const dynamic = 'force-dynamic'
 

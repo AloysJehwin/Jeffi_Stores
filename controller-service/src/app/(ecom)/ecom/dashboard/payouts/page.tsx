@@ -1,4 +1,4 @@
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { getOwnerBankWithRoute, listLinkedPayouts } from '@/lib/tenant-registry'
 import PageHeader from '../_components/PageHeader'
 import { PayoutsTable } from '../_components/finance'

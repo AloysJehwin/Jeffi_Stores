@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope, isPlatformAdmin } from '@/lib/auth/scopes'
-import { checkComputeChange } from '@/lib/compute/change'
-import { ComputeSpecSchema } from '@/lib/compute/schema'
-import { getTenantCompute, patchTenantCompute, saveDesiredCompute } from '@/lib/compute/store'
+import { checkComputeChange } from '@controller/lib/compute/change'
+import { ComputeSpecSchema } from '@controller/lib/compute/schema'
+import { getTenantCompute, patchTenantCompute, saveDesiredCompute } from '@controller/lib/compute/store'
 
 export const dynamic = 'force-dynamic'
 

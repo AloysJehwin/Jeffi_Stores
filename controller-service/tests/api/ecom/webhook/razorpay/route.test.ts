@@ -10,7 +10,7 @@ const m = vi.hoisted(() => ({
   query: vi.fn(),
 }))
 
-vi.mock('@/lib/payments/razorpay-subscriptions', () => ({ verifyWebhookSignature: vi.fn() }))
+vi.mock('@controller/lib/payments/razorpay-subscriptions', () => ({ verifyWebhookSignature: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({
   getTenantBySubscriptionId: m.bySub,
   setSubscriptionStatus: m.subStatus,
@@ -20,7 +20,7 @@ vi.mock('@/lib/tenant-registry', () => ({
 }))
 vi.mock('@/lib/shared/ecom-emails', () => ({ sendStoreLiveEmail: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/billing/platform-invoice', () => ({ issuePlatformInvoiceLater: vi.fn() }))
-vi.mock('@/lib/provisioning/trigger', () => ({
+vi.mock('@controller/lib/provisioning/trigger', () => ({
   triggerProvisioning: m.trigger,
   resolveRestoreKey: vi.fn().mockResolvedValue(undefined),
 }))

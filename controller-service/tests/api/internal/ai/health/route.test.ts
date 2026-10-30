@@ -9,11 +9,11 @@ vi.mock('@/lib/shared/redis', () => ({
     del: async (k: string) => (store.delete(k) ? 1 : 0),
   }),
 }))
-vi.mock('@/lib/provisioning/alerts', () => ({ sendPlatformAlert: vi.fn(async () => {}) }))
+vi.mock('@controller/lib/provisioning/alerts', () => ({ sendPlatformAlert: vi.fn(async () => {}) }))
 
 import { GET } from '@controller/app/api/(internal)/internal/ai/health/route'
-import { INCIDENT_KEY } from '@/lib/shared/ai-health'
-import { sendPlatformAlert } from '@/lib/provisioning/alerts'
+import { INCIDENT_KEY } from '@controller/lib/shared/ai-health'
+import { sendPlatformAlert } from '@controller/lib/provisioning/alerts'
 
 const OLLAMA = 'http://ollama.test:11434'
 const mockFetch = vi.fn()

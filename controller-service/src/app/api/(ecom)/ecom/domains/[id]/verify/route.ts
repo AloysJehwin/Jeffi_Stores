@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await setCustomDomainStatus(id, 'verified')
     // k8s: the domain's Certificate + IngressRoute exist only once the namespace is re-applied.
     if (tenant.status === 'active') {
-      const { triggerProvisioning } = await import('@/lib/provisioning/trigger')
+      const { triggerProvisioning } = await import('@controller/lib/provisioning/trigger')
       await triggerProvisioning({
         action: 'reprovision',
         tenantId: tenant.id,

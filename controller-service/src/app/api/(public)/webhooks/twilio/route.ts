@@ -4,9 +4,9 @@ import { query, queryOne } from '@/lib/shared/db'
 import { logMessage } from '@/lib/shared/message-log'
 import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
-import { handleInboundWhatsApp } from '@/lib/support/inbound'
+import { handleInboundWhatsApp } from '@controller/lib/support/inbound'
 import { onCustomerMessage } from '@/lib/support/agent'
-import { routeAdminWhatsApp } from '@/lib/admin-agent/whatsapp'
+import { routeAdminWhatsApp } from '@controller/lib/admin-agent/whatsapp'
 
 export const dynamic = 'force-dynamic'
 

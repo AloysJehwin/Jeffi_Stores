@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
-import { StatusPill } from '@/components/admin/ecom/EcomUI'
+import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 
 interface BillingTenant {
   id: string

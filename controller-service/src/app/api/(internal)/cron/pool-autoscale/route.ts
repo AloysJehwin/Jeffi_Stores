@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runPoolAutoscale } from '@/lib/tenancy/pool-autoscale'
+import { runPoolAutoscale } from '@controller/lib/tenancy/pool-autoscale'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'

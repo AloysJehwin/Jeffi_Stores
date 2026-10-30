@@ -7,7 +7,7 @@ vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryOne: vi.fn(), queryMany
 vi.mock('@/lib/shared/message-log', () => ({ logMessage: vi.fn() }))
 vi.mock('@/lib/tenant-registry/host-resolution', () => ({ lookupTenantContextById: vi.fn() }))
 vi.mock('@/lib/tenancy/tenant-context', () => ({ runWithTenantContext: vi.fn() }))
-vi.mock('@/lib/support/inbound', () => ({ handleInboundWhatsApp: vi.fn() }))
+vi.mock('@controller/lib/support/inbound', () => ({ handleInboundWhatsApp: vi.fn() }))
 vi.mock('@/lib/support/agent', () => ({ onCustomerMessage: vi.fn() }))
 
 import { POST } from '@controller/app/api/(public)/webhooks/twilio/route'
@@ -15,7 +15,7 @@ import { query, queryOne } from '@/lib/shared/db'
 import { logMessage } from '@/lib/shared/message-log'
 import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
-import { handleInboundWhatsApp } from '@/lib/support/inbound'
+import { handleInboundWhatsApp } from '@controller/lib/support/inbound'
 import { onCustomerMessage } from '@/lib/support/agent'
 
 const mockQuery = vi.mocked(query)

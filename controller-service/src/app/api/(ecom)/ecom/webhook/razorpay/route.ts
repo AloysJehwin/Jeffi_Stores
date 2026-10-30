@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyWebhookSignature } from '@/lib/payments/razorpay-subscriptions'
+import { verifyWebhookSignature } from '@controller/lib/payments/razorpay-subscriptions'
 import { getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
 import { issuePlatformInvoiceLater } from '@/lib/billing/platform-invoice'
-import { triggerProvisioning } from '@/lib/provisioning/trigger'
-import { startStore } from '@/lib/provisioning/start-store'
+import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
+import { startStore } from '@controller/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
 

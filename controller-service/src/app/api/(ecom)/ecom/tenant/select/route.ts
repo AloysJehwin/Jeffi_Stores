@@ -5,7 +5,7 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 import { getOwnerTenants } from '@/lib/tenant-registry'
-import { TENANT_COOKIE } from '@/lib/ecom/owner-context'
+import { TENANT_COOKIE } from '@controller/lib/ecom/owner-context'
 
 export const dynamic = 'force-dynamic'
 

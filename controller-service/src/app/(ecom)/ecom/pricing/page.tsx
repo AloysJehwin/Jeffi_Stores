@@ -2,9 +2,9 @@ import { Fragment } from 'react'
 import Link from 'next/link'
 import { listPlans, planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-registry'
 import PricingCards from './PricingCards'
-import { computePlans, computeSpecEnabled, getCatalog } from '@/lib/compute/catalog'
+import { computePlans, computeSpecEnabled, getCatalog } from '@controller/lib/compute/catalog'
 import { presetSpec } from '@/lib/compute/presets'
-import { quoteSpec } from '@/lib/compute/pricing'
+import { quoteSpec } from '@controller/lib/compute/pricing'
 
 /** Each plan's default server size, priced, when owners pay for servers separately. */
 async function serversFrom(): Promise<Record<string, number> | null> {

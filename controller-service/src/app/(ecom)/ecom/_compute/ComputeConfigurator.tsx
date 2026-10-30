@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChoiceCards, Segmented, fieldCls } from '../_ui'
 import { DEDICATED_PRESETS, PRESETS, presetOf, presetSpec, withHighAvailability } from '@/lib/compute/presets'
-import { monthlyTotal, quoteSpec, type Quote } from '@/lib/compute/pricing'
+import { monthlyTotal, quoteSpec, type Quote } from '@controller/lib/compute/pricing'
 import { LIMITS, planCompatibilityError, smallestFittingNode, validateSpec, type Validation } from '@/lib/compute/validate'
 import { activeServices, cloneSpec, type Catalog, type ComputeSpec, type PodSize, type PresetKey, type ServiceName } from '@/lib/compute/spec'
 
