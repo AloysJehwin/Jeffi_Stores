@@ -1,5 +1,5 @@
 // Renders deploy/k8s/platform/cronjobs.yaml from the CRON_JOBS registry.
-// Run: npx jiti deploy/k8s/gen-cronjobs.ts   (tests/lib/k8s fails if the file drifts)
+// Run: npx jiti deploy/k8s/gen-cronjobs.ts   (controller-service/tests/lib/k8s fails if the file drifts)
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CRON_JOBS, cronSchedule, type CronJob } from '../../packages/store-core/src/lib/shared/cron-jobs'

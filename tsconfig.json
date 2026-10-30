@@ -26,6 +26,6 @@
       "@business/*": ["./business-service/src/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", "controller-service/.next/types/**/*.ts", "storefront-service/.next/types/**/*.ts", "admin-service/.next/types/**/*.ts", "business-service/.next/types/**/*.ts", "next-env.d.ts"],
+  "include": ["**/*.ts", "**/*.tsx", "next-env.d.ts"],
   "exclude": ["node_modules", "ai-platform", "packages/api-contracts", "packages/bulk", "packages/design-tokens", "packages/draft-locks", "packages/gst", "packages/list-filters", "packages/mail-shell", "packages/pricing", "packages/push", "packages/service-auth", "packages/tenancy", "packages/wallet", "messaging-service", "document-service", "public-api-service", "mobile-service"]
 }
