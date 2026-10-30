@@ -1625,8 +1625,8 @@
     "semantic_hash": ""
   },
   "docs/MICROSERVICES.md": {
-    "mtime": 1793379299.805109,
-    "ast_hash": "cb85d6865cc387ac5ffe951f0d733d6f",
+    "mtime": 1793380226.3144753,
+    "ast_hash": "05d5f721cc85b92d76b53495729aa20e",
     "semantic_hash": ""
   },
   "messaging-service/src/mail-shell.ts": {
@@ -1870,8 +1870,8 @@
     "semantic_hash": ""
   },
   "controller-service/.eslintrc.js": {
-    "mtime": 1793376170.1469474,
-    "ast_hash": "a80640bf206aeab7dfddf7dc4e945e87",
+    "mtime": 1793380044.044127,
+    "ast_hash": "e0ab4b988f4907bebd5c8ce047eb8000",
     "semantic_hash": ""
   },
   "controller-service/cluster-server.js": {
@@ -1920,18 +1920,18 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/billing/[id]/view/page.tsx": {
-    "mtime": 1792943291.5643945,
-    "ast_hash": "d50df0307839d93fdcddcbe4ac53bac2",
+    "mtime": 1793379990.2379904,
+    "ast_hash": "f3978771942a81403fb6c344995e69dd",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/billing/_components/EcomBillingMobileList.tsx": {
-    "mtime": 1792943291.5646234,
-    "ast_hash": "c1a40cbc3fe2c76465f38de78ecc6829",
+    "mtime": 1793379990.237382,
+    "ast_hash": "a8fdfe1a81bf791f284fb15568d2f26a",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/billing/page.tsx": {
-    "mtime": 1792943291.5648777,
-    "ast_hash": "70279f16db102273bfa6c50198e126a7",
+    "mtime": 1793379990.2372477,
+    "ast_hash": "5d152825b83d1db8e1c76d590dc496a3",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/customers/[id]/page.tsx": {
@@ -1940,18 +1940,18 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/customers/[id]/view/page.tsx": {
-    "mtime": 1792943291.5653987,
-    "ast_hash": "31f2b4d9379eb3cde855374a1d5738f6",
+    "mtime": 1793379990.235565,
+    "ast_hash": "5c0bba5f8ee0a541752135eb8198e869",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/customers/_components/EcomCustomersMobileList.tsx": {
-    "mtime": 1792943291.5656114,
-    "ast_hash": "2aa75c965a2cc4b69a2d2b3105457a9c",
+    "mtime": 1793379990.23531,
+    "ast_hash": "927ba31dd69e0f63d53a4ff7d76a6c90",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/customers/page.tsx": {
-    "mtime": 1792943291.5658505,
-    "ast_hash": "e4f2dba2c99d68cdae99dc01edf78cc6",
+    "mtime": 1793379990.235109,
+    "ast_hash": "7c859441b925a7cceb624b3c7accfa34",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/instances/[id]/page.tsx": {
@@ -1960,8 +1960,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/instances/[id]/view/page.tsx": {
-    "mtime": 1792943291.5672517,
-    "ast_hash": "85592653dc5a51ce7813b7fc83d27ca5",
+    "mtime": 1793379990.2371259,
+    "ast_hash": "b9734b2cb3a9f9a408b8a2b4efab424b",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/instances/_components/EcomInstancesMobileList.tsx": {
@@ -1970,8 +1970,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/instances/page.tsx": {
-    "mtime": 1792943291.567751,
-    "ast_hash": "c7e157b366a1ae27ec186d3feb8d8519",
+    "mtime": 1793379990.236754,
+    "ast_hash": "b1c68be9ff6a0cc17e8085177a5fbd03",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/store-status/[id]/page.tsx": {
@@ -1980,13 +1980,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/store-status/[id]/view/page.tsx": {
-    "mtime": 1792943291.5682738,
-    "ast_hash": "cf83f2b2268065fdef310c29e41c0aca",
+    "mtime": 1793379990.2363393,
+    "ast_hash": "3b4f99a295622977e8b4f0f6a0ce9e3c",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/store-status/page.tsx": {
-    "mtime": 1792943291.5686166,
-    "ast_hash": "79d72ee876433d95a67517823768347a",
+    "mtime": 1793379990.2359529,
+    "ast_hash": "d49e1eb4ed32d42812cf4647b13dfc91",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/layout.tsx": {
@@ -2025,8 +2025,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/OwnerAuthForm.tsx": {
-    "mtime": 1792943291.6693773,
-    "ast_hash": "aa03d074f692cb59a8da54764c2d5571",
+    "mtime": 1793379990.2201357,
+    "ast_hash": "9204ae63f6cebdcc9616259049e9a8f4",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/Shapes.tsx": {
@@ -2370,8 +2370,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/add-store/page.tsx": {
-    "mtime": 1792943291.6838322,
-    "ast_hash": "c9c53d7a0e89756d9fdfda4e44d776e9",
+    "mtime": 1793379990.2242134,
+    "ast_hash": "47e6b3e5caccb04a4097046cb5cde5bd",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/api-keys/ApiKeysClient.tsx": {
@@ -2385,8 +2385,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/api-keys/page.tsx": {
-    "mtime": 1792943291.6846757,
-    "ast_hash": "109a53ac5a11e34e12cb3b77e025bf26",
+    "mtime": 1793379990.2231262,
+    "ast_hash": "269eb8c9606e491322b31af64f6b818a",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/billing/BillingClient.tsx": {
@@ -2400,8 +2400,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/billing/page.tsx": {
-    "mtime": 1792943291.6854517,
-    "ast_hash": "c4a391023909425c2da14ddf6403b1bb",
+    "mtime": 1793379990.2250834,
+    "ast_hash": "b6947497fee3e0884400f7d58804b640",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/business/loading.tsx": {
@@ -2410,8 +2410,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/business/page.tsx": {
-    "mtime": 1792943291.6857982,
-    "ast_hash": "72a58dbbd65294f2948629a95e87ea49",
+    "mtime": 1793379990.2229893,
+    "ast_hash": "9af911a582dba53fc07a85be4cd16b5b",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/delivery/loading.tsx": {
@@ -2420,8 +2420,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/delivery/page.tsx": {
-    "mtime": 1792943291.6861572,
-    "ast_hash": "588887ecb391a21344cc6640d34211aa",
+    "mtime": 1793379990.2241123,
+    "ast_hash": "7d677a3b2ce55222437d0637d79146d1",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/documents/BulkDocuments.tsx": {
@@ -2445,8 +2445,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/documents/page.tsx": {
-    "mtime": 1792943291.687009,
-    "ast_hash": "f10772958290e863d141b791cf07261d",
+    "mtime": 1793379990.2243228,
+    "ast_hash": "1e41b9e132233a84a7ef66e991d95cd2",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/domains/loading.tsx": {
@@ -2455,13 +2455,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/domains/page.tsx": {
-    "mtime": 1792943291.6878982,
-    "ast_hash": "1b23e282c8e3dd6411c1b5d0ef145e4d",
+    "mtime": 1793379990.2228336,
+    "ast_hash": "585fb074509b257625c1e22e6b25db9e",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/layout.tsx": {
-    "mtime": 1793372187.9128976,
-    "ast_hash": "3c3ea560ade3accb843cc93d31160c15",
+    "mtime": 1793379990.221897,
+    "ast_hash": "39fa5df18efce7b29ed6d1f86b5c3f29",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/ledger/loading.tsx": {
@@ -2470,8 +2470,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/ledger/page.tsx": {
-    "mtime": 1792943291.6885645,
-    "ast_hash": "a93ed19720340b2bbb988fabea5bfd64",
+    "mtime": 1793379990.222412,
+    "ast_hash": "f20b4ef59553c4ff2da1e4fbde97c32a",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/loading.tsx": {
@@ -2495,8 +2495,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/messaging/page.tsx": {
-    "mtime": 1792943291.6893692,
-    "ast_hash": "f779a22dddb6598480754479b6167ed2",
+    "mtime": 1793379990.2244353,
+    "ast_hash": "49827e8be89e1eb3abe2a77dce41a028",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/nav.ts": {
@@ -2505,8 +2505,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/page.tsx": {
-    "mtime": 1792943291.6896465,
-    "ast_hash": "4a888f9c4984a78de1861c2d98f2557a",
+    "mtime": 1793379990.2222595,
+    "ast_hash": "c7441e258486dcc5f1bcc1a3ea993081",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/payouts/PayoutsClient.tsx": {
@@ -2520,8 +2520,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/payouts/page.tsx": {
-    "mtime": 1793364853.1941807,
-    "ast_hash": "ba90405fae56eec653d0389665a4a668",
+    "mtime": 1793379990.2247486,
+    "ast_hash": "718137dc6a328abe1c348be2ae0ef226",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/transactions/loading.tsx": {
@@ -2530,8 +2530,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/transactions/page.tsx": {
-    "mtime": 1792943291.6916444,
-    "ast_hash": "69cb7f484f6d37582242b8fc1c444e4c",
+    "mtime": 1793379990.2232842,
+    "ast_hash": "3d567799d1ff3379548a1521197b1af6",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/wallet/WalletClient.tsx": {
@@ -2545,8 +2545,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/wallet/page.tsx": {
-    "mtime": 1792943291.6923869,
-    "ast_hash": "b635e76fd9db1bee60b0725e9218a001",
+    "mtime": 1793379990.22399,
+    "ast_hash": "ed17fe0cc736ad3550d90b29c47e571c",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/layout.tsx": {
@@ -2560,13 +2560,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/onboard/OnboardWizard.tsx": {
-    "mtime": 1793376026.6945546,
-    "ast_hash": "151a6a1331196b49d2ab947b3df92aee",
+    "mtime": 1793379990.2208025,
+    "ast_hash": "aa67396db77167a75b877eb8e99b7d57",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/onboard/PaymentTrigger.tsx": {
-    "mtime": 1792943291.6934714,
-    "ast_hash": "439ac2d34e22504fa493387502f8a84c",
+    "mtime": 1793379990.2205806,
+    "ast_hash": "f5a9768ccee054e0ff030c553cc9dd39",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/onboard/ServicePicker.tsx": {
@@ -2580,13 +2580,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/onboard/page.tsx": {
-    "mtime": 1793369685.9535172,
-    "ast_hash": "cb1010bc7bc285f817eeb14f1be56890",
+    "mtime": 1793379990.220974,
+    "ast_hash": "f7693913f7539c1c3df3565bc4f46d93",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/onboard/success/page.tsx": {
-    "mtime": 1793376026.695147,
-    "ast_hash": "f9013490ee0152e3c3d8392fb1e1ac25",
+    "mtime": 1793379990.2214384,
+    "ast_hash": "d019bacf844101449fbfbb108d5014f0",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/page.tsx": {
@@ -2600,8 +2600,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/pricing/page.tsx": {
-    "mtime": 1793369919.6536918,
-    "ast_hash": "f8ff429700a4b6aedde2c6f83c80ba1d",
+    "mtime": 1793379990.225192,
+    "ast_hash": "3032ccf001845c643e1fa9a8fdcf6d99",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/signin/page.tsx": {
@@ -2650,8 +2650,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/dns/resync/route.ts": {
-    "mtime": 1792943291.7635937,
-    "ast_hash": "72c76ab44f5ac477c7803ab88aacbf5f",
+    "mtime": 1793379990.2342482,
+    "ast_hash": "7c9e9a9f28f070fd8cb00d081f3d3037",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/reconcile-settlements/route.ts": {
@@ -2675,13 +2675,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/customers/[id]/deprovision/route.ts": {
-    "mtime": 1792943291.7667854,
-    "ast_hash": "870840ce67c3aba7572f9876c59ddc18",
+    "mtime": 1793379990.2329211,
+    "ast_hash": "76822b7a6209c1fa16c681ff6e55b334",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/customers/[id]/disable-instance/route.ts": {
-    "mtime": 1792943291.767005,
-    "ast_hash": "904af386f7ad0654ba0e5a29de68ab8e",
+    "mtime": 1793379990.233184,
+    "ast_hash": "8b35e3f01a30f1dc883cb3bb062f8eeb",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/customers/[id]/messaging/[...path]/route.ts": {
@@ -2690,13 +2690,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/customers/[id]/provision/route.ts": {
-    "mtime": 1792943291.7675328,
-    "ast_hash": "8ed9d1b64be5a4dcbf1e4cbe09b8d0eb",
+    "mtime": 1793379990.2326279,
+    "ast_hash": "468c227b9f070d060cd21816ab558f3a",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/customers/[id]/provisioning/route.ts": {
-    "mtime": 1792943291.7677479,
-    "ast_hash": "08bd67585b4bfd9d78735a7199a60dba",
+    "mtime": 1793379990.2330618,
+    "ast_hash": "91ea2c425f8155eaaf6b85ab0cf822e9",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/customers/[id]/purge/route.ts": {
@@ -2705,8 +2705,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/customers/[id]/retry/route.ts": {
-    "mtime": 1792943291.768547,
-    "ast_hash": "1c2ae4b787040524a9bc03564b10b4d1",
+    "mtime": 1793379990.2327538,
+    "ast_hash": "11466d00da4653bddb7d711a6d044175",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/customers/[id]/services/route.ts": {
@@ -2715,13 +2715,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/kyc/[tenantId]/approve/route.ts": {
-    "mtime": 1793370999.5306284,
-    "ast_hash": "0e4cd1d16dfa5779b7e6d6d07060e057",
+    "mtime": 1793379990.2334766,
+    "ast_hash": "f6f93c855acb210545e8b06b264bcaef",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/kyc/[tenantId]/cert/route.ts": {
-    "mtime": 1792943291.7703924,
-    "ast_hash": "b814acb4b3fed10ad54e8c4911c18261",
+    "mtime": 1793379990.2336338,
+    "ast_hash": "a7eb89c14694991ad921c99f30fb875c",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/kyc/[tenantId]/reject/route.ts": {
@@ -2730,23 +2730,23 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/migrations/run/route.ts": {
-    "mtime": 1792943291.770904,
-    "ast_hash": "4ad7a41b81f731afdb5a9af3296d5991",
+    "mtime": 1793379990.2333395,
+    "ast_hash": "23126842923e0af06659e50f3e08b6ac",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/ai/enrich-field/route.ts": {
-    "mtime": 1792943291.887355,
-    "ast_hash": "841802f6d361a4ad6082c2d7fcc3a8b6",
+    "mtime": 1793379990.2292364,
+    "ast_hash": "ac35b154aeea9a1175cbfb51d31f8ddb",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/api-keys/[id]/route.ts": {
-    "mtime": 1792943291.888952,
-    "ast_hash": "428f79edd0f406b03869853f343314b5",
+    "mtime": 1793379990.2280626,
+    "ast_hash": "86569de7b71a21a45a377adfa1b7dde3",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/api-keys/route.ts": {
-    "mtime": 1792943291.8890831,
-    "ast_hash": "f860137f7cee6be1dde3a69fa196b036",
+    "mtime": 1793379990.2279572,
+    "ast_hash": "1648b695c58f8333a920638fd0421ae9",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/auth/google/route.ts": {
@@ -2775,13 +2775,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/bank/verify/route.ts": {
-    "mtime": 1792943291.8909125,
-    "ast_hash": "00402f9e07572f53bb15437a068f673f",
+    "mtime": 1793379990.2277255,
+    "ast_hash": "65bde4f2c7c091d02dfdb229e7916384",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/billing/change-plan/route.ts": {
-    "mtime": 1793372288.0008888,
-    "ast_hash": "f0ca0d3c356c4a54f076b234aedb1b8a",
+    "mtime": 1793379990.230218,
+    "ast_hash": "2395f772191da6b40a78b100b0daf4e8",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/delivery-account/route.ts": {
@@ -2790,8 +2790,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/domains/[id]/verify/route.ts": {
-    "mtime": 1792943291.8933082,
-    "ast_hash": "3052b17f9ed3670b3ea8cfb6fa0643cf",
+    "mtime": 1793379990.2276013,
+    "ast_hash": "a5a67d02500553e16989ac58ef00cb39",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/domains/route.ts": {
@@ -2800,8 +2800,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/messaging/assets/upload/route.ts": {
-    "mtime": 1792943291.8945637,
-    "ast_hash": "20eb81afa8f5fb0f6bf83c512af5b7b5",
+    "mtime": 1793379990.2298734,
+    "ast_hash": "76e42c7bdd58576bbd7c66a2d9279f22",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/onboard/brand-upload/route.ts": {
@@ -2815,8 +2815,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/onboard/kyc-upload/route.ts": {
-    "mtime": 1792943291.8956165,
-    "ast_hash": "6badf036ff96f19eb2a76ccad5eabc03",
+    "mtime": 1793379990.228503,
+    "ast_hash": "83683e16b334ebefaeda3598e469a225",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/onboard/pincode/route.ts": {
@@ -2830,8 +2830,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/onboard/route.ts": {
-    "mtime": 1792943291.897906,
-    "ast_hash": "a568182b2f1db529b9c6be504d47ca24",
+    "mtime": 1793379990.2281835,
+    "ast_hash": "130165d48966fdc318ce0ca7fc98498b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/onboard/services/route.ts": {
@@ -2840,18 +2840,18 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/onboard/submit/route.ts": {
-    "mtime": 1793369712.684331,
-    "ast_hash": "83b036ebae16294e9fcce05c1a900cff",
+    "mtime": 1793379990.228396,
+    "ast_hash": "40cd5e1a7d2506b3a508085de0b60a41",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/provisioning/route.ts": {
-    "mtime": 1792943291.9000351,
-    "ast_hash": "fcbac20ef427b6d216aca9335804a7e6",
+    "mtime": 1793379990.227836,
+    "ast_hash": "f299fc9e52a72d7369cd2dcc4718e71f",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/services/add/route.ts": {
-    "mtime": 1792943291.901981,
-    "ast_hash": "bf80d3b96dad2ef601515507b0315e33",
+    "mtime": 1793379990.2299874,
+    "ast_hash": "bcf020037bb5c5e3a91cfea8b23d8fde",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/site-reachability/route.ts": {
@@ -2860,43 +2860,43 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/svc/[service]/[...path]/route.ts": {
-    "mtime": 1792943291.903702,
-    "ast_hash": "70344d8641044110cb7467bf760d4fc0",
+    "mtime": 1793379990.228603,
+    "ast_hash": "4cc0db3f5f693ac4ba639541618d98bc",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/tenant/select/route.ts": {
-    "mtime": 1792943291.9048986,
-    "ast_hash": "92f457ee2bc8c5b51ea4fd52e507c75b",
+    "mtime": 1793379990.2273378,
+    "ast_hash": "60a7a5a4d01803eb3f6ed7ef61b3a369",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/wallet/route.ts": {
-    "mtime": 1792943291.9056132,
-    "ast_hash": "0ff96a2508c088632648be28075b73ce",
+    "mtime": 1793379990.229454,
+    "ast_hash": "bea72d53daa3f6e1514510a5c5191486",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/wallet/topup/create-order/route.ts": {
-    "mtime": 1792943291.9060526,
-    "ast_hash": "211657cc472021c577b7f7f6712dae7a",
+    "mtime": 1793379990.2296584,
+    "ast_hash": "26753b2040429e8d5b72db2be636c06a",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/wallet/topup/verify/route.ts": {
-    "mtime": 1792943291.9063365,
-    "ast_hash": "799d01593fb7a9b60eaff5339c4d62a9",
+    "mtime": 1793379990.229557,
+    "ast_hash": "4dc4df945bb6d794d6914f9a1a41ec8b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/webhook/razorpay/route.ts": {
-    "mtime": 1792943291.9067142,
-    "ast_hash": "b64a361b6ea096d3341494f8fbb71db0",
+    "mtime": 1793379990.2271962,
+    "ast_hash": "0656a7b377c9647a6edfe60d17b97b13",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/cron/fanout/route.ts": {
-    "mtime": 1793377422.1585689,
-    "ast_hash": "b8ebef27dfb660095574074e81aef2e9",
+    "mtime": 1793379990.2270398,
+    "ast_hash": "f2e91cd169dc604895dcdac68c43011b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/cron/pool-autoscale/route.ts": {
-    "mtime": 1792943291.9184709,
-    "ast_hash": "d0ccc0a7f8ab19f03c71df7bef2d990f",
+    "mtime": 1793379990.2268794,
+    "ast_hash": "346dc1b433499c0f8e69ecc57d52822a",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/cron/reconcile-settlements/route.ts": {
@@ -2915,8 +2915,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/internal/ai/health/route.ts": {
-    "mtime": 1792943291.9242196,
-    "ast_hash": "0f330aa7020c8dacd647e0263cbda9f8",
+    "mtime": 1793379990.2266154,
+    "ast_hash": "1a62ce12c7abff1088156f1c48bade80",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/internal/cron-record/route.ts": {
@@ -2925,23 +2925,23 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/internal/import/worker/route.ts": {
-    "mtime": 1792943291.9247477,
-    "ast_hash": "db39e92faaaef9e7d96da64b28a402e3",
+    "mtime": 1793379990.2267356,
+    "ast_hash": "94630fbe66ac71c710331186e400ff16",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/internal/provisioning/advance/route.ts": {
-    "mtime": 1792943291.925461,
-    "ast_hash": "f36e964101d55738f1af77f479d0f640",
+    "mtime": 1793379990.225858,
+    "ast_hash": "483b54b926e282313e77ed6ad3f0be49",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/internal/provisioning/reconcile/route.ts": {
-    "mtime": 1792943291.925888,
-    "ast_hash": "f71d662aa72e5603aa02949b92f9754a",
+    "mtime": 1793379990.2255423,
+    "ast_hash": "d042396e905cc453dc430f66a27a312b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/internal/provisioning/worker/route.ts": {
-    "mtime": 1793371983.888379,
-    "ast_hash": "0b9ab37ac5840f9fc86f87b315647f12",
+    "mtime": 1793379990.2264626,
+    "ast_hash": "4d5cca451e466c90dafb81c15625eb8c",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/certportal/auth/google/route.ts": {
@@ -2965,13 +2965,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/certportal/certs/[serial]/download/route.ts": {
-    "mtime": 1793309173.0187356,
-    "ast_hash": "bbadee729dc4b8b5c19901e07740d0b1",
+    "mtime": 1793379990.2310114,
+    "ast_hash": "3a94230f98306eec35c1873fc5d16268",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/certportal/certs/route.ts": {
-    "mtime": 1793309173.0180976,
-    "ast_hash": "38b7bddf6c22d30fff76cec6555e5b75",
+    "mtime": 1793379990.2308946,
+    "ast_hash": "defe5ede1175793a11eaeccb42e543df",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/webhooks/aws-messaging/status/route.ts": {
@@ -2985,23 +2985,23 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/webhooks/twilio/route.ts": {
-    "mtime": 1793310425.9308028,
-    "ast_hash": "40f655c735f67288ae4aece838f6440f",
+    "mtime": 1793379990.2318757,
+    "ast_hash": "41097bfd476462cc764563c76b0a127c",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/webhooks/twilio/status/route.ts": {
-    "mtime": 1793265636.239507,
-    "ast_hash": "1f43e5fdb7076470aa17de98050f1f0d",
+    "mtime": 1793379990.2321687,
+    "ast_hash": "c7caf660b18222c6872e9e968f1fe3b9",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/internal/migrations/fanout/route.ts": {
-    "mtime": 1792943291.993054,
-    "ast_hash": "2314cd814dd27a522dc1d0d8c769d851",
+    "mtime": 1793379990.2306736,
+    "ast_hash": "4097bbbc9677ef380672fcf87626f7dc",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/internal/migrations/files-fanout/route.ts": {
-    "mtime": 1792943291.9932568,
-    "ast_hash": "e76d5ad3b9c04c5d732868f29a4e28b4",
+    "mtime": 1793379990.2305577,
+    "ast_hash": "be76ed808bf7dc735cd9f3fb0f041e2c",
     "semantic_hash": ""
   },
   "controller-service/src/app/layout.tsx": {
@@ -3030,8 +3030,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/internal/provisioning/reconcile-k8s/route.ts": {
-    "mtime": 1792943291.9256752,
-    "ast_hash": "b2ddd5550cf7a5ecc29109b50ff84c25",
+    "mtime": 1793379990.2263167,
+    "ast_hash": "22028624205fe7bb907b72d7d8f7ef3e",
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/doc-hosts-dns.sh": {
@@ -3170,8 +3170,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/play/route.ts": {
-    "mtime": 1792943291.899315,
-    "ast_hash": "3576f81cd5644451fbca239429d4a129",
+    "mtime": 1793379990.229764,
+    "ast_hash": "ce3315618d1c21a58bc8b64c0b9c85d8",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/_ui/choice.tsx": {
@@ -3210,13 +3210,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/services/ServicesClient.tsx": {
-    "mtime": 1792943291.6904945,
-    "ast_hash": "56cca6aedcc6a632a9dddd0465821c1a",
+    "mtime": 1793379990.2249677,
+    "ast_hash": "ee25c5ac603d5e849cbdde579d547612",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/services/page.tsx": {
-    "mtime": 1792943291.690614,
-    "ast_hash": "704926ee3addfa1f259262cacc150b01",
+    "mtime": 1793379990.2248518,
+    "ast_hash": "276a0767d79e23cf0d3e815a4ed9d176",
     "semantic_hash": ""
   },
   "database/ads.sql": {
@@ -3225,8 +3225,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/google-ads/ManagedAccountsClient.tsx": {
-    "mtime": 1792943291.5660648,
-    "ast_hash": "1fc74bfa52d1dc14ad27b344ae855528",
+    "mtime": 1793379990.2357957,
+    "ast_hash": "56c6c799cedc2dcd41a12f93b87f39ac",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/google-ads/page.tsx": {
@@ -3235,13 +3235,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/google-ads/[customerId]/route.ts": {
-    "mtime": 1792943291.769317,
-    "ast_hash": "c0524de5b7e8aaa2a9a06240f485b190",
+    "mtime": 1793379990.23392,
+    "ast_hash": "32985c5ab40b7bcc9f7dd6577e84b66b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/google-ads/route.ts": {
-    "mtime": 1792943291.769432,
-    "ast_hash": "46f9509108848516ab6c25142b647aa3",
+    "mtime": 1793379990.2337751,
+    "ast_hash": "b18cb45e5deffcff9ab86da606d0b449",
     "semantic_hash": ""
   },
   "database/channels.sql": {
@@ -3290,43 +3290,43 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/billing/_components/EcomBillingOverview.tsx": {
-    "mtime": 1792943291.5647607,
-    "ast_hash": "adbee2e1f3cfe7457b8c4cc9e7f43f68",
+    "mtime": 1793379990.2375085,
+    "ast_hash": "1eaa50b9c1ba45acaa0295ddf5354a7b",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/customers/_components/EcomCustomersOverview.tsx": {
-    "mtime": 1792943291.5657392,
-    "ast_hash": "9e0153d70719c219e4f57c1036adc14c",
+    "mtime": 1793379990.2354338,
+    "ast_hash": "24c29f23969ae78b068d97f08eb2ba9a",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/instances/_components/EcomInstancesOverview.tsx": {
-    "mtime": 1792943291.5676394,
-    "ast_hash": "0e144a9a89c47348bccb100a841a1525",
+    "mtime": 1793379990.2368867,
+    "ast_hash": "b73c71271ad101eac16176ed201377ee",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/store-status/_components/EcomStoreStatusOverview.tsx": {
-    "mtime": 1792943291.5684984,
-    "ast_hash": "44a86bd0e8c1956e5fa5c89a776f16cc",
+    "mtime": 1793379990.23613,
+    "ast_hash": "d6fc7a42abb8d806ed97e69d826b121b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/billing/overview/route.ts": {
-    "mtime": 1792943291.7663834,
-    "ast_hash": "114d554fe18d8572d0222c32b45c3162",
+    "mtime": 1793379990.234772,
+    "ast_hash": "cb2a10e0db4308071da6ee0af020dc79",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/customers/overview/route.ts": {
-    "mtime": 1792943291.7690046,
-    "ast_hash": "813b97a56eafd710a15affe4313059f8",
+    "mtime": 1793379990.2324724,
+    "ast_hash": "00c03d7ba85a9a3a792c61508183360b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/instances/overview/route.ts": {
-    "mtime": 1792943291.7697446,
-    "ast_hash": "becbf544ae630a8cbd11e8b9846d48f1",
+    "mtime": 1793379990.234461,
+    "ast_hash": "7871760dd5a8765fe881af46c7cd6978",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/store-status/overview/route.ts": {
-    "mtime": 1792943291.7712023,
-    "ast_hash": "99f65174da82583761a906155e2acf41",
+    "mtime": 1793379990.2343585,
+    "ast_hash": "73b9ed2344ae27afc3aadcec28faacf8",
     "semantic_hash": ""
   },
   "ai-platform/gateway/src/files.ts": {
@@ -3435,13 +3435,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/_components/EcomTables.tsx": {
-    "mtime": 1793115874.1185381,
-    "ast_hash": "5106562eb32ea52b8414798e7ab2b218",
+    "mtime": 1793379990.2366126,
+    "ast_hash": "54887a34adfc19d640565e899106dbc3",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/billing/[id]/BillingTables.tsx": {
-    "mtime": 1793115874.1192179,
-    "ast_hash": "caebd885128f2e5cc0c7ec51a4c3e963",
+    "mtime": 1793379990.2378588,
+    "ast_hash": "9f155974d331878c87f7801d112ce83e",
     "semantic_hash": ""
   },
   "docs/plans/ADMIN_LAYOUT_STANDARD.md": {
@@ -3485,8 +3485,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/ai/template-scenario/route.ts": {
-    "mtime": 1792943291.8885186,
-    "ast_hash": "69af83e5f6149ea54b33752da555689a",
+    "mtime": 1793379990.2293484,
+    "ast_hash": "85e348948005ec2ad6018fc5ca2f0a15",
     "semantic_hash": ""
   },
   "messaging-service/scripts/backfill-legacy-wa-to-v2.ts": {
@@ -4630,13 +4630,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/onboard/success/PurchaseBeacon.tsx": {
-    "mtime": 1792943291.6940916,
-    "ast_hash": "a64f4ef1d320f60ad70e9d12edee8804",
+    "mtime": 1793379990.221171,
+    "ast_hash": "cdc2613732a250fe65357ca938db8dd1",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/billing/ad-free/route.ts": {
-    "mtime": 1792943291.8912728,
-    "ast_hash": "8a8bbce6426a639116fbadacd40fddbe",
+    "mtime": 1793379990.230335,
+    "ast_hash": "376dab1f0a37d23c3f85a9e3139220b9",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/cron/ad-free-renew/route.ts": {
@@ -5820,8 +5820,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/webhooks/aws-messaging/route.ts": {
-    "mtime": 1793310393.9255943,
-    "ast_hash": "7ba415c35094d39589ee9de6499a959a",
+    "mtime": 1793379990.2316382,
+    "ast_hash": "5a2c4c40229da27c7c5278d099e9e4bd",
     "semantic_hash": ""
   },
   "database/drive.sql": {
@@ -5930,8 +5930,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/webhooks/ses-inbound/route.ts": {
-    "mtime": 1793286379.593319,
-    "ast_hash": "da463ec9a96f3353fd1bae2fcfc4d213",
+    "mtime": 1793379990.2314336,
+    "ast_hash": "c926c105fb48f66d5dcfd82341ef9db1",
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/ses-inbound.sh": {
@@ -5970,13 +5970,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/certportal/mobile/send/route.ts": {
-    "mtime": 1793309173.0422156,
-    "ast_hash": "349bf580e84d940b13606e96e0c7360f",
+    "mtime": 1793379990.231222,
+    "ast_hash": "efe5e7f57710e24ac9d9f35a11193f1b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/certportal/mobile/verify/route.ts": {
-    "mtime": 1793309173.0535898,
-    "ast_hash": "86cfdcd14910bf7d26a2671a9c2cfa90",
+    "mtime": 1793379990.2311144,
+    "ast_hash": "5cc9c083bdef6e0b6b63a4c5c4508ee3",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/settings/compute-pricing/ComputePricingClient.tsx": {
@@ -5990,23 +5990,23 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/_compute/ComputeConfigurator.tsx": {
-    "mtime": 1793374255.9334965,
-    "ast_hash": "c80b6031a086d38634323d9c2a8e0f87",
+    "mtime": 1793379990.22161,
+    "ast_hash": "7e5f7daeced0fea1ebd62443706c7988",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/compute-pricing/route.ts": {
-    "mtime": 1793369768.8730497,
-    "ast_hash": "11a4b0579151c44b06f55e87eded0536",
+    "mtime": 1793379990.2346609,
+    "ast_hash": "478fd0273469eb4400ec4c0c0d1ad925",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/compute/catalog/route.ts": {
-    "mtime": 1793372187.9134238,
-    "ast_hash": "8cc6efb867725ab6f60225c3997d85f2",
+    "mtime": 1793379990.229126,
+    "ast_hash": "ee3d3d8d475e2390eac6c3f3588c2f93",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/compute/quote/route.ts": {
-    "mtime": 1793369484.0715365,
-    "ast_hash": "a723562cef94c7310b17dd3e6da85946",
+    "mtime": 1793379990.2289205,
+    "ast_hash": "2b8fb290229f3f5b184f98112b48538d",
     "semantic_hash": ""
   },
   "deploy/k8s/db/refresh-compute-prices.sh": {
@@ -6015,23 +6015,23 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/compute/ComputeClient.tsx": {
-    "mtime": 1793372221.2330277,
-    "ast_hash": "6405af571d121a79861679554b838861",
+    "mtime": 1793379990.2236283,
+    "ast_hash": "ba439dcd05d1b3f13ddbe1638f2201cb",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/compute/page.tsx": {
-    "mtime": 1793372205.9725938,
-    "ast_hash": "0df2cbea631bbc02169f7ee286f0f71a",
+    "mtime": 1793379990.2238698,
+    "ast_hash": "184d7db50280505d761c4b14e4254145",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/compute/route.ts": {
-    "mtime": 1793372805.4522784,
-    "ast_hash": "4b0210b4aeafa15a6b9ec90a4331b289",
+    "mtime": 1793379990.2341368,
+    "ast_hash": "2c55aa132e7678865366554153786648",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(ecom)/ecom/compute/route.ts": {
-    "mtime": 1793372139.871182,
-    "ast_hash": "300dff1edc4d22be4da87bb7707b9a92",
+    "mtime": 1793379990.2288198,
+    "ast_hash": "2f89fcca10d8042faacef8929921293f",
     "semantic_hash": ""
   },
   "packages/store-core/.eslintrc.js": {
@@ -6732,106 +6732,6 @@
   "packages/store-core/src/components/admin/drive/api.ts": {
     "mtime": 1793270516.5950236,
     "ast_hash": "f4fb223002b88f32eb9b1dd10a4069d0",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/EcomFilters.tsx": {
-    "mtime": 1792943292.0160277,
-    "ast_hash": "176a3f54d5a81e81e35aaa084ebaaf7a",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/EcomUI.tsx": {
-    "mtime": 1792943292.0161662,
-    "ast_hash": "923c994893addd64e0b653ee94752d6f",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/ProvisioningLogsClient.tsx": {
-    "mtime": 1792943292.0163314,
-    "ast_hash": "2c2726cc752bb1ea2e432ee7bbcb9b47",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/PurgeCustomerButton.tsx": {
-    "mtime": 1792943292.016458,
-    "ast_hash": "b1b48a969f2e16f2df8c773d33a94956",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/TenantActions.tsx": {
-    "mtime": 1792943292.0165887,
-    "ast_hash": "b0cebf666cb5541cf345d3b1c47221eb",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/TenantObjectHeader.tsx": {
-    "mtime": 1792943292.0167081,
-    "ast_hash": "a1ecb92dc504e131dee93a5a54b206d3",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/AccessTab.tsx": {
-    "mtime": 1792943292.0170572,
-    "ast_hash": "be9fbb8810de7162f7a37480650fd1cc",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/BillingReconcile.tsx": {
-    "mtime": 1792943292.017182,
-    "ast_hash": "82917c84dcb794d3a3ff36fc22b2d403",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/CommerceTab.tsx": {
-    "mtime": 1792943292.0173047,
-    "ast_hash": "73d1725830178aad5869a875c279f6be",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/ComputeRetryButton.tsx": {
-    "mtime": 1793373065.3671603,
-    "ast_hash": "d7abbe21b7cc9e3cbb095d049f09bee2",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/InfrastructureTab.tsx": {
-    "mtime": 1793370833.341526,
-    "ast_hash": "f25751c3599f1f960f458152f92ce3bb",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/K8sWorkloadSection.tsx": {
-    "mtime": 1793374423.0437956,
-    "ast_hash": "2e3c0cca9bea53a487a6889f33a002e3",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/KycActionButtons.tsx": {
-    "mtime": 1792943292.0177062,
-    "ast_hash": "d3aedc3f39958559e9f8e6e79430bb68",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/KycTab.tsx": {
-    "mtime": 1792943292.0178213,
-    "ast_hash": "43fa1f841b8dc02cb1800ed5fd1a1ac5",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/MessagingTab.tsx": {
-    "mtime": 1793088370.6559887,
-    "ast_hash": "e93684caf6e5cb8ba8dcbf0b656017f6",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/OverviewTab.tsx": {
-    "mtime": 1792943292.018565,
-    "ast_hash": "575eba11790843995188cdaaedccce89",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/ProvisioningTab.tsx": {
-    "mtime": 1792943292.0187027,
-    "ast_hash": "4b72a066fea5d933911dcc93279d0b51",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/ServiceApprovals.tsx": {
-    "mtime": 1792943292.0188541,
-    "ast_hash": "c168875cd3ecd7df6a049faa14151444",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/ShipmentCorrection.tsx": {
-    "mtime": 1792943292.0189788,
-    "ast_hash": "b5468438fc72e6bc8efd41396c7e2c38",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/components/admin/ecom/tabs/ShipmentsTab.tsx": {
-    "mtime": 1792943292.019115,
-    "ast_hash": "1779d4268ebe4eb534c52b744acdc0f4",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/admin/email-composer/EmailBlockBuilder.tsx": {
@@ -8484,11 +8384,6 @@
     "ast_hash": "260d2c71b81620c5b40f8300c1459b56",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/admin-agent/internal-session.ts": {
-    "mtime": 1793310069.2108943,
-    "ast_hash": "6dc5341f54e7c961f2ca29c0880a1819",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/admin-agent/page-context.ts": {
     "mtime": 1793260070.4862165,
     "ast_hash": "023ba68eee2e042bc20fd990a8dd131e",
@@ -8557,11 +8452,6 @@
   "packages/store-core/src/lib/admin-agent/vision.ts": {
     "mtime": 1793290797.7022953,
     "ast_hash": "9dabdb6bffb0e582f36de478a1f62b3b",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/admin-agent/whatsapp.ts": {
-    "mtime": 1793310357.4403384,
-    "ast_hash": "80a8b6ffd2eeea917a0352b1ead56d82",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/admin/business-customers.ts": {
@@ -8882,11 +8772,6 @@
   "packages/store-core/src/lib/auth/auth.ts": {
     "mtime": 1792943292.076368,
     "ast_hash": "16a1a49d1b86b78de93e5ac2c7372516",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/auth/cert-mobile.ts": {
-    "mtime": 1793309172.9788983,
-    "ast_hash": "164e22110082d238f83345db262bdab0",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/auth/cookie-domain.ts": {
@@ -9364,11 +9249,6 @@
     "ast_hash": "e129b5ac800c24be5e7eec3f9806ca72",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/catalog/kyc-upload.ts": {
-    "mtime": 1792943292.1152704,
-    "ast_hash": "b082c151e1c1c825ece5fe82ab4c3755",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/catalog/listing-model.ts": {
     "mtime": 1793206545.7633605,
     "ast_hash": "23f199a505b4f046b1ec89b98eb06f9c",
@@ -9377,11 +9257,6 @@
   "packages/store-core/src/lib/catalog/meta.ts": {
     "mtime": 1792943292.1155367,
     "ast_hash": "ce3579fa985cc3138a87ed1a59373c96",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/catalog/onboard-schema.ts": {
-    "mtime": 1793369712.6839037,
-    "ast_hash": "98278e590b0a723b4691e713dfdb9941",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/catalog/pricing.ts": {
@@ -9442,11 +9317,6 @@
   "packages/store-core/src/lib/catalog/product-filters.ts": {
     "mtime": 1792943292.1171563,
     "ast_hash": "d41b5962b0eae82b9f288a197ca7a907",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/catalog/product-import.ts": {
-    "mtime": 1793177792.801875,
-    "ast_hash": "5fe4e9434350823abcd4b40eae49408d",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/catalog/product-label.ts": {
@@ -9614,11 +9484,6 @@
     "ast_hash": "8f199d8004a0469b9b9cc76f350448f9",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/client/ecom-analytics.ts": {
-    "mtime": 1792943292.1250134,
-    "ast_hash": "ac353330e67d1262a89c5a0b945f3d0d",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/client/fp-beacon.ts": {
     "mtime": 1792943292.125305,
     "ast_hash": "563fae8884c3f8a5a93bbb98b9a33c9a",
@@ -9634,21 +9499,6 @@
     "ast_hash": "46fc31c03f9c9f4f0199ec428fdf76fe",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/compute/catalog.ts": {
-    "mtime": 1793374573.7734993,
-    "ast_hash": "ca3e867b9300b968fa961a07ef7f62e0",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/compute/change.ts": {
-    "mtime": 1793372120.4892323,
-    "ast_hash": "c70e6fc20bcc9b205fefb5b36eb188fe",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/compute/changes.ts": {
-    "mtime": 1793372205.9647408,
-    "ast_hash": "b43bb9fca46d745c86593895c98de74f",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/compute/legacy.ts": {
     "mtime": 1793374128.3163524,
     "ast_hash": "2f184169599361092c5d6ebc84bbb7c6",
@@ -9659,39 +9509,9 @@
     "ast_hash": "1e231350027900983e0555fa93db5a88",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/compute/pricing.ts": {
-    "mtime": 1793369346.127225,
-    "ast_hash": "9e3ca2693c2f7944d2440fd51b3a20d7",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/compute/quote.ts": {
-    "mtime": 1793372120.4803123,
-    "ast_hash": "aeda0ec8692db4e84eeee82708d3c7ed",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/compute/resolve.ts": {
-    "mtime": 1793374864.064762,
-    "ast_hash": "542af80d9d40263a4f5a5c7c08c78cff",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/compute/schema.ts": {
-    "mtime": 1793369484.0172193,
-    "ast_hash": "1eb1c21b387dedb7ac3c9a0b08f4bbfe",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/compute/shared-db.ts": {
-    "mtime": 1793371197.297588,
-    "ast_hash": "d833998aba87128a5753387680b7d5f4",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/compute/spec.ts": {
     "mtime": 1793377123.2026432,
     "ast_hash": "306c54eff99f86bfc0d1414d3f9a6b45",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/compute/store.ts": {
-    "mtime": 1793374521.4635024,
-    "ast_hash": "64a67db22abaa9dacf0e15d2a8c5cf65",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/compute/validate.ts": {
@@ -9809,24 +9629,9 @@
     "ast_hash": "a92809bd933b797d34fae0b77166a696",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/ecom/owner-api.ts": {
-    "mtime": 1792943292.1282825,
-    "ast_hash": "b5d88703791bf272b35f959a8c0e8dd1",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/ecom/owner-context.ts": {
-    "mtime": 1792943292.1283917,
-    "ast_hash": "01809a36528d073fc7d6a19f76d1f029",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/ecom/service-client.ts": {
     "mtime": 1792943292.1285067,
     "ast_hash": "bac540626d199bab32adf597847f5419",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/ecom/service-states.ts": {
-    "mtime": 1792943292.1286168,
-    "ast_hash": "0c069c1e8b98e8b00e132b53609f92d7",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/email/auth.ts": {
@@ -10329,11 +10134,6 @@
     "ast_hash": "ad73e3d2f4085af854277bd38b3a63ab",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/google-ads/manager-view.ts": {
-    "mtime": 1792943292.1398668,
-    "ast_hash": "7f88079b99872a00523a3e9c6ffdcc98",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/google-ads/margin-impact.ts": {
     "mtime": 1792943292.140325,
     "ast_hash": "701e16f7da927c6532a50077eaa5f809",
@@ -10434,11 +10234,6 @@
     "ast_hash": "74f3e7587e1c8fb2f492f28755c4cb59",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/import/to-draft.ts": {
-    "mtime": 1792943292.1434238,
-    "ast_hash": "0ab456458254cc7d11af1a35dc1fa7bd",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/import/validate-row.ts": {
     "mtime": 1792943292.143728,
     "ast_hash": "3c68b858b4533378f86ca7d120a5f923",
@@ -10464,11 +10259,6 @@
     "ast_hash": "964afc4224441de6f9e54c9375673adf",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/k8s/capacity.ts": {
-    "mtime": 1793370999.5300803,
-    "ast_hash": "a73e309a397483cda04587b3216d7068",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/k8s/client.ts": {
     "mtime": 1793370696.7099571,
     "ast_hash": "749279643e02317dfbf053717b06f4f3",
@@ -10489,19 +10279,9 @@
     "ast_hash": "a9d54861fac6e844af85fd9d7a9f5976",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/legals/generate.ts": {
-    "mtime": 1792943292.1452367,
-    "ast_hash": "c5974277f601b73abb94d7f96742ba22",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/legals/policies.ts": {
     "mtime": 1792943292.1454027,
     "ast_hash": "0dc01d66c1123fd89c3884dd51b5c6fc",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/legals/provision.ts": {
-    "mtime": 1792943292.1455183,
-    "ast_hash": "91102d0be8e8091fe057309e2c869781",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/loyalty/coupons.ts": {
@@ -10804,11 +10584,6 @@
     "ast_hash": "f1d41c6006149bd4abfb9e45bd7f7e3f",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/orders/tenant-shipments-shared.ts": {
-    "mtime": 1792943292.1549706,
-    "ast_hash": "0e54ea7a8520c2d20245cecaf82d74ca",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/orders/unit-conversion.ts": {
     "mtime": 1792943292.155226,
     "ast_hash": "a6ee8233e586d791626b0c0752c72ae9",
@@ -10907,36 +10682,6 @@
   "packages/store-core/src/lib/overviews/delhivery.ts": {
     "mtime": 1792943292.160851,
     "ast_hash": "9a52cedc8383096d5773ead1752defb1",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/overviews/ecom-billing.ts": {
-    "mtime": 1792943292.1609762,
-    "ast_hash": "958ffdb54d0ce50eec804b7b8ab8bc8c",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/overviews/ecom-customers.ts": {
-    "mtime": 1792943292.1612146,
-    "ast_hash": "ba26862e13a13e9c4c7aefa45959ecdd",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/overviews/ecom-instances.ts": {
-    "mtime": 1792943292.1613457,
-    "ast_hash": "0dc89d6694f69d9ddca5eff620e4b83b",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/overviews/ecom-platform.ts": {
-    "mtime": 1792943292.161497,
-    "ast_hash": "04c3c236eb9d12b363a6813ec84155d4",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/overviews/ecom-route.ts": {
-    "mtime": 1792943292.1616142,
-    "ast_hash": "2fb11c4cfa418ac10068039843de11bf",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/overviews/ecom-store-status.ts": {
-    "mtime": 1792943292.161787,
-    "ast_hash": "b2e968d3d5f16efd5628dfd6a5387d24",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/overviews/inflation.ts": {
@@ -11044,11 +10789,6 @@
     "ast_hash": "79bd5cc20aff106d06f65854469ec895",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/payments/bank-verify.ts": {
-    "mtime": 1792943292.1681466,
-    "ast_hash": "a1d41e148fd02852c0195932e8c9487b",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/payments/capture.ts": {
     "mtime": 1793358455.2944942,
     "ast_hash": "d0a2ab71d0db900cc730a122cd3b34df",
@@ -11057,11 +10797,6 @@
   "packages/store-core/src/lib/payments/dispute-records.ts": {
     "mtime": 1793358904.826291,
     "ast_hash": "406024d5e81371f96de8e2a645854204",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/payments/ecom-payment-bypass.ts": {
-    "mtime": 1792943292.168281,
-    "ast_hash": "4197f2e2dda8671ad9d524610af2d69d",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/payments/external-refund.ts": {
@@ -11127,11 +10862,6 @@
   "packages/store-core/src/lib/payments/razorpay-route.ts": {
     "mtime": 1793364759.063755,
     "ast_hash": "54efbc5f583b5f174c2b06ef07bb5d75",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/payments/razorpay-subscriptions.ts": {
-    "mtime": 1792943292.168863,
-    "ast_hash": "8596bb0d778c6ff579e4ec57be07171d",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/payments/razorpay.ts": {
@@ -11204,74 +10934,9 @@
     "ast_hash": "a64619a620bae3aa6c067fff5a6f002a",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/provisioning/alerts.ts": {
-    "mtime": 1792943292.1699748,
-    "ast_hash": "4de829bed1978f59f5f62a7833fadb28",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/aws-provider.ts": {
-    "mtime": 1793372446.2602232,
-    "ast_hash": "16b9f4a404929d872b4c398987716214",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/compute-reconcile.ts": {
-    "mtime": 1793374755.64348,
-    "ast_hash": "c0404a2520efffaa9e00b80e1e7707d8",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/index.ts": {
-    "mtime": 1792943292.1702356,
-    "ast_hash": "bd567cd0cedc0f4806abb9444ef961c9",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/provider.ts": {
-    "mtime": 1793372449.6885555,
-    "ast_hash": "1ac8f839579c970f4e554d7ce0788a42",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/seed-catalog.ts": {
-    "mtime": 1792943292.1705823,
-    "ast_hash": "e8e67c2d5ec720ed5172308b05a44c94",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/seed-settings.ts": {
-    "mtime": 1792943292.1707492,
-    "ast_hash": "5bed0c3cc9a6e2e64f7e618f6aa5ba03",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/seed.ts": {
-    "mtime": 1792943292.1708891,
-    "ast_hash": "52586e350b48ebaba56675adb9a4f9ca",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/start-store.ts": {
-    "mtime": 1792943292.1710012,
-    "ast_hash": "0abc40ea7413bd7d222ddf6f6eab150c",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/steps.ts": {
-    "mtime": 1793371882.6150625,
-    "ast_hash": "263134700ff3511c7869c237db0acdeb",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/stub-provider.ts": {
-    "mtime": 1793371709.33533,
-    "ast_hash": "2ef87249eb702c77462ce5f740567bfd",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/provisioning/tiers.ts": {
     "mtime": 1793374573.772172,
     "ast_hash": "e263b170a57d7772d0defa3135d72fe5",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/trigger.ts": {
-    "mtime": 1792943292.171582,
-    "ast_hash": "5187147e390aba417d7fb61fba29020a",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/provisioning/user-data.ts": {
-    "mtime": 1792943292.1716964,
-    "ast_hash": "a3ab44759886c06df13dbcbd75a4be51",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/purchasing/leaves-sql.ts": {
@@ -11434,11 +11099,6 @@
     "ast_hash": "ce871cba040e22db5c0c10f78614aca6",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/replies/email-text.ts": {
-    "mtime": 1793286206.332035,
-    "ast_hash": "213d3cd0bff787dc26ac008c77ea6018",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/replies/engine.ts": {
     "mtime": 1793287823.980276,
     "ast_hash": "b23eb1d70bef4ecbedbca24c2ae8d254",
@@ -11582,11 +11242,6 @@
   "packages/store-core/src/lib/shared/ai-feedback.ts": {
     "mtime": 1792943292.1956882,
     "ast_hash": "043ff015441bddd7bdf1a1f29cc2cbd0",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/shared/ai-health.ts": {
-    "mtime": 1792943292.1959033,
-    "ast_hash": "df2710a8cb149837ab32d98c6bb773ad",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/shared/attribution.ts": {
@@ -11819,11 +11474,6 @@
     "ast_hash": "0b0f69708611ffa1dd21ecaba7ad11c6",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/shared/messaging/delivery-status.ts": {
-    "mtime": 1793266878.681748,
-    "ast_hash": "cee41159825550d975bebf9af63269e7",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/shared/messaging/index.ts": {
     "mtime": 1792943292.2121606,
     "ast_hash": "4a11e9a8c4ebd9c9e934a91652a5a89c",
@@ -11837,11 +11487,6 @@
   "packages/store-core/src/lib/shared/messaging/remote.ts": {
     "mtime": 1793286138.6776426,
     "ast_hash": "b03d25b125ef38f7ef9a066332f512cf",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/shared/messaging/sns.ts": {
-    "mtime": 1793265620.9412727,
-    "ast_hash": "fc72fd4ea8d43e0da5ab451822990a68",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/shared/messaging/twilio-provider.ts": {
@@ -11957,11 +11602,6 @@
   "packages/store-core/src/lib/shared/sms.ts": {
     "mtime": 1792943292.2164378,
     "ast_hash": "983d9a6d10c8a972451fdfa5dfe40255",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/shared/ssm-client.ts": {
-    "mtime": 1792943292.2165504,
-    "ast_hash": "1c94425c9731a285905e3ae669008cbd",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/shared/storefront-ai.ts": {
@@ -12249,11 +11889,6 @@
     "ast_hash": "729b8859b4c3963fb83289176173636c",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/support/email-inbound.ts": {
-    "mtime": 1793287824.009231,
-    "ast_hash": "f3c66b10afb8c1e2675a577fb7b23ae4",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/support/email.ts": {
     "mtime": 1793286293.2123175,
     "ast_hash": "ab41197ed331dc743fb462ea7fe441b4",
@@ -12272,11 +11907,6 @@
   "packages/store-core/src/lib/support/http.ts": {
     "mtime": 1793267658.4746392,
     "ast_hash": "f040ca3ddf898a72891fededa875e31f",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/support/inbound.ts": {
-    "mtime": 1793284599.682914,
-    "ast_hash": "f3e8364caea926dc7a07eb366b4c2d00",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/support/messages.ts": {
@@ -12364,16 +11994,6 @@
     "ast_hash": "2ff312e21e78d58609c95b876719528c",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/tenancy/mtls-fleet.ts": {
-    "mtime": 1792943292.2282803,
-    "ast_hash": "4cdf6568498dbaeede3a56d77f54068a",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/tenancy/pool-autoscale.ts": {
-    "mtime": 1792943292.2284005,
-    "ast_hash": "96a3af516297e8dc798065193a9881db",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/tenancy/portal-certs.ts": {
     "mtime": 1792943292.2285187,
     "ast_hash": "dc6e86b3b3322eb758abd481ae0231d7",
@@ -12387,11 +12007,6 @@
   "packages/store-core/src/lib/tenancy/request-tenant.ts": {
     "mtime": 1792943292.228786,
     "ast_hash": "4ccf4f63e2d2c6eb872d25c16bfbcb02",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/tenancy/tenant-admin-provision.ts": {
-    "mtime": 1793371131.0517254,
-    "ast_hash": "22a1d7256bbb4469792d22395cb85a54",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/tenancy/tenant-backup-store.ts": {
@@ -12409,29 +12024,9 @@
     "ast_hash": "d7023cbc49aff8702839f55ed89a53a5",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/tenancy/tenant-db-backup.ts": {
-    "mtime": 1793372882.519509,
-    "ast_hash": "8f66286318b5937bfc6bd876ce59817d",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/tenancy/tenant-dns.ts": {
-    "mtime": 1792943292.229783,
-    "ast_hash": "5e764265994517e6f05aae33b585a7d2",
-    "semantic_hash": ""
-  },
   "packages/store-core/src/lib/tenancy/tenant-mtls.ts": {
     "mtime": 1792943292.2299385,
     "ast_hash": "b145b0ca8772d59814b7e5bea2da72a2",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/tenant-migrations-schema.ts": {
-    "mtime": 1793283895.212845,
-    "ast_hash": "7ee86d0be64d8616aa8449599c1ef1c1",
-    "semantic_hash": ""
-  },
-  "packages/store-core/src/lib/tenant-migrations.ts": {
-    "mtime": 1793002651.3973668,
-    "ast_hash": "c5c02ab0c72bc810c103159cffd455c5",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/tenant-registry/custom-domains.ts": {
@@ -12610,8 +12205,8 @@
     "semantic_hash": ""
   },
   "admin-service/.eslintrc.js": {
-    "mtime": 1793377199.8602302,
-    "ast_hash": "a80640bf206aeab7dfddf7dc4e945e87",
+    "mtime": 1793380044.009673,
+    "ast_hash": "e4e779c22b5e119d82e45a741a2e0d29",
     "semantic_hash": ""
   },
   "admin-service/next.config.js": {
@@ -18335,8 +17930,8 @@
     "semantic_hash": ""
   },
   "business-service/.eslintrc.js": {
-    "mtime": 1793377199.8657837,
-    "ast_hash": "a80640bf206aeab7dfddf7dc4e945e87",
+    "mtime": 1793380044.0174127,
+    "ast_hash": "de2470f4b9282be31260d1e459c43273",
     "semantic_hash": ""
   },
   "business-service/next.config.js": {
@@ -18684,14 +18279,9 @@
     "ast_hash": "6d5c22d19a0417bdb16407704d5bc9e8",
     "semantic_hash": ""
   },
-  "packages/store-core/src/lib/shared/internal-http.ts": {
-    "mtime": 1793377411.4038904,
-    "ast_hash": "48e6f33839e6b09372b64963dc14e347",
-    "semantic_hash": ""
-  },
   "storefront-service/.eslintrc.js": {
-    "mtime": 1793377199.8551605,
-    "ast_hash": "a80640bf206aeab7dfddf7dc4e945e87",
+    "mtime": 1793380044.0021465,
+    "ast_hash": "5b0723e3cdef2ee71c7daca70c9bdb7b",
     "semantic_hash": ""
   },
   "storefront-service/next.config.js": {
@@ -22140,8 +21730,8 @@
     "semantic_hash": ""
   },
   "admin-service/tests/lib/admin-client-write-gate.test.ts": {
-    "mtime": 1793377262.9518309,
-    "ast_hash": "bc9011670b8ee1db7d69619566dfc58b",
+    "mtime": 1793380015.5671499,
+    "ast_hash": "0cb6a9f0feb320abb18c922ac994b13b",
     "semantic_hash": ""
   },
   "admin-service/tests/lib/admin-page-scope-coverage.test.ts": {
@@ -22205,8 +21795,8 @@
     "semantic_hash": ""
   },
   "controller-service/tests/api/admin/ecom/google-ads/route.test.ts": {
-    "mtime": 1793379602.9642284,
-    "ast_hash": "336190a4bbdcd7bad9aeb4322baec835",
+    "mtime": 1793379990.2492793,
+    "ast_hash": "6f51418a5ebe910f9a957bbdf9dabeaa",
     "semantic_hash": ""
   },
   "controller-service/tests/api/admin/ecom/instances/overview/route.test.ts": {
@@ -22215,8 +21805,8 @@
     "semantic_hash": ""
   },
   "controller-service/tests/api/admin/ecom/kyc/[tenantId]/approve/route.test.ts": {
-    "mtime": 1793376026.7832499,
-    "ast_hash": "cb61de301be0baf6c3bb98f7f5364aad",
+    "mtime": 1793379990.2492006,
+    "ast_hash": "42416304bb4615ba5c31a1fc9a5bbe95",
     "semantic_hash": ""
   },
   "controller-service/tests/api/admin/ecom/store-status/overview/route.test.ts": {
@@ -22225,33 +21815,33 @@
     "semantic_hash": ""
   },
   "controller-service/tests/api/cron/fanout/route.test.ts": {
-    "mtime": 1793377411.4342191,
-    "ast_hash": "67d8db80e8fb0f92678e5217788ccd75",
+    "mtime": 1793379990.249978,
+    "ast_hash": "d42f9f7f21327fa025f6d5557b95634f",
     "semantic_hash": ""
   },
   "controller-service/tests/api/ecom/bank/verify/route.test.ts": {
-    "mtime": 1793376026.899903,
-    "ast_hash": "fe554c6929c160037b465848c0cc20a0",
+    "mtime": 1793379990.2497613,
+    "ast_hash": "68f111630620805a1536ff1b8b34b18c",
     "semantic_hash": ""
   },
   "controller-service/tests/api/ecom/onboard/submit/route.test.ts": {
-    "mtime": 1793376026.90049,
-    "ast_hash": "d70d65985779f9d3aadc5164f6a75dd2",
+    "mtime": 1793379990.249811,
+    "ast_hash": "b939ec0f195ec2ce764a8f6a0610e995",
     "semantic_hash": ""
   },
   "controller-service/tests/api/ecom/play/route.test.ts": {
-    "mtime": 1793376026.901067,
-    "ast_hash": "c2a0ba934cd57fee7dc8de42451ee99b",
+    "mtime": 1793379990.249858,
+    "ast_hash": "86ea6fc9713ba69f1e1b271769fb60c2",
     "semantic_hash": ""
   },
   "controller-service/tests/api/ecom/webhook/razorpay/route.test.ts": {
-    "mtime": 1793376026.9016774,
-    "ast_hash": "0fbf0921f49483636ce372ef50b9aff7",
+    "mtime": 1793379990.249712,
+    "ast_hash": "f324baa9123578d63c769295bad6b227",
     "semantic_hash": ""
   },
   "controller-service/tests/api/internal/ai/health/route.test.ts": {
-    "mtime": 1793376026.9076812,
-    "ast_hash": "880b87cbf88fac2ef2ecb795a6338b1d",
+    "mtime": 1793379990.2494698,
+    "ast_hash": "96caaed5e6df37740f4dcb5e4be8f79e",
     "semantic_hash": ""
   },
   "controller-service/tests/api/internal/cron-record/route.test.ts": {
@@ -22260,8 +21850,8 @@
     "semantic_hash": ""
   },
   "controller-service/tests/api/internal/migrations/fanout/route.test.ts": {
-    "mtime": 1793376026.9091153,
-    "ast_hash": "5b24f5f105a25c22944abad495080d39",
+    "mtime": 1793379990.2493398,
+    "ast_hash": "2d1f1b99c33cef6508712fe5d425f82c",
     "semantic_hash": ""
   },
   "controller-service/tests/api/webhooks/razorpay/route.draft-recovery.test.ts": {
@@ -22290,13 +21880,13 @@
     "semantic_hash": ""
   },
   "controller-service/tests/api/webhooks/twilio-status.test.ts": {
-    "mtime": 1793376026.952487,
-    "ast_hash": "4da5d01b60d72cbd6ff3ed0edb184c6c",
+    "mtime": 1793379990.2495308,
+    "ast_hash": "74362d8c9e3c9df9c2ca1e47db3713eb",
     "semantic_hash": ""
   },
   "controller-service/tests/api/webhooks/twilio/route.test.ts": {
-    "mtime": 1793376026.9532082,
-    "ast_hash": "ddaedaf8e71db9f84baa85af6c75845e",
+    "mtime": 1793379990.2496536,
+    "ast_hash": "568c4b36a484441b794fee11184f7433",
     "semantic_hash": ""
   },
   "controller-service/tests/components/ecom/bulk-documents-rows.test.ts": {
@@ -22779,11 +22369,6 @@
     "ast_hash": "16a9c4d9d7cf8cd4fa794d49a4e4c34c",
     "semantic_hash": ""
   },
-  "packages/store-core/tests/lib/bank-verify.test.ts": {
-    "mtime": 1790931257.1160054,
-    "ast_hash": "9186a593beedf1ada5678b9e49d70144",
-    "semantic_hash": ""
-  },
   "packages/store-core/tests/lib/blurhash-encode.test.ts": {
     "mtime": 1790931257.1190863,
     "ast_hash": "9f9247d59d53a2bb0fa38e31e99c56eb",
@@ -23009,11 +22594,6 @@
     "ast_hash": "72a06e49c953b026f20e10670ad43888",
     "semantic_hash": ""
   },
-  "packages/store-core/tests/lib/compute/pricing.test.ts": {
-    "mtime": 1793374713.8915997,
-    "ast_hash": "3c14c9c2f03303a62249bc684092219f",
-    "semantic_hash": ""
-  },
   "packages/store-core/tests/lib/cookie-domain.test.ts": {
     "mtime": 1790931257.1785054,
     "ast_hash": "b28e69b1b923326d268141d7a89dcf40",
@@ -23109,11 +22689,6 @@
     "ast_hash": "15fada29b6b8feed1d87099e84ac4590",
     "semantic_hash": ""
   },
-  "packages/store-core/tests/lib/ecom-payment-bypass.test.ts": {
-    "mtime": 1790931257.2291045,
-    "ast_hash": "d01db1e49576d662e5910fbc3e6888d8",
-    "semantic_hash": ""
-  },
   "packages/store-core/tests/lib/edd-cache.test.ts": {
     "mtime": 1790931257.232041,
     "ast_hash": "02c3eaf5e08961139deeec46d121e4cb",
@@ -23167,11 +22742,6 @@
   "packages/store-core/tests/lib/format.test.ts": {
     "mtime": 1792943293.4687426,
     "ast_hash": "590a8c20324f93000a5ef38f5830d764",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/google-ads/account-manager.test.ts": {
-    "mtime": 1792943293.4691594,
-    "ast_hash": "64a8929e85dcb1357f87ebc340f5371f",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/google-ads/accounts.test.ts": {
@@ -23379,16 +22949,6 @@
     "ast_hash": "d592d6ec00e69593395b02238377abf0",
     "semantic_hash": ""
   },
-  "packages/store-core/tests/lib/import/blank-optional-integration.test.ts": {
-    "mtime": 1792943293.477484,
-    "ast_hash": "5e81a3794c1f2ad848ef54939c38b52c",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/import/data-source-edge.test.ts": {
-    "mtime": 1792943293.4779634,
-    "ast_hash": "63df609a88f364c85a22feccf7abd850",
-    "semantic_hash": ""
-  },
   "packages/store-core/tests/lib/import/google-sync.test.ts": {
     "mtime": 1790931257.2902608,
     "ast_hash": "28aef3f6bfe1840831d692c1db7ac9ab",
@@ -23407,16 +22967,6 @@
   "packages/store-core/tests/lib/import/sheet-links.test.ts": {
     "mtime": 1790931257.2935512,
     "ast_hash": "17e4e4a454c4f9497fcfd66de3771918",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/import/subscription-columns.test.ts": {
-    "mtime": 1792943293.4786339,
-    "ast_hash": "eaf4dbb0d7e85d353c5251ea1b702909",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/import/to-draft-backfill.test.ts": {
-    "mtime": 1792943293.4788005,
-    "ast_hash": "ff12728e63d45e7db777a3d6316cc23a",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/india-pincode-state.test.ts": {
@@ -23462,11 +23012,6 @@
   "packages/store-core/tests/lib/jwt.test.ts": {
     "mtime": 1791295875.9206977,
     "ast_hash": "c314a3e1dbe9547dc8854445e3b06207",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/k8s/capacity.test.ts": {
-    "mtime": 1792943293.4803078,
-    "ast_hash": "fe3fecca5081799011a97504cd6917a5",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/k8s/otel.test.ts": {
@@ -23645,8 +23190,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/no-hardcoded-brand.test.ts": {
-    "mtime": 1793378699.3291476,
-    "ast_hash": "c8d5994db4e0c2dc1ee54e17900d7a5f",
+    "mtime": 1793380015.5674036,
+    "ast_hash": "f33d3f976e6e9ee95d5f457290bf3412",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/notify.test.ts": {
@@ -23687,11 +23232,6 @@
   "packages/store-core/tests/lib/on-device/user-profile.test.ts": {
     "mtime": 1790931257.3809862,
     "ast_hash": "bead0bdef1e6faec913ea692ad08efa9",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/onboard-schema.test.ts": {
-    "mtime": 1790931257.3848944,
-    "ast_hash": "4158ac21be8c4e1140ec8e95ad048952",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/order-commit-helpers.test.ts": {
@@ -23752,11 +23292,6 @@
   "packages/store-core/tests/lib/overviews/catalog.test.ts": {
     "mtime": 1792943293.4946225,
     "ast_hash": "23b1ada160c598ce95eeb6a419e4d8c5",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/overviews/ecom-platform.test.ts": {
-    "mtime": 1792943293.4947984,
-    "ast_hash": "1940a664fb59d7421a8b7d420a1f39ec",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/overviews/fulfilment.test.ts": {
@@ -23874,46 +23409,6 @@
     "ast_hash": "1324acf6e1425a7e72e097b5f60c124b",
     "semantic_hash": ""
   },
-  "packages/store-core/tests/lib/provisioning/aws-provider.test.ts": {
-    "mtime": 1792943293.4989963,
-    "ast_hash": "3025ccb91b213a0f6e90e4d9313fae8a",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/provisioning/compute-reconcile.test.ts": {
-    "mtime": 1793373106.767277,
-    "ast_hash": "7ce94a496c5d0a44c26a0eea3f8c6139",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/provisioning/seed-catalog.test.ts": {
-    "mtime": 1790931257.466587,
-    "ast_hash": "992fb30a9f8aae92892310179b92f75d",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/provisioning/steps.k8s.test.ts": {
-    "mtime": 1793374851.2511985,
-    "ast_hash": "c87295a9afeb55a9b762c450c6b15555",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/provisioning/steps.late-steps-and-teardown.test.ts": {
-    "mtime": 1792943293.4996443,
-    "ast_hash": "a50bbf07bc26214f9aed46def3850d43",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/provisioning/steps.test.ts": {
-    "mtime": 1793371331.9105093,
-    "ast_hash": "c3367a45a92db893b78a2cd4ee05e784",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/provisioning/stub-provider.test.ts": {
-    "mtime": 1790931257.4772978,
-    "ast_hash": "86cf75b0bc6d1298ae5a11eb0e3780ff",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/provisioning/trigger.test.ts": {
-    "mtime": 1790931257.4821377,
-    "ast_hash": "bc981a81b77f39f33820066e858199bc",
-    "semantic_hash": ""
-  },
   "packages/store-core/tests/lib/queries.test.ts": {
     "mtime": 1790931257.4872754,
     "ast_hash": "8fea54c7a7592a0a690c188d096556dc",
@@ -23942,11 +23437,6 @@
   "packages/store-core/tests/lib/razorpay-route.test.ts": {
     "mtime": 1792943293.5009627,
     "ast_hash": "a1e4a310ad8c18b1eb717533a87ca860",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/razorpay-subscriptions.test.ts": {
-    "mtime": 1792943293.5012863,
-    "ast_hash": "b16677735e380e17cb2b2988e7704875",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/razorpay.test.ts": {
@@ -24229,39 +23719,9 @@
     "ast_hash": "e7ce3cf76c261adf59d45c8442f4e5d8",
     "semantic_hash": ""
   },
-  "packages/store-core/tests/lib/tenant-admin-provision-scopes.test.ts": {
-    "mtime": 1790931257.6566348,
-    "ast_hash": "ceca69d77a76705b87204bd48281fbf4",
-    "semantic_hash": ""
-  },
   "packages/store-core/tests/lib/tenant-backup-store.test.ts": {
     "mtime": 1790931257.66127,
     "ast_hash": "805b2d809e9f525dde18ac62a98acf97",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/tenant-db-backup.test.ts": {
-    "mtime": 1790931257.6656494,
-    "ast_hash": "d0a3314b478e2c5572825f20e55f394d",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/tenant-dns.test.ts": {
-    "mtime": 1790931257.6697602,
-    "ast_hash": "482f3f67efc90902ca7be37165d9a1db",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/tenant-migrations-schema-files.test.ts": {
-    "mtime": 1792943293.5110004,
-    "ast_hash": "a0edacdc9ea44f849e7ba57fd85dbe9e",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/tenant-migrations-schema.test.ts": {
-    "mtime": 1792943293.5112906,
-    "ast_hash": "a5c87519202153c46095f0b15abf1ee6",
-    "semantic_hash": ""
-  },
-  "packages/store-core/tests/lib/tenant-migrations.test.ts": {
-    "mtime": 1790931257.6751955,
-    "ast_hash": "f4c2289dcbd4eea31395d43c31d4658e",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/tenant-mtls.test.ts": {
@@ -25052,6 +24512,546 @@
   "packages/store-core/integration-tests/README.md": {
     "mtime": 1793379636.7634296,
     "ast_hash": "5516433f258e1130cd4ff01f031a9b91",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/EcomFilters.tsx": {
+    "mtime": 1792943292.0160277,
+    "ast_hash": "176a3f54d5a81e81e35aaa084ebaaf7a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/EcomUI.tsx": {
+    "mtime": 1792943292.0161662,
+    "ast_hash": "923c994893addd64e0b653ee94752d6f",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/ProvisioningLogsClient.tsx": {
+    "mtime": 1792943292.0163314,
+    "ast_hash": "2c2726cc752bb1ea2e432ee7bbcb9b47",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/PurgeCustomerButton.tsx": {
+    "mtime": 1792943292.016458,
+    "ast_hash": "b1b48a969f2e16f2df8c773d33a94956",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/TenantActions.tsx": {
+    "mtime": 1792943292.0165887,
+    "ast_hash": "b0cebf666cb5541cf345d3b1c47221eb",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/TenantObjectHeader.tsx": {
+    "mtime": 1792943292.0167081,
+    "ast_hash": "a1ecb92dc504e131dee93a5a54b206d3",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/AccessTab.tsx": {
+    "mtime": 1792943292.0170572,
+    "ast_hash": "be9fbb8810de7162f7a37480650fd1cc",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/BillingReconcile.tsx": {
+    "mtime": 1792943292.017182,
+    "ast_hash": "82917c84dcb794d3a3ff36fc22b2d403",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/CommerceTab.tsx": {
+    "mtime": 1792943292.0173047,
+    "ast_hash": "73d1725830178aad5869a875c279f6be",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/ComputeRetryButton.tsx": {
+    "mtime": 1793373065.3671603,
+    "ast_hash": "d7abbe21b7cc9e3cbb095d049f09bee2",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/InfrastructureTab.tsx": {
+    "mtime": 1793379990.2383463,
+    "ast_hash": "e038c9c5e80587f412fcb520ddddad78",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/K8sWorkloadSection.tsx": {
+    "mtime": 1793379990.2386556,
+    "ast_hash": "f91db47fd73e13146d865425dc029385",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/KycActionButtons.tsx": {
+    "mtime": 1792943292.0177062,
+    "ast_hash": "d3aedc3f39958559e9f8e6e79430bb68",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/KycTab.tsx": {
+    "mtime": 1792943292.0178213,
+    "ast_hash": "43fa1f841b8dc02cb1800ed5fd1a1ac5",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/MessagingTab.tsx": {
+    "mtime": 1793088370.6559887,
+    "ast_hash": "e93684caf6e5cb8ba8dcbf0b656017f6",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/OverviewTab.tsx": {
+    "mtime": 1792943292.018565,
+    "ast_hash": "575eba11790843995188cdaaedccce89",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/ProvisioningTab.tsx": {
+    "mtime": 1792943292.0187027,
+    "ast_hash": "4b72a066fea5d933911dcc93279d0b51",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/ServiceApprovals.tsx": {
+    "mtime": 1792943292.0188541,
+    "ast_hash": "c168875cd3ecd7df6a049faa14151444",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/ShipmentCorrection.tsx": {
+    "mtime": 1792943292.0189788,
+    "ast_hash": "b5468438fc72e6bc8efd41396c7e2c38",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ecom/tabs/ShipmentsTab.tsx": {
+    "mtime": 1793379990.2382019,
+    "ast_hash": "dc81d0044fcf8c66b945d28726851bdf",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/admin-agent/internal-session.ts": {
+    "mtime": 1793310069.2108943,
+    "ast_hash": "6dc5341f54e7c961f2ca29c0880a1819",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/admin-agent/whatsapp.ts": {
+    "mtime": 1793379990.2401307,
+    "ast_hash": "f78bdeb94064c6e8b3bee2160557fe25",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/auth/cert-mobile.ts": {
+    "mtime": 1793309172.9788983,
+    "ast_hash": "164e22110082d238f83345db262bdab0",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/catalog/kyc-upload.ts": {
+    "mtime": 1792943292.1152704,
+    "ast_hash": "b082c151e1c1c825ece5fe82ab4c3755",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/catalog/onboard-schema.ts": {
+    "mtime": 1793379990.2407806,
+    "ast_hash": "48cdd929d49cecdf85b67ff41acc05d9",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/catalog/product-import.ts": {
+    "mtime": 1793379990.2406392,
+    "ast_hash": "e65153197e488bd7fd10d30df779473c",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/client/ecom-analytics.ts": {
+    "mtime": 1792943292.1250134,
+    "ast_hash": "ac353330e67d1262a89c5a0b945f3d0d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/compute/catalog.ts": {
+    "mtime": 1793379990.243471,
+    "ast_hash": "9d9d8976823a8f47ff9204bd8b18605b",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/compute/change.ts": {
+    "mtime": 1793379990.2425869,
+    "ast_hash": "c58613d119f9f2d1ef375ffb4c81f1c0",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/compute/changes.ts": {
+    "mtime": 1793379990.2431183,
+    "ast_hash": "81ba7e9dd3c4e6c937e48713db9f7bde",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/compute/pricing.ts": {
+    "mtime": 1793379990.2426963,
+    "ast_hash": "b139ba86fca1a90861de959273060bcb",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/compute/quote.ts": {
+    "mtime": 1793379990.242811,
+    "ast_hash": "cc59413aaf8293b036cf51ed1d0f43b7",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/compute/resolve.ts": {
+    "mtime": 1793379990.2430007,
+    "ast_hash": "6276de984e443a684672b6a7ddd1f43a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/compute/schema.ts": {
+    "mtime": 1793379990.242463,
+    "ast_hash": "8397df237e22a8b932e1e6248b00745a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/compute/shared-db.ts": {
+    "mtime": 1793379990.2436564,
+    "ast_hash": "68b2ccfb384c323c9ee2ee3facfba7ab",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/compute/store.ts": {
+    "mtime": 1793379990.2433069,
+    "ast_hash": "a22a9c2495932055a29ef2bcdf32d251",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/ecom/owner-api.ts": {
+    "mtime": 1792943292.1282825,
+    "ast_hash": "b5d88703791bf272b35f959a8c0e8dd1",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/ecom/owner-context.ts": {
+    "mtime": 1792943292.1283917,
+    "ast_hash": "01809a36528d073fc7d6a19f76d1f029",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/ecom/service-states.ts": {
+    "mtime": 1792943292.1286168,
+    "ast_hash": "0c069c1e8b98e8b00e132b53609f92d7",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/google-ads/manager-view.ts": {
+    "mtime": 1793379990.2399194,
+    "ast_hash": "e3e11dfb279ce6f7eecc6d43628fe14d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/import/to-draft.ts": {
+    "mtime": 1793379990.2441785,
+    "ast_hash": "36251a854599403c1de908678149caf8",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/k8s/capacity.ts": {
+    "mtime": 1793379990.2404046,
+    "ast_hash": "f5a649d431a251bc75ace7542f9c7d31",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/legals/generate.ts": {
+    "mtime": 1792943292.1452367,
+    "ast_hash": "c5974277f601b73abb94d7f96742ba22",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/legals/provision.ts": {
+    "mtime": 1793379990.2422197,
+    "ast_hash": "704156885084321d0abebb51e53b1366",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/orders/tenant-shipments-shared.ts": {
+    "mtime": 1792943292.1549706,
+    "ast_hash": "0e54ea7a8520c2d20245cecaf82d74ca",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/overviews/ecom-billing.ts": {
+    "mtime": 1792943292.1609762,
+    "ast_hash": "958ffdb54d0ce50eec804b7b8ab8bc8c",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/overviews/ecom-customers.ts": {
+    "mtime": 1792943292.1612146,
+    "ast_hash": "ba26862e13a13e9c4c7aefa45959ecdd",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/overviews/ecom-instances.ts": {
+    "mtime": 1792943292.1613457,
+    "ast_hash": "0dc89d6694f69d9ddca5eff620e4b83b",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/overviews/ecom-platform.ts": {
+    "mtime": 1792943292.161497,
+    "ast_hash": "04c3c236eb9d12b363a6813ec84155d4",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/overviews/ecom-route.ts": {
+    "mtime": 1792943292.1616142,
+    "ast_hash": "2fb11c4cfa418ac10068039843de11bf",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/overviews/ecom-store-status.ts": {
+    "mtime": 1792943292.161787,
+    "ast_hash": "b2e968d3d5f16efd5628dfd6a5387d24",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/payments/bank-verify.ts": {
+    "mtime": 1792943292.1681466,
+    "ast_hash": "a1d41e148fd02852c0195932e8c9487b",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/payments/ecom-payment-bypass.ts": {
+    "mtime": 1792943292.168281,
+    "ast_hash": "4197f2e2dda8671ad9d524610af2d69d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/payments/razorpay-subscriptions.ts": {
+    "mtime": 1792943292.168863,
+    "ast_hash": "8596bb0d778c6ff579e4ec57be07171d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/alerts.ts": {
+    "mtime": 1793379990.2420917,
+    "ast_hash": "2cbacfa66d074fde4f751ae53dceacf3",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/aws-provider.ts": {
+    "mtime": 1793379990.2418222,
+    "ast_hash": "5832fc7b8fe2fc2d51d2802dd629cce8",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/compute-reconcile.ts": {
+    "mtime": 1793379990.2414367,
+    "ast_hash": "3b3d65a8416d6479a59614fa25997f18",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/index.ts": {
+    "mtime": 1792943292.1702356,
+    "ast_hash": "bd567cd0cedc0f4806abb9444ef961c9",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/provider.ts": {
+    "mtime": 1793372449.6885555,
+    "ast_hash": "1ac8f839579c970f4e554d7ce0788a42",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/seed-catalog.ts": {
+    "mtime": 1792943292.1705823,
+    "ast_hash": "e8e67c2d5ec720ed5172308b05a44c94",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/seed-settings.ts": {
+    "mtime": 1793379990.241176,
+    "ast_hash": "676764df198a9469220cd79517af9705",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/seed.ts": {
+    "mtime": 1792943292.1708891,
+    "ast_hash": "52586e350b48ebaba56675adb9a4f9ca",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/start-store.ts": {
+    "mtime": 1793379990.2416208,
+    "ast_hash": "4ea965c0d2d7742e1a74969709ec1097",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/steps.ts": {
+    "mtime": 1793379990.2419763,
+    "ast_hash": "f49e44f4e981032e01de88cbdc0c591e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/stub-provider.ts": {
+    "mtime": 1793371709.33533,
+    "ast_hash": "2ef87249eb702c77462ce5f740567bfd",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/trigger.ts": {
+    "mtime": 1793379990.2410414,
+    "ast_hash": "72dca39d1c95af5f29abf53d1f0d7c28",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/provisioning/user-data.ts": {
+    "mtime": 1792943292.1716964,
+    "ast_hash": "a3ab44759886c06df13dbcbd75a4be51",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/replies/email-text.ts": {
+    "mtime": 1793286206.332035,
+    "ast_hash": "213d3cd0bff787dc26ac008c77ea6018",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/shared/ai-health.ts": {
+    "mtime": 1793379990.2423315,
+    "ast_hash": "a5933127d4276a240ce1986145d5a31e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/shared/internal-http.ts": {
+    "mtime": 1793377411.4038904,
+    "ast_hash": "48e6f33839e6b09372b64963dc14e347",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/shared/messaging/delivery-status.ts": {
+    "mtime": 1793266878.681748,
+    "ast_hash": "cee41159825550d975bebf9af63269e7",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/shared/messaging/sns.ts": {
+    "mtime": 1793265620.9412727,
+    "ast_hash": "fc72fd4ea8d43e0da5ab451822990a68",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/shared/ssm-client.ts": {
+    "mtime": 1792943292.2165504,
+    "ast_hash": "1c94425c9731a285905e3ae669008cbd",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/support/email-inbound.ts": {
+    "mtime": 1793379990.2440488,
+    "ast_hash": "75dfae31849435ee4843d49a3f722130",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/support/inbound.ts": {
+    "mtime": 1793379990.2438476,
+    "ast_hash": "dd93a2b218f0b8a5094041ef8007dd00",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/tenancy/mtls-fleet.ts": {
+    "mtime": 1793379990.2396352,
+    "ast_hash": "e6d72e26d4c27a9964fa32bcd7c12799",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/tenancy/pool-autoscale.ts": {
+    "mtime": 1793379990.23941,
+    "ast_hash": "0fa731fe6dc54a56f1ba0b88fe05d1d3",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/tenancy/tenant-admin-provision.ts": {
+    "mtime": 1793371131.0517254,
+    "ast_hash": "22a1d7256bbb4469792d22395cb85a54",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/tenancy/tenant-db-backup.ts": {
+    "mtime": 1793372882.519509,
+    "ast_hash": "8f66286318b5937bfc6bd876ce59817d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/tenancy/tenant-dns.ts": {
+    "mtime": 1792943292.229783,
+    "ast_hash": "5e764265994517e6f05aae33b585a7d2",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/tenant-migrations-schema.ts": {
+    "mtime": 1793283895.212845,
+    "ast_hash": "7ee86d0be64d8616aa8449599c1ef1c1",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/tenant-migrations.ts": {
+    "mtime": 1793379990.238882,
+    "ast_hash": "162cccc5f599dd10ee2e08584bcb1269",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/bank-verify.test.ts": {
+    "mtime": 1793379990.2447083,
+    "ast_hash": "d6473c547efe3ee0e864659520821bac",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/compute/pricing.test.ts": {
+    "mtime": 1793379990.2482264,
+    "ast_hash": "b2d25e7c4e5363395c812426bb27911c",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/ecom-payment-bypass.test.ts": {
+    "mtime": 1793379990.2460914,
+    "ast_hash": "4748aeab28beedfb1a4e7c06425b8b58",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/google-ads/account-manager.test.ts": {
+    "mtime": 1793379990.2462866,
+    "ast_hash": "ca932e09976bc6533351b5c90bf8655e",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/import/blank-optional-integration.test.ts": {
+    "mtime": 1793379990.249121,
+    "ast_hash": "a682e665d2155a333c0e53a0dd00cac1",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/import/data-source-edge.test.ts": {
+    "mtime": 1793379990.2489135,
+    "ast_hash": "a5f74f0158800bcc3340e0faff6c0a8a",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/import/subscription-columns.test.ts": {
+    "mtime": 1793379990.2485867,
+    "ast_hash": "ed042c605144d2d7ca7fd72d25fe77d1",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/import/to-draft-backfill.test.ts": {
+    "mtime": 1793379990.2487996,
+    "ast_hash": "9534e2adf278ac1495c7f26ddbe57213",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/k8s/capacity.test.ts": {
+    "mtime": 1793379990.2463984,
+    "ast_hash": "35ccbf3d3b6aec00cfdcfaeba490a65f",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/onboard-schema.test.ts": {
+    "mtime": 1793379990.2455206,
+    "ast_hash": "6a41b80fa5ebeb1cd517861eef054468",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/overviews/ecom-platform.test.ts": {
+    "mtime": 1793379990.2484448,
+    "ast_hash": "2aefac8309fc8838be1c9e93f42d41ee",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/provisioning/aws-provider.test.ts": {
+    "mtime": 1793379990.247589,
+    "ast_hash": "1e9289a598f92eda94f37a80308995d8",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/provisioning/compute-reconcile.test.ts": {
+    "mtime": 1793379990.2470415,
+    "ast_hash": "d23e09b154ae17e22d773241c60b1e7f",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/provisioning/seed-catalog.test.ts": {
+    "mtime": 1793379990.2478936,
+    "ast_hash": "1c8e27d25979f185ffffd1f74c5f1192",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/provisioning/steps.k8s.test.ts": {
+    "mtime": 1793379990.24773,
+    "ast_hash": "8bc121a8c3bdd9ad2284aa917be4db6d",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/provisioning/steps.late-steps-and-teardown.test.ts": {
+    "mtime": 1793379990.2467594,
+    "ast_hash": "c17c84a0af2fbc61516817e96b4c4f7f",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/provisioning/steps.test.ts": {
+    "mtime": 1793379990.2471876,
+    "ast_hash": "8cd942a5ee59562a4e9cdc2c5e4bd711",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/provisioning/stub-provider.test.ts": {
+    "mtime": 1793379990.2474477,
+    "ast_hash": "f3ca4a8b7abedbe00d85475fab2e6db9",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/provisioning/trigger.test.ts": {
+    "mtime": 1793379990.2480054,
+    "ast_hash": "e8b962e9fb1836ec0373d8e3531d9399",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/razorpay-subscriptions.test.ts": {
+    "mtime": 1793379990.2443922,
+    "ast_hash": "ead158fa19d82c9dd83b2c25b9e17a47",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/tenant-admin-provision-scopes.test.ts": {
+    "mtime": 1793379990.2459776,
+    "ast_hash": "ce403ff7de1d03c1ca7234b839225030",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/tenant-db-backup.test.ts": {
+    "mtime": 1793379990.2458513,
+    "ast_hash": "749fd0a28cacec68882641da2f1e66fd",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/tenant-dns.test.ts": {
+    "mtime": 1793379990.2451813,
+    "ast_hash": "2e9236f30c551c140303bad77def0dee",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/tenant-migrations-schema-files.test.ts": {
+    "mtime": 1793379990.2457263,
+    "ast_hash": "9ab80e56eb1169731e242753ac1b57bd",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/tenant-migrations-schema.test.ts": {
+    "mtime": 1793379990.2449565,
+    "ast_hash": "8d1eb9579e9397f6c1f15646bad85d19",
+    "semantic_hash": ""
+  },
+  "controller-service/tests/lib/tenant-migrations.test.ts": {
+    "mtime": 1793379990.24531,
+    "ast_hash": "68b8948733ba93c011c08880801a21c1",
     "semantic_hash": ""
   }
 }
