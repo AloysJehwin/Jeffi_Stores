@@ -5,15 +5,16 @@ import { applyCapturedPayment, applyLinkPayment, applyQrPayment, recordPaymentDe
 import { runInTenant } from '@/lib/payments/webhook-tenant'
 import { inPaymentStore, storeFor, type EventContext } from './context'
 
-export async function onPaymentCaptured(payment: any, ctx: EventContext) {
-  if (!payment?.id) return
+/** Returns what happened to the payment (a CaptureOutcome, or 'wallet' for a top-up). */
+export async function onPaymentCaptured(payment: any, ctx: EventContext): Promise<string> {
+  if (!payment?.id) return 'unmatched'
   // Wallet top-ups are not orders. The browser callback normally credits them; this is the durable
   // fallback. rechargeWallet is idempotent on external_ref, so the two racing credit once.
   if (payment.notes?.purpose === 'wallet_topup') {
     if (ctx.source === 'platform') await creditWalletTopup(payment)
-    return
+    return 'wallet'
   }
-  await inPaymentStore(ctx, payment, async store => {
+  return inPaymentStore(ctx, payment, async store => {
     const out = await applyCapturedPayment(payment, store)
     if (out !== 'unmatched') await details(payment, ctx)
     return out

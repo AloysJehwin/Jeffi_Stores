@@ -64,7 +64,8 @@ export async function dispatchRazorpayEvent(event: any, ctx: EventContext): Prom
   const p = event?.payload ?? {}
   switch (type) {
     case 'payment.captured':
-      return onPaymentCaptured(p.payment?.entity, ctx)
+      await onPaymentCaptured(p.payment?.entity, ctx)
+      return
     case 'payment.failed':
       return onPaymentFailed(p.payment?.entity, ctx)
     case 'payment_link.paid':
