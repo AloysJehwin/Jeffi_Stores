@@ -22,7 +22,7 @@ export class StubProvisioningProvider implements ProvisioningProvider {
     this.paramGroups.add(paramGroup) // idempotent
   }
 
-  async createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string }> {
+  async createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string; instanceClass?: string }> {
     if (!this.endpoints.has(args.dbInstanceId) && !this.pending.has(args.dbInstanceId)) {
       this.pending.set(args.dbInstanceId, this.availableAfterPolls)
     }
@@ -43,8 +43,22 @@ export class StubProvisioningProvider implements ProvisioningProvider {
     return null // still provisioning
   }
 
-  async loadSchema(_endpoint: string, _dbName: string): Promise<void> {
+  async loadSchema(_endpoint: string, _dbName: string, _appUser?: string): Promise<void> {
     /* no-op in stub */
+  }
+
+  readonly databases = new Set<string>() // endpoint/db for Starter stores on a shared host
+
+  async initSharedDbHost(_endpoint: string): Promise<void> {
+    /* no-op in stub */
+  }
+
+  async createTenantDatabase(endpoint: string, dbName: string, _role: string): Promise<void> {
+    this.databases.add(`${endpoint}/${dbName}`)
+  }
+
+  async dropTenantDatabase(endpoint: string, dbName: string, _role: string | null): Promise<void> {
+    this.databases.delete(`${endpoint}/${dbName}`)
   }
 
   async backupDb(endpoint: string, _dbName: string): Promise<Buffer> {

@@ -28,7 +28,7 @@ import { hasService, reviewServiceApproval, controlPlanePool } from '@/lib/tenan
 // TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 import { isPaymentBypassed, bypassAuditNote } from '@/lib/payments/ecom-payment-bypass'
-import { dedicatedCapacityError } from '@/lib/k8s/capacity'
+import { tenantCapacityError } from '@/lib/k8s/capacity'
 import { startStore } from '@/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
@@ -57,11 +57,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   // Don't start billing a plan we can't build yet.
-  const capacityError = await dedicatedCapacityError(tenant.plan)
+  const capacityError = await tenantCapacityError(tenantId, tenant.plan)
   if (capacityError) {
     return NextResponse.json(
       {
-        error: `Cannot approve yet: no EC2 capacity for a dedicated ${tenant.plan} node. Move the store to Basic or raise the vCPU quota.`,
+        error: `Cannot approve yet: no EC2 capacity for this store's own servers. Move it to a smaller size or raise the vCPU quota.`,
       },
       { status: 409 }
     )

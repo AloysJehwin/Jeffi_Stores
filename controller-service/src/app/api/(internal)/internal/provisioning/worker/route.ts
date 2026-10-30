@@ -57,6 +57,16 @@ async function tick() {
     results.push({ tenantId, step: 'k8s_plan', status: r.ok ? (r.error ?? 'applied') : `error: ${r.error}` })
   }
 
+  // Pool servers left empty (stores moved to their own servers or left) are terminated after an hour.
+  const k8s = await import('@/lib/k8s/tenant-compute')
+  if (k8s.k8sComputeEnabled()) {
+    const reclaimed = await k8s.reclaimEmptyPoolNodes(id => provider.deleteAppInstance(id)).catch((e: any) => {
+      console.error('[provisioning] pool reclaim failed:', e?.message)
+      return []
+    })
+    for (const id of reclaimed) results.push({ tenantId: '-', step: 'pool_reclaim', status: `terminated ${id}` })
+  }
+
   return { success: true, advanced: results.length, results }
 }
 

@@ -12,6 +12,9 @@ export interface CreateDbInstanceArgs {
   dbInstanceId: string // jeffi-tenant-{slug}
   paramGroup: string
   maxConnections: number
+  instanceClass?: string // default TENANT_RDS_CLASS (db.t4g.micro)
+  storageGb?: number // default 20
+  multiAz?: boolean
 }
 
 export interface AppInstanceArgs {
@@ -25,13 +28,22 @@ export interface ProvisioningProvider {
   ensureParamGroup(paramGroup: string, maxConnections: number): Promise<void>
 
   /** Create the RDS instance (idempotent). Returns immediately; not yet available. */
-  createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string }>
+  createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string; instanceClass?: string }>
 
   /** Poll: is the instance 'available' yet? Returns endpoint when ready, null while pending. */
   getDbEndpoint(dbInstanceId: string): Promise<string | null>
 
-  /** Run the full desired-state schema + create app_user WITH rds_iam on the fresh DB. */
-  loadSchema(endpoint: string, dbName: string): Promise<void>
+  /** Run the full desired-state schema + create the app login (app_user, or a Starter store's own role) WITH rds_iam. */
+  loadSchema(endpoint: string, dbName: string, appUser?: string): Promise<void>
+
+  /** Lock a shared Starter host down so no store can connect to its own default databases (idempotent). */
+  initSharedDbHost(endpoint: string): Promise<void>
+
+  /** A Starter store's own database + IAM login role on a shared host, connectable by that role only (idempotent). */
+  createTenantDatabase(endpoint: string, dbName: string, role: string): Promise<void>
+
+  /** Drop a Starter store's database + role from its shared host (idempotent). */
+  dropTenantDatabase(endpoint: string, dbName: string, role: string | null): Promise<void>
 
   /** Snapshot the tenant DB to a gzip'd archive (pure-JS, no pg_dump binary). */
   backupDb(endpoint: string, dbName: string): Promise<Buffer>

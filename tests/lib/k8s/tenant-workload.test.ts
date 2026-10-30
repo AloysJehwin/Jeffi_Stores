@@ -65,6 +65,31 @@ describe('renderTenantWorkload', () => {
     expect(byKind(objs, 'PodDisruptionBudget')).toHaveLength(3)
   })
 
+  it('renders from a compute choice: servers, generation, copies per service and the database pool', () => {
+    const compute = {
+      node: { placement: 'dedicated' as const, type: 't4g.medium', count: 2 },
+      db: { mode: 'dedicated' as const, class: 'db.t4g.small', storageGb: 20, multiAz: false },
+      services: {
+        controller: { replicas: 2, maxReplicas: 4, size: 'M' as const },
+        messaging: { replicas: 1, maxReplicas: 2, size: 'S' as const },
+        documents: { replicas: 1, maxReplicas: 1, size: 'L' as const },
+      },
+    }
+    const objs = renderTenantWorkload({ slug: 'big', plan: 'growth', hosts: hosts('big'), compute, dbPoolMax: 6, nodeGen: 3 }) as any[]
+    const app = appDep(objs)
+    expect(app.spec.template.spec.nodeSelector).toEqual({ 'jeffi.io/tenant': 'big', 'jeffi.io/gen': '3' })
+    expect(app.spec.template.spec.topologySpreadConstraints[0].topologyKey).toBe('kubernetes.io/hostname')
+    expect(envOf(app).DB_POOL_MAX).toBe('6')
+    expect(envOf(byKind(objs, 'Deployment', 'big-document-service')[0]).DB_POOL_MAX).toBe('6')
+    expect(byKind(objs, 'Deployment', 'big-document-service')[0].spec.template.spec.containers[0].resources.limits.memory).toBe('640Mi')
+    expect(byKind(objs, 'HorizontalPodAutoscaler').map(h => [h.metadata.name, h.spec.maxReplicas])).toEqual([
+      ['big-messaging-service', 2],
+      ['big-controller-service', 4],
+    ])
+    expect(byKind(objs, 'PodDisruptionBudget').map(p => p.metadata.name)).toEqual(['big-controller-service'])
+    expect(objs[0].metadata.labels['jeffi.io/placement']).toBe('dedicated')
+  })
+
   it('routes admin-{slug} through tenant mTLS and everything else through the default TLS option', () => {
     const objs = renderTenantWorkload({
       slug: 'acme',

@@ -7,7 +7,7 @@ import {
   TRAEFIK_CERT_INFO_HEADER,
 } from '@/lib/tenancy/edge-client-cert'
 import { CRON_JOBS, cronSchedule, inProcessCronEnabled } from '@/lib/shared/cron-jobs'
-import { computeTierFor, COMPUTE_TIERS } from '@/lib/provisioning/tiers'
+import { legacySpecFor } from '@/lib/compute/legacy'
 
 const B64 = 'MIIB' + 'A'.repeat(130) + '=='
 
@@ -65,9 +65,9 @@ describe('cron scheduling for k8s', () => {
 
 describe('compute tiers', () => {
   it('places basic on the pool and paid tiers on dedicated nodes', () => {
-    expect(computeTierFor('basic').placement).toBe('pool')
-    for (const p of ['growth', 'pro', 'enterprise'] as const) expect(COMPUTE_TIERS[p].placement).toBe('dedicated')
-    expect(computeTierFor('unknown')).toBe(COMPUTE_TIERS.basic)
+    expect(legacySpecFor('basic').node.placement).toBe('pool')
+    for (const p of ['growth', 'pro', 'enterprise']) expect(legacySpecFor(p).node.placement).toBe('dedicated')
+    expect(legacySpecFor('unknown')).toEqual(legacySpecFor('basic'))
   })
 })
 

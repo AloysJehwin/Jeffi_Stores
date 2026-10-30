@@ -111,7 +111,7 @@ export function presetOf(spec: ComputeSpec): PresetKey | 'custom' {
 
 // Postgres max_connections set on a store's own database, by class. Others: memory / 16.
 const DB_MAX_CONNECTIONS: Record<string, number> = {
-  'db.t4g.micro': 60,
+  'db.t4g.micro': 50, // 100 ran a micro out of memory
   'db.t4g.small': 120,
   'db.t4g.medium': 250,
   'db.t4g.large': 500,

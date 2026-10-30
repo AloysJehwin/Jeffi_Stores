@@ -1,6 +1,6 @@
 import 'server-only'
 import crypto from 'node:crypto'
-import { apply, get, list, remove, type K8sObject } from './client'
+import { apply, get, list, listAll, patchMerge, remove, type K8sObject } from './client'
 import {
   renderTenantWorkload,
   tenantAppName,
@@ -11,12 +11,14 @@ import {
 } from './tenant-workload'
 import { agentNodeUserData } from './node-user-data'
 import {
-  computeTierFor,
   dedicatedNodeName,
+  isTenantNodeName,
   POOL_NODE_CAPACITY,
   POOL_NODE_TYPE,
   tenantNamespace,
+  tenantNodeName,
 } from '@/lib/provisioning/tiers'
+import type { ComputeSpec } from '@/lib/compute/spec'
 
 // k3s compute for a tenant (PROVISIONING_COMPUTE=k8s). Every call is idempotent so the
 // provisioning worker can retry it; node launches report 'pending' until the node is Ready.
@@ -64,7 +66,8 @@ async function launchNode(
   nodeName: string,
   instanceType: string,
   labels: Record<string, string>,
-  taints: string[] = []
+  taints: string[] = [],
+  tags?: Record<string, string>
 ) {
   const { runInstance } = await import('@/lib/shared/ec2-client')
   const cfg = nodeLaunchConfig()
@@ -76,64 +79,131 @@ async function launchNode(
     iamProfile: cfg.iamProfile,
     appTag: 'jeffi-k8s',
     metadataHopLimit: 2,
+    tags,
     userData: agentNodeUserData({ nodeName, labels, taints, server: cfg.server }),
   })
 }
 
-// instanceId is the tenant's OWN EC2 (dedicated only). Pool launches report poolInstanceId instead —
-// a shared node must never be terminated by a tenant teardown.
+// instances are the tenant's OWN EC2s by node name (dedicated only). Pool launches report poolInstanceId
+// instead — a shared node must never be terminated by a tenant teardown.
 export interface PlacementResult {
   ready: boolean
-  instanceId?: string
+  instances?: Record<string, string>
   poolInstanceId?: string
 }
 
+/** The AWS instance behind a node (spec.providerID aws:///<az>/i-…). */
+export const nodeInstanceId = (node: any): string | null => node?.spec?.providerID?.match(/(i-[0-9a-f]+)$/)?.[1] ?? null
+
+/** True for a namespace whose store runs on the shared pool (older namespaces only carry the plan). */
+const onPool = (ns: any) => {
+  const l = ns?.metadata?.labels ?? {}
+  return l['jeffi.io/placement'] ? l['jeffi.io/placement'] === 'pool' : l['jeffi.io/plan'] === 'basic'
+}
+
 /**
- * Make sure a node exists for this tenant's tier. Dedicated: its own node t-{slug}. Pool: any
- * Ready pool-basic node with spare capacity, else launch the next pool-basic-N.
- * `known` holds instances a previous attempt launched (persisted by the caller).
+ * Make sure the servers for this store exist. Own servers: `count` nodes of generation `gen`, named
+ * t-{slug}[.{gen}-{i}], labelled + tainted to the store. Pool: any Ready pool-basic node with spare
+ * capacity, else launch the next pool-basic-N. `known` holds instances a previous attempt launched
+ * (persisted by the caller from onLaunched).
  */
-export async function ensureTenantNode(
+export async function ensureTenantNodes(
   slug: string,
-  plan: string | null,
-  known: { instanceId?: string; poolInstanceId?: string },
-  onLaunched: (instanceId: string, kind: 'dedicated' | 'pool') => Promise<void>
+  node: ComputeSpec['node'],
+  gen: number,
+  known: { instances?: Record<string, string>; poolInstanceId?: string },
+  onLaunched: (instanceId: string, kind: 'dedicated' | 'pool', nodeName: string) => Promise<void>
 ): Promise<PlacementResult> {
-  const knownInstanceId = known.instanceId
-  const knownPoolInstanceId = known.poolInstanceId
-  const tier = computeTierFor(plan)
-  if (tier.placement === 'dedicated') {
-    const name = dedicatedNodeName(slug)
-    const node = await get('Node', name)
-    if (isReady(node)) return { ready: true, instanceId: knownInstanceId }
-    if (!node && !knownInstanceId) {
+  if (node.placement === 'dedicated') {
+    if (!node.type) throw new Error(`no server type for "${slug}"`)
+    const instances = { ...known.instances }
+    let ready = true
+    for (let i = 0; i < node.count; i++) {
+      const name = tenantNodeName(slug, gen, i)
+      const n = await get('Node', name)
+      if (isReady(n)) continue
+      ready = false
+      if (n || instances[name]) continue
       const { instanceId } = await launchNode(
         name,
-        tier.nodeType,
-        { 'jeffi.io/role': 'dedicated', 'jeffi.io/tenant': slug },
-        [`jeffi.io/tenant=${slug}:NoSchedule`]
+        node.type,
+        { 'jeffi.io/role': 'dedicated', 'jeffi.io/tenant': slug, 'jeffi.io/gen': String(gen) },
+        [`jeffi.io/tenant=${slug}:NoSchedule`],
+        { 'jeffi-tenant': slug }
       )
-      await onLaunched(instanceId, 'dedicated')
-      return { ready: false, instanceId }
+      instances[name] = instanceId
+      await onLaunched(instanceId, 'dedicated', name)
     }
-    return { ready: false, instanceId: knownInstanceId }
+    return { ready, instances }
   }
 
-  // Any node labelled jeffi.io/pool=basic hosts Basic tenants (incl. core while EC2 quota is tight);
+  // Any node labelled jeffi.io/pool=basic hosts pool stores (incl. core while EC2 quota is tight);
   // jeffi.io/pool-capacity caps how many.
+  const knownPoolInstanceId = known.poolInstanceId
   const nodes = await list('Node', undefined, POOL_SELECTOR)
-  const basicTenants = (await list('Namespace', undefined, 'jeffi.io/tier=tenant,jeffi.io/plan=basic')).filter(
-    (n: any) => n.metadata?.name !== tenantNamespace(slug)
+  const poolTenants = (await list('Namespace', undefined, 'jeffi.io/tier=tenant')).filter(
+    (n: any) => n.metadata?.name !== tenantNamespace(slug) && onPool(n)
   ).length
   const ready = nodes.filter(isReady)
-  if (ready.reduce((sum, n) => sum + poolCapacity(n), 0) > basicTenants) return { ready: true }
+  if (ready.reduce((sum, n) => sum + poolCapacity(n), 0) > poolTenants) return { ready: true }
   // A pool node is already joining — wait for it rather than launching another.
   if (nodes.length > ready.length || knownPoolInstanceId) return { ready: false, poolInstanceId: knownPoolInstanceId }
   const poolNodes = nodes.filter((n: any) => n.metadata?.labels?.['jeffi.io/role'] === 'pool-basic').length
   const name = `pool-basic-${poolNodes + 1}`
   const { instanceId } = await launchNode(name, POOL_NODE_TYPE, { 'jeffi.io/role': 'pool-basic', ...POOL_LABEL })
-  await onLaunched(instanceId, 'pool')
+  await onLaunched(instanceId, 'pool', name)
   return { ready: false, poolInstanceId: instanceId }
+}
+
+/** The store's own server nodes, any generation. */
+export async function tenantNodes(slug: string): Promise<any[]> {
+  return (await list<any>('Node', undefined, `jeffi.io/tenant=${slug}`)).filter(n => isTenantNodeName(slug, n.metadata?.name ?? ''))
+}
+
+/** Remove the store's server nodes not in `keep` (an older generation after a resize); returns their instances. */
+export async function removeTenantNodes(slug: string, keep: string[] = []): Promise<string[]> {
+  const gone = (await tenantNodes(slug)).filter(n => !keep.includes(n.metadata.name))
+  for (const n of gone) await remove('Node', n.metadata.name)
+  if (!keep.includes(dedicatedNodeName(slug))) await remove('Node', dedicatedNodeName(slug))
+  return gone.map(nodeInstanceId).filter((id): id is string => !!id)
+}
+
+const EMPTY_SINCE = 'jeffi.io/empty-since'
+const POOL_RECLAIM_AFTER_MS = 60 * 60 * 1000
+
+/**
+ * Terminate pool-basic servers that have run no store for an hour, keeping at least one pool server.
+ * Run from the provisioning worker tick. Returns the instances terminated.
+ */
+export async function reclaimEmptyPoolNodes(terminate: (id: string) => Promise<void>): Promise<string[]> {
+  const nodes = (await list<any>('Node', undefined, POOL_SELECTOR)).filter(isReady)
+  if (nodes.length <= 1) return []
+  const busy = new Set((await listAll<any>('Pod', 'jeffi.io/tenant')).map(p => p.spec?.nodeName).filter(Boolean))
+  const { describeInstanceName } = await import('@/lib/shared/ec2-client')
+  const out: string[] = []
+  let left = nodes.length
+  for (const n of nodes) {
+    const name: string = n.metadata?.name ?? ''
+    if (n.metadata?.labels?.['jeffi.io/role'] !== 'pool-basic' || !/^pool-basic-\d+$/.test(name)) continue
+    const since = n.metadata?.annotations?.[EMPTY_SINCE]
+    if (busy.has(name)) {
+      if (since) await patchMerge('Node', name, undefined, { metadata: { annotations: { [EMPTY_SINCE]: null } } })
+      continue
+    }
+    if (!since) {
+      await patchMerge('Node', name, undefined, { metadata: { annotations: { [EMPTY_SINCE]: new Date().toISOString() } } })
+      continue
+    }
+    if (left <= 1 || Date.now() - Date.parse(since) < POOL_RECLAIM_AFTER_MS) continue
+    const id = nodeInstanceId(n)
+    // Only an instance launched as this pool node: never core or a store's server.
+    if (!id || (await describeInstanceName(id)) !== `jeffi-k8s-${name}`) continue
+    await remove('Node', name)
+    await terminate(id)
+    out.push(id)
+    left--
+  }
+  return out
 }
 
 /** Copy platform-provided Secrets/ConfigMaps a tenant namespace needs (pull secret, RDS CA). */
@@ -236,7 +306,7 @@ export async function tenantRolloutComplete(slug: string): Promise<boolean> {
 }
 
 /**
- * Terminate a tenant's OWN node instance (t-{slug}, or a legacy dedicated box). Anything else — the
+ * Terminate a tenant's OWN node instance (t-{slug}[.{gen}-{i}], or a legacy dedicated box). Anything else — the
  * core node, a shared pool node — is refused, so a tenant teardown can never take the cluster down.
  */
 export async function terminateTenantInstance(
@@ -247,15 +317,16 @@ export async function terminateTenantInstance(
   const { describeInstanceName } = await import('@/lib/shared/ec2-client')
   const name = await describeInstanceName(instanceId)
   if (name === null) return 'gone'
-  if (name !== `jeffi-k8s-${dedicatedNodeName(slug)}` && name !== `jeffi-tenant-${slug}`) return 'refused'
+  const own = name.startsWith('jeffi-k8s-') && isTenantNodeName(slug, name.slice('jeffi-k8s-'.length))
+  if (!own && name !== `jeffi-tenant-${slug}`) return 'refused'
   await terminate(instanceId)
   return 'terminated'
 }
 
-/** Delete the namespace (everything in it). The caller terminates a dedicated EC2 separately. */
-export async function deleteTenantWorkload(slug: string): Promise<void> {
+/** Delete the namespace (everything in it) and the store's server nodes. Returns those nodes' instances, which the caller terminates. */
+export async function deleteTenantWorkload(slug: string): Promise<string[]> {
   await remove('Namespace', tenantNamespace(slug))
-  await remove('Node', dedicatedNodeName(slug))
+  return removeTenantNodes(slug)
 }
 
 export interface TenantWorkloadStatus {

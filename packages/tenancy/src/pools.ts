@@ -75,7 +75,7 @@ export function platformPool(): pg.Pool {
 function basePoolConfig(): any {
   const workers = parseInt(process.env.WEB_CONCURRENCY || '1', 10)
   return {
-    max: Math.max(2, Math.floor(15 / workers)),
+    max: Math.max(2, Math.floor((Number(process.env.DB_POOL_MAX) || 15) / workers)),
     min: 1,
     idleTimeoutMillis: 60000,
     connectionTimeoutMillis: 10000,
@@ -101,7 +101,7 @@ function buildTenantPool(infra: TenantInfra): pg.Pool {
   }
   config.ssl = rdsSslOption()
   if (!infra.iamAuth) throw new Error('Password-auth tenant pools not implemented; use IAM auth')
-  const user = process.env.RDS_USER || 'app_user'
+  const user = infra.rdsUser || process.env.RDS_USER || 'app_user'
   config.user = user
   config.password = rdsIamPassword(infra.rdsEndpoint, infra.rdsPort, user, infra.region)
   return createPgPool(config)

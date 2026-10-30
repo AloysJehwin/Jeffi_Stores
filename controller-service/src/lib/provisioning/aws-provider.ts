@@ -45,16 +45,12 @@ const RDS_SUBNET_GROUP = process.env.TENANT_RDS_SUBNET_GROUP || 'default'
 const RDS_INSTANCE_CLASS = process.env.TENANT_RDS_CLASS || 'db.t4g.micro'
 const RDS_ENGINE_VERSION = process.env.TENANT_RDS_PG_VERSION || '16'
 
-/** Class/storage combos tried in order when AWS reports no capacity (cheapest first). */
-export function rdsShapes(): Array<{ cls: string; storage: 'gp3' | 'gp2' }> {
-  const extra = (process.env.TENANT_RDS_FALLBACK_CLASSES || 'db.t3.micro,db.t4g.small')
-    .split(',')
-    .map(c => c.trim())
-    .filter(Boolean)
-  const classes = [RDS_INSTANCE_CLASS, ...extra.filter(c => c !== RDS_INSTANCE_CLASS)]
-  return classes.flatMap(cls => [
-    { cls, storage: 'gp3' as const },
-    { cls, storage: 'gp2' as const },
+/** Class/storage combos tried in order when AWS reports no capacity: the class, then the same size on t3. */
+export function rdsShapes(cls = RDS_INSTANCE_CLASS): Array<{ cls: string; storage: 'gp3' | 'gp2' }> {
+  const classes = cls.includes('.t4g.') ? [cls, cls.replace('.t4g.', '.t3.')] : [cls]
+  return classes.flatMap(c => [
+    { cls: c, storage: 'gp3' as const },
+    { cls: c, storage: 'gp2' as const },
   ])
 }
 
@@ -69,6 +65,12 @@ export function isInsufficientCapacity(err: unknown): boolean {
 }
 const RDS_MASTER_USER = process.env.TENANT_RDS_MASTER_USER || 'postgres'
 const APP_IAM_USER = process.env.RDS_USER || 'app_user'
+
+/** A SQL identifier built from a slug (t_{slug}, app_{slug}); anything but lowercase letters, digits and _ is refused. */
+function ident(name: string): string {
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(name)) throw new Error(`refusing SQL identifier "${name}"`)
+  return name
+}
 
 function isAlreadyExists(err: any): boolean {
   const code = err?.name || err?.Code || ''
@@ -106,7 +108,7 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     )
   }
 
-  async createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string }> {
+  async createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string; instanceClass?: string }> {
     // LOCAL-TEST ONLY: TENANT_RDS_PUBLIC_TEST=true creates the tenant RDS publicly accessible so
     // a laptop outside the VPC can run load_schema/backup without manually flipping visibility +
     // SG each run. NEVER set in production — prod tenant DBs must stay PubliclyAccessible:false
@@ -120,7 +122,8 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     if (publicTest) await this.openLocalRdsAccess()
     // AWS sometimes has no capacity for a class/storage combo in any AZ — fall through to the next.
     let lastErr: unknown
-    for (const { cls, storage } of rdsShapes()) {
+    const storageGb = args.storageGb ?? 20
+    for (const { cls, storage } of rdsShapes(args.instanceClass)) {
       try {
         await this.rds.send(
           new CreateDBInstanceCommand({
@@ -128,7 +131,10 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
             DBInstanceClass: cls,
             Engine: 'postgres',
             EngineVersion: RDS_ENGINE_VERSION,
-            AllocatedStorage: 20,
+            AllocatedStorage: storageGb,
+            // Storage autoscaling headroom so a full disk never takes the store down.
+            MaxAllocatedStorage: storageGb * 2,
+            MultiAZ: !!args.multiAz,
             MasterUsername: RDS_MASTER_USER,
             MasterUserPassword: process.env.RDS_MASTER_PASSWORD,
             DBName: 'jeffi_stores',
@@ -146,7 +152,7 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
             ],
           })
         )
-        return { dbInstanceId: args.dbInstanceId }
+        return { dbInstanceId: args.dbInstanceId, instanceClass: cls }
       } catch (err) {
         if (isAlreadyExists(err)) return { dbInstanceId: args.dbInstanceId }
         if (!isInsufficientCapacity(err)) throw err
@@ -198,25 +204,63 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     return null
   }
 
-  async loadSchema(endpoint: string, dbName: string): Promise<void> {
+  async loadSchema(endpoint: string, dbName: string, appUser = APP_IAM_USER): Promise<void> {
+    const user = ident(appUser)
     const pool = this.tenantPool(endpoint, dbName)
     try {
       // 1. Apply desired-state schema (reuse the fan-out builder for identical ordering)
       await pool.query(buildTenantSchemaSql())
 
-      // 2. Create the app_user role with rds_iam so the app can connect via IAM token
+      // 2. Create the app login role with rds_iam so the app can connect via IAM token
       await pool.query(`
         DO $$ BEGIN
-          IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${APP_IAM_USER}') THEN
-            CREATE ROLE ${APP_IAM_USER} LOGIN;
+          IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${appUser}') THEN
+            CREATE ROLE ${user} LOGIN;
           END IF;
         END $$;
-        GRANT rds_iam TO ${APP_IAM_USER};
-        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${APP_IAM_USER};
-        GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${APP_IAM_USER};
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${APP_IAM_USER};
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${APP_IAM_USER};
+        GRANT rds_iam TO ${user};
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${user};
+        GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${user};
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${user};
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${user};
       `)
+    } finally {
+      await pool.end().catch(() => {})
+    }
+  }
+
+  async initSharedDbHost(endpoint: string): Promise<void> {
+    const pool = this.tenantPool(endpoint, 'postgres')
+    try {
+      for (const db of ['postgres', 'template1', 'jeffi_stores']) {
+        const found = await pool.query('SELECT 1 FROM pg_database WHERE datname = $1', [db])
+        if (found.rowCount) await pool.query(`REVOKE CONNECT, TEMPORARY ON DATABASE ${ident(db)} FROM PUBLIC`)
+      }
+    } finally {
+      await pool.end().catch(() => {})
+    }
+  }
+
+  async createTenantDatabase(endpoint: string, dbName: string, role: string): Promise<void> {
+    const pool = this.tenantPool(endpoint, 'postgres')
+    try {
+      const found = await pool.query('SELECT 1 FROM pg_database WHERE datname = $1', [dbName])
+      if (!found.rowCount) await pool.query(`CREATE DATABASE ${ident(dbName)}`)
+      await pool.query(`REVOKE CONNECT, TEMPORARY ON DATABASE ${ident(dbName)} FROM PUBLIC`)
+      const exists = await pool.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [role])
+      if (!exists.rowCount) await pool.query(`CREATE ROLE ${ident(role)} LOGIN`)
+      await pool.query(`GRANT rds_iam TO ${ident(role)}`)
+      await pool.query(`GRANT CONNECT ON DATABASE ${ident(dbName)} TO ${ident(role)}`)
+    } finally {
+      await pool.end().catch(() => {})
+    }
+  }
+
+  async dropTenantDatabase(endpoint: string, dbName: string, role: string | null): Promise<void> {
+    const pool = this.tenantPool(endpoint, 'postgres')
+    try {
+      await pool.query(`DROP DATABASE IF EXISTS ${ident(dbName)} WITH (FORCE)`)
+      if (role) await pool.query(`DROP ROLE IF EXISTS ${ident(role)}`)
     } finally {
       await pool.end().catch(() => {})
     }
