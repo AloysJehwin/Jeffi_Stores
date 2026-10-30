@@ -54,7 +54,7 @@ spec:
             - name: GOOGLE_SERVICE_ACCOUNT_JSON
               valueFrom: { secretKeyRef: { name: google-sa, key: json, optional: true } }
           resources:
-            requests: { cpu: 150m, memory: 768Mi }
+            requests: { cpu: 100m, memory: 768Mi }
             limits: { cpu: 1500m, memory: 1400Mi }
           startupProbe:
             httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }

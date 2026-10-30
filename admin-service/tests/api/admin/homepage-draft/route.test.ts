@@ -5,6 +5,7 @@ import { DRAFT_ID, makeHomepageDraftDb, sectionRow, slideRow } from '../../../he
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('@/lib/shared/internal-http', () => ({ internalRequest: vi.fn().mockResolvedValue({ ok: true, status: 200, body: '' }) }))
 vi.mock('@/lib/shared/admin-audit', () => ({ logAdminAudit: vi.fn().mockResolvedValue(undefined) }))
 
 const fake = makeHomepageDraftDb()

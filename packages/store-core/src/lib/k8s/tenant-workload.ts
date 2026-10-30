@@ -244,6 +244,7 @@ function appDeployment(a: {
                 { name: 'SM_SECRET_ID', value: a.secret },
                 // The image is the role; this pins the pod to its store.
                 ...(a.role ? [{ name: 'SERVICE_TENANT_SLUG', value: a.slug }] : []),
+                ...(a.role === 'admin' ? [{ name: 'STOREFRONT_URL', value: `http://${tenantRoleName(a.slug, 'storefront')}:3000` }] : []),
                 { name: 'WEB_CONCURRENCY', value: '1' },
                 ...a.poolEnv,
                 { name: 'IN_PROCESS_CRON', value: 'false' },

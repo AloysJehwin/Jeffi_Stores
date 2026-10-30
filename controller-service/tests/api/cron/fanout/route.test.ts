@@ -6,7 +6,7 @@ const reg = vi.hoisted(() => ({ listTenants: vi.fn(), getTenantPlan: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({ listTenants: reg.listTenants }))
 vi.mock('@/lib/auth/plan-gate', () => ({ getTenantPlan: reg.getTenantPlan }))
 const requestMock = vi.hoisted(() => vi.fn())
-vi.mock('@controller/lib/shared/internal-http', () => ({ internalRequest: requestMock }))
+vi.mock('@/lib/shared/internal-http', () => ({ internalRequest: requestMock }))
 
 import { POST } from '@controller/app/api/(internal)/cron/fanout/route'
 
