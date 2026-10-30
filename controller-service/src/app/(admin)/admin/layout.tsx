@@ -7,6 +7,7 @@ import { getAdminSession } from '@/lib/auth/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
 import AdminShortcutHandler from '@/components/admin/AdminShortcutHandler'
 import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
+import PaymentDowntimeBanner from '@/components/admin/PaymentDowntimeBanner'
 import { getSiteControls, getStoreIdentity } from '@/lib/catalog/site-controls'
 import { getHost } from '@/lib/tenancy/get-host'
 import { LogOut } from 'lucide-react'
@@ -239,6 +240,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         wallet={wallet}
       >
         <DesktopRequiredBanner />
+        {(hasScope(role, scopes, 'orders:read') || hasScope(role, scopes, 'financial:read')) && <PaymentDowntimeBanner />}
         {children}
       </AdminShell>
     </>
