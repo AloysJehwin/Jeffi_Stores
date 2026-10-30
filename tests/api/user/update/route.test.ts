@@ -16,7 +16,7 @@ vi.mock('@/lib/shared/validate', () => ({
   zDob: { optional: () => ({}) },
 }))
 
-import { PATCH } from '@controller/app/api/(public)/user/update/route'
+import { PATCH } from '@storefront/app/api/(public)/user/update/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as validate from '@/lib/shared/validate'

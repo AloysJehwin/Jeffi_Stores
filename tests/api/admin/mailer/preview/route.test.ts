@@ -11,7 +11,7 @@ vi.mock('@/lib/templates/variables', async () => {
   return { ...shared, resolveTemplateVariables: vi.fn() }
 })
 
-import { POST } from '@controller/app/api/(admin)/admin/mailer/preview/route'
+import { POST } from '@admin/app/api/(admin)/admin/mailer/preview/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'

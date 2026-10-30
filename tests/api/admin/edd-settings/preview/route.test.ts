@@ -7,7 +7,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({ getBusinessValues: vi.fn() }))
 vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenantId: vi.fn(async () => null) }))
 vi.mock('@/lib/shipping/delhivery', () => ({ listDelhiveryPickupLocations: vi.fn() }))
 
-import { POST } from '@controller/app/api/(admin)/admin/edd-settings/preview/route'
+import { POST } from '@admin/app/api/(admin)/admin/edd-settings/preview/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getBusinessValues } from '@/lib/catalog/site-controls'

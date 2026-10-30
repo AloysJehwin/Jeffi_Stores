@@ -3,7 +3,7 @@ import { legacySpecFor } from '@/lib/compute/legacy'
 import { POD_RESOURCES, REDIS_RESOURCES } from '@/lib/compute/presets'
 import { activeServices, type ComputeSpec, type ServiceName, type ServiceSpec, type StoreLayout } from '@/lib/compute/spec'
 import { surges } from '@/lib/compute/validate'
-import { STORE_ROLES, type ServiceRole } from '@/lib/service-roles'
+import { STORE_ROLES, type ServiceRole } from '@/lib/service-routing'
 import type { K8sObject } from './client'
 
 // Renders one tenant's namespace: its storefront, admin and business services (or, in the old layout, one
@@ -243,12 +243,8 @@ function appDeployment(a: {
               ports: [{ name: 'http', containerPort: 3000 }],
               env: [
                 { name: 'SM_SECRET_ID', value: a.secret },
-                ...(a.role
-                  ? [
-                      { name: 'SERVICE_ROLE', value: a.role },
-                      { name: 'SERVICE_TENANT_SLUG', value: a.slug },
-                    ]
-                  : []),
+                // The image is the role; this pins the pod to its store.
+                ...(a.role ? [{ name: 'SERVICE_TENANT_SLUG', value: a.slug }] : []),
                 { name: 'WEB_CONCURRENCY', value: '1' },
                 ...a.poolEnv,
                 { name: 'IN_PROCESS_CRON', value: 'false' },

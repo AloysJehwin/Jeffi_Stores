@@ -7,7 +7,7 @@ vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
 
-import { GET } from '@controller/app/api/(public)/orders/[id]/track-rvp/route'
+import { GET } from '@storefront/app/api/(public)/orders/[id]/track-rvp/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 

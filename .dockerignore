@@ -46,10 +46,10 @@ ai-platform/
 document-service/.documents/
 **/.env.local
 **/.env.local.overrides
-controller-service/public/models/onboarding/onnx/
-controller-service/public/models/onboarding/ort/
-controller-service/public/ort/*.wasm
-controller-service/public/ort/*.map
+storefront-service/public/models/onboarding/onnx/
+storefront-service/public/models/onboarding/ort/
+storefront-service/public/ort/*.wasm
+storefront-service/public/ort/*.map
 data/
 store_documents/
 .vault-store/

@@ -5,6 +5,8 @@ vi.mock('@/lib/shared/cron-auth', () => ({ verifyCronRequest: vi.fn(() => true) 
 const reg = vi.hoisted(() => ({ listTenants: vi.fn(), getTenantPlan: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({ listTenants: reg.listTenants }))
 vi.mock('@/lib/auth/plan-gate', () => ({ getTenantPlan: reg.getTenantPlan }))
+const requestMock = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/shared/internal-http', () => ({ internalRequest: requestMock }))
 
 import { POST } from '@controller/app/api/(internal)/cron/fanout/route'
 
@@ -16,18 +18,19 @@ function post(jobId: string) {
     body: JSON.stringify({ jobId }),
   })
 }
-const fetchMock = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
   process.env.CRON_SECRET = 'x'
   process.env.PLATFORM_ROOT_DOMAIN = 'jeffistores.in'
   process.env.CRON_SELF_BASE = BASE
-  fetchMock.mockResolvedValue({ ok: true, status: 200 })
-  vi.stubGlobal('fetch', fetchMock)
+  process.env.CRON_FLAGSHIP_BASE = 'http://flagship-admin:3000'
+  process.env.CRON_STORE_BASE = 'http://{slug}-admin:3000'
+  requestMock.mockResolvedValue({ ok: true, status: 200 })
 })
 
-const hostsCalled = () => fetchMock.mock.calls.map(c => (c[1]?.headers as any)?.Host)
+const hostsCalled = () => requestMock.mock.calls.map(c => c[1]?.host)
+const urlsCalled = () => requestMock.mock.calls.map(c => c[0] as string)
 
 describe('cron fan-out', () => {
   it('rejects an unknown jobId', async () => {
@@ -41,6 +44,7 @@ describe('cron fan-out', () => {
     expect(json.mode).toBe('platform')
     expect(reg.listTenants).not.toHaveBeenCalled()
     expect(hostsCalled()).toEqual(['jeffistores.in'])
+    expect(urlsCalled()).toEqual([`${BASE}/api/internal/provisioning/worker`])
   })
 
   it('tenant-scoped job runs flagship + only tenants whose plan grants the scope', async () => {
@@ -58,13 +62,15 @@ describe('cron fan-out', () => {
     expect(json.mode).toBe('tenant')
     expect(json.skippedByPlan).toBe(1)
     expect(hostsCalled().sort()).toEqual(['alpha.jeffistores.in', 'jeffistores.in'])
+    // Store jobs run on each store's admin service, not this app.
+    expect(urlsCalled().sort()).toEqual(['http://alpha-admin:3000/api/cron/cancel-stale-orders', 'http://flagship-admin:3000/api/cron/cancel-stale-orders'])
   })
 
   it('isolates a failing tenant — one 500 does not abort the rest', async () => {
     reg.listTenants.mockResolvedValue([{ id: 't1', slug: 'alpha' }])
     reg.getTenantPlan.mockResolvedValue({ plan: 'x', scopes: new Set(['orders:read']) })
-    fetchMock.mockImplementation(async (url: string, init: any) =>
-      (init?.headers?.Host as string).startsWith('alpha') ? { ok: false, status: 500 } : { ok: true, status: 200 }
+    requestMock.mockImplementation(async (url: string, init: any) =>
+      (init?.host as string).startsWith('alpha') ? { ok: false, status: 500 } : { ok: true, status: 200 }
     )
     const res = await POST(post('cancel_stale_orders'))
     const json = await res.json()

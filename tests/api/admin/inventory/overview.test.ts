@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
 vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenant: vi.fn(async () => null) }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn(), query: vi.fn() }))
 
-import { GET } from '@controller/app/api/(admin)/admin/inventory/overview/route'
+import { GET } from '@admin/app/api/(admin)/admin/inventory/overview/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryOne } from '@/lib/shared/db'
 

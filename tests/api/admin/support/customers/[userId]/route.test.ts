@@ -6,7 +6,7 @@ vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryOne: vi.fn(), queryMany: vi.fn(), withTransaction: vi.fn() }))
 vi.mock('@/lib/support/sessions', () => ({ listInbox: vi.fn(), getSessionRow: vi.fn() }))
 
-import { GET } from '@controller/app/api/(admin)/admin/support/customers/[userId]/route'
+import { GET } from '@admin/app/api/(admin)/admin/support/customers/[userId]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { listInbox } from '@/lib/support/sessions'

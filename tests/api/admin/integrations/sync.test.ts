@@ -11,7 +11,7 @@ vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenant: mockResolveTenan
 vi.mock('@/lib/merchant/sync', () => ({ syncAllProductsToMerchant: mockSyncMerchant }))
 vi.mock('@/lib/amazon/sync', () => ({ syncAllProductsToAmazon: vi.fn() }))
 
-import { POST } from '@controller/app/api/(admin)/admin/integrations/sync/route'
+import { POST } from '@admin/app/api/(admin)/admin/integrations/sync/route'
 
 const req = (body: unknown) =>
   new NextRequest('http://localhost/api/admin/integrations/sync', { method: 'POST', body: JSON.stringify(body) })

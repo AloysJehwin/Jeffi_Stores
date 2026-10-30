@@ -27,7 +27,7 @@ vi.mock('@/lib/auth/google-verify', () => ({
   verifyGoogleCredential: vi.fn(),
 }))
 
-import { POST } from '@controller/app/api/(public)/business/google/complete/route'
+import { POST } from '@storefront/app/api/(public)/business/google/complete/route'
 import * as gverify from '@/lib/auth/google-verify'
 
 // A valid DOB ~30 years ago (passes the 3..120 bound and the not-future check).

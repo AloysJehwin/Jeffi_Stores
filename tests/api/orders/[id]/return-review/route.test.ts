@@ -52,7 +52,7 @@ vi.mock('@/lib/orders/order-stock', () => ({
   restoreOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { POST } from '@controller/app/api/(public)/orders/[id]/return-review/route'
+import { POST } from '@storefront/app/api/(public)/orders/[id]/return-review/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'

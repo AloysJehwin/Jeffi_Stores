@@ -9,7 +9,7 @@ vi.mock('@/lib/admin-agent/conversations', () => ({
   conversationMeta: vi.fn(async () => ({ title: 'Hello', shared: false, owner_name: 'Owner' })),
 }))
 
-import { GET } from '@controller/app/api/(admin)/admin/agent/conversations/[id]/messages/route'
+import { GET } from '@admin/app/api/(admin)/admin/agent/conversations/[id]/messages/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

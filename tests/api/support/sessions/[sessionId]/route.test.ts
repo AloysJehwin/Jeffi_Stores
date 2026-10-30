@@ -15,7 +15,7 @@ vi.mock('@/lib/support/sessions', () => ({
   closeSession: vi.fn(),
 }))
 
-import { GET, PATCH } from '@controller/app/api/(public)/support/sessions/[sessionId]/route'
+import { GET, PATCH } from '@storefront/app/api/(public)/support/sessions/[sessionId]/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { logActivity } from '@/lib/shared/activity'
 import { getSessionRow, getSessionDto, closeSession } from '@/lib/support/sessions'

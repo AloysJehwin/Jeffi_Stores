@@ -15,8 +15,8 @@ vi.mock('@/lib/integrations/test-connection', () => ({
   testMeta: vi.fn(async () => ({ ok: true, message: 'Reached Facebook Page Acme.' })),
 }))
 
-import { POST, DELETE } from '@controller/app/api/(admin)/admin/integrations/route'
-import { POST as TEST } from '@controller/app/api/(admin)/admin/integrations/test/route'
+import { POST, DELETE } from '@admin/app/api/(admin)/admin/integrations/route'
+import { POST as TEST } from '@admin/app/api/(admin)/admin/integrations/test/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
 import { saveIntegrationCredential, deleteIntegrationCredential } from '@/lib/tenant-registry'

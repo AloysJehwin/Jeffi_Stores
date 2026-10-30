@@ -106,7 +106,7 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
 ])
 
 function mutatingRoutesWithoutWriteScope(): string[] {
-  const files = glob.sync('controller-service/src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() })
+  const files = glob.sync('{admin,controller}-service/src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() })
   const offenders: string[] = []
   for (const f of files) {
     const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
@@ -124,7 +124,7 @@ function mutatingRoutesWithoutWriteScope(): string[] {
     if (/hasScope\(/.test(src) && lits.length > 0 && lits.every(l => l.endsWith(":write'"))) continue
     if (/aiDenial\(/.test(src) && /resolveAiScope\(/.test(src)) continue
     if (/CRON_SECRET|verifyCronRequest|authenticateServiceAccount/.test(src)) continue
-    const route = f.replace('controller-service/src/app/api/(admin)/admin/', '').replace('/route.ts', '')
+    const route = f.replace(/^[a-z]+-service\/src\/app\/api\/\(admin\)\/admin\//, '').replace('/route.ts', '')
     if (ALLOWED_WITHOUT_WRITE_SCOPE.has(route)) continue
     offenders.push(route)
   }
@@ -136,24 +136,24 @@ function mutatingRoutesWithoutWriteScope(): string[] {
 // with a valid admin session could reach the write unless it also gates on a :write scope.
 // Each glob is a mutating handler that must carry the same :write check the /api/admin tree uses.
 const ADMIN_ONLY_OUTSIDE_ADMIN = [
-  'controller-service/src/app/api/(public)/brands/route.ts',
-  'controller-service/src/app/api/(public)/brands/[id]/route.ts',
-  'controller-service/src/app/api/(public)/categories/[id]/route.ts',
-  'controller-service/src/app/api/(public)/categories/reorder/route.ts',
-  'controller-service/src/app/api/(public)/upload/route.ts',
-  'controller-service/src/app/api/(public)/gallery/upload/route.ts',
-  'controller-service/src/app/api/(public)/generate-image/route.ts',
-  'controller-service/src/app/api/(public)/orders/[id]/refund/route.ts',
-  'controller-service/src/app/api/(public)/orders/[id]/cancel-review/route.ts',
-  'controller-service/src/app/api/(public)/orders/[id]/return-review/route.ts',
-  'controller-service/src/app/api/(public)/orders/[id]/route.ts',
-  'controller-service/src/app/api/(public)/razorpay/payment-link/route.ts',
-  'controller-service/src/app/api/(public)/products/[id]/route.ts',
+  'storefront-service/src/app/api/(public)/brands/route.ts',
+  'storefront-service/src/app/api/(public)/brands/[id]/route.ts',
+  'storefront-service/src/app/api/(public)/categories/[id]/route.ts',
+  'storefront-service/src/app/api/(public)/categories/reorder/route.ts',
+  'storefront-service/src/app/api/(public)/upload/route.ts',
+  'storefront-service/src/app/api/(public)/gallery/upload/route.ts',
+  'storefront-service/src/app/api/(public)/generate-image/route.ts',
+  'storefront-service/src/app/api/(public)/orders/[id]/refund/route.ts',
+  'storefront-service/src/app/api/(public)/orders/[id]/cancel-review/route.ts',
+  'storefront-service/src/app/api/(public)/orders/[id]/return-review/route.ts',
+  'storefront-service/src/app/api/(public)/orders/[id]/route.ts',
+  'storefront-service/src/app/api/(public)/razorpay/payment-link/route.ts',
+  'storefront-service/src/app/api/(public)/products/[id]/route.ts',
 ]
 
 // products/[id] DELETE is a hard 405 that mutates nothing, so it needs no scope; the file's
 // PATCH is what carries products:write.
-const MUTATING_WITHOUT_SCOPE_OK = new Set(['controller-service/src/app/api/(public)/products/[id]/route.ts'])
+const MUTATING_WITHOUT_SCOPE_OK = new Set(['storefront-service/src/app/api/(public)/products/[id]/route.ts'])
 
 function adminOnlyRoutesWithoutWriteScope(): string[] {
   const offenders: string[] = []
@@ -186,6 +186,6 @@ describe('an admin action is never reachable with read-only access', () => {
   })
 
   it('reads a meaningful number of routes (guards the glob)', () => {
-    expect(glob.sync('controller-service/src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() }).length).toBeGreaterThanOrEqual(339)
+    expect(glob.sync('{admin,controller}-service/src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() }).length).toBeGreaterThanOrEqual(339)
   })
 })

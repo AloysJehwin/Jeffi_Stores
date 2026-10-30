@@ -13,7 +13,7 @@ vi.mock('@/lib/shared/s3', () => ({
   GALLERY_MAX_BYTES: MAX,
 }))
 
-import { POST, OPTIONS } from '@controller/app/api/(public)/gallery/upload/route'
+import { POST, OPTIONS } from '@storefront/app/api/(public)/gallery/upload/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { uploadGalleryMedia, fetchRemoteImage } from '@/lib/shared/s3'

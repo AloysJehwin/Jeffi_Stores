@@ -17,7 +17,7 @@ vi.stubGlobal('fetch', mockFetch)
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@controller/app/api/(admin)/admin/orders/[id]/update-shipment/route'
+import { POST } from '@admin/app/api/(admin)/admin/orders/[id]/update-shipment/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

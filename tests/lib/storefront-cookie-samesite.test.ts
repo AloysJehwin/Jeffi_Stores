@@ -12,12 +12,12 @@ import { join } from 'node:path'
 
 const ROOT = join(__dirname, '..', '..')
 const STOREFRONT_SESSION_ROUTES = [
-  'controller-service/src/app/api/(public)/auth/login/route.ts',
-  'controller-service/src/app/api/(public)/auth/signup/route.ts',
-  'controller-service/src/app/api/(public)/auth/google/route.ts',
-  'controller-service/src/app/api/(public)/business/login/route.ts',
-  'controller-service/src/app/api/(public)/business/signup/route.ts',
-  'controller-service/src/app/api/(public)/business/google/route.ts',
+  'storefront-service/src/app/api/(public)/auth/login/route.ts',
+  'storefront-service/src/app/api/(public)/auth/signup/route.ts',
+  'storefront-service/src/app/api/(public)/auth/google/route.ts',
+  'storefront-service/src/app/api/(public)/business/login/route.ts',
+  'storefront-service/src/app/api/(public)/business/signup/route.ts',
+  'storefront-service/src/app/api/(public)/business/google/route.ts',
 ]
 
 describe('storefront session cookie sameSite', () => {

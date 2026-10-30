@@ -21,7 +21,7 @@ vi.mock('@/lib/support/messages', () => ({
 vi.mock('@/lib/support/translate', () => ({ settleCustomerLang: vi.fn() }))
 vi.mock('@/lib/support/agent', () => ({ onCustomerMessage: vi.fn() }))
 
-import { GET, POST } from '@controller/app/api/(public)/support/sessions/[sessionId]/messages/route'
+import { GET, POST } from '@storefront/app/api/(public)/support/sessions/[sessionId]/messages/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { queryMany } from '@/lib/shared/db'
 import { logActivity } from '@/lib/shared/activity'

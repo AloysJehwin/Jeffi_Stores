@@ -7,13 +7,13 @@ vi.mock('@/lib/catalog/site-controls', () => ({
   getBusinessValues: vi.fn(async () => ({ eddSettingsJson: '{"handlingDays":3}', delhiveryOriginPincode: '492001' })),
 }))
 
-import { GET as ordersGET } from '@controller/app/api/(admin)/admin/orders/overview/route'
-import { GET as delhiveryGET } from '@controller/app/api/(admin)/admin/delhivery/overview/route'
-import { GET as returnsGET } from '@controller/app/api/(admin)/admin/returns/overview/route'
-import { GET as replacementsGET } from '@controller/app/api/(admin)/admin/replacements/overview/route'
-import { GET as packingGET } from '@controller/app/api/(admin)/admin/packing-slips/overview/route'
-import { GET as labelsGET } from '@controller/app/api/(admin)/admin/labels/overview/route'
-import { GET as scanGET } from '@controller/app/api/(admin)/admin/scan/overview/route'
+import { GET as ordersGET } from '@admin/app/api/(admin)/admin/orders/overview/route'
+import { GET as delhiveryGET } from '@admin/app/api/(admin)/admin/delhivery/overview/route'
+import { GET as returnsGET } from '@admin/app/api/(admin)/admin/returns/overview/route'
+import { GET as replacementsGET } from '@admin/app/api/(admin)/admin/replacements/overview/route'
+import { GET as packingGET } from '@admin/app/api/(admin)/admin/packing-slips/overview/route'
+import { GET as labelsGET } from '@admin/app/api/(admin)/admin/labels/overview/route'
+import { GET as scanGET } from '@admin/app/api/(admin)/admin/scan/overview/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 

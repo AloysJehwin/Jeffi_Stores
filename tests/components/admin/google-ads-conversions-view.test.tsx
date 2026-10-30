@@ -5,10 +5,10 @@ let canWrite = true
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(window.location.search), usePathname: () => '/admin/google-ads' }))
 vi.mock('@/contexts/AdminScopesContext', () => ({ useCanWrite: () => canWrite }))
 
-import ConversionsView from '@controller/app/(admin)/admin/google-ads/_components/ConversionsView'
+import ConversionsView from '@admin/app/(admin)/admin/google-ads/_components/ConversionsView'
 import { ToastProvider } from '@/contexts/ToastContext'
 import type { ReactElement } from 'react'
-import GoogleAdsClient from '@controller/app/(admin)/admin/google-ads/GoogleAdsClient'
+import GoogleAdsClient from '@admin/app/(admin)/admin/google-ads/GoogleAdsClient'
 import type { ConversionsSummary, DataManagerRequest, GoogleConversionsData, UploadLog } from '@/lib/google-ads/conversions/types'
 
 const ACTION = 'customers/1234567890/conversionActions/777'

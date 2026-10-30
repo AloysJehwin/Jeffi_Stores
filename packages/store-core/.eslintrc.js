@@ -1,7 +1,7 @@
 // Shared code for every Next app: it must never import an app's own routes or code.
 module.exports = {
   extends: 'next/core-web-vitals',
-  settings: { next: { rootDir: ['../../controller-service'] } },
+  settings: { next: { rootDir: ['../../controller-service', '../../storefront-service', '../../admin-service', '../../business-service'] } },
   rules: {
     'no-restricted-imports': ['error', { patterns: [{ group: ['@controller/*', '@storefront/*', '@admin/*', '@business/*'], message: 'packages/store-core must not import an app.' }] }],
     'import/no-restricted-paths': [

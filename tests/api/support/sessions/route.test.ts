@@ -16,7 +16,7 @@ vi.mock('@/lib/support/sessions', () => ({
   getSessionRow: vi.fn(),
 }))
 
-import { GET, POST } from '@controller/app/api/(public)/support/sessions/route'
+import { GET, POST } from '@storefront/app/api/(public)/support/sessions/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { logActivity } from '@/lib/shared/activity'
 import { openSessionFor, createSession, getSessionDto } from '@/lib/support/sessions'

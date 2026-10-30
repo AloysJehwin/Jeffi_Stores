@@ -6,7 +6,7 @@ vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/automation-emails', () => ({ sendTestCampaignEmail: vi.fn() }))
 vi.mock('@/lib/shared/marketing', () => ({}))
 
-import { POST } from '@controller/app/api/(admin)/admin/campaigns/[kind]/test/route'
+import { POST } from '@admin/app/api/(admin)/admin/campaigns/[kind]/test/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { sendTestCampaignEmail } from '@/lib/shared/automation-emails'

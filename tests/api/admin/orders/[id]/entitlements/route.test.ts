@@ -14,7 +14,7 @@ vi.mock('@/lib/orders/entitlements', () => ({
 }))
 vi.mock('@/lib/shared/admin-audit', () => ({ logAdminAudit: vi.fn().mockResolvedValue(undefined) }))
 
-import { GET, POST } from '@controller/app/api/(admin)/admin/orders/[id]/entitlements/route'
+import { GET, POST } from '@admin/app/api/(admin)/admin/orders/[id]/entitlements/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'

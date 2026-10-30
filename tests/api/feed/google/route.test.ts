@@ -25,7 +25,7 @@ vi.mock('@/lib/shared/google-merchant-helpers', () => ({
 }))
 
 // ── import module AFTER mocks ────────────────────────────────────────────────
-import * as feedModule from '@controller/app/api/(public)/feed/google/route'
+import * as feedModule from '@storefront/app/api/(public)/feed/google/route'
 const { GET } = feedModule
 
 // ── helpers ──────────────────────────────────────────────────────────────────

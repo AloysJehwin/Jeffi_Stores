@@ -32,7 +32,7 @@ vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
-import { POST } from '@controller/app/api/(public)/business/logout/route'
+import { POST } from '@storefront/app/api/(public)/business/logout/route'
 import { cookies } from 'next/headers'
 
 // ── helpers ───────────────────────────────────────────────────────────────────

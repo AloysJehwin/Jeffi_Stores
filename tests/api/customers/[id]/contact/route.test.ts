@@ -13,7 +13,7 @@ vi.mock('@/lib/email', () => ({
   sendAdminContactEmail: vi.fn(),
 }))
 
-import { POST } from '@controller/app/api/(public)/customers/[id]/contact/route'
+import { POST } from '@storefront/app/api/(public)/customers/[id]/contact/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as scopes from '@/lib/auth/scopes'
 import * as queries from '@/lib/queries'

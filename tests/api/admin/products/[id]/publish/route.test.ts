@@ -22,7 +22,7 @@ vi.mock('@/lib/catalog/product-draft', () => {
   }
 })
 
-import { POST } from '@controller/app/api/(admin)/admin/products/[id]/publish/route'
+import { POST } from '@admin/app/api/(admin)/admin/products/[id]/publish/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { queryOne, query } from '@/lib/shared/db'
 import { publishProductDraft, UnitChangeBlockedError } from '@/lib/catalog/product-draft'

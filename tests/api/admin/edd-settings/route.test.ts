@@ -14,7 +14,7 @@ vi.mock('@/lib/shipping/delhivery', () => ({
   setDefaultPickupLocation: vi.fn(),
 }))
 
-import { GET, PUT } from '@controller/app/api/(admin)/admin/edd-settings/route'
+import { GET, PUT } from '@admin/app/api/(admin)/admin/edd-settings/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'

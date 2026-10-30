@@ -14,7 +14,7 @@ vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
-import { POST } from '@controller/app/api/(admin)/admin/refresh/route'
+import { POST } from '@admin/app/api/(admin)/admin/refresh/route'
 import { authenticateAdmin, JWT_MAX_AGE_S } from '@/lib/auth/jwt'
 import { extendSession } from '@/lib/auth/auth-sessions'
 

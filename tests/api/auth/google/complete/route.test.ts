@@ -29,7 +29,7 @@ vi.mock('@/lib/auth/google-verify', () => ({
   verifyGoogleCredential: vi.fn(),
 }))
 
-import { POST } from '@controller/app/api/(public)/auth/google/complete/route'
+import { POST } from '@storefront/app/api/(public)/auth/google/complete/route'
 import * as gverify from '@/lib/auth/google-verify'
 
 const VALID_DOB = '1990-05-15'

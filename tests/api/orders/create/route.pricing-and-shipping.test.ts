@@ -49,7 +49,7 @@ vi.mock('@/lib/shared/validate', async importOriginal => {
   return { ...actual }
 })
 
-import { POST } from '@controller/app/api/(public)/orders/create/route'
+import { POST } from '@storefront/app/api/(public)/orders/create/route'
 import * as db from '@/lib/shared/db'
 import * as jwt from '@/lib/auth/jwt'
 import * as bizDiscount from '@/lib/catalog/business-discount'

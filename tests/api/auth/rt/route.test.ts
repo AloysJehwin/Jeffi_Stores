@@ -19,7 +19,7 @@ vi.mock('@/lib/auth/auth-sessions', () => ({ resolveSession: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/auth/session-signals-request', () => ({ extractSessionSignals: vi.fn(() => ({ binding: null })) }))
 
-import { POST } from '@controller/app/api/(public)/auth/rt/route'
+import { POST } from '@storefront/app/api/(public)/auth/rt/route'
 import { resolveSession } from '@/lib/auth/auth-sessions'
 import { queryOne } from '@/lib/shared/db'
 import { loadSessionKey } from '@/lib/auth/session-binding'

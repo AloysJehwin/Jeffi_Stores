@@ -43,12 +43,12 @@ vi.mock('@/lib/google-ads/merchant-link', () => ({ merchantLinkStatus: vi.fn() }
 vi.mock('@/lib/google-ads/listing', () => ({ itemIdsForCategories: vi.fn() }))
 vi.mock('@/lib/catalog/site-controls', () => ({ getSiteControls: vi.fn(async () => ({ identity: { logoUrl: 'https://cdn/logo.png' } })) }))
 
-import { POST as createAccount } from '@controller/app/api/(admin)/admin/google-ads/account/route'
-import { POST as newExperiment } from '@controller/app/api/(admin)/admin/google-ads/manage/experiments/route'
-import { POST as experimentAct } from '@controller/app/api/(admin)/admin/google-ads/manage/experiments/[id]/route'
+import { POST as createAccount } from '@admin/app/api/(admin)/admin/google-ads/account/route'
+import { POST as newExperiment } from '@admin/app/api/(admin)/admin/google-ads/manage/experiments/route'
+import { POST as experimentAct } from '@admin/app/api/(admin)/admin/google-ads/manage/experiments/[id]/route'
 import { GET as managed } from '@controller/app/api/(admin)/admin/ecom/google-ads/route'
 import { DELETE as unlink } from '@controller/app/api/(admin)/admin/ecom/google-ads/[customerId]/route'
-import { POST as createCampaignRoute } from '@controller/app/api/(admin)/admin/google-ads/manage/campaigns/route'
+import { POST as createCampaignRoute } from '@admin/app/api/(admin)/admin/google-ads/manage/campaigns/route'
 
 const ADMIN = { adminId: 'a1', email: 'owner@store.in', role: 'super_admin', scopes: ['google_ads:write', 'google_ads_campaigns:write'] }
 const post = (url: string, body: unknown) => new NextRequest(`https://acme.jeffistores.in${url}`, { method: 'POST', body: JSON.stringify(body) })

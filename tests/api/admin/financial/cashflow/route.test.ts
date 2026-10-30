@@ -3,12 +3,12 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@controller/app/api/(admin)/admin/financial/cashflow/summary', () => ({ getCashflowOverview: vi.fn() }))
+vi.mock('@admin/app/api/(admin)/admin/financial/cashflow/summary', () => ({ getCashflowOverview: vi.fn() }))
 
-import { GET } from '@controller/app/api/(admin)/admin/financial/cashflow/route'
+import { GET } from '@admin/app/api/(admin)/admin/financial/cashflow/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { getCashflowOverview } from '@controller/app/api/(admin)/admin/financial/cashflow/summary'
+import { getCashflowOverview } from '@admin/app/api/(admin)/admin/financial/cashflow/summary'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

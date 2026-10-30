@@ -5,7 +5,7 @@ export const SERVICE_NAMES = ['storefront', 'admin', 'business', 'messaging', 'd
 export type ServiceName = (typeof SERVICE_NAMES)[number]
 
 // controller: the store runs the old all-in-one {slug}-controller-service; services: storefront, admin
-// and business each run on their own (service-roles.ts). Set only on what runs (applied), never chosen.
+// and business each run on their own (service-routing.ts). Set only on what runs (applied), never chosen.
 export type StoreLayout = 'controller' | 'services'
 
 export type PodSize = 'S' | 'M' | 'L'

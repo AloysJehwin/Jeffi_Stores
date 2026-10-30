@@ -52,7 +52,7 @@ describe('Route transfer resolves the linked account with the owner-bank fallbac
       expect(src, `${f} no longer calls transferToLinkedAccount directly`).not.toContain('transferToLinkedAccount')
     }
     for (const f of [
-      'controller-service/src/app/api/(public)/razorpay/verify/route.ts',
+      'storefront-service/src/app/api/(public)/razorpay/verify/route.ts',
       'packages/store-core/src/lib/payments/razorpay-events/payments.ts',
     ]) {
       const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')

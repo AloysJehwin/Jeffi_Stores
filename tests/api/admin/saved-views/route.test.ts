@@ -12,8 +12,8 @@ vi.mock('@/lib/auth/jwt', () => ({
 }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
-import { GET, POST } from '@controller/app/api/(admin)/admin/saved-views/route'
-import { PATCH, DELETE } from '@controller/app/api/(admin)/admin/saved-views/[id]/route'
+import { GET, POST } from '@admin/app/api/(admin)/admin/saved-views/route'
+import { PATCH, DELETE } from '@admin/app/api/(admin)/admin/saved-views/[id]/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 

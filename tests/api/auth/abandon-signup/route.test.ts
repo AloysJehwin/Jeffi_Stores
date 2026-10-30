@@ -11,7 +11,7 @@ vi.mock('@/lib/shared/s3', () => ({
   deleteObjectKey: vi.fn(),
 }))
 
-import { POST } from '@controller/app/api/(public)/auth/abandon-signup/route'
+import { POST } from '@storefront/app/api/(public)/auth/abandon-signup/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as s3 from '@/lib/shared/s3'

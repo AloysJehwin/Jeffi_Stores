@@ -98,9 +98,10 @@ async function loadSecrets() {
     }
     const envPath = resolve(OUT_DIR, '.env.local')
     writeFileSync(envPath, lines.join('\n') + '\n', 'utf8')
-    // Next loads env files from its project dir (controller-service/); point it at this one.
-    const appEnv = resolve(REPO_ROOT, 'controller-service', '.env.local')
-    if (OUT_DIR === REPO_ROOT && existsSync(resolve(REPO_ROOT, 'controller-service'))) {
+    // Next loads env files from each app's project dir; point every app at this one.
+    for (const app of ['controller-service', 'storefront-service', 'admin-service', 'business-service']) {
+      const appEnv = resolve(REPO_ROOT, app, '.env.local')
+      if (OUT_DIR !== REPO_ROOT || !existsSync(resolve(REPO_ROOT, app))) continue
       let stat = null
       try { stat = lstatSync(appEnv) } catch {}
       if (!stat || stat.isSymbolicLink()) {
