@@ -1,6 +1,6 @@
 import 'server-only'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
+import { lookupTenantContextById, lookupTenantContextBySlug } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext, type TenantContext } from '@/lib/tenancy/tenant-context'
 
 /**
@@ -61,12 +61,68 @@ export function scopeForTenantId(tenantId: string | null | undefined): Promise<W
   return id ? toWebhookTenant(id) : Promise.resolve(null)
 }
 
+const NIL = '00000000-0000-0000-0000-000000000000'
+
+/** The platform account's own store: the default pool, no tenant context. */
+export function flagshipScope(): WebhookTenant {
+  return { tenantId: NIL, slug: 'platform', ctx: null }
+}
+
+export const isFlagship = (t: { tenantId: string } | null | undefined) => !t?.tenantId || t.tenantId === NIL
+
+const str = (v: unknown) => (v ?? '').toString().trim()
+
+/** The store notes name: undefined when they name none, null when the store can't be found. */
+export async function storeNamedIn(notes: any): Promise<WebhookTenant | null | undefined> {
+  const id = str(notes?.tenant_id)
+  if (id) return toWebhookTenant(id)
+  const slug = str(notes?.tenant_slug)
+  if (!slug) return undefined
+  const ctx = await lookupTenantContextBySlug(slug).catch(() => null)
+  return ctx ? { tenantId: ctx.tenantId, slug: ctx.slug, ctx } : null
+}
+
+/** A platform-account read (the webhook has no store context, so never the ALS keys). */
+async function platformFetch(fn: (rzp: any) => Promise<any>): Promise<any> {
+  try {
+    const { getRazorpayInstance } = await import('@/lib/payments/razorpay')
+    return await fn(getRazorpayInstance())
+  } catch {
+    return null
+  }
+}
+
+/** The store a Razorpay order on the platform account was created for (its notes are ours). */
+export async function storeForRazorpayOrder(rzpOrderId: string | null | undefined) {
+  if (!rzpOrderId) return undefined
+  return storeNamedIn((await platformFetch(rzp => rzp.orders.fetch(rzpOrderId)))?.notes)
+}
+
+/**
+ * The store a platform-account event belongs to: the entity's notes, then the payment's, then the
+ * payment and its order as Razorpay holds them. The flagship when nothing names a store; null when a
+ * named store can't be found, so the caller drops the event rather than writing to the flagship DB.
+ */
+export async function scopeForEntity(entity: any, opts: { paymentId?: string; payment?: any } = {}): Promise<WebhookTenant | null> {
+  for (const notes of [entity?.notes, opts.payment?.notes]) {
+    const s = await storeNamedIn(notes)
+    if (s !== undefined) return s
+  }
+  if (opts.paymentId) {
+    const p = await platformFetch(rzp => rzp.payments.fetch(opts.paymentId))
+    let s = await storeNamedIn(p?.notes)
+    if (s === undefined) s = await storeForRazorpayOrder(p?.order_id)
+    if (s !== undefined) return s
+  }
+  return flagshipScope()
+}
+
 async function toWebhookTenant(tenantId: string): Promise<WebhookTenant | null> {
   // The flagship (platform) store has no dedicated infra row, so lookupTenantContextById returns
   // null for it — that's correct, it runs on the default pool with no tenant context.
-  const NIL = '00000000-0000-0000-0000-000000000000'
-  if (tenantId === NIL) return { tenantId, slug: 'platform', ctx: null }
-  const ctx = await lookupTenantContextById(tenantId).catch(() => null)
+  if (tenantId === NIL) return flagshipScope()
+  // A control-plane error throws, so the webhook retries instead of dropping the event.
+  const ctx = await lookupTenantContextById(tenantId)
   if (!ctx) return null
   return { tenantId, slug: ctx.slug, ctx }
 }

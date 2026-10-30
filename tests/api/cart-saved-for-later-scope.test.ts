@@ -17,7 +17,7 @@ describe('checkout leaves saved-for-later items alone', () => {
     for (const path of [
       'controller-service/src/app/api/(public)/orders/create/route.ts',
       'controller-service/src/app/api/(public)/razorpay/verify/route.ts',
-      'controller-service/src/app/api/(public)/webhooks/razorpay/route.ts',
+      'controller-service/src/lib/payments/capture.ts',
     ]) {
       const deletes = src(path).match(/DELETE FROM cart_items WHERE user_id = \$1[^'`]*/g) ?? []
       expect(deletes.length).toBeGreaterThan(0)

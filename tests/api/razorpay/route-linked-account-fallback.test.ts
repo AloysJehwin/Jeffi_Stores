@@ -46,13 +46,17 @@ describe('Route transfer resolves the linked account with the owner-bank fallbac
   })
 
   it('every capture path goes through recordCapturedPayment, not a hand-rolled transfer', () => {
-    for (const f of [
-      'controller-service/src/app/api/(public)/razorpay/verify/route.ts',
-      'controller-service/src/app/api/(public)/webhooks/razorpay/route.ts',
-      'controller-service/src/lib/subscriptions/cycle.ts',
-    ]) {
+    for (const f of ['controller-service/src/lib/payments/capture.ts', 'controller-service/src/lib/subscriptions/cycle.ts']) {
       const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
       expect(src, `${f} uses recordCapturedPayment`).toContain('recordCapturedPayment')
+      expect(src, `${f} no longer calls transferToLinkedAccount directly`).not.toContain('transferToLinkedAccount')
+    }
+    for (const f of [
+      'controller-service/src/app/api/(public)/razorpay/verify/route.ts',
+      'controller-service/src/lib/payments/razorpay-events/payments.ts',
+    ]) {
+      const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
+      expect(src, `${f} goes through lib/payments/capture`).toContain('@/lib/payments/capture')
       expect(src, `${f} no longer calls transferToLinkedAccount directly`).not.toContain('transferToLinkedAccount')
     }
   })
