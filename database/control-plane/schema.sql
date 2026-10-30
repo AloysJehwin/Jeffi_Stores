@@ -13,9 +13,9 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 --
 CREATE TABLE IF NOT EXISTS public.plans (
     id             uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    slug           character varying(40) NOT NULL,          -- 'basic' | 'growth' | 'pro' | 'enterprise'
+    slug           character varying(40) NOT NULL,          -- 'starter' | 'basic' | 'growth' | 'pro' | 'enterprise'
     name           character varying(80) NOT NULL,
-    tier           integer NOT NULL,                        -- 1..4, ordering
+    tier           integer NOT NULL,                        -- 1..5, ordering
     monthly_price_inr  numeric(12,2) NOT NULL DEFAULT 0,
     max_custom_domains integer       NOT NULL DEFAULT 0,  -- 0=none, 1=Pro, 3=Enterprise
     is_active          boolean       NOT NULL DEFAULT true,
@@ -102,7 +102,7 @@ ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_billing_interval_c
     CHECK (billing_interval IN ('monthly','yearly'));
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_store_request_check
     CHECK (store_request IN ('pending_approval','awaiting_payment','provisioning'));
-ALTER TABLE ONLY public.plans          ADD CONSTRAINT plans_tier_check CHECK (tier BETWEEN 0 AND 4); -- 0 = services-only plan
+ALTER TABLE ONLY public.plans          ADD CONSTRAINT plans_tier_check CHECK (tier BETWEEN 0 AND 5); -- 0 = services-only plan
 
 -- FKs are safe here: all four tables live in the SAME control-plane DB.
 ALTER TABLE ONLY public.plan_features  ADD CONSTRAINT plan_features_plan_id_fkey
@@ -1055,3 +1055,60 @@ CREATE TABLE IF NOT EXISTS public.razorpay_downtimes (
 ALTER TABLE ONLY public.razorpay_downtimes ADD CONSTRAINT razorpay_downtimes_pkey PRIMARY KEY (id);
 CREATE INDEX IF NOT EXISTS idx_razorpay_downtimes_open ON public.razorpay_downtimes USING btree (updated_at DESC) WHERE (status <> 'resolved'::text);
 
+
+--
+-- Owner-chosen store compute (configurable provisioning). compute_prices: AWS on-demand list prices the
+-- calculator prices from, in USD (rewritten by deploy/aws/refresh-prices.sh). The rate, margin and pool
+-- sizes it prices with are platform_infra key 'compute_pricing'.
+--
+CREATE TABLE IF NOT EXISTS public.compute_prices (
+    code                  text NOT NULL,                -- ec2:t4g.small | rds:db.t4g.micro | rds_storage:gp3 | ebs:gp3
+    kind                  text NOT NULL,
+    label                 text NOT NULL,
+    vcpu                  integer,
+    memory_mib            integer,
+    usd_hourly            numeric(10,5),
+    usd_hourly_multi_az   numeric(10,5),
+    usd_gb_month          numeric(10,5),
+    usd_gb_month_multi_az numeric(10,5),
+    sellable              boolean NOT NULL DEFAULT true,
+    sort                  integer NOT NULL DEFAULT 0,
+    updated_at            timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.compute_prices ADD CONSTRAINT compute_prices_pkey PRIMARY KEY (code);
+ALTER TABLE ONLY public.compute_prices ADD CONSTRAINT compute_prices_kind_check
+    CHECK (kind IN ('ec2','rds','rds_storage','ebs'));
+
+--
+-- tenant_compute: a store's chosen (desired) and running (applied) compute spec, see lib/compute/spec.ts.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_compute (
+    tenant_id     uuid NOT NULL,
+    preset        text,                                 -- shared|small|medium|large|xlarge|custom
+    desired       jsonb NOT NULL,
+    applied       jsonb,
+    status        text NOT NULL DEFAULT 'pending',
+    apply_mode    text NOT NULL DEFAULT 'window',       -- window: RDS class changes wait for the maintenance window
+    rate_inr_hour numeric(12,4),                        -- applied spec's price, margin included, GST excluded
+    attempts      integer NOT NULL DEFAULT 0,
+    next_at       timestamp with time zone,
+    last_error    text,
+    applied_at    timestamp with time zone,
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_pkey PRIMARY KEY (tenant_id);
+ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_status_check
+    CHECK (status IN ('pending','applying','applied','failed','paused'));
+ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_apply_mode_check
+    CHECK (apply_mode IN ('window','now'));
+CREATE INDEX IF NOT EXISTS idx_tenant_compute_pending ON public.tenant_compute USING btree (next_at) WHERE (status IN ('pending','applying'));
+
+-- What a plan allows: its default preset, whether the store shares a pool node and database ('pool',
+-- Starter) or gets its own ('dedicated'), and whether the owner may customise beyond the presets.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS default_preset   text;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS min_placement    text NOT NULL DEFAULT 'dedicated';
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS advanced_compute boolean NOT NULL DEFAULT true;
+ALTER TABLE ONLY public.plans ADD CONSTRAINT plans_min_placement_check CHECK (min_placement IN ('pool','dedicated'));
