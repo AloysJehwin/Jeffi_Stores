@@ -64,6 +64,41 @@ export async function routeCapturedPayment(opts: {
   })
 }
 
+const paiseToInr = (p: unknown) => (p == null || p === '' ? null : Number(p) / 100)
+
+/**
+ * Fills a payment row with how it was paid, as Razorpay reports it: method, card/bank/wallet/UPI,
+ * Razorpay's fee incl. GST, the account it was collected on and when. Never overwrites a value.
+ */
+export async function recordPaymentDetails(payment: any, opts: { account?: 'platform' | 'own'; capturedAt?: Date | null } = {}) {
+  if (!payment?.id) return
+  const card = payment.card ?? {}
+  await query(
+    `UPDATE payments SET
+       gateway_account = COALESCE(gateway_account, $2), gateway_method = COALESCE(gateway_method, $3),
+       card_network = COALESCE(card_network, $4), card_type = COALESCE(card_type, $5),
+       card_last4 = COALESCE(card_last4, $6), card_issuer = COALESCE(card_issuer, $7),
+       bank = COALESCE(bank, $8), wallet = COALESCE(wallet, $9), vpa = COALESCE(vpa, $10),
+       fee = COALESCE(fee, $11), tax = COALESCE(tax, $12), captured_at = COALESCE(captured_at, $13)
+     WHERE transaction_id = $1`,
+    [
+      payment.id,
+      opts.account ?? null,
+      payment.method ?? null,
+      card.network ?? null,
+      card.type ?? null,
+      card.last4 ?? null,
+      card.issuer ?? null,
+      payment.bank ?? null,
+      payment.wallet ?? null,
+      payment.vpa ?? payment.upi?.vpa ?? null,
+      paiseToInr(payment.fee),
+      paiseToInr(payment.tax),
+      opts.capturedAt ?? null,
+    ]
+  )
+}
+
 function sendPaidNotifications(user: any, order: any, items: any[]) {
   const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
   sendOrderConfirmationEmail(user.email, order, items).catch(() => {})

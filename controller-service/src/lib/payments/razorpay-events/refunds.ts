@@ -3,6 +3,7 @@ import { queryOne, query, withTransaction } from '@/lib/shared/db'
 import { applyRouteRefund } from '@/lib/payments/route-settlement'
 import { isFlagship, runInTenant } from '@/lib/payments/webhook-tenant'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
+import { applyRefundEvent } from '@/lib/payments/refund-records'
 import { storeFor, type EventContext } from './context'
 
 /**
@@ -11,11 +12,15 @@ import { storeFor, type EventContext } from './context'
  * and book the refund against the store's Route ledger. Refunds the app issued already recorded
  * themselves; the status guard makes this a no-op for those.
  */
-export async function onRefund(refund: any, payment: any, ctx: EventContext) {
+export async function onRefund(type: string, refund: any, payment: any, ctx: EventContext) {
   const paymentId = (refund?.payment_id ?? '').toString().trim()
   if (!paymentId) return
   const store = await storeFor(ctx, refund, { paymentId, payment })
   if (!store) return
+
+  // Status, ARN and speed for every refund; a failure alerts and undoes the store's Route booking.
+  await runInTenant(store, () => applyRefundEvent(type, refund, store)).catch(e => console.error('[webhook:razorpay] refund not recorded', refund?.id, e))
+  if (type !== 'refund.created' && type !== 'refund.processed') return
 
   const order = await runInTenant(store, async () => {
     const current = await queryOne<{ order_id: string; amount: string }>(

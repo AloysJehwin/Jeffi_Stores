@@ -11,6 +11,7 @@ import { logActivity } from '@/lib/shared/activity'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 import { refundCapacity } from '@/lib/payments/refund'
+import { recordRefund } from '@/lib/payments/refund-records'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -270,6 +271,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                   amount: amountInPaise,
                 })
                 perPayment.push({ record: paymentRecord, refund })
+                recordRefund({ refund, paymentRowId: paymentRecord.id, orderId: paymentOrderId, purpose: 'return' }).catch(() => {})
                 remaining = Math.round((remaining - thisRefund) * 100) / 100
 
                 // Claw back the tenant's share of this PARTIAL return. Without this the buyer was

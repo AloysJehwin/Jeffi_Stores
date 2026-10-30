@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/shared/activity'
 import { getReturnRequest } from '@/lib/queries'
 import { computeRefundableAmount, externalRefundCeiling, recordExternalRefund, refundCapacity } from '@/lib/payments/refund'
 import { RAZORPAY_ONLY_METHODS, externalRefundLabel, parseExternalRefund } from '@/lib/payments/external-refund'
+import { recordRefund } from '@/lib/payments/refund-records'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const amountInPaise = Math.round(thisRefund * 100)
       const refund = await razorpay.payments.refund(paymentRecord.transaction_id, { amount: amountInPaise })
       refundIds.push(refund.id)
+      recordRefund({ refund, paymentRowId: paymentRecord.id, orderId: paymentOrderId, purpose: 'refund' }).catch(() => {})
       totalRefunded += thisRefund
       remaining = Math.round((remaining - thisRefund) * 100) / 100
 
