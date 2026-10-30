@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { getRazorpayInstance } from '@/lib/payments/razorpay'
 import { creditTopup } from '@/lib/billing/topup'
+import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,5 +22,7 @@ export async function POST(request: NextRequest) {
   if (order?.notes?.purpose !== 'wallet_topup' || order?.notes?.tenant_id !== ctx.tenant.id) return NextResponse.json({ error: 'Order does not belong to this wallet' }, { status: 400 })
   const r = await creditTopup({ tenantId: ctx.tenant.id, paymentId: razorpay_payment_id, paidPaise: Number(order.amount_paid || order.amount), notes: order.notes as any })
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 500 })
-  return NextResponse.json({ ok: true, balance: r.balance })
+  // A new store waiting on its servers' prepayment starts now.
+  const started = await startStoreIfReady(ctx.tenant.id).catch(() => false)
+  return NextResponse.json({ ok: true, balance: r.balance, started })
 }

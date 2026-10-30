@@ -73,6 +73,18 @@ async function tick() {
     results.push({ tenantId, step: 'layout_switch', status: r.ok ? `${r.status}${r.detail ? `: ${r.detail}` : ''}` : `error: ${r.detail}` })
   }
 
+  // New stores whose plan is paid and whose servers' prepayment has since arrived (a top-up the webhook credited).
+  const { startStoreIfReady } = await import('@controller/lib/provisioning/start-store')
+  const waiting = await controlPlanePool()
+    .query<{ id: string }>(
+      `SELECT id FROM tenants WHERE subscription_status = 'active'
+          AND (store_request = 'awaiting_payment' OR (store_request IS NULL AND status = 'awaiting_payment'))`
+    )
+    .catch(() => ({ rows: [] as { id: string }[] }))
+  for (const { id } of waiting.rows) {
+    if (await startStoreIfReady(id).catch(() => false)) results.push({ tenantId: id, step: 'start_store', status: 'started' })
+  }
+
   // Stores paused for an unpaid wallet that has since been topped up.
   const { resumeFundedStores } = await import('@controller/lib/billing/infra-balance')
   for (const r of await resumeFundedStores(provider).catch(() => [])) results.push({ tenantId: r.tenantId, step: 'resume', status: r.status })
