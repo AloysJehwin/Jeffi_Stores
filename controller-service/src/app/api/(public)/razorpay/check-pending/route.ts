@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { queryOne, queryMany, query } from '@/lib/shared/db'
+import { queryOne, resolveRequestTenant } from '@/lib/shared/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
-import { getRazorpayInstance } from '@/lib/payments/razorpay'
-import { verifyDraftToken, hashCartItems } from '@/lib/orders/order-draft'
-import {
-  loadActiveCart,
-  cartSubtotal,
-  cartTaxAmount,
-  cartItemsForHash,
-  validateCouponForUser,
-  commitOrder,
-} from '@/lib/orders/order-commit'
-import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
-import { notifyAccessGranted } from '@/lib/shared/notify'
-import { createDraftInvoice, generateOrderInvoice } from '@/lib/documents/invoice'
-import { getFeatureFlags } from '@/lib/catalog/site-controls'
-import { logActivity } from '@/lib/shared/activity'
-import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
-import { createAutoTask } from '@/lib/shared/auto-tasks'
+import { getRazorpayInstanceFor } from '@/lib/payments/razorpay'
+import { verifyDraftToken } from '@/lib/orders/order-draft'
+import { commitDraftFromCapture } from '@/lib/payments/capture'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
 const Schema = z.object({
@@ -26,6 +12,14 @@ const Schema = z.object({
   draftToken: zNonEmpty,
 })
 
+const orderFor = (rzpOrderId: string) =>
+  queryOne<{ id: string; order_number: string }>(
+    `SELECT o.id, o.order_number FROM payments p JOIN orders o ON o.id = p.order_id
+     WHERE p.gateway_response->>'razorpay_order_id' = $1 LIMIT 1`,
+    [rzpOrderId]
+  )
+
+/** The checkout asks after a payment whose browser never reached verify; creates the order if it was paid. */
 export async function POST(request: NextRequest) {
   try {
     const authUser = await authenticateUser(request)
@@ -36,204 +30,42 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response
     const { razorpayOrderId, draftToken } = parsed.data
 
-    // Verify draft token belongs to this user
     const draft = await verifyDraftToken(draftToken)
     if (!draft) return NextResponse.json({ error: 'Invalid or expired checkout session' }, { status: 400 })
     if (draft.userId !== authUser.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
-    // Check if already committed (webhook or previous verify beat us)
-    const existingOrder = await queryOne<{ id: string; order_number: string }>(
-      `SELECT o.id, o.order_number FROM payments p
-       JOIN orders o ON o.id = p.order_id
-       WHERE p.transaction_id IN (
-         SELECT razorpay_payment_id FROM (
-           SELECT (p2.gateway_response->>'razorpay_payment_id') as razorpay_payment_id
-           FROM payments p2 JOIN orders o2 ON o2.id = p2.order_id
-           WHERE p2.gateway_response->>'razorpay_order_id' = $1
-         ) sub WHERE razorpay_payment_id IS NOT NULL
-       ) LIMIT 1`,
-      [razorpayOrderId]
-    )
+    // Verify or the webhook may already have made the order.
+    const existing = await orderFor(razorpayOrderId)
+    if (existing) return NextResponse.json({ order: { id: existing.id, orderNumber: existing.order_number } })
 
-    // Simpler check via pending_payment_intents committed flag
-    const intent = await queryOne<{ committed: boolean }>(
-      `SELECT committed FROM pending_payment_intents WHERE razorpay_order_id = $1`,
-      [razorpayOrderId]
-    )
-
-    if (existingOrder) {
-      return NextResponse.json({ order: { id: existingOrder.id, orderNumber: existingOrder.order_number } })
-    }
-
-    // Fetch Razorpay order status
-    const razorpay = getRazorpayInstance()
+    // A store on its own Razorpay account made the order there.
+    const tenant = await resolveRequestTenant()
+    const { instance: razorpay } = await getRazorpayInstanceFor(tenant?.tenantId)
     const rzpOrder = await (razorpay.orders as any).fetch(razorpayOrderId)
 
     if (rzpOrder.status === 'paid') {
-      // Payment was captured — fetch payment details and commit
       const payments = await (razorpay.orders as any).fetchPayments(razorpayOrderId)
-      const capturedPayment = payments?.items?.find((p: any) => p.status === 'captured')
-      if (!capturedPayment) {
-        return NextResponse.json({ status: 'pending', error: 'Payment processing — please wait.' })
-      }
+      const captured = payments?.items?.find((p: any) => p.status === 'captured')
+      if (!captured) return NextResponse.json({ status: 'pending', error: 'Payment processing — please wait.' })
 
-      // Atomically claim the intent to prevent double-commit with webhook
-      const claimed = await queryOne<{ id: string }>(
-        `UPDATE pending_payment_intents SET committed = true
-         WHERE razorpay_order_id = $1 AND committed = false
-         RETURNING id`,
-        [razorpayOrderId]
-      )
-      if (!claimed) {
-        // Webhook may have just committed it — check again
-        await new Promise(r => setTimeout(r, 1000))
-        const committed = await queryOne<{ id: string; order_number: string }>(
-          `SELECT o.id, o.order_number FROM orders o
-           JOIN payments p ON p.order_id = o.id
-           WHERE p.gateway_response->>'razorpay_order_id' = $1 LIMIT 1`,
-          [razorpayOrderId]
+      const r = await commitDraftFromCapture(razorpayOrderId, captured, tenant, { via: 'payment recovery' })
+      if (r.status === 'committed') return NextResponse.json({ order: { id: r.order.id, orderNumber: r.order.order_number } })
+      if (r.status === 'needs_action') {
+        return NextResponse.json(
+          { error: `${r.reason}. Our team will create your order or refund you — payment ID: ${captured.id}` },
+          { status: 409 }
         )
-        if (committed) return NextResponse.json({ order: { id: committed.id, orderNumber: committed.order_number } })
-        return NextResponse.json({ status: 'pending', error: 'Payment is being processed. Check My Orders shortly.' })
       }
-
-      const user = await queryOne<any>(`SELECT * FROM users WHERE id = $1`, [authUser.userId])
-      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-
-      let subtotal = 0,
-        taxAmount = 0
-      let cartItems: Awaited<ReturnType<typeof loadActiveCart>> = []
-      let buyNowSnapshot: { product: any; variant: any | null; subVariant: any | null } | null = null
-      const { gstEnabled } = await getFeatureFlags()
-
-      if (draft.mode === 'cart') {
-        cartItems = await loadActiveCart(authUser.userId)
-        if (cartItems.length === 0) {
-          return NextResponse.json(
-            { error: 'Cart is empty — cannot create order. Contact support with payment ID: ' + capturedPayment.id },
-            { status: 409 }
-          )
-        }
-        subtotal = cartSubtotal(cartItems, gstEnabled)
-        taxAmount = cartTaxAmount(cartItems, gstEnabled)
-      } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
-        const product = await queryOne<any>(
-          `SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`,
-          [draft.buyNowItem.productId]
-        )
-        if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-        const variant = draft.buyNowItem.variantId
-          ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [
-              draft.buyNowItem.variantId,
-            ])
-          : null
-        const subVariant = draft.buyNowItem.subVariantId
-          ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [
-              draft.buyNowItem.subVariantId,
-            ])
-          : null
-        buyNowSnapshot = { product, variant, subVariant }
-        subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
-        const gstRate = parseFloat(String(product.gst_percentage || '0'))
-        taxAmount = gstEnabled ? subtotal - subtotal / (1 + gstRate / 100) : 0
-      } else {
-        return NextResponse.json({ error: 'Invalid draft' }, { status: 400 })
-      }
-
-      let appliedDiscount = 0
-      if (draft.couponId) {
-        const r = await validateCouponForUser({ couponId: draft.couponId, userId: authUser.userId, subtotal })
-        if (r.ok) appliedDiscount = r.appliedDiscount
-      }
-
-      const created =
-        draft.mode === 'cart'
-          ? await commitOrder({
-              mode: 'cart',
-              userId: authUser.userId,
-              user,
-              addressId: draft.addressId,
-              notes: draft.notes,
-              couponId: draft.couponId,
-              shippingAmount: draft.shippingAmount,
-              codFeeAmount: draft.codFeeAmount,
-              cartItems,
-              subtotal,
-              taxAmount,
-              appliedDiscount,
-              businessDiscountAmount: draft.businessDiscountAmount,
-              paymentRecord: {
-                gatewayOrderId: razorpayOrderId,
-                paymentId: capturedPayment.id,
-                signature: '',
-                amountPaise: capturedPayment.amount,
-              },
-            })
-          : await commitOrder({
-              mode: 'buyNow',
-              userId: authUser.userId,
-              user,
-              addressId: draft.addressId,
-              notes: draft.notes,
-              couponId: draft.couponId,
-              shippingAmount: draft.shippingAmount,
-              codFeeAmount: draft.codFeeAmount,
-              item: draft.buyNowItem!,
-              product: buyNowSnapshot!.product,
-              variant: buyNowSnapshot!.variant,
-              subVariant: buyNowSnapshot!.subVariant,
-              subtotal,
-              taxAmount,
-              appliedDiscount,
-              businessDiscountAmount: draft.businessDiscountAmount,
-              paymentRecord: {
-                gatewayOrderId: razorpayOrderId,
-                paymentId: capturedPayment.id,
-                signature: '',
-                amountPaise: capturedPayment.amount,
-              },
-            })
-
-      const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
-      // An all-digital order is fulfilled at payment ('granted'), so number its invoice now.
-      const draftInvoice = createDraftInvoice(created.id).catch(() => {})
-      if (created.status === 'granted') {
-        draftInvoice.then(() => generateOrderInvoice(created.id)).catch(() => {})
-        notifyAccessGranted(authUser.userId, created.order_number).catch(() => {})
-      }
-      const fullOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [created.id])
-      const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
-      sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
-      sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
-      sendPaymentStatusUpdate(
-        user.email,
-        userName,
-        created.order_number,
-        created.id,
-        'paid',
-        parseFloat(created.total_amount)
-      ).catch(() => {})
-      logActivity({
-        userId: authUser.userId,
-        kind: 'order_placed',
-        referenceId: created.id,
-        referenceType: 'orders',
-        summary: `Placed order #${created.order_number} via payment recovery`,
-        metadata: { orderNumber: created.order_number, total: created.total_amount },
-      }).catch(() => {})
-      recordImplicitSignalsForProducts(
-        authUser.userId,
-        (orderItems || []).map((i: any) => i.product_id),
-        'purchased'
-      ).catch(() => {})
-
-      return NextResponse.json({ order: { id: created.id, orderNumber: created.order_number } })
+      // The webhook claimed it first; give it a moment to finish.
+      await new Promise(res => setTimeout(res, 1000))
+      const committed = await orderFor(razorpayOrderId)
+      if (committed) return NextResponse.json({ order: { id: committed.id, orderNumber: committed.order_number } })
+      return NextResponse.json({ status: 'pending', error: 'Payment is being processed. Check My Orders shortly.' })
     }
 
     if (rzpOrder.status === 'created' || rzpOrder.status === 'attempted') {
       return NextResponse.json({ status: 'pending', error: 'Payment not yet completed.' })
     }
-
     return NextResponse.json({ status: 'not_paid', error: 'Payment was not completed. Your cart has been restored.' })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Could not check payment status' }, { status: 500 })

@@ -7,9 +7,10 @@ vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+  resolveRequestTenant: vi.fn(async () => null),
 }))
 vi.mock('@/lib/payments/razorpay', () => ({
-  getRazorpayInstance: vi.fn(),
+  getRazorpayInstanceFor: vi.fn(),
 }))
 vi.mock('@/lib/orders/order-draft', () => ({
   verifyDraftToken: vi.fn(),
@@ -90,11 +91,14 @@ function draft(overrides: Record<string, unknown> = {}) {
 
 // Configure a razorpay instance mock with the given order + payments behavior
 function mockRazorpay(orderResult: any, paymentsResult?: any) {
-  vi.mocked(razorpay.getRazorpayInstance).mockReturnValue({
-    orders: {
-      fetch: vi.fn().mockResolvedValue(orderResult),
-      fetchPayments: vi.fn().mockResolvedValue(paymentsResult ?? { items: [] }),
+  vi.mocked(razorpay.getRazorpayInstanceFor).mockResolvedValue({
+    instance: {
+      orders: {
+        fetch: vi.fn().mockResolvedValue(orderResult),
+        fetchPayments: vi.fn().mockResolvedValue(paymentsResult ?? { items: [] }),
+      },
     },
+    creds: {},
   } as any)
 }
 
@@ -146,22 +150,19 @@ describe('POST /api/razorpay/check-pending', () => {
   })
 
   it('returns existing order when payment already committed (idempotent)', async () => {
-    // existingOrder query returns a row; intent query returns null
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ id: 'ord-existing', order_number: 'ORD-EX' }) // existingOrder
-      .mockResolvedValueOnce(null) // intent
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
     expect(res.status).toBe(200)
     expect(body.order).toEqual({ id: 'ord-existing', orderNumber: 'ORD-EX' })
     // Razorpay should not be fetched on the idempotent path
-    expect(razorpay.getRazorpayInstance).not.toHaveBeenCalled()
+    expect(razorpay.getRazorpayInstanceFor).not.toHaveBeenCalled()
   })
 
   it('returns status=pending when razorpay order is created', async () => {
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null) // existingOrder
-      .mockResolvedValueOnce(null) // intent
     mockRazorpay({ status: 'created' })
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
@@ -171,7 +172,7 @@ describe('POST /api/razorpay/check-pending', () => {
   })
 
   it('returns status=pending when razorpay order is attempted', async () => {
-    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null)
     mockRazorpay({ status: 'attempted' })
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
@@ -180,7 +181,7 @@ describe('POST /api/razorpay/check-pending', () => {
   })
 
   it('returns status=not_paid for any other razorpay order status', async () => {
-    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null)
     mockRazorpay({ status: 'failed' })
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
@@ -190,7 +191,7 @@ describe('POST /api/razorpay/check-pending', () => {
   })
 
   it('returns pending when order paid but no captured payment found', async () => {
-    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null)
     mockRazorpay({ status: 'paid' }, { items: [{ id: 'p1', status: 'failed' }] })
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
@@ -200,7 +201,7 @@ describe('POST /api/razorpay/check-pending', () => {
   })
 
   it('returns pending when payments payload is null/undefined', async () => {
-    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null)
     mockRazorpay({ status: 'paid' }, null)
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
@@ -212,7 +213,6 @@ describe('POST /api/razorpay/check-pending', () => {
     vi.useFakeTimers()
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null) // existingOrder
-      .mockResolvedValueOnce(null) // intent
       .mockResolvedValueOnce(null) // claim UPDATE returns nothing (already claimed)
       .mockResolvedValueOnce({ id: 'ord-web', order_number: 'ORD-WEB' }) // committed lookup after wait
     mockRazorpay({ status: 'paid' }, { items: [CAPTURED_PAYMENT] })
@@ -231,7 +231,6 @@ describe('POST /api/razorpay/check-pending', () => {
     vi.useFakeTimers()
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null) // existingOrder
-      .mockResolvedValueOnce(null) // intent
       .mockResolvedValueOnce(null) // claim fails
       .mockResolvedValueOnce(null) // committed lookup still null
     mockRazorpay({ status: 'paid' }, { items: [CAPTURED_PAYMENT] })
@@ -247,23 +246,21 @@ describe('POST /api/razorpay/check-pending', () => {
     expect(body.error).toMatch(/being processed/i)
   })
 
-  it('returns 404 when user not found after successful claim', async () => {
+  it('returns 409 for a manual check when the customer is gone after the claim', async () => {
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null) // existingOrder
-      .mockResolvedValueOnce(null) // intent
       .mockResolvedValueOnce({ id: 'intent-1' }) // claim succeeds
       .mockResolvedValueOnce(null) // user not found
     mockRazorpay({ status: 'paid' }, { items: [CAPTURED_PAYMENT] })
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
-    expect(res.status).toBe(404)
-    expect(body.error).toMatch(/user not found/i)
+    expect(res.status).toBe(409)
+    expect(body.error).toMatch(/missing customer/i)
   })
 
   it('returns 409 when cart is empty in cart mode', async () => {
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null) // existingOrder
-      .mockResolvedValueOnce(null) // intent
       .mockResolvedValueOnce({ id: 'intent-1' }) // claim
       .mockResolvedValueOnce(MOCK_USER) // user
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([] as any)
@@ -290,7 +287,6 @@ describe('POST /api/razorpay/check-pending', () => {
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue(draft({ couponId: 'coupon-1' }) as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null) // existingOrder
-      .mockResolvedValueOnce(null) // intent
       .mockResolvedValueOnce({ id: 'intent-1' }) // claim
       .mockResolvedValueOnce(MOCK_USER) // user
       .mockResolvedValueOnce({ ...MOCK_USER }) // fullOrder lookup
@@ -323,7 +319,6 @@ describe('POST /api/razorpay/check-pending', () => {
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue(draft() as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'intent-1' })
       .mockResolvedValueOnce(MOCK_USER)
       .mockResolvedValueOnce({ ...MOCK_USER })
@@ -348,7 +343,6 @@ describe('POST /api/razorpay/check-pending', () => {
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue(draft({ couponId: 'coupon-bad' }) as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'intent-1' })
       .mockResolvedValueOnce(MOCK_USER)
       .mockResolvedValueOnce({ ...MOCK_USER })
@@ -369,7 +363,7 @@ describe('POST /api/razorpay/check-pending', () => {
     expect(body.order.id).toBe('order-nc')
   })
 
-  it('buyNow mode: returns 404 when product not found', async () => {
+  it('buyNow mode: returns 409 for a manual check when the product is gone', async () => {
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue(
       draft({
         mode: 'buyNow',
@@ -378,15 +372,14 @@ describe('POST /api/razorpay/check-pending', () => {
     )
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null) // existingOrder
-      .mockResolvedValueOnce(null) // intent
       .mockResolvedValueOnce({ id: 'intent-1' }) // claim
       .mockResolvedValueOnce(MOCK_USER) // user
       .mockResolvedValueOnce(null) // product not found
     mockRazorpay({ status: 'paid' }, { items: [CAPTURED_PAYMENT] })
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
-    expect(res.status).toBe(404)
-    expect(body.error).toMatch(/product not found/i)
+    expect(res.status).toBe(409)
+    expect(body.error).toMatch(/product is gone/i)
   })
 
   it('buyNow mode: commits order successfully with variant and subVariant', async () => {
@@ -398,7 +391,6 @@ describe('POST /api/razorpay/check-pending', () => {
     )
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null) // existingOrder
-      .mockResolvedValueOnce(null) // intent
       .mockResolvedValueOnce({ id: 'intent-1' }) // claim
       .mockResolvedValueOnce(MOCK_USER) // user
       .mockResolvedValueOnce({ id: 'prod-1', name: 'Bolt', sku: 'B001', gst_percentage: '18', hsn_code: '7318' }) // product
@@ -428,7 +420,6 @@ describe('POST /api/razorpay/check-pending', () => {
     )
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'intent-1' })
       .mockResolvedValueOnce(MOCK_USER)
       .mockResolvedValueOnce({ id: 'prod-2', name: 'Nut', sku: 'N001', gst_percentage: null, hsn_code: '7318' })
@@ -446,32 +437,30 @@ describe('POST /api/razorpay/check-pending', () => {
     expect(body.order.id).toBe('order-bn2')
   })
 
-  it('returns 400 when draft mode is invalid (not cart or buyNow)', async () => {
+  it('returns 409 when draft mode is invalid (not cart or buyNow)', async () => {
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue(draft({ mode: 'unknown' }) as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'intent-1' })
       .mockResolvedValueOnce(MOCK_USER)
     mockRazorpay({ status: 'paid' }, { items: [CAPTURED_PAYMENT] })
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
-    expect(res.status).toBe(400)
-    expect(body.error).toMatch(/invalid draft/i)
+    expect(res.status).toBe(409)
+    expect(body.error).toMatch(/unreadable checkout/i)
   })
 
-  it('returns 400 when buyNow mode has no buyNowItem', async () => {
+  it('returns 409 when buyNow mode has no buyNowItem', async () => {
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue(draft({ mode: 'buyNow', buyNowItem: null }) as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'intent-1' })
       .mockResolvedValueOnce(MOCK_USER)
     mockRazorpay({ status: 'paid' }, { items: [CAPTURED_PAYMENT] })
     const res = await POST(makeRequest(VALID_BODY) as any)
     const body = await res.json()
-    expect(res.status).toBe(400)
-    expect(body.error).toMatch(/invalid draft/i)
+    expect(res.status).toBe(409)
+    expect(body.error).toMatch(/unreadable checkout/i)
   })
 
   it('returns 500 on unexpected error', async () => {
