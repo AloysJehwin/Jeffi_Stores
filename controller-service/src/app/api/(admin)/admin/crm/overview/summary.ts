@@ -1,5 +1,5 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
-import { bucketFor, istToday, previousPeriod, type Bucket, type Period } from '@/app/(admin)/admin/crm/_lib/period'
+import { bucketFor, istToday, previousPeriod, type Bucket, type Period } from '@controller/app/(admin)/admin/crm/_lib/period'
 import {
   buildAttention,
   buildCohorts,
@@ -8,7 +8,7 @@ import {
   toTopCustomers,
   toTrend,
   type CrmOverviewData,
-} from '@/app/(admin)/admin/crm/_lib/overview'
+} from '@controller/app/(admin)/admin/crm/_lib/overview'
 
 // Registered customers only; an order counts once it is paid (or COD collected) and not cancelled or returned.
 const REALIZED = `o.payment_status IN ('paid', 'cod_collected') AND o.status NOT IN ('cancelled', 'returned')`

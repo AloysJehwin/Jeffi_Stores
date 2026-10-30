@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/referrals/settings', () => ({ isReferralLive: vi.fn() }))
 vi.mock('@/lib/referrals/codes', () => ({ resolveReferralCode: vi.fn() }))
 
-import { GET } from '@/app/api/(public)/referrals/lookup/route'
+import { GET } from '@controller/app/api/(public)/referrals/lookup/route'
 import { isReferralLive } from '@/lib/referrals/settings'
 import { resolveReferralCode } from '@/lib/referrals/codes'
 

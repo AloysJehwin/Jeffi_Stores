@@ -30,7 +30,7 @@ vi.mock('@/lib/email', () => ({}))
 vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn(async () => ({ action: 'none', reason: 'test' })) }))
 vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn().mockResolvedValue({}) }))
 
-import { POST } from '@/app/api/(public)/webhooks/razorpay/route'
+import { POST } from '@controller/app/api/(public)/webhooks/razorpay/route'
 import * as db from '@/lib/shared/db'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 import { applyRouteRefund } from '@/lib/payments/route-settlement'

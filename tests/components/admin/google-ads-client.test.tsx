@@ -6,7 +6,7 @@ let canWrite = true
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }), useSearchParams: () => new URLSearchParams(window.location.search) }))
 vi.mock('@/contexts/AdminScopesContext', () => ({ useCanWrite: () => canWrite }))
 
-import GoogleAdsClient from '@/app/(admin)/admin/google-ads/GoogleAdsClient'
+import GoogleAdsClient from '@controller/app/(admin)/admin/google-ads/GoogleAdsClient'
 
 // Connecting lives in the gear dialog (top right), the same as every integration page.
 const openGear = () => fireEvent.click(screen.getByRole('button', { name: /Google Ads connection \(/ }))

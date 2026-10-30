@@ -1,6 +1,6 @@
 'use client'
 
-import type { StaffNoteDraft } from '@/app/(portal)/staff/notes/_lib/useStaffNoteDraft'
+import type { StaffNoteDraft } from '@controller/app/(portal)/staff/notes/_lib/useStaffNoteDraft'
 
 export default function StaffNoteSaved({ d, wide = false }: { d: StaffNoteDraft; wide?: boolean }) {
   return (

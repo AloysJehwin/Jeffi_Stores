@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('@/contexts/ToastContext', () => ({ useToast: () => ({ showToast: () => {} }) }))
-import { groupRows } from '@/app/(ecom)/ecom/dashboard/documents/BulkDocuments'
+import { groupRows } from '@controller/app/(ecom)/ecom/dashboard/documents/BulkDocuments'
 
 const row = (o: Record<string, string>) => ({ reference: 'R1', item_description: 'Item', quantity: '1', unit_price: '100', ...o })
 

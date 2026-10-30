@@ -7,7 +7,7 @@ vi.mock('@/lib/loyalty/queries', () => ({ getLoyaltyAccount: vi.fn(), listLoyalt
 vi.mock('@/lib/loyalty/redeem', () => ({ adjustPoints: vi.fn(), isLoyaltyEligible: vi.fn() }))
 vi.mock('@/lib/loyalty/settings', () => ({ getLoyaltySettings: vi.fn() }))
 
-import { GET, POST } from '@/app/api/(admin)/admin/customers/[id]/loyalty/route'
+import { GET, POST } from '@controller/app/api/(admin)/admin/customers/[id]/loyalty/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getLoyaltyAccount, listLoyaltyLedger } from '@/lib/loyalty/queries'

@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/auth/auth-sessions', () => ({ sweepExpiredAdminSessions: vi.fn() }))
 vi.mock('@/lib/admin/draft-locks', () => ({ sweepDraftLocks: vi.fn(async () => ({ presence: 0, released: 0, orphaned: 0, purged: 0 })) }))
 
-import { GET } from '@/app/api/(internal)/cron/sweep-sessions/route'
+import { GET } from '@controller/app/api/(internal)/cron/sweep-sessions/route'
 import { sweepExpiredAdminSessions } from '@/lib/auth/auth-sessions'
 
 const mockSweep = vi.mocked(sweepExpiredAdminSessions)

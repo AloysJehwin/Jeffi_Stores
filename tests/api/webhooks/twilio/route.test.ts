@@ -10,7 +10,7 @@ vi.mock('@/lib/tenancy/tenant-context', () => ({ runWithTenantContext: vi.fn() }
 vi.mock('@/lib/support/inbound', () => ({ handleInboundWhatsApp: vi.fn() }))
 vi.mock('@/lib/support/agent', () => ({ onCustomerMessage: vi.fn() }))
 
-import { POST } from '@/app/api/(public)/webhooks/twilio/route'
+import { POST } from '@controller/app/api/(public)/webhooks/twilio/route'
 import { query, queryOne } from '@/lib/shared/db'
 import { logMessage } from '@/lib/shared/message-log'
 import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'

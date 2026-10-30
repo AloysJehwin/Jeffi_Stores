@@ -11,10 +11,10 @@ vi.mock('@/contexts/AdminScopesContext', () => ({
 
 import { ConfirmProvider } from '@/contexts/ConfirmContext'
 import { ToastProvider } from '@/contexts/ToastContext'
-import { AdsManageProvider } from '@/app/(admin)/admin/google-ads/_components/ManageContext'
-import { NewCampaignButton } from '@/app/(admin)/admin/google-ads/_components/CampaignWizard'
-import { CampaignRowActions, SearchTermRowActions } from '@/app/(admin)/admin/google-ads/_components/ManageActions'
-import { CampaignsView } from '@/app/(admin)/admin/google-ads/_components/ReportViews'
+import { AdsManageProvider } from '@controller/app/(admin)/admin/google-ads/_components/ManageContext'
+import { NewCampaignButton } from '@controller/app/(admin)/admin/google-ads/_components/CampaignWizard'
+import { CampaignRowActions, SearchTermRowActions } from '@controller/app/(admin)/admin/google-ads/_components/ManageActions'
+import { CampaignsView } from '@controller/app/(admin)/admin/google-ads/_components/ReportViews'
 
 const BOOTSTRAP = {
   store: { name: 'Acme Tools', baseUrl: 'https://acme.in', logoUrl: null, currency: 'INR' },

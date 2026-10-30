@@ -19,7 +19,7 @@ vi.mock('jose', () => ({
   },
 }))
 
-import { POST } from '@/app/api/(public)/business/token/generate/route'
+import { POST } from '@controller/app/api/(public)/business/token/generate/route'
 import { authenticateBusiness } from '@/lib/auth/jwt'
 
 const USER = {

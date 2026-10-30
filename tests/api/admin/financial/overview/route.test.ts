@@ -5,8 +5,8 @@ vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
-import { GET } from '@/app/api/(admin)/admin/financial/overview/route'
-import { periodTotals } from '@/app/api/(admin)/admin/financial/overview/summary'
+import { GET } from '@controller/app/api/(admin)/admin/financial/overview/route'
+import { periodTotals } from '@controller/app/api/(admin)/admin/financial/overview/summary'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne } from '@/lib/shared/db'

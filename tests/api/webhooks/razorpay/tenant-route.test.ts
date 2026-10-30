@@ -8,7 +8,7 @@ vi.mock('@/lib/subscriptions/cycle', async () => ({
   processSubscriptionEvent: vi.fn(async () => true),
 }))
 
-import { POST } from '@/app/api/(public)/webhooks/razorpay/[tenant]/route'
+import { POST } from '@controller/app/api/(public)/webhooks/razorpay/[tenant]/route'
 import { lookupTenantContextBySlug } from '@/lib/tenant-registry'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { processSubscriptionEvent } from '@/lib/subscriptions/cycle'

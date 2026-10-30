@@ -28,8 +28,8 @@ vi.mock('@/lib/shared/google-credentials', () => ({
   loadGoogleServiceAccount: () => ({ client_email: 'sa@jeffi.iam.gserviceaccount.com', private_key: 'pk' }),
 }))
 
-import { GET, POST, DELETE } from '@/app/api/(admin)/admin/google-ads/connection/route'
-import { GET as accounts } from '@/app/api/(admin)/admin/google-ads/accounts/route'
+import { GET, POST, DELETE } from '@controller/app/api/(admin)/admin/google-ads/connection/route'
+import { GET as accounts } from '@controller/app/api/(admin)/admin/google-ads/accounts/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getIntegrationCredential, saveIntegrationCredential, deleteIntegrationCredential } from '@/lib/tenant-registry'

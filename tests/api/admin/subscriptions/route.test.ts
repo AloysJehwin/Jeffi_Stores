@@ -25,8 +25,8 @@ vi.mock('@/lib/subscriptions/service', () => {
   }
 })
 
-import { GET as LIST } from '@/app/api/(admin)/admin/subscriptions/route'
-import { GET, POST } from '@/app/api/(admin)/admin/subscriptions/[id]/route'
+import { GET as LIST } from '@controller/app/api/(admin)/admin/subscriptions/route'
+import { GET, POST } from '@controller/app/api/(admin)/admin/subscriptions/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { getScopeForPath } from '@/lib/auth/scopes'
 import {

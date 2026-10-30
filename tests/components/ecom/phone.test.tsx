@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitPhone, isValidPhone } from '@/app/(ecom)/ecom/_ui/phone'
+import { splitPhone, isValidPhone } from '@controller/app/(ecom)/ecom/_ui/phone'
 
 describe('phone helpers', () => {
   it('splits E.164 on the longest country code', () => {

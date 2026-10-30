@@ -27,7 +27,7 @@ vi.mock('@/lib/merchant/sync', () => ({
   },
 }))
 
-import { POST, GET } from '@/app/api/(admin)/admin/merchant/sync/route'
+import { POST, GET } from '@controller/app/api/(admin)/admin/merchant/sync/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import {

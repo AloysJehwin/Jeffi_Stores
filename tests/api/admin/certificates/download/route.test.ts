@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { GET } from '@/app/api/(admin)/admin/certificates/download/route'
+import { GET } from '@controller/app/api/(admin)/admin/certificates/download/route'
 
 // #487: admin certificates are NEVER downloadable from an admin panel — the sole path is the
 // certificate portal. This route is a permanent 410 tombstone: no auth, no token lookup, no .p12,

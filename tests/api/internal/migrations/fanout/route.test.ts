@@ -17,7 +17,7 @@ beforeEach(() => {
 })
 
 const post = async (headers: Record<string, string>, body: unknown = {}) => {
-  const { POST } = await import('@/app/api/internal/migrations/fanout/route')
+  const { POST } = await import('@controller/app/api/internal/migrations/fanout/route')
   return POST(
     new NextRequest('http://localhost/api/internal/migrations/fanout', {
       method: 'POST',

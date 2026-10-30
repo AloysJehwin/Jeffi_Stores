@@ -10,8 +10,8 @@ import {
   presetPeriod,
   previousPeriod,
   spanDays,
-} from '@/app/(admin)/admin/crm/_lib/period'
-import { buildAttention, buildCohorts, toKpis, toTopCustomers, toTrend } from '@/app/(admin)/admin/crm/_lib/overview'
+} from '@controller/app/(admin)/admin/crm/_lib/period'
+import { buildAttention, buildCohorts, toKpis, toTopCustomers, toTrend } from '@controller/app/(admin)/admin/crm/_lib/overview'
 
 describe('crm overview period helpers', () => {
   const today = '2026-10-16'

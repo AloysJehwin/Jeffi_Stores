@@ -10,7 +10,7 @@ import 'server-only'
 import { round2 } from '@/lib/catalog/gst'
 import { storeSignature } from '@/lib/catalog/brand'
 import { tenantLogoBuffer } from '@/lib/documents/store-logo'
-import { appPath } from '@/lib/shared/paths'
+import { assetPath } from '@/lib/shared/paths'
 
 const PDFDocument = eval('require')('pdfkit')
 const bwipjs = eval('require')('bwip-js')
@@ -133,7 +133,7 @@ async function drawLabelPage(doc: any, input: LabelInput): Promise<void> {
   try {
     const logoH = 18
     const logoW = Math.round(logoH * (3246 / 546))
-    doc.image(appPath('public', 'delhivery-logo.png'), M + BW - logoW - p, y + 6, {
+    doc.image(assetPath('delhivery-logo.png'), M + BW - logoW - p, y + 6, {
       width: logoW,
       height: logoH,
     })

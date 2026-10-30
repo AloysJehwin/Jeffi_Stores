@@ -1,6 +1,6 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, previousPeriod, type Period } from '@/lib/overview/period'
-import { fillSeries } from '@/app/(admin)/admin/financial/_components/overview-period'
+import { fillSeries } from '@controller/app/(admin)/admin/financial/_components/overview-period'
 
 // Payables overview: snapshot (outstanding / overdue / open bills as of p.to) + period flow
 // (paid in [from..to]) + payments-by-method bucket series + aging mix + top open bills + top

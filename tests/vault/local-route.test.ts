@@ -13,7 +13,7 @@ const driver = {
 }
 vi.mock('@/lib/vault/storage', () => ({ getStorageDriver: () => driver }))
 
-import { GET, PUT } from '@/app/api/(public)/vault/local/[...path]/route'
+import { GET, PUT } from '@controller/app/api/(public)/vault/local/[...path]/route'
 import { signLocalToken } from '@/lib/vault/vault-storage-local'
 
 const KEY = 'vault/t1/p1/f1.mp4'

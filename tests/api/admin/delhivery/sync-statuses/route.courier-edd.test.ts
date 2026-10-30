@@ -15,7 +15,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 }))
 vi.mock('@/lib/integrations/resolve', () => ({ resolveDelhiveryToken: vi.fn(async () => 'tok') }))
 
-import { POST } from '@/app/api/(admin)/admin/delhivery/sync-statuses/route'
+import { POST } from '@controller/app/api/(admin)/admin/delhivery/sync-statuses/route'
 import { query, queryMany } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)

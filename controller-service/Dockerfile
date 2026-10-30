@@ -87,6 +87,8 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/controller-service/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/controller-service/.next/static ./controller-service/.next/static
 COPY --from=builder /app/controller-service/public ./controller-service/public
+# Files the server reads from disk (fonts, PDF images, the shipping-label logo).
+COPY --from=builder /app/packages/store-core/assets ./packages/store-core/assets
 
 # pdfjs require()s @napi-rs/canvas at run time to render scanned PDFs; the tracer can't see it.
 COPY --from=deps /app/node_modules/@napi-rs ./node_modules/@napi-rs

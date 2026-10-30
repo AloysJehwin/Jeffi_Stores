@@ -25,7 +25,7 @@ vi.mock('@/lib/provisioning/trigger', () => ({
   resolveRestoreKey: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { POST } from '@/app/api/(ecom)/ecom/webhook/razorpay/route'
+import { POST } from '@controller/app/api/(ecom)/ecom/webhook/razorpay/route'
 
 const charged = () =>
   new NextRequest('https://ecom.jeffistores.in/api/ecom/webhook/razorpay', {

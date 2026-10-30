@@ -16,7 +16,7 @@ vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query }) })
 vi.mock('@/lib/shared/messaging', () => ({ messagingProviderReadiness: readiness }))
 vi.mock('@/lib/providers/policy', async importOriginal => ({ ...(await importOriginal<object>()), ...policy }))
 
-import { GET, PUT, DELETE } from '@/app/api/(admin)/admin/settings/providers/route'
+import { GET, PUT, DELETE } from '@controller/app/api/(admin)/admin/settings/providers/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { isPlatformOwner } from '@/lib/auth/scopes'
 

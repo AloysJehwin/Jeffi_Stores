@@ -49,7 +49,7 @@ vi.mock('@/lib/auth/scopes', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/(admin)/admin/users/route'
+import { POST } from '@controller/app/api/(admin)/admin/users/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { query } from '@/lib/shared/db'
 import { createAdminUser } from '@/lib/auth/auth'

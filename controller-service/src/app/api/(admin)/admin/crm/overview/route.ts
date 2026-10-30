@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { istToday, parsePeriod } from '@/app/(admin)/admin/crm/_lib/period'
+import { istToday, parsePeriod } from '@controller/app/(admin)/admin/crm/_lib/period'
 import { getCrmOverview } from './summary'
 
 export const dynamic = 'force-dynamic'

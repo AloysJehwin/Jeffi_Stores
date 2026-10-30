@@ -1,6 +1,6 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, previousPeriod, type Period } from '@/lib/overview/period'
-import { fillSeries } from '@/app/(admin)/admin/financial/_components/overview-period'
+import { fillSeries } from '@controller/app/(admin)/admin/financial/_components/overview-period'
 
 // AI usage for Finance (tenant DB ai_usage, written by lib/ai/billing). On the flagship the
 // headline amount is the platform cost; on a tenant it is what was charged to the wallet.

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckMark } from '@/app/(ecom)/ecom/Shapes'
+import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import { ChoiceCards, ChoiceChips, Segmented, focusRing } from '../_ui'
 import { useToast } from '@/contexts/ToastContext'
 import { PhoneInput } from '../_ui/phone'

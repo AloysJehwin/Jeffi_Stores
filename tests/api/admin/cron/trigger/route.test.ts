@@ -16,12 +16,12 @@ vi.mock('@/lib/shared/cron-record', () => ({ recordCronRun: vi.fn().mockResolved
 // Job route modules invoked in-process by the trigger.
 const cancelGet = vi.fn()
 const delhiveryPost = vi.fn()
-vi.mock('@/app/api/(internal)/cron/cancel-stale-orders/route', () => ({ GET: cancelGet }))
-vi.mock('@/app/api/(admin)/admin/delhivery/sync-statuses/route', () => ({ POST: delhiveryPost }))
+vi.mock('@controller/app/api/(internal)/cron/cancel-stale-orders/route', () => ({ GET: cancelGet }))
+vi.mock('@controller/app/api/(admin)/admin/delhivery/sync-statuses/route', () => ({ POST: delhiveryPost }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/(admin)/admin/cron/trigger/route'
+import { POST } from '@controller/app/api/(admin)/admin/cron/trigger/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'

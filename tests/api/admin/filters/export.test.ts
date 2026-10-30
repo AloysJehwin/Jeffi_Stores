@@ -24,7 +24,7 @@ vi.mock('@/lib/filters/registry', async () => {
   return { getEntity: (k: string) => (k === 'orders' ? orders : null) }
 })
 
-import { GET } from '@/app/api/(admin)/admin/filters/[entity]/export/route'
+import { GET } from '@controller/app/api/(admin)/admin/filters/[entity]/export/route'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
 
 const row = (n: string, customer: string) => ({ order_number: n, customer, total: '-12.50', __k0: '2026-10-01 10:00:00.123456+05:30', __k1: n })

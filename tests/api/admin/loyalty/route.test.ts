@@ -12,7 +12,7 @@ vi.mock('@/lib/loyalty/settings', async importOriginal => ({
   saveLoyaltySettings: vi.fn(),
 }))
 
-import { GET, PUT } from '@/app/api/(admin)/admin/loyalty/route'
+import { GET, PUT } from '@controller/app/api/(admin)/admin/loyalty/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getLoyaltyStats } from '@/lib/loyalty/queries'

@@ -27,7 +27,7 @@ vi.mock('@/lib/filters/run', () => ({ cappedCount: mockCappedCount }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/(admin)/admin/audit/route'
+import { GET, POST } from '@controller/app/api/(admin)/admin/audit/route'
 import { authenticateAdmin, authenticateServiceAccount } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

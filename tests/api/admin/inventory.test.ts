@@ -75,8 +75,8 @@ vi.mock('@/lib/shared/validate', () => {
 // Import handlers AFTER mocks are set up
 // ---------------------------------------------------------------------------
 
-import { GET as stockGET, PATCH as stockPATCH } from '@/app/api/(admin)/admin/inventory/stock/route'
-import { GET as poGET, POST as poPOST } from '@/app/api/(admin)/admin/inventory/po/route'
+import { GET as stockGET, PATCH as stockPATCH } from '@controller/app/api/(admin)/admin/inventory/stock/route'
+import { GET as poGET, POST as poPOST } from '@controller/app/api/(admin)/admin/inventory/po/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne, getClient, withTransaction } from '@/lib/shared/db'

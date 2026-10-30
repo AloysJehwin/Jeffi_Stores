@@ -5,13 +5,13 @@ import {
   resolvePeriod,
   turnoverStats,
   MAX_RANGE_DAYS,
-} from '@/app/api/(admin)/admin/inventory/overview/compute'
+} from '@controller/app/api/(admin)/admin/inventory/overview/compute'
 import {
   formatRange,
   matchPreset,
   presetRange,
   rangeFromParams,
-} from '@/app/(admin)/admin/inventory/_components/inventoryOverviewPeriod'
+} from '@controller/app/(admin)/admin/inventory/_components/inventoryOverviewPeriod'
 
 describe('resolvePeriod', () => {
   it('defaults to the last 30 IST days with an equal previous window', () => {

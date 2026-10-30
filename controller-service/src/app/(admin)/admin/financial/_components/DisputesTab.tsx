@@ -7,7 +7,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col, type Tone } from '@/components/admin/channels/ui'
 import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
 import { badgeCls, useActionToast } from '@/components/admin/kit'
-import type { DisputeListRow, DisputesResponse } from '@/app/api/(admin)/admin/financial/disputes/route'
+import type { DisputeListRow, DisputesResponse } from '@controller/app/api/(admin)/admin/financial/disputes/route'
 
 type Filter = 'open' | 'closed' | 'all'
 const FILTERS: { value: Filter; label: string }[] = [

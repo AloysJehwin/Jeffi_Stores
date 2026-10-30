@@ -13,10 +13,10 @@ up and cut production over to it.
 | `bootstrap/rollout.sh` | Rollout: platform, tenant schema fan-out, then every store namespace one at a time |
 | `db/` | Production DB release scripts (backup, schema, control-plane merge, secrets, fan-out, seeds); see `docs/GO_LIVE_RUNBOOK.md` |
 | `platform/` | Traefik config, cert-manager + wildcard, mTLS edge, the controller/messaging/document/public-api services, Redis, CronJobs, Coroot + Headlamp |
-| `gen-cronjobs.ts` | Regenerates `platform/cronjobs.yaml` from `controller-service/src/lib/shared/cron-jobs.ts` (a test fails on drift) |
+| `gen-cronjobs.ts` | Regenerates `platform/cronjobs.yaml` from `packages/store-core/src/lib/shared/cron-jobs.ts` (a test fails on drift) |
 
 Tenant namespaces are **not** in git. The provisioning engine renders them
-(`controller-service/src/lib/k8s/tenant-workload.ts`) and applies them (`controller-service/src/lib/k8s/tenant-compute.ts`) when
+(`packages/store-core/src/lib/k8s/tenant-workload.ts`) and applies them (`packages/store-core/src/lib/k8s/tenant-compute.ts`) when
 `PROVISIONING_COMPUTE=k8s` (set by the `provisioning` ConfigMap).
 
 ## Bring-up (in order)

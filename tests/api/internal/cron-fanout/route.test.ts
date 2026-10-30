@@ -6,7 +6,7 @@ const reg = vi.hoisted(() => ({ listTenants: vi.fn(), getTenantPlan: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({ listTenants: reg.listTenants }))
 vi.mock('@/lib/auth/plan-gate', () => ({ getTenantPlan: reg.getTenantPlan }))
 
-import { POST } from '@/app/api/(internal)/cron/fanout/route'
+import { POST } from '@controller/app/api/(internal)/cron/fanout/route'
 
 const BASE = 'http://127.0.0.1:3000'
 function post(jobId: string) {

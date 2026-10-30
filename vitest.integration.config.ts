@@ -34,7 +34,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './controller-service/src'),
+      '@controller': path.resolve(__dirname, './controller-service/src'),
+      '@': path.resolve(__dirname, './packages/store-core/src'),
       'server-only': path.resolve(__dirname, './node_modules/next/dist/compiled/server-only/empty.js'),
     },
   },

@@ -1,6 +1,6 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, previousPeriod, type Period } from '@/lib/overview/period'
-import { fillSeries } from '@/app/(admin)/admin/financial/_components/overview-period'
+import { fillSeries } from '@controller/app/(admin)/admin/financial/_components/overview-period'
 
 // Receivables overview backing the Finance → Receivables tab. An order is a receivable while
 // payment_status is unpaid or partial and status is live. Aging runs off COALESCE(invoice_date,

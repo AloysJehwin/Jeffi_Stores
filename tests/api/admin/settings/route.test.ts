@@ -8,7 +8,7 @@ vi.mock('@/lib/shipping/delivery-settings', () => ({ invalidateDeliverySettingsC
 vi.mock('@/lib/loyalty/settings', () => ({ getLoyaltySettings: vi.fn() }))
 vi.mock('@/lib/loyalty/reconcile', () => ({ reconcileLoyaltyUntilDone: vi.fn() }))
 
-import { PATCH } from '@/app/api/(admin)/admin/settings/route'
+import { PATCH } from '@controller/app/api/(admin)/admin/settings/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'

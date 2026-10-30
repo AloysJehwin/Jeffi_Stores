@@ -17,37 +17,37 @@ import glob from 'fast-glob'
 const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Auth / self-service: the member is proving who they are or acting on themselves.
   'controller-service/src/app/(admin)/admin/login/page.tsx',
-  'controller-service/src/components/admin/AdminSessionController.tsx',
-  'controller-service/src/components/admin/AccessDenied.tsx',
-  'controller-service/src/components/admin/TwoFactorCard.tsx',
-  'controller-service/src/components/admin/MobileNumberCard.tsx',
-  'controller-service/src/components/admin/AdminSupportChat.tsx',
+  'packages/store-core/src/components/admin/AdminSessionController.tsx',
+  'packages/store-core/src/components/admin/AccessDenied.tsx',
+  'packages/store-core/src/components/admin/TwoFactorCard.tsx',
+  'packages/store-core/src/components/admin/MobileNumberCard.tsx',
+  'packages/store-core/src/components/admin/AdminSupportChat.tsx',
   // Self-service: marks the member's own notification bell read; no scoped record mutation.
-  'controller-service/src/components/admin/NotificationBell.tsx',
+  'packages/store-core/src/components/admin/NotificationBell.tsx',
   // Self-service: the member's own saved filter views. Sharing one is offered only when the
   // server reports the list's :write scope (canShare), which the routes enforce again.
-  'controller-service/src/components/admin/kit/saved-views.tsx',
+  'packages/store-core/src/components/admin/kit/saved-views.tsx',
   // Platform control plane: gated by host + isPlatformAdmin, not a tenant scope.
-  'controller-service/src/components/admin/ecom/tabs/KycActionButtons.tsx',
-  'controller-service/src/components/admin/ecom/TenantActions.tsx',
-  'controller-service/src/components/admin/ecom/PurgeCustomerButton.tsx',
+  'packages/store-core/src/components/admin/ecom/tabs/KycActionButtons.tsx',
+  'packages/store-core/src/components/admin/ecom/TenantActions.tsx',
+  'packages/store-core/src/components/admin/ecom/PurgeCustomerButton.tsx',
   'controller-service/src/app/(admin)/admin/ecom/billing/[id]/AccountModeToggle.tsx',
   'controller-service/src/app/(admin)/admin/ecom/billing/[id]/DeliveryModeToggle.tsx',
   // DNS re-sync for a tenant: platform-admin only (isPlatformAdmin), same as the sibling toggles.
   'controller-service/src/app/(admin)/admin/ecom/billing/[id]/DnsResyncButton.tsx',
   'controller-service/src/app/(admin)/admin/ecom/billing/[id]/ReconcileButton.tsx',
-  'controller-service/src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
-  'controller-service/src/components/admin/ecom/tabs/BillingReconcile.tsx',
-  'controller-service/src/components/admin/ecom/tabs/MessagingTab.tsx',
-  'controller-service/src/components/admin/ecom/tabs/ServiceApprovals.tsx',
+  'packages/store-core/src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
+  'packages/store-core/src/components/admin/ecom/tabs/BillingReconcile.tsx',
+  'packages/store-core/src/components/admin/ecom/tabs/MessagingTab.tsx',
+  'packages/store-core/src/components/admin/ecom/tabs/ServiceApprovals.tsx',
   // Google Ads manager view (unlink): the page redirects non-platform admins and the API is isPlatformAdmin-only.
   'controller-service/src/app/(admin)/admin/ecom/google-ads/ManagedAccountsClient.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
-  'controller-service/src/components/admin/CreateAdminForm.tsx',
-  'controller-service/src/components/admin/AdminUserActions.tsx',
-  'controller-service/src/components/admin/ServiceAccountRevokeButton.tsx',
+  'packages/store-core/src/components/admin/CreateAdminForm.tsx',
+  'packages/store-core/src/components/admin/AdminUserActions.tsx',
+  'packages/store-core/src/components/admin/ServiceAccountRevokeButton.tsx',
   // Owner-only revoke rendered only for owners by service-accounts/_components/ServiceAccountsPanel.tsx (replaced the button above).
-  'controller-service/src/components/admin/ServiceAccountRowActions.tsx',
+  'packages/store-core/src/components/admin/ServiceAccountRowActions.tsx',
   'controller-service/src/app/(admin)/admin/service-accounts/add/page.tsx',
   // Read-only view; its only POST is an export/filter, not a scoped write.
   'controller-service/src/app/(admin)/admin/audit/AdminAuditClient.tsx',
@@ -61,7 +61,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/app/(admin)/admin/invoices/InvoicesClient.tsx',
   'controller-service/src/app/(admin)/admin/quotations/QuotationsClient.tsx',
   // Gated by a server-derived `canWrite` prop that wraps the RowActions ({canWrite && <RowActions/>}).
-  'controller-service/src/components/admin/CouponTableRow.tsx',
+  'packages/store-core/src/components/admin/CouponTableRow.tsx',
   // Gated on a server-derived canWrite prop (hasScope(role, scopes, 'service_accounts:write')
   // in the page), passed in and used to gate every action — same pattern as the siblings above.
   'controller-service/src/app/(admin)/admin/service-accounts/_components/ServiceAccountsMobileList.tsx',
@@ -69,30 +69,30 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/app/(admin)/admin/packing-slips/PackingSlipsClient.tsx',
   'controller-service/src/app/(admin)/admin/packing-slips/_components/order-documents.tsx',
   'controller-service/src/app/(admin)/admin/labels/LabelsClient.tsx',
-  'controller-service/src/components/admin/BatchSerialLabelPicker.tsx',
+  'packages/store-core/src/components/admin/BatchSerialLabelPicker.tsx',
   'controller-service/src/app/(admin)/admin/products/_components/ProductLabelModal.tsx',
   // Shared modal committed via a parent-owned onConfirm — the gate sits on each caller's
   // open control (cash-sale, quotations, invoices, order status), not the modal.
-  'controller-service/src/components/admin/BatchPickerModal.tsx',
+  'packages/store-core/src/components/admin/BatchPickerModal.tsx',
   // Shared "Fill from scenario" dialog — the opener is only rendered when the caller
   // passes canUseScenarioFill (useCanWrite('templates') / server-derived canEdit), and
   // the applyFill callback lives in the parent editor. Same pattern as BatchPickerModal.
-  'controller-service/src/components/admin/messaging-templates/ScenarioFillDialog.tsx',
+  'packages/store-core/src/components/admin/messaging-templates/ScenarioFillDialog.tsx',
   // Draft merge dialog: opens only from a publish the caller already gated (draft editors, DraftRowActions).
-  'controller-service/src/components/admin/drafts/MergeDialog.tsx',
+  'packages/store-core/src/components/admin/drafts/MergeDialog.tsx',
   // Mutation lives in the parent form; this is a field editor feeding onChange.
-  'controller-service/src/components/admin/LineItemsSection.tsx',
+  'packages/store-core/src/components/admin/LineItemsSection.tsx',
   // Image-URL field feeding onChange; its upload POST is a CDN asset write the server gates on the
   // parent form's :write scope (uploads/image EDIT_SCOPES). The record mutation lives in the parent.
-  'controller-service/src/components/admin/ImageUrlInput.tsx',
+  'packages/store-core/src/components/admin/ImageUrlInput.tsx',
   // Approve/Reject render only when the page passes a server-derived canWrite for the record.
-  'controller-service/src/components/admin/replies/RecordReplies.tsx',
+  'packages/store-core/src/components/admin/replies/RecordReplies.tsx',
   // Gated on the stricter isSuperAdmin, which no tenant :write scope expresses.
-  'controller-service/src/components/admin/CustomerTagDefinitionsCard.tsx',
+  'packages/store-core/src/components/admin/CustomerTagDefinitionsCard.tsx',
 ])
 
 function mutatingClientComponents(): string[] {
-  const files = glob.sync(['controller-service/src/app/\\(admin\\)/admin/**/*.tsx', 'controller-service/src/components/admin/**/*.tsx'], {
+  const files = glob.sync(['controller-service/src/app/\\(admin\\)/admin/**/*.tsx', 'packages/store-core/src/components/admin/**/*.tsx'], {
     cwd: process.cwd(),
   })
   const out: string[] = []

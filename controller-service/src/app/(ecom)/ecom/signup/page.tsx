@@ -1,4 +1,4 @@
-import AuthSplit from '@/app/(ecom)/ecom/AuthSplit'
+import AuthSplit from '@controller/app/(ecom)/ecom/AuthSplit'
 
 export const dynamic = 'force-dynamic'
 

@@ -12,18 +12,18 @@ export const dynamic = 'force-dynamic'
 // Turbopack dev reliably bundle them (an interpolated import() is flagged by vite:dynamic-import-vars
 // and may not trace). Store jobs only: platform jobs live in the controller.
 const JOB_ROUTE_IMPORTS: Record<string, () => Promise<Record<string, any>>> = {
-  delhivery_sync: () => import('@/app/api/(admin)/admin/delhivery/sync-statuses/route'),
-  cancel_stale_orders: () => import('@/app/api/(internal)/cron/cancel-stale-orders/route'),
-  sweep_auto_tasks: () => import('@/app/api/(internal)/cron/sweep-auto-tasks/route'),
-  dispatch_mailer: () => import('@/app/api/(internal)/cron/dispatch-mailer/route'),
-  run_campaigns: () => import('@/app/api/(internal)/cron/run-campaigns/route'),
-  compute_health: () => import('@/app/api/(internal)/cron/compute-health/route'),
-  daily_briefing: () => import('@/app/api/(internal)/cron/daily-briefing/route'),
-  publish_social_posts: () => import('@/app/api/(internal)/cron/publish-social-posts/route'),
-  customer_notes_digest: () => import('@/app/api/(internal)/cron/customer-notes-digest/route'),
-  loyalty_reconcile: () => import('@/app/api/(internal)/cron/loyalty-reconcile/route'),
-  sweep_idle_sessions: () => import('@/app/api/(internal)/cron/sweep-sessions/route'),
-  embed_sync: () => import('@/app/api/(internal)/cron/embed-sync/route'),
+  delhivery_sync: () => import('@controller/app/api/(admin)/admin/delhivery/sync-statuses/route'),
+  cancel_stale_orders: () => import('@controller/app/api/(internal)/cron/cancel-stale-orders/route'),
+  sweep_auto_tasks: () => import('@controller/app/api/(internal)/cron/sweep-auto-tasks/route'),
+  dispatch_mailer: () => import('@controller/app/api/(internal)/cron/dispatch-mailer/route'),
+  run_campaigns: () => import('@controller/app/api/(internal)/cron/run-campaigns/route'),
+  compute_health: () => import('@controller/app/api/(internal)/cron/compute-health/route'),
+  daily_briefing: () => import('@controller/app/api/(internal)/cron/daily-briefing/route'),
+  publish_social_posts: () => import('@controller/app/api/(internal)/cron/publish-social-posts/route'),
+  customer_notes_digest: () => import('@controller/app/api/(internal)/cron/customer-notes-digest/route'),
+  loyalty_reconcile: () => import('@controller/app/api/(internal)/cron/loyalty-reconcile/route'),
+  sweep_idle_sessions: () => import('@controller/app/api/(internal)/cron/sweep-sessions/route'),
+  embed_sync: () => import('@controller/app/api/(internal)/cron/embed-sync/route'),
 }
 
 // Manually run ONE cron job for the CURRENT store, IN-PROCESS under that store's tenant context.

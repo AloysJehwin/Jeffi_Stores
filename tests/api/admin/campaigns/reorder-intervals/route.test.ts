@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryMany: vi.fn() }))
 
-import { GET, PUT } from '@/app/api/(admin)/admin/campaigns/reorder-intervals/route'
+import { GET, PUT } from '@controller/app/api/(admin)/admin/campaigns/reorder-intervals/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany } from '@/lib/shared/db'

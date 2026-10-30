@@ -42,7 +42,7 @@ vi.mock('@/lib/shared/activity', () => ({
 }))
 vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn(async () => ({ action: 'none', reason: 'test' })) }))
 
-import { POST } from '@/app/api/(public)/orders/[id]/refund/route'
+import { POST } from '@controller/app/api/(public)/orders/[id]/refund/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'

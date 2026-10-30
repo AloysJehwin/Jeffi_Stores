@@ -7,7 +7,7 @@ vi.mock('@/lib/auth/scopes', () => ({ isPlatformAdmin: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query }) }))
 vi.mock('@/lib/tenant-registry/shared', () => ({ ROOT_DOMAIN: 'example.test' }))
 
-import { GET } from '@/app/api/(admin)/admin/ecom/store-status/overview/route'
+import { GET } from '@controller/app/api/(admin)/admin/ecom/store-status/overview/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 

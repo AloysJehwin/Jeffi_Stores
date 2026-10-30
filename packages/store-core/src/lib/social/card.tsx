@@ -2,8 +2,7 @@ import { ImageResponse } from 'next/og'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { mrpDiscountPct } from '@/lib/catalog/pricing'
 import { readFileSync } from 'fs'
-import { join } from 'path'
-import { appPath } from '@/lib/shared/paths'
+import { assetPath } from '@/lib/shared/paths'
 
 const W = 1080
 const H = 1920
@@ -19,13 +18,11 @@ const s3Client = new S3Client({
 })
 
 function loadFont(name: string): Buffer {
-  const candidates = [appPath('public/fonts', name), join(process.cwd(), 'public/fonts', name)]
-  for (const p of candidates) {
-    try {
-      return readFileSync(p)
-    } catch {}
+  try {
+    return readFileSync(assetPath('fonts', name))
+  } catch {
+    throw new Error(`Font not found: ${name}`)
   }
-  throw new Error(`Font not found: ${name}`)
 }
 
 let _fontBold: Buffer | null = null

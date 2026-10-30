@@ -6,7 +6,7 @@ vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ isPlatformAdmin: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query }) }))
 
-import { GET } from '@/app/api/(admin)/admin/ecom/instances/overview/route'
+import { GET } from '@controller/app/api/(admin)/admin/ecom/instances/overview/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 

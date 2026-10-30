@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/loyalty/reconcile', () => ({ reconcileLoyaltyUntilDone: vi.fn() }))
 
-import { POST } from '@/app/api/(admin)/admin/loyalty/recalculate/route'
+import { POST } from '@controller/app/api/(admin)/admin/loyalty/recalculate/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { reconcileLoyaltyUntilDone } from '@/lib/loyalty/reconcile'

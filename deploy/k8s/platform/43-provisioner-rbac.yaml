@@ -1,4 +1,4 @@
-# jeffi-stores-controller-service runs the provisioning engine (controller-service/src/lib/k8s/tenant-compute.ts): it creates tenant
+# jeffi-stores-controller-service runs the provisioning engine (packages/store-core/src/lib/k8s/tenant-compute.ts): it creates tenant
 # namespaces and everything inside them, reads Nodes for placement, copies the pull secret / RDS CA
 # out of jeffi, and patches the tenant-admin CA bundle in jeffi-edge.
 apiVersion: rbac.authorization.k8s.io/v1

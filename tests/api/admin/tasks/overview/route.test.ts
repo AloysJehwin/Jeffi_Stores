@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
-import { GET } from '@/app/api/(admin)/admin/tasks/overview/route'
+import { GET } from '@controller/app/api/(admin)/admin/tasks/overview/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 

@@ -11,7 +11,7 @@ vi.mock('@/lib/shared/redis', () => ({
 }))
 vi.mock('@/lib/provisioning/alerts', () => ({ sendPlatformAlert: vi.fn(async () => {}) }))
 
-import { GET } from '@/app/api/(internal)/internal/ai/health/route'
+import { GET } from '@controller/app/api/(internal)/internal/ai/health/route'
 import { INCIDENT_KEY } from '@/lib/shared/ai-health'
 import { sendPlatformAlert } from '@/lib/provisioning/alerts'
 

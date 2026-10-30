@@ -12,7 +12,7 @@ vi.mock('@/lib/support/messages', () => ({ listMessages: vi.fn(), localize: vi.f
 vi.mock('@/lib/support/translate', () => ({ ensureTranslations: vi.fn() }))
 vi.mock('@/lib/support/admin', () => ({ agentAttachments: vi.fn(), agentReply: vi.fn() }))
 
-import { GET, POST } from '@/app/api/(admin)/admin/support/sessions/[sessionId]/messages/route'
+import { GET, POST } from '@controller/app/api/(admin)/admin/support/sessions/[sessionId]/messages/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

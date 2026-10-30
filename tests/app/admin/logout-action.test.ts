@@ -56,7 +56,7 @@ vi.mock('@/lib/auth/auth-sessions', () => ({
   revokeAllForPrincipal: mockRevokeAll,
 }))
 
-import { logoutAction } from '@/app/(admin)/admin/logout-action'
+import { logoutAction } from '@controller/app/(admin)/admin/logout-action'
 
 describe('logoutAction', () => {
   beforeEach(() => {

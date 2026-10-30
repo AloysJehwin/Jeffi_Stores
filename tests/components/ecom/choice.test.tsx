@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { Segmented, ChoiceChips } from '@/app/(ecom)/ecom/_ui/choice'
+import { Segmented, ChoiceChips } from '@controller/app/(ecom)/ecom/_ui/choice'
 
 const opts = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }, { value: 'c', label: 'Gamma' }]
 

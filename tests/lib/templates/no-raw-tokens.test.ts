@@ -57,10 +57,10 @@ import {
   sendTestCampaignEmail,
 } from '@/lib/shared/automation-emails'
 import { renderTemplate, resolveTemplateVariables, BUILTIN_VARIABLE_KEYS } from '@/lib/templates/variables'
-import { POST as mailerPreview } from '@/app/api/(admin)/admin/mailer/preview/route'
-import { POST as orderMail } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/route'
-import { POST as orderMailPreview } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/preview/route'
-import { POST as customerContact } from '@/app/api/(public)/customers/[id]/contact/route'
+import { POST as mailerPreview } from '@controller/app/api/(admin)/admin/mailer/preview/route'
+import { POST as orderMail } from '@controller/app/api/(admin)/admin/orders/[id]/send-customer-mail/route'
+import { POST as orderMailPreview } from '@controller/app/api/(admin)/admin/orders/[id]/send-customer-mail/preview/route'
+import { POST as customerContact } from '@controller/app/api/(public)/customers/[id]/contact/route'
 
 const IDENTITY = { name: 'Acme Tools', email: 'hi@acme.in', phone: '+91 90000 11111', web: 'acme.in', logoUrl: '', emailAccent: '' }
 

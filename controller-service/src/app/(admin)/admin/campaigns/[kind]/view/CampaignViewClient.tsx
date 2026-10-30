@@ -21,14 +21,14 @@ import {
   ChannelChip,
   CampaignStatsGrid,
   CampaignPushStats,
-} from '@/app/(admin)/admin/campaigns/_components/campaign-presentation'
+} from '@controller/app/(admin)/admin/campaigns/_components/campaign-presentation'
 import {
   EligibleRecipientsPanel,
   RecentSendsPanel,
   WhatsAppLogPanel,
   type RecentSend,
   type WhatsAppLog,
-} from '@/app/(admin)/admin/campaigns/[kind]/_components/CampaignOpsPanels'
+} from '@controller/app/(admin)/admin/campaigns/[kind]/_components/CampaignOpsPanels'
 import { startCampaignDraft } from './actions'
 import { ChangeLog } from '@/components/admin/change-log'
 

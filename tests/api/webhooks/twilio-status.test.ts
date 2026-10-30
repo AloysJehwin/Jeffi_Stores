@@ -12,7 +12,7 @@ vi.mock('@/lib/tenant-registry/host-resolution', () => ({
 }))
 vi.mock('@/lib/tenancy/tenant-context', () => ({ runWithTenantContext: (_c: any, fn: any) => fn() }))
 
-import { POST } from '@/app/api/(public)/webhooks/twilio/status/route'
+import { POST } from '@controller/app/api/(public)/webhooks/twilio/status/route'
 
 function req(params: Record<string, string>, t = 't1') {
   const body = new URLSearchParams(params)

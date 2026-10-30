@@ -4,7 +4,7 @@ import type { Policy, Section } from '@/lib/legals/policies'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import { storeAddressLine } from '@/lib/catalog/brand'
 import { tenantLogoBuffer } from '@/lib/documents/store-logo'
-import { appPath } from '@/lib/shared/paths'
+import { assetPath } from '@/lib/shared/paths'
 
 const PDFDocument = eval('require')('pdfkit')
 
@@ -60,7 +60,7 @@ function drawFooter(doc: any, store: StoreHeading, pageNum: number, totalPages: 
 }
 
 function drawSeal(doc: any, seal?: string | Buffer) {
-  const sealSrc = seal ?? appPath('public', 'images', 'jeffi-seal.png')
+  const sealSrc = seal ?? assetPath('images', 'jeffi-seal.png')
   const SEAL_SIZE = 110
   const x = PAGE_W - MR - SEAL_SIZE
   const y = PAGE_H - 36 - SEAL_SIZE - 20
