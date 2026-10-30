@@ -3,7 +3,7 @@
 // `npm run dev`; `*.localhost:3000` URLs work as before. WebSockets (HMR) are piped through too.
 import http from 'node:http'
 import net from 'node:net'
-import { CONTROLLER_ASSET_PREFIX, routeFor, type AppName } from '../packages/store-core/src/lib/service-routing'
+import { ASSET_PREFIX, routeFor, type AppName } from '../packages/store-core/src/lib/service-routing'
 
 export const DEV_PORTS: Record<AppName, number> = { storefront: 3010, admin: 3011, business: 3012, controller: 3013 }
 const PORT = Number(process.env.DEV_ROUTER_PORT || 3000)
@@ -15,11 +15,13 @@ function target(req: http.IncomingMessage) {
 
 const down = (app: AppName) => `${app} isn't running on :${DEV_PORTS[app]}. Start it with npm run dev:${app}, or everything with npm run dev.\n`
 
-// The controller's asset prefix is stripped before it reaches the app, as the ingress does in production
-// (Next doesn't serve prefixed paths there, and its middleware would rewrite them). HMR's WebSocket
-// keeps it: Next expects it there.
-const upstreamPath = (app: AppName, url = '/') =>
-  app === 'controller' && url.startsWith(CONTROLLER_ASSET_PREFIX + '/') ? url.slice(CONTROLLER_ASSET_PREFIX.length) : url
+// An app's asset prefix (/_controller, /_admin, /_business) is stripped before it reaches the app, as the
+// ingress does in production (Next doesn't serve prefixed paths there, and its middleware would rewrite
+// them). HMR's WebSocket keeps it: Next expects it there.
+function upstreamPath(app: AppName, url = '/') {
+  const prefix = app === 'storefront' ? null : ASSET_PREFIX[app]
+  return prefix && url.startsWith(prefix + '/') ? url.slice(prefix.length) : url
+}
 
 const server = http.createServer((req, res) => {
   const { app, port } = target(req)

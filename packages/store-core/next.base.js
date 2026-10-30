@@ -102,6 +102,10 @@ function baseConfig({ app, headers = [] }) {
       externalDir: true,
     },
     env: { JEFFI_APP: app },
+    // /_next/ is the storefront's on every host; the other apps load their build output under /_<app>, which
+    // the ingress and the dev router strip (ASSET_PREFIX in src/lib/service-routing.ts). Images stay on
+    // /_next/image: the storefront's optimizer, which holds public/.
+    ...(app === 'storefront' ? {} : { assetPrefix: `/_${app}` }),
     // Bundled, pdfjs can't find its worker ("pdf.worker.mjs" missing); @napi-rs/canvas is native.
     serverExternalPackages: ['pdfkit', 'ioredis', 'pg', 'pdfjs-dist', '@napi-rs/canvas'],
     images: {

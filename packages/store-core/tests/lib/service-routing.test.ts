@@ -23,7 +23,10 @@ describe('routeFor', () => {
     ['admin-acme.jeffistores.in', '/orders', 'admin'],
     ['admin-acme.jeffistores.in', '/ecom', 'admin'],
     ['admin-acme.jeffistores.in', '/api/admin/products', 'admin'],
-    ['admin-acme.jeffistores.in', '/_next/static/chunks/a.js', 'admin'],
+    ['admin-acme.jeffistores.in', '/_admin/_next/static/chunks/a.js', 'admin'],
+    ['acme.jeffistores.in', '/_business/_next/static/chunks/a.js', 'business'],
+    ['admin-acme.jeffistores.in', '/_next/static/chunks/a.js', 'storefront'],
+    ['jeffistores.in', '/_next/image', 'storefront'],
     ['acme.jeffistores.in', '/api/cron/cancel-stale-orders', 'admin'],
     // the store's public APIs answer every host
     ['admin-acme.jeffistores.in', '/api/orders/1/invoice', 'storefront'],
@@ -40,7 +43,7 @@ describe('routeFor', () => {
     ['acme.business.jeffistores.in', '/images/business-hero.webp', 'storefront'],
     ['ecom.jeffistores.in', '/screenshots/a.png', 'storefront'],
     ['admin-acme.jeffistores.in', '/manifest.webmanifest', 'storefront'],
-    ['admin-acme.jeffistores.in', '/_next/static/media/font.woff2', 'admin'],
+    ['admin-acme.jeffistores.in', '/_admin/_next/static/media/font.woff2', 'admin'],
   ])('%s%s → %s', (host, path, app) => {
     expect(routeFor(host, path)).toBe(app)
   })
