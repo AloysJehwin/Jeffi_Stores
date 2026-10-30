@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
+import { internalRequest } from '@/lib/shared/internal-http'
 import type { Resolution } from '@/lib/admin/draft-merge'
 import { homepageDraftIdFrom, homepageDraftOr, homepageLockFrom, noHomepageDraft, publishHomepageDraft } from '@/lib/catalog/homepage-draft'
 
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
 
   revalidatePath('/')
   revalidatePath('/business')
+  await refreshStorefront(request)
   await logAdminAudit({
     adminId: admin.adminId,
     action: 'update',
@@ -50,4 +52,20 @@ export async function POST(request: NextRequest) {
   }).catch(() => {})
 
   return NextResponse.json({ success: true, published })
+}
+
+// The home page is cached by the storefront app, not this one.
+async function refreshStorefront(request: NextRequest) {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return
+  const base = process.env.STOREFRONT_URL || 'http://127.0.0.1:3000'
+  await internalRequest(`${base}/api/revalidate`, {
+    method: 'POST',
+    host: request.headers.get('host') ?? undefined,
+    headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths: ['/'] }),
+    timeoutMs: 3000,
+  })
+    .then(r => r.ok || console.warn(`[homepage-draft publish] storefront refresh: HTTP ${r.status}`))
+    .catch(e => console.warn(`[homepage-draft publish] storefront refresh: ${e?.message}`))
 }
