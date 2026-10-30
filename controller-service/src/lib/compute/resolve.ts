@@ -2,7 +2,7 @@ import 'server-only'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { DEFAULT_SETTINGS, computeSpecEnabled, getCatalog } from './catalog'
 import { legacySpecFor } from '@/lib/compute/legacy'
-import { quoteSpec } from './pricing'
+import { pausedInrHour, quoteSpec } from './pricing'
 import { getTenantCompute } from './store'
 import { dbBudget } from '@/lib/compute/validate'
 import { dbMaxConnections, presetOf } from '@/lib/compute/presets'
@@ -58,6 +58,15 @@ export async function rateFor(spec: ComputeSpec): Promise<number | null> {
   }
 }
 
+/** What the spec still costs per hour while the store is paused; null when a part has no price. */
+export async function pausedRateFor(spec: ComputeSpec): Promise<number | null> {
+  try {
+    return pausedInrHour(spec, await catalogOrDefault())
+  } catch {
+    return null
+  }
+}
+
 /**
  * Record what now runs and its hourly rate. While owners can't choose (flag off) the choice is the plan's,
  * so `desired` follows; otherwise a choice made meanwhile stays pending.
@@ -76,4 +85,6 @@ export async function markComputeApplied(tenantId: string, spec: ComputeSpec, no
        attempts = 0, last_error = NULL, updated_at = now()`,
     [tenantId, JSON.stringify(spec), rate, nodeGen, follow, presetOf(spec)]
   )
+  const { syncComputePeriod } = await import('@controller/lib/billing/infra-billing')
+  await syncComputePeriod(tenantId)
 }

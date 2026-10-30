@@ -320,3 +320,58 @@ export async function sendServicesReviewedEmail(owner: { email: string; name: st
     <p style="margin:0;">Reply to this email with any corrections and we will review it again.</p>
   `))
 }
+
+export type InfraBalanceNotice =
+  | { kind: 'low'; daysLeft: number }
+  | { kind: 'negative'; pauseOn: Date }
+  | { kind: 'paused' }
+  | { kind: 'resumed' }
+
+/** The store's servers are paid from its wallet: running low, below zero, paused, or back after a top-up. */
+export async function sendInfraBalanceEmail(
+  owner: { email: string; name: string | null },
+  tenant: { display_name: string; slug: string },
+  balance: number,
+  dailyInr: number,
+  n: InfraBalanceNotice
+) {
+  const name = owner.name ?? 'there'
+  const wallet = `https://ecom.jeffistores.in/dashboard/wallet?tenant=${encodeURIComponent(tenant.slug)}`
+  const day = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })
+  const copy = {
+    low: {
+      subject: `${tenant.display_name}: about ${n.kind === 'low' ? n.daysLeft : 0} days of servers left`,
+      lead: `Your wallet covers about <strong>${n.kind === 'low' ? n.daysLeft : 0} more days</strong> of servers for ${tenant.display_name}. Top up to keep the store running.`,
+      tone: 'info' as const,
+    },
+    negative: {
+      subject: `${tenant.display_name}: your wallet is below zero`,
+      lead: `Your wallet no longer covers the servers for ${tenant.display_name}. The store keeps running until <strong>${n.kind === 'negative' ? day(n.pauseOn) : ''}</strong>; if the wallet is still below zero then, the store is paused until you top up.`,
+      tone: 'warn' as const,
+    },
+    paused: {
+      subject: `${tenant.display_name} is paused`,
+      lead: `${tenant.display_name} has been paused because its wallet stayed below zero. Your data is kept. Top up and the store starts again within a few minutes.`,
+      tone: 'warn' as const,
+    },
+    resumed: {
+      subject: `${tenant.display_name} is running again`,
+      lead: `Thanks for topping up. ${tenant.display_name} is running again.`,
+      tone: 'info' as const,
+    },
+  }[n.kind]
+  const html = baseHtml(
+    copy.subject,
+    copy.subject,
+    `
+    <p style="margin:0 0 14px;">Hi ${name},</p>
+    ${notice(copy.lead, copy.tone)}
+    ${detailTable([
+      { label: 'Wallet balance', value: inr(balance) },
+      { label: 'Servers per day', value: `${inr(dailyInr)} + GST on top-up` },
+    ])}
+    ${n.kind === 'resumed' ? '' : button(wallet, 'Top up the wallet')}
+  `
+  )
+  await send(owner.email, copy.subject, html)
+}

@@ -54,6 +54,7 @@ async function advance(tenantId: string, retry: boolean): Promise<LayoutResult> 
   if (sw?.failed && !retry) return { ok: false, status: 'failed', detail: sw.failed }
   if (tenant.status !== 'active') return { ok: true, status: 'waiting', detail: 'the store is not active' }
   if (row.status === 'pending' || row.status === 'applying') return { ok: true, status: 'waiting', detail: 'a compute change is running' }
+  if (row.status === 'paused') return { ok: true, status: 'waiting', detail: 'the store is paused' }
 
   const now = Date.now()
   if (!sw || sw.failed) sw = { step: 'both', since: now, at: now }
@@ -87,6 +88,8 @@ async function advance(tenantId: string, retry: boolean): Promise<LayoutResult> 
     await k8s.applyTenantWorkload(input)
     delete p.layout
     await patchTenantCompute(tenantId, { applied, progress: Object.keys(p).length ? p : null, rate_inr_hour: await rateFor(applied) })
+    const { syncComputePeriod } = await import('@controller/lib/billing/infra-billing')
+    await syncComputePeriod(tenantId).catch(e => console.error(`[layout] ${tenant.slug}: billing period not synced: ${e?.message}`))
     return { ok: true, status: 'services' }
   } catch (e: any) {
     const msg = e?.message || 'layout switch failed'

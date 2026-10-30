@@ -94,5 +94,13 @@ export function monthlyTotal(quote: Quote, planFeeInr: number, gstRate: number) 
   return { planFee: round2(planFeeInr), infra: quote.inrMonth, gstOnInfra: gst, total: round2(planFeeInr + quote.inrMonth + gst) }
 }
 
+/** While a store is paused for an unpaid wallet: its disks, database storage and the platform share, per hour. */
+export function pausedInrHour(spec: ComputeSpec, catalog: Catalog): number {
+  const s = catalog.settings
+  const kept = quoteSpec(spec, catalog).lines.filter(l => l.key === 'storage' || l.key === 'platform').reduce((n, l) => n + l.awsUsdMonth, 0)
+  const disks = spec.node.placement === 'pool' ? 0 : spec.node.count * s.rootVolumeGb * perGb(catalog, 'ebs:gp3')
+  return Math.round((((kept + disks) * s.usdInr * (1 + s.margin)) / HOURS_PER_MONTH) * 10000) / 10000
+}
+
 /** Billing for part of a month: the spec's hourly rate × hours it ran. */
 export const chargeFor = (inrHour: number, hours: number) => round2(inrHour * hours)

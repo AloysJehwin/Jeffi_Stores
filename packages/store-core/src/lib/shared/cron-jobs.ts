@@ -502,6 +502,17 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    id: 'infra_billing',
+    name: 'Server billing',
+    path: '/api/cron/infra-billing',
+    method: 'GET',
+    intervalMs: DAY,
+    intervalLabel: 'daily',
+    startDelayMs: 705 * SEC,
+    lockTtlMs: DAY - MIN,
+    tenantScope: null,
+  },
+  {
     id: 'ai_health',
     name: 'AI platform health',
     path: '/api/internal/ai/health',
@@ -536,6 +547,8 @@ const DAILY_AT_IST: Record<string, string> = {
   ad_free_renew: '0 5',
   drive_purge_trash: '15 3',
   wallet_drift: '45 3',
+  // Just after midnight IST, so yesterday's servers are charged once the day is over.
+  infra_billing: '30 0',
 }
 
 // Weekly jobs: minute hour * * day-of-week (IST).

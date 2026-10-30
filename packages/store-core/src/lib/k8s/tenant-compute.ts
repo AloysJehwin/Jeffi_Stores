@@ -163,6 +163,18 @@ export async function tenantNodes(slug: string): Promise<any[]> {
   return (await list<any>('Node', undefined, `jeffi.io/tenant=${slug}`)).filter(n => isTenantNodeName(slug, n.metadata?.name ?? ''))
 }
 
+/** The instances of the store's own server nodes, and whether every one is Ready. */
+export async function tenantNodeInstances(slug: string): Promise<{ instances: string[]; ready: boolean }> {
+  const nodes = await tenantNodes(slug)
+  return { instances: nodes.map(nodeInstanceId).filter((id): id is string => !!id), ready: nodes.every(isReady) }
+}
+
+/** Scale every Deployment in the store's namespace to 0 (a paused store); applyTenantWorkload brings them back. */
+export async function scaleTenantWorkloadToZero(slug: string): Promise<void> {
+  const ns = tenantNamespace(slug)
+  for (const d of await list<any>('Deployment', ns)) await patchMerge('Deployment', d.metadata.name, ns, { spec: { replicas: 0 } })
+}
+
 /** Remove the store's server nodes not in `keep` (an older generation after a resize); returns their instances. */
 export async function removeTenantNodes(slug: string, keep: string[] = []): Promise<string[]> {
   const gone = (await tenantNodes(slug)).filter(n => !keep.includes(n.metadata.name))

@@ -517,6 +517,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         }
         await setTenantStatus(job.tenant_id, 'active')
         await setStoreRequest(job.tenant_id, null)
+        // Its servers are billed from now.
+        const { syncComputePeriod } = await import('@controller/lib/billing/infra-billing')
+        await syncComputePeriod(job.tenant_id).catch(e => console.error(`[provisioning] ${job.tenant_id}: billing period not opened: ${e?.message}`))
         await recordStepEvent(job.id, 'activate', 'ok', 'tenant activated', {})
         await updateProvisioningJob(job.id, { status: 'done', created_resources: res })
         return 'done'
@@ -1171,8 +1174,11 @@ export async function reconcileK8sPlan(
   }
 
   try {
-    const { layoutSwitching } = await import('@controller/lib/compute/store')
-    if (await layoutSwitching(tenantId)) {
+    const { computeHold } = await import('@controller/lib/compute/store')
+    const hold = await computeHold(tenantId)
+    // A paused store is re-applied when it resumes.
+    if (hold === 'paused') return { ok: true, added, removed, error: 'pending: the store is paused' }
+    if (hold === 'switching') {
       delete created.k8sPlanNextAt
       await save({ k8sPendingPlan: tenant.plan })
       return { ok: true, added, removed, error: 'pending: the store is moving to its own services' }
