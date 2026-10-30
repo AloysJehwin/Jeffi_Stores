@@ -636,7 +636,7 @@ INSERT INTO public.ai_price_list (capability, provider, model, unit_type, cost_i
 ON CONFLICT (capability, provider, model, unit_type) DO NOTHING;
 
 -- Compute prices: AWS us-east-1 on-demand, Linux, USD (checked 2026-10-30). Inserted once so the platform
--- admin's edits stand; deploy/aws/refresh-prices.sh prints UPDATEs for a refresh. RDS storage is gp3.
+-- admin's edits stand; deploy/k8s/db/refresh-compute-prices.sh prints UPDATEs for a refresh. RDS storage is gp3.
 INSERT INTO public.compute_prices (code, kind, label, vcpu, memory_mib, usd_hourly, usd_hourly_multi_az, usd_gb_month, usd_gb_month_multi_az, sellable, sort) VALUES
   ('ec2:t4g.small',     'ec2',         't4g.small (2 vCPU, 2 GB)',    2,  2048, 0.0168, NULL,  NULL,  NULL,  true,  10),
   ('ec2:t4g.medium',    'ec2',         't4g.medium (2 vCPU, 4 GB)',   2,  4096, 0.0336, NULL,  NULL,  NULL,  true,  20),

@@ -143,6 +143,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       group: 'Settings',
       platformAdminOnly: true,
     },
+    {
+      href: '/admin/settings/compute-pricing',
+      label: 'Server Pricing',
+      scope: 'ecom_billing:read',
+      group: 'Settings',
+      platformAdminOnly: true,
+    },
     // The Settings hub: Account, Team, Service accounts and Audit log tabs (lib/admin/settings-hub).
     { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings', exactMatch: true },
   ]
