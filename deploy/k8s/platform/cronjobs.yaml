@@ -1660,6 +1660,7 @@ spec:
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
+                - { name: CRON_TARGET, value: 'http://jeffi-stores-admin-service.jeffi.svc.cluster.local:3000' }
               resources:
                 requests: { cpu: 10m, memory: 48Mi }
                 limits: { memory: 128Mi }
@@ -1697,6 +1698,7 @@ spec:
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
+                - { name: CRON_TARGET, value: 'http://jeffi-stores-admin-service.jeffi.svc.cluster.local:3000' }
               resources:
                 requests: { cpu: 10m, memory: 48Mi }
                 limits: { memory: 128Mi }

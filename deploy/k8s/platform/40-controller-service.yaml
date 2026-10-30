@@ -1,4 +1,5 @@
-# jeffi-stores-controller-service: the platform store (jeffistores.in + platform subdomains). Every tenant runs the same image.
+# jeffi-stores-controller-service: the control plane (ecom console, certificate portal, platform admin pages,
+# provisioning, platform crons and webhooks). Stores never run it. Its routes are in 49-routes.yaml.
 apiVersion: v1
 kind: ServiceAccount
 metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
@@ -37,6 +38,9 @@ spec:
             - { name: CLIENT_CERT_PROXY, value: traefik }
             - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
             - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
+            # The cron fan-out runs store jobs on the flagship's admin service and on each store's own.
+            - { name: CRON_FLAGSHIP_BASE, value: 'http://jeffi-stores-admin-service.jeffi.svc.cluster.local:3000' }
+            - { name: CRON_STORE_BASE, value: 'http://{slug}-admin-service.tenant-{slug}.svc.cluster.local:3000' }
             # Traces → Coroot in-cluster (the public k8s. URL is behind mTLS). Every request is traced (14-day retention).
             - { name: OTEL_SERVICE_NAME, value: jeffi-stores-controller-service }
             - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }
@@ -92,53 +96,6 @@ metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
 spec:
   selector: { app: controller-service, jeffi.io/tenant: jeffi-stores }
   ports: [{ name: http, port: 3000, targetPort: http }]
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata: { name: jeffi-stores-controller-service-cloudfront-origin, namespace: jeffi }
-spec:
-  entryPoints: [web]
-  routes:
-    - match: Host(`jeffistores.in`) || Host(`www.jeffistores.in`)
-      kind: Rule
-      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
-spec:
-  entryPoints: [websecure]
-  routes:
-    - match: >-
-        Host(`jeffistores.in`) || Host(`www.jeffistores.in`) || Host(`business.jeffistores.in`) ||
-        Host(`forms.jeffistores.in`) || Host(`certificate.jeffistores.in`) || Host(`ecom.jeffistores.in`) ||
-        Host(`vault.jeffistores.in`)
-      kind: Rule
-      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
-      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
-    # Hosts not claimed by a tenant namespace or a service route fall through here; unknown slugs 404.
-    - match: HostRegexp(`^[a-z0-9-]+\.jeffistores\.in$`) || HostRegexp(`^[a-z0-9-]+\.business\.jeffistores\.in$`)
-      priority: 2
-      kind: Rule
-      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
-      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
-  # No options: the TLSOption named `default` applies automatically (naming it is an error).
-  tls: {}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata: { name: jeffi-stores-controller-service-admin, namespace: jeffi }
-spec:
-  entryPoints: [websecure]
-  routes:
-    - match: Host(`admin.jeffistores.in`)
-      kind: Rule
-      middlewares:
-        - { name: strip-client-cert, namespace: jeffi-edge }
-        - { name: pass-client-cert, namespace: jeffi-edge }
-      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
-  tls:
-    options: { name: platform-mtls, namespace: jeffi-edge }
 ---
 # Two pods: the core has one vCPU (the account's EC2 limit), where more pods add no CPU. Back to 2→4 (and a
 # 300m request) on a bigger core.

@@ -18,9 +18,6 @@ export interface ResolvedCompute {
   nodeGen: number
 }
 
-/** The layout stores move to: their own storefront/admin/business services, or the old all-in-one app. */
-export const targetLayout = (): StoreLayout => (process.env.STORE_ROLES_ENABLED === 'true' ? 'services' : 'controller')
-
 // Provisioning must not stop on a price read, so a missing catalog falls back to the class table.
 export const catalogOrDefault = (): Promise<Catalog> => getCatalog().catch(() => ({ prices: [], settings: DEFAULT_SETTINGS }))
 
@@ -45,8 +42,9 @@ export async function resolveCompute(
   const row = await getTenantCompute(tenantId).catch(() => null)
   const chosen =
     computeSpecEnabled() && row ? (opts.which === 'applied' ? (row.applied ?? row.desired) : (row.desired ?? row.applied)) : null
-  // Rendered as the store runs now: only reconcileLayout switches layouts. A new store starts in the target one.
-  const layout = row?.applied ? (row.applied.layout ?? 'controller') : targetLayout()
+  // Rendered as the store runs now: only reconcileLayout moves a store off the old all-in-one app. A new store
+  // starts on its own services.
+  const layout: StoreLayout = row?.applied ? (row.applied.layout ?? 'controller') : 'services'
   const spec = { ...(opts.spec ? normalizeSpec(opts.spec) : (chosen ?? legacySpecFor(plan))), layout }
   return { spec, ...computeParams(spec, await catalogOrDefault(), plan), nodeGen: row?.node_gen ?? 0 }
 }

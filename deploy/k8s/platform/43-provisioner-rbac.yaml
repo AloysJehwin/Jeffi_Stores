@@ -49,5 +49,6 @@ data:
   K8S_NODE_IAM_PROFILE: jeffi-stores-ec2-profile
   # Applied EC2 On-Demand vCPU quota; blocks Growth+ sign-ups/upgrades with no room for a node. Raise when AWS approves.
   EC2_VCPU_QUOTA: '1'
-  # Basic tenants per shared pool node: each store runs controller + messaging + document pods.
-  POOL_NODE_CAPACITY: '4'
+  # Basic stores per shared pool node: each runs storefront, admin (and business on B2B plans), messaging and
+  # document pods.
+  POOL_NODE_CAPACITY: '3'

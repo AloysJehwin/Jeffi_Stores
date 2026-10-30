@@ -6,8 +6,9 @@ import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
-// Re-applies every active store's namespace, so each runs its controller, messaging and document pods
-// at the release images. deploy/k8s/bootstrap/rollout.sh calls it after the platform rolls; idempotent.
+// Re-applies every active store's namespace, so each runs its storefront, admin, business, messaging and
+// document pods at the release images (a store still on the old all-in-one app keeps that app's image until
+// switch-layout moves it). deploy/k8s/bootstrap/rollout.sh calls it after the platform rolls; idempotent.
 // ?slug= limits it to one store. Auth: Bearer ${CRON_SECRET}.
 export async function POST(request: NextRequest) {
   if (!verifyCronRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

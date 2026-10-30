@@ -65,6 +65,14 @@ async function tick() {
     results.push({ tenantId, step: 'compute_change', status: r.ok ? r.status : `error: ${r.error}` })
   }
 
+  // Stores part-way off the old all-in-one app (the release starts each move; see switch-layout).
+  const { dueLayoutSwitches } = await import('@controller/lib/compute/store')
+  const { reconcileLayout } = await import('@controller/lib/provisioning/layout-switch')
+  for (const tenantId of await dueLayoutSwitches().catch(() => [])) {
+    const r = await reconcileLayout(tenantId).catch((e: any) => ({ ok: false, status: 'error', detail: e?.message }))
+    results.push({ tenantId, step: 'layout_switch', status: r.ok ? `${r.status}${r.detail ? `: ${r.detail}` : ''}` : `error: ${r.detail}` })
+  }
+
   // Pool servers left empty (stores moved to their own servers or left) are terminated after an hour.
   const k8s = await import('@/lib/k8s/tenant-compute')
   if (k8s.k8sComputeEnabled()) {

@@ -148,3 +148,49 @@ describe('legacy store Deployment retirement', () => {
     ])
   })
 })
+
+describe('applyTenantWorkload – the old all-in-one app', () => {
+  const OLD = 'ecr/jeffi-stores-controller-service:old'
+  const deployments = () => k8s.apply.mock.calls.map(c => c[0]).filter((o: any) => o.kind === 'Deployment')
+  const removed = () => k8s.remove.mock.calls.map(c => `${c[0]}/${c[1]}`)
+  let running: any
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    running = { spec: { template: { spec: { containers: [{ name: 'app', image: OLD }] } } } }
+    k8s.get.mockImplementation(async (kind: string, name: string) =>
+      kind === 'ConfigMap' && name === 'release'
+        ? { data: { controller: 'ecr/jeffi-stores-controller-service:new', storefront: 'ecr/jeffi-stores-storefront-service:new' } }
+        : kind === 'Deployment' && name === 'acme-controller-service'
+          ? running
+          : kind === 'Secret' && name === 'redis'
+            ? {}
+            : null
+    )
+  })
+
+  it('keeps the image it runs, not the control-plane-only release image', async () => {
+    const { applyTenantWorkload } = await import('@/lib/k8s/tenant-compute')
+    await applyTenantWorkload({ slug: 'acme', plan: 'basic', hosts: ['acme.jeffistores.in'] })
+    const app = deployments().find((d: any) => d.metadata.name === 'acme-controller-service')
+    expect(app.spec.template.spec.containers[0].image).toBe(OLD)
+  })
+
+  it('refuses to start it anew', async () => {
+    running = null
+    const { applyTenantWorkload } = await import('@/lib/k8s/tenant-compute')
+    await expect(applyTenantWorkload({ slug: 'acme', plan: 'basic', hosts: ['acme.jeffistores.in'] })).rejects.toThrow(/only run its own services/)
+    expect(k8s.apply).not.toHaveBeenCalled()
+  })
+
+  it('stays up to drain while the routes move to the services, then goes', async () => {
+    const { applyTenantWorkload } = await import('@/lib/k8s/tenant-compute')
+    const input = { slug: 'acme', plan: 'basic', hosts: ['acme.jeffistores.in'], layout: 'services' as const }
+    await applyTenantWorkload(input, { keepApps: true })
+    expect(removed()).not.toContain('Deployment/acme-controller-service')
+    expect(removed()).toContain('IngressRoute/controller')
+    k8s.remove.mockClear()
+    await applyTenantWorkload(input)
+    expect(removed()).toContain('Deployment/acme-controller-service')
+  })
+})

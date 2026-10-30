@@ -25,10 +25,14 @@ Services:
 - `messaging-service` (SMS/email/WhatsApp send + templates library)
 - `document-service` (invoice/quotation/PO rendering + storage)
 - `public-api-service` (the public API gateway, `public.jeffistores.in`)
-- `mobile-service` (the mobile backend, `mobile.jeffistores.in`: the only host the Play Store app talks to; `/v1/app/*` is native, `/api/*` is forwarded to the controller in-cluster until each route gets its own handler). The Expo app itself lives in `mobile-service/client` and is built by EAS, not in an image.
+- `mobile-service` (the mobile backend, `mobile.jeffistores.in`: the only host the Play Store app talks to; `/v1/app/*` is native, `/api/*` is forwarded to the storefront in-cluster until each route gets its own handler). The Expo app itself lives in `mobile-service/client` and is built by EAS, not in an image.
 
-Each runs as its own k8s pod. The platform's are `jeffi-stores-<service>-service` (namespace `jeffi`); each store
-tenant runs `{slug}-{controller,messaging,document}-service` in `tenant-{slug}`; public-api and mobile are shared.
+Each runs as its own k8s pod, from its own image (the four Next apps share `deploy/next-app.Dockerfile`, built with
+`APP=<app>-service`). The platform's are `jeffi-stores-<service>-service` (namespace `jeffi`): the controller plus the
+flagship's storefront, admin and business. Each store tenant runs `{slug}-{storefront,admin,business,messaging,document}-service`
+in `tenant-{slug}` (business only from Pro); public-api and mobile are shared. Traefik routes every host by path from the
+same `ROUTES` table (`deploy/k8s/gen-routes.ts` renders the platform's, `lib/k8s/tenant-workload.ts` each store's), so a
+store has no controller pod: control-plane paths on its hosts 404.
 
 Every service connects to **the same database**:
 - **Local**: `jeffi_production_ready` (port 5432)

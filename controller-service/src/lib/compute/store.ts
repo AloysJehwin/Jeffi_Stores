@@ -49,6 +49,7 @@ export async function dueComputeChanges(): Promise<string[]> {
     `SELECT c.tenant_id FROM tenant_compute c JOIN tenants t ON t.id = c.tenant_id
      WHERE ((c.status IN ('pending','applying') AND t.status = 'active') OR c.progress ? 'oldDb')
        AND (c.next_at IS NULL OR c.next_at <= now())
+       AND NOT COALESCE(c.progress ? 'layout' AND NOT c.progress->'layout' ? 'failed', false)
      ORDER BY c.updated_at LIMIT 20`
   )
   return r.rows.map(x => x.tenant_id)
@@ -61,14 +62,18 @@ export async function getTenantCompute(tenantId: string): Promise<TenantCompute 
   return { ...row, desired: normalizeSpec(row.desired), applied: row.applied ? normalizeSpec(row.applied) : null }
 }
 
-/** Stores whose app pods run another layout than STORE_ROLES_ENABLED asks for, and no compute change is running. */
-export async function dueLayoutSwitches(target: 'controller' | 'services'): Promise<string[]> {
+/** True while the store is moving off the old all-in-one app (a failed move is not running). */
+export async function layoutSwitching(tenantId: string): Promise<boolean> {
+  const sw = (await getTenantCompute(tenantId))?.progress?.layout
+  return !!sw && !sw.failed
+}
+
+/** Stores part-way through leaving the old all-in-one app, to be resumed; a failed move waits for the release. */
+export async function dueLayoutSwitches(): Promise<string[]> {
   const r = await controlPlanePool().query<{ tenant_id: string }>(
     `SELECT c.tenant_id FROM tenant_compute c JOIN tenants t ON t.id = c.tenant_id
-     WHERE t.status = 'active' AND c.applied IS NOT NULL AND c.status NOT IN ('pending', 'applying')
-       AND (COALESCE(c.applied->>'layout', 'controller') <> $1 OR c.progress ? 'layout')
-     ORDER BY c.updated_at LIMIT 5`,
-    [target]
+     WHERE t.status = 'active' AND c.progress ? 'layout' AND NOT c.progress->'layout' ? 'failed'
+     ORDER BY c.updated_at LIMIT 5`
   )
   return r.rows.map(x => x.tenant_id)
 }

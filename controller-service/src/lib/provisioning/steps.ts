@@ -1171,6 +1171,12 @@ export async function reconcileK8sPlan(
   }
 
   try {
+    const { layoutSwitching } = await import('@controller/lib/compute/store')
+    if (await layoutSwitching(tenantId)) {
+      delete created.k8sPlanNextAt
+      await save({ k8sPendingPlan: tenant.plan })
+      return { ok: true, added, removed, error: 'pending: the store is moving to its own services' }
+    }
     const k8s = await import('@/lib/k8s/tenant-compute')
     const { resolveCompute } = await import('@controller/lib/compute/resolve')
     // What runs now: the store's applied choice, or (until owners choose) its plan's tier.
