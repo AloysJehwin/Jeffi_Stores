@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runWithAuditActor } from '@/lib/auth/audit-context'
-import crypto from 'crypto'
 import { lookupTenantContextBySlug } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
-import { isSubscriptionEvent, processSubscriptionEvent } from '@/lib/subscriptions/cycle'
-
-function safeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a)
-  const bb = Buffer.from(b)
-  return ab.length === bb.length && crypto.timingSafeEqual(ab, bb)
-}
+import { dispatchRazorpayEvent, TransientWebhookError, verifyRazorpaySignature } from '@/lib/payments/razorpay-events/dispatch'
 
 /**
- * Own-key tenants' Razorpay webhook. Events are signed with the tenant's OWN webhook secret and
- * never touch the platform index; the tenant is the URL slug and its DB is the only one written.
- * Only subscription events are handled here; anything else is acked.
+ * Own-key stores' Razorpay webhook. Events are signed with the store's OWN webhook secret; the store is
+ * the URL slug and its DB is the only one written. Route events (transfer.*) never come from here.
  */
 async function handle(request: NextRequest, { params }: { params: Promise<{ tenant: string }> }) {
   const { tenant: slug } = await params
@@ -30,20 +22,19 @@ async function handle(request: NextRequest, { params }: { params: Promise<{ tena
     return NextResponse.json({ error: 'retry' }, { status: 503 })
   }
   if (!ctx) return NextResponse.json({ error: 'Unknown store' }, { status: 404 })
+  const store = ctx
 
-  return runWithTenantContext(ctx, async () => {
+  return runWithTenantContext(store, async () => {
     let secret: string | undefined
     try {
-      const creds = await resolveRazorpayCreds(ctx.tenantId)
+      const creds = await resolveRazorpayCreds(store.tenantId)
       // Never accept the platform secret here: that would let platform-signed events bypass the index.
       secret = creds.isOwn ? creds.webhook_secret : undefined
     } catch {
       return NextResponse.json({ error: 'retry' }, { status: 503 })
     }
     if (!secret) return NextResponse.json({ error: 'Webhook not configured' }, { status: 404 })
-
-    const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
-    if (!safeEqual(expected, signature)) return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    if (!verifyRazorpaySignature(rawBody, signature, secret)) return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
 
     let event: any
     try {
@@ -51,14 +42,20 @@ async function handle(request: NextRequest, { params }: { params: Promise<{ tena
     } catch {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
     }
-    const eventType = String(event?.event ?? '')
-    if (!isSubscriptionEvent(eventType)) return NextResponse.json({ status: 'ok' })
 
     try {
-      await processSubscriptionEvent(eventType, event, { tenantId: ctx.tenantId, slug: ctx.slug })
+      await dispatchRazorpayEvent(event, {
+        source: 'own',
+        store: { tenantId: store.tenantId, slug: store.slug, ctx: store },
+        eventId: request.headers.get('x-razorpay-event-id'),
+        accountId: event?.account_id ?? null,
+      })
     } catch (err) {
-      console.error('[webhook:razorpay/tenant] subscription handler failed', { slug, eventType, err })
-      return NextResponse.json({ error: 'retry' }, { status: 503 })
+      if (err instanceof TransientWebhookError) {
+        console.error('[webhook:razorpay/tenant] retryable failure', { slug, event: event?.event, err })
+        return NextResponse.json({ error: 'retry' }, { status: 503 })
+      }
+      console.error('[webhook:razorpay/tenant] handler failed', { slug, event: event?.event, err })
     }
     return NextResponse.json({ status: 'ok' })
   })
