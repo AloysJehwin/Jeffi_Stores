@@ -135,6 +135,25 @@ export async function updateTenantPlan(
   )
 }
 
+/** A downgrade waiting for the paid cycle to end (null clears it). */
+export async function setPendingPlan(tenantId: string, pending: { planSlug: string; billingInterval: string } | null): Promise<void> {
+  await controlPlanePool().query(
+    `UPDATE tenants SET pending_plan_id = (SELECT id FROM plans WHERE slug = $2), pending_billing_interval = $3, updated_at = now() WHERE id = $1`,
+    [tenantId, pending?.planSlug ?? null, pending?.billingInterval ?? null]
+  )
+}
+
+/** Move the store onto its waiting downgrade, if it has one; returns the plan it moved to. */
+export async function applyPendingPlan(tenantId: string): Promise<string | null> {
+  const r = await controlPlanePool().query<{ slug: string }>(
+    `UPDATE tenants t SET plan_id = t.pending_plan_id, billing_interval = COALESCE(t.pending_billing_interval, t.billing_interval),
+            pending_plan_id = NULL, pending_billing_interval = NULL, updated_at = now()
+       FROM plans p WHERE t.id = $1 AND p.id = t.pending_plan_id RETURNING p.slug`,
+    [tenantId]
+  )
+  return r.rows[0]?.slug ?? null
+}
+
 export async function setTenantInstanceState(tenantId: string, state: 'running' | 'stopped' | 'migrating' | 'paused'): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(`UPDATE tenants SET instance_state=$1, updated_at=now() WHERE id=$2`, [state, tenantId])
