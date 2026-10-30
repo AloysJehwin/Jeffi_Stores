@@ -139,7 +139,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { app: controller, run: npx tsc --noEmit } # root tsconfig: the app, tests and integration tests
+          - { app: controller, run: npx tsc --noEmit } # root tsconfig: every Next app, store-core, and their tests
           - { app: messaging, run: npm --prefix messaging-service run typecheck }
           - { app: documents, run: npm --prefix document-service run typecheck }
           - { app: public-api, run: npm --prefix public-api-service run typecheck }

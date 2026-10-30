@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./packages/store-core/tests/setup.ts'],
     pool: 'forks',
     // @ts-expect-error poolOptions not yet in vitest v4 InlineConfig types
     poolOptions: {
@@ -24,7 +24,14 @@ export default defineConfig({
       GOOGLE_CLIENT_ID: 'test-google-client-id',
       SERVICE_AUTH_SECRET: 'test-service-auth-secret',
     },
-    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+    // One project per app or package, each running its own tests/. `npx vitest --project admin` runs one.
+    projects: [
+      ['store-core', 'packages/store-core'],
+      ['storefront', 'storefront-service'],
+      ['admin', 'admin-service'],
+      ['business', 'business-service'],
+      ['controller', 'controller-service'],
+    ].map(([name, dir]) => ({ extends: true as const, test: { name, include: [`${dir}/tests/**/*.test.{ts,tsx}`] } })),
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'json-summary', 'json'],
