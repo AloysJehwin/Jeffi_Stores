@@ -15,6 +15,7 @@ import { CodRemittanceTab } from './_components/CodRemittanceTab'
 import { MessagingTab } from './_components/MessagingTab'
 import { AiCostsTab } from './_components/AiCostsTab'
 import { DisputesTab } from './_components/DisputesTab'
+import { RazorpaySettlementsTab } from './_components/RazorpaySettlementsTab'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -24,12 +25,13 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'pl', label: 'P&L' },
   { key: 'cashflow', label: 'Cashflow' },
   { key: 'cod_remittance', label: 'COD Remittance' },
+  { key: 'razorpay', label: 'Razorpay settlements' },
   { key: 'disputes', label: 'Disputes' },
   { key: 'messaging', label: 'Messaging' },
   { key: 'ai_costs', label: 'AI costs' },
 ]
 
-export default function FinancialClient() {
+export default function FinancialClient({ razorpayTab }: { razorpayTab: boolean }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const tabParam = searchParams.get('tab') as Tab | null
@@ -41,6 +43,7 @@ export default function FinancialClient() {
     'pl',
     'cashflow',
     'cod_remittance',
+    ...(razorpayTab ? (['razorpay'] as Tab[]) : []),
     'disputes',
     'messaging',
     'ai_costs',
@@ -83,7 +86,7 @@ export default function FinancialClient() {
 
   return (
     <div className="space-y-5">
-      <Tabs tabs={TABS.map(t => ({ id: t.key, label: t.label }))} value={tab} onChange={handleTabChange} />
+      <Tabs tabs={TABS.filter(t => validTabs.includes(t.key)).map(t => ({ id: t.key, label: t.label }))} value={tab} onChange={handleTabChange} />
 
       <div>
         {tab === 'overview' && <OverviewTab />}
@@ -93,6 +96,7 @@ export default function FinancialClient() {
         {tab === 'pl' && <PLTab />}
         {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
         {tab === 'cod_remittance' && <CodRemittanceTab />}
+        {tab === 'razorpay' && razorpayTab && <RazorpaySettlementsTab />}
         {tab === 'disputes' && <DisputesTab />}
         {tab === 'messaging' && <MessagingTab />}
         {tab === 'ai_costs' && <AiCostsTab />}

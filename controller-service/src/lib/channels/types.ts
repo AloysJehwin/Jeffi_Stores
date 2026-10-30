@@ -1,4 +1,4 @@
-export const CHANNELS = ['gmc', 'amazon', 'amazon_ads', 'meta_ads', 'social'] as const
+export const CHANNELS = ['gmc', 'amazon', 'amazon_ads', 'meta_ads', 'social', 'razorpay'] as const
 export type Channel = (typeof CHANNELS)[number]
 
 export type Severity = 'info' | 'warning' | 'critical'
@@ -15,6 +15,7 @@ export const CHANNEL_INFO: Record<Channel, { label: string; path: string; readSc
   amazon_ads: { label: 'Amazon Ads', path: '/amazon-ads', readScope: 'amazon_ads:read' },
   meta_ads: { label: 'Meta Ads', path: '/meta-ads', readScope: 'meta_ads:read' },
   social: { label: 'Social', path: '/social-posts', readScope: 'social:read' },
+  razorpay: { label: 'Razorpay', path: '/financial?tab=razorpay', readScope: 'financial:read' },
 }
 
 // Advisory lock keys, one per channel job. Existing keys elsewhere: 84219575/6 (Amazon push and
@@ -34,5 +35,7 @@ export const CHANNEL_LOCKS = {
   social_insights: 84219641,
   social_inbox: 84219642,
   social_catalog: 84219643,
+  razorpay_settlements: 84219651,
+  razorpay_sweep: 84219652,
 } as const
 export type ChannelLock = keyof typeof CHANNEL_LOCKS
