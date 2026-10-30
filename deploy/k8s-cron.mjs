@@ -1,13 +1,15 @@
 // k8s CronJob entrypoint: call one cron route on the in-cluster app, then record the run so
 // /api/admin/cron/status keeps working. Usage: node deploy/k8s-cron.mjs <jobId> <METHOD> <path>
 const [jobId, method, path] = process.argv.slice(2)
-const base = process.env.CRON_TARGET || 'http://jeffi-stores-controller-service.jeffi.svc.cluster.local:3000'
+// Runs are recorded on the controller; a job may run on another app (CRON_TARGET, e.g. the flagship's admin).
+const controller = 'http://jeffi-stores-controller-service.jeffi.svc.cluster.local:3000'
+const base = process.env.CRON_TARGET || controller
 const headers = { Host: process.env.CRON_HOST || 'jeffistores.in', Authorization: `Bearer ${process.env.CRON_SECRET}` }
 const timeoutMs = Number(process.env.CRON_TIMEOUT_MS || 290_000)
 
 async function record(ok, errorMsg, detail) {
   try {
-    await fetch(`${base}/api/internal/cron-record`, {
+    await fetch(`${controller}/api/internal/cron-record`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId, ok, errorMsg, detail }),

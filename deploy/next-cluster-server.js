@@ -1,3 +1,4 @@
+// Entry for each Next app's image (deploy/next-app.Dockerfile copies it beside the app's standalone server.js).
 const cluster = require('cluster')
 const os = require('os')
 

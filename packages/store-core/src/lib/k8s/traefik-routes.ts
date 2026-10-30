@@ -8,9 +8,10 @@ import { ROUTES, type AppName, type HostClass, type PathMatch } from '@/lib/serv
 export const EDGE_NS = 'jeffi-edge'
 export const STRIP_ASSET_PREFIX = { name: 'strip-asset-prefix', namespace: EDGE_NS }
 
-// Bands: a store's or the platform's named hosts; the platform's catch-all for hosts no store claims; and
+// Bands: a store's or the platform's named hosts; the platform's catch-all for hosts no store claims, below
+// every route left at Traefik's default priority (its rule's length; public-api, mobile, documents); and
 // routes that must beat both on a shared host (a store's own-key webhook on the platform host).
-export const PRIORITY_BAND = { named: 1000, catchAll: 100, override: 2000 } as const
+export const PRIORITY_BAND = { named: 1000, catchAll: 0, override: 2000 } as const
 
 export interface HostGroup {
   classes: Exclude<HostClass, 'any'>[]

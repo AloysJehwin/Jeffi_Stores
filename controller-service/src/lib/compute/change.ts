@@ -41,6 +41,9 @@ export async function checkComputeChange(tenantId: string, spec: ComputeSpec, op
   }
   const row = await getTenantCompute(tenantId)
   if (row?.status === 'applying') return { status: 409, error: 'A change is still being applied. Try again once it has finished.' }
+  if (row?.progress?.layout && !row.progress.layout.failed) {
+    return { status: 409, error: 'The store is moving to its own services. Try again in a few minutes.' }
+  }
   const plan = await planCompute(tenant.plan ?? '')
   if (!plan) return { status: 400, error: 'Unknown plan.' }
   const catalog = await getCatalog()

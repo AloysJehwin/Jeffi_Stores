@@ -2,12 +2,12 @@ name: Jeffi Stores Pipeline
 
 # One pipeline, one card per stage. Per-app stages are matrices (one job per app inside the card).
 #
-#   Init ─┬→ Lint (5) ────────┬→ Build (5) ───────┐
+#   Init ─┬→ Lint (5) ────────┬→ Build (9) ───────┐
 #         ├→ Type check (5) ──┘                    │
 #         ├→ Security                              ├→ Checks passed (required status; on a release, the approval)
 #         ├→ Unit tests (5) ───────────────────────┤
 #         ├→ Integration tests ────────────────────┘
-#         └→ Images (4, release only, after Lint and Type check)
+#         └→ Images (8, release only, after Lint and Type check)
 #
 # Release (push to main, or workflow_dispatch with deploy=true): Checks passed waits for the one approval, then:
 #   Checks passed (approval) ─┬→ DB · flagship schema ─────┬→ Deploy · flagship ───┬→ Smoke · flagship ─────────┬→ Deploy · tenants
@@ -218,9 +218,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The Next app compiles here; the services run their TypeScript directly, so their build is the image
+          # The Next apps compile here; the services run their TypeScript directly, so their build is the image
           # (arm64 like production, not pushed). The service caches are shared with the release Images stage.
           - { app: controller, runner: ubuntu-latest, kind: next }
+          - { app: storefront, runner: ubuntu-latest, kind: next }
+          - { app: admin, runner: ubuntu-latest, kind: next }
+          - { app: business, runner: ubuntu-latest, kind: next }
           - { app: messaging, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target messaging . }
           - { app: documents, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target documents . }
           - { app: public-api, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target public-api . }
@@ -232,7 +235,7 @@ jobs:
         uses: ./.github/actions/node-setup
       - name: Next.js build
         if: matrix.kind == 'next'
-        run: npm run build
+        run: npm run build:${{ matrix.app }}
         env:
           NODE_OPTIONS: --max-old-space-size=6144
           DATABASE_URL: postgresql://localhost:5432/dummy
@@ -264,7 +267,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        service: [controller, messaging, documents, public-api, mobile]
+        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile]
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:

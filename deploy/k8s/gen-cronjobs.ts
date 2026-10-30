@@ -8,7 +8,7 @@ export const CRONJOBS_PATH = join(__dirname, 'platform', 'cronjobs.yaml')
 
 const k8sName = (id: string) => `cron-${id.replace(/_/g, '-')}`
 
-function render(job: CronJob, extra?: { id: string; method: string; path: string; schedule: string }): string {
+function render(job: CronJob, extra?: { id: string; method: string; path: string; schedule: string; target?: string }): string {
   const id = extra?.id ?? job.id
   const schedule = extra?.schedule ?? cronSchedule(job)
   // Registry jobs with a tenantScope go through the per-tenant fan-out (flagship + every active
@@ -52,16 +52,18 @@ spec:
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
-              resources:
+${extra?.target ? `                - { name: CRON_TARGET, value: '${extra.target}' }\n` : ''}              resources:
                 requests: { cpu: 10m, memory: 48Mi }
                 limits: { memory: 128Mi }
 `
 }
 
 // Nightly feed syncs previously installed as a host crontab (deploy/sync-cron-setup.sh).
+// The flagship's feed syncs are admin routes, so they run on its admin service.
+const FLAGSHIP_ADMIN = 'http://jeffi-stores-admin-service.jeffi.svc.cluster.local:3000'
 const FEED_SYNCS = [
-  { id: 'merchant_sync', method: 'GET', path: '/api/admin/merchant/sync', schedule: '15 23 * * *' },
-  { id: 'amazon_sync', method: 'GET', path: '/api/admin/merchant/amazon/sync', schedule: '45 23 * * *' },
+  { id: 'merchant_sync', method: 'GET', path: '/api/admin/merchant/sync', schedule: '15 23 * * *', target: FLAGSHIP_ADMIN },
+  { id: 'amazon_sync', method: 'GET', path: '/api/admin/merchant/amazon/sync', schedule: '45 23 * * *', target: FLAGSHIP_ADMIN },
 ]
 
 export function renderCronJobs(): string {

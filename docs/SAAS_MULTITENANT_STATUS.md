@@ -15,13 +15,15 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 
 ## Service pods and go-live (2026-10-14)
 
-- The Next app is `controller-service/` (was `src/`). Every service runs as its own pod:
-  - platform (`jeffi`): `jeffi-stores-{controller,messaging,document,public-api}-service`;
-  - each store tenant (`tenant-{slug}`): `{slug}-{controller,messaging,document}-service`, sized from the store's compute spec (below) and pinned with `SERVICE_TENANT_SLUG`;
-  - public-api is shared.
+- The Next app is split (2026-10-30) into `controller-service/` (the control plane only), `storefront-service/`, `admin-service/` and `business-service/`, sharing `packages/store-core` ([`MICROSERVICES.md`](MICROSERVICES.md)). Every service runs as its own pod, from its own image:
+  - platform (`jeffi`): `jeffi-stores-{controller,storefront,admin,business,messaging,document,public-api,mobile}-service`; the storefront, admin and business pods serve the flagship;
+  - each store tenant (`tenant-{slug}`): `{slug}-{storefront,admin,business,messaging,document}-service` (business from Pro), sized from the store's compute spec (below) and pinned with `SERVICE_TENANT_SLUG`;
+  - public-api and mobile are shared.
+- Routing is one table, `ROUTES` in `packages/store-core/src/lib/service-routing.ts`: each app's middleware gate, the local dev router and both ingress renderers (`deploy/k8s/gen-routes.ts` → `platform/49-routes.yaml`, `lib/k8s/tenant-workload.ts`) follow it, and tests check the rendered routes against it.
+- Crons: store jobs run on the store's own admin pod (`CRON_STORE_BASE`), the flagship's on `jeffi-stores-admin-service`; platform jobs stay on the controller.
 - A pinned pod serves and runs background loops for its own tenant only; the platform's pods skip store tenants (`SERVICE_SKIP_STORE_TENANTS`, `packages/tenancy/src/service-scope.ts`).
 - Routes: `public.` → public-api (`/webhooks/` → messaging); `invoice.`/`quotation.`/`purchaseorder.` → the platform document-service; `invoice-`/`quotation-`/`purchaseorder-{slug}.` → the store's own document-service.
-- Existing stores move to the new layout through `POST /api/internal/provisioning/reconcile-k8s`, which `rollout.sh` runs.
+- Existing stores re-apply at the release images through `POST /api/internal/provisioning/reconcile-k8s`; a store still on the old all-in-one app keeps that app's image. `rollout.sh` then moves each onto its own services, one at a time, with `POST /api/internal/provisioning/switch-layout?slug=` (`lib/provisioning/layout-switch.ts`): the services start beside the old app, the routes move once they are Ready, the old app drains and goes. A store that can't start its services goes back to the old app and the release stops; the provisioning worker resumes a move left half done. Compute changes wait while a store moves.
 - Production DB: the control plane merges into `jeffi_stores` at go-live (`CONTROL_PLANE_RDS_DB=jeffi_stores`); `jeffi_control_plane` stays a week as the fallback.
 - Releases without CI: `deploy/k8s/bootstrap/release.sh`. DB changes are user-run scripts in `deploy/k8s/db/`. Go-live steps: [`GO_LIVE_RUNBOOK.md`](GO_LIVE_RUNBOOK.md).
 - **Live state:** not deployed yet; production runs `5c4ffbf4`.
