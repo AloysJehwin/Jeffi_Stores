@@ -28,7 +28,8 @@ spec:
           image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-storefront-service:latest
           ports: [{ name: http, containerPort: 3000 }]
           env:
-            - { name: SM_SECRET_ID, value: jeffi/production }
+            - { name: SM_SECRET_ID, value: jeffi/store }
+            - { name: SM_SECRET_FALLBACK_ID, value: jeffi/production }
             - { name: WEB_CONCURRENCY, value: '1' }
             - { name: IN_PROCESS_CRON, value: 'false' }
             - { name: CLIENT_CERT_PROXY, value: traefik }
@@ -126,7 +127,8 @@ spec:
           image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-admin-service:latest
           ports: [{ name: http, containerPort: 3000 }]
           env:
-            - { name: SM_SECRET_ID, value: jeffi/production }
+            - { name: SM_SECRET_ID, value: jeffi/store }
+            - { name: SM_SECRET_FALLBACK_ID, value: jeffi/production }
             - { name: WEB_CONCURRENCY, value: '1' }
             - { name: IN_PROCESS_CRON, value: 'false' }
             - { name: CLIENT_CERT_PROXY, value: traefik }
@@ -222,7 +224,8 @@ spec:
           image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-business-service:latest
           ports: [{ name: http, containerPort: 3000 }]
           env:
-            - { name: SM_SECRET_ID, value: jeffi/production }
+            - { name: SM_SECRET_ID, value: jeffi/store }
+            - { name: SM_SECRET_FALLBACK_ID, value: jeffi/production }
             - { name: WEB_CONCURRENCY, value: '1' }
             - { name: IN_PROCESS_CRON, value: 'false' }
             - { name: CLIENT_CERT_PROXY, value: traefik }
