@@ -13,7 +13,7 @@ vi.mock('@/lib/shared/db', () => ({
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/(admin)/admin/financial/payables/webhook/route'
-import { query } from '@/lib/shared/db'
+import { query, queryOne } from '@/lib/shared/db'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -37,6 +37,7 @@ function makeReq(body: object, signature?: string) {
 }
 
 const mockQuery = vi.mocked(query)
+const mockQueryOne = vi.mocked(queryOne)
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
@@ -146,12 +147,11 @@ describe('POST /api/admin/financial/payables/webhook', () => {
       event: 'payout.failed',
       payload: { payout: { entity: { id: 'pay_004', status: 'failed' } } },
     }
-    mockQuery
-      .mockResolvedValueOnce([] as any) // UPDATE payout_status
-      .mockResolvedValueOnce([{ expense_id: 'exp-1' }] as any) // SELECT expense_id
-      .mockResolvedValueOnce([{ paid: '0' }] as any) // SUM paid
-      .mockResolvedValueOnce([{ total_amount: '1000' }] as any) // total_amount
-      .mockResolvedValueOnce([] as any) // UPDATE expenses status
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ expense_id: 'exp-1' } as any)
+      .mockResolvedValueOnce({ paid: '0' } as any)
+      .mockResolvedValueOnce({ total_amount: '1000' } as any)
 
     const res = await POST(makeReq(body))
     expect(res.status).toBe(200)
@@ -165,12 +165,11 @@ describe('POST /api/admin/financial/payables/webhook', () => {
       event: 'payout.reversed',
       payload: { payout: { entity: { id: 'pay_005', status: 'reversed' } } },
     }
-    mockQuery
-      .mockResolvedValueOnce([] as any)
-      .mockResolvedValueOnce([{ expense_id: 'exp-2' }] as any)
-      .mockResolvedValueOnce([{ paid: '400' }] as any)
-      .mockResolvedValueOnce([{ total_amount: '1000' }] as any)
-      .mockResolvedValueOnce([] as any)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ expense_id: 'exp-2' } as any)
+      .mockResolvedValueOnce({ paid: '400' } as any)
+      .mockResolvedValueOnce({ total_amount: '1000' } as any)
 
     const res = await POST(makeReq(body))
     expect(res.status).toBe(200)
@@ -183,12 +182,11 @@ describe('POST /api/admin/financial/payables/webhook', () => {
       event: 'payout.failed',
       payload: { payout: { entity: { id: 'pay_006', status: 'failed' } } },
     }
-    mockQuery
-      .mockResolvedValueOnce([] as any)
-      .mockResolvedValueOnce([{ expense_id: 'exp-3' }] as any)
-      .mockResolvedValueOnce([{ paid: '1000' }] as any)
-      .mockResolvedValueOnce([{ total_amount: '1000' }] as any)
-      .mockResolvedValueOnce([] as any)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ expense_id: 'exp-3' } as any)
+      .mockResolvedValueOnce({ paid: '1000' } as any)
+      .mockResolvedValueOnce({ total_amount: '1000' } as any)
 
     const res = await POST(makeReq(body))
     expect(res.status).toBe(200)
