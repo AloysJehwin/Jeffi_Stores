@@ -55,6 +55,12 @@ export async function resolveSubscriptionTenant(subscriptionEntity: any): Promis
   return toWebhookTenant(indexedTenantId)
 }
 
+/** A store named by our own server-set notes (payouts, orders we created). Null = unknown store. */
+export function scopeForTenantId(tenantId: string | null | undefined): Promise<WebhookTenant | null> {
+  const id = (tenantId ?? '').toString().trim()
+  return id ? toWebhookTenant(id) : Promise.resolve(null)
+}
+
 async function toWebhookTenant(tenantId: string): Promise<WebhookTenant | null> {
   // The flagship (platform) store has no dedicated infra row, so lookupTenantContextById returns
   // null for it — that's correct, it runs on the default pool with no tenant context.

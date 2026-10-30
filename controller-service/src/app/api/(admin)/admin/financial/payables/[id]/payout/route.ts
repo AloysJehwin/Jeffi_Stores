@@ -4,6 +4,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { parseBody, zCurrency } from '@/lib/shared/validate'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
 
 const PayoutSchema = z.object({
   mode: z.enum(['NEFT', 'RTGS', 'IMPS', 'UPI']),
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!expense) return NextResponse.json({ error: 'Expense not found' }, { status: 404 })
 
     const payAmount = amount
+    const tenant = await resolveTenant().catch(() => null)
 
     if (mode === 'UPI' && !expense.upi_id) {
       return NextResponse.json({ error: 'Supplier has no UPI ID on file' }, { status: 400 })
@@ -111,6 +113,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       queue_if_low_balance: true,
       narration,
       reference_id: expense.id,
+      // The payout webhook finds the store's DB from these.
+      notes: tenant ? { tenant_id: tenant.tenantId, tenant_slug: tenant.slug } : {},
     })
 
     const payment_date = new Date().toISOString().slice(0, 10)
