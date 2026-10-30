@@ -8,6 +8,8 @@ import { describeChange } from '@controller/lib/compute/changes'
 import { specKey } from '@/lib/compute/presets'
 import type { ComputeSpec } from '@/lib/compute/spec'
 import { Card, Row } from '../_components/Card'
+import ServersNotice from '../_components/ServersNotice'
+import type { ServersBilling } from '@controller/lib/billing/infra-status'
 
 type ApplyMode = 'window' | 'now'
 
@@ -33,6 +35,8 @@ export default function ComputeClient({
   current,
   change,
   rateInrHour,
+  paused,
+  servers,
 }: {
   tenantId: string
   planSlug: string
@@ -40,6 +44,8 @@ export default function ComputeClient({
   current: ComputeSpec
   change: { desired: ComputeSpec; status: string; error: string | null; applyMode: ApplyMode } | null
   rateInrHour: number | null
+  paused: boolean
+  servers: ServersBilling | null
 }) {
   const router = useRouter()
   const [choice, setChoice] = useState<ComputeChoice | null>(null)
@@ -68,6 +74,7 @@ export default function ComputeClient({
 
   return (
     <div className="space-y-6">
+      {servers && <ServersNotice servers={servers} />}
       <Card title="Running now">
         <div className="space-y-2">
           <Row label="Servers" value={summary(current)} />
@@ -87,7 +94,9 @@ export default function ComputeClient({
       </Card>
 
       <Card title="Change servers">
-        {busy ? (
+        {paused ? (
+          <p className="text-sm text-foreground-secondary">Your store is paused. You can change its servers once it runs again.</p>
+        ) : busy ? (
           <p className="text-sm text-foreground-secondary">A change is being applied. You can make another once it has finished.</p>
         ) : (
           <div className="space-y-6">

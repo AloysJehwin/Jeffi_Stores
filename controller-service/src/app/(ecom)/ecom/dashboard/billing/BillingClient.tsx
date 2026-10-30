@@ -148,6 +148,12 @@ export default function BillingClient({
               Next renewal: <span className="text-foreground font-medium">{renewalDate}</span>
             </div>
           )}
+          {tenant.pending_plan && (
+            <div className="w-full text-sm text-foreground-muted">
+              Moves to <span className="text-foreground font-medium">{plans.find(p => p.slug === tenant.pending_plan)?.name ?? tenant.pending_plan}</span>
+              {tenant.pending_billing_interval ? ` (${tenant.pending_billing_interval})` : ''} at the next renewal.
+            </div>
+          )}
         </div>
         {tenant.razorpay_subscription_id && (
           <div className="text-xs text-foreground-muted mt-3 font-mono">{tenant.razorpay_subscription_id}</div>

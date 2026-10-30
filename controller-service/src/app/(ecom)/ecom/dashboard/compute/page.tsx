@@ -2,6 +2,7 @@ import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { computeSpecEnabled, planCompute } from '@controller/lib/compute/catalog'
 import { legacySpecFor } from '@/lib/compute/legacy'
 import { getTenantCompute } from '@controller/lib/compute/store'
+import { serversBilling } from '@controller/lib/billing/infra-status'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
 import ComputeClient from './ComputeClient'
@@ -24,7 +25,11 @@ export default async function ComputePage({ searchParams }: { searchParams: Prom
       </>
     )
   }
-  const [row, plan] = await Promise.all([getTenantCompute(tenant.id), planCompute(tenant.plan ?? '')])
+  const [row, plan, servers] = await Promise.all([
+    getTenantCompute(tenant.id),
+    planCompute(tenant.plan ?? ''),
+    serversBilling(tenant.id).catch(() => null),
+  ])
   const current = row?.applied ?? legacySpecFor(tenant.plan)
   return (
     <>
@@ -35,11 +40,13 @@ export default async function ComputePage({ searchParams }: { searchParams: Prom
         planFeeInr={plan?.monthlyPriceInr ?? 0}
         current={current}
         change={
-          row && row.status !== 'applied'
+          row && row.status !== 'applied' && row.status !== 'paused'
             ? { desired: row.desired, status: row.status, error: row.last_error, applyMode: row.apply_mode }
             : null
         }
         rateInrHour={row?.rate_inr_hour ? Number(row.rate_inr_hour) : null}
+        paused={row?.status === 'paused'}
+        servers={servers}
       />
     </>
   )
