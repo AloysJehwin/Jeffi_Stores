@@ -4,6 +4,7 @@ import { lookupTenantContextBySlug } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { dispatchRazorpayEvent, TransientWebhookError, verifyRazorpaySignature } from '@/lib/payments/razorpay-events/dispatch'
+import { noteRazorpayWebhook } from '@/lib/payments/rzp-webhook-health'
 
 /**
  * Own-key stores' Razorpay webhook. Events are signed with the store's OWN webhook secret; the store is
@@ -35,6 +36,7 @@ async function handle(request: NextRequest, { params }: { params: Promise<{ tena
     }
     if (!secret) return NextResponse.json({ error: 'Webhook not configured' }, { status: 404 })
     if (!verifyRazorpaySignature(rawBody, signature, secret)) return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    noteRazorpayWebhook(store.tenantId)
 
     let event: any
     try {

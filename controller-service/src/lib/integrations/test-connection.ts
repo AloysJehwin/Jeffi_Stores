@@ -81,3 +81,29 @@ export async function testGoogleAds(tenantId?: string | null): Promise<Connectio
     return failure(e)
   }
 }
+
+/** Live check of a Razorpay key pair: one authenticated read. Mode comes from the key's prefix. */
+export async function verifyRazorpayKeys(keyId: string, keySecret: string): Promise<ConnectionTestResult> {
+  if (!/^rzp_(live|test)_[A-Za-z0-9]+$/.test(keyId)) return { ok: false, message: 'The key id should look like rzp_live_… or rzp_test_….' }
+  try {
+    const { default: Razorpay } = await import('razorpay')
+    await new Razorpay({ key_id: keyId, key_secret: keySecret }).payments.all({ count: 1 })
+    return { ok: true, message: `Reached Razorpay with ${keyId.startsWith('rzp_live_') ? 'live' : 'test'} keys.` }
+  } catch (e: any) {
+    const status = Number(e?.statusCode ?? e?.status)
+    if (status === 401) return { ok: false, message: 'Razorpay rejected these keys. Check the key id and secret.' }
+    return failure(e?.error?.description ?? e)
+  }
+}
+
+/** The store's Razorpay keys (its own, or the platform's) against Razorpay. */
+export async function testRazorpay(tenantId?: string): Promise<ConnectionTestResult> {
+  try {
+    const { resolveRazorpayCreds } = await import('./resolve')
+    const creds = await resolveRazorpayCreds(tenantId)
+    if (!creds.key_id || !creds.key_secret) return { ok: false, message: 'No Razorpay keys are set.' }
+    return verifyRazorpayKeys(creds.key_id, creds.key_secret)
+  } catch (e) {
+    return failure(e)
+  }
+}
