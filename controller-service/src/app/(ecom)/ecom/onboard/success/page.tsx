@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { getOwnerTenants, setSubscriptionStatus } from '@/lib/tenant-registry'
 import { getSubscription } from '@controller/lib/payments/razorpay-subscriptions'
-import { triggerProvisioning, resolveRestoreKey } from '@controller/lib/provisioning/trigger'
+import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import PurchaseBeacon from './PurchaseBeacon'
 
@@ -38,20 +38,10 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
     const paid = sub && ['active', 'authenticated', 'charged'].includes(sub.status)
     if (paid) {
       paidNow = true
-      // Payment confirmed → flip to 'provisioning' and kick the engine (only place provisioning
-      // starts). Do NOT set 'active' — only the engine's activate step does, after infra exists.
-      // Reliable local path (no webhook) + webhook fallback; enqueueProvisioning is idempotent.
-      await setSubscriptionStatus(tenant.id, 'active', 'provisioning')
-      const restoreFromKey = await resolveRestoreKey(tenant.id, tenant.slug)
-      await triggerProvisioning({
-        action: 'provision',
-        tenantId: tenant.id,
-        slug: tenant.slug,
-        plan: tenant.plan,
-        ownerId: owner.id,
-        restoreFromKey,
-        reason: 'first_payment',
-      }).catch(() => {})
+      // The plan is paid (the reliable path locally, and a fallback for a late webhook). The store is
+      // built once its wallet also holds the servers' first days; until then /onboard asks for them.
+      await setSubscriptionStatus(tenant.id, 'active')
+      if (!(await startStoreIfReady(tenant.id))) redirect('/onboard?paid=1')
     }
   }
 

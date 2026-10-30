@@ -5,6 +5,9 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import OnboardEntry from './OnboardEntry'
 import OnboardWizard from './OnboardWizard'
 import PaymentTrigger from './PaymentTrigger'
+import FundServers from './FundServers'
+import { storePrepay } from '@controller/lib/billing/prepay'
+import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 import { computeSpecEnabled } from '@controller/lib/compute/catalog'
 
 export const dynamic = 'force-dynamic'
@@ -100,6 +103,25 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
       return <UpgradeWizard ownerId={owner.id} ownerName={owner.name} tenant={t} />
     }
     if (t.status === 'active') redirect('/dashboard')
+
+    // Plan paid → the servers' first days go into the wallet; the store is built once they are there.
+    if (t.status === 'awaiting_payment' && t.subscription_status === 'active') {
+      const prepay = await storePrepay(t.id, t.plan ?? null)
+      if (prepay.balance >= prepay.requiredInr && (await startStoreIfReady(t.id))) redirect('/onboard')
+      return (
+        <SidebarLayout currentStep={7}>
+          <FundServers
+            slug={t.slug}
+            displayName={t.display_name}
+            keyId={process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? ''}
+            requiredInr={prepay.requiredInr}
+            balance={prepay.balance}
+            dailyInr={prepay.dailyInr}
+            days={prepay.days}
+          />
+        </SidebarLayout>
+      )
+    }
 
     // Approved + awaiting payment → show the payment link (owner completes the subscription here).
     if (t.status === 'awaiting_payment' && t.razorpay_subscription_id) {

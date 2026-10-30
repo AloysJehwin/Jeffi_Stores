@@ -3,7 +3,7 @@ import { verifyWebhookSignature } from '@controller/lib/payments/razorpay-subscr
 import { getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
 import { issuePlatformInvoiceLater } from '@/lib/billing/platform-invoice'
 import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
-import { startStore } from '@controller/lib/provisioning/start-store'
+import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,7 +73,9 @@ export async function POST(request: NextRequest) {
       // only the engine's activate step does that, after infra exists + the host verifies.
       // A services workspace whose store application is approved is not live as a store yet either.
       if (tenant.store_request === 'awaiting_payment' || (!tenant.store_request && tenant.status !== 'active' && tenant.status !== 'provisioning')) {
-        await startStore(tenant)
+        // The plan is paid; the store is built once its wallet also holds the servers' first days.
+        await setSubscriptionStatus(tenant.id, 'active')
+        await startStoreIfReady(tenant.id)
       } else {
         // Recurring charge on an already-live tenant — just keep the subscription active.
         await setSubscriptionStatus(tenant.id, 'active')
