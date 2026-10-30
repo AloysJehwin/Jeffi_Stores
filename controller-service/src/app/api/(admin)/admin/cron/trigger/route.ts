@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 
 // Static jobId → route-module import map. Fully literal specifiers so both the webpack prod build and
 // Turbopack dev reliably bundle them (an interpolated import() is flagged by vite:dynamic-import-vars
-// and may not trace). Keep in sync with CRON_JOBS — the test asserts every job id resolves here.
+// and may not trace). Store jobs only: platform jobs live in the controller.
 const JOB_ROUTE_IMPORTS: Record<string, () => Promise<Record<string, any>>> = {
   delhivery_sync: () => import('@/app/api/(admin)/admin/delhivery/sync-statuses/route'),
   cancel_stale_orders: () => import('@/app/api/(internal)/cron/cancel-stale-orders/route'),
@@ -19,15 +19,11 @@ const JOB_ROUTE_IMPORTS: Record<string, () => Promise<Record<string, any>>> = {
   run_campaigns: () => import('@/app/api/(internal)/cron/run-campaigns/route'),
   compute_health: () => import('@/app/api/(internal)/cron/compute-health/route'),
   daily_briefing: () => import('@/app/api/(internal)/cron/daily-briefing/route'),
-  provisioning_worker: () => import('@/app/api/(internal)/internal/provisioning/worker/route'),
-  import_worker: () => import('@/app/api/(internal)/internal/import/worker/route'),
-  provisioning_reconcile: () => import('@/app/api/(internal)/internal/provisioning/reconcile/route'),
   publish_social_posts: () => import('@/app/api/(internal)/cron/publish-social-posts/route'),
   customer_notes_digest: () => import('@/app/api/(internal)/cron/customer-notes-digest/route'),
   loyalty_reconcile: () => import('@/app/api/(internal)/cron/loyalty-reconcile/route'),
   sweep_idle_sessions: () => import('@/app/api/(internal)/cron/sweep-sessions/route'),
   embed_sync: () => import('@/app/api/(internal)/cron/embed-sync/route'),
-  ai_health: () => import('@/app/api/(internal)/internal/ai/health/route'),
 }
 
 // Manually run ONE cron job for the CURRENT store, IN-PROCESS under that store's tenant context.
@@ -77,12 +73,18 @@ export async function POST(request: NextRequest) {
       let errorMsg: string | undefined
       let detail: unknown
       try {
-        const loader = JOB_ROUTE_IMPORTS[jobId]
-        if (!loader) throw new Error(`No route module mapped for ${jobId}`)
-        const mod = await loader()
-        const handler = mod?.[job.method]
-        if (typeof handler !== 'function') throw new Error(`No ${job.method} handler for ${job.path}`)
-        const res: Response = await handler(jobReq)
+        let res: Response
+        if (job.tenantScope === null) {
+          // Platform jobs need no store context and run on the controller.
+          const controller = process.env.CONTROLLER_URL || `http://127.0.0.1:${process.env.PORT || 3000}`
+          res = await fetch(`${controller}${job.path}`, { method: job.method, headers: { Authorization: `Bearer ${cronSecret}` } })
+        } else {
+          const loader = JOB_ROUTE_IMPORTS[jobId]
+          if (!loader) throw new Error(`No route module mapped for ${jobId}`)
+          const handler = (await loader())?.[job.method]
+          if (typeof handler !== 'function') throw new Error(`No ${job.method} handler for ${job.path}`)
+          res = await handler(jobReq)
+        }
         ok = res.ok
         if (!ok) errorMsg = `HTTP ${res.status}`
         detail = await res.json().catch(() => undefined)

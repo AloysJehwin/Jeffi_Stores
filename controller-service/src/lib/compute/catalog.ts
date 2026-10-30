@@ -11,7 +11,7 @@ export const DEFAULT_SETTINGS: PricingSettings = {
   platformShareUsd: 3,
   rootVolumeGb: 20,
   poolNodeType: 't4g.medium',
-  poolCapacity: 4,
+  poolCapacity: 3,
   sharedDbClass: 'db.t4g.small',
   sharedDbCapacity: 8,
   sharedDbStorageGb: 10,

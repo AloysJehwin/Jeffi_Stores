@@ -5,7 +5,7 @@ import { ChoiceCards, Segmented, fieldCls } from '../_ui'
 import { DEDICATED_PRESETS, PRESETS, presetOf, presetSpec, withHighAvailability } from '@/lib/compute/presets'
 import { monthlyTotal, quoteSpec, type Quote } from '@/lib/compute/pricing'
 import { LIMITS, planCompatibilityError, smallestFittingNode, validateSpec, type Validation } from '@/lib/compute/validate'
-import { SERVICE_NAMES, cloneSpec, type Catalog, type ComputeSpec, type PodSize, type PresetKey, type ServiceName } from '@/lib/compute/spec'
+import { activeServices, cloneSpec, type Catalog, type ComputeSpec, type PodSize, type PresetKey, type ServiceName } from '@/lib/compute/spec'
 
 export interface ComputePlan {
   slug: string
@@ -25,7 +25,9 @@ export interface ComputeChoice {
 }
 
 const SERVICE_LABEL: Record<ServiceName, string> = {
-  controller: 'Storefront & admin',
+  storefront: 'Storefront',
+  admin: 'Admin panel',
+  business: 'Business portal',
   messaging: 'Messaging',
   documents: 'Invoices & documents',
 }
@@ -129,7 +131,7 @@ export function ComputeConfigurator({
   const ec2 = catalog.prices.filter(p => p.kind === 'ec2' && p.sellable)
   const rds = catalog.prices.filter(p => p.kind === 'rds' && p.sellable)
   const fit = validation?.fit
-  const bigger = validation && !validation.ok && fit && spec.node.placement === 'dedicated' ? smallestFittingNode(spec, catalog) : null
+  const bigger = validation && !validation.ok && fit && spec.node.placement === 'dedicated' ? smallestFittingNode(spec, catalog, planSlug) : null
 
   return (
     <div className="space-y-5">
@@ -242,7 +244,7 @@ export function ComputeConfigurator({
                 </tr>
               </thead>
               <tbody>
-                {SERVICE_NAMES.map(k => {
+                {activeServices(planSlug).map(k => {
                   const sv = spec.services[k]
                   return (
                     <tr key={k} className="border-t border-border-default/60">

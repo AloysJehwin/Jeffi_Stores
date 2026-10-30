@@ -1,8 +1,12 @@
 // A store's compute: where it runs, its database, and each service's pods. Stored in
 // tenant_compute.desired / .applied; priced by pricing.ts and checked by validate.ts.
 
-export const SERVICE_NAMES = ['controller', 'messaging', 'documents'] as const
+export const SERVICE_NAMES = ['storefront', 'admin', 'business', 'messaging', 'documents'] as const
 export type ServiceName = (typeof SERVICE_NAMES)[number]
+
+// controller: the store runs the old all-in-one {slug}-controller-service; services: storefront, admin
+// and business each run on their own (service-roles.ts). Set only on what runs (applied), never chosen.
+export type StoreLayout = 'controller' | 'services'
 
 export type PodSize = 'S' | 'M' | 'L'
 export const POD_SIZES: PodSize[] = ['S', 'M', 'L']
@@ -19,6 +23,7 @@ export interface ComputeSpec {
   // shared: a database on a server shared with other Starter stores; dedicated: its own RDS.
   db: { mode: 'shared' | 'dedicated'; class: string | null; storageGb: number; multiAz: boolean }
   services: Record<ServiceName, ServiceSpec>
+  layout?: StoreLayout
 }
 
 export type PresetKey = 'shared' | 'small' | 'medium' | 'large' | 'xlarge'
@@ -78,3 +83,24 @@ export function priceOf(catalog: Catalog, code: string): PriceRow | undefined {
 
 /** Deep copy, so presets and stored specs are never edited in place. */
 export const cloneSpec = (s: ComputeSpec): ComputeSpec => JSON.parse(JSON.stringify(s))
+
+/** A stored spec in today's shape: one from before the split had a single `controller` service. */
+export function normalizeSpec(raw: any): ComputeSpec {
+  const s = JSON.parse(JSON.stringify(raw))
+  const ctrl = s?.services?.controller
+  if (ctrl) {
+    s.services.storefront ??= ctrl
+    s.services.admin ??= { replicas: 1, maxReplicas: 1, size: ctrl.size }
+    s.services.business ??= { replicas: 1, maxReplicas: 1, size: 'S' }
+    delete s.services.controller
+    s.layout ??= 'controller'
+  }
+  return s
+}
+
+/** The business portal ({slug}.business host) is sold from Pro; other plans run no business service. */
+export const hasBusinessPortal = (plan: string | null | undefined) => plan === 'pro' || plan === 'enterprise'
+
+/** The services a store on this plan runs. */
+export const activeServices = (plan: string | null | undefined): ServiceName[] =>
+  SERVICE_NAMES.filter(n => n !== 'business' || hasBusinessPortal(plan))

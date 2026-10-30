@@ -3,7 +3,8 @@
 // pool-basic nodes; a store with its own servers gets nodes labelled + tainted to it.
 
 export const POOL_NODE_TYPE = 't4g.medium'
-export const POOL_NODE_CAPACITY = Number(process.env.POOL_NODE_CAPACITY || 4)
+// Stores per shared pool server: each runs storefront, admin, messaging and documents (validate.ts).
+export const POOL_NODE_CAPACITY = Number(process.env.POOL_NODE_CAPACITY || 3)
 
 export const tenantNamespace = (slug: string) => `tenant-${slug}`
 export const dedicatedNodeName = (slug: string) => `t-${slug}`

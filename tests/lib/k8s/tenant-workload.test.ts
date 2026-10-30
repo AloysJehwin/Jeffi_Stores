@@ -70,7 +70,9 @@ describe('renderTenantWorkload', () => {
       node: { placement: 'dedicated' as const, type: 't4g.medium', count: 2 },
       db: { mode: 'dedicated' as const, class: 'db.t4g.small', storageGb: 20, multiAz: false },
       services: {
-        controller: { replicas: 2, maxReplicas: 4, size: 'M' as const },
+        storefront: { replicas: 2, maxReplicas: 4, size: 'M' as const },
+        admin: { replicas: 1, maxReplicas: 1, size: 'S' as const },
+        business: { replicas: 1, maxReplicas: 1, size: 'S' as const },
         messaging: { replicas: 1, maxReplicas: 2, size: 'S' as const },
         documents: { replicas: 1, maxReplicas: 1, size: 'L' as const },
       },
@@ -83,8 +85,8 @@ describe('renderTenantWorkload', () => {
     expect(envOf(byKind(objs, 'Deployment', 'big-document-service')[0]).DB_POOL_MAX).toBe('6')
     expect(byKind(objs, 'Deployment', 'big-document-service')[0].spec.template.spec.containers[0].resources.limits.memory).toBe('640Mi')
     expect(byKind(objs, 'HorizontalPodAutoscaler').map(h => [h.metadata.name, h.spec.maxReplicas])).toEqual([
-      ['big-messaging-service', 2],
       ['big-controller-service', 4],
+      ['big-messaging-service', 2],
     ])
     expect(byKind(objs, 'PodDisruptionBudget').map(p => p.metadata.name)).toEqual(['big-controller-service'])
     expect(objs[0].metadata.labels['jeffi.io/placement']).toBe('dedicated')
@@ -178,5 +180,42 @@ describe('tracing env', () => {
     )
     expect(env.OTEL_SERVICE_NAME).toBe('acme-controller-service')
     expect(env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT).toBe('http://coroot-coroot.observability:8080/v1/traces')
+  })
+
+  describe('separate store services', () => {
+    const deps = (objs: any[]) => byKind(objs, 'Deployment').map((d: any) => d.metadata.name)
+    const route = (objs: any[], name: string) => (byKind(objs, 'IngressRoute', name)[0] as any)?.spec.routes[0]
+
+    it('runs storefront and admin, pinned to the store, and no controller', () => {
+      const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme'), layout: 'services' }) as any[]
+      expect(deps(objs)).toEqual(['redis', 'acme-storefront-service', 'acme-admin-service', 'acme-messaging-service', 'acme-document-service'])
+      const sf = byKind(objs, 'Deployment', 'acme-storefront-service')[0] as any
+      expect(envOf(sf)).toMatchObject({ SERVICE_ROLE: 'storefront', SERVICE_TENANT_SLUG: 'acme' })
+      expect(sf.spec.template.spec.containers[0].image).toContain('jeffi-stores-storefront-service')
+      expect(route(objs, 'store').services).toEqual([{ name: 'acme-storefront-service', port: 3000 }])
+      expect(route(objs, 'admin').services).toEqual([{ name: 'acme-admin-service', port: 3000 }])
+      expect(byKind(objs, 'IngressRoute', 'controller')).toEqual([])
+      expect(route(objs, 'razorpay-webhook').match).toBe('Host(`jeffistores.in`) && Path(`/api/webhooks/razorpay/acme`)')
+      // Admin restarts in place on a rollout; the storefront never drops below its copies.
+      expect((byKind(objs, 'Deployment', 'acme-admin-service')[0] as any).spec.strategy.rollingUpdate).toEqual({ maxUnavailable: 1, maxSurge: 0 })
+      expect(sf.spec.strategy.rollingUpdate).toEqual({ maxUnavailable: 0, maxSurge: 1 })
+    })
+
+    it('gives Pro its business portal on its own host', () => {
+      const objs = renderTenantWorkload({ slug: 'acme', plan: 'pro', hosts: [...hosts('acme'), 'acme.business.jeffistores.in'], layout: 'services' }) as any[]
+      expect(deps(objs)).toContain('acme-business-service')
+      expect(route(objs, 'business')).toMatchObject({ match: 'Host(`acme.business.jeffistores.in`)', services: [{ name: 'acme-business-service', port: 3000 }] })
+      expect(route(objs, 'store').match).not.toContain('business')
+    })
+
+    it('keeps traffic on the old app while the new services start', () => {
+      const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme'), layout: 'services', routeTo: 'controller' }) as any[]
+      expect(deps(objs)).toEqual(['redis', 'acme-controller-service', 'acme-storefront-service', 'acme-admin-service', 'acme-messaging-service', 'acme-document-service'])
+      const ctrl = byKind(objs, 'Deployment', 'acme-controller-service')[0] as any
+      expect(ctrl.spec.replicas).toBe(1)
+      expect(ctrl.spec.selector.matchLabels).toEqual({ app: 'controller-service', 'jeffi.io/tenant': 'acme' })
+      expect(route(objs, 'controller').services).toEqual([{ name: 'acme-controller-service', port: 3000 }])
+      expect(route(objs, 'admin').services).toEqual([{ name: 'acme-controller-service', port: 3000 }])
+    })
   })
 })

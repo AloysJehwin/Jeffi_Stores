@@ -27,7 +27,7 @@ export default async function K8sWorkloadSection({
   const { getTenantCompute } = await import('@/lib/compute/store')
   const row = await getTenantCompute(tenantId).catch(() => null)
   const spec = row?.applied ?? legacySpecFor(plan)
-  const ctrl = POD_RESOURCES.controller[spec.services.controller.size]
+  const ctrl = POD_RESOURCES.storefront[spec.services.storefront.size]
   const { getTenantWorkloadStatus } = await import('@/lib/k8s/tenant-compute')
   const status = await getTenantWorkloadStatus(slug).catch(() => undefined)
   const ns = tenantNamespace(slug)

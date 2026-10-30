@@ -6,7 +6,7 @@ import { quoteSpec } from './pricing'
 import { getTenantCompute } from './store'
 import { dbBudget } from './validate'
 import { dbMaxConnections, presetOf } from './presets'
-import { priceOf, rdsCode, type Catalog, type ComputeSpec } from './spec'
+import { normalizeSpec, priceOf, rdsCode, type Catalog, type ComputeSpec, type StoreLayout } from './spec'
 
 export interface ResolvedCompute {
   spec: ComputeSpec
@@ -18,13 +18,16 @@ export interface ResolvedCompute {
   nodeGen: number
 }
 
+/** The layout stores move to: their own storefront/admin/business services, or the old all-in-one app. */
+export const targetLayout = (): StoreLayout => (process.env.STORE_ROLES_ENABLED === 'true' ? 'services' : 'controller')
+
 // Provisioning must not stop on a price read, so a missing catalog falls back to the class table.
 export const catalogOrDefault = (): Promise<Catalog> => getCatalog().catch(() => ({ prices: [], settings: DEFAULT_SETTINGS }))
 
-export function computeParams(spec: ComputeSpec, catalog: Catalog) {
+export function computeParams(spec: ComputeSpec, catalog: Catalog, plan?: string | null) {
   const cls = spec.db.class ?? ''
   return {
-    dbPoolMax: Math.max(2, dbBudget(spec, catalog).poolPerPod),
+    dbPoolMax: Math.max(2, dbBudget(spec, catalog, plan).poolPerPod),
     maxConnections: dbMaxConnections(cls, priceOf(catalog, rdsCode(cls))?.memoryMib ?? null),
   }
 }
@@ -42,8 +45,10 @@ export async function resolveCompute(
   const row = await getTenantCompute(tenantId).catch(() => null)
   const chosen =
     computeSpecEnabled() && row ? (opts.which === 'applied' ? (row.applied ?? row.desired) : (row.desired ?? row.applied)) : null
-  const spec = opts.spec ?? chosen ?? legacySpecFor(plan)
-  return { spec, ...computeParams(spec, await catalogOrDefault()), nodeGen: row?.node_gen ?? 0 }
+  // Rendered as the store runs now: only reconcileLayout switches layouts. A new store starts in the target one.
+  const layout = row?.applied ? (row.applied.layout ?? 'controller') : targetLayout()
+  const spec = { ...(opts.spec ? normalizeSpec(opts.spec) : (chosen ?? legacySpecFor(plan))), layout }
+  return { spec, ...computeParams(spec, await catalogOrDefault(), plan), nodeGen: row?.node_gen ?? 0 }
 }
 
 /** The spec's price per hour (margin included, GST not); null when a part has no price. */
@@ -69,7 +74,7 @@ export async function markComputeApplied(tenantId: string, spec: ComputeSpec, no
        applied = EXCLUDED.applied, rate_inr_hour = EXCLUDED.rate_inr_hour, node_gen = EXCLUDED.node_gen, applied_at = now(),
        desired = CASE WHEN $5 THEN EXCLUDED.applied ELSE tenant_compute.desired END,
        preset = CASE WHEN $5 THEN EXCLUDED.preset ELSE tenant_compute.preset END,
-       status = CASE WHEN $5 OR tenant_compute.desired = EXCLUDED.applied THEN 'applied' ELSE 'pending' END,
+       status = CASE WHEN $5 OR (tenant_compute.desired - 'layout') = (EXCLUDED.applied - 'layout') THEN 'applied' ELSE 'pending' END,
        attempts = 0, last_error = NULL, updated_at = now()`,
     [tenantId, JSON.stringify(spec), rate, nodeGen, follow, presetOf(spec)]
   )

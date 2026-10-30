@@ -9,7 +9,9 @@ const r = (cpu: string, mem: string, limCpu: string, limMem: string): Resources 
 })
 
 export const POD_RESOURCES: Record<ServiceName, Record<PodSize, Resources>> = {
-  controller: { S: r('150m', '384Mi', '1', '640Mi'), M: r('200m', '512Mi', '1500m', '900Mi'), L: r('300m', '768Mi', '2', '1200Mi') },
+  storefront: { S: r('150m', '384Mi', '1', '640Mi'), M: r('200m', '512Mi', '1500m', '900Mi'), L: r('300m', '768Mi', '2', '1200Mi') },
+  admin: { S: r('150m', '384Mi', '1', '640Mi'), M: r('200m', '512Mi', '1500m', '900Mi'), L: r('300m', '768Mi', '2', '1200Mi') },
+  business: { S: r('100m', '256Mi', '1', '512Mi'), M: r('150m', '384Mi', '1500m', '640Mi'), L: r('200m', '512Mi', '2', '900Mi') },
   messaging: { S: r('25m', '128Mi', '300m', '256Mi'), M: r('50m', '160Mi', '500m', '384Mi'), L: r('75m', '192Mi', '1', '448Mi') },
   documents: { S: r('25m', '160Mi', '500m', '384Mi'), M: r('50m', '224Mi', '1', '512Mi'), L: r('100m', '256Mi', '1500m', '640Mi') },
 }
@@ -45,27 +47,28 @@ export const PRESETS: Record<PresetKey, Preset> = {
     spec: {
       node: { placement: 'dedicated', type: 't4g.small', count: 1 },
       db: { mode: 'dedicated', class: 'db.t4g.micro', storageGb: 20, multiAz: false },
-      services: all(svc(1, 1, 'S')),
+      // A second storefront copy takes the room a rollout needs anyway.
+      services: { ...all(svc(1, 1, 'S')), storefront: svc(1, 2, 'S') },
     },
   },
   medium: {
     key: 'medium',
     label: 'Medium',
-    blurb: 'Two copies of every service, so a restart never takes the store down.',
+    blurb: 'Two copies of the storefront, so a restart never takes the store down.',
     spec: {
       node: { placement: 'dedicated', type: 't4g.medium', count: 1 },
       db: { mode: 'dedicated', class: 'db.t4g.small', storageGb: 20, multiAz: false },
-      services: { controller: svc(2, 3, 'M'), messaging: svc(2, 2, 'M'), documents: svc(2, 2, 'M') },
+      services: { storefront: svc(2, 3, 'M'), admin: svc(1, 1, 'S'), business: svc(1, 1, 'S'), messaging: svc(2, 2, 'M'), documents: svc(2, 2, 'M') },
     },
   },
   large: {
     key: 'large',
     label: 'Large',
-    blurb: 'For busy stores: scales the storefront up to five copies under load.',
+    blurb: 'For busy stores: scales the storefront up to four copies under load.',
     spec: {
       node: { placement: 'dedicated', type: 't4g.large', count: 1 },
       db: { mode: 'dedicated', class: 'db.t4g.medium', storageGb: 50, multiAz: false },
-      services: { controller: svc(2, 5, 'L'), messaging: svc(2, 2, 'L'), documents: svc(2, 2, 'L') },
+      services: { storefront: svc(2, 4, 'L'), admin: svc(1, 1, 'M'), business: svc(1, 1, 'S'), messaging: svc(2, 2, 'L'), documents: svc(2, 2, 'L') },
     },
   },
   xlarge: {
@@ -75,7 +78,7 @@ export const PRESETS: Record<PresetKey, Preset> = {
     spec: {
       node: { placement: 'dedicated', type: 't4g.xlarge', count: 1 },
       db: { mode: 'dedicated', class: 'db.t4g.large', storageGb: 100, multiAz: false },
-      services: { controller: svc(3, 8, 'L'), messaging: svc(3, 3, 'L'), documents: svc(3, 3, 'L') },
+      services: { storefront: svc(3, 8, 'L'), admin: svc(2, 2, 'M'), business: svc(1, 2, 'S'), messaging: svc(3, 3, 'L'), documents: svc(3, 3, 'L') },
     },
   },
 }

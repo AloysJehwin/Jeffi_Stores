@@ -1,5 +1,5 @@
 import { DB_POOL_CAP, DB_POOL_MIN, DB_RESERVED_CONNECTIONS, POD_RESOURCES, REDIS_RESOURCES, dbMaxConnections, presetOf } from './presets'
-import { POD_SIZES, SERVICE_NAMES, ec2Code, priceOf, rdsCode, type Catalog, type ComputeSpec, type PlanCompute } from './spec'
+import { POD_SIZES, SERVICE_NAMES, activeServices, ec2Code, priceOf, rdsCode, type Catalog, type ComputeSpec, type PlanCompute, type ServiceName, type ServiceSpec } from './spec'
 
 export const LIMITS = { maxNodes: 3, maxReplicas: 10, minStorageGb: 20, maxStorageGb: 1000 }
 
@@ -23,23 +23,31 @@ export interface Validation {
 export const milli = (cpu: string) => (cpu.endsWith('m') ? Number(cpu.slice(0, -1)) : Number(cpu) * 1000)
 export const mib = (mem: string) => (mem.endsWith('Gi') ? Number(mem.slice(0, -2)) * 1024 : Number(mem.replace(/Mi$/, '')))
 
-// The two busiest moments: every service scaled out, or a release rolling one extra copy of each.
+/** On a rollout the storefront, and any service with spare copies, adds one pod; a single-copy back-office
+ * service restarts in place instead (tenant-workload.ts), so small servers need no room for it. */
+export const surges = (k: ServiceName, s: ServiceSpec) => k === 'storefront' || s.replicas > 1
+
+// The services a plan runs; no plan: all of them (the cautious count).
+const namesFor = (plan?: string | null): ServiceName[] => (plan === undefined ? [...SERVICE_NAMES] : activeServices(plan))
+
+// The two busiest moments: every service scaled out, or a release rolling the services.
 const states = (spec: ComputeSpec) => [
-  (k: (typeof SERVICE_NAMES)[number]) => spec.services[k].maxReplicas,
-  (k: (typeof SERVICE_NAMES)[number]) => spec.services[k].replicas + 1,
+  (k: ServiceName) => spec.services[k].maxReplicas,
+  (k: ServiceName) => spec.services[k].replicas + (surges(k, spec.services[k]) ? 1 : 0),
 ]
 
 /** Most pods the store runs at once. */
-export const peakPods = (spec: ComputeSpec) => Math.max(...states(spec).map(count => SERVICE_NAMES.reduce((n, k) => n + count(k), 0)))
+export const peakPods = (spec: ComputeSpec, plan?: string | null) =>
+  Math.max(...states(spec).map(count => namesFor(plan).reduce((n, k) => n + count(k), 0)))
 
 /** Requests at the busiest moment, Redis included. */
-function requested(spec: ComputeSpec) {
+function requested(spec: ComputeSpec, plan?: string | null) {
   let cpu = 0
   let mem = 0
   for (const count of states(spec)) {
     let c = milli(REDIS_RESOURCES.requests.cpu)
     let m = mib(REDIS_RESOURCES.requests.memory)
-    for (const k of SERVICE_NAMES) {
+    for (const k of namesFor(plan)) {
       const res = POD_RESOURCES[k][spec.services[k].size].requests
       c += milli(res.cpu) * count(k)
       m += mib(res.memory) * count(k)
@@ -51,24 +59,24 @@ function requested(spec: ComputeSpec) {
 }
 
 /** Connections the store's database allows it, and the pool each pod gets. */
-export function dbBudget(spec: ComputeSpec, catalog: Catalog) {
+export function dbBudget(spec: ComputeSpec, catalog: Catalog, plan?: string | null) {
   const s = catalog.settings
   const maxConnections =
     spec.db.mode === 'shared'
       ? Math.floor((s.sharedDbMaxConnections - DB_RESERVED_CONNECTIONS) / s.sharedDbCapacity)
       : dbMaxConnections(spec.db.class ?? '', priceOf(catalog, rdsCode(spec.db.class ?? ''))?.memoryMib ?? null) - DB_RESERVED_CONNECTIONS
-  const pods = peakPods(spec)
+  const pods = peakPods(spec, plan)
   return { pods, maxConnections, poolPerPod: Math.min(DB_POOL_CAP, Math.floor(maxConnections / pods)) }
 }
 
-export function fitOf(spec: ComputeSpec, catalog: Catalog): Fit {
-  const req = requested(spec)
+export function fitOf(spec: ComputeSpec, catalog: Catalog, plan?: string | null): Fit {
+  const req = requested(spec, plan)
   const node = spec.node.placement === 'dedicated' ? priceOf(catalog, ec2Code(spec.node.type ?? '')) : undefined
   const count = spec.node.placement === 'dedicated' ? spec.node.count : 1
   return {
     cpu: { requestedMilli: req.cpu, allocatableMilli: node ? ((node.vcpu ?? 0) * 1000 - NODE_RESERVED_MILLI) * count : 0 },
     memory: { requestedMib: req.mem, allocatableMib: node ? ((node.memoryMib ?? 0) - NODE_RESERVED_MIB) * count : 0 },
-    db: dbBudget(spec, catalog),
+    db: dbBudget(spec, catalog, plan),
     vcpus: node ? (node.vcpu ?? 0) * count : 0,
   }
 }
@@ -120,7 +128,7 @@ export function validateSpec(
     errors.push('A standby database needs your own database.')
   }
 
-  for (const k of SERVICE_NAMES) {
+  for (const k of namesFor(plan.slug)) {
     const s = spec.services[k]
     if (!int(s.replicas) || !int(s.maxReplicas) || s.replicas < 1 || s.maxReplicas < s.replicas || s.maxReplicas > LIMITS.maxReplicas) {
       errors.push(`${k}: copies must be 1–${LIMITS.maxReplicas}, and the autoscale limit at least that.`)
@@ -129,7 +137,7 @@ export function validateSpec(
   }
   if (errors.length) return { ok: false, errors, fit: null }
 
-  const fit = fitOf(spec, catalog)
+  const fit = fitOf(spec, catalog, plan.slug)
   if (spec.node.placement === 'dedicated') {
     if (fit.memory.requestedMib > fit.memory.allocatableMib) {
       errors.push(`The services need ${fit.memory.requestedMib} MB of memory; the server has ${fit.memory.allocatableMib} MB. Choose a bigger server or fewer copies.`)
@@ -145,10 +153,10 @@ export function validateSpec(
 }
 
 /** The smallest sellable server the spec fits on, for "choose a bigger server". */
-export function smallestFittingNode(spec: ComputeSpec, catalog: Catalog): string | null {
+export function smallestFittingNode(spec: ComputeSpec, catalog: Catalog, plan?: string | null): string | null {
   const types = catalog.prices.filter(p => p.kind === 'ec2' && p.sellable).sort((a, b) => (a.memoryMib ?? 0) - (b.memoryMib ?? 0) || a.sort - b.sort)
   for (const t of types) {
-    const f = fitOf({ ...spec, node: { ...spec.node, type: t.code.slice(4) } }, catalog)
+    const f = fitOf({ ...spec, node: { ...spec.node, type: t.code.slice(4) } }, catalog, plan)
     if (f.memory.requestedMib <= f.memory.allocatableMib && f.cpu.requestedMilli <= f.cpu.allocatableMilli) return t.code.slice(4)
   }
   return null

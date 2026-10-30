@@ -162,7 +162,7 @@ async function workloadInput(ctx: Ctx) {
   return { slug: ctx.tenant.slug, plan: ctx.tenant.plan, hosts: tenantHostnames(ctx.tenant.slug, ctx.tenant.plan), customDomains }
 }
 
-const poolMaxFor = async (spec: ComputeSpec) => computeParams(spec, await catalogOrDefault()).dbPoolMax
+const poolMaxFor = async (spec: ComputeSpec, plan: string | null) => computeParams(spec, await catalogOrDefault(), plan).dbPoolMax
 
 // ── 1. Database moves between a shared host and its own instance ─────────────────────────────────
 
@@ -175,7 +175,7 @@ async function moveDatabase(ctx: Ctx): Promise<Outcome> {
 
   if (m.step === 'create') {
     if (want.mode === 'dedicated') {
-      const { maxConnections } = computeParams(desired, await catalogOrDefault())
+      const { maxConnections } = computeParams(desired, await catalogOrDefault(), tenant.plan)
       await provider.ensureParamGroup(paramGroupName(slug), maxConnections)
       const created = await provider.createDbInstance({
         dbInstanceId: dbInstanceId(slug),
@@ -290,7 +290,8 @@ async function dropDatabase(provider: ProvisioningProvider, db: DbRef): Promise<
 
 async function serversAndPods(ctx: Ctx): Promise<Outcome> {
   const { tenant, row, desired, applied, p, provider, tenantId } = ctx
-  const target: ComputeSpec = { ...desired, db: applied.db }
+  // Rendered in the layout the store runs: only reconcileLayout changes it.
+  const target: ComputeSpec = { ...desired, db: applied.db, layout: applied.layout }
   if (specKey(target) === specKey(applied)) return 'done'
   const slug = tenant.slug
   const a = applied.node
@@ -313,7 +314,7 @@ async function serversAndPods(ctx: Ctx): Promise<Outcome> {
   }
 
   // Pods pooled for the database as it runs now and as it will, whichever allows fewer connections.
-  const poolMax = Math.min(await poolMaxFor(target), await poolMaxFor(desired))
+  const poolMax = Math.min(await poolMaxFor(target, tenant.plan), await poolMaxFor(desired, tenant.plan))
   if (!p.podsApplied) {
     await k8s.applyTenantWorkload({ ...(await workloadInput(ctx)), compute: target, dbPoolMax: poolMax, nodeGen: gen })
     p.podsApplied = true
@@ -404,8 +405,8 @@ async function ownDatabase(ctx: Ctx): Promise<Outcome> {
     if (!p.dbClass) {
       if (!ready) return 'wait'
       // Pods first pool for the smaller of the two classes, so a smaller class never runs out of connections.
-      const now = await poolMaxFor(applied)
-      const lower = Math.min(now, await poolMaxFor(desired))
+      const now = await poolMaxFor(applied, tenant.plan)
+      const lower = Math.min(now, await poolMaxFor(desired, tenant.plan))
       if (lower < now && p.poolMax !== lower) {
         const k8s = await import('@/lib/k8s/tenant-compute')
         await k8s.applyTenantWorkload({ ...(await workloadInput(ctx)), compute: applied, dbPoolMax: lower, nodeGen: row.node_gen })
@@ -413,7 +414,7 @@ async function ownDatabase(ctx: Ctx): Promise<Outcome> {
         return 'wait'
       }
       // max_connections for the new class takes effect with the class change's restart.
-      const { maxConnections } = computeParams(desired, await catalogOrDefault())
+      const { maxConnections } = computeParams(desired, await catalogOrDefault(), tenant.plan)
       await provider.ensureParamGroup((job?.created_resources as any)?.paramGroup || paramGroupName(tenant.slug), maxConnections)
       await provider.modifyDbInstance(id, { instanceClass: want.class!, applyImmediately: row.apply_mode === 'now' })
       p.dbClass = Date.now()
@@ -428,7 +429,7 @@ async function ownDatabase(ctx: Ctx): Promise<Outcome> {
 
 /** Once the database is as chosen, pods get its full connection budget. */
 async function finalPods(ctx: Ctx): Promise<void> {
-  const poolMax = await poolMaxFor(ctx.applied)
+  const poolMax = await poolMaxFor(ctx.applied, ctx.tenant.plan)
   if (ctx.p.poolMax === undefined || ctx.p.poolMax === poolMax) {
     delete ctx.p.poolMax
     return
