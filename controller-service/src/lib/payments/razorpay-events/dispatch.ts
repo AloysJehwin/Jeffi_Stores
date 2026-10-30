@@ -7,6 +7,7 @@ import { onPaymentCaptured, onPaymentFailed, onPaymentLinkExpired, onPaymentLink
 import { onRefund } from './refunds'
 import { onDispute } from './disputes'
 import { onSettlementProcessed, onTransfer } from './settlements'
+import { onDowntime } from './downtime'
 
 export { TransientWebhookError, type EventContext, type EventSource } from './context'
 
@@ -45,6 +46,9 @@ export const RAZORPAY_WEBHOOK_EVENTS: readonly { event: string; platformOnly?: b
   { event: 'refund.speed_changed' },
   ...DISPUTE_EVENTS.map(event => ({ event })),
   { event: 'settlement.processed' },
+  { event: 'payment.downtime.started' },
+  { event: 'payment.downtime.updated' },
+  { event: 'payment.downtime.resolved' },
   { event: 'transfer.processed', platformOnly: true },
   { event: 'transfer.failed', platformOnly: true },
   { event: 'transfer.reversed', platformOnly: true },
@@ -81,6 +85,10 @@ export async function dispatchRazorpayEvent(event: any, ctx: EventContext): Prom
       return onRefund(type, p.refund?.entity, p.payment?.entity, ctx)
     case 'settlement.processed':
       return onSettlementProcessed(p.settlement?.entity, ctx)
+    case 'payment.downtime.started':
+    case 'payment.downtime.updated':
+    case 'payment.downtime.resolved':
+      return onDowntime(type, p['payment.downtime']?.entity, ctx)
     case 'transfer.processed':
     case 'transfer.failed':
     case 'transfer.reversed':

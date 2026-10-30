@@ -249,6 +249,30 @@ export async function sendDisputeAdminEmail(d: {
   })
 }
 
+/** Razorpay reports an outage for a payment method customers use. */
+export async function sendPaymentDowntimeEmail(d: { label: string; severity: string | null; beganAt: string | null }) {
+  const [to, brand] = await Promise.all([getAdminNotificationEmails(), currentBrandNameAsync()])
+  const began = d.beganAt ? new Date(d.beganAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }) : null
+  return sendAuditedMail({
+    from: adminMailFrom(),
+    to,
+    subject: `[Payments] ${d.label} is down at Razorpay`,
+    html: mailShell({
+      brand,
+      kicker: 'Payment outage',
+      title: `${escapeHtml(d.label)} payments are failing`,
+      content: `
+        <div class="warning">
+          <p style="margin: 0;">Razorpay reports an outage${d.severity ? ` (${escapeHtml(d.severity)} severity)` : ''}${began ? ` since ${began}` : ''}. Customers paying this way may see failures until it is resolved; other payment methods still work.</p>
+        </div>
+        <p>You will see a banner in the admin panel until Razorpay marks it resolved.</p>
+      `,
+    }),
+    kind: 'admin_notification',
+    templateName: 'payment_downtime_admin',
+  })
+}
+
 /**
  * A message from the store team to a customer. 'message' frames the text under the subject in a box;
  * 'template' sends a library template's body as written (it carries its own greeting and headline).
