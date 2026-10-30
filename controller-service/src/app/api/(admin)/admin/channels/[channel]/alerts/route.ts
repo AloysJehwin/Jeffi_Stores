@@ -14,6 +14,7 @@ const WRITE_SCOPE: Record<Channel, string> = {
   amazon_ads: 'amazon_ads:write',
   meta_ads: 'meta_ads:write',
   social: 'social:write',
+  razorpay: 'financial:write',
 }
 
 type Ctx = { params: Promise<{ channel: string }> }

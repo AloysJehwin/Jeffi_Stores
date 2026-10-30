@@ -24,6 +24,8 @@ import { externalRefundLabel } from '@/lib/payments/external-refund'
 import RetryPaymentEmailButton from '@/app/(admin)/admin/orders/[id]/_components/RetryPaymentEmailButton'
 import RetryRefundButton from '@/app/(admin)/admin/orders/[id]/_components/RetryRefundButton'
 import { orderDisputes, orderRefunds, paidWith } from '@/lib/payments/order-payment-info'
+import { estimatedSettlement, orderSettlements } from '@/lib/payments/rzp-settlement-report'
+import { isFlagship } from '@/lib/payments/webhook-tenant'
 import CreateShipmentButton from '@/app/(admin)/admin/orders/[id]/_components/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductAdjustments from '@/app/(admin)/admin/orders/[id]/_components/ProductAdjustments'
@@ -121,7 +123,14 @@ export default async function OrderDetailsPage({
   const returnRequest = await getReturnRequest(id).catch(() => null)
   // Razorpay refunds, with their bank status. A replacement's payments sit on the original order.
   const paymentOrderIds = [order.id, order.original_order_id].filter(Boolean)
-  const [refunds, disputes] = await Promise.all([orderRefunds(paymentOrderIds), orderDisputes(paymentOrderIds)])
+  // Route stores are paid out by transfer; settlements belong to the flagship and own-key stores.
+  const showSettlement = isFlagship(tenant) || ownRazorpay
+  const [refunds, disputes, settlements] = await Promise.all([
+    orderRefunds(paymentOrderIds),
+    orderDisputes(paymentOrderIds),
+    showSettlement ? orderSettlements(paymentOrderIds) : Promise.resolve([]),
+  ])
+  const settledByPayment = new Map(settlements.map(s => [s.payment_id, s]))
   const addressChangeRequests = (await listAddressChangeRequests(id)).map(r => ({
     id: r.id,
     status: r.status,
@@ -943,6 +952,26 @@ export default async function OrderDetailsPage({
                           <div className="flex justify-between text-sm">
                             <span className="text-foreground-secondary">Captured</span>
                             <span className="text-foreground">{new Date(p.captured_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}</span>
+                          </div>
+                        )}
+                        {showSettlement && p.payment_gateway === 'razorpay' && p.status === 'completed' && String(p.transaction_id || '').startsWith('pay_') && (
+                          <div className="flex justify-between gap-3 text-sm">
+                            <span className="text-foreground-secondary">Settlement</span>
+                            {settledByPayment.get(p.transaction_id) ? (
+                              <span className="min-w-0 text-right text-foreground">
+                                Settled on {new Date(settledByPayment.get(p.transaction_id)!.settled_at || '').toLocaleDateString('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' })}
+                                {settledByPayment.get(p.transaction_id)!.utr ? (
+                                  <span className="block font-mono text-[11px] text-foreground-muted">UTR {settledByPayment.get(p.transaction_id)!.utr}</span>
+                                ) : null}
+                              </span>
+                            ) : (
+                              <span className="text-right text-foreground-muted">
+                                Awaiting{' '}
+                                {p.captured_at || p.created_at
+                                  ? `(est. ${estimatedSettlement(new Date(p.captured_at || p.created_at)).toLocaleDateString('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' })})`
+                                  : ''}
+                              </span>
+                            )}
                           </div>
                         )}
                         {p.status === 'failed' && (p.error_description || p.error_reason) && (
