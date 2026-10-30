@@ -18,9 +18,22 @@ PLATFORM=($CTRL jeffi-stores-storefront-service jeffi-stores-admin-service jeffi
 k8s_tunnel
 manifests() { kubectl kustomize "$REPO/deploy/k8s/platform" | sed -E "s#(${REG}/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:${TAG}#g"; }
 tenants() { kubectl get ns -l jeffi.io/tier=tenant -o jsonpath='{.items[*].metadata.name}'; }
+# The flagship's store pods the release adds to the core must fit its CPU, checked before anything changes.
+core_room() {
+  local node d
+  node=$(kubectl get nodes -l jeffi.io/role=core -o jsonpath='{.items[0].metadata.name}')
+  d=$(mktemp -d)
+  manifests | kubectl create --dry-run=client -l jeffi.io/step=store -f - -o json > "$d/m.json"
+  kubectl get node "$node" -o json > "$d/n.json"
+  kubectl get pods -A --field-selector "spec.nodeName=$node" -o json > "$d/p.json"
+  kubectl -n jeffi get deploy -o json > "$d/d.json"
+  python3 -I "$REPO/deploy/k8s/bootstrap/core-room.py" "$d/m.json" "$d/n.json" "$d/p.json" "$d/d.json" || { rm -rf "$d"; return 1; }
+  rm -rf "$d"
+}
 
 platform() {
   say "Platform at $TAG"
+  core_room || exit 1
   if $DRY_RUN; then
     manifests | kubectl diff -f - || [ $? -eq 1 ]  # 1 = differences shown
     echo "Dry run: would apply the above and wait for ${PLATFORM[*]}."; return 0
