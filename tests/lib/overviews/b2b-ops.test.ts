@@ -11,7 +11,7 @@ import { shelfAttention } from '@/lib/overviews/shelving'
 import { teamAttention } from '@/lib/overviews/team'
 import { auditAttention } from '@/lib/overviews/audit'
 import { agentAttention } from '@/lib/overviews/agent'
-import { viewFor } from '@/app/(admin)/admin/tasks/TasksTabs'
+import { viewFor } from '@controller/app/(admin)/admin/tasks/TasksTabs'
 
 const now = new Date('2026-10-16T12:00:00Z')
 const hoursAgo = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString()

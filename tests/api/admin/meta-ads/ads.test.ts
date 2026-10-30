@@ -16,7 +16,7 @@ vi.mock('@/lib/crypto/token-cipher', () => ({
   decryptToken: (s: string) => s.replace(/^enc:/, ''),
 }))
 
-import { GET, POST } from '@/app/api/(admin)/admin/meta-ads/console/ads/route'
+import { GET, POST } from '@controller/app/api/(admin)/admin/meta-ads/console/ads/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { query, queryOne } from '@/lib/shared/db'
 import { listAccounts } from '@/lib/social/accounts'

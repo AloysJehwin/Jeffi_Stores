@@ -9,17 +9,17 @@ vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
-vi.mock('@/app/api/(admin)/admin/financial/payables/summary', () => ({
+vi.mock('@controller/app/api/(admin)/admin/financial/payables/summary', () => ({
   getPayablesOverview: vi.fn(),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/(admin)/admin/financial/payables/route'
+import { GET, POST } from '@controller/app/api/(admin)/admin/financial/payables/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
-import { getPayablesOverview } from '@/app/api/(admin)/admin/financial/payables/summary'
+import { getPayablesOverview } from '@controller/app/api/(admin)/admin/financial/payables/summary'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

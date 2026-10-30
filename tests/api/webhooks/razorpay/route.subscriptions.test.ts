@@ -13,7 +13,7 @@ vi.mock('@/lib/payments/webhook-tenant', () => ({
 }))
 vi.mock('@/lib/subscriptions/cycle', () => ({ processSubscriptionEvent: vi.fn(async () => true) }))
 
-import { POST } from '@/app/api/(public)/webhooks/razorpay/route'
+import { POST } from '@controller/app/api/(public)/webhooks/razorpay/route'
 import { resolveSubscriptionTenant, runInTenant } from '@/lib/payments/webhook-tenant'
 import { processSubscriptionEvent } from '@/lib/subscriptions/cycle'
 

@@ -70,7 +70,7 @@ vi.mock('@/lib/provisioning/start-store', () => ({ startStore: vi.fn() }))
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/(admin)/admin/ecom/kyc/[tenantId]/approve/route'
+import { POST } from '@controller/app/api/(admin)/admin/ecom/kyc/[tenantId]/approve/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import {
   approveKyc,

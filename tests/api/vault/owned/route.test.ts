@@ -7,7 +7,7 @@ vi.mock('@/lib/vault/links', () => ({
   vaultItemUrl: vi.fn(async (id: string) => `https://vault.example.com/item/${id}`),
 }))
 
-import { GET } from '@/app/api/(public)/vault/owned/route'
+import { GET } from '@controller/app/api/(public)/vault/owned/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { queryOne } from '@/lib/shared/db'
 

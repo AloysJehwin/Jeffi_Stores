@@ -7,8 +7,8 @@ import {
   type AgingKey,
   type Bucket,
   type Range,
-} from '@/app/(admin)/admin/financial/_components/overview-period'
-import type { FinanceOverviewContract } from '@/app/(admin)/admin/financial/_components/finance-overview-contract'
+} from '@controller/app/(admin)/admin/financial/_components/overview-period'
+import type { FinanceOverviewContract } from '@controller/app/(admin)/admin/financial/_components/finance-overview-contract'
 import { aiTotals } from '../ai-costs/summary'
 
 // Finance overview in SQL. Revenue, refunds and COGS follow getPLReport; cash in/out follow

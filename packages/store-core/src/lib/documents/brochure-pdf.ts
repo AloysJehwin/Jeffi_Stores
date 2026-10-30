@@ -5,7 +5,7 @@ import { tenantLogoBuffer } from '@/lib/documents/store-logo'
 import { asJpegOrPng } from '@/lib/shared/image-compat'
 import path from 'path'
 import fs from 'fs'
-import { appPath } from '@/lib/shared/paths'
+import { assetPath } from '@/lib/shared/paths'
 
 const PDFDocument = eval('require')('pdfkit')
 const QRCode = eval('require')('qrcode')
@@ -445,11 +445,11 @@ export async function generateBrochurePDF(products: BrochureProductInput[], opts
   return done
 }
 
-/** Cover background image, if a curated one has been dropped in public/images. */
+/** Cover background image, if a curated one has been dropped in packages/store-core/assets/images. */
 function loadCoverImage(): string | null {
   const candidates = ['brochure-cover.png', 'brochure-cover.jpg', 'brochure-cover.jpeg']
   for (const f of candidates) {
-    const p = appPath('public', 'images', f)
+    const p = assetPath('images', f)
     try {
       if (fs.existsSync(p)) return p
     } catch {
@@ -460,7 +460,7 @@ function loadCoverImage(): string | null {
 }
 
 /**
- * Page 1 — advertising cover. Uses public/images/brochure-cover.* as a full-bleed
+ * Page 1 — advertising cover. Uses packages/store-core/assets/images/brochure-cover.* as a full-bleed
  * hero if present; otherwise paints a branded green gradient. Overlaid: logo,
  * store name, brochure title, optional promo line, contact/GST, generated date.
  */

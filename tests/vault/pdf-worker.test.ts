@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import path from 'path'
-import { GET } from '@/app/api/(public)/vault/pdf-worker/route'
+import { GET } from '@controller/app/api/(public)/vault/pdf-worker/route'
 
 describe('pdf.js worker', () => {
   it('public fallback copy matches the installed pdfjs-dist build (no API/worker version drift)', () => {

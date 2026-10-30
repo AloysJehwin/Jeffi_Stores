@@ -14,7 +14,7 @@ import { join, relative, sep } from 'node:path'
 // Adding a tenant-facing file here instead of fixing the leak defeats the guard — don't.
 
 const ROOT = join(__dirname, '..', '..')
-const SRC = join(ROOT, 'controller-service/src')
+const SRCS = ['controller-service/src', 'packages/store-core/src'].map(d => join(ROOT, d))
 
 // Matches the platform brand as a literal word, not substrings like "jeffistores.in" domains
 // (those are covered by host/env config, not brand strings) — we match "Jeffi" followed by a
@@ -28,12 +28,12 @@ const LOCATION_RE = /\b(Chhattisgarh|Raipur)\b/
 // Only enforced on prompt + ops surfaces where a tenant store acts; platform-entity references
 // (legal docs, Amazon LMPC contact, pincode reference tables, GST-code hints) live elsewhere.
 const LOCATION_SCOPE_PREFIXES = [
-  'controller-service/src/lib/admin-agent/',
+  'packages/store-core/src/lib/admin-agent/',
   'controller-service/src/app/api/(admin)/',
   'controller-service/src/app/api/(public)/',
 ]
 const LOCATION_ALLOW_FILES = new Set<string>([
-  'controller-service/src/lib/admin-agent/tools/sales.ts', // description now neutral + default via storeOrigin(); keeps the word only in a comment
+  'packages/store-core/src/lib/admin-agent/tools/sales.ts', // description now neutral + default via storeOrigin(); keeps the word only in a comment
   'controller-service/src/app/api/(public)/orders/[id]/invoice/route.ts', // reads business_state (tenant), no literal
 ])
 
@@ -41,35 +41,35 @@ const LOCATION_ALLOW_FILES = new Set<string>([
 const ALLOW_PREFIXES = [
   'controller-service/src/app/(ecom)/',
   'controller-service/src/app/api/(ecom)/', // the ecom portal's own API (portal prompts, service gates, platform billing)
-  'controller-service/src/components/admin/ecom/', // platform control plane (admin.jeffistores.in /admin/ecom, isPlatformAdmin)
-  'controller-service/src/lib/billing/', // Jeffi's own invoices/top-ups billed to tenants
+  'packages/store-core/src/components/admin/ecom/', // platform control plane (admin.jeffistores.in /admin/ecom, isPlatformAdmin)
+  'packages/store-core/src/lib/billing/', // Jeffi's own invoices/top-ups billed to tenants
   'controller-service/src/app/(marketing)/',
   'controller-service/src/app/(portal)/',
-  'controller-service/src/lib/provisioning/',
-  'controller-service/src/lib/legals/',
-  'controller-service/src/lib/amazon/',
-  'controller-service/src/lib/merchant/',
-  'controller-service/src/lib/social/',
-  'controller-service/src/lib/payments/',
-  'controller-service/src/lib/tenancy/certificates.ts',
-  'controller-service/src/lib/tenancy/tenant-ca.ts',
-  'controller-service/src/lib/tenant-registry/social.ts',
-  'controller-service/src/lib/integrations/resolve.ts',
-  'controller-service/src/lib/shared/ecom-emails.ts',
+  'packages/store-core/src/lib/provisioning/',
+  'packages/store-core/src/lib/legals/',
+  'packages/store-core/src/lib/amazon/',
+  'packages/store-core/src/lib/merchant/',
+  'packages/store-core/src/lib/social/',
+  'packages/store-core/src/lib/payments/',
+  'packages/store-core/src/lib/tenancy/certificates.ts',
+  'packages/store-core/src/lib/tenancy/tenant-ca.ts',
+  'packages/store-core/src/lib/tenant-registry/social.ts',
+  'packages/store-core/src/lib/integrations/resolve.ts',
+  'packages/store-core/src/lib/shared/ecom-emails.ts',
 ]
 
 // Specific files allowed to name the platform entity.
 const ALLOW_FILES = new Set<string>([
-  'controller-service/src/lib/catalog/brand.ts', // defines platformBrandName() — the platform default lives here
-  'controller-service/src/lib/catalog/site-controls.ts', // DEFAULTS block (tenant-overridable platform defaults)
-  'controller-service/src/lib/auth/mfa.ts', // PLATFORM_ISSUER fallback (used only when no tenant brand resolves)
-  'controller-service/src/lib/shared/mail-audit.ts', // literal only appears in a comment (default now tenant-resolved)
-  'controller-service/src/lib/email/certificates.ts', // ecom/platform-admin cert mail; tenant branch already uses tenant.storeName
+  'packages/store-core/src/lib/catalog/brand.ts', // defines platformBrandName() — the platform default lives here
+  'packages/store-core/src/lib/catalog/site-controls.ts', // DEFAULTS block (tenant-overridable platform defaults)
+  'packages/store-core/src/lib/auth/mfa.ts', // PLATFORM_ISSUER fallback (used only when no tenant brand resolves)
+  'packages/store-core/src/lib/shared/mail-audit.ts', // literal only appears in a comment (default now tenant-resolved)
+  'packages/store-core/src/lib/email/certificates.ts', // ecom/platform-admin cert mail; tenant branch already uses tenant.storeName
   'controller-service/src/app/api/(admin)/admin/access-request/route.ts', // operator alert to the platform admin
   'controller-service/src/app/api/(admin)/admin/users/route.ts', // last-resort fallback for a null tenant (platform)
-  'controller-service/src/components/admin/AdminSupportChat.tsx', // operator-side chat label, not customer-facing
-  'controller-service/src/components/admin/ExtensionTokenCard.tsx', // "Jeffi Gallery Uploader" — product proper noun
-  'controller-service/src/components/visitor/SupportChat.tsx', // widget mounts on platform (marketing/business) hosts
+  'packages/store-core/src/components/admin/AdminSupportChat.tsx', // operator-side chat label, not customer-facing
+  'packages/store-core/src/components/admin/ExtensionTokenCard.tsx', // "Jeffi Gallery Uploader" — product proper noun
+  'packages/store-core/src/components/visitor/SupportChat.tsx', // widget mounts on platform (marketing/business) hosts
 ])
 
 function isAllowed(rel: string): boolean {
@@ -93,7 +93,7 @@ function walk(dir: string, out: string[]): void {
 
 describe('no hardcoded platform brand in tenant-facing code (#486)', () => {
   const files: string[] = []
-  walk(SRC, files)
+  for (const src of SRCS) walk(src, files)
 
   const offenders: { file: string; line: number; text: string }[] = []
   for (const full of files) {

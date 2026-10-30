@@ -4,7 +4,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn() }))
 vi.mock('@/lib/loyalty/settings', () => ({ getLoyaltySettings: vi.fn() }))
 vi.mock('@/lib/referrals/settings', () => ({ getReferralSettings: vi.fn() }))
 
-import { GET } from '@/app/api/(public)/feature-flags/route'
+import { GET } from '@controller/app/api/(public)/feature-flags/route'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getReferralSettings } from '@/lib/referrals/settings'

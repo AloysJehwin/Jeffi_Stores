@@ -193,7 +193,7 @@ describe.skipIf(!ENABLED)('Razorpay subscription webhook replay (real DB)', () =
     delete process.env.RDS_IAM_AUTH
     db = await import('@/lib/shared/db')
     ;({ NextRequest } = await import('next/server'))
-    ;({ POST } = (await import('@/app/api/(public)/webhooks/razorpay/route')) as any)
+    ;({ POST } = (await import('@controller/app/api/(public)/webhooks/razorpay/route')) as any)
 
     const u = await db.queryOne<{ id: string }>(
       `INSERT INTO users (email, first_name, last_name, phone) VALUES ($1, 'Replay', 'Tester', '9999999999') RETURNING id`,

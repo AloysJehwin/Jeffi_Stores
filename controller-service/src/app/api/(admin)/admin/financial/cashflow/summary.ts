@@ -1,6 +1,6 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, previousPeriod, type Bucket, type Period } from '@/lib/overview/period'
-import { fillSeries } from '@/app/(admin)/admin/financial/_components/overview-period'
+import { fillSeries } from '@controller/app/(admin)/admin/financial/_components/overview-period'
 import { getCashflow, type CashflowMonth } from '@/lib/payments/financial'
 
 // Cashflow overview matching FinanceOverviewContract. Current + previous period totals, bucketed

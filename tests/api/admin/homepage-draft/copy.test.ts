@@ -21,7 +21,7 @@ vi.mock('@/lib/admin/draft-locks', async importOriginal => ({
 
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { POST } from '@/app/api/(admin)/admin/homepage-draft/copy/route'
+import { POST } from '@controller/app/api/(admin)/admin/homepage-draft/copy/route'
 
 const admin = { adminId: '33333333-3333-4333-8333-333333333333', role: 'super_admin', scopes: [] }
 const A = 'eeeeeeee-0000-4000-8000-000000000001'

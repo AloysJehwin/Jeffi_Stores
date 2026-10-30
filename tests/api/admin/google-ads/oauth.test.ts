@@ -20,8 +20,8 @@ vi.mock('@/lib/crypto/token-cipher', () => ({
   decryptToken: (s: string) => s.replace(/^enc:/, ''),
 }))
 
-import { GET as adsConnect } from '@/app/api/(admin)/admin/integrations/google-ads/connect/route'
-import { GET as googleCallback } from '@/app/api/(admin)/admin/integrations/google/callback/route'
+import { GET as adsConnect } from '@controller/app/api/(admin)/admin/integrations/google-ads/connect/route'
+import { GET as googleCallback } from '@controller/app/api/(admin)/admin/integrations/google/callback/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'

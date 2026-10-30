@@ -36,7 +36,7 @@ vi.mock('@/lib/shared/ecom-emails', () => ({ sendKycSubmittedEmail: vi.fn().mock
 vi.mock('@/lib/k8s/capacity', () => ({ dedicatedCapacityError: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/shipping/delhivery', () => ({ verifyDelhiveryToken: vi.fn() }))
 
-import { POST } from '@/app/api/(ecom)/ecom/onboard/submit/route'
+import { POST } from '@controller/app/api/(ecom)/ecom/onboard/submit/route'
 
 const SERVICES = { id: 't-1', slug: 'acme', service_types: ['messaging'], store_request: null, status: 'active' }
 const BODY = {

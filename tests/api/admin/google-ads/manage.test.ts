@@ -34,10 +34,10 @@ vi.mock('@/lib/google-ads/manage-data', () => ({ loadWizardBootstrap: m.bootstra
 vi.mock('@/lib/google-ads/listing', () => ({ itemIdsForCategories: m.itemIds }))
 vi.mock('@/lib/google-ads/assets', () => ({ prepareImages: vi.fn(), assetSuggestions: vi.fn() }))
 
-import { GET as bootstrap, POST as action } from '@/app/api/(admin)/admin/google-ads/manage/route'
-import { POST as create } from '@/app/api/(admin)/admin/google-ads/manage/campaigns/route'
-import { POST as aiCopy } from '@/app/api/(admin)/admin/google-ads/manage/ai-copy/route'
-import { GET as changeLog } from '@/app/api/(admin)/admin/google-ads/manage/change-log/route'
+import { GET as bootstrap, POST as action } from '@controller/app/api/(admin)/admin/google-ads/manage/route'
+import { POST as create } from '@controller/app/api/(admin)/admin/google-ads/manage/campaigns/route'
+import { POST as aiCopy } from '@controller/app/api/(admin)/admin/google-ads/manage/ai-copy/route'
+import { GET as changeLog } from '@controller/app/api/(admin)/admin/google-ads/manage/change-log/route'
 import { AdsMutationError } from '@/lib/google-ads/mutate'
 
 const PRO_ADMIN = { adminId: 'a1', email: 'owner@store.in', role: 'super_admin', scopes: ['google_ads_campaigns:write', 'google_ads:read', 'catalog_enrichment:write'] }

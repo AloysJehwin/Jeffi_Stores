@@ -32,12 +32,12 @@ vi.mock('@/lib/catalog/meta', () => ({
   })),
 }))
 
-import { GET as amazonConnect } from '@/app/api/(admin)/admin/integrations/amazon/connect/route'
-import { GET as amazonCallback } from '@/app/api/(admin)/admin/integrations/amazon/callback/route'
-import { GET as googleConnect } from '@/app/api/(admin)/admin/integrations/google/connect/route'
-import { GET as googleCallback } from '@/app/api/(admin)/admin/integrations/google/callback/route'
-import { GET as metaConnect } from '@/app/api/(admin)/admin/social/connect/[provider]/route'
-import { GET as metaCallback } from '@/app/api/(admin)/admin/social/callback/route'
+import { GET as amazonConnect } from '@controller/app/api/(admin)/admin/integrations/amazon/connect/route'
+import { GET as amazonCallback } from '@controller/app/api/(admin)/admin/integrations/amazon/callback/route'
+import { GET as googleConnect } from '@controller/app/api/(admin)/admin/integrations/google/connect/route'
+import { GET as googleCallback } from '@controller/app/api/(admin)/admin/integrations/google/callback/route'
+import { GET as metaConnect } from '@controller/app/api/(admin)/admin/social/connect/[provider]/route'
+import { GET as metaCallback } from '@controller/app/api/(admin)/admin/social/callback/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
 import {

@@ -12,7 +12,7 @@ import {
   presetRange,
   previousPeriod,
   spanDays,
-} from '@/app/(admin)/admin/financial/_components/overview-period'
+} from '@controller/app/(admin)/admin/financial/_components/overview-period'
 
 // 2026-10-16 10:00 IST
 const NOW = new Date('2026-10-16T04:30:00Z')

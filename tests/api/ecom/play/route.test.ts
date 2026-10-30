@@ -17,7 +17,7 @@ vi.mock('@/lib/tenant-registry', () => ({
 }))
 vi.mock('@/lib/ecom/service-client', () => ({ fetchService: mockFetchService }))
 
-import { POST } from '@/app/api/(ecom)/ecom/play/route'
+import { POST } from '@controller/app/api/(ecom)/ecom/play/route'
 
 const KEY = '11111111-1111-4111-8111-111111111111'
 const MSG = { apiKeyId: KEY, kind: 'message', channel: 'whatsapp', template: 'order/confirmed', to: '+919876543210', variables: { 1: 'Priya' } }

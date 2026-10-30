@@ -28,7 +28,7 @@ vi.mock('@/lib/admin/draft-locks', async importOriginal => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/(admin)/admin/mailer/[id]/send/route'
+import { POST } from '@controller/app/api/(admin)/admin/mailer/[id]/send/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'

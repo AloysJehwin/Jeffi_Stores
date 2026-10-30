@@ -9,7 +9,7 @@ vi.mock('@/lib/referrals/settings', async () => {
   return { ...actual, getReferralSettings: vi.fn(), saveReferralSettings: vi.fn() }
 })
 
-import { GET, PUT } from '@/app/api/(admin)/admin/referrals/route'
+import { GET, PUT } from '@controller/app/api/(admin)/admin/referrals/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getReferralStats } from '@/lib/referrals/queries'

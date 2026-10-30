@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
-vi.mock('@/app/api/(admin)/admin/crm/overview/summary', () => ({ getCrmOverview: vi.fn() }))
+vi.mock('@controller/app/api/(admin)/admin/crm/overview/summary', () => ({ getCrmOverview: vi.fn() }))
 
-import { GET } from '@/app/api/(admin)/admin/crm/overview/route'
+import { GET } from '@controller/app/api/(admin)/admin/crm/overview/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { getCrmOverview } from '@/app/api/(admin)/admin/crm/overview/summary'
-import { istToday, presetPeriod } from '@/app/(admin)/admin/crm/_lib/period'
+import { getCrmOverview } from '@controller/app/api/(admin)/admin/crm/overview/summary'
+import { istToday, presetPeriod } from '@controller/app/(admin)/admin/crm/_lib/period'
 
 const mockScope = vi.mocked(requireAdminScope)
 const mockOverview = vi.mocked(getCrmOverview)

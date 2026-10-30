@@ -11,7 +11,7 @@ vi.mock('@/lib/catalog/return-policy', () => ({
   getOrderItemsPolicy: vi.fn(),
 }))
 
-import { GET } from '@/app/api/(public)/orders/[id]/return-policy/route'
+import { GET } from '@controller/app/api/(public)/orders/[id]/return-policy/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as returnPolicy from '@/lib/catalog/return-policy'

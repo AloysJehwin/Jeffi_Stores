@@ -37,8 +37,8 @@ vi.mock('@/lib/shared/db', () => {
 })
 
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
-import { createProduct } from '@/app/(admin)/admin/products/add/actions'
-import { updateProduct } from '@/app/(admin)/admin/products/[id]/edit/actions'
+import { createProduct } from '@controller/app/(admin)/admin/products/add/actions'
+import { updateProduct } from '@controller/app/(admin)/admin/products/[id]/edit/actions'
 import { publishProductDraft } from '@/lib/catalog/product-draft'
 import { productsWriteError } from '@/lib/catalog/product-action-auth'
 import { deleteProductImage } from '@/lib/shared/s3'

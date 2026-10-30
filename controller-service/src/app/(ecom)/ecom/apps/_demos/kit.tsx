@@ -4,7 +4,7 @@ import { useState, Fragment, type ReactNode, type ComponentType } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import clsx from 'clsx'
 import { Check } from 'lucide-react'
-import { BrowserFrame } from '@/app/(ecom)/ecom/BrowserFrame'
+import { BrowserFrame } from '@controller/app/(ecom)/ecom/BrowserFrame'
 
 // Shared chrome for every per-app demo: pill stepper, fixed-height browser frame, Back/Next.
 // Each demo keeps its own state and views — this only standardises the shell so no stage shifts layout.

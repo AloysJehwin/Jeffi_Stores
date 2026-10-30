@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import RfqTrendChart, { type RfqTrendPoint } from '@/app/(admin)/admin/business/rfqs/_components/RfqTrendChart'
+import RfqTrendChart, { type RfqTrendPoint } from '@controller/app/(admin)/admin/business/rfqs/_components/RfqTrendChart'
 
 // Seed example for the integration suite — the Business RFQs stats block (fix 50a2cb6f).
 // Two parts, because the stats row is split across a renderable child and a non-renderable parent:

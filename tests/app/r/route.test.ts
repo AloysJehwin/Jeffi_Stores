@@ -8,7 +8,7 @@ vi.mock('@/lib/referrals/codes', async () => {
   return { ...actual, resolveReferralCode: vi.fn() }
 })
 
-import { GET } from '@/app/(storefront)/r/[code]/route'
+import { GET } from '@controller/app/(storefront)/r/[code]/route'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { isReferralLive } from '@/lib/referrals/settings'
 import { resolveReferralCode } from '@/lib/referrals/codes'

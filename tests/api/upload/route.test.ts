@@ -40,7 +40,7 @@ vi.mock('@/lib/shared/s3', () => ({
 
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/(public)/upload/route'
+import { POST } from '@controller/app/api/(public)/upload/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { uploadProductImage, UploadValidationError } from '@/lib/shared/s3'
 

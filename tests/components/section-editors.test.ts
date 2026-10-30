@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
-const DIR = join(process.cwd(), 'controller-service/src/components/admin/homepage')
+const DIR = join(process.cwd(), 'packages/store-core/src/components/admin/homepage')
 const EDITORS = join(DIR, 'editors')
 
 function allSources(): { file: string; src: string }[] {

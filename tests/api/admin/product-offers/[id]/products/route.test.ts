@@ -17,7 +17,7 @@ vi.mock('@/lib/shared/db', () => ({
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
-import { GET, PUT, POST } from '@/app/api/(admin)/admin/product-offers/[id]/products/route'
+import { GET, PUT, POST } from '@controller/app/api/(admin)/admin/product-offers/[id]/products/route'
 
 const admin = { adminId: 'a1', role: 'super_admin', scopes: [] }
 const params = Promise.resolve({ id: '11111111-1111-1111-1111-111111111111' })

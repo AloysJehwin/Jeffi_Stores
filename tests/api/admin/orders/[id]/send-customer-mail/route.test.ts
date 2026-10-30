@@ -10,7 +10,7 @@ vi.mock('@/lib/orders/customer-mail', async () => {
   return { unfilledTokens: actual.unfilledTokens, orderMailVars: vi.fn() }
 })
 
-import { POST } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/route'
+import { POST } from '@controller/app/api/(admin)/admin/orders/[id]/send-customer-mail/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { sendAdminContactEmail } from '@/lib/email'

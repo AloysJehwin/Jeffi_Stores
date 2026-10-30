@@ -27,7 +27,7 @@ vi.mock('@/lib/shared/customer-links', () => ({
   orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
 }))
 
-import { POST } from '@/app/api/(public)/razorpay/payment-link/route'
+import { POST } from '@controller/app/api/(public)/razorpay/payment-link/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'

@@ -6,7 +6,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/s3', () => ({ deleteGalleryImage: vi.fn() }))
 
-import { DELETE } from '@/app/api/(public)/gallery/[id]/route'
+import { DELETE } from '@controller/app/api/(public)/gallery/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'

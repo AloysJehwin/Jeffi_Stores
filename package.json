@@ -9,7 +9,7 @@
     "dev:https": "node controller-service/server.js",
     "build": "next build controller-service",
     "start": "next start controller-service",
-    "lint": "next lint controller-service",
+    "lint": "next lint controller-service --dir src --dir ../packages/store-core/src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

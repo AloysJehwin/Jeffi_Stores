@@ -4,7 +4,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import {
   isValidRange,
   presetRange,
-} from '@/app/(admin)/admin/financial/_components/overview-period'
+} from '@controller/app/(admin)/admin/financial/_components/overview-period'
 import { FLAGSHIP_TENANT_ID } from '@/lib/payments/wallet'
 import { getFinanceOverview } from './summary'
 

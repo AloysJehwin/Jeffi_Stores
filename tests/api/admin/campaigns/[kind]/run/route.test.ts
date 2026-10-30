@@ -9,7 +9,7 @@ vi.mock('@/lib/campaigns/runner', () => ({ runScenario: vi.fn() }))
 vi.mock('@/lib/campaigns/custom-runner', () => ({ runCustomScenario: vi.fn() }))
 vi.mock('@/lib/shared/marketing', () => ({ getCampaign: vi.fn() }))
 
-import { POST } from '@/app/api/(admin)/admin/campaigns/[kind]/run/route'
+import { POST } from '@controller/app/api/(admin)/admin/campaigns/[kind]/run/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

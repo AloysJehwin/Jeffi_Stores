@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
 vi.mock('@/lib/overviews/subscriptions', () => ({ loadSubscriptionOverview: vi.fn() }))
 vi.mock('@/lib/queries/subscriptions', () => ({ getAdminSubscriptionStats: vi.fn() }))
 
-import { GET } from '@/app/api/(admin)/admin/subscriptions/overview/route'
+import { GET } from '@controller/app/api/(admin)/admin/subscriptions/overview/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { loadSubscriptionOverview } from '@/lib/overviews/subscriptions'
 import { getAdminSubscriptionStats } from '@/lib/queries/subscriptions'

@@ -1,6 +1,6 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, previousPeriod, type Period } from '@/lib/overview/period'
-import { fillSeries } from '@/app/(admin)/admin/financial/_components/overview-period'
+import { fillSeries } from '@controller/app/(admin)/admin/financial/_components/overview-period'
 import { MESSAGING_ESTIMATE_INR } from '@/lib/shared/messaging/pricing'
 
 // Finance → Messaging. SMS/WhatsApp are trued up to the provider price on the status callback;

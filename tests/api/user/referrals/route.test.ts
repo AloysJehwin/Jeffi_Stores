@@ -7,7 +7,7 @@ vi.mock('@/lib/referrals/codes', () => ({ getOrCreateReferralCode: vi.fn() }))
 vi.mock('@/lib/referrals/queries', () => ({ getReferralSummary: vi.fn() }))
 vi.mock('@/lib/referrals/settings', () => ({ getReferralSettings: vi.fn(), isReferralLive: vi.fn() }))
 
-import { GET } from '@/app/api/(public)/user/referrals/route'
+import { GET } from '@controller/app/api/(public)/user/referrals/route'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { isLoyaltyEligible } from '@/lib/loyalty/redeem'
 import { getOrCreateReferralCode } from '@/lib/referrals/codes'

@@ -6,8 +6,8 @@ vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn(), query: vi.fn() }))
 vi.mock('@/lib/catalog/site-controls', () => ({ getStoreIdentity: vi.fn() }))
 
-import { GET, POST } from '@/app/api/(admin)/admin/template-variables/route'
-import { PATCH, DELETE } from '@/app/api/(admin)/admin/template-variables/[id]/route'
+import { GET, POST } from '@controller/app/api/(admin)/admin/template-variables/route'
+import { PATCH, DELETE } from '@controller/app/api/(admin)/admin/template-variables/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'

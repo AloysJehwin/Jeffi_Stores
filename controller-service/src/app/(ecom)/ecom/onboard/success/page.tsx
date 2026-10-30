@@ -5,7 +5,7 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { getOwnerTenants, setSubscriptionStatus } from '@/lib/tenant-registry'
 import { getSubscription } from '@/lib/payments/razorpay-subscriptions'
 import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
-import { CheckMark } from '@/app/(ecom)/ecom/Shapes'
+import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import PurchaseBeacon from './PurchaseBeacon'
 
 export const dynamic = 'force-dynamic'

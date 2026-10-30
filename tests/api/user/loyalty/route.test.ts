@@ -7,7 +7,7 @@ vi.mock('@/lib/loyalty/redeem', () => ({ isLoyaltyEligible: vi.fn() }))
 vi.mock('@/lib/loyalty/reconcile', () => ({ reconcileLoyalty: vi.fn() }))
 vi.mock('@/lib/loyalty/queries', () => ({ getLoyaltySummary: vi.fn() }))
 
-import { GET } from '@/app/api/(public)/user/loyalty/route'
+import { GET } from '@controller/app/api/(public)/user/loyalty/route'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { isLoyaltyEligible } from '@/lib/loyalty/redeem'

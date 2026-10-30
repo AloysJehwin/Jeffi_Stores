@@ -20,7 +20,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 const signDownload = vi.fn(async (_k: string, o: any) => `/signed?d=${o.disposition}`)
 vi.mock('@/lib/vault/storage', () => ({ getStorageDriver: () => ({ signDownload }) }))
 
-import { GET } from '@/app/api/(public)/vault/stream/route'
+import { GET } from '@controller/app/api/(public)/vault/stream/route'
 import { safeContentType } from '@/lib/vault/entitled-files'
 
 const FILE_ID = '11111111-1111-4111-8111-111111111111'

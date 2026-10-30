@@ -11,8 +11,8 @@ vi.mock('@/lib/crypto/token-cipher', () => ({
   decryptToken: (s: string) => Buffer.from(s.slice(4), 'base64').toString(),
 }))
 
-import { POST as manualPOST } from '@/app/api/(admin)/admin/social/networks/[network]/manual/route'
-import { POST as pickPOST, GET as pickGET } from '@/app/api/(admin)/admin/social/networks/[network]/route'
+import { POST as manualPOST } from '@controller/app/api/(admin)/admin/social/networks/[network]/manual/route'
+import { POST as pickPOST, GET as pickGET } from '@controller/app/api/(admin)/admin/social/networks/[network]/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { providerFor } from '@/lib/social/providers'
