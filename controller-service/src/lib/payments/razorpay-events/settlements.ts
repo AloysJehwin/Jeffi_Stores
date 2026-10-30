@@ -1,5 +1,5 @@
 import 'server-only'
-import { applySettlementProcessed, applyTransferState } from '@/lib/payments/route-settlement'
+import { applySettlementProcessed, applyTransferState, recordLinkedSettlement } from '@/lib/payments/route-settlement'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { flagshipScope, runInTenant, type WebhookTenant } from '@/lib/payments/webhook-tenant'
 import type { EventContext } from './context'
@@ -12,6 +12,7 @@ import type { EventContext } from './context'
 export async function onTransfer(transfer: any, ctx: EventContext) {
   if (ctx.source !== 'platform') return
   await applyTransferState(transfer).catch(() => {})
+  if (transfer?.recipient_settlement_id) await recordLinkedSettlement({ settlementId: String(transfer.recipient_settlement_id) })
 }
 
 /**
@@ -26,7 +27,8 @@ export async function onSettlementProcessed(settlement: any, ctx: EventContext) 
     return
   }
   await applySettlementProcessed(settlement).catch(() => {})
-  if (!(await isLinkedAccount(ctx.accountId))) syncSettlementDay(flagshipScope(), settlement)
+  if (await isLinkedAccount(ctx.accountId)) await recordLinkedSettlement({ settlement, linkedAccountId: ctx.accountId })
+  else syncSettlementDay(flagshipScope(), settlement)
 }
 
 async function isLinkedAccount(accountId: string | null | undefined): Promise<boolean> {

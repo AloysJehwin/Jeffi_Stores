@@ -245,6 +245,9 @@ export interface TenantTransaction {
   gateway_txn_id: string | null
   status: string
   occurred_at: string
+  /** When a Route sale reached the store's bank, and the bank's reference. */
+  payout_at?: string | null
+  payout_utr?: string | null
 }
 export interface LedgerEntry {
   id: string
@@ -263,7 +266,12 @@ export async function getTenantBilling(tenantId: string): Promise<{
 }> {
   const pool = controlPlanePool()
   const [txn, led] = await Promise.all([
-    pool.query(`SELECT * FROM tenant_transactions WHERE tenant_id=$1 ORDER BY occurred_at DESC`, [tenantId]),
+    pool.query(
+      `SELECT t.*, s.settled_at AS payout_at, s.utr AS payout_utr
+         FROM tenant_transactions t LEFT JOIN linked_account_settlements s ON s.id = t.recipient_settlement_id
+        WHERE t.tenant_id=$1 ORDER BY t.occurred_at DESC`,
+      [tenantId]
+    ),
     pool.query(
       `SELECT id, entry_type, amount, note, occurred_at FROM settlement_ledger WHERE tenant_id=$1 ORDER BY occurred_at DESC`,
       [tenantId]
@@ -282,6 +290,26 @@ export async function getTenantBilling(tenantId: string): Promise<{
     { gross: 0, tenantShare: 0, commission: 0, fees: 0 }
   )
   return { transactions, ledger, balance, totals }
+}
+
+export interface LinkedPayout {
+  id: string
+  amount: string
+  fees: string
+  tax: string
+  utr: string | null
+  status: string | null
+  settled_at: string | null
+}
+
+/** A Route store's recent payouts from its linked account to its bank. */
+export async function listLinkedPayouts(tenantId: string, limit = 20): Promise<LinkedPayout[]> {
+  const r = await controlPlanePool().query(
+    `SELECT id, amount, fees, tax, utr, status, settled_at FROM linked_account_settlements
+      WHERE tenant_id = $1 ORDER BY settled_at DESC NULLS LAST LIMIT $2`,
+    [tenantId, limit]
+  )
+  return r.rows as LinkedPayout[]
 }
 
 /** Platform-wide MRR + commission summary for the billing list hero. */
