@@ -5,6 +5,7 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import OnboardEntry from './OnboardEntry'
 import OnboardWizard from './OnboardWizard'
 import PaymentTrigger from './PaymentTrigger'
+import { computeSpecEnabled } from '@/lib/compute/catalog'
 
 export const dynamic = 'force-dynamic'
 
@@ -255,6 +256,7 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
   return (
     <OnboardEntry
       plans={plans}
+      computeEnabled={computeSpecEnabled()}
       initialDraft={draft ? { current_step: submitted ? 0 : draft.current_step, data: carried } : null}
       reusingPreviousDetails={submitted}
       ownerName={owner.name}
@@ -306,6 +308,7 @@ async function UpgradeWizard({
   return (
     <OnboardWizard
       plans={plans}
+      computeEnabled={computeSpecEnabled()}
       initialDraft={{ current_step: reopened ? 0 : (draft?.current_step ?? 0), data }}
       ownerName={ownerName}
       upgrade={{ tenantId: tenant.id, slug: tenant.slug, displayName: tenant.display_name }}
