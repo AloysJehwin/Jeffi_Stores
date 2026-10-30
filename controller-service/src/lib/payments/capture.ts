@@ -15,14 +15,15 @@ import { recordCapturedPayment } from '@/lib/payments/route-settlement'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
-import { isFlagship, type WebhookTenant } from '@/lib/payments/webhook-tenant'
+import { isFlagship } from '@/lib/payments/webhook-tenant'
 
 /**
  * One path for a captured Razorpay payment, used by the webhooks, verify, check-pending and the sweep.
  * Everything here runs in the store the payment belongs to: callers wrap it in runInTenant.
  */
 
-type Store = { tenantId: string; slug?: string | null } | null
+/** The store the payment belongs to; null or the nil id is the flagship. */
+export type Store = { tenantId: string; slug?: string | null } | null
 
 /**
  * Books a store's share of a captured payment. The transfer API is not idempotent, so callers only
@@ -86,7 +87,7 @@ const CLEAR_CART = 'DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved
 export type CaptureOutcome = 'paid' | 'already_paid' | 'committed' | 'adjustment' | 'variant_change' | 'needs_action' | 'unmatched'
 
 /** Applies a captured payment to the store this runs in. 'unmatched': nothing here was waiting for it. */
-export async function applyCapturedPayment(payment: any, store: WebhookTenant): Promise<CaptureOutcome> {
+export async function applyCapturedPayment(payment: any, store: Store): Promise<CaptureOutcome> {
   const rzpOrderId = payment.order_id
   const paymentId = payment.id
   const amountPaise = Number(payment.amount) || 0
@@ -105,7 +106,7 @@ export async function applyCapturedPayment(payment: any, store: WebhookTenant): 
   // A product-adjustment top-up whose browser never reached verify.
   if (payment?.notes?.purpose === 'order_adjustment' && rzpOrderId) {
     const { settleAdjustmentPayment } = await import('@/lib/orders/adjustments')
-    const tenant = isFlagship(store) ? null : { tenantId: store.tenantId, slug: store.slug }
+    const tenant = store && !isFlagship(store) ? { tenantId: store.tenantId, slug: store.slug } : null
     await settleAdjustmentPayment({ razorpayOrderId: rzpOrderId, razorpayPaymentId: paymentId, amountPaise, tenant }).catch(e =>
       console.error('[capture] order adjustment settle failed', e)
     )
@@ -162,7 +163,7 @@ export async function applyCapturedPayment(payment: any, store: WebhookTenant): 
 }
 
 /** A payment-link payment: the order the link was made for is paid. */
-export async function applyLinkPayment(link: any, payment: any, store: WebhookTenant): Promise<CaptureOutcome> {
+export async function applyLinkPayment(link: any, payment: any, store: Store): Promise<CaptureOutcome> {
   const linkId = link?.id
   if (!linkId) return 'unmatched'
   const order = await queryOne(
@@ -212,7 +213,7 @@ export async function applyLinkPayment(link: any, payment: any, store: WebhookTe
 }
 
 /** A UPI QR payment (invoice QR): the order the QR was made for is paid. */
-export async function applyQrPayment(qr: any, payment: any, store: WebhookTenant): Promise<CaptureOutcome> {
+export async function applyQrPayment(qr: any, payment: any, store: Store): Promise<CaptureOutcome> {
   const qrId = qr?.id
   if (!qrId) return 'unmatched'
   const order = await queryOne<{
@@ -262,7 +263,7 @@ export type DraftCommit =
 export async function commitDraftFromCapture(
   rzpOrderId: string,
   payment: any,
-  store: WebhookTenant,
+  store: Store,
   opts: { via?: string } = {}
 ): Promise<DraftCommit> {
   const paymentId = payment.id

@@ -28,7 +28,8 @@ interface RawOffer {
   rules?: { items?: Array<{ criteria?: { includes?: { paymentInstrument?: Record<string, any> } } }> } | null
 }
 
-let cache: { at: number; offers: PublicOffer[] } | null = null
+// Per Razorpay account: a store on its own account has its own offers.
+const caches = new Map<string, { at: number; offers: PublicOffer[] }>()
 
 /** Bank codes Razorpay returns on card rules; unmapped codes fall through unchanged. */
 const ISSUER_NAMES: Record<string, string> = {
@@ -157,13 +158,15 @@ export type OffersFetch =
  * is empty.
  */
 export async function fetchAccountOffers(): Promise<OffersFetch> {
-  if (cache && Date.now() - cache.at < TTL_MS) return { ok: true, offers: cache.offers }
-
-  const keyId = process.env.RAZORPAY_KEY_ID
-  const keySecret = process.env.RAZORPAY_KEY_SECRET
+  const { resolveRazorpayCreds } = await import('@/lib/integrations/resolve')
+  const creds = await resolveRazorpayCreds().catch(() => null)
+  const keyId = creds?.key_id
+  const keySecret = creds?.key_secret
   if (!keyId || !keySecret) {
-    return { ok: false, offers: [], reason: 'no_keys', detail: 'RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are not set.' }
+    return { ok: false, offers: [], reason: 'no_keys', detail: 'No Razorpay keys are set for this store.' }
   }
+  const cache = caches.get(keyId)
+  if (cache && Date.now() - cache.at < TTL_MS) return { ok: true, offers: cache.offers }
 
   const testMode = keyId.startsWith('rzp_test_')
 
@@ -192,7 +195,7 @@ export async function fetchAccountOffers(): Promise<OffersFetch> {
 
     const body = (await res.json()) as { items?: RawOffer[] }
     const offers = (body.items ?? []).map(normalise).filter((o): o is PublicOffer => !!o)
-    cache = { at: Date.now(), offers }
+    caches.set(keyId, { at: Date.now(), offers })
     return { ok: true, offers }
   } catch (e) {
     return {
