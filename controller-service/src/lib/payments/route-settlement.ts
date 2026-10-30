@@ -3,6 +3,7 @@ import {
   commissionPct,
   fetchTransfer,
   fetchTransfersForPayment,
+  fetchLinkedSettlement,
   fetchTransfersForSettlement,
   reverseTransfer,
   transferToLinkedAccount,
@@ -723,7 +724,103 @@ export async function reconcileSettlements(opts?: {
     const ok = await transferForTxn(pool, row, { linkedAccountId: target.linkedAccountId, dailyPayout: target.dailyPayout })
     if (ok) res.transferred++
   }
+
+  // Payouts whose bank date and UTR were never read (webhook missed, or rows settled before this existed).
+  const unread = await pool
+    .query(
+      `SELECT DISTINCT t.recipient_settlement_id AS id, t.tenant_id FROM tenant_transactions t
+        WHERE t.recipient_settlement_id IS NOT NULL AND t.settled_at > now() - interval '60 days' ${scope.replace('tenant_id', 't.tenant_id').replace('$3', '$1')}
+          AND NOT EXISTS (SELECT 1 FROM linked_account_settlements s WHERE s.id = t.recipient_settlement_id)
+        LIMIT 20`,
+      opts?.tenantId ? [opts.tenantId] : []
+    )
+    .then((r: any) => (r.rows ?? []) as { id: string; tenant_id: string }[])
+    .catch(() => [])
+  for (const u of unread) await recordLinkedSettlement({ settlementId: u.id, tenantId: u.tenant_id })
   return res
+}
+
+/** For a Route store's order page: where each payment's share stands, and its payout to the bank. */
+export async function routePayoutsFor(tenantId: string, paymentIds: string[]) {
+  if (!paymentIds.length) return []
+  const pool = await cpPool()
+  const r = await pool
+    .query(
+      `SELECT t.payment_id, t.status, t.tenant_share, t.transferred_at, s.settled_at AS payout_at, s.utr AS payout_utr
+         FROM tenant_transactions t LEFT JOIN linked_account_settlements s ON s.id = t.recipient_settlement_id
+        WHERE t.tenant_id = $1 AND t.payment_id = ANY($2)`,
+      [tenantId, paymentIds]
+    )
+    .catch(() => null)
+  return (r?.rows ?? []) as {
+    payment_id: string
+    status: string
+    tenant_share: string
+    transferred_at: string | null
+    payout_at: string | null
+    payout_utr: string | null
+  }[]
+}
+
+/**
+ * A Route store's payout from its linked account to its bank: amount, fees, UTR and when. From the
+ * linked account's settlement.processed entity when we have it, else read through a transfer it paid.
+ */
+export async function recordLinkedSettlement(opts: {
+  settlementId?: string
+  settlement?: any
+  tenantId?: string | null
+  linkedAccountId?: string | null
+}): Promise<boolean> {
+  try {
+    const pool = await cpPool()
+    let s = opts.settlement
+    let linked = opts.linkedAccountId ?? null
+    let transferId: string | null = null
+    if (!s) {
+      const known = await pool.query(`SELECT 1 FROM linked_account_settlements WHERE id = $1 AND utr IS NOT NULL`, [opts.settlementId])
+      if (known.rows?.length) return true
+      const found = await fetchLinkedSettlement(String(opts.settlementId))
+      if (!found) return false
+      s = found.settlement
+      linked = linked ?? found.linkedAccountId
+      transferId = found.transferId
+    }
+    if (!s?.id) return false
+    let tenantId = opts.tenantId ?? null
+    if (!tenantId) {
+      const r = await pool.query(
+        `SELECT tenant_id FROM tenant_transactions WHERE recipient_settlement_id = $1 OR transfer_id = $2
+         UNION ALL SELECT id FROM tenants WHERE razorpay_linked_account_id = $3
+         UNION ALL SELECT ot.tenant_id FROM tenant_bank_accounts b JOIN owner_tenants ot ON ot.owner_id = b.owner_id WHERE b.linked_account_id = $3
+         LIMIT 1`,
+        [s.id, transferId, linked]
+      )
+      tenantId = r.rows?.[0]?.tenant_id ?? null
+    }
+    if (!tenantId) return false
+    await pool.query(
+      `INSERT INTO linked_account_settlements (id, tenant_id, linked_account_id, amount, fees, tax, utr, status, settled_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (id) DO UPDATE SET utr = COALESCE(EXCLUDED.utr, linked_account_settlements.utr), status = EXCLUDED.status,
+         amount = EXCLUDED.amount, fees = EXCLUDED.fees, tax = EXCLUDED.tax,
+         settled_at = COALESCE(EXCLUDED.settled_at, linked_account_settlements.settled_at), fetched_at = now()`,
+      [
+        s.id,
+        tenantId,
+        linked ?? '',
+        toInr(Number(s.amount) || 0),
+        toInr(Number(s.fees) || 0),
+        toInr(Number(s.tax) || 0),
+        s.utr || null,
+        s.status || null,
+        Number(s.created_at) > 0 ? new Date(Number(s.created_at) * 1000).toISOString() : null,
+      ]
+    )
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**

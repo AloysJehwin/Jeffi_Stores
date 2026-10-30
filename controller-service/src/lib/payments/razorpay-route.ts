@@ -503,6 +503,18 @@ export async function fetchTransfersForSettlement(settlementId: string): Promise
   }
 }
 
+/** A linked account's settlement (the store's payout to its bank), read through one transfer it paid. */
+export async function fetchLinkedSettlement(settlementId: string): Promise<{ settlement: any; linkedAccountId: string | null; transferId: string | null } | null> {
+  try {
+    const page = await (getRazorpayInstance().transfers as any).all({ recipient_settlement_id: settlementId, 'expand[]': 'recipient_settlement', count: 1 })
+    const t = Array.isArray(page?.items) ? page.items[0] : null
+    if (!t?.recipient_settlement) return null
+    return { settlement: t.recipient_settlement, linkedAccountId: t.recipient ?? null, transferId: t.id ?? null }
+  } catch {
+    return null
+  }
+}
+
 /**
  * Map KYC business_type to Razorpay Route account type.
  */

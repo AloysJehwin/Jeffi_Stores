@@ -19,6 +19,7 @@ export {
   listPlans,
   getTenant,
   getTenantBilling,
+  listLinkedPayouts,
   billingSummary,
   addTenantServices,
   applyStoreUpgrade,
@@ -33,6 +34,7 @@ export {
   type TenantDetail,
   type TenantTransaction,
   type LedgerEntry,
+  type LinkedPayout,
 } from './tenants'
 export {
   enqueueProvisioning,

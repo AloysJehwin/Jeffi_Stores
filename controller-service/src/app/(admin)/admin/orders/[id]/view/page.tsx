@@ -26,6 +26,7 @@ import RetryRefundButton from '@/app/(admin)/admin/orders/[id]/_components/Retry
 import { orderDisputes, orderRefunds, paidWith } from '@/lib/payments/order-payment-info'
 import { estimatedSettlement, orderSettlements } from '@/lib/payments/rzp-settlement-report'
 import { isFlagship } from '@/lib/payments/webhook-tenant'
+import { routePayoutsFor } from '@/lib/payments/route-settlement'
 import CreateShipmentButton from '@/app/(admin)/admin/orders/[id]/_components/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductAdjustments from '@/app/(admin)/admin/orders/[id]/_components/ProductAdjustments'
@@ -131,6 +132,17 @@ export default async function OrderDetailsPage({
     showSettlement ? orderSettlements(paymentOrderIds) : Promise.resolve([]),
   ])
   const settledByPayment = new Map(settlements.map(s => [s.payment_id, s]))
+  const routePayouts =
+    !showSettlement && tenant?.tenantId
+      ? new Map(
+          (
+            await routePayoutsFor(
+              tenant.tenantId,
+              ((order.payments ?? []) as any[]).map(p => p.transaction_id).filter((x: any) => typeof x === 'string' && x.startsWith('pay_'))
+            )
+          ).map(r => [r.payment_id, r])
+        )
+      : new Map()
   const addressChangeRequests = (await listAddressChangeRequests(id)).map(r => ({
     id: r.id,
     status: r.status,
@@ -972,6 +984,21 @@ export default async function OrderDetailsPage({
                                   : ''}
                               </span>
                             )}
+                          </div>
+                        )}
+                        {routePayouts.get(p.transaction_id) && (
+                          <div className="flex justify-between gap-3 text-sm">
+                            <span className="text-foreground-secondary">Your share</span>
+                            <span className="min-w-0 text-right text-foreground">
+                              Rs. {Number(routePayouts.get(p.transaction_id).tenant_share).toFixed(2)}
+                              <span className="block text-[11px] text-foreground-muted">
+                                {routePayouts.get(p.transaction_id).payout_at
+                                  ? `Paid out to you on ${new Date(routePayouts.get(p.transaction_id).payout_at).toLocaleDateString('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' })}${routePayouts.get(p.transaction_id).payout_utr ? ` · UTR ${routePayouts.get(p.transaction_id).payout_utr}` : ''}`
+                                  : routePayouts.get(p.transaction_id).transferred_at
+                                    ? 'Transferred, awaiting payout to your bank'
+                                    : 'Awaiting transfer'}
+                              </span>
+                            </span>
                           </div>
                         )}
                         {p.status === 'failed' && (p.error_description || p.error_reason) && (
