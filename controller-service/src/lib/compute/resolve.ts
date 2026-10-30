@@ -19,7 +19,7 @@ export interface ResolvedCompute {
 }
 
 // Provisioning must not stop on a price read, so a missing catalog falls back to the class table.
-const catalogOrDefault = (): Promise<Catalog> => getCatalog().catch(() => ({ prices: [], settings: DEFAULT_SETTINGS }))
+export const catalogOrDefault = (): Promise<Catalog> => getCatalog().catch(() => ({ prices: [], settings: DEFAULT_SETTINGS }))
 
 export function computeParams(spec: ComputeSpec, catalog: Catalog) {
   const cls = spec.db.class ?? ''
@@ -46,17 +46,21 @@ export async function resolveCompute(
   return { spec, ...computeParams(spec, await catalogOrDefault()), nodeGen: row?.node_gen ?? 0 }
 }
 
+/** The spec's price per hour (margin included, GST not); null when a part has no price. */
+export async function rateFor(spec: ComputeSpec): Promise<number | null> {
+  try {
+    return Math.round(quoteSpec(spec, await catalogOrDefault()).inrHour * 10000) / 10000
+  } catch {
+    return null
+  }
+}
+
 /**
  * Record what now runs and its hourly rate. While owners can't choose (flag off) the choice is the plan's,
  * so `desired` follows; otherwise a choice made meanwhile stays pending.
  */
 export async function markComputeApplied(tenantId: string, spec: ComputeSpec, nodeGen: number): Promise<void> {
-  let rate: number | null = null
-  try {
-    rate = Math.round(quoteSpec(spec, await catalogOrDefault()).inrHour * 10000) / 10000
-  } catch {
-    rate = null
-  }
+  const rate = await rateFor(spec)
   const follow = !computeSpecEnabled()
   await controlPlanePool().query(
     `INSERT INTO tenant_compute (tenant_id, preset, desired, applied, status, rate_inr_hour, node_gen, applied_at)

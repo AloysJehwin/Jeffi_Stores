@@ -1091,6 +1091,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_compute (
     apply_mode    text NOT NULL DEFAULT 'window',       -- window: RDS class changes wait for the maintenance window
     rate_inr_hour numeric(12,4),                        -- applied spec's price, margin included, GST excluded
     node_gen      integer NOT NULL DEFAULT 0,           -- dedicated servers' generation; a type change starts the next
+    progress      jsonb,                                -- where a change of a running store has got to (compute-reconcile.ts)
     attempts      integer NOT NULL DEFAULT 0,
     next_at       timestamp with time zone,
     last_error    text,

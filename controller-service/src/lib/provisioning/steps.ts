@@ -575,7 +575,7 @@ const BACKOFF_BASE_MS = 15_000 // 15s, doubling
 const BACKOFF_CAP_MS = 600_000 // capped at 10 min
 
 /** Deterministic errors that won't fix themselves on retry → fail fast (no wasted retries). */
-function isTerminalError(msg: string): boolean {
+export function isTerminalError(msg: string): boolean {
   return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env|VcpuLimitExceeded|InstanceLimitExceeded|k8s node launch needs/i.test(
     msg
   )
@@ -1095,7 +1095,7 @@ export async function deprovisionTenant(
   }
 }
 
-export { STEPS, dbInstanceId, tenantHostnames }
+export { STEPS, dbInstanceId, paramGroupName, tenantHostnames }
 
 /**
  * k8s plan change: make sure the new tier's node exists, then re-apply the namespace (resources,

@@ -257,6 +257,16 @@ export async function applyTenantWorkload(input: TenantWorkloadInput): Promise<v
   await retireLegacyApp(input.slug)
 }
 
+/** Restart every store pod (they keep a database pool open, e.g. to a database that has just moved). */
+export async function restartTenantWorkload(slug: string): Promise<void> {
+  const at = new Date().toISOString()
+  for (const name of tenantWorkloadNames(slug)) {
+    await patchMerge('Deployment', name, tenantNamespace(slug), {
+      spec: { template: { metadata: { annotations: { 'kubectl.kubernetes.io/restartedAt': at } } } },
+    })
+  }
+}
+
 /** Drop the earlier store Deployments and the `storefront` Service/route once the controller serves. Idempotent. */
 async function retireLegacyApp(slug: string): Promise<void> {
   const ns = tenantNamespace(slug)

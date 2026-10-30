@@ -107,13 +107,15 @@ function buildTenantPool(infra: TenantInfra): pg.Pool {
   return createPgPool(config)
 }
 
-const tenantPools = new Map<string, pg.Pool>()
+const tenantPools = new Map<string, { key: string; pool: pg.Pool }>()
 export function tenantPool(t: TenantContext): pg.Pool {
   if (!t.infra?.rdsEndpoint) throw new Error(`Tenant "${t.slug}" has no RDS endpoint configured`)
-  let p = tenantPools.get(t.tenantId)
-  if (!p) {
-    p = buildTenantPool(t.infra)
-    tenantPools.set(t.tenantId, p)
-  }
-  return p
+  // Rebuilt when the store's database moves (a size change between a shared and its own database).
+  const key = `${t.infra.rdsEndpoint}/${t.infra.rdsDb}/${t.infra.rdsUser ?? ''}`
+  const cached = tenantPools.get(t.tenantId)
+  if (cached?.key === key) return cached.pool
+  const pool = buildTenantPool(t.infra)
+  tenantPools.set(t.tenantId, { key, pool })
+  cached?.pool.end().catch(() => {})
+  return pool
 }

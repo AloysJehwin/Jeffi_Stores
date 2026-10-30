@@ -8,6 +8,7 @@ import {
   StopDBInstanceCommand,
   StartDBInstanceCommand,
   DeleteDBInstanceCommand,
+  ModifyDBInstanceCommand,
 } from '@aws-sdk/client-rds'
 import {
   S3Client,
@@ -24,7 +25,7 @@ import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
 import { buildTenantSchemaSql } from '@/lib/tenant-migrations-schema'
 import { dumpTenantDb, restoreTenantDb } from '@/lib/tenancy/tenant-db-backup'
 import { upsertTenantDns, deleteTenantDns } from '@/lib/tenancy/tenant-dns'
-import type { ProvisioningProvider, CreateDbInstanceArgs } from './provider'
+import type { ProvisioningProvider, CreateDbInstanceArgs, DbInstanceState, ModifyDbInstanceArgs } from './provider'
 
 /**
  * Real AWS provisioning provider (Route/RDS/S3).
@@ -193,6 +194,37 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
         `[provisioning] TENANT_RDS_PUBLIC_TEST: SG self-authorize failed (continuing): ${err?.message}\n`
       )
     }
+  }
+
+  async describeDbInstance(dbInstanceId: string): Promise<DbInstanceState | null> {
+    try {
+      const res = await this.rds.send(new DescribeDBInstancesCommand({ DBInstanceIdentifier: dbInstanceId }))
+      const i = res.DBInstances?.[0]
+      if (!i) return null
+      const pv = i.PendingModifiedValues ?? {}
+      return {
+        status: i.DBInstanceStatus ?? '',
+        instanceClass: i.DBInstanceClass ?? '',
+        storageGb: i.AllocatedStorage ?? 0,
+        multiAz: !!i.MultiAZ,
+        pending: [pv.DBInstanceClass, pv.AllocatedStorage, pv.MultiAZ, pv.StorageType, pv.Iops].some(v => v != null),
+      }
+    } catch (err: any) {
+      if (/DBInstanceNotFound/i.test(err?.name || err?.Code || '')) return null
+      throw err
+    }
+  }
+
+  async modifyDbInstance(dbInstanceId: string, args: ModifyDbInstanceArgs): Promise<void> {
+    await this.rds.send(
+      new ModifyDBInstanceCommand({
+        DBInstanceIdentifier: dbInstanceId,
+        ...(args.instanceClass ? { DBInstanceClass: args.instanceClass } : {}),
+        ...(args.storageGb ? { AllocatedStorage: args.storageGb, MaxAllocatedStorage: args.storageGb * 2 } : {}),
+        ...(args.multiAz != null ? { MultiAZ: args.multiAz } : {}),
+        ApplyImmediately: args.applyImmediately,
+      })
+    )
   }
 
   async getDbEndpoint(dbInstanceId: string): Promise<string | null> {

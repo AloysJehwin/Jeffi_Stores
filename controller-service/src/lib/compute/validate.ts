@@ -88,12 +88,17 @@ export function planCompatibilityError(spec: ComputeSpec, plan: PlanCompute): st
  * Whether a spec can be chosen on this plan and actually runs: the pods fit the server, the database has
  * connections for every pod, and storage only grows. Messages are shown to the store owner.
  */
-export function validateSpec(spec: ComputeSpec, catalog: Catalog, plan: PlanCompute, opts: { current?: ComputeSpec | null } = {}): Validation {
+export function validateSpec(
+  spec: ComputeSpec,
+  catalog: Catalog,
+  plan: PlanCompute,
+  opts: { current?: ComputeSpec | null; anyPlan?: boolean } = {}
+): Validation {
   const errors: string[] = []
   if (!spec?.node || !spec?.db || !spec?.services || SERVICE_NAMES.some(k => !spec.services[k])) {
     return { ok: false, errors: ['Incomplete compute choice.'], fit: null }
   }
-  const planError = planCompatibilityError(spec, plan)
+  const planError = opts.anyPlan ? null : planCompatibilityError(spec, plan)
   if (planError) errors.push(planError)
 
   if (spec.node.placement === 'dedicated') {

@@ -15,7 +15,13 @@ export interface PlanQuote {
 }
 
 /** Server-side price and checks for a spec on a plan. The client's own quote is display only. */
-export async function quoteForPlan(spec: ComputeSpec, plan: PlanOption | PlanCompute, catalog: Catalog, opts: { current?: ComputeSpec | null } = {}): Promise<PlanQuote> {
+// `extraVcpus`: what the change adds to the account's running servers (a resize); default all of them.
+export async function quoteForPlan(
+  spec: ComputeSpec,
+  plan: PlanOption | PlanCompute,
+  catalog: Catalog,
+  opts: { current?: ComputeSpec | null; anyPlan?: boolean; extraVcpus?: number } = {}
+): Promise<PlanQuote> {
   const validation = validateSpec(spec, catalog, plan, opts)
   let quote: Quote | null = null
   try {
@@ -31,6 +37,6 @@ export async function quoteForPlan(spec: ComputeSpec, plan: PlanOption | PlanCom
     validation,
     quote,
     total: quote ? monthlyTotal(quote, fee, catalog.settings.gstRate) : null,
-    capacityError: validation.ok && validation.fit ? await vcpuCapacityError(validation.fit.vcpus) : null,
+    capacityError: validation.ok && validation.fit ? await vcpuCapacityError(opts.extraVcpus ?? validation.fit.vcpus) : null,
   }
 }

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { LayoutDashboard, Globe, Truck, Receipt, BookOpen, Landmark, CreditCard, Building2, Wallet, KeyRound, MessageSquare, FileText, Store, LayoutGrid } from 'lucide-react'
+import { LayoutDashboard, Globe, Truck, Receipt, BookOpen, Landmark, CreditCard, Building2, Wallet, KeyRound, MessageSquare, FileText, Store, LayoutGrid, Server } from 'lucide-react'
 import type { ServiceType } from '@/lib/tenant-registry'
 
 export interface NavItem {
@@ -9,6 +9,7 @@ export interface NavItem {
   exact?: boolean
   requires?: ServiceType      // shown only when the tenant has this service
   hideWhen?: ServiceType      // shown only when the tenant does NOT have this service
+  flag?: 'compute'            // shown only while that feature is switched on
 }
 export interface NavGroup {
   title?: string
@@ -23,6 +24,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/dashboard/domains', label: 'Domains', icon: Globe, requires: 'store' },
       { href: '/dashboard/delivery', label: 'Delivery', icon: Truck, requires: 'store' },
+      { href: '/dashboard/compute', label: 'Servers', icon: Server, requires: 'store', flag: 'compute' },
       { href: '/dashboard/add-store', label: 'Add a store', icon: Store, hideWhen: 'store' },
     ],
   },
@@ -53,7 +55,8 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
-export function navFor(serviceTypes: string[]): NavGroup[] {
+export function navFor(serviceTypes: string[], flags: string[] = []): NavGroup[] {
   const has = (s?: ServiceType) => !s || serviceTypes.includes(s)
-  return NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => has(i.requires) && !(i.hideWhen && serviceTypes.includes(i.hideWhen))) })).filter(g => g.items.length)
+  const on = (i: NavItem) => !i.flag || flags.includes(i.flag)
+  return NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => has(i.requires) && on(i) && !(i.hideWhen && serviceTypes.includes(i.hideWhen))) })).filter(g => g.items.length)
 }

@@ -5,12 +5,12 @@ import { slugFromHost } from './hosts'
 const cache = new Map<string, { ctx: TenantContext | null; expires: number }>()
 const TTL = 60_000
 
-const SELECT = `SELECT t.id, t.slug, t.display_name, t.status, p.slug AS plan,
+const SELECT = `SELECT t.id, t.slug, t.display_name, t.status, t.instance_state, p.slug AS plan,
   i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
   FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id LEFT JOIN tenant_infra i ON i.tenant_id = t.id`
 
 function toCtx(r: any): TenantContext | null {
-  if (!r || r.status !== 'active') return null
+  if (!r || r.status !== 'active' || r.instance_state === 'migrating') return null
   return {
     tenantId: r.id,
     slug: r.slug,

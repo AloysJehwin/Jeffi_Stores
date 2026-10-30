@@ -2,8 +2,12 @@ import { Field, FieldGrid, Section, Mono } from '../EcomUI'
 import { tenantNamespace } from '@/lib/provisioning/tiers'
 import { legacySpecFor } from '@/lib/compute/legacy'
 import { POD_RESOURCES } from '@/lib/compute/presets'
+import ComputeRetryButton from './ComputeRetryButton'
 
 const CONSOLE = 'https://k8s.jeffistores.in'
+
+const stepOf = (p: Record<string, any> | null) =>
+  p?.move ? `moving database: ${p.move.step}` : p?.gen != null ? 'new servers' : p?.dbClass ? 'database size' : p?.dbOnline ? 'database storage' : null
 
 // Live pods for a tenant running on k3s. Read straight from the API server, so it reflects the
 // cluster even when the provisioning job JSON is stale.
@@ -48,7 +52,18 @@ export default async function K8sWorkloadSection({
         />
         <Field label="Pod size" value={`${ctrl.requests.cpu} / ${ctrl.limits.memory}`} />
         {row && row.status !== 'applied' && (
-          <Field label="Compute change" value={<span className="capitalize">{row.status}{row.last_error ? `: ${row.last_error}` : ''}</span>} />
+          <Field
+            wide
+            label="Compute change"
+            value={
+              <span className={row.status === 'failed' ? 'text-red-600 dark:text-red-400' : undefined}>
+                <span className="capitalize">{row.status}</span>
+                {stepOf(row.progress) ? ` (${stepOf(row.progress)})` : ''}
+                {row.last_error ? `: ${row.last_error}` : ''}
+                {row.status === 'failed' && <ComputeRetryButton tenantId={tenantId} />}
+              </span>
+            }
+          />
         )}
         <Field
           label="Replicas"

@@ -92,7 +92,7 @@ async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Pro
        )`
       : `t.${where} = $1`
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.display_name, t.status, p.slug AS plan,
+    `SELECT t.id, t.slug, t.display_name, t.status, t.instance_state, p.slug AS plan,
             i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
@@ -104,6 +104,7 @@ async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Pro
   const r = res.rows[0]
   if (!r) return null
   if (r.status !== 'active') return null // suspended/provisioning/terminated → treated as no-serve
+  if (r.instance_state === 'migrating') return null // its database is moving (compute change); writes must wait
   return {
     tenantId: r.id,
     slug: r.slug,
@@ -180,7 +181,7 @@ export async function lookupTenantContextBySlug(slug: string): Promise<TenantCon
 export async function lookupTenantContextById(tenantId: string): Promise<TenantContext | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.display_name, t.status, p.slug AS plan,
+    `SELECT t.id, t.slug, t.display_name, t.status, t.instance_state, p.slug AS plan,
             i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
@@ -189,7 +190,7 @@ export async function lookupTenantContextById(tenantId: string): Promise<TenantC
     [tenantId]
   )
   const r = res.rows[0]
-  if (!r || r.status !== 'active' || !r.rds_endpoint) return null
+  if (!r || r.status !== 'active' || r.instance_state === 'migrating' || !r.rds_endpoint) return null
   return {
     tenantId: r.id,
     slug: r.slug,

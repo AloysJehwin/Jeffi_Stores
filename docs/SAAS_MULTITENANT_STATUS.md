@@ -46,7 +46,12 @@ Code: `controller-service/src/lib/compute/`.
 - **Price:** AWS cost (`compute_prices`) × USD→INR × (1 + margin), settings in `platform_infra.compute_pricing`; admin page Settings → Server Pricing; `deploy/k8s/db/refresh-compute-prices.sh` prints price updates.
 - **Flag:** `COMPUTE_SPEC_ENABLED=true` shows the picker at onboarding and makes provisioning use the owner's choice. Off, every store runs its plan's old tier (`compute/legacy.ts`) and `tenant_compute` records it.
 - **Provisioning (phase 2):** the database is created at the chosen class/storage/Multi-AZ with `max_connections` by class; each pod gets `DB_POOL_MAX` so all copies fit the database's connections. Starter stores get a database `t_{slug}` and IAM role `app_{slug}` on a shared host (`shared_db_hosts`, `tenant_infra.rds_user`/`shared_db_host`).
-- **Not done:** resizing a running store (phase 3), wallet billing for servers (phase 4), service role split (phase 5).
+- **Resizing a running store (phase 3):** owner page `/ecom/dashboard/compute` (Servers, shown when the flag is on) or the admin `PUT /api/admin/ecom/[tenantId]/compute`. A price rise needs 7 days of wallet. The provisioning worker runs `reconcileCompute` (`lib/provisioning/compute-reconcile.ts`) one step per tick:
+  - **Shared ↔ own database:** create the target, take the store offline (`instance_state='migrating'`), wait 90 s for requests to finish, copy, switch `tenant_infra`, restart pods, bring it back. The old database is dropped after 24 h.
+  - **Servers:** more servers of the same type join the current generation; any other change starts a new generation `t-{slug}.{gen}-{i}`, pods roll over, then the old servers are removed.
+  - **Own database:** storage and standby change at once; the class changes in the maintenance window (or now), with pods lowered to the smaller connection pool first.
+  - A failed change retries with backoff, then alerts; admin Infrastructure → Kubernetes has Retry.
+- **Not done:** wallet billing for servers (phase 4), service role split (phase 5).
 
 ---
 

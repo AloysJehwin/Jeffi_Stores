@@ -17,6 +17,7 @@ const DEFAULT_KEY = '__default__'
 // which otherwise exhausts local Postgres ("too many clients already").
 const dbGlobal = globalThis as unknown as { __appPool?: Pool | null; __tenantPools?: Map<string, Pool> }
 let pool: Pool | null = dbGlobal.__appPool ?? null
+const poolTargets = new WeakMap<Pool, string>()
 const tenantPools: Map<string, Pool> = dbGlobal.__tenantPools ?? (dbGlobal.__tenantPools = new Map<string, Pool>())
 
 export { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext, runWithAuditActor }
@@ -143,12 +144,15 @@ function getPool(explicitTenant?: TenantContextType | null): Pool {
         `refusing to fall back to the platform database.`
     )
   }
-  // Per-tenant pool, lazily built + cached by tenant id.
-  let tp = tenantPools.get(tenant.tenantId)
-  if (!tp) {
-    tp = buildTenantPool(tenant.infra)
-    tenantPools.set(tenant.tenantId, tp)
-  }
+  // Per-tenant pool, lazily built + cached by tenant id. A store whose database moved (a size change
+  // between a shared and its own database) gets a new pool once its context refreshes; the old one closes.
+  const key = `${tenant.infra.rdsEndpoint}/${tenant.infra.rdsDb}/${tenant.infra.rdsUser ?? ''}`
+  const cached = tenantPools.get(tenant.tenantId)
+  if (cached && poolTargets.get(cached) === key) return cached
+  const tp = buildTenantPool(tenant.infra)
+  poolTargets.set(tp, key)
+  tenantPools.set(tenant.tenantId, tp)
+  cached?.end().catch(() => {})
   return tp
 }
 

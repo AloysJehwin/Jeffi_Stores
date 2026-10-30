@@ -12,6 +12,8 @@ export interface TenantCompute {
   apply_mode: 'window' | 'now'
   rate_inr_hour: string | null
   node_gen: number
+  progress: Record<string, any> | null
+  attempts: number
   last_error: string | null
   applied_at: string | null
   updated_at: string
@@ -25,6 +27,31 @@ export async function saveDesiredCompute(tenantId: string, spec: ComputeSpec, ap
        status = 'pending', attempts = 0, next_at = NULL, last_error = NULL, updated_at = now()`,
     [tenantId, presetOf(spec), JSON.stringify(spec), applyMode]
   )
+}
+
+const COLUMNS = ['applied', 'progress', 'status', 'node_gen', 'attempts', 'next_at', 'last_error', 'rate_inr_hour', 'applied_at'] as const
+type Patch = Partial<Record<(typeof COLUMNS)[number], unknown>>
+
+/** Update the given columns of a store's compute row (jsonb columns take objects). */
+export async function patchTenantCompute(tenantId: string, patch: Patch): Promise<void> {
+  const keys = COLUMNS.filter(k => k in patch)
+  if (!keys.length) return
+  const json = (k: string, v: unknown) => (k === 'applied' || k === 'progress') && v != null ? JSON.stringify(v) : v
+  await controlPlanePool().query(
+    `UPDATE tenant_compute SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')}, updated_at = now() WHERE tenant_id = $1`,
+    [tenantId, ...keys.map(k => json(k, patch[k]))]
+  )
+}
+
+/** Stores whose compute change is due to be worked on. */
+export async function dueComputeChanges(): Promise<string[]> {
+  const r = await controlPlanePool().query<{ tenant_id: string }>(
+    `SELECT c.tenant_id FROM tenant_compute c JOIN tenants t ON t.id = c.tenant_id
+     WHERE ((c.status IN ('pending','applying') AND t.status = 'active') OR c.progress ? 'oldDb')
+       AND (c.next_at IS NULL OR c.next_at <= now())
+     ORDER BY c.updated_at LIMIT 20`
+  )
+  return r.rows.map(x => x.tenant_id)
 }
 
 export async function getTenantCompute(tenantId: string): Promise<TenantCompute | null> {
