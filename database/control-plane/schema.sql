@@ -1012,3 +1012,46 @@ ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identi
 --
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS ad_free_until timestamp with time zone;
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS ad_free_renew boolean NOT NULL DEFAULT false;
+
+--
+-- linked_account_settlements: a Route store's payout from its linked account to its bank, read from
+-- Razorpay (settlement.processed on the linked account, or the transfers it settled).
+--
+CREATE TABLE IF NOT EXISTS public.linked_account_settlements (
+    id                text NOT NULL,                -- setl_ on the linked account
+    tenant_id         uuid NOT NULL,
+    linked_account_id text NOT NULL,
+    amount            numeric(14,2) NOT NULL DEFAULT 0,
+    fees              numeric(12,2) NOT NULL DEFAULT 0,
+    tax               numeric(12,2) NOT NULL DEFAULT 0,
+    utr               text,
+    status            text,
+    settled_at        timestamp with time zone,
+    fetched_at        timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.linked_account_settlements ADD CONSTRAINT linked_account_settlements_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.linked_account_settlements ADD CONSTRAINT linked_account_settlements_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_linked_account_settlements_tenant ON public.linked_account_settlements USING btree (tenant_id, settled_at DESC);
+
+--
+-- razorpay_downtimes: payment-method outages Razorpay reports (payment.downtime.*), shown on every
+-- admin console. source: the account whose webhook reported it (platform, or a store slug).
+--
+CREATE TABLE IF NOT EXISTS public.razorpay_downtimes (
+    id            text NOT NULL,                    -- down_
+    method        text NOT NULL,
+    instrument    jsonb,
+    severity      text,
+    status        text NOT NULL,                    -- scheduled|started|updated|resolved
+    scheduled     boolean NOT NULL DEFAULT false,
+    begin_at      timestamp with time zone,
+    end_at        timestamp with time zone,
+    source        text NOT NULL DEFAULT 'platform',
+    notified_at   timestamp with time zone,
+    first_seen_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.razorpay_downtimes ADD CONSTRAINT razorpay_downtimes_pkey PRIMARY KEY (id);
+CREATE INDEX IF NOT EXISTS idx_razorpay_downtimes_open ON public.razorpay_downtimes USING btree (updated_at DESC) WHERE (status <> 'resolved'::text);
+
