@@ -1096,6 +1096,8 @@ CREATE TABLE IF NOT EXISTS public.tenant_compute (
     next_at       timestamp with time zone,
     last_error    text,
     applied_at    timestamp with time zone,
+    low_balance_since timestamp with time zone,         -- the wallet went below zero; the store pauses graceDays later
+    balance_warned_at timestamp with time zone,         -- last "top up soon" email (lib/billing/infra-balance.ts)
     created_at    timestamp with time zone NOT NULL DEFAULT now(),
     updated_at    timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -1107,6 +1109,25 @@ ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_status_chec
 ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_apply_mode_check
     CHECK (apply_mode IN ('window','now'));
 CREATE INDEX IF NOT EXISTS idx_tenant_compute_pending ON public.tenant_compute USING btree (next_at) WHERE (status IN ('pending','applying'));
+
+--
+-- tenant_compute_periods: a store's server price per hour over time, for the daily wallet debit
+-- (lib/billing/infra-billing.ts). A new period starts whenever the price or the paused state changes.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_compute_periods (
+    id               uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id        uuid NOT NULL,
+    rate_inr_hour    numeric(12,4) NOT NULL,           -- running: the applied spec's price, margin included, GST excluded
+    storage_inr_hour numeric(12,4) NOT NULL,           -- paused: disks, database storage and the platform share only
+    paused           boolean NOT NULL DEFAULT false,
+    started_at       timestamp with time zone NOT NULL DEFAULT now(),
+    ended_at         timestamp with time zone
+);
+ALTER TABLE ONLY public.tenant_compute_periods ADD CONSTRAINT tenant_compute_periods_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_compute_periods ADD CONSTRAINT tenant_compute_periods_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_tenant_compute_periods_tenant ON public.tenant_compute_periods USING btree (tenant_id, started_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tenant_compute_periods_open ON public.tenant_compute_periods USING btree (tenant_id) WHERE (ended_at IS NULL);
 
 -- What a plan allows: its default preset, whether the store shares a pool node and database ('pool',
 -- Starter) or gets its own ('dedicated'), and whether the owner may customise beyond the presets.

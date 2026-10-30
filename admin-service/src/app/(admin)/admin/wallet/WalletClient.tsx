@@ -35,6 +35,8 @@ const CATEGORY_LABEL: Record<string, string> = {
   whatsapp: 'WhatsApp',
   email: 'Email',
   media: 'Media',
+  ad_free: 'Ad-free',
+  infra: 'Servers',
   adjustment: 'Adjustment',
 }
 const catOf = (e: LedgerEntry) => e.category || e.entry_type

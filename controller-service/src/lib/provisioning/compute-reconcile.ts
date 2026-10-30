@@ -124,6 +124,8 @@ export async function reconcileCompute(tenantId: string, provider: ProvisioningP
       last_error: null,
       applied_at: new Date(),
     })
+    const { syncComputePeriod } = await import('@controller/lib/billing/infra-billing')
+    await syncComputePeriod(tenantId).catch(e => console.error(`[compute] ${tenantId}: billing period not synced: ${e?.message}`))
     return { ok: true, status: 'applied' }
   } catch (e: any) {
     return fail(ctx, e?.message || 'compute change failed')

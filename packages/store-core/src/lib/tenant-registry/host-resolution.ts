@@ -105,6 +105,7 @@ async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Pro
   if (!r) return null
   if (r.status !== 'active') return null // suspended/provisioning/terminated → treated as no-serve
   if (r.instance_state === 'migrating') return null // its database is moving (compute change); writes must wait
+  if (r.instance_state === 'paused') return null // its wallet stayed below zero; its servers are stopped
   return {
     tenantId: r.id,
     slug: r.slug,
@@ -190,7 +191,7 @@ export async function lookupTenantContextById(tenantId: string): Promise<TenantC
     [tenantId]
   )
   const r = res.rows[0]
-  if (!r || r.status !== 'active' || r.instance_state === 'migrating' || !r.rds_endpoint) return null
+  if (!r || r.status !== 'active' || r.instance_state === 'migrating' || r.instance_state === 'paused' || !r.rds_endpoint) return null
   return {
     tenantId: r.id,
     slug: r.slug,

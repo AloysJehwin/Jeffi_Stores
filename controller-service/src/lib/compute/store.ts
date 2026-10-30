@@ -16,6 +16,8 @@ export interface TenantCompute {
   attempts: number
   last_error: string | null
   applied_at: string | null
+  low_balance_since: string | null
+  balance_warned_at: string | null
   updated_at: string
 }
 
@@ -29,7 +31,7 @@ export async function saveDesiredCompute(tenantId: string, spec: ComputeSpec, ap
   )
 }
 
-const COLUMNS = ['applied', 'progress', 'status', 'node_gen', 'attempts', 'next_at', 'last_error', 'rate_inr_hour', 'applied_at'] as const
+const COLUMNS = ['applied', 'progress', 'status', 'node_gen', 'attempts', 'next_at', 'last_error', 'rate_inr_hour', 'applied_at', 'low_balance_since', 'balance_warned_at'] as const
 type Patch = Partial<Record<(typeof COLUMNS)[number], unknown>>
 
 /** Update the given columns of a store's compute row (jsonb columns take objects). */
@@ -62,10 +64,12 @@ export async function getTenantCompute(tenantId: string): Promise<TenantCompute 
   return { ...row, desired: normalizeSpec(row.desired), applied: row.applied ? normalizeSpec(row.applied) : null }
 }
 
-/** True while the store is moving off the old all-in-one app (a failed move is not running). */
-export async function layoutSwitching(tenantId: string): Promise<boolean> {
-  const sw = (await getTenantCompute(tenantId))?.progress?.layout
-  return !!sw && !sw.failed
+/** Why the store's pods must not be re-applied now: it is moving off the old all-in-one app, or paused (unpaid). */
+export async function computeHold(tenantId: string): Promise<'switching' | 'paused' | null> {
+  const row = await getTenantCompute(tenantId)
+  if (row?.status === 'paused') return 'paused'
+  const sw = row?.progress?.layout
+  return sw && !sw.failed ? 'switching' : null
 }
 
 /** Stores part-way through leaving the old all-in-one app, to be resumed; a failed move waits for the release. */

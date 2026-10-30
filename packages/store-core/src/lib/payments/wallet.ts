@@ -45,6 +45,7 @@ export type WalletCategory =
   | 'email'
   | 'media'
   | 'ad_free'
+  | 'infra'
   | 'adjustment'
 
 export interface TenantWallet {
@@ -590,6 +591,8 @@ export async function debitWallet(opts: {
   note: string
   // Minimum balance to leave after the charge. Defaults to the Rs 500 shipping floor; messaging passes 0.
   floorInr?: number
+  // Charge even below the floor, into a negative balance: for use already made (servers), not a purchase.
+  allowNegative?: boolean
   // Runs in the debit's transaction, only when this call charged; a throw rolls the debit back.
   onCharged?: (client: PoolClient) => Promise<void>
 }): Promise<{ ok: true; charged: boolean; balance: number } | { ok: false; error: string }> {
@@ -604,7 +607,7 @@ export async function debitWallet(opts: {
         opts.externalRef,
       ])
       if (dup.rowCount) return { ok: true as const, charged: false, balance }
-      if (balance - amount < floor) {
+      if (!opts.allowNegative && balance - amount < floor) {
         return { ok: false as const, error: shortfallMessage(opts.note, amount, balance, floor) }
       }
       await client.query(

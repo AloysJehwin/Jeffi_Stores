@@ -73,6 +73,10 @@ async function tick() {
     results.push({ tenantId, step: 'layout_switch', status: r.ok ? `${r.status}${r.detail ? `: ${r.detail}` : ''}` : `error: ${r.detail}` })
   }
 
+  // Stores paused for an unpaid wallet that has since been topped up.
+  const { resumeFundedStores } = await import('@controller/lib/billing/infra-balance')
+  for (const r of await resumeFundedStores(provider).catch(() => [])) results.push({ tenantId: r.tenantId, step: 'resume', status: r.status })
+
   // Pool servers left empty (stores moved to their own servers or left) are terminated after an hour.
   const k8s = await import('@/lib/k8s/tenant-compute')
   if (k8s.k8sComputeEnabled()) {
