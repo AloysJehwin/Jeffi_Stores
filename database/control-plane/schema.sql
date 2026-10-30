@@ -1014,6 +1014,13 @@ ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS ad_free_until timestamp with
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS ad_free_renew boolean NOT NULL DEFAULT false;
 
 --
+-- A downgrade waits for the end of the paid cycle: Razorpay switches the subscription's plan then, and the
+-- next subscription.charged moves the store onto pending_plan_id (webhook/razorpay).
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS pending_plan_id uuid;
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS pending_billing_interval character varying(16);
+
+--
 -- linked_account_settlements: a Route store's payout from its linked account to its bank, read from
 -- Razorpay (settlement.processed on the linked account, or the transfers it settled).
 --

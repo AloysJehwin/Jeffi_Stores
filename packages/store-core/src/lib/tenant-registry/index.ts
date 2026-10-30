@@ -60,6 +60,8 @@ export {
   setSubscriptionStatus,
   getTenantBySubscriptionId,
   updateTenantPlan,
+  setPendingPlan,
+  applyPendingPlan,
   setTenantInstanceState,
   recordTenantStepEvent,
   writeTenantInfra,

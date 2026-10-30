@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyWebhookSignature } from '@controller/lib/payments/razorpay-subscriptions'
-import { getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
+import { applyPendingPlan, getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
+import { invalidatePlanCache } from '@/lib/auth/plan-gate'
 import { issuePlatformInvoiceLater } from '@/lib/billing/platform-invoice'
 import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
 import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
@@ -77,8 +78,14 @@ export async function POST(request: NextRequest) {
         await setSubscriptionStatus(tenant.id, 'active')
         await startStoreIfReady(tenant.id)
       } else {
-        // Recurring charge on an already-live tenant — just keep the subscription active.
+        // Recurring charge on an already-live tenant: keep the subscription active, and a downgrade made
+        // during the cycle that just ended takes effect now.
         await setSubscriptionStatus(tenant.id, 'active')
+        const moved = await applyPendingPlan(tenant.id)
+        if (moved) {
+          invalidatePlanCache(tenant.id)
+          await triggerProvisioning({ action: 'reprovision', tenantId: tenant.id, slug: tenant.slug, plan: moved, ownerId: null, reason: 'plan_change' }).catch(() => {})
+        }
       }
       await invoiceSubscriptionCharge(tenant.id, sub, payload.payload?.payment?.entity)
       break

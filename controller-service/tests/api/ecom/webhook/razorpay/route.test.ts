@@ -18,6 +18,7 @@ vi.mock('@/lib/tenant-registry', () => ({
   addTenantServices: m.addServices,
   setStoreRequest: m.storeRequest,
   getTenant: m.getTenant,
+  applyPendingPlan: vi.fn().mockResolvedValue(null),
   controlPlanePool: () => ({ query: m.query }),
 }))
 vi.mock('@controller/lib/billing/prepay', () => ({ storePrepay: vi.fn().mockResolvedValue({ requiredInr: 0, balance: 0, dailyInr: 0, days: 0 }) }))
