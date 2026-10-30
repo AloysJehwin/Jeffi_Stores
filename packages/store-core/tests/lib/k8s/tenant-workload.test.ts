@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { renderTenantWorkload } from '@/lib/k8s/tenant-workload'
 import { agentNodeUserData } from '@/lib/k8s/node-user-data'
 import { resourcePath } from '@/lib/k8s/client'
+import { routeFor } from '@/lib/service-routing'
+import { matchIngress } from '../../helpers/traefik-match'
 
 const hosts = (slug: string) => [
   `${slug}.jeffistores.in`,
@@ -192,8 +194,6 @@ describe('tracing env', () => {
       const sf = byKind(objs, 'Deployment', 'acme-storefront-service')[0] as any
       expect(envOf(sf)).toMatchObject({ SERVICE_TENANT_SLUG: 'acme' })
       expect(sf.spec.template.spec.containers[0].image).toContain('jeffi-stores-storefront-service')
-      expect(route(objs, 'store').services).toEqual([{ name: 'acme-storefront-service', port: 3000 }])
-      expect(route(objs, 'admin').services).toEqual([{ name: 'acme-admin-service', port: 3000 }])
       expect(byKind(objs, 'IngressRoute', 'controller')).toEqual([])
       expect(route(objs, 'razorpay-webhook').match).toBe('Host(`jeffistores.in`) && Path(`/api/webhooks/razorpay/acme`)')
       // Admin restarts in place on a rollout; the storefront never drops below its copies.
@@ -204,8 +204,40 @@ describe('tracing env', () => {
     it('gives Pro its business portal on its own host', () => {
       const objs = renderTenantWorkload({ slug: 'acme', plan: 'pro', hosts: [...hosts('acme'), 'acme.business.jeffistores.in'], layout: 'services' }) as any[]
       expect(deps(objs)).toContain('acme-business-service')
-      expect(route(objs, 'business')).toMatchObject({ match: 'Host(`acme.business.jeffistores.in`)', services: [{ name: 'acme-business-service', port: 3000 }] })
-      expect(route(objs, 'store').match).not.toContain('business')
+      expect(matchIngress(objs, 'acme.business.jeffistores.in', '/signin')?.route.services).toEqual([{ name: 'acme-business-service', port: 3000 }])
+    })
+
+    // Traefik, given the rendered routes, sends each request where the apps' own gate (routeFor) expects it.
+    // Paths the controller owns have no route of their own here: they reach a store service, which 404s them.
+    describe('routes every path where routeFor does', () => {
+      const PATHS = [
+        '/', '/products/drill', '/cart', '/api/products', '/api/cart', '/api/admin/orders', '/api/admin/ecom/kyc',
+        '/api/cron/cancel-stale-orders', '/api/cron/wallet-drift', '/api/internal/import/worker', '/api/ecom/onboard',
+        '/api/webhooks/razorpay', '/api/webhooks/razorpay/acme', '/_next/static/chunks/a.js', '/_next/image',
+        '/_admin/_next/static/chunks/a.js', '/_business/_next/static/media/f.woff2', '/_controller/_next/static/a.js',
+        '/images/logo.png', '/manifest.webmanifest', '/ort/x.wasm', '/admin', '/admin/orders', '/admin/ecom',
+        '/business', '/business/signin', '/ecom', '/certportal', '/legal/terms', '/settings/compute-pricing', '/login',
+      ]
+      const HOSTS = ['acme.jeffistores.in', 'admin-acme.jeffistores.in', 'vault-acme.jeffistores.in', 'acme.business.jeffistores.in', 'shop.acme.com']
+      for (const plan of ['pro', 'basic']) {
+        it(plan, () => {
+          const objs = renderTenantWorkload({
+            slug: 'acme', plan, hosts: [...hosts('acme'), 'acme.business.jeffistores.in'], customDomains: ['shop.acme.com'], layout: 'services',
+          }) as any[]
+          const hasBusiness = deps(objs).includes('acme-business-service')
+          for (const host of HOSTS) {
+            for (const path of PATHS) {
+              const hit = matchIngress(objs, host, path)
+              const want = routeFor(host, path)
+              const got = hit?.route.services[0].name
+              if (want === 'controller') expect(got, `${host}${path}`).toMatch(/^acme-(storefront|admin|business)-service$/)
+              else expect(got, `${host}${path}`).toBe(`acme-${want === 'business' && !hasBusiness ? 'storefront' : want}-service`)
+              const strips = (hit?.route.middlewares ?? []).some((m: any) => m.name === 'strip-asset-prefix')
+              expect(strips, `${host}${path} strips its asset prefix`).toBe(/^\/_(admin|business|controller)\//.test(path) && want !== 'controller')
+            }
+          }
+        })
+      }
     })
 
     it('keeps traffic on the old app while the new services start', () => {

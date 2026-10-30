@@ -2,10 +2,12 @@ import { CRON_JOBS } from '@/lib/shared/cron-jobs'
 import { storeHostForSlug } from '@/lib/tenancy/forms-host'
 import { appFromHost } from '@/lib/tenant-registry/host-resolution'
 
-// Which Next app answers a request. One table for the request gate (each app 404s what isn't its own),
-// the local dev router (scripts/dev-router.ts) and the Traefik routes the tenant renderer writes.
+// Which Next app answers a request. One ordered table (ROUTES) is the request gate (each app 404s what
+// isn't its own), the local dev router (scripts/dev-router.ts) and, through lib/k8s/traefik-routes.ts,
+// the ingress: the platform's routes and the ones the tenant renderer writes.
 //   controller  control plane: ecom console, certificate portal, platform admin pages, provisioning, platform crons
-//   storefront  the store's site and every store /api route (admin and business UIs call them on their own host)
+//   storefront  the store's site, every store /api route (admin and business UIs call them on their own host),
+//               public/ files and the image optimizer
 //   admin       the admin panel, /api/admin and the store's crons
 //   business    the B2B portal's pages
 
@@ -28,48 +30,89 @@ export function pinnedHost(host: string): string {
   return slug && /\.svc(\.cluster\.local)?(:\d+)?$/.test(host) ? storeHostForSlug(slug) : host
 }
 
-/** Prefix the controller's pages load their assets under, so they share a host with admin's. */
-export const CONTROLLER_ASSET_PREFIX = '/_controller'
+/**
+ * Where each app other than the storefront loads its build output (next.config assetPrefix), so any app's
+ * pages can share any host: /_next/ is always the storefront's. The ingress and the dev router strip it.
+ */
+export const ASSET_PREFIX: Record<Exclude<AppName, 'storefront'>, string> = {
+  controller: '/_controller',
+  admin: '/_admin',
+  business: '/_business',
+}
 
-const STORE_CRON_PATHS = new Set(CRON_JOBS.filter(j => j.tenantScope !== null).map(j => j.path))
+// Host classes a rule applies to. `store` is every host that isn't one of the others: the store's own,
+// www, vault-, forms-, custom domains.
+export type HostClass = 'any' | 'console' | 'platform-admin' | 'admin' | 'business' | 'store'
+
+export type PathMatch =
+  | { prefix: string } // path.startsWith
+  | { under: string } // the path or below it
+  | { exact: string }
+  | { pattern: RegExp } // anchored, no lookaround: the ingress uses it as-is (Go RE2)
+
+export interface RouteRule {
+  hosts: HostClass
+  paths?: PathMatch[] // any of them; none = every path
+  app: AppName
+  strip?: string // prefix the ingress removes before the app sees the path
+}
+
+const STORE_CRON_PATHS = CRON_JOBS.filter(j => j.tenantScope !== null && j.path.startsWith('/api/cron/')).map(j => j.path)
 const PLATFORM_WEBHOOKS = ['/api/webhooks/ses-inbound', '/api/webhooks/aws-messaging', '/api/webhooks/twilio']
 // Platform admin pages, served at the admin host's root (admin.x/ecom → /admin/ecom).
 const PLATFORM_ADMIN_PAGES = ['/ecom', '/settings/ai-pricing', '/settings/compute-pricing']
-
-// public/ files (images, fonts, the on-device model, the PWA manifest) live in the storefront only;
-// every host's pages load them from there.
+// public/ files (images, fonts, the on-device model, the PWA manifest) live in the storefront only.
 const STATIC_FILE_RE = /\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp4|webm|pdf|mjs|wasm|onnx)$/i
 const STATIC_PREFIXES = ['/images', '/screenshots', '/icon', '/ort', '/models']
 
-const under = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + '/')
+const under = (...ps: string[]): PathMatch[] => ps.map(p => ({ under: p }))
+
+/** First match wins; the ingress turns the order into router priorities. */
+export const ROUTES: readonly RouteRule[] = [
+  ...(['controller', 'admin', 'business'] as const).map(app => ({ hosts: 'any' as const, paths: under(ASSET_PREFIX[app]), app, strip: ASSET_PREFIX[app] })),
+  { hosts: 'any', paths: [{ prefix: '/_next/' }], app: 'storefront' },
+  { hosts: 'any', paths: [{ prefix: '/api/admin/ecom' }], app: 'controller' },
+  { hosts: 'any', paths: [{ prefix: '/api/admin' }], app: 'admin' },
+  { hosts: 'any', paths: [...under('/api/ecom', '/api/internal', '/api/certportal', ...PLATFORM_WEBHOOKS), { exact: '/api/webhooks/razorpay' }], app: 'controller' },
+  { hosts: 'any', paths: STORE_CRON_PATHS.map(exact => ({ exact })), app: 'admin' },
+  { hosts: 'any', paths: under('/api/cron'), app: 'controller' },
+  { hosts: 'any', paths: [{ prefix: '/api/' }], app: 'storefront' },
+  { hosts: 'any', paths: [{ exact: '/manifest.webmanifest' }, ...under(...STATIC_PREFIXES), { pattern: STATIC_FILE_RE }], app: 'storefront' },
+  { hosts: 'console', paths: under('/legal'), app: 'storefront' },
+  { hosts: 'console', app: 'controller' },
+  { hosts: 'platform-admin', paths: under(...PLATFORM_ADMIN_PAGES), app: 'controller' },
+  { hosts: 'admin', app: 'admin' },
+  { hosts: 'business', app: 'business' },
+  { hosts: 'store', paths: under('/admin/ecom', ...PLATFORM_ADMIN_PAGES.slice(1).map(p => '/admin' + p)), app: 'controller' },
+  { hosts: 'store', paths: under('/admin'), app: 'admin' },
+  { hosts: 'store', paths: under('/business'), app: 'business' },
+  { hosts: 'store', paths: under('/ecom', '/certportal'), app: 'controller' },
+  { hosts: 'store', app: 'storefront' },
+]
+
 const firstLabel = (host: string) => host.toLowerCase().split(':')[0].split('.')[0]
 
-export function routeFor(host: string, path: string): AppName {
-  if (under(path, CONTROLLER_ASSET_PREFIX)) return 'controller'
-
-  if (path.startsWith('/api/')) {
-    if (path.startsWith('/api/admin/ecom')) return 'controller'
-    if (path.startsWith('/api/admin')) return 'admin'
-    if (['/api/ecom', '/api/internal', '/api/certportal'].some(p => under(path, p))) return 'controller'
-    if (path === '/api/webhooks/razorpay' || PLATFORM_WEBHOOKS.some(p => under(path, p))) return 'controller'
-    if (under(path, '/api/cron')) return STORE_CRON_PATHS.has(path) ? 'admin' : 'controller'
-    return 'storefront'
-  }
-  // /_next/ is each app's own build output; it stays with the app serving the host's pages.
-  const isPublicFile = path === '/manifest.webmanifest' || STATIC_PREFIXES.some(p => under(path, p)) || STATIC_FILE_RE.test(path)
-  if (isPublicFile && !path.startsWith('/_next/')) return 'storefront'
-
+/** The classes a host belongs to (besides `any`). */
+export function hostClasses(host: string): HostClass[] {
   const label = firstLabel(host)
-  if (label === 'ecom' || label === 'certificate') return under(path, '/legal') ? 'storefront' : 'controller'
+  if (label === 'ecom' || label === 'certificate') return ['console']
   const app = appFromHost(host)
-  if (app === 'admin') return label === 'admin' && PLATFORM_ADMIN_PAGES.some(p => under(path, p)) ? 'controller' : 'admin'
-  if (app === 'business') return 'business'
+  if (app === 'admin') return label === 'admin' ? ['platform-admin', 'admin'] : ['admin']
+  if (app === 'business') return ['business']
+  return ['store']
+}
 
-  if (under(path, '/admin/ecom') || PLATFORM_ADMIN_PAGES.slice(1).some(p => under(path, '/admin' + p))) return 'controller'
-  if (under(path, '/admin')) return 'admin'
-  if (under(path, '/business')) return 'business'
-  if (under(path, '/ecom') || under(path, '/certportal')) return 'controller'
-  return 'storefront'
+export function pathMatches(m: PathMatch, path: string): boolean {
+  if ('prefix' in m) return path.startsWith(m.prefix)
+  if ('under' in m) return path === m.under || path.startsWith(m.under + '/')
+  if ('exact' in m) return path === m.exact
+  return m.pattern.test(path)
+}
+
+export function routeFor(host: string, path: string): AppName {
+  const classes = hostClasses(host)
+  const rule = ROUTES.find(r => (r.hosts === 'any' || classes.includes(r.hosts)) && (!r.paths || r.paths.some(m => pathMatches(m, path))))
+  return rule!.app
 }
 
 const PROBES = new Set(['/healthz', '/api/health', '/api/ready'])

@@ -5,6 +5,7 @@ import { activeServices, type ComputeSpec, type ServiceName, type ServiceSpec, t
 import { surges } from '@/lib/compute/validate'
 import { STORE_ROLES, type ServiceRole } from '@/lib/service-routing'
 import type { K8sObject } from './client'
+import { EDGE_NS, hostMatch, PRIORITY_BAND, trafficRoutes, type HostGroup } from './traefik-routes'
 
 // Renders one tenant's namespace: its storefront, admin and business services (or, in the old layout, one
 // all-in-one controller), messaging and documents (Deployment + Service each, wired to one another),
@@ -21,7 +22,6 @@ export const DEFAULT_IMAGES: Record<TenantService, string> = {
   messaging: `${ECR}/jeffi-stores-messaging-service:latest`,
   documents: `${ECR}/jeffi-stores-document-service:latest`,
 }
-const EDGE_NS = 'jeffi-edge'
 // Provider callbacks and API links resolve through the shared public gateway.
 const PUBLIC_BASE_URL = 'https://public.jeffistores.in'
 const DOC_APPS = ['invoice', 'quotation', 'purchaseorder']
@@ -96,7 +96,6 @@ const spread = (slug: string, app: string, nodes: number) =>
       }
     : {}
 
-const hostRule = (hosts: string[]) => hosts.map(h => `Host(\`${h}\`)`).join(' || ')
 
 const podBase = (place: ReturnType<typeof placement>, grace: number) => ({
   ...place,
@@ -426,90 +425,69 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
     },
   })
 
-  // Where each host's traffic goes: the all-in-one app, or the store service for that host.
-  const to = (role: ServiceRole) => [{ name: routeTo === 'controller' ? tenantAppName(slug) : tenantRoleName(slug, role), port: 3000 }]
-  const split = routeTo === 'services'
   const strip = { name: 'strip-client-cert', namespace: EDGE_NS }
-  const route = (name: string, hosts: string[], services: unknown[], extra: Record<string, unknown> = {}): K8sObject => ({
+  const ingress = (name: string, routes: unknown[], tls: Record<string, unknown> = {}): K8sObject => ({
     apiVersion: 'traefik.io/v1alpha1',
     kind: 'IngressRoute',
     metadata: { name, namespace: ns },
-    spec: {
-      entryPoints: ['websecure'],
-      routes: [{ match: hostRule(hosts), kind: 'Rule', middlewares: [strip], services }],
-      // The TLSOption named `default` applies implicitly; referencing it by name fails in Traefik.
-      tls: {},
-      ...extra,
-    },
+    // The TLSOption named `default` applies implicitly; referencing it by name fails in Traefik.
+    spec: { entryPoints: ['websecure'], routes, tls },
   })
-  const storeHosts = split ? publicHosts.filter(h => !businessHosts.includes(h)) : publicHosts
-  objs.push(route(split ? 'store' : 'controller', storeHosts, to('storefront')))
-  if (split && businessHosts.length && roles.includes('business')) objs.push(route('business', businessHosts, to('business')))
-  if (split) {
-    // The store's own-key Razorpay webhook arrives on the platform host; its storefront takes it.
-    objs.push({
-      apiVersion: 'traefik.io/v1alpha1',
-      kind: 'IngressRoute',
-      metadata: { name: 'razorpay-webhook', namespace: ns },
-      spec: {
-        entryPoints: ['websecure'],
-        routes: [
-          {
-            match: `Host(\`${ROOT_DOMAIN}\`) && Path(\`/api/webhooks/razorpay/${slug}\`)`,
-            kind: 'Rule',
-            priority: 1000,
-            middlewares: [strip],
-            services: to('storefront'),
-          },
-        ],
-        tls: {},
-      },
-    })
+  const adminTls = { options: { name: 'tenant-mtls', namespace: EDGE_NS } }
+  const adminMiddlewares = [strip, { name: 'pass-client-cert', namespace: EDGE_NS }]
+
+  if (routeTo === 'controller') {
+    // The all-in-one app takes every host whole.
+    const app = [{ name: tenantAppName(slug), port: 3000 }]
+    const whole = (hosts: string[], middlewares = [strip]) => [{ match: hostMatch(hosts), kind: 'Rule', middlewares, services: app }]
+    objs.push(ingress('controller', whole(publicHosts)))
+    if (adminHosts.length) objs.push(ingress('admin', whole(adminHosts, adminMiddlewares), adminTls))
+    customDomains.forEach((domain, i) => objs.push(customDomainCert(ns, i, domain), ingress(`custom-${i}`, whole([domain]), { secretName: `custom-${i}-tls` })))
+  } else {
+    // Each path goes to the service service-routing.ts names for it. A store without the B2B portal
+    // sends its business paths to its storefront, which answers them 404.
+    const backend = (role: ServiceRole) => ({ name: tenantRoleName(slug, role), port: 3000 })
+    const backends = { storefront: backend('storefront'), admin: backend('admin'), business: backend(roles.includes('business') ? 'business' : 'storefront') }
+    const routes = (groups: HostGroup[], middlewares = [strip]) => trafficRoutes({ groups, backends, middlewares, band: PRIORITY_BAND.named })
+    const storeHosts = publicHosts.filter(h => !businessHosts.includes(h))
+    objs.push(
+      ingress(
+        'store',
+        routes([
+          { classes: ['store'], match: hostMatch(storeHosts) },
+          ...(businessHosts.length ? [{ classes: ['business' as const], match: hostMatch(businessHosts) }] : []),
+        ])
+      ),
+      // The store's own-key Razorpay webhook arrives on the platform host; its storefront takes it.
+      ingress('razorpay-webhook', [
+        {
+          match: `Host(\`${ROOT_DOMAIN}\`) && Path(\`/api/webhooks/razorpay/${slug}\`)`,
+          kind: 'Rule',
+          priority: PRIORITY_BAND.override,
+          middlewares: [strip],
+          services: [backends.storefront],
+        },
+      ])
+    )
+    if (adminHosts.length) objs.push(ingress('admin', routes([{ classes: ['admin'], match: hostMatch(adminHosts) }], adminMiddlewares), adminTls))
+    customDomains.forEach((domain, i) =>
+      objs.push(customDomainCert(ns, i, domain), ingress(`custom-${i}`, routes([{ classes: ['store'], match: hostMatch([domain]) }]), { secretName: `custom-${i}-tls` }))
+    )
   }
   if (docHosts.length) {
-    objs.push(route('documents', docHosts, [{ name: tenantServiceName(slug, 'documents'), port: SERVICES.documents.port }]))
+    objs.push(ingress('documents', [{ match: hostMatch(docHosts), kind: 'Rule', middlewares: [strip], services: [{ name: tenantServiceName(slug, 'documents'), port: SERVICES.documents.port }] }]))
   }
-  if (adminHosts.length) {
-    objs.push({
-      apiVersion: 'traefik.io/v1alpha1',
-      kind: 'IngressRoute',
-      metadata: { name: 'admin', namespace: ns },
-      spec: {
-        entryPoints: ['websecure'],
-        routes: [
-          {
-            match: hostRule(adminHosts),
-            kind: 'Rule',
-            middlewares: [strip, { name: 'pass-client-cert', namespace: EDGE_NS }],
-            services: to('admin'),
-          },
-        ],
-        tls: { options: { name: 'tenant-mtls', namespace: EDGE_NS } },
-      },
-    })
-  }
-  customDomains.forEach((domain, i) => {
-    const secretName = `custom-${i}-tls`
-    objs.push(
-      {
-        apiVersion: 'cert-manager.io/v1',
-        kind: 'Certificate',
-        metadata: { name: `custom-${i}`, namespace: ns, annotations: { 'jeffi.io/domain': domain } },
-        spec: { secretName, dnsNames: [domain], issuerRef: { kind: 'ClusterIssuer', name: 'letsencrypt-http' } },
-      },
-      {
-        apiVersion: 'traefik.io/v1alpha1',
-        kind: 'IngressRoute',
-        metadata: { name: `custom-${i}`, namespace: ns },
-        spec: {
-          entryPoints: ['websecure'],
-          routes: [{ match: hostRule([domain]), kind: 'Rule', middlewares: [strip], services: to('storefront') }],
-          tls: { secretName },
-        },
-      }
-    )
-  })
   return objs
+}
+
+/** A cert-manager certificate for a verified customer domain (HTTP-01). */
+function customDomainCert(ns: string, i: number, domain: string): K8sObject {
+  return {
+    apiVersion: 'cert-manager.io/v1',
+    kind: 'Certificate',
+    metadata: { name: `custom-${i}`, namespace: ns, annotations: { 'jeffi.io/domain': domain } },
+    spec: { secretName: `custom-${i}-tls`, dnsNames: [domain], issuerRef: { kind: 'ClusterIssuer', name: 'letsencrypt-http' } },
+  }
 }
 
 export { tenantNamespace, dedicatedNodeName }
