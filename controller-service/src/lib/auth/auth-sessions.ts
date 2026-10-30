@@ -336,7 +336,7 @@ export async function createSession(args: {
  * with what was granted), never the full grant. A control-plane blip must not silently expose
  * feature pages a plan never bought; it only keeps the shell + settings reachable.
  */
-async function effectiveScopes(tenantId: string | null, granted: string[], role: string | null): Promise<string[]> {
+export async function effectiveScopes(tenantId: string | null, granted: string[], role: string | null): Promise<string[]> {
   if (!tenantId || granted.length === 0) return granted
   try {
     const { getTenantPlan } = await import('@/lib/auth/plan-gate')

@@ -32,7 +32,7 @@ describe('digital products are never stock-tracked', () => {
   })
 
   it.each([
-    ['controller-service/src/lib/shared/daily-briefing.ts', /is_digital = FALSE AND inventory_quantity <= 10/],
+    ['controller-service/src/lib/shared/daily-briefing.ts', /is_digital = FALSE AND inventory_quantity <= \$1/],
     [
       'controller-service/src/lib/admin-agent/tools/catalog.ts',
       /p\.is_active = TRUE AND p\.is_digital = FALSE\s+AND \(p\.inventory_quantity <= \$1/,

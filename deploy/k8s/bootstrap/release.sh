@@ -2,7 +2,7 @@
 # Release the committed HEAD, from a Mac or from GitHub Actions (ci.yml): build the four images (arm64) from a
 # clean `git archive`, push them to ECR (tags already there are skipped), roll out with rollout.sh, smoke-test.
 # --build-only stops after the push, so images can be ready before a window; --rollout-only skips the builds
-# (CI builds them in parallel first). Images are tagged local-<image_sha> (lib.sh): commits that only touch
+# (CI builds them in parallel first). After the smoke test, 50-seeds.sh brings the message templates up to the catalog. Images are tagged local-<image_sha> (lib.sh): commits that only touch
 # docs or deploy/k8s reuse the images already pushed, and a Mac and CI build of the same commit share a tag.
 # Usage: bash deploy/k8s/bootstrap/release.sh [--build-only|--rollout-only]
 source "$(dirname "$0")/../db/lib.sh"
@@ -38,5 +38,8 @@ bash deploy/k8s/bootstrap/rollout.sh "$TAG"
 
 echo "== 3/3 Smoke test"
 bash deploy/k8s/bootstrap/smoke.sh "$SHA"
+
+echo "== Templates (new catalog entries, email content for unedited copies)"
+bash deploy/k8s/db/50-seeds.sh
 echo "== Released $SHA. Roll back the platform: kubectl -n jeffi rollout undo deploy/<jeffi-stores-*-service>;"
 echo "   a store: kubectl -n tenant-<slug> rollout undo deploy/<slug>-{controller,messaging,document}-service"

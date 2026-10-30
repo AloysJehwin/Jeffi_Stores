@@ -6,6 +6,7 @@ import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { handleInboundWhatsApp } from '@/lib/support/inbound'
 import { onCustomerMessage } from '@/lib/support/agent'
+import { routeAdminWhatsApp } from '@/lib/admin-agent/whatsapp'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -78,10 +79,12 @@ async function handle(raw: string): Promise<void> {
       if (m.type === 'reaction' || m.type === 'system' || m.type === 'unsupported') continue
       const media = cloudInboundMedia(m)
       const profile = value.contacts?.find(c => c.wa_id === m.from)?.profile?.name ?? null
+      const from = `+${m.from.replace(/\D/g, '')}`
+      if (await routeAdminWhatsApp({ providerSid: m.id, from, to: ours, text: cloudInboundText(m), hasMedia: !!media, repliedToSid: m.context?.id ?? null })) continue
       const r = await handleInboundWhatsApp({
         provider: 'aws',
         providerSid: m.id,
-        from: `+${m.from.replace(/\D/g, '')}`,
+        from,
         to: ours,
         text: cloudInboundText(m),
         profileName: profile,

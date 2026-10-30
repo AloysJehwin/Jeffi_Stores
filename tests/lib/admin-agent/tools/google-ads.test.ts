@@ -13,12 +13,12 @@ vi.mock('@/lib/auth/plan-gate', () => ({ currentTenantPlanGate: planGate }))
 vi.mock('@/lib/auth/audit-context', () => ({ getCurrentAuditAdminId: auditAdmin }))
 vi.mock('@/lib/google-ads/credentials', () => ({ googleAdsClientFor: clientFor }))
 vi.mock('@/lib/google-ads/refresh', () => ({ refreshMirror }))
-vi.mock('@/app/api/(admin)/admin/agent/actions/[id]/approve/_lib/shared', () => ({ callInternalApi }))
+vi.mock('@/lib/admin-agent/actions/shared', () => ({ callInternalApi }))
 
 import { GoogleAdsClient } from '@/lib/google-ads/client'
 import { GOOGLE_ADS_TOOLS, adsGate } from '@/lib/admin-agent/tools/google-ads'
 import { getTool, TOOLS } from '@/lib/admin-agent/tools'
-import { executeAction } from '@/app/api/(admin)/admin/agent/actions/[id]/approve/_lib/execute'
+import { executeAction } from '@/lib/admin-agent/actions/execute'
 
 const CID = '1234567890'
 const fetchMock = vi.fn()

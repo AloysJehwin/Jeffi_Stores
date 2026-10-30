@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { verifyPortalToken, PORTAL_COOKIE } from '@/lib/auth/portal-session'
 import { decryptPortalSecret } from '@/lib/tenancy/portal-certs'
+import { certNeedsMobileCheck, downloadableCert, inCertStore } from '@/lib/auth/cert-mobile'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!session) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
 
   const pool = controlPlanePool()
+
+  // A verified mobile number comes first; checked before the claim so the one download isn't used up.
+  if (certNeedsMobileCheck()) {
+    const cert = await downloadableCert(serial, session.email)
+    if (cert) {
+      const verified = await inCertStore(cert.tenant_id, cert.store_name, session.email, async ({ admin }) => !!admin?.mobile_verified_at)
+      if (!verified)
+        return NextResponse.json({ error: 'Verify your mobile number before downloading.', needsMobile: true }, { status: 409 })
+    }
+  }
 
   // Claim the download atomically. Only succeeds for THIS email's cert that is still downloadable.
   const claim = await pool.query(

@@ -228,7 +228,7 @@ metadata:
   namespace: jeffi
   labels: { app.kubernetes.io/part-of: jeffi-cron }
 spec:
-  schedule: '0 8 * * *'
+  schedule: '3 * * * *'
   timeZone: Asia/Kolkata
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 120

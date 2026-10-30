@@ -91,6 +91,14 @@ CREATE INDEX idx_admin_agent_conversations_admin ON public.admin_agent_conversat
 
 
 --
+-- Name: idx_admin_agent_conversations_channel; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_agent_conversations_channel ON public.admin_agent_conversations USING btree (admin_id, channel, last_message_at DESC);
+
+
+
+--
 -- Name: idx_admin_agent_messages_admin; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -103,6 +111,22 @@ CREATE INDEX idx_admin_agent_messages_admin ON public.admin_agent_messages USING
 --
 
 CREATE INDEX idx_admin_agent_messages_conv ON public.admin_agent_messages USING btree (conversation_id, created_at);
+
+
+
+--
+-- Name: idx_admin_agent_messages_provider_sid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_admin_agent_messages_provider_sid ON public.admin_agent_messages USING btree (provider_sid) WHERE (provider_sid IS NOT NULL);
+
+
+
+--
+-- Name: admins_mobile_verified_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX admins_mobile_verified_key ON public.admins USING btree (mobile) WHERE (mobile_verified_at IS NOT NULL);
 
 
 

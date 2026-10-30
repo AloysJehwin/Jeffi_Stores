@@ -844,6 +844,22 @@ CREATE INDEX IF NOT EXISTS idx_portal_certs_issued_to ON public.portal_certs USI
 CREATE INDEX IF NOT EXISTS idx_portal_certs_downloadable
     ON public.portal_certs USING btree (download_token) WHERE revoked_at IS NULL AND downloaded_at IS NULL;
 
+-- Verified admin mobile numbers across every store (tenant_id NULL = the platform): which store a
+-- WhatsApp message from an admin's number is for. The store's admins row stays the source of truth.
+CREATE TABLE IF NOT EXISTS public.admin_mobiles (
+    phone       character varying(16) NOT NULL,
+    tenant_id   uuid,
+    admin_id    uuid NOT NULL,
+    verified_at timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.admin_mobiles ADD CONSTRAINT admin_mobiles_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+CREATE UNIQUE INDEX IF NOT EXISTS admin_mobiles_admin_key
+    ON public.admin_mobiles USING btree (COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid), admin_id);
+CREATE UNIQUE INDEX IF NOT EXISTS admin_mobiles_phone_store_key
+    ON public.admin_mobiles USING btree (phone, COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid));
+CREATE INDEX IF NOT EXISTS idx_admin_mobiles_phone ON public.admin_mobiles USING btree (phone);
+
 
 -- =====================================================================
 -- Vault storage quotas + customer-subscription webhook routing

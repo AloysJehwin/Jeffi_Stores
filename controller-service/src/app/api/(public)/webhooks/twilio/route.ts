@@ -6,12 +6,13 @@ import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { handleInboundWhatsApp } from '@/lib/support/inbound'
 import { onCustomerMessage } from '@/lib/support/agent'
+import { routeAdminWhatsApp } from '@/lib/admin-agent/whatsapp'
 
 export const dynamic = 'force-dynamic'
 
-// Inbound Twilio messages. WhatsApp goes to the customer's support chat (the assistant answers;
-// media lands in the Drive); SMS only carries STOP/START. A store's own number posts with ?t=<tenant>.
-// Always answers with empty TwiML so Twilio doesn't retry.
+// Inbound Twilio messages. WhatsApp from an admin's verified number goes to the admin assistant, the rest
+// to the customer's support chat (the assistant answers; media lands in the Drive); SMS only carries
+// STOP/START. A store's own number posts with ?t=<tenant>. Always answers with empty TwiML so Twilio doesn't retry.
 
 const EMPTY_TWIML = '<Response></Response>'
 const twiml = () => new NextResponse(EMPTY_TWIML, { status: 200, headers: { 'Content-Type': 'text/xml' } })
@@ -58,6 +59,8 @@ async function handle(params: Record<string, string>): Promise<void> {
   if (/^whatsapp:/i.test(from)) {
     const n = Math.min(Number(params.NumMedia) || 0, 10)
     const media = Array.from({ length: n }, (_, i) => ({ ref: params[`MediaUrl${i}`], mime: params[`MediaContentType${i}`] || '' })).filter(m => m.ref)
+    // An admin's verified number reaches the admin assistant instead, where the store has it on.
+    if (await routeAdminWhatsApp({ providerSid: sid, from, to, text: body, hasMedia: media.length > 0, repliedToSid: params.OriginalRepliedMessageSid || null })) return
     const r = await handleInboundWhatsApp({ provider: 'twilio', providerSid: sid, from, to, text: body, profileName: params.ProfileName || null, media })
     // A swipe-reply quotes the message it answers, which ties it to that order or quotation.
     if (r) await onCustomerMessage(r.session, r.message, { repliedToSid: params.OriginalRepliedMessageSid || null, phone: from })
