@@ -48,7 +48,7 @@ export async function storeFor(ctx: EventContext, entity: any, opts: { paymentId
 }
 
 /**
- * Runs fn in the payment's store. On the platform account, when nothing there was waiting for the
+ * Runs fn in the payment's store and returns its outcome ('unmatched' when no store had it). On the platform account, when nothing there was waiting for the
  * payment, it tries once more in the store the Razorpay order was made for: a customer can set payment
  * notes at checkout, but the order's notes are ours.
  */
@@ -56,10 +56,10 @@ export async function inPaymentStore(
   ctx: EventContext,
   payment: any,
   fn: (store: WebhookTenant) => Promise<string>
-): Promise<void> {
+): Promise<string> {
   const first = await storeFor(ctx, payment)
-  if (first && (await runInTenant(first, () => fn(first))) !== 'unmatched') return
-  if (ctx.source === 'own') return
+  const out = first ? await runInTenant(first, () => fn(first)) : 'unmatched'
+  if (out !== 'unmatched' || ctx.source === 'own') return out
   let byOrder: WebhookTenant | null | undefined
   try {
     byOrder = await storeForRazorpayOrder(payment?.order_id)
@@ -67,5 +67,5 @@ export async function inPaymentStore(
     throw new TransientWebhookError('store lookup failed', e)
   }
   const second = byOrder === undefined ? flagshipScope() : byOrder
-  if (second && second.tenantId !== first?.tenantId) await runInTenant(second, () => fn(second))
+  return second && second.tenantId !== first?.tenantId ? runInTenant(second, () => fn(second)) : out
 }
