@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const runMigrationFanout = vi.fn()
-vi.mock('@/lib/tenant-migrations', () => ({ runMigrationFanout: (s: string) => runMigrationFanout(s) }))
+vi.mock('@controller/lib/tenant-migrations', () => ({ runMigrationFanout: (s: string) => runMigrationFanout(s) }))
 
 const REAL_ENV = { ...process.env }
 beforeEach(() => {

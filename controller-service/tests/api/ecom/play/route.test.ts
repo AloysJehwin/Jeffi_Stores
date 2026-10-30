@@ -8,7 +8,7 @@ const { mockQuery, mockFetchService, mockApprovals } = vi.hoisted(() => ({
 }))
 
 const TENANT = { id: 't-1', slug: 'acme', service_types: ['messaging', 'documents'] }
-vi.mock('@/lib/ecom/owner-api', () => ({ ownerApi: async () => ({ owner: { id: 'o-1' }, tenant: TENANT, tenants: [TENANT] }) }))
+vi.mock('@controller/lib/ecom/owner-api', () => ({ ownerApi: async () => ({ owner: { id: 'o-1' }, tenant: TENANT, tenants: [TENANT] }) }))
 vi.mock('@/lib/tenant-registry/shared', () => ({ controlPlanePool: () => ({ query: mockQuery }) }))
 vi.mock('@/lib/tenant-registry', () => ({
   hasService: (t: { service_types: string[] }, s: string) => t.service_types.includes(s),

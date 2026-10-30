@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import type { GoogleOAuthResult } from '@/lib/client/google-oauth-popup'
-import { trackOwnerAuth } from '@/lib/client/ecom-analytics'
+import { trackOwnerAuth } from '@controller/lib/client/ecom-analytics'
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
 
 // OTP + Google auth form for ecom owners. mode 'signup' collects a name; 'signin'

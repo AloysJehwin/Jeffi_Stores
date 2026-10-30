@@ -6,7 +6,7 @@ const validateRequest = vi.hoisted(() => vi.fn(() => true))
 vi.mock('twilio', () => ({ default: { validateRequest } }))
 vi.mock('@/lib/shared/messaging/billing', () => ({ debitMessageCost }))
 vi.mock('@/lib/shared/db', () => ({ query }))
-vi.mock('@/lib/shared/messaging/delivery-status', () => ({ applyDeliveryStatus: vi.fn() }))
+vi.mock('@controller/lib/shared/messaging/delivery-status', () => ({ applyDeliveryStatus: vi.fn() }))
 vi.mock('@/lib/tenant-registry/host-resolution', () => ({
   lookupTenantContextById: vi.fn(async () => ({ tenantId: 't1' })),
 }))

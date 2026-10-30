@@ -2,9 +2,9 @@ import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getTenant, getProvisioningJob, listCustomDomains } from '@/lib/tenant-registry'
-import { getTenantMigrationRuns } from '@/lib/tenant-migrations'
-import TenantObjectHeader from '@/components/admin/ecom/TenantObjectHeader'
-import InfrastructureTab from '@/components/admin/ecom/tabs/InfrastructureTab'
+import { getTenantMigrationRuns } from '@controller/lib/tenant-migrations'
+import TenantObjectHeader from '@controller/components/admin/ecom/TenantObjectHeader'
+import InfrastructureTab from '@controller/components/admin/ecom/tabs/InfrastructureTab'
 
 export const dynamic = 'force-dynamic'
 

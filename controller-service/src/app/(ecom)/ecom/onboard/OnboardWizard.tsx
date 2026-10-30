@@ -6,7 +6,7 @@ import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import { ChoiceCards, ChoiceChips, Segmented, focusRing } from '../_ui'
 import { useToast } from '@/contexts/ToastContext'
 import { PhoneInput } from '../_ui/phone'
-import { trackStoreApplication } from '@/lib/client/ecom-analytics'
+import { trackStoreApplication } from '@controller/lib/client/ecom-analytics'
 import { ComputeConfigurator, type ComputeChoice } from '../_compute/ComputeConfigurator'
 import { PRESETS } from '@/lib/compute/presets'
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ownerApi } from '@/lib/ecom/owner-api'
+import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { hasService } from '@/lib/tenant-registry'
 import { uploadTemplateAsset } from '@jeffi/tenancy'
 import { readUpload } from '@/lib/shared/form-file'

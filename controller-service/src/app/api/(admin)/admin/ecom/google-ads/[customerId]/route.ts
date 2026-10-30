@@ -4,7 +4,7 @@ import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { formatCustomerId, isValidCustomerId } from '@/lib/google-ads/client'
 import { managerClient } from '@/lib/google-ads/credentials'
-import { unlinkManagedAccount } from '@/lib/google-ads/manager-view'
+import { unlinkManagedAccount } from '@controller/lib/google-ads/manager-view'
 import { adsErrorResponse } from '@/lib/google-ads/manage-route'
 
 export const dynamic = 'force-dynamic'

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { computePlans, getCatalog } from '@/lib/compute/catalog'
+import { computePlans, getCatalog } from '@controller/lib/compute/catalog'
 
 export const dynamic = 'force-dynamic'
 

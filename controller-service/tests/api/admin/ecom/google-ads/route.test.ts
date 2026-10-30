@@ -13,7 +13,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: m.authenticateAdmin }))
 vi.mock('@/lib/shared/admin-audit', () => ({ logAdminAudit: m.audit }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn(async () => []), query: vi.fn() }))
 vi.mock('@/lib/google-ads/credentials', () => ({ managerClient: m.managerClient }))
-vi.mock('@/lib/google-ads/manager-view', () => ({ listManagedAccounts: m.listManaged, unlinkManagedAccount: m.unlink }))
+vi.mock('@controller/lib/google-ads/manager-view', () => ({ listManagedAccounts: m.listManaged, unlinkManagedAccount: m.unlink }))
 
 import { GET as managed } from '@controller/app/api/(admin)/admin/ecom/google-ads/route'
 import { DELETE as unlink } from '@controller/app/api/(admin)/admin/ecom/google-ads/[customerId]/route'

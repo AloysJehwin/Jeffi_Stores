@@ -5,7 +5,11 @@
 **Only the SERVICES are segregated. The DATABASE is unified.**
 
 Services:
-- Four Next.js apps, sharing their code through `packages/store-core` (lib, components, contexts, hooks, the middleware):
+- Four Next.js apps, sharing their code through `packages/store-core` (lib, components, contexts, hooks, the middleware).
+  Code only the control plane uses (provisioning, compute, tenant migrations, the ecom console's components and
+  overviews) lives in `controller-service/src/{lib,components}` as `@controller/...`, so store pods never ship it. An app
+  imports store-core (`@/`) and itself, never another app: ESLint enforces it on `src`, and
+  `packages/store-core/tests/lib/app-import-boundaries.test.ts` on everything including tests.
   - `controller-service` — the control plane only: the ecom console (`ecom.`), the certificate portal, the platform admin pages (`admin.<root>/ecom`, `/settings/{ai,compute}-pricing`), provisioning, platform crons and webhooks
   - `storefront-service` — the store's site (store host, custom domains, `vault-`, `forms-`) and every store `/api` route; admin and business UIs call those on their own host
   - `admin-service` — the admin panel, `/api/admin` and the store's crons

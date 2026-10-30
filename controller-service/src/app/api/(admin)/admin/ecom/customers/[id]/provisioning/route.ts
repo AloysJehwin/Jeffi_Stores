@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getTenant, controlPlanePool } from '@/lib/tenant-registry'
-import { STEPS } from '@/lib/provisioning/steps'
+import { STEPS } from '@controller/lib/provisioning/steps'
 
 export const dynamic = 'force-dynamic'
 

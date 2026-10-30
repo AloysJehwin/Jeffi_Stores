@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runMigrationFilesFanout } from '@/lib/tenant-migrations'
+import { runMigrationFilesFanout } from '@controller/lib/tenant-migrations'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'

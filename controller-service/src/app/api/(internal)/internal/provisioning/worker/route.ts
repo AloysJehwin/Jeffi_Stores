@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { activeProvisioningJobs, getProvisioningJob, controlPlanePool } from '@/lib/tenant-registry'
 import { pendingK8sPlanTenants } from '@/lib/tenant-registry/provisioning'
-import { advanceProvisioningJob, reconcileK8sPlan } from '@/lib/provisioning/steps'
-import { getProvisioningProvider } from '@/lib/provisioning'
-import { provisionTenantOwnerAdmin } from '@/lib/tenancy/tenant-admin-provision'
+import { advanceProvisioningJob, reconcileK8sPlan } from '@controller/lib/provisioning/steps'
+import { getProvisioningProvider } from '@controller/lib/provisioning'
+import { provisionTenantOwnerAdmin } from '@controller/lib/tenancy/tenant-admin-provision'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
@@ -58,8 +58,8 @@ async function tick() {
   }
 
   // Owners' compute changes to running stores (and old databases due to be dropped).
-  const { dueComputeChanges } = await import('@/lib/compute/store')
-  const { reconcileCompute } = await import('@/lib/provisioning/compute-reconcile')
+  const { dueComputeChanges } = await import('@controller/lib/compute/store')
+  const { reconcileCompute } = await import('@controller/lib/provisioning/compute-reconcile')
   for (const tenantId of await dueComputeChanges().catch(() => [])) {
     const r = await reconcileCompute(tenantId, provider).catch((e: any) => ({ ok: false, status: 'error', error: e?.message }))
     results.push({ tenantId, step: 'compute_change', status: r.ok ? r.status : `error: ${r.error}` })
@@ -109,13 +109,13 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
   // tenant's admin host advertises its CA (and prompts for the cert) without waiting for the
   // next deploy. Non-fatal — the store is live regardless.
   try {
-    const { refreshTenantMtlsFleet } = await import('@/lib/tenancy/mtls-fleet')
+    const { refreshTenantMtlsFleet } = await import('@controller/lib/tenancy/mtls-fleet')
     await refreshTenantMtlsFleet(r.slug)
   } catch (e: any) {
     const reason = e?.message ?? String(e)
     console.error(`[mtls-fleet] ${r.slug}: ${reason}`)
     try {
-      const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+      const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
       await alertProvisioningFailure(r.slug, 'mtls_fleet_refresh', reason)
     } catch {
       /* alerting must never mask the original failure */
@@ -128,7 +128,7 @@ async function reportOwnerAdminFailure(slug: string, error?: string): Promise<vo
   const msg = `[provisionTenantOwnerAdmin] ${slug}: ${error ?? 'unknown error'}`
   console.error(msg)
   try {
-    const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+    const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
     await alertProvisioningFailure(slug, 'owner_admin_cert', error ?? 'unknown error')
   } catch {
     /* alerting must never mask the original failure */

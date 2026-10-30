@@ -11,7 +11,7 @@ import {
 } from '@/lib/tenant-registry'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { createRazorpaySubscription } from '@/lib/payments/razorpay-subscriptions'
+import { createRazorpaySubscription } from '@controller/lib/payments/razorpay-subscriptions'
 
 export const dynamic = 'force-dynamic'
 

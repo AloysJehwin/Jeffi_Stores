@@ -1,7 +1,7 @@
 'use client'
 
 import { DataTable, type DataCol } from '@/components/admin/kit'
-import { StatusPill } from '@/components/admin/ecom/EcomUI'
+import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import type { LedgerEntry, TenantTransaction } from '@/lib/tenant-registry/tenants'
 
 // Client table wrappers for the billing detail page.

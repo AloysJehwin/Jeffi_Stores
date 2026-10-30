@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 import { CRON_JOBS, isCronJobId } from '@/lib/shared/cron-jobs'
-import { internalRequest } from '@/lib/shared/internal-http'
+import { internalRequest } from '@controller/lib/shared/internal-http'
 
 export const dynamic = 'force-dynamic'
 

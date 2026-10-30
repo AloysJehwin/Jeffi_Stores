@@ -33,7 +33,7 @@ vi.mock('@/lib/tenant-registry', () => ({
   addTenantServices: m.addServices,
 }))
 vi.mock('@/lib/shared/ecom-emails', () => ({ sendKycSubmittedEmail: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/k8s/capacity', () => ({ dedicatedCapacityError: vi.fn().mockResolvedValue(null) }))
+vi.mock('@controller/lib/k8s/capacity', () => ({ dedicatedCapacityError: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/shipping/delhivery', () => ({ verifyDelhiveryToken: vi.fn() }))
 
 import { POST } from '@controller/app/api/(ecom)/ecom/onboard/submit/route'

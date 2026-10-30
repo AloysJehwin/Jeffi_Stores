@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getTenant, getProvisioningJob, setTenantInstanceState } from '@/lib/tenant-registry'
-import { getProvisioningProvider } from '@/lib/provisioning'
-import { dbInstanceId } from '@/lib/provisioning/steps'
+import { getProvisioningProvider } from '@controller/lib/provisioning'
+import { dbInstanceId } from '@controller/lib/provisioning/steps'
 
 export const dynamic = 'force-dynamic'
 

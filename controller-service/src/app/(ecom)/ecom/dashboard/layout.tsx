@@ -1,7 +1,7 @@
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import ConsoleShell from './ConsoleShell'
 import { listServiceApprovals } from '@/lib/tenant-registry'
-import { computeSpecEnabled } from '@/lib/compute/catalog'
+import { computeSpecEnabled } from '@controller/lib/compute/catalog'
 
 export const dynamic = 'force-dynamic'
 

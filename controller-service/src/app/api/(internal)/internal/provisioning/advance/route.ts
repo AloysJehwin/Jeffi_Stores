@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProvisioningJob, controlPlanePool } from '@/lib/tenant-registry'
-import { advanceProvisioningJob } from '@/lib/provisioning/steps'
-import { getProvisioningProvider } from '@/lib/provisioning'
-import { provisionTenantOwnerAdmin } from '@/lib/tenancy/tenant-admin-provision'
+import { advanceProvisioningJob } from '@controller/lib/provisioning/steps'
+import { getProvisioningProvider } from '@controller/lib/provisioning'
+import { provisionTenantOwnerAdmin } from '@controller/lib/tenancy/tenant-admin-provision'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
@@ -61,7 +61,7 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
   if (!res.success) {
     console.error(`[provisionTenantOwnerAdmin] ${r.slug}: ${res.error ?? 'unknown error'}`)
     try {
-      const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+      const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
       await alertProvisioningFailure(r.slug, 'owner_admin_cert', res.error ?? 'unknown error')
     } catch {
       /* alerting must never mask the original failure */
@@ -73,13 +73,13 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
   // next deploy. Non-fatal: the store is live regardless, so a fleet-reload failure is logged
   // and alerted, never allowed to fail provisioning.
   try {
-    const { refreshTenantMtlsFleet } = await import('@/lib/tenancy/mtls-fleet')
+    const { refreshTenantMtlsFleet } = await import('@controller/lib/tenancy/mtls-fleet')
     await refreshTenantMtlsFleet(r.slug)
   } catch (e: any) {
     const reason = e?.message ?? String(e)
     console.error(`[mtls-fleet] ${r.slug}: ${reason}`)
     try {
-      const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+      const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
       await alertProvisioningFailure(r.slug, 'mtls_fleet_refresh', reason)
     } catch {
       /* alerting must never mask the original failure */

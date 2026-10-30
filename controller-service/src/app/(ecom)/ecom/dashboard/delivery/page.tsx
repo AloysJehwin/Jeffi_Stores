@@ -1,4 +1,4 @@
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { hasOwnDelhiveryToken } from '@/lib/integrations/resolve'
 import PageHeader from '../_components/PageHeader'
 import DeliveryAccount from '../DeliveryAccount'

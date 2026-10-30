@@ -16,7 +16,7 @@ import {
   type Col,
   type Tone,
 } from '@/components/admin/channels/ui'
-import type { EcomStoreStatusOverview as Data } from '@/lib/overviews/ecom-store-status'
+import type { EcomStoreStatusOverview as Data } from '@controller/lib/overviews/ecom-store-status'
 import { OverviewShell, Grid2, dateIn, label, useEcomOverview } from '../../_components/overview-shell'
 
 const HEALTH_TONE: Record<string, Tone> = {

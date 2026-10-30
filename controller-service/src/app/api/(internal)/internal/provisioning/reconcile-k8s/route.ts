@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { reconcileK8sPlan } from '@/lib/provisioning/steps'
-import { getProvisioningProvider } from '@/lib/provisioning'
+import { reconcileK8sPlan } from '@controller/lib/provisioning/steps'
+import { getProvisioningProvider } from '@controller/lib/provisioning'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'

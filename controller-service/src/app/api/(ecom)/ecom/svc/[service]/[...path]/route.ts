@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ownerApi } from '@/lib/ecom/owner-api'
+import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { hasService, listServiceApprovals, blockedServices } from '@/lib/tenant-registry'
 import { fetchService } from '@/lib/ecom/service-client'
 

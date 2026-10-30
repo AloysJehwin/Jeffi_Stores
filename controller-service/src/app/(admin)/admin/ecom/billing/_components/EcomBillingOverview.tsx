@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { AttentionList } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct, type Col } from '@/components/admin/channels/ui'
 import { TrendChart, RankedBars, type SeriesDef } from '@/components/admin/dashboard/Charts'
-import type { EcomBillingOverview as Data } from '@/lib/overviews/ecom-billing'
+import type { EcomBillingOverview as Data } from '@controller/lib/overviews/ecom-billing'
 import { OverviewShell, Grid2, dateIn, useEcomOverview } from '../../_components/overview-shell'
 
 const SERIES: SeriesDef[] = [
