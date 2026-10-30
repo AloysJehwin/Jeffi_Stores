@@ -22,6 +22,8 @@ import InitiateRefundButton from '@/app/(admin)/admin/orders/[id]/_components/In
 import { RecordRefundLink } from '@/app/(admin)/admin/orders/[id]/_components/ExternalRefundForm'
 import { externalRefundLabel } from '@/lib/payments/external-refund'
 import RetryPaymentEmailButton from '@/app/(admin)/admin/orders/[id]/_components/RetryPaymentEmailButton'
+import RetryRefundButton from '@/app/(admin)/admin/orders/[id]/_components/RetryRefundButton'
+import { orderRefunds, paidWith } from '@/lib/payments/order-payment-info'
 import CreateShipmentButton from '@/app/(admin)/admin/orders/[id]/_components/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductAdjustments from '@/app/(admin)/admin/orders/[id]/_components/ProductAdjustments'
@@ -117,6 +119,8 @@ export default async function OrderDetailsPage({
   const inventoryValidationEnabled = inventoryFlag && hasScope(role, scopes, 'inventory:read')
 
   const returnRequest = await getReturnRequest(id).catch(() => null)
+  // Razorpay refunds, with their bank status. A replacement's payments sit on the original order.
+  const refunds = await orderRefunds([order.id, order.original_order_id].filter(Boolean))
   const addressChangeRequests = (await listAddressChangeRequests(id)).map(r => ({
     id: r.id,
     status: r.status,
@@ -922,6 +926,30 @@ export default async function OrderDetailsPage({
                             <span className="text-foreground">{collectedViaLabel}</span>
                           </div>
                         )}
+                        {paidWith(p) && (
+                          <div className="flex justify-between gap-3 text-sm">
+                            <span className="text-foreground-secondary">Paid with</span>
+                            <span className="min-w-0 text-right text-foreground [overflow-wrap:anywhere]">{paidWith(p)}</span>
+                          </div>
+                        )}
+                        {p.fee != null && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-foreground-secondary">Razorpay fee (incl. GST)</span>
+                            <span className="text-foreground tabular-nums">Rs. {Number(p.fee).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {p.captured_at && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-foreground-secondary">Captured</span>
+                            <span className="text-foreground">{new Date(p.captured_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}</span>
+                          </div>
+                        )}
+                        {p.status === 'failed' && (p.error_description || p.error_reason) && (
+                          <div className="flex justify-between gap-3 text-sm">
+                            <span className="text-foreground-secondary">Failed</span>
+                            <span className="min-w-0 text-right text-red-600 dark:text-red-400">{p.error_description || p.error_reason}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between text-sm">
                           <span className="text-foreground-secondary">Amount</span>
                           <span className="text-foreground font-semibold">
@@ -947,11 +975,11 @@ export default async function OrderDetailsPage({
                             </span>
                           </div>
                         ))}
-                        {partialTotal > 0 && (
+                        {(partialTotal > 0 || p.fee != null) && (
                           <div className="flex justify-between text-sm border-t border-border-default pt-1.5">
-                            <span className="text-foreground-secondary">Net received</span>
+                            <span className="text-foreground-secondary">{p.fee != null ? 'Net to you' : 'Net received'}</span>
                             <span className="text-foreground font-semibold">
-                              Rs. {(Number(p.amount) - partialTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              Rs. {(Number(p.amount) - partialTotal - Number(p.fee ?? 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                         )}
@@ -989,6 +1017,30 @@ export default async function OrderDetailsPage({
                       </div>
                     )
                   })}
+                </div>
+              )}
+              {refunds.length > 0 && (
+                <div className="mt-3 rounded-lg border border-border-default p-3 space-y-2">
+                  <span className="text-xs font-semibold text-foreground">Refunds</span>
+                  {refunds.map(r => (
+                    <div key={r.id} className="space-y-1 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="tabular-nums text-foreground">Rs. {Number(r.amount).toFixed(2)}</span>
+                        <Badge tone={r.status === 'processed' ? 'green' : r.status === 'failed' ? 'red' : 'amber'}>
+                          {r.status === 'processed' ? 'At the bank' : r.status === 'failed' ? (r.retried ? 'Failed · retried' : 'Failed') : 'Pending'}
+                        </Badge>
+                      </div>
+                      <div className="text-[11px] text-foreground-muted">
+                        <span className="font-mono [overflow-wrap:anywhere]">{r.razorpay_refund_id}</span>
+                        {r.initiated_by !== 'app' ? ` · ${r.initiated_by === 'dashboard' ? 'Razorpay dashboard' : r.initiated_by}` : ''}
+                        {r.speed_processed ? ` · ${r.speed_processed}` : ''}
+                        {` · ${new Date(r.processed_at || r.failed_at || r.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}`}
+                      </div>
+                      {r.arn && <div className="text-[11px] text-foreground-muted">Bank reference (ARN/RRN): <span className="font-mono">{r.arn}</span></div>}
+                      {r.status === 'failed' && r.failure_reason && <div className="text-[11px] text-red-600 dark:text-red-400">{r.failure_reason}</div>}
+                      {r.status === 'failed' && !r.retried && canWrite && <RetryRefundButton orderId={order.id} refundId={r.id} amount={Number(r.amount)} />}
+                    </div>
+                  ))}
                 </div>
               )}
               {canWrite && moneyIn && order.status !== 'cancelled' && order.status !== 'returned' && Number(order.total_amount) > 0 && (

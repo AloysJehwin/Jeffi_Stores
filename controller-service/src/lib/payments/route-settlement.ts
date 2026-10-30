@@ -576,6 +576,61 @@ export async function applyRouteRefund(opts: {
   }
 }
 
+/**
+ * The bank rejected a refund: the money is back in the account, so its booking is undone. The transfer
+ * reversal stays — a retried refund books against it without reversing the store's share again.
+ * Idempotent: only a refund id still on the row is undone.
+ */
+export async function applyRouteRefundFailed(opts: {
+  tenantId?: string | null
+  paymentId: string
+  refundId: string
+  refundPaise: number
+  orderRef?: string | null
+}): Promise<boolean> {
+  try {
+    if (!opts.paymentId || !opts.refundId || !(opts.refundPaise > 0)) return false
+    const pool = await cpPool()
+    const row = await findTenantTransaction({ tenantId: opts.tenantId, paymentId: opts.paymentId, orderRef: opts.orderRef })
+    if (!row || row.is_cod) return false
+    const upd = await pool.query(
+      `UPDATE tenant_transactions
+          SET refunded_amount = GREATEST(0, refunded_amount - $2),
+              refund_ids = array_remove(refund_ids, $3::text),
+              status = CASE WHEN GREATEST(0, refunded_amount - $2) > 0 THEN 'partially_refunded'
+                            WHEN recipient_settlement_id IS NOT NULL THEN 'settled'
+                            WHEN transfer_id IS NOT NULL OR gateway_txn_id LIKE 'trf\\_%' THEN 'split'
+                            ELSE 'captured' END
+        WHERE id = $1 AND $3::text = ANY(refund_ids)
+        RETURNING refunded_amount`,
+      [row.id, toInr(opts.refundPaise), opts.refundId]
+    )
+    const after = upd?.rows?.[0]
+    if (!after) return false
+
+    if (row.gateway === 'razorpay_route' && transferIdOf(row)) {
+      // The reverse of applyRouteRefund's entries for this refund.
+      const gross = toPaise(row.gross_amount)
+      const now = Math.min(gross, toPaise(after.refunded_amount))
+      const before = Math.min(gross, now + opts.refundPaise)
+      const share = (total: number, p: number) => Math.round((total * p) / gross)
+      const c = toPaise(row.platform_commission)
+      const f = toPaise(row.gateway_fee)
+      const ref = row.order_ref ?? ''
+      const key = `${opts.refundId}:failed`
+      await insertLedger(pool, [
+        { tenantId: row.tenant_id, type: 'refund', amountInr: toInr(before - now), txnId: row.id, note: `Refund ${opts.refundId} failed — order ${ref}`, ref: key },
+        { tenantId: row.tenant_id, type: 'commission', amountInr: -toInr(share(c, before) - share(c, now)), txnId: row.id, note: `Commission refund undone — order ${ref}`, ref: key },
+        { tenantId: row.tenant_id, type: 'gateway_fee', amountInr: -toInr(share(f, before) - share(f, now)), txnId: row.id, note: `Fee refund undone — order ${ref}`, ref: key },
+      ])
+    }
+    return true
+  } catch (e: any) {
+    console.error('[route-settlement] applyRouteRefundFailed failed', opts.paymentId, e?.message)
+    return false
+  }
+}
+
 /** Retry reversals still short of their proportional target (empty linked-account balance). */
 export async function retryPendingReversals(limit = 50): Promise<{ retried: number; recoveredPaise: number; stillOwedPaise: number }> {
   const pool = await cpPool()

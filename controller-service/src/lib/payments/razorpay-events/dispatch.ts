@@ -32,6 +32,8 @@ export const RAZORPAY_WEBHOOK_EVENTS: readonly { event: string; platformOnly?: b
   { event: 'qr_code.credited' },
   { event: 'refund.created' },
   { event: 'refund.processed' },
+  { event: 'refund.failed' },
+  { event: 'refund.speed_changed' },
   { event: 'payment.dispute.lost' },
   { event: 'settlement.processed' },
   { event: 'transfer.processed', platformOnly: true },
@@ -64,7 +66,9 @@ export async function dispatchRazorpayEvent(event: any, ctx: EventContext): Prom
       return onQrCodeCredited(p.qr_code?.entity, p.payment?.entity, ctx)
     case 'refund.created':
     case 'refund.processed':
-      return onRefund(p.refund?.entity, p.payment?.entity, ctx)
+    case 'refund.failed':
+    case 'refund.speed_changed':
+      return onRefund(type, p.refund?.entity, p.payment?.entity, ctx)
     case 'payment.dispute.lost':
       return onDisputeLost(p.dispute?.entity, p.payment?.entity, ctx)
     case 'settlement.processed':

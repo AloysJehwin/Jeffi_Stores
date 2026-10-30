@@ -1,7 +1,7 @@
 import 'server-only'
 import { queryOne } from '@/lib/shared/db'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
-import { applyCapturedPayment, applyLinkPayment, applyQrPayment } from '@/lib/payments/capture'
+import { applyCapturedPayment, applyLinkPayment, applyQrPayment, recordPaymentDetails } from '@/lib/payments/capture'
 import { runInTenant } from '@/lib/payments/webhook-tenant'
 import { inPaymentStore, storeFor, type EventContext } from './context'
 
@@ -13,8 +13,16 @@ export async function onPaymentCaptured(payment: any, ctx: EventContext) {
     if (ctx.source === 'platform') await creditWalletTopup(payment)
     return
   }
-  await inPaymentStore(ctx, payment, store => applyCapturedPayment(payment, store))
+  await inPaymentStore(ctx, payment, async store => {
+    const out = await applyCapturedPayment(payment, store)
+    if (out !== 'unmatched') await details(payment, ctx)
+    return out
+  })
 }
+
+// Verify usually wins the race, so the details are filled even when the order was already paid.
+const details = (payment: any, ctx: EventContext) =>
+  recordPaymentDetails(payment, { account: ctx.source, capturedAt: new Date() }).catch(() => {})
 
 async function creditWalletTopup(payment: any) {
   const tenantId = (payment.notes.tenant_id ?? '').toString().trim()
@@ -38,9 +46,19 @@ async function markPaymentFailed(payment: any) {
   if (!record) return 'unmatched'
 
   await queryOne(
-    `UPDATE payments SET status = 'failed', gateway_response = $1, updated_at = NOW()
+    `UPDATE payments SET status = 'failed', gateway_response = $1, updated_at = NOW(),
+            error_code = $3, error_reason = $4, error_source = $5, error_step = $6, error_description = $7, gateway_method = COALESCE(gateway_method, $8)
      WHERE order_id = $2 AND payment_gateway = 'razorpay' AND status = 'pending'`,
-    [JSON.stringify(payment), record.order_id]
+    [
+      JSON.stringify(payment),
+      record.order_id,
+      payment.error_code ?? null,
+      payment.error_reason ?? null,
+      payment.error_source ?? null,
+      payment.error_step ?? null,
+      payment.error_description ?? null,
+      payment.method ?? null,
+    ]
   )
   await queryOne(`UPDATE orders SET payment_status = 'failed', updated_at = NOW() WHERE id = $1 AND payment_status = 'unpaid'`, [
     record.order_id,
@@ -67,7 +85,10 @@ async function markPaymentFailed(payment: any) {
 // Links and QR codes are made by us, so their notes name the store.
 export async function onPaymentLinkPaid(link: any, payment: any, ctx: EventContext) {
   const store = await storeFor(ctx, link)
-  if (store) await runInTenant(store, () => applyLinkPayment(link, payment, store))
+  if (!store) return
+  await runInTenant(store, async () => {
+    if ((await applyLinkPayment(link, payment, store)) !== 'unmatched' && payment?.id) await details(payment, ctx)
+  })
 }
 
 export async function onPaymentLinkExpired(link: any, ctx: EventContext) {
@@ -83,5 +104,8 @@ export async function onPaymentLinkExpired(link: any, ctx: EventContext) {
 export async function onQrCodeCredited(qr: any, payment: any, ctx: EventContext) {
   if (!qr?.id) return
   const store = await storeFor(ctx, qr)
-  if (store) await runInTenant(store, () => applyQrPayment(qr, payment, store))
+  if (!store) return
+  await runInTenant(store, async () => {
+    if ((await applyQrPayment(qr, payment, store)) !== 'unmatched' && payment?.id) await details(payment, ctx)
+  })
 }

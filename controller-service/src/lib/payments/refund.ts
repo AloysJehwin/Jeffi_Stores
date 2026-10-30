@@ -71,6 +71,9 @@ export async function refundAcrossPayments(opts: {
     if (!(take > 0)) continue
     const paise = Math.round(take * 100)
     const refund = await instance.payments.refund(p.transaction_id!, { amount: paise, notes: { purpose: opts.purpose } })
+    await import('@/lib/payments/refund-records')
+      .then(m => m.recordRefund({ refund, paymentRowId: p.id, orderId: opts.orderId, purpose: opts.purpose }))
+      .catch(() => {})
     const outcome = await applyRouteRefund({ tenantId: opts.tenantId ?? undefined, paymentId: p.transaction_id!, refundId: refund.id, refundPaise: paise, orderRef: opts.orderRef })
     if (outcome.unrecoveredPaise > 0) console.error(`[refund] transfer reversal INCOMPLETE order=${opts.orderId} payment=${p.transaction_id} unrecoveredPaise=${outcome.unrecoveredPaise}`)
     const gw = parseGw(p.gateway_response)
