@@ -4,7 +4,17 @@ import { formatINR as formatINRBase, formatDate as formatDateBase } from '@/lib/
 import { Kpi, TableSkeleton, badgeCls, fieldInputCls, type StatusMap, type Tone } from '@/components/admin/kit'
 
 export type Tab =
-  'overview' | 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow' | 'cod_remittance' | 'messaging' | 'ai_costs'
+  | 'overview'
+  | 'receivables'
+  | 'payables'
+  | 'transactions'
+  | 'pl'
+  | 'cashflow'
+  | 'cod_remittance'
+  | 'razorpay'
+  | 'disputes'
+  | 'messaging'
+  | 'ai_costs'
 
 export const inputCls = fieldInputCls
 export const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1.5'

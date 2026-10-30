@@ -203,6 +203,52 @@ export async function sendPaymentFailedAdminNotification(
   }
 }
 
+/** A chargeback needs evidence on the Razorpay dashboard before its deadline. */
+export async function sendDisputeAdminEmail(d: {
+  disputeId: string
+  paymentId: string
+  amount: number
+  orderId: string | null
+  orderNumber: string | null
+  respondBy: Date | null
+}) {
+  const [to, brand, adminBase] = await Promise.all([getAdminNotificationEmails(), currentBrandNameAsync(), currentAdminBaseUrlAsync()])
+  const amount = d.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const due = d.respondBy ? d.respondBy.toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Asia/Kolkata' }) : null
+  const label = d.orderNumber ? `Order #${escapeHtml(d.orderNumber)}` : `Payment ${escapeHtml(d.paymentId)}`
+  return sendAuditedMail({
+    from: adminMailFrom(),
+    to,
+    subject: `[Chargeback] ${d.orderNumber ? `Order ${d.orderNumber}` : d.paymentId} — respond${due ? ` by ${due}` : ''}`,
+    html: mailShell({
+      brand,
+      kicker: 'Action Required',
+      title: 'Payment Disputed',
+      content: `
+        <div class="danger">
+          <p style="font-size: 18px; margin: 0;"><strong>${label}</strong> — ₹${amount} disputed by the customer's bank</p>
+        </div>
+        <div class="card">
+          <p><strong>Dispute:</strong> ${escapeHtml(d.disputeId)}</p>
+          <p><strong>Payment:</strong> ${escapeHtml(d.paymentId)}</p>
+          ${due ? `<p><strong>Respond by:</strong> ${due}</p>` : ''}
+        </div>
+        <div class="warning">
+          <p style="margin: 0;">Upload proof of delivery or service on the Razorpay dashboard before the deadline, or the amount is deducted from your next settlement.</p>
+        </div>
+        <div class="cta">
+          <a href="https://dashboard.razorpay.com/app/disputes/${encodeURIComponent(d.disputeId)}" class="button">Respond on Razorpay</a>
+          ${d.orderId ? `<p><a href="${adminBase}/orders/${d.orderId}/view">View the order</a></p>` : ''}
+        </div>
+      `,
+    }),
+    kind: 'admin_notification',
+    templateName: 'payment_dispute_admin',
+    entityType: 'payment_disputes',
+    entityId: d.disputeId,
+  })
+}
+
 /**
  * A message from the store team to a customer. 'message' frames the text under the subject in a box;
  * 'template' sends a library template's body as written (it carries its own greeting and headline).

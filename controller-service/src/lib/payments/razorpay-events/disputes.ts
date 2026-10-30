@@ -3,14 +3,45 @@ import { queryOne, withTransaction } from '@/lib/shared/db'
 import { recordExternalRefund } from '@/lib/payments/refund'
 import { isFlagship, runInTenant } from '@/lib/payments/webhook-tenant'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
+import { followUpDispute, isNewDisputeAlert, upsertDispute } from '@/lib/payments/dispute-records'
+import { createAdminNotification } from '@/lib/shared/admin-notify'
 import { storeFor, type EventContext } from './context'
+
+/** Every payment.dispute.* event: recorded in the payment's store, which gets the deadline task and alert. */
+export async function onDispute(type: string, dispute: any, payment: any, ctx: EventContext) {
+  const paymentId = (dispute?.payment_id ?? payment?.id ?? '').toString().trim()
+  if (!dispute?.id || !paymentId) return
+  const store = await storeFor(ctx, payment ?? dispute, { paymentId })
+  if (!store) return
+  const entity = { ...dispute, payment_id: paymentId }
+  const row = await runInTenant(store, async () => {
+    const r = await upsertDispute(entity, type)
+    if (r) await followUpDispute(r, type)
+    return r
+  })
+  // A Route store's chargeback still comes out of the platform account: the flagship hears of it too.
+  if (row && ctx.source === 'platform' && !isFlagship(store) && isNewDisputeAlert(row, type)) {
+    createAdminNotification({
+      type: 'payment_dispute',
+      category: 'finance',
+      title: `Chargeback of Rs. ${Number(row.amount).toFixed(2)} on ${store.slug || 'a store'}'s payment ${row.razorpay_payment_id}`,
+      message: `Dispute ${row.razorpay_dispute_id}. The store has been asked to respond; a lost dispute is recovered from its share.`,
+      link: `https://dashboard.razorpay.com/app/disputes/${row.razorpay_dispute_id}`,
+      entityType: 'payment_dispute',
+      entityId: row.razorpay_dispute_id,
+      severity: 'critical',
+      scope: 'financial:read',
+    }).catch(() => {})
+  }
+  if (type === 'payment.dispute.lost') await onDisputeLost(entity, payment, ctx)
+}
 
 /**
  * A lost dispute (chargeback) returns the money through the customer's bank, not as a refund. Record it
  * as one so the order, the payment and the store's Route share settle the same way. Keyed on the
  * dispute id, so a redelivered event changes nothing.
  */
-export async function onDisputeLost(dispute: any, payment: any, ctx: EventContext) {
+async function onDisputeLost(dispute: any, payment: any, ctx: EventContext) {
   const paymentId = (dispute?.payment_id ?? payment?.id ?? '').toString().trim()
   const disputeId = (dispute?.id ?? '').toString().trim()
   const paise = Number(dispute?.amount_deducted) || Number(dispute?.amount) || 0

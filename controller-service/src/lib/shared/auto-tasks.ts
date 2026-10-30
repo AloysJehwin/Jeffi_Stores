@@ -9,6 +9,7 @@ export type AutoTaskKind =
   | 'chase_refund'
   | 'contact_failed_payment'
   | 'retry_failed_refund'
+  | 'respond_dispute'
   | 'abandoned_checkout'
   | 'confirm_cod_payment'
   | 'review_high_value_order'

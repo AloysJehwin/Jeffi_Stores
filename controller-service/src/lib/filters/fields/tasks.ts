@@ -22,6 +22,7 @@ export const TASK_KIND_SEGMENTS: Record<string, string[]> = {
     'review_flagged',
     'contact_failed_payment',
     'retry_failed_refund',
+    'respond_dispute',
     'abandoned_checkout',
   ],
   support: ['support_pickup', 'support_urgent'],
