@@ -52,8 +52,9 @@ describe('ensureTenantNodes – basic pool', () => {
   })
 
   it('defaults to the pool node capacity', () => {
-    expect(poolCapacity(node({ 'jeffi.io/pool': 'basic' }))).toBe(4)
-    expect(poolCapacity(node({ 'jeffi.io/pool-capacity': 'x' }))).toBe(4)
+    expect(poolCapacity(node({ 'jeffi.io/pool': 'basic' }))).toBe(3)
+    expect(poolCapacity(node({ 'jeffi.io/pool-capacity': 'x' }))).toBe(3)
+    expect(poolCapacity(node({ 'jeffi.io/pool-capacity': '4' }))).toBe(3)
   })
 
   it('counts pool stores by their placement label, older namespaces by plan', async () => {
@@ -129,6 +130,10 @@ describe('legacy store Deployment retirement', () => {
       'Deployment/acme': up,
     }
     k8s.get.mockImplementation(async (kind: string, name: string) => state[`${kind}/${name}`] ?? null)
+    // The store's own Deployments carry jeffi.io/service; the earlier `acme` one does not.
+    k8s.list.mockImplementation(async (kind: string) =>
+      kind === 'Deployment' ? ['acme-controller-service', 'acme-messaging-service', 'acme-document-service'].map(n => ({ metadata: { name: n }, ...state[`Deployment/${n}`] })) : []
+    )
     expect(await tenantWorkloadReady('acme')).toBe(false)
     expect(k8s.remove).not.toHaveBeenCalled()
 

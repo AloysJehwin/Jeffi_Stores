@@ -7,6 +7,7 @@ import { applyRateLimit } from './lib/shared/rate-limit'
 import { extractSessionSignals } from './lib/auth/session-signals-request'
 import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } from './lib/tenant-registry'
 import { documentHostForSlug } from './lib/tenancy/forms-host'
+import { pinnedHost, serviceRole, servesRequest } from './lib/service-roles'
 import { runWithTenantContext } from './lib/tenancy/tenant-context'
 import { adminCookieNameForHost } from './lib/auth/admin-cookie'
 import { bindingGate } from './lib/auth/session-binding-gate'
@@ -115,7 +116,7 @@ export async function middleware(request: NextRequest) {
 }
 
 async function handle(request: NextRequest) {
-  const hostname = resolveTrustedHost(request)
+  const hostname = pinnedHost(resolveTrustedHost(request))
   const pathname = request.nextUrl.pathname
 
   // public.<domain> is served by public-api-service, not this app. In production Traefik routes the
@@ -220,6 +221,11 @@ async function handle(request: NextRequest) {
         })
       )
     }
+  }
+
+  // A store service answers only its own store's hosts, never the control plane.
+  if (!servesRequest(serviceRole(), { app: appFromHost(hostname), path: pathname, tenantSlug: tenant?.slug ?? null })) {
+    return addSecurityHeaders(new NextResponse('Not found', { status: 404, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' } }))
   }
 
   // Bare NextResponse.next() drops x-tenant-slug, and db.ts then serves the platform pool.

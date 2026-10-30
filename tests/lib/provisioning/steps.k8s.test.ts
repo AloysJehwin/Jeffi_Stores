@@ -78,7 +78,11 @@ beforeEach(() => {
   deployment = null
   k8s.get.mockImplementation(async (kind: string) => (kind === 'Deployment' ? deployment : null))
   k8s.list.mockImplementation(async (kind: string) =>
-    kind === 'Node' ? [readyNode({ 'jeffi.io/pool': 'basic', 'jeffi.io/pool-capacity': '3' })] : []
+    kind === 'Node'
+      ? [readyNode({ 'jeffi.io/pool': 'basic', 'jeffi.io/pool-capacity': '3' })]
+      : kind === 'Deployment' && deployment
+        ? ['acme-controller-service', 'acme-messaging-service', 'acme-document-service'].map(name => ({ ...deployment, metadata: { name } }))
+        : []
   )
   process.env.PROVISIONING_COMPUTE = 'k8s'
   process.env.CLUSTER_INGRESS_IP = '198.51.100.7'

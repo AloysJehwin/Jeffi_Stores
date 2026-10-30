@@ -5,8 +5,11 @@ import type { ComputeSpec, PodSize } from './spec'
 const legacy = (placement: 'pool' | 'dedicated', type: string | null, c: [number, number, PodSize], s: [number, number, PodSize]): ComputeSpec => ({
   node: { placement, type, count: 1 },
   db: { mode: 'dedicated', class: 'db.t4g.micro', storageGb: 20, multiAz: false },
+  layout: 'controller',
   services: {
-    controller: { replicas: c[0], maxReplicas: c[1], size: c[2] },
+    storefront: { replicas: c[0], maxReplicas: c[1], size: c[2] },
+    admin: { replicas: 1, maxReplicas: 1, size: c[2] },
+    business: { replicas: 1, maxReplicas: 1, size: 'S' },
     messaging: { replicas: s[0], maxReplicas: s[1], size: s[2] },
     documents: { replicas: s[0], maxReplicas: s[1], size: s[2] },
   },

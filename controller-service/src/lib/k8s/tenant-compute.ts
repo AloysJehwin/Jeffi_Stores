@@ -4,7 +4,9 @@ import { apply, get, list, listAll, patchMerge, remove, type K8sObject } from '.
 import {
   renderTenantWorkload,
   tenantAppName,
+  tenantRoleName,
   tenantWorkloadNames,
+  TENANT_ROUTE_NAMES,
   legacyAppNames,
   type TenantService,
   type TenantWorkloadInput,
@@ -56,7 +58,8 @@ const POOL_SELECTOR = 'jeffi.io/pool=basic'
 
 export function poolCapacity(node: any): number {
   const n = Number(node?.metadata?.labels?.['jeffi.io/pool-capacity'])
-  return Number.isInteger(n) && n >= 0 ? n : POOL_NODE_CAPACITY
+  // A label from when stores ran one app can only lower the count, never overbook the server.
+  return Number.isInteger(n) && n >= 0 ? Math.min(n, POOL_NODE_CAPACITY) : POOL_NODE_CAPACITY
 }
 
 const isReady = (node: any) =>
@@ -236,32 +239,39 @@ export async function releaseImages(): Promise<Partial<Record<TenantService, str
   const cm = await get<any>('ConfigMap', 'release', PLATFORM_NS).catch(() => null)
   const d = cm?.data ?? {}
   const pick = (v?: string) => (v && !v.endsWith(':set-by-rollout') ? v : undefined)
-  return { controller: pick(d.controller), messaging: pick(d.messaging), documents: pick(d.documents) }
+  const keys = ['controller', 'storefront', 'admin', 'business', 'messaging', 'documents'] as const
+  return Object.fromEntries(keys.map(k => [k, pick(d[k])])) as Partial<Record<TenantService, string>>
 }
 
 /** Apply (create or reconcile) the tenant's whole namespace. Safe to call on plan change. */
 export async function applyTenantWorkload(input: TenantWorkloadInput): Promise<void> {
-  const objs = renderTenantWorkload({ ...input, images: { ...(await releaseImages()), ...input.images } })
+  const objs = renderTenantWorkload({
+    ...input,
+    images: { ...(await releaseImages()), ...input.images },
+    storeSecret: input.storeSecret ?? process.env.STORE_SECRET_ID,
+  })
   const [nsObj, ...rest] = objs
   await apply(nsObj)
   await seedNamespace(tenantNamespace(input.slug))
   for (const o of rest) await apply(o)
-  // Downgrades drop the HPA/PDBs the new tier no longer renders.
+  // Drop what this render no longer has: HPA/PDBs a smaller size doesn't need, and the app pods and
+  // routes of the layout the store has just left (only once traffic is on the new one, see reconcileLayout).
   const ns = tenantNamespace(input.slug)
   const rendered = new Set(rest.map(o => `${o.kind}/${o.metadata.name}`))
-  for (const kind of ['HorizontalPodAutoscaler', 'PodDisruptionBudget']) {
+  for (const kind of ['HorizontalPodAutoscaler', 'PodDisruptionBudget', 'Deployment', 'Service']) {
     for (const name of tenantWorkloadNames(input.slug)) {
       if (!rendered.has(`${kind}/${name}`)) await remove(kind, name, ns)
     }
   }
+  for (const name of TENANT_ROUTE_NAMES) if (!rendered.has(`IngressRoute/${name}`)) await remove('IngressRoute', name, ns)
   await retireLegacyApp(input.slug)
 }
 
 /** Restart every store pod (they keep a database pool open, e.g. to a database that has just moved). */
 export async function restartTenantWorkload(slug: string): Promise<void> {
   const at = new Date().toISOString()
-  for (const name of tenantWorkloadNames(slug)) {
-    await patchMerge('Deployment', name, tenantNamespace(slug), {
+  for (const d of await workloads(slug)) {
+    await patchMerge('Deployment', d.metadata.name, tenantNamespace(slug), {
       spec: { template: { metadata: { annotations: { 'kubectl.kubernetes.io/restartedAt': at } } } },
     })
   }
@@ -270,7 +280,7 @@ export async function restartTenantWorkload(slug: string): Promise<void> {
 /** Drop the earlier store Deployments and the `storefront` Service/route once the controller serves. Idempotent. */
 async function retireLegacyApp(slug: string): Promise<void> {
   const ns = tenantNamespace(slug)
-  const d = await get<any>('Deployment', tenantAppName(slug), ns)
+  const d = (await get<any>('Deployment', tenantAppName(slug), ns)) ?? (await get<any>('Deployment', tenantRoleName(slug, 'storefront'), ns))
   if ((d?.status?.readyReplicas ?? 0) < 1) return
   for (const name of legacyAppNames(slug)) {
     if (!(await get('Deployment', name, ns))) continue
@@ -280,29 +290,31 @@ async function retireLegacyApp(slug: string): Promise<void> {
   await remove('Service', 'storefront', ns)
 }
 
-/** The store's controller Deployment (or an earlier name until migrated). */
+/** The store's main app Deployment: its storefront, the old all-in-one app, or an earlier name. */
 async function appDeployment(slug: string): Promise<any> {
   const ns = tenantNamespace(slug)
-  for (const name of [tenantAppName(slug), ...legacyAppNames(slug)]) {
+  for (const name of [tenantRoleName(slug, 'storefront'), tenantAppName(slug), ...legacyAppNames(slug)]) {
     const d = await get<any>('Deployment', name, ns)
     if (d) return d
   }
   return null
 }
 
-const workloads = (slug: string) =>
-  Promise.all(tenantWorkloadNames(slug).map(n => get<any>('Deployment', n, tenantNamespace(slug))))
+/** The store's own Deployments (redis aside), in whichever layout it runs. */
+const workloads = (slug: string) => list<any>('Deployment', tenantNamespace(slug), 'jeffi.io/service')
 
-/** True once the store's controller, messaging and document Deployments each have a ready replica. */
+/** True once the store's app, messaging and document Deployments each have a ready replica. */
 export async function tenantWorkloadReady(slug: string): Promise<boolean> {
-  const ready = (await workloads(slug)).every(d => (d?.status?.readyReplicas ?? 0) > 0)
+  const ds = await workloads(slug)
+  const ready = ds.length >= 3 && ds.every(d => (d?.status?.readyReplicas ?? 0) > 0)
   if (ready) await retireLegacyApp(slug).catch(() => {})
   return ready
 }
 
 /** Rolled out: every replica of every store Deployment is on the current template and ready. */
 export async function tenantRolloutComplete(slug: string): Promise<boolean> {
-  return (await workloads(slug)).every(d => {
+  const ds = await workloads(slug)
+  return ds.length >= 3 && ds.every(d => {
     if (!d) return false
     const want = d.spec?.replicas ?? 1
     const s = d.status ?? {}

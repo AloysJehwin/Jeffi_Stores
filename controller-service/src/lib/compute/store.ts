@@ -1,7 +1,7 @@
 import 'server-only'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { presetOf } from './presets'
-import type { ComputeSpec } from './spec'
+import { normalizeSpec, type ComputeSpec } from './spec'
 
 export interface TenantCompute {
   tenant_id: string
@@ -56,5 +56,19 @@ export async function dueComputeChanges(): Promise<string[]> {
 
 export async function getTenantCompute(tenantId: string): Promise<TenantCompute | null> {
   const r = await controlPlanePool().query<TenantCompute>(`SELECT * FROM tenant_compute WHERE tenant_id = $1`, [tenantId])
-  return r.rows[0] ?? null
+  const row = r.rows[0]
+  if (!row) return null
+  return { ...row, desired: normalizeSpec(row.desired), applied: row.applied ? normalizeSpec(row.applied) : null }
+}
+
+/** Stores whose app pods run another layout than STORE_ROLES_ENABLED asks for, and no compute change is running. */
+export async function dueLayoutSwitches(target: 'controller' | 'services'): Promise<string[]> {
+  const r = await controlPlanePool().query<{ tenant_id: string }>(
+    `SELECT c.tenant_id FROM tenant_compute c JOIN tenants t ON t.id = c.tenant_id
+     WHERE t.status = 'active' AND c.applied IS NOT NULL AND c.status NOT IN ('pending', 'applying')
+       AND (COALESCE(c.applied->>'layout', 'controller') <> $1 OR c.progress ? 'layout')
+     ORDER BY c.updated_at LIMIT 5`,
+    [target]
+  )
+  return r.rows.map(x => x.tenant_id)
 }

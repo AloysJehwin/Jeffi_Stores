@@ -654,7 +654,7 @@ ON CONFLICT (code) DO NOTHING;
 
 -- Pricing settings for the compute calculator (lib/compute/catalog.ts). Inserted once; edited by the platform admin.
 INSERT INTO public.platform_infra (key, value) VALUES ('compute_pricing',
-  '{"usdInr":88,"margin":0.25,"gstRate":0.18,"platformShareUsd":3,"rootVolumeGb":20,"poolNodeType":"t4g.medium","poolCapacity":4,"sharedDbClass":"db.t4g.small","sharedDbCapacity":8,"sharedDbStorageGb":10,"sharedDbMaxConnections":200,"minPrepayDays":30,"graceDays":3}')
+  '{"usdInr":88,"margin":0.25,"gstRate":0.18,"platformShareUsd":3,"rootVolumeGb":20,"poolNodeType":"t4g.medium","poolCapacity":3,"sharedDbClass":"db.t4g.small","sharedDbCapacity":8,"sharedDbStorageGb":10,"sharedDbMaxConnections":200,"minPrepayDays":30,"graceDays":3}')
 ON CONFLICT (key) DO NOTHING;
 
 -- Stores provisioned before compute was configurable: record what they run (their plan's old tier, a micro

@@ -50,6 +50,7 @@ const catalog: Catalog = {
 const starter: PlanCompute = { slug: 'starter', defaultPreset: 'shared', minPlacement: 'pool', advanced: false }
 const pro: PlanCompute = { slug: 'pro', defaultPreset: 'medium', minPlacement: 'dedicated', advanced: true }
 const presetsOnly: PlanCompute = { ...pro, advanced: false }
+const growth: PlanCompute = { slug: 'growth', defaultPreset: 'small', minPlacement: 'dedicated', advanced: true }
 
 describe('quoteSpec', () => {
   it('prices each preset as AWS cost × rate × (1 + margin)', () => {
@@ -80,22 +81,30 @@ describe('quoteSpec', () => {
 describe('validateSpec', () => {
   it('accepts every preset on a plan that allows it', () => {
     expect(validateSpec(presetSpec('shared'), catalog, starter).ok).toBe(true)
-    for (const k of ['small', 'medium', 'large', 'xlarge'] as const) expect(validateSpec(presetSpec(k), catalog, pro).errors).toEqual([])
+    expect(validateSpec(presetSpec('small'), catalog, growth).errors).toEqual([])
+    for (const k of ['medium', 'large', 'xlarge'] as const) expect(validateSpec(presetSpec(k), catalog, pro).errors).toEqual([])
+  })
+
+  it('fits storefront and admin on Small, but not the Pro business portal or a third storefront copy', () => {
+    expect(validateSpec(presetSpec('small'), catalog, pro).errors.join(' ')).toMatch(/memory/)
+    const s = presetSpec('small')
+    s.services.storefront.maxReplicas = 3
+    expect(validateSpec(s, catalog, growth).errors.join(' ')).toMatch(/memory/)
   })
 
   it('keeps Starter on the shared preset and paid plans on their own servers', () => {
     expect(planCompatibilityError(presetSpec('small'), starter)).toMatch(/shared servers/)
     expect(planCompatibilityError(presetSpec('shared'), pro)).toMatch(/own server/)
     const custom = presetSpec('small')
-    custom.services.controller.replicas = 2
-    custom.services.controller.maxReplicas = 2
+    custom.services.storefront.replicas = 2
+    custom.services.storefront.maxReplicas = 2
     expect(planCompatibilityError(custom, presetsOnly)).toMatch(/higher plan/)
     expect(planCompatibilityError(custom, pro)).toBeNull()
   })
 
   it('suggests a bigger server when the copies do not fit', () => {
     const s = presetSpec('small')
-    s.services.controller = { replicas: 3, maxReplicas: 4, size: 'L' }
+    s.services.storefront = { replicas: 3, maxReplicas: 4, size: 'L' }
     const v = validateSpec(s, catalog, pro)
     expect(v.ok).toBe(false)
     expect(v.errors.join(' ')).toMatch(/memory/)
@@ -105,7 +114,7 @@ describe('validateSpec', () => {
   it('caps copies by the database connections', () => {
     const s = presetSpec('small')
     s.node.type = 't4g.xlarge'
-    s.services.controller = { replicas: 2, maxReplicas: 10, size: 'S' }
+    s.services.storefront = { replicas: 2, maxReplicas: 10, size: 'S' }
     s.services.messaging = { replicas: 2, maxReplicas: 6, size: 'S' }
     expect(validateSpec(s, catalog, pro).errors.join(' ')).toMatch(/connections/)
   })

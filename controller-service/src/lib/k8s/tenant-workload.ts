@@ -1,17 +1,23 @@
 import { dedicatedNodeName, tenantNamespace } from '@/lib/provisioning/tiers'
 import { legacySpecFor } from '@/lib/compute/legacy'
 import { POD_RESOURCES, REDIS_RESOURCES } from '@/lib/compute/presets'
-import { SERVICE_NAMES, type ComputeSpec, type ServiceSpec } from '@/lib/compute/spec'
+import { activeServices, type ComputeSpec, type ServiceName, type ServiceSpec, type StoreLayout } from '@/lib/compute/spec'
+import { surges } from '@/lib/compute/validate'
+import { STORE_ROLES, type ServiceRole } from '@/lib/service-roles'
 import type { K8sObject } from './client'
 
-// Renders one tenant's namespace: its controller, messaging and document services (Deployment +
-// Service each, wired to one another), Redis, PDB/HPA, NetworkPolicy and IngressRoutes (+ cert-manager
-// Certificate per verified custom domain). Pure, so it is unit tested; tenant-compute.ts applies it.
+// Renders one tenant's namespace: its storefront, admin and business services (or, in the old layout, one
+// all-in-one controller), messaging and documents (Deployment + Service each, wired to one another),
+// Redis, PDB/HPA, NetworkPolicy and IngressRoutes (+ cert-manager Certificate per verified custom domain).
+// Pure, so it is unit tested; tenant-compute.ts applies it.
 
 const ECR = '708835965056.dkr.ecr.us-east-1.amazonaws.com'
-export type TenantService = 'controller' | 'messaging' | 'documents'
+export type TenantService = 'controller' | ServiceRole | 'messaging' | 'documents'
 export const DEFAULT_IMAGES: Record<TenantService, string> = {
   controller: `${ECR}/jeffi-stores-controller-service:latest`,
+  storefront: `${ECR}/jeffi-stores-storefront-service:latest`,
+  admin: `${ECR}/jeffi-stores-admin-service:latest`,
+  business: `${ECR}/jeffi-stores-business-service:latest`,
   messaging: `${ECR}/jeffi-stores-messaging-service:latest`,
   documents: `${ECR}/jeffi-stores-document-service:latest`,
 }
@@ -37,6 +43,9 @@ export interface TenantWorkloadInput {
   compute?: ComputeSpec // defaults to the plan's pre-configurable tier
   dbPoolMax?: number // per-pod database pool (DB_POOL_MAX)
   nodeGen?: number // generation of the store's own servers; pods follow it during a resize
+  layout?: StoreLayout // what runs; defaults to the spec's (old stores: controller)
+  routeTo?: StoreLayout // while switching layouts: traffic stays on this one, which runs a single copy
+  storeSecret?: string // Secrets Manager id for the store's app pods (default: the platform's)
 }
 
 const SERVICES = {
@@ -45,15 +54,20 @@ const SERVICES = {
 } as const
 type BackingService = keyof typeof SERVICES
 
-/** The store's controller Deployment/Service/HPA/PDB name. */
+/** The old all-in-one store app's Deployment/Service/HPA/PDB name. */
 export const tenantAppName = (slug: string) => `${slug}-controller-service`
+/** A store service's Deployment/Service/HPA/PDB name. */
+export const tenantRoleName = (slug: string, role: ServiceRole) => `${slug}-${role}-service`
 export const tenantServiceName = (slug: string, service: BackingService) => `${slug}-${SERVICES[service].suffix}`
-/** Every Deployment a store runs. */
+/** Every Deployment a store may run, in either layout. */
 export const tenantWorkloadNames = (slug: string) => [
   tenantAppName(slug),
+  ...STORE_ROLES.map(r => tenantRoleName(slug, r)),
   tenantServiceName(slug, 'messaging'),
   tenantServiceName(slug, 'documents'),
 ]
+/** IngressRoutes the renderer owns (custom-{i} besides). */
+export const TENANT_ROUTE_NAMES = ['controller', 'store', 'admin', 'business', 'documents', 'razorpay-webhook']
 /** Earlier store Deployment names (Service and IngressRoute were `storefront`); retired once the controller serves. */
 export const legacyAppNames = (slug: string) => ['storefront', slug]
 
@@ -124,7 +138,7 @@ function serviceDeployment(slug: string, ns: string, service: BackingService, sp
     spec: {
       replicas: spec.replicas,
       revisionHistoryLimit: 3,
-      strategy: { type: 'RollingUpdate', rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } },
+      strategy: rollout(service, spec),
       selector: { matchLabels: selector(slug, s.app) },
       template: {
         metadata: { labels: lbl },
@@ -151,6 +165,13 @@ function serviceDeployment(slug: string, ns: string, service: BackingService, sp
     },
   }
 }
+
+// The storefront, and services with spare copies, surge a pod on a rollout; a single-copy back-office
+// service restarts in place (validate.ts counts the same), so small servers need no room for it.
+const rollout = (k: ServiceName, s: ServiceSpec) =>
+  surges(k, s)
+    ? { type: 'RollingUpdate', rollingUpdate: { maxUnavailable: s.replicas > 1 ? 1 : 0, maxSurge: 1 } }
+    : { type: 'RollingUpdate', rollingUpdate: { maxUnavailable: 1, maxSurge: 0 } }
 
 // A PDB once a service runs two copies, and an HPA (on CPU) when it may grow past its copies.
 function scaling(ns: string, name: string, match: Record<string, string>, svc: ServiceSpec): K8sObject[] {
@@ -179,25 +200,127 @@ function scaling(ns: string, name: string, match: Record<string, string>, svc: S
   return out
 }
 
+const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
+
+// A Next app pod: the old all-in-one controller (role null) or one store service.
+function appDeployment(a: {
+  slug: string
+  ns: string
+  name: string
+  role: ServiceRole | null
+  svc: ServiceSpec
+  sizeOf: ServiceName
+  image: string
+  place: ReturnType<typeof placement>
+  nodes: number
+  poolEnv: { name: string; value: string }[]
+  secret: string
+}): K8sObject {
+  const res = POD_RESOURCES[a.sizeOf][a.svc.size]
+  const app = appLabel(a.role)
+  const lbl = labels(a.slug, app, a.role ?? 'controller')
+  // Probes use localhost: the app 404s a tenant host until the tenant is active, which happens only
+  // after these pods are Ready. verify_serving checks readiness separately.
+  const probe = (path: string) => ({ httpGet: { path, port: 'http', httpHeaders: [{ name: 'Host', value: 'localhost' }] } })
+  return {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: { name: a.name, namespace: a.ns, labels: lbl },
+    spec: {
+      replicas: a.svc.replicas,
+      revisionHistoryLimit: 3,
+      strategy: rollout(a.role ?? 'storefront', a.svc),
+      selector: { matchLabels: selector(a.slug, app) },
+      template: {
+        metadata: { labels: lbl },
+        spec: {
+          ...podBase(a.place, 60),
+          ...spread(a.slug, app, a.nodes),
+          containers: [
+            {
+              name: 'app',
+              image: a.image,
+              ports: [{ name: 'http', containerPort: 3000 }],
+              env: [
+                { name: 'SM_SECRET_ID', value: a.secret },
+                ...(a.role
+                  ? [
+                      { name: 'SERVICE_ROLE', value: a.role },
+                      { name: 'SERVICE_TENANT_SLUG', value: a.slug },
+                    ]
+                  : []),
+                { name: 'WEB_CONCURRENCY', value: '1' },
+                ...a.poolEnv,
+                { name: 'IN_PROCESS_CRON', value: 'false' },
+                { name: 'CLIENT_CERT_PROXY', value: 'traefik' },
+                { name: 'MESSAGING_URL', value: `http://${tenantServiceName(a.slug, 'messaging')}:${SERVICES.messaging.port}` },
+                { name: 'DOCUMENTS_URL', value: `http://${tenantServiceName(a.slug, 'documents')}:${SERVICES.documents.port}` },
+                { name: 'OTEL_SERVICE_NAME', value: a.name },
+                ...OTEL_ENV,
+                { name: 'NODE_OPTIONS', value: `--max-old-space-size=${Math.floor(mem(res.limits.memory) * 0.7)}` },
+                { name: 'REDIS_PASSWORD', valueFrom: { secretKeyRef: { name: 'redis', key: 'password' } } },
+                { name: 'REDIS_URL', value: 'redis://:$(REDIS_PASSWORD)@redis:6379' },
+              ],
+              resources: res,
+              startupProbe: { ...probe('/api/health'), periodSeconds: 5, failureThreshold: 36 },
+              readinessProbe: { ...probe('/api/ready'), periodSeconds: 10, timeoutSeconds: 5 },
+              livenessProbe: { ...probe('/api/health'), periodSeconds: 20, timeoutSeconds: 5 },
+              lifecycle: { preStop: { exec: { command: ['sleep', '10'] } } },
+              volumeMounts,
+            },
+          ],
+          volumes,
+        },
+      },
+    },
+  }
+}
+
+// Pod `app` label; a Deployment's selector can't change, so the controller keeps its original one.
+const appLabel = (role: ServiceRole | null) => (role ? `${role}-service` : 'controller-service')
+
+const appService = (ns: string, slug: string, name: string, role: ServiceRole | null): K8sObject => ({
+  apiVersion: 'v1',
+  kind: 'Service',
+  metadata: { name, namespace: ns },
+  spec: { selector: selector(slug, appLabel(role)), ports: [{ name: 'http', port: 3000, targetPort: 'http' }] },
+})
+
 export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   const { slug } = input
   const ns = tenantNamespace(slug)
   const spec = input.compute ?? legacySpecFor(input.plan)
+  const layout = input.layout ?? spec.layout ?? 'controller'
+  const routeTo = input.routeTo ?? layout
   const nodes = spec.node.placement === 'dedicated' ? spec.node.count : 1
   const place = placement(slug, spec.node, input.nodeGen ?? 0)
-  const ctrl = spec.services.controller
-  const ctrlRes = POD_RESOURCES.controller[ctrl.size]
   const poolEnv = input.dbPoolMax ? [{ name: 'DB_POOL_MAX', value: String(input.dbPoolMax) }] : []
   const image = (s: TenantService) => input.images?.[s] || DEFAULT_IMAGES[s]
-  const app = tenantAppName(slug)
-  const ctrlSelector = selector(slug, 'controller-service')
+  const secret = input.storeSecret || 'jeffi/production'
+  const roles = activeServices(input.plan).filter((k): k is ServiceRole => (STORE_ROLES as readonly string[]).includes(k))
   const adminHosts = input.hosts.filter(h => h.startsWith(`admin-${slug}.`))
   const docHosts = input.hosts.filter(h => DOC_APPS.some(a => h.startsWith(`${a}-${slug}.`)))
+  const businessHosts = input.hosts.filter(h => h.startsWith(`${slug}.business.`))
   const publicHosts = input.hosts.filter(h => !adminHosts.includes(h) && !docHosts.includes(h))
   const customDomains = input.customDomains ?? []
-  // Probes use localhost: the app 404s a tenant host until the tenant is active, which happens only
-  // after these pods are Ready. verify_serving checks readiness separately.
-  const probeHost = [{ name: 'Host', value: 'localhost' }]
+
+  // The store's app pods per layout; the one being left (while switching) runs a single copy, no autoscale.
+  const apps: { name: string; role: ServiceRole | null; svc: ServiceSpec; sizeOf: ServiceName; image: string }[] = []
+  for (const l of routeTo === layout ? [layout] : [routeTo, layout]) {
+    const leaving = l !== layout
+    const one = (svc: ServiceSpec) => (leaving ? { ...svc, replicas: 1, maxReplicas: 1 } : svc)
+    if (l === 'controller') {
+      apps.push({ name: tenantAppName(slug), role: null, svc: one(spec.services.storefront), sizeOf: 'storefront', image: image('controller') })
+    } else {
+      for (const r of roles) apps.push({ name: tenantRoleName(slug, r), role: r, svc: one(spec.services[r]), sizeOf: r, image: image(r) })
+    }
+  }
+  const backing = (['messaging', 'documents'] as const).map(k => ({ k, svc: spec.services[k] }))
+  const quotaPods = [...apps.map(a => a.svc), ...backing.map(b => b.svc)]
+  const quotaMem = [
+    ...apps.map(a => mem(POD_RESOURCES[a.sizeOf][a.svc.size].limits.memory) * (a.svc.maxReplicas + 1)),
+    ...backing.map(b => mem(POD_RESOURCES[b.k][b.svc.size].limits.memory) * (b.svc.maxReplicas + 1)),
+  ]
 
   const objs: K8sObject[] = [
     {
@@ -219,14 +342,10 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
       metadata: { name: 'tenant', namespace: ns },
       spec: {
         hard: {
-          pods: String(SERVICE_NAMES.reduce((n, k) => n + spec.services[k].maxReplicas + 1, 0) + 3),
-          // Every Deployment surges one pod on a rollout (maxUnavailable 0 would otherwise stall it).
-          // +512Mi covers redis + an HTTP-01 solver pod.
-          'limits.memory': `${
-            Math.ceil(
-              (SERVICE_NAMES.reduce((n, k) => n + mem(POD_RESOURCES[k][spec.services[k].size].limits.memory) * (spec.services[k].maxReplicas + 1), 0) + 512) / 256
-            ) * 256
-          }Mi`,
+          pods: String(quotaPods.reduce((n, s) => n + s.maxReplicas + 1, 0) + 3),
+          // Room for each Deployment at its autoscale limit plus a rolling pod; +512Mi covers redis + an
+          // HTTP-01 solver pod.
+          'limits.memory': `${Math.ceil((quotaMem.reduce((n, m) => n + m, 0) + 512) / 256) * 256}Mi`,
         },
       },
     },
@@ -271,81 +390,22 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
       metadata: { name: 'redis', namespace: ns },
       spec: { selector: { app: 'redis' }, ports: [{ port: 6379 }] },
     },
-    {
-      apiVersion: 'apps/v1',
-      kind: 'Deployment',
-      metadata: { name: app, namespace: ns, labels: labels(slug, 'controller-service', 'controller') },
-      spec: {
-        replicas: ctrl.replicas,
-        revisionHistoryLimit: 3,
-        strategy: { type: 'RollingUpdate', rollingUpdate: { maxUnavailable: ctrl.replicas > 1 ? 1 : 0, maxSurge: 1 } },
-        selector: { matchLabels: ctrlSelector },
-        template: {
-          metadata: { labels: labels(slug, 'controller-service', 'controller') },
-          spec: {
-            ...podBase(place, 60),
-            ...spread(slug, 'controller-service', nodes),
-            containers: [
-              {
-                name: 'app',
-                image: image('controller'),
-                ports: [{ name: 'http', containerPort: 3000 }],
-                env: [
-                  { name: 'SM_SECRET_ID', value: 'jeffi/production' },
-                  { name: 'WEB_CONCURRENCY', value: '1' },
-                  ...poolEnv,
-                  { name: 'IN_PROCESS_CRON', value: 'false' },
-                  { name: 'CLIENT_CERT_PROXY', value: 'traefik' },
-                  { name: 'MESSAGING_URL', value: `http://${tenantServiceName(slug, 'messaging')}:${SERVICES.messaging.port}` },
-                  { name: 'DOCUMENTS_URL', value: `http://${tenantServiceName(slug, 'documents')}:${SERVICES.documents.port}` },
-                  { name: 'OTEL_SERVICE_NAME', value: app },
-                  ...OTEL_ENV,
-                  { name: 'NODE_OPTIONS', value: `--max-old-space-size=${Math.floor(mem(ctrlRes.limits.memory) * 0.7)}` },
-                  { name: 'REDIS_PASSWORD', valueFrom: { secretKeyRef: { name: 'redis', key: 'password' } } },
-                  { name: 'REDIS_URL', value: 'redis://:$(REDIS_PASSWORD)@redis:6379' },
-                ],
-                resources: ctrlRes,
-                startupProbe: {
-                  httpGet: { path: '/api/health', port: 'http', httpHeaders: probeHost },
-                  periodSeconds: 5,
-                  failureThreshold: 36,
-                },
-                readinessProbe: {
-                  httpGet: { path: '/api/ready', port: 'http', httpHeaders: probeHost },
-                  periodSeconds: 10,
-                  timeoutSeconds: 5,
-                },
-                livenessProbe: {
-                  httpGet: { path: '/api/health', port: 'http', httpHeaders: probeHost },
-                  periodSeconds: 20,
-                  timeoutSeconds: 5,
-                },
-                lifecycle: { preStop: { exec: { command: ['sleep', '10'] } } },
-                volumeMounts,
-              },
-            ],
-            volumes,
-          },
-        },
-      },
-    },
-    {
-      apiVersion: 'v1',
-      kind: 'Service',
-      metadata: { name: app, namespace: ns },
-      spec: { selector: ctrlSelector, ports: [{ name: 'http', port: 3000, targetPort: 'http' }] },
-    },
   ]
 
-  for (const service of ['messaging', 'documents'] as const) {
-    const s = SERVICES[service]
-    objs.push(serviceDeployment(slug, ns, service, spec.services[service], image(service), place, nodes, poolEnv), {
+  for (const a of apps) {
+    objs.push(appDeployment({ slug, ns, ...a, place, nodes, poolEnv, secret }), appService(ns, slug, a.name, a.role))
+    objs.push(...scaling(ns, a.name, selector(slug, appLabel(a.role)), a.svc))
+  }
+
+  for (const { k: service, svc: s } of backing) {
+    const b = SERVICES[service]
+    objs.push(serviceDeployment(slug, ns, service, s, image(service), place, nodes, poolEnv), {
       apiVersion: 'v1',
       kind: 'Service',
       metadata: { name: tenantServiceName(slug, service), namespace: ns },
-      spec: { selector: selector(slug, s.app), ports: [{ name: 'http', port: s.port, targetPort: 'http' }] },
+      spec: { selector: selector(slug, b.app), ports: [{ name: 'http', port: b.port, targetPort: 'http' }] },
     })
-    objs.push(...scaling(ns, tenantServiceName(slug, service), selector(slug, s.app), spec.services[service]))
+    objs.push(...scaling(ns, tenantServiceName(slug, service), selector(slug, b.app), s))
   }
 
   objs.push({
@@ -361,6 +421,8 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
             { podSelector: {} },
             { namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'kube-system' } } },
             { namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'observability' } } },
+            // The platform's cron fan-out calls the store's admin service.
+            { namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'jeffi' } } },
             { ipBlock: { cidr: '172.31.0.0/16' } },
           ],
         },
@@ -368,39 +430,48 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
     },
   })
 
-  objs.push(...scaling(ns, app, ctrlSelector, ctrl))
-
+  // Where each host's traffic goes: the all-in-one app, or the store service for that host.
+  const to = (role: ServiceRole) => [{ name: routeTo === 'controller' ? tenantAppName(slug) : tenantRoleName(slug, role), port: 3000 }]
+  const split = routeTo === 'services'
   const strip = { name: 'strip-client-cert', namespace: EDGE_NS }
-  const svc = [{ name: app, port: 3000 }]
-  objs.push({
+  const route = (name: string, hosts: string[], services: unknown[], extra: Record<string, unknown> = {}): K8sObject => ({
     apiVersion: 'traefik.io/v1alpha1',
     kind: 'IngressRoute',
-    metadata: { name: 'controller', namespace: ns },
+    metadata: { name, namespace: ns },
     spec: {
       entryPoints: ['websecure'],
-      routes: [{ match: hostRule(publicHosts), kind: 'Rule', middlewares: [strip], services: svc }],
+      routes: [{ match: hostRule(hosts), kind: 'Rule', middlewares: [strip], services }],
       // The TLSOption named `default` applies implicitly; referencing it by name fails in Traefik.
       tls: {},
+      ...extra,
     },
   })
-  if (docHosts.length) {
+  const storeHosts = split ? publicHosts.filter(h => !businessHosts.includes(h)) : publicHosts
+  objs.push(route(split ? 'store' : 'controller', storeHosts, to('storefront')))
+  if (split && businessHosts.length && roles.includes('business')) objs.push(route('business', businessHosts, to('business')))
+  if (split) {
+    // The store's own-key Razorpay webhook arrives on the platform host; its storefront takes it.
     objs.push({
       apiVersion: 'traefik.io/v1alpha1',
       kind: 'IngressRoute',
-      metadata: { name: 'documents', namespace: ns },
+      metadata: { name: 'razorpay-webhook', namespace: ns },
       spec: {
         entryPoints: ['websecure'],
         routes: [
           {
-            match: hostRule(docHosts),
+            match: `Host(\`${ROOT_DOMAIN}\`) && Path(\`/api/webhooks/razorpay/${slug}\`)`,
             kind: 'Rule',
+            priority: 1000,
             middlewares: [strip],
-            services: [{ name: tenantServiceName(slug, 'documents'), port: SERVICES.documents.port }],
+            services: to('storefront'),
           },
         ],
         tls: {},
       },
     })
+  }
+  if (docHosts.length) {
+    objs.push(route('documents', docHosts, [{ name: tenantServiceName(slug, 'documents'), port: SERVICES.documents.port }]))
   }
   if (adminHosts.length) {
     objs.push({
@@ -414,7 +485,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
             match: hostRule(adminHosts),
             kind: 'Rule',
             middlewares: [strip, { name: 'pass-client-cert', namespace: EDGE_NS }],
-            services: svc,
+            services: to('admin'),
           },
         ],
         tls: { options: { name: 'tenant-mtls', namespace: EDGE_NS } },
@@ -436,7 +507,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
         metadata: { name: `custom-${i}`, namespace: ns },
         spec: {
           entryPoints: ['websecure'],
-          routes: [{ match: hostRule([domain]), kind: 'Rule', middlewares: [strip], services: svc }],
+          routes: [{ match: hostRule([domain]), kind: 'Rule', middlewares: [strip], services: to('storefront') }],
           tls: { secretName },
         },
       }
