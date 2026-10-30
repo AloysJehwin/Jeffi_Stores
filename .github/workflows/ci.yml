@@ -2,10 +2,10 @@ name: Jeffi Stores Pipeline
 
 # One pipeline, one card per stage. Per-app stages are matrices (one job per app inside the card).
 #
-#   Init ─┬→ Lint (5) ────────┬→ Build (9) ───────┐
-#         ├→ Type check (5) ──┘                    │
+#   Init ─┬→ Lint (6) ────────┬→ Build (9) ───────┐
+#         ├→ Type check (7) ──┘                    │
 #         ├→ Security                              ├→ Checks passed (required status; on a release, the approval)
-#         ├→ Unit tests (5) ───────────────────────┤
+#         ├→ Unit tests (6) ───────────────────────┤
 #         ├→ Integration tests ────────────────────┘
 #         └→ Images (8, release only, after Lint and Type check)
 #
@@ -24,8 +24,9 @@ name: Jeffi Stores Pipeline
 # is touched. Tenants follow, since their schema fan-out runs inside the new controller. The schema is additive,
 # so it lands while the old code runs. Every stage after the approval runs in `production-release` (no
 # reviewer) over an SSM tunnel and a failure stops the rest. Both schema stages always run (they apply only what
-# is missing). dry_run (default on by hand) builds the images and shows each stage's SQL, kubectl diff and
-# targets without changing production.
+# is missing). Deploy · flagship first brings jeffi/store (the store pods' secret) up to date from jeffi/production
+# and stops if the core can't fit the flagship's store pods. dry_run (default on by hand) builds the images and
+# shows each stage's SQL, kubectl diff and targets without changing production.
 
 on:
   pull_request:
@@ -393,7 +394,9 @@ jobs:
         with: { fetch-depth: 0 } # the release tag is computed from history
       - uses: ./.github/actions/release-setup
         with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
-      - name: Controller, messaging, documents, public-api, mobile and CronJobs at the release tag
+      - name: jeffi/store from jeffi/production, without the control-plane keys (prints no values)
+        run: bash deploy/k8s/bootstrap/store-secret.sh ${{ env.DRY_FLAG }}
+      - name: Controller, the flagship's storefront, admin and business, messaging, documents, public-api, mobile and CronJobs at the release tag
         run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform ${{ env.DRY_FLAG }}
 
   smoke-flagship:
@@ -479,7 +482,7 @@ jobs:
         with: { fetch-depth: 0 } # the release tag is computed from history
       - uses: ./.github/actions/release-setup
         with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
-      - name: Every store's controller, messaging and document pods at the release tag
+      - name: Every store's storefront, admin, business, messaging and document pods at the release tag, moving any still on the old app
         run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" stores ${{ env.DRY_FLAG }}
 
   smoke-tenants:
