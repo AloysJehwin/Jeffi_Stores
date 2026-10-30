@@ -7,7 +7,7 @@ vi.mock('@/lib/tenant-registry', () => ({ saveTenantSocialAccount: vi.fn(), dele
 vi.mock('@/lib/crypto/token-cipher', () => ({ encryptToken: (s: string) => `enc:${s}` }))
 vi.mock('@/lib/catalog/meta', () => ({ getPageInfo: vi.fn() }))
 
-import { POST, DELETE } from '@controller/app/api/(admin)/admin/social/accounts/route'
+import { POST, DELETE } from '@admin/app/api/(admin)/admin/social/accounts/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
 import { saveTenantSocialAccount, deleteTenantSocialAccount } from '@/lib/tenant-registry'

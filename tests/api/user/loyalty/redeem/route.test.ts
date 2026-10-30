@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/auth/jwt', () => ({ authenticateUser: vi.fn() }))
 vi.mock('@/lib/loyalty/redeem', () => ({ redeemPoints: vi.fn() }))
 
-import { POST } from '@controller/app/api/(public)/user/loyalty/redeem/route'
+import { POST } from '@storefront/app/api/(public)/user/loyalty/redeem/route'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { redeemPoints } from '@/lib/loyalty/redeem'
 

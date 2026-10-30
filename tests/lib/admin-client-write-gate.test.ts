@@ -16,7 +16,7 @@ import glob from 'fast-glob'
  */
 const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Auth / self-service: the member is proving who they are or acting on themselves.
-  'controller-service/src/app/(admin)/admin/login/page.tsx',
+  'admin-service/src/app/(admin)/admin/login/page.tsx',
   'packages/store-core/src/components/admin/AdminSessionController.tsx',
   'packages/store-core/src/components/admin/AccessDenied.tsx',
   'packages/store-core/src/components/admin/TwoFactorCard.tsx',
@@ -48,29 +48,29 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'packages/store-core/src/components/admin/ServiceAccountRevokeButton.tsx',
   // Owner-only revoke rendered only for owners by service-accounts/_components/ServiceAccountsPanel.tsx (replaced the button above).
   'packages/store-core/src/components/admin/ServiceAccountRowActions.tsx',
-  'controller-service/src/app/(admin)/admin/service-accounts/add/page.tsx',
+  'admin-service/src/app/(admin)/admin/service-accounts/add/page.tsx',
   // Read-only view; its only POST is an export/filter, not a scoped write.
-  'controller-service/src/app/(admin)/admin/audit/AdminAuditClient.tsx',
+  'admin-service/src/app/(admin)/admin/audit/AdminAuditClient.tsx',
   // Dashboard shell: its only POST is a fire-and-forget payout reconciliation on mount,
   // not a user action. Each mutating tab (receivables/payables/cod) gates on financial:write.
-  'controller-service/src/app/(admin)/admin/financial/FinancialClient.tsx',
+  'admin-service/src/app/(admin)/admin/financial/FinancialClient.tsx',
   // Gated on the exact :write scope, but through a server-derived canWrite prop
   // (hasScope(role, scopes, '<area>:write') in the page) rather than the client context.
-  'controller-service/src/app/(admin)/admin/products/ProductsTableClient.tsx',
-  'controller-service/src/app/(admin)/admin/products/_components/ProductsMobileList.tsx',
-  'controller-service/src/app/(admin)/admin/invoices/InvoicesClient.tsx',
-  'controller-service/src/app/(admin)/admin/quotations/QuotationsClient.tsx',
+  'admin-service/src/app/(admin)/admin/products/ProductsTableClient.tsx',
+  'admin-service/src/app/(admin)/admin/products/_components/ProductsMobileList.tsx',
+  'admin-service/src/app/(admin)/admin/invoices/InvoicesClient.tsx',
+  'admin-service/src/app/(admin)/admin/quotations/QuotationsClient.tsx',
   // Gated by a server-derived `canWrite` prop that wraps the RowActions ({canWrite && <RowActions/>}).
   'packages/store-core/src/components/admin/CouponTableRow.tsx',
   // Gated on a server-derived canWrite prop (hasScope(role, scopes, 'service_accounts:write')
   // in the page), passed in and used to gate every action — same pattern as the siblings above.
-  'controller-service/src/app/(admin)/admin/service-accounts/_components/ServiceAccountsMobileList.tsx',
+  'admin-service/src/app/(admin)/admin/service-accounts/_components/ServiceAccountsMobileList.tsx',
   // Read-only document/label exports (GET/PDF); no record mutation to gate.
-  'controller-service/src/app/(admin)/admin/packing-slips/PackingSlipsClient.tsx',
-  'controller-service/src/app/(admin)/admin/packing-slips/_components/order-documents.tsx',
-  'controller-service/src/app/(admin)/admin/labels/LabelsClient.tsx',
+  'admin-service/src/app/(admin)/admin/packing-slips/PackingSlipsClient.tsx',
+  'admin-service/src/app/(admin)/admin/packing-slips/_components/order-documents.tsx',
+  'admin-service/src/app/(admin)/admin/labels/LabelsClient.tsx',
   'packages/store-core/src/components/admin/BatchSerialLabelPicker.tsx',
-  'controller-service/src/app/(admin)/admin/products/_components/ProductLabelModal.tsx',
+  'admin-service/src/app/(admin)/admin/products/_components/ProductLabelModal.tsx',
   // Shared modal committed via a parent-owned onConfirm — the gate sits on each caller's
   // open control (cash-sale, quotations, invoices, order status), not the modal.
   'packages/store-core/src/components/admin/BatchPickerModal.tsx',
@@ -92,7 +92,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
 ])
 
 function mutatingClientComponents(): string[] {
-  const files = glob.sync(['controller-service/src/app/\\(admin\\)/admin/**/*.tsx', 'packages/store-core/src/components/admin/**/*.tsx'], {
+  const files = glob.sync(['{admin,controller}-service/src/app/\\(admin\\)/admin/**/*.tsx', 'packages/store-core/src/components/admin/**/*.tsx'], {
     cwd: process.cwd(),
   })
   const out: string[] = []

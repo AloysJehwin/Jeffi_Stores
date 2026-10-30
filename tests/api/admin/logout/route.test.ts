@@ -23,7 +23,7 @@ vi.mock('@/lib/auth/auth-sessions', () => ({
   revokeAllForPrincipal: mockRevokeAll,
 }))
 
-import { POST } from '@controller/app/api/(admin)/admin/logout/route'
+import { POST } from '@admin/app/api/(admin)/admin/logout/route'
 import { cookies } from 'next/headers'
 
 const mockCookies = vi.mocked(cookies)

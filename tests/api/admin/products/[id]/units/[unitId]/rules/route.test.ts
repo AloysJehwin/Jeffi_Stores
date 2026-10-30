@@ -16,7 +16,7 @@ vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-import { POST } from '@controller/app/api/(admin)/admin/products/[id]/units/[unitId]/rules/route'
+import { POST } from '@admin/app/api/(admin)/admin/products/[id]/units/[unitId]/rules/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

@@ -16,7 +16,7 @@ vi.mock('@/lib/import/jobs', () => {
   }
 })
 
-import { POST } from '@controller/app/api/(admin)/admin/data-source/import/route'
+import { POST } from '@admin/app/api/(admin)/admin/data-source/import/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { enqueueImportJob, findActiveUploadByFingerprint, withImportLock, ImportBusyError } from '@/lib/import/jobs'
 import { uploadImportFile } from '@/lib/shared/s3'

@@ -15,7 +15,7 @@ vi.mock('@/lib/auth/jwt', () => ({
   verifyToken: vi.fn(),
 }))
 
-import { POST } from '@controller/app/api/(public)/track/route'
+import { POST } from '@storefront/app/api/(public)/track/route'
 import * as db from '@/lib/shared/db'
 import * as jwtLib from '@/lib/auth/jwt'
 

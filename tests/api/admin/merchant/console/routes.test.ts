@@ -13,8 +13,8 @@ vi.mock('@/lib/merchant/console-data', async () => {
   return { ...actual, loadMerchantTab: m.load }
 })
 
-import { POST as action } from '@controller/app/api/(admin)/admin/merchant/console/actions/route'
-import { GET as consoleGet } from '@controller/app/api/(admin)/admin/merchant/console/route'
+import { POST as action } from '@admin/app/api/(admin)/admin/merchant/console/actions/route'
+import { GET as consoleGet } from '@admin/app/api/(admin)/admin/merchant/console/route'
 
 const ADMIN = { adminId: 'a1', email: 'o@s.in', role: 'staff', scopes: ['merchant_sync:write'] }
 const post = (body: unknown) => new NextRequest('https://acme.jeffistores.in/api/admin/merchant/console/actions', { method: 'POST', body: JSON.stringify(body) })

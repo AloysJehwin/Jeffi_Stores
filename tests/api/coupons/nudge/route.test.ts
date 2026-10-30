@@ -8,7 +8,7 @@ vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn().mockResolvedValue(null),
 }))
 
-import { GET } from '@controller/app/api/(public)/coupons/nudge/route'
+import { GET } from '@storefront/app/api/(public)/coupons/nudge/route'
 import { queryMany } from '@/lib/shared/db'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 

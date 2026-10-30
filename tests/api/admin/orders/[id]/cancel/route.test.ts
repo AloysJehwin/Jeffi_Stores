@@ -19,7 +19,7 @@ vi.mock('@/lib/payments/razorpay', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@controller/app/api/(admin)/admin/orders/[id]/cancel/route'
+import { POST } from '@admin/app/api/(admin)/admin/orders/[id]/cancel/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

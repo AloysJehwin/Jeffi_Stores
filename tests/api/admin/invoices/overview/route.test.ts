@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
 vi.mock('@/lib/overviews/invoices', () => ({ loadInvoiceOverview: vi.fn() }))
 
-import { GET } from '@controller/app/api/(admin)/admin/invoices/overview/route'
+import { GET } from '@admin/app/api/(admin)/admin/invoices/overview/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { loadInvoiceOverview } from '@/lib/overviews/invoices'
 

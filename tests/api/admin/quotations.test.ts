@@ -17,12 +17,12 @@ vi.mock('@/lib/tenancy/tenant-context', () => ({
   resolveTenant: vi.fn(async () => null),
 }))
 
-import { GET as quotationsGET, POST as quotationsPOST } from '@controller/app/api/(admin)/admin/quotations/route'
+import { GET as quotationsGET, POST as quotationsPOST } from '@admin/app/api/(admin)/admin/quotations/route'
 import {
   GET as quotationByIdGET,
   PATCH as quotationByIdPATCH,
   DELETE as quotationByIdDELETE,
-} from '@controller/app/api/(admin)/admin/quotations/[id]/route'
+} from '@admin/app/api/(admin)/admin/quotations/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 

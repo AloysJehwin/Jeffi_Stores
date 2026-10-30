@@ -61,7 +61,7 @@ vi.mock('@/lib/orders/variant-change', () => ({
 }))
 vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn(async () => ({ action: 'none', reason: 'test' })) }))
 
-import { POST } from '@controller/app/api/(public)/razorpay/verify/route'
+import { POST } from '@storefront/app/api/(public)/razorpay/verify/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as orderCommit from '@/lib/orders/order-commit'

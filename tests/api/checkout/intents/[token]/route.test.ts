@@ -19,7 +19,7 @@ vi.mock('@/lib/orders/order-commit', () => ({
   cartSubtotal: vi.fn(),
 }))
 
-import { GET } from '@controller/app/api/(public)/checkout/intents/[token]/route'
+import { GET } from '@storefront/app/api/(public)/checkout/intents/[token]/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { verifyIntent } from '@/lib/orders/checkout-intent'
 import { resolveBuyNowItem, loadActiveCart, cartSubtotal } from '@/lib/orders/order-commit'

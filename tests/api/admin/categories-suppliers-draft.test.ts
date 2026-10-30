@@ -28,15 +28,15 @@ vi.mock('@/lib/admin/supplier-drafts', async orig => ({ ...(await orig<object>()
 
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { DraftConflictError } from '@/lib/admin/draft-branches'
-import { POST, PATCH, DELETE } from '@controller/app/api/(admin)/admin/categories/[id]/draft/route'
-import { POST as catPublish } from '@controller/app/api/(admin)/admin/categories/[id]/publish/route'
+import { POST, PATCH, DELETE } from '@admin/app/api/(admin)/admin/categories/[id]/draft/route'
+import { POST as catPublish } from '@admin/app/api/(admin)/admin/categories/[id]/publish/route'
 import {
   GET as suppGet,
   PATCH as suppPatch,
   POST as suppPost,
   DELETE as suppDelete,
-} from '@controller/app/api/(admin)/admin/suppliers/[id]/draft/route'
-import { POST as suppPublish } from '@controller/app/api/(admin)/admin/suppliers/[id]/publish/route'
+} from '@admin/app/api/(admin)/admin/suppliers/[id]/draft/route'
+import { POST as suppPublish } from '@admin/app/api/(admin)/admin/suppliers/[id]/publish/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 

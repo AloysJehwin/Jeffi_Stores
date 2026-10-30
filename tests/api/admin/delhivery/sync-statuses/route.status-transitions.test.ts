@@ -21,7 +21,7 @@ vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { POST } from '@controller/app/api/(admin)/admin/delhivery/sync-statuses/route'
+import { POST } from '@admin/app/api/(admin)/admin/delhivery/sync-statuses/route'
 import { query, queryMany } from '@/lib/shared/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'

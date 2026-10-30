@@ -11,7 +11,7 @@ vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: '2026-06-14',
 }))
 
-import { POST } from '@controller/app/api/(public)/user/accept-policies/route'
+import { POST } from '@storefront/app/api/(public)/user/accept-policies/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 

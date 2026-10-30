@@ -59,7 +59,7 @@ vi.mock('@/lib/shared/validate', async importOriginal => {
   return { ...actual }
 })
 
-import { GET, PATCH, DELETE } from '@controller/app/api/(public)/orders/[id]/route'
+import { GET, PATCH, DELETE } from '@storefront/app/api/(public)/orders/[id]/route'
 import * as db from '@/lib/shared/db'
 import * as jwt from '@/lib/auth/jwt'
 import * as inventoryDeduct from '@/lib/orders/inventory-deduct'

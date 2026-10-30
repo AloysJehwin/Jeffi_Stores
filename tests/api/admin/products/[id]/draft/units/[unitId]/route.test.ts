@@ -16,7 +16,7 @@ vi.mock('@/lib/shared/db', () => ({
 vi.mock('@/lib/catalog/product-draft-id', () => ({ productDraftIdFor: vi.fn(async () => 'draft-1') }))
 
 import { authenticateAdmin } from '@/lib/auth/jwt'
-import { PATCH, DELETE } from '@controller/app/api/(admin)/admin/products/[id]/draft/units/[unitId]/route'
+import { PATCH, DELETE } from '@admin/app/api/(admin)/admin/products/[id]/draft/units/[unitId]/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 

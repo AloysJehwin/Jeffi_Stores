@@ -17,7 +17,7 @@ vi.mock('@/lib/shared/db', () => ({
 
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { GET, POST } from '@controller/app/api/(admin)/admin/product-offers/route'
+import { GET, POST } from '@admin/app/api/(admin)/admin/product-offers/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 

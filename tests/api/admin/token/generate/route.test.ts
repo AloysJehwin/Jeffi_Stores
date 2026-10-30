@@ -20,7 +20,7 @@ vi.mock('jose', () => ({
   },
 }))
 
-import { POST } from '@controller/app/api/(admin)/admin/token/generate/route'
+import { POST } from '@admin/app/api/(admin)/admin/token/generate/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 

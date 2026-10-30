@@ -19,7 +19,7 @@ vi.mock('@/lib/filters/run', () => ({ cappedCount: mockCappedCount }))
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
-import { GET } from '@controller/app/api/(admin)/admin/audit/mail-log/route'
+import { GET } from '@admin/app/api/(admin)/admin/audit/mail-log/route'
 import { queryMany } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)

@@ -42,8 +42,8 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(mockCookieStore),
 }))
 
-import { POST as loginPOST } from '@controller/app/api/(public)/business/login/route'
-import { POST as signupPOST } from '@controller/app/api/(public)/business/signup/route'
+import { POST as loginPOST } from '@storefront/app/api/(public)/business/login/route'
+import { POST as signupPOST } from '@storefront/app/api/(public)/business/signup/route'
 import * as otpLib from '@/lib/auth/otp'
 import * as db from '@/lib/shared/db'
 

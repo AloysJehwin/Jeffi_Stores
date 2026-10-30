@@ -7,7 +7,7 @@ import { applyRateLimit } from './lib/shared/rate-limit'
 import { extractSessionSignals } from './lib/auth/session-signals-request'
 import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } from './lib/tenant-registry'
 import { documentHostForSlug } from './lib/tenancy/forms-host'
-import { pinnedHost, serviceRole, servesRequest } from './lib/service-roles'
+import { currentApp, pinnedHost, servesRequest } from './lib/service-routing'
 import { runWithTenantContext } from './lib/tenancy/tenant-context'
 import { adminCookieNameForHost } from './lib/auth/admin-cookie'
 import { bindingGate } from './lib/auth/session-binding-gate'
@@ -216,8 +216,8 @@ async function handle(request: NextRequest) {
     }
   }
 
-  // A store service answers only its own store's hosts, never the control plane.
-  if (!servesRequest(serviceRole(), { app: appFromHost(hostname), path: pathname, tenantSlug: tenant?.slug ?? null })) {
+  // Each app answers only what routeFor sends it, and a store's pods only their own store.
+  if (!servesRequest(currentApp(), { host: hostname, path: pathname, tenantSlug: tenant?.slug ?? null })) {
     return addSecurityHeaders(new NextResponse('Not found', { status: 404, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' } }))
   }
 

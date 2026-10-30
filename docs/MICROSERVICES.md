@@ -5,7 +5,14 @@
 **Only the SERVICES are segregated. The DATABASE is unified.**
 
 Services:
-- `controller-service` — the Next.js app (admin + ecom + storefront)
+- Four Next.js apps, sharing their code through `packages/store-core` (lib, components, contexts, hooks, the middleware):
+  - `controller-service` — the control plane only: the ecom console (`ecom.`), the certificate portal, the platform admin pages (`admin.<root>/ecom`, `/settings/{ai,compute}-pricing`), provisioning, platform crons and webhooks
+  - `storefront-service` — the store's site (store host, custom domains, `vault-`, `forms-`) and every store `/api` route; admin and business UIs call those on their own host
+  - `admin-service` — the admin panel, `/api/admin` and the store's crons
+  - `business-service` — the B2B portal's pages (`{slug}.business.`)
+
+  Who answers what is one table, `routeFor` in `packages/store-core/src/lib/service-routing.ts`: each app's middleware
+  404s anything else, and the local dev router and the ingress route by it.
 - `messaging-service` (SMS/email/WhatsApp send + templates library)
 - `document-service` (invoice/quotation/PO rendering + storage)
 - `public-api-service` (the public API gateway, `public.jeffistores.in`)

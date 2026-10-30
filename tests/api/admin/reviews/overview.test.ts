@@ -7,7 +7,7 @@ vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: m.requireAdminScope }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: m.hasScope }))
 vi.mock('@/lib/shared/db', () => ({ queryMany: m.queryMany, queryOne: m.queryOne }))
 
-import { GET } from '@controller/app/api/(admin)/admin/reviews/overview/route'
+import { GET } from '@admin/app/api/(admin)/admin/reviews/overview/route'
 
 const req = (qs = '') => new NextRequest(`http://localhost/api/admin/reviews/overview${qs}`)
 

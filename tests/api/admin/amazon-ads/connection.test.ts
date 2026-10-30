@@ -16,7 +16,7 @@ vi.mock('@/lib/crypto/token-cipher', () => ({
   decryptToken: (s: string) => s.replace(/^enc:/, ''),
 }))
 
-import { GET, POST } from '@controller/app/api/(admin)/admin/amazon-ads/connection/route'
+import { GET, POST } from '@admin/app/api/(admin)/admin/amazon-ads/connection/route'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getIntegrationCredential, saveIntegrationCredential } from '@/lib/tenant-registry'
 

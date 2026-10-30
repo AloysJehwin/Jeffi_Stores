@@ -15,7 +15,7 @@ vi.mock('@/lib/auth/jwt', () => ({
 }))
 vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn() }))
 
-import { POST } from '@controller/app/api/(public)/products/[id]/view/route'
+import { POST } from '@storefront/app/api/(public)/products/[id]/view/route'
 import { query, queryOne } from '@/lib/shared/db'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 

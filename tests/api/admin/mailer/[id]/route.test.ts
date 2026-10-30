@@ -23,7 +23,7 @@ vi.mock('@/lib/admin/draft-locks', async importOriginal => ({
   actorOf: () => null,
 }))
 
-import { GET, PATCH, DELETE } from '@controller/app/api/(admin)/admin/mailer/[id]/route'
+import { GET, PATCH, DELETE } from '@admin/app/api/(admin)/admin/mailer/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, queryCount, query } from '@/lib/shared/db'

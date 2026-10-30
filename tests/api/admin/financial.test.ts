@@ -23,7 +23,7 @@ vi.mock('@/lib/catalog/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@controller/app/api/(admin)/admin/financial/receivables/summary', () => ({
+vi.mock('@admin/app/api/(admin)/admin/financial/receivables/summary', () => ({
   getReceivablesOverview: vi.fn(),
 }))
 
@@ -31,12 +31,12 @@ vi.mock('@controller/app/api/(admin)/admin/financial/receivables/summary', () =>
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { GET as plGET } from '@controller/app/api/(admin)/admin/financial/pl/route'
-import { GET as receivablesGET } from '@controller/app/api/(admin)/admin/financial/receivables/route'
+import { GET as plGET } from '@admin/app/api/(admin)/admin/financial/pl/route'
+import { GET as receivablesGET } from '@admin/app/api/(admin)/admin/financial/receivables/route'
 import { authenticateAdmin, requireAdminScope } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getPLReport } from '@/lib/payments/financial'
-import { getReceivablesOverview } from '@controller/app/api/(admin)/admin/financial/receivables/summary'
+import { getReceivablesOverview } from '@admin/app/api/(admin)/admin/financial/receivables/summary'
 
 // ---------------------------------------------------------------------------
 // Helpers

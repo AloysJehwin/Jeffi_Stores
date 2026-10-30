@@ -21,7 +21,7 @@ vi.mock('@/lib/email', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@controller/app/api/(admin)/admin/access-request/route'
+import { POST } from '@admin/app/api/(admin)/admin/access-request/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { queryMany } from '@/lib/shared/db'
 import { transporter } from '@/lib/email'

@@ -3,10 +3,10 @@ import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/re
 
 let canWrite = true
 vi.mock('@/contexts/AdminScopesContext', () => ({ useCanWrite: () => canWrite, useCanUseAi: () => false }))
-vi.mock('@controller/app/(admin)/admin/google-ads/_components/ManageContext', () => ({ useAdsManage: () => null }))
+vi.mock('@admin/app/(admin)/admin/google-ads/_components/ManageContext', () => ({ useAdsManage: () => null }))
 
-import AudiencesView from '@controller/app/(admin)/admin/google-ads/_components/AudiencesView'
-import AlertsPanel from '@controller/app/(admin)/admin/google-ads/_components/AlertsPanel'
+import AudiencesView from '@admin/app/(admin)/admin/google-ads/_components/AudiencesView'
+import AlertsPanel from '@admin/app/(admin)/admin/google-ads/_components/AlertsPanel'
 import { DEFAULT_ALERT_CONFIG } from '@/lib/google-ads/alerts'
 
 const audience = (over: Record<string, unknown> = {}) => ({

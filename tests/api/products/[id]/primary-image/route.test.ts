@@ -8,7 +8,7 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { GET } from '@controller/app/api/(public)/products/[id]/primary-image/route'
+import { GET } from '@storefront/app/api/(public)/products/[id]/primary-image/route'
 import { queryOne } from '@/lib/shared/db'
 
 const mockQueryOne = vi.mocked(queryOne)

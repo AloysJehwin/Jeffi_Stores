@@ -21,7 +21,7 @@ vi.mock('@/lib/auth/plan-gate', () => ({ currentTenantPlanGate: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query: h.query }) }))
 vi.mock('@/lib/integrations/owner', () => ({ credentialOwnerId: h.ownerId, isPlatformOwner: (id: string) => id === 'platform' }))
 
-import { GET } from '@controller/app/api/(admin)/admin/ai/price/route'
+import { GET } from '@admin/app/api/(admin)/admin/ai/price/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { currentTenantPlanGate } from '@/lib/auth/plan-gate'
 

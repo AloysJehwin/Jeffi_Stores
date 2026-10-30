@@ -30,7 +30,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 }))
 
 // ── import handler AFTER mocks ───────────────────────────────────────────────
-import { GET } from '@controller/app/api/(public)/products/slug/[slug]/variants/route'
+import { GET } from '@storefront/app/api/(public)/products/slug/[slug]/variants/route'
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 const variantsRow = {

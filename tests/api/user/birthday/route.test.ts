@@ -5,7 +5,7 @@ vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/auth/jwt', () => ({ verifyBirthdayToken: vi.fn() }))
 vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn() }))
 
-import { GET, POST } from '@controller/app/api/(public)/user/birthday/route'
+import { GET, POST } from '@storefront/app/api/(public)/user/birthday/route'
 import { queryOne } from '@/lib/shared/db'
 import { verifyBirthdayToken } from '@/lib/auth/jwt'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'

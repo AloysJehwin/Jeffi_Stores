@@ -18,11 +18,11 @@ vi.mock('@/lib/google-ads/credentials', () => ({
 vi.mock('@/lib/integrations/test-connection', () => ({ testGoogleAds: vi.fn(async () => ({ ok: true, message: 'Reached' })) }))
 vi.mock('@/lib/google-ads/alerts', () => ({ runAdsAlerts: vi.fn(async () => ({ findings: 0, created: 0, resolved: 0, notified: 0 })) }))
 
-import { GET as report } from '@controller/app/api/(admin)/admin/google-ads/report/route'
-import { POST as syncNow, GET as syncStatus } from '@controller/app/api/(admin)/admin/google-ads/sync/route'
-import { GET as testConn } from '@controller/app/api/(admin)/admin/google-ads/test/route'
-import { GET as cronFull } from '@controller/app/api/(internal)/cron/google-ads-sync/route'
-import { GET as cronToday } from '@controller/app/api/(internal)/cron/google-ads-refresh/route'
+import { GET as report } from '@admin/app/api/(admin)/admin/google-ads/report/route'
+import { POST as syncNow, GET as syncStatus } from '@admin/app/api/(admin)/admin/google-ads/sync/route'
+import { GET as testConn } from '@admin/app/api/(admin)/admin/google-ads/test/route'
+import { GET as cronFull } from '@admin/app/api/(internal)/cron/google-ads-sync/route'
+import { GET as cronToday } from '@admin/app/api/(internal)/cron/google-ads-refresh/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { loadTab } from '@/lib/google-ads/report'
 import { syncGoogleAds, isAdsSyncRunning, AdsSyncInProgressError } from '@/lib/google-ads/sync'

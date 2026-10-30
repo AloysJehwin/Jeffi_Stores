@@ -10,7 +10,7 @@ vi.mock('@/lib/shared/daily-briefing', () => ({
 }))
 vi.mock('@/lib/shared/ops-email', () => ({ loadOpsEmail: vi.fn(), buildOpsEmail: vi.fn(), opsEmailRecipients: vi.fn() }))
 
-import { GET } from '@controller/app/api/(internal)/cron/daily-briefing/route'
+import { GET } from '@admin/app/api/(internal)/cron/daily-briefing/route'
 import { query, queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import { istHour } from '@/lib/shared/daily-briefing'

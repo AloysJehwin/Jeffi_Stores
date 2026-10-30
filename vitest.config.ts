@@ -28,7 +28,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'json-summary', 'json'],
-      include: ['controller-service/src/**/*.{ts,tsx}', 'packages/store-core/src/**/*.{ts,tsx}'],
+      include: ['{controller,storefront,admin,business}-service/src/**/*.{ts,tsx}', 'packages/store-core/src/**/*.{ts,tsx}'],
       // Baseline after adding .tsx to coverage (#524) and the service split: measured
       // statements 38.9 / lines 39.7 / branches 31.8 / functions 25.1. Floored a point below
       // the measured numbers so a single new gated branch can't tip CI red; raise as coverage grows.
@@ -44,6 +44,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@controller': path.resolve(__dirname, './controller-service/src'),
+      '@storefront': path.resolve(__dirname, './storefront-service/src'),
+      '@admin': path.resolve(__dirname, './admin-service/src'),
+      '@business': path.resolve(__dirname, './business-service/src'),
       '@': path.resolve(__dirname, './packages/store-core/src'),
       'server-only': path.resolve(__dirname, './node_modules/next/dist/compiled/server-only/empty.js'),
     },

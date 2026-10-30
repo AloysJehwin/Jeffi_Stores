@@ -34,8 +34,8 @@ vi.mock('@/lib/auth/plan-gate', () => ({ currentTenantPlanGate: vi.fn() }))
 vi.mock('@/lib/ai/billing', () => ({ AiWalletError: h.AiWalletError }))
 vi.mock('@/lib/ai/media', () => ({ generateVideo: h.generateVideo, videoJob: h.videoJob, AiMediaError: h.AiMediaError }))
 
-import { POST } from '@controller/app/api/(admin)/admin/ai/video/route'
-import { GET } from '@controller/app/api/(admin)/admin/ai/video/[jobId]/route'
+import { POST } from '@admin/app/api/(admin)/admin/ai/video/route'
+import { GET } from '@admin/app/api/(admin)/admin/ai/video/[jobId]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { currentTenantPlanGate } from '@/lib/auth/plan-gate'
 

@@ -13,7 +13,9 @@ export async function register() {
     registerOTel(otelOptions())
     installTraceLogPrefix()
   }
-  if (!inProcessCronEnabled()) return
+  // Only the controller runs the schedule; every other app would fire each job again.
+  const app = process.env.JEFFI_APP
+  if (!inProcessCronEnabled() || (app && app !== 'controller')) return
 
   const CRON_SECRET = process.env.CRON_SECRET
   const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL

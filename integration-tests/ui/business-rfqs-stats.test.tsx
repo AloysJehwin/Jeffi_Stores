@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import RfqTrendChart, { type RfqTrendPoint } from '@controller/app/(admin)/admin/business/rfqs/_components/RfqTrendChart'
+import RfqTrendChart, { type RfqTrendPoint } from '@admin/app/(admin)/admin/business/rfqs/_components/RfqTrendChart'
 
 // Seed example for the integration suite — the Business RFQs stats block (fix 50a2cb6f).
 // Two parts, because the stats row is split across a renderable child and a non-renderable parent:
@@ -38,7 +38,7 @@ describe('RfqTrendChart (render)', () => {
 })
 
 describe('Business RFQs stats layout (regression guard for 50a2cb6f)', () => {
-  const pageSrc = readFileSync(join(process.cwd(), 'controller-service/src/app/(admin)/admin/business/rfqs/page.tsx'), 'utf8')
+  const pageSrc = readFileSync(join(process.cwd(), 'admin-service/src/app/(admin)/admin/business/rfqs/page.tsx'), 'utf8')
 
   // The gradient card holds 6 stat tiles (2–3 rows), taller than a fixed 14rem. A hard lg:h-56
   // clipped it so the bottom tiles overflowed into the search bar. min-h lets the row grow.

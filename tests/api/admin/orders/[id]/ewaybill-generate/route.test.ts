@@ -19,7 +19,7 @@ vi.mock('@/lib/shared/validate', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@controller/app/api/(admin)/admin/orders/[id]/ewaybill-generate/route'
+import { POST } from '@admin/app/api/(admin)/admin/orders/[id]/ewaybill-generate/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'

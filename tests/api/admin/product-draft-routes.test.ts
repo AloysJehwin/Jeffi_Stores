@@ -61,7 +61,7 @@ import {
   POST as prodDraftPost,
   PATCH as prodDraftPatch,
   DELETE as prodDraftDelete,
-} from '@controller/app/api/(admin)/admin/products/[id]/draft/route'
+} from '@admin/app/api/(admin)/admin/products/[id]/draft/route'
 
 // Products draft sub-variants
 import {
@@ -69,18 +69,18 @@ import {
   POST as svPost,
   DELETE as svDelete,
   PATCH as svPatch,
-} from '@controller/app/api/(admin)/admin/products/[id]/draft/sub-variants/route'
+} from '@admin/app/api/(admin)/admin/products/[id]/draft/sub-variants/route'
 
 // Products draft units
 import {
   GET as unitsGet,
   POST as unitsPost,
   DELETE as unitsDelete,
-} from '@controller/app/api/(admin)/admin/products/[id]/draft/units/route'
+} from '@admin/app/api/(admin)/admin/products/[id]/draft/units/route'
 
 // Review forms draft + publish
-import { POST as rfDraftPost, PATCH as rfPatch, DELETE as rfDelete } from '@controller/app/api/(admin)/admin/review-forms/[id]/draft/route'
-import { POST as rfPublish } from '@controller/app/api/(admin)/admin/review-forms/[id]/publish/route'
+import { POST as rfDraftPost, PATCH as rfPatch, DELETE as rfDelete } from '@admin/app/api/(admin)/admin/review-forms/[id]/draft/route'
+import { POST as rfPublish } from '@admin/app/api/(admin)/admin/review-forms/[id]/publish/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 

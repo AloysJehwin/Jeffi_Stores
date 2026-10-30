@@ -190,7 +190,7 @@ describe('tracing env', () => {
       const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme'), layout: 'services' }) as any[]
       expect(deps(objs)).toEqual(['redis', 'acme-storefront-service', 'acme-admin-service', 'acme-messaging-service', 'acme-document-service'])
       const sf = byKind(objs, 'Deployment', 'acme-storefront-service')[0] as any
-      expect(envOf(sf)).toMatchObject({ SERVICE_ROLE: 'storefront', SERVICE_TENANT_SLUG: 'acme' })
+      expect(envOf(sf)).toMatchObject({ SERVICE_TENANT_SLUG: 'acme' })
       expect(sf.spec.template.spec.containers[0].image).toContain('jeffi-stores-storefront-service')
       expect(route(objs, 'store').services).toEqual([{ name: 'acme-storefront-service', port: 3000 }])
       expect(route(objs, 'admin').services).toEqual([{ name: 'acme-admin-service', port: 3000 }])

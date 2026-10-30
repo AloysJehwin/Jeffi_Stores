@@ -19,7 +19,7 @@ vi.mock('@/lib/tenancy/tenant-context', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@controller/app/api/(admin)/admin/orders/[id]/create-rvp-shipment/route'
+import { POST } from '@admin/app/api/(admin)/admin/orders/[id]/create-rvp-shipment/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'

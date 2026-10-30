@@ -34,7 +34,7 @@ vi.mock('@/lib/auth/plan-gate', () => ({ currentTenantPlanGate: vi.fn() }))
 vi.mock('@/lib/ai/billing', () => ({ AiWalletError: h.AiWalletError }))
 vi.mock('@/lib/ai/media', () => ({ generateImage: h.generateImage, AiMediaError: h.AiMediaError }))
 
-import { POST } from '@controller/app/api/(admin)/admin/ai/image/route'
+import { POST } from '@admin/app/api/(admin)/admin/ai/image/route'
 import { authenticateAdmin, requireAdminScope } from '@/lib/auth/jwt'
 import { currentTenantPlanGate } from '@/lib/auth/plan-gate'
 

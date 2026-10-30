@@ -14,7 +14,7 @@ vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { GET, POST, DELETE } from '@controller/app/api/(admin)/admin/customers/[id]/notes/route'
+import { GET, POST, DELETE } from '@admin/app/api/(admin)/admin/customers/[id]/notes/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany } from '@/lib/shared/db'

@@ -21,7 +21,7 @@ vi.mock('@/lib/referrals/queries', () => ({
   getReferralStats: vi.fn(async () => ({ signups: 0, byStatus: {}, pointsPaid: 0, referrers: 0 })),
 }))
 
-import { GET } from '@controller/app/api/(admin)/admin/customer-programs/overview/route'
+import { GET } from '@admin/app/api/(admin)/admin/customer-programs/overview/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 

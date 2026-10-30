@@ -10,7 +10,7 @@ vi.mock('@/lib/queries', () => ({
   getCustomers: vi.fn(),
 }))
 
-import { GET } from '@controller/app/api/(public)/customers/route'
+import { GET } from '@storefront/app/api/(public)/customers/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as scopes from '@/lib/auth/scopes'
 import * as queries from '@/lib/queries'

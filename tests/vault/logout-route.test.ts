@@ -5,7 +5,7 @@ const revokeSession = vi.fn(async (_sid: string) => {})
 vi.mock('@/lib/auth/auth-sessions', () => ({ revokeSession: (sid: string) => revokeSession(sid) }))
 vi.mock('@/lib/vault/links', () => ({ storeBaseUrlAsync: async () => 'https://acme.jeffistores.in' }))
 
-import { POST } from '@controller/app/api/(public)/vault/logout/route'
+import { POST } from '@storefront/app/api/(public)/vault/logout/route'
 
 function req(cookie?: string) {
   const r = new NextRequest('http://vault-acme.localhost/api/vault/logout', { method: 'POST' })

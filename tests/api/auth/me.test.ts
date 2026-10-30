@@ -41,8 +41,8 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(mockCookieStore),
 }))
 
-import { GET } from '@controller/app/api/(public)/auth/me/route'
-import { POST as logoutPOST } from '@controller/app/api/(public)/auth/logout/route'
+import { GET } from '@storefront/app/api/(public)/auth/me/route'
+import { POST as logoutPOST } from '@storefront/app/api/(public)/auth/logout/route'
 import * as jwtLib from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 

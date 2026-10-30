@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/loyalty/reconcile', () => ({ reconcileLoyalty: vi.fn() }))
 
-import { GET } from '@controller/app/api/(internal)/cron/loyalty-reconcile/route'
+import { GET } from '@admin/app/api/(internal)/cron/loyalty-reconcile/route'
 import { reconcileLoyalty } from '@/lib/loyalty/reconcile'
 
 const mockReconcile = reconcileLoyalty as ReturnType<typeof vi.fn>

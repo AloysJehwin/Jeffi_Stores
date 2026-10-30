@@ -24,7 +24,7 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { POST } from '@controller/app/api/(public)/business/rfqs/[id]/respond/route'
+import { POST } from '@storefront/app/api/(public)/business/rfqs/[id]/respond/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const AUTH_USER = { userId: 'biz-1', email: 'biz@example.com', isBusiness: true, approvalStatus: 'approved' }

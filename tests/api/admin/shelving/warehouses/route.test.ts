@@ -30,7 +30,7 @@ vi.mock('@/lib/shared/validate', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET, POST } from '@controller/app/api/(admin)/admin/shelving/warehouses/route'
+import { GET, POST } from '@admin/app/api/(admin)/admin/shelving/warehouses/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { listWarehouses, createWarehouse } from '@/lib/catalog/shelf'
