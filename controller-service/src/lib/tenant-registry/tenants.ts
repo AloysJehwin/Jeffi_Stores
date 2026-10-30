@@ -209,6 +209,8 @@ export async function listPlans(): Promise<
 export interface TenantDetail extends TenantRow {
   rds_db: string | null
   rds_port: number | null
+  rds_user: string | null
+  shared_db_host: string | null
   iam_auth: boolean | null
   cloudfront_id: string | null
   instance_state: string
@@ -223,7 +225,7 @@ export async function getTenant(id: string): Promise<TenantDetail | null> {
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,
-            i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.ec2_target, i.ec2_instance_id, i.region, i.cloudfront_id
+            i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.shared_db_host, i.iam_auth, i.s3_bucket, i.ec2_target, i.ec2_instance_id, i.region, i.cloudfront_id
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id

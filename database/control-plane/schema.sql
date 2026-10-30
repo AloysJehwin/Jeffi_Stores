@@ -1090,6 +1090,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_compute (
     status        text NOT NULL DEFAULT 'pending',
     apply_mode    text NOT NULL DEFAULT 'window',       -- window: RDS class changes wait for the maintenance window
     rate_inr_hour numeric(12,4),                        -- applied spec's price, margin included, GST excluded
+    node_gen      integer NOT NULL DEFAULT 0,           -- dedicated servers' generation; a type change starts the next
     attempts      integer NOT NULL DEFAULT 0,
     next_at       timestamp with time zone,
     last_error    text,
@@ -1112,3 +1113,26 @@ ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS default_preset   text;
 ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS min_placement    text NOT NULL DEFAULT 'dedicated';
 ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS advanced_compute boolean NOT NULL DEFAULT true;
 ALTER TABLE ONLY public.plans ADD CONSTRAINT plans_min_placement_check CHECK (min_placement IN ('pool','dedicated'));
+
+--
+-- shared_db_hosts: RDS instances that hold Starter stores, one database + IAM login role per store
+-- (t_{slug} / app_{slug}). `tenants` counts seats taken, including stores still provisioning.
+--
+CREATE TABLE IF NOT EXISTS public.shared_db_hosts (
+    id         text NOT NULL,                           -- the RDS instance id, jeffi-starter-{n}
+    endpoint   text,
+    db_class   text NOT NULL,
+    storage_gb integer NOT NULL,
+    capacity   integer NOT NULL,
+    tenants    integer NOT NULL DEFAULT 0,
+    status     text NOT NULL DEFAULT 'creating',
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.shared_db_hosts ADD CONSTRAINT shared_db_hosts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.shared_db_hosts ADD CONSTRAINT shared_db_hosts_status_check
+    CHECK (status IN ('creating','available','retired'));
+
+-- A Starter store's own login role on its shared host (null = RDS_USER), and which host.
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS rds_user       text;
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS shared_db_host text;

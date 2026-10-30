@@ -43,7 +43,9 @@ const STEPS = [
 ] as const
 type Step = (typeof STEPS)[number]
 
-const MAX_CONNECTIONS = 50 // conservative for db.t4g.micro (100 OOM'd a micro previously)
+
+// A store's own database name; a Starter store's on a shared host is t_{slug} (res.dbName).
+const TENANT_DB = 'jeffi_stores'
 
 // The flagship app box serves jeffistores.in only — never a tenant.
 const FLAGSHIP_APP_IP = process.env.FLAGSHIP_APP_IP || '52.20.193.62'
@@ -140,18 +142,38 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         return await next(job.id, 'create_param_group', res)
       }
 
-      case 'create_param_group':
-        await provider.ensureParamGroup(paramGroupName(slug), MAX_CONNECTIONS)
+      case 'create_param_group': {
+        // max_connections by the database class the store chose (50 on a micro). A Starter store's
+        // database lives on a shared host, which has its own.
+        const c = await jobCompute(job.tenant_id, tenant.plan, res)
+        if (c.spec.db.mode === 'shared') return await next(job.id, 'create_db_instance', res)
+        await provider.ensureParamGroup(paramGroupName(slug), c.maxConnections)
         res.paramGroup = paramGroupName(slug)
         return await next(job.id, 'create_db_instance', res)
+      }
 
       case 'create_db_instance': {
-        const { dbInstanceId: id } = await provider.createDbInstance({
+        const c = await jobCompute(job.tenant_id, tenant.plan, res)
+        const { db } = c.spec
+        if (db.mode === 'shared') {
+          // A seat on a shared host. Never res.dbInstanceId: rollback deletes that instance.
+          if (!res.sharedDbHost) {
+            const { reserveSharedDbHost } = await import('@/lib/compute/shared-db')
+            res.sharedDbHost = (await reserveSharedDbHost(provider)).id
+          }
+          return await next(job.id, 'wait_db_available', res)
+        }
+        const created = await provider.createDbInstance({
           dbInstanceId: dbInstanceId(slug),
           paramGroup: paramGroupName(slug),
-          maxConnections: MAX_CONNECTIONS,
+          maxConnections: c.maxConnections,
+          instanceClass: db.class ?? undefined,
+          storageGb: db.storageGb,
+          multiAz: db.multiAz,
         })
-        res.dbInstanceId = id
+        res.dbInstanceId = created.dbInstanceId
+        // AWS may fall back to the same size on t3 when t4g has no capacity.
+        if (created.instanceClass) res.dbClass = created.instanceClass
         return await next(job.id, 'wait_db_available', res)
       }
 
@@ -161,7 +183,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // after the deadline instead of polling forever — the catch triggers rollback.
         if (!res.dbWaitStartedAt) res.dbWaitStartedAt = Date.now()
         const DB_WAIT_DEADLINE_MS = 25 * 60 * 1000 // 25 min
-        const endpoint = await provider.getDbEndpoint(res.dbInstanceId)
+        const endpoint = await provider.getDbEndpoint(res.sharedDbHost ?? res.dbInstanceId)
         if (!endpoint) {
           if (Date.now() - res.dbWaitStartedAt > DB_WAIT_DEADLINE_MS) {
             throw new Error(
@@ -172,6 +194,15 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
           return 'pending'
         }
+        if (res.sharedDbHost) {
+          const { markSharedDbHostAvailable, tenantDbNames } = await import('@/lib/compute/shared-db')
+          await markSharedDbHostAvailable(res.sharedDbHost, endpoint)
+          await provider.initSharedDbHost(endpoint)
+          const names = tenantDbNames(slug)
+          await provider.createTenantDatabase(endpoint, names.db, names.role)
+          res.dbName = names.db
+          res.rdsUser = names.role
+        }
         res.endpoint = endpoint
         return await next(job.id, 'load_schema', res)
       }
@@ -180,7 +211,8 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // Loads the desired-state SCHEMA ONLY (0 rows) into the tenant's own DB. A fresh
         // tenant store is intentionally EMPTY — the owner adds their own catalog. Starter
         // data, if ever wanted, goes through the optional seed_data step below (not here).
-        await provider.loadSchema(res.endpoint, 'jeffi_stores')
+        if (res.rdsUser) await provider.loadSchema(res.endpoint, res.dbName, res.rdsUser)
+        else await provider.loadSchema(res.endpoint, TENANT_DB)
         return await next(job.id, 'restore_data', res)
 
       case 'restore_data': {
@@ -190,7 +222,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         if (key) {
           const { getTenantBackup } = await import('@/lib/tenancy/tenant-backup-store')
           const archive = await getTenantBackup(key)
-          await provider.restoreDb(res.endpoint, 'jeffi_stores', archive)
+          await provider.restoreDb(res.endpoint, res.dbName ?? TENANT_DB, archive)
           res.restored = true
         }
         return await next(job.id, 'seed_data', res)
@@ -204,7 +236,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         const profile = res.seedProfile as string | undefined
         if (profile && !res.restored) {
           const { seedTenantData } = await import('./seed')
-          await seedTenantData(res.endpoint, 'jeffi_stores', profile)
+          await seedTenantData(res.endpoint, res.dbName ?? TENANT_DB, profile)
           res.seeded = profile
         }
         return await next(job.id, 'create_bucket', res)
@@ -238,7 +270,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           const ownerId = ownerRow?.rows?.[0]?.owner_id
           if (ownerId && res.endpoint) {
             const { seedTenantSiteSettings } = await import('./seed-settings')
-            await seedTenantSiteSettings(job.tenant_id, ownerId, res.endpoint, 'jeffi_stores')
+            await seedTenantSiteSettings(job.tenant_id, ownerId, res.endpoint, res.dbName ?? TENANT_DB)
             res.settingsSeeded = true
           } else {
             res.settingsSeeded = 'skipped (missing owner or db endpoint)'
@@ -255,7 +287,11 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         return await next(job.id, 'write_infra', res)
 
       case 'write_infra':
-        await writeTenantInfra(job.tenant_id, { rdsEndpoint: res.endpoint, s3Bucket: res.bucket })
+        await writeTenantInfra(job.tenant_id, {
+          rdsEndpoint: res.endpoint,
+          s3Bucket: res.bucket,
+          ...(res.sharedDbHost ? { rdsDb: res.dbName, rdsUser: res.rdsUser, sharedDbHost: res.sharedDbHost } : {}),
+        })
         return await next(job.id, 'generate_legals', res)
 
       case 'ensure_compute': {
@@ -272,19 +308,23 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         const k8s = await import('@/lib/k8s/tenant-compute')
         if (k8s.k8sComputeEnabled()) {
           if (!res.computeWaitStartedAt) res.computeWaitStartedAt = Date.now()
-          const placed = await k8s.ensureTenantNode(
+          const c = await jobCompute(job.tenant_id, tenant.plan, res)
+          const placed = await k8s.ensureTenantNodes(
             slug,
-            tenant.plan,
-            { instanceId: res.ec2InstanceId, poolInstanceId: res.poolInstanceId },
-            async (id, kind) => {
-              if (kind === 'dedicated') res.ec2InstanceId = id
-              else res.poolInstanceId = id
+            c.spec.node,
+            c.nodeGen,
+            { instances: knownNodeInstances(slug, res), poolInstanceId: res.poolInstanceId },
+            async (id, kind, name) => {
+              if (kind === 'dedicated') {
+                res.nodeInstances = { ...res.nodeInstances, [name]: id }
+                res.ec2InstanceId ??= id
+              } else res.poolInstanceId = id
               await updateProvisioningJob(job.id, { created_resources: res })
             }
           )
           if (!placed.ready) {
             if (Date.now() - res.computeWaitStartedAt > 15 * 60 * 1000) {
-              throw new Error(`ensure_compute: k8s node for "${slug}" did not become Ready within 15 min`)
+              throw new Error(`ensure_compute: k8s servers for "${slug}" did not become Ready within 15 min`)
             }
             await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
             return 'pending'
@@ -298,7 +338,11 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             plan: tenant.plan,
             hosts: tenantHostnames(slug, tenant.plan),
             customDomains,
+            compute: c.spec,
+            dbPoolMax: c.dbPoolMax,
+            nodeGen: c.nodeGen,
           })
+          await recordApplied(job.tenant_id, slug, res.dbClass ? { ...c.spec, db: { ...c.spec.db, class: res.dbClass } } : c.spec, c.nodeGen)
           res.ec2Target = k8s.clusterIngressIp()
           res.computeMode = 'k8s'
           delete res.poolInstanceId
@@ -656,6 +700,30 @@ function onK8sCompute(r: Record<string, any>): boolean {
   return r.computeMode === 'k8s' || !!r.computeWaitStartedAt || process.env.PROVISIONING_COMPUTE === 'k8s'
 }
 
+/** The compute this job builds, fixed on first use so the database and servers agree. */
+async function jobCompute(tenantId: string, plan: string | null, res: Record<string, any>) {
+  const { resolveCompute } = await import('@/lib/compute/resolve')
+  const c = await resolveCompute(tenantId, plan, { spec: res.computeSpec })
+  res.computeSpec = c.spec
+  return c
+}
+
+/** Server instances a job launched, by node name (jobs before generations kept only ec2InstanceId). */
+function knownNodeInstances(slug: string, r: Record<string, any>): Record<string, string> {
+  return r.nodeInstances ?? (r.ec2InstanceId ? { [dedicatedNodeName(slug)]: r.ec2InstanceId } : {})
+}
+
+/** Every instance a store's own servers ran on, from the job and the registry. */
+function ownInstanceIds(r: Record<string, any>, registered?: string | null, extra: string[] = []): string[] {
+  return [...new Set([r.ec2InstanceId, registered, ...Object.values(r.nodeInstances ?? {}), ...extra].filter(Boolean))] as string[]
+}
+
+// Billing reads tenant_compute.applied; a failed write is retried by the next apply, so it never fails a step.
+async function recordApplied(tenantId: string, slug: string, spec: import('@/lib/compute/spec').ComputeSpec, gen: number) {
+  const { markComputeApplied } = await import('@/lib/compute/resolve')
+  await markComputeApplied(tenantId, spec, gen).catch((e: any) => console.error(`[provisioning] ${slug}: compute not recorded: ${e?.message}`))
+}
+
 /** Terminate a tenant's own instance. On k8s, refuses anything not named for this tenant (returns why). */
 async function terminateOwnInstance(
   provider: ProvisioningProvider,
@@ -698,18 +766,28 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   // Dedicated EC2 (higher plans) — terminate it; a Basic tenant used the shared pool (left alone
   // here, reclaimed by deletePoolIfEmpty on the final deprovision). Prefer the durably-persisted
   // instance id (tenant_infra.ec2_instance_id) over the job JSON, which can be trimmed/lost.
-  const rollbackInstanceId = r.ec2InstanceId || tenant?.ec2_instance_id
+  let nodeInstanceIds: string[] = []
   if (k8s && tenant?.slug) {
     const { deleteTenantWorkload } = await import('@/lib/k8s/tenant-compute')
-    await deleteTenantWorkload(tenant.slug).catch(() => {})
+    nodeInstanceIds = await deleteTenantWorkload(tenant.slug).catch(() => [])
   }
-  if (rollbackInstanceId && tenant?.slug) {
-    const refused = await terminateOwnInstance(provider, tenant.slug, rollbackInstanceId, k8s).catch(() => null)
-    if (refused) r.manualCleanup = { ...((r.manualCleanup as Record<string, unknown>) || {}), instance: refused }
+  if (tenant?.slug) {
+    const refused: string[] = []
+    for (const id of ownInstanceIds(r, tenant.ec2_instance_id, nodeInstanceIds)) {
+      const why = await terminateOwnInstance(provider, tenant.slug, id, k8s).catch(() => null)
+      if (why) refused.push(why)
+    }
+    if (refused.length) r.manualCleanup = { ...((r.manualCleanup as Record<string, unknown>) || {}), instance: refused.join('; ') }
   }
   // Billable resources.
   if (r.bucket) await provider.deleteBucket(r.bucket).catch(() => {})
   if (r.dbInstanceId) await provider.deleteDbInstance(r.dbInstanceId).catch(() => {})
+  if (r.sharedDbHost) {
+    if (r.endpoint && r.dbName) await provider.dropTenantDatabase(r.endpoint, r.dbName, r.rdsUser ?? null).catch(() => {})
+    const { releaseSharedDbSeat } = await import('@/lib/compute/shared-db')
+    await releaseSharedDbSeat(r.sharedDbHost).catch(() => {})
+    delete r.sharedDbHost
+  }
   // Param group can only be deleted once the DB is gone.
   await deleteParamGroupWhenDbGone(provider, r.dbInstanceId, r.paramGroup)
   // Null infra pointers so the resolver never routes to deleted infra.
@@ -855,6 +933,8 @@ export async function deprovisionTenant(
   const endpoint: string | null = tenant.rds_endpoint || created.endpoint || null
   const instId: string = created.dbInstanceId || dbInstanceId(slug)
   const bucket: string = tenant.s3_bucket || created.bucket || `jeffi-tenant-${slug}`
+  // A Starter store's database is one of many on a shared host: drop it, never the instance.
+  const sharedHost: string | null = tenant.shared_db_host || created.sharedDbHost || null
 
   let backupKey: string | null = null
   let backedUp = false
@@ -862,7 +942,7 @@ export async function deprovisionTenant(
   try {
     // 2. Backup (only if there was ever a DB to back up).
     if (endpoint) {
-      const archive = await provider.backupDb(endpoint, tenant.rds_db || 'jeffi_stores')
+      const archive = await provider.backupDb(endpoint, tenant.rds_db || created.dbName || TENANT_DB)
       const { putTenantBackup } = await import('@/lib/tenancy/tenant-backup-store')
       const { ownerKey } = await putTenantBackup({
         buffer: archive,
@@ -874,7 +954,15 @@ export async function deprovisionTenant(
     }
 
     // 3. Delete billable resources (idempotent).
-    await provider.deleteDbInstance(instId)
+    if (sharedHost) {
+      const dbName = tenant.rds_db || created.dbName
+      if (endpoint && dbName && dbName !== TENANT_DB) {
+        await provider.dropTenantDatabase(endpoint, dbName, tenant.rds_user || created.rdsUser || null)
+      }
+      const { releaseSharedDbSeat } = await import('@/lib/compute/shared-db')
+      if (!created.sharedDbReleased) await releaseSharedDbSeat(sharedHost)
+      created.sharedDbReleased = true
+    } else await provider.deleteDbInstance(instId)
     await provider.deleteBucket(bucket)
 
     // 3a. Compute teardown: a dedicated EC2 (higher plans) is terminated; a Basic tenant used
@@ -882,18 +970,24 @@ export async function deprovisionTenant(
     // durably-persisted instance id over the job JSON (which can be trimmed/lost).
     // On k8s the shared pool / core node is never reclaimed or terminated by a tenant teardown, and a
     // failed namespace delete must not abort a teardown whose DB is already gone (a retry can't re-backup).
-    const dedicatedInstanceId = created.ec2InstanceId || tenant.ec2_instance_id
     const onK8s = onK8sCompute(created)
     const computeCleanup: Record<string, unknown> = {}
+    let nodeInstanceIds: string[] = []
     if (onK8s) {
       const { deleteTenantWorkload } = await import('@/lib/k8s/tenant-compute')
-      await deleteTenantWorkload(slug).catch((e: any) => {
+      nodeInstanceIds = await deleteTenantWorkload(slug).catch((e: any) => {
         computeCleanup.k8sNamespace = `delete failed: ${e?.message || e}`
+        return []
       })
     }
-    if (dedicatedInstanceId) {
-      const refused = await terminateOwnInstance(provider, slug, dedicatedInstanceId, onK8s).catch(() => null)
-      if (refused) computeCleanup.instance = refused
+    const ownInstances = ownInstanceIds(created, tenant.ec2_instance_id, nodeInstanceIds)
+    if (ownInstances.length) {
+      const refused: string[] = []
+      for (const id of ownInstances) {
+        const why = await terminateOwnInstance(provider, slug, id, onK8s).catch(() => null)
+        if (why) refused.push(why)
+      }
+      if (refused.length) computeCleanup.instance = refused.join('; ')
     } else if (!onK8s) {
       const { deletePoolIfEmpty } = await import('@/lib/tenancy/pool-autoscale')
       await deletePoolIfEmpty().catch(() => {})
@@ -925,7 +1019,7 @@ export async function deprovisionTenant(
 
     // 3c. Delete the tenant's param group once the DB instance is fully gone (else RDS
     // refuses). Best-effort — a still-deleting DB is retried by a later sweep.
-    await deleteParamGroupWhenDbGone(provider, instId, created.paramGroup || paramGroupName(slug))
+    if (!sharedHost) await deleteParamGroupWhenDbGone(provider, instId, created.paramGroup || paramGroupName(slug))
 
     // 3d. Neither provider supports deletion. Razorpay has no delete for a linked account and
     // cannot clear a settlement bank (product-update only overwrites account/ifsc/beneficiary);
@@ -1001,7 +1095,7 @@ export async function deprovisionTenant(
   }
 }
 
-export { STEPS, MAX_CONNECTIONS, dbInstanceId, tenantHostnames }
+export { STEPS, dbInstanceId, tenantHostnames }
 
 /**
  * k8s plan change: make sure the new tier's node exists, then re-apply the namespace (resources,
@@ -1078,33 +1172,42 @@ export async function reconcileK8sPlan(
 
   try {
     const k8s = await import('@/lib/k8s/tenant-compute')
-    const wantDedicated = isDedicatedPlan(tenant.plan)
-    const oldDedicated = wantDedicated ? undefined : created.ec2InstanceId || tenant.ec2_instance_id || undefined
-    const placed = await k8s.ensureTenantNode(
+    const { resolveCompute } = await import('@/lib/compute/resolve')
+    // What runs now: the store's applied choice, or (until owners choose) its plan's tier.
+    const c = await resolveCompute(tenantId, tenant.plan, { which: 'applied' })
+    const wantDedicated = c.spec.node.placement === 'dedicated'
+    const oldDedicated = wantDedicated ? [] : ownInstanceIds(created, tenant.ec2_instance_id)
+    const placed = await k8s.ensureTenantNodes(
       tenant.slug,
-      tenant.plan,
-      { instanceId: wantDedicated ? created.ec2InstanceId : undefined, poolInstanceId: created.poolInstanceId },
-      async (id, kind) => {
-        if (kind === 'dedicated') created.ec2InstanceId = id
-        else created.poolInstanceId = id
-        created.k8sPlanLaunchedInstanceId = kind === 'dedicated' ? id : undefined
+      c.spec.node,
+      c.nodeGen,
+      { instances: wantDedicated ? knownNodeInstances(tenant.slug, created) : undefined, poolInstanceId: created.poolInstanceId },
+      async (id, kind, name) => {
+        if (kind === 'dedicated') {
+          created.nodeInstances = { ...created.nodeInstances, [name]: id }
+          created.ec2InstanceId ??= id
+          created.k8sPlanLaunched = [...(created.k8sPlanLaunched ?? []), id]
+        } else created.poolInstanceId = id
         await save({})
       }
     )
     const overdue = now - (created.k8sPendingSince || now) > K8S_PLAN_DEADLINE_MS
     if (!placed.ready) {
       if (overdue) {
-        // Abandon only the instance this change launched; never a pool node or a pre-existing one.
-        const launched = created.k8sPlanLaunchedInstanceId
-        if (launched && launched === created.ec2InstanceId) {
+        // Abandon only the instances this change launched; never a pool node or a pre-existing one.
+        const launched: string[] = [...(created.k8sPlanLaunched ?? []), created.k8sPlanLaunchedInstanceId].filter(Boolean)
+        if (launched.length) {
           const { remove } = await import('@/lib/k8s/client')
-          await remove('Node', dedicatedNodeName(tenant.slug)).catch(() => {})
-          await terminateOwnInstance(provider, tenant.slug, launched, true).catch(() => null)
-          delete created.ec2InstanceId
+          const names = Object.entries(knownNodeInstances(tenant.slug, created)).filter(([, id]) => launched.includes(id))
+          for (const [name] of names) await remove('Node', name).catch(() => {})
+          for (const id of launched) await terminateOwnInstance(provider, tenant.slug, id, true).catch(() => null)
+          if (created.nodeInstances) created.nodeInstances = Object.fromEntries(Object.entries(created.nodeInstances).filter(([, id]) => !launched.includes(id as string)))
+          if (launched.includes(created.ec2InstanceId)) delete created.ec2InstanceId
         }
+        delete created.k8sPlanLaunched
         delete created.k8sPlanLaunchedInstanceId
         delete created.poolInstanceId
-        return await fail(`node for plan "${tenant.plan}" did not become Ready within 20 min`, false)
+        return await fail(`servers for plan "${tenant.plan}" did not become Ready within 20 min`, false)
       }
       delete created.k8sPlanNextAt
       await save({ k8sPendingPlan: tenant.plan })
@@ -1115,9 +1218,17 @@ export async function reconcileK8sPlan(
     const customDomains = (await listCustomDomains(tenantId).catch(() => []))
       .filter(d => d.status === 'verified')
       .map(d => d.domain)
-    await k8s.applyTenantWorkload({ slug: tenant.slug, plan: tenant.plan, hosts: desired, customDomains })
+    await k8s.applyTenantWorkload({
+      slug: tenant.slug,
+      plan: tenant.plan,
+      hosts: desired,
+      customDomains,
+      compute: c.spec,
+      dbPoolMax: c.dbPoolMax,
+      nodeGen: c.nodeGen,
+    })
 
-    if (oldDedicated) {
+    if (oldDedicated.length) {
       // Keep the dedicated node until every pod has rolled onto the pool, else the store drops.
       if (!(await k8s.tenantRolloutComplete(tenant.slug))) {
         if (overdue) return await fail('pods did not move off the dedicated node within 20 min', false)
@@ -1125,13 +1236,16 @@ export async function reconcileK8sPlan(
         await save({ k8sPendingPlan: tenant.plan })
         return { ok: true, added, removed, error: 'pending: waiting for pods to move to the pool' }
       }
-      const { remove } = await import('@/lib/k8s/client')
-      await remove('Node', dedicatedNodeName(tenant.slug))
-      const refused = await terminateOwnInstance(provider, tenant.slug, oldDedicated, true).catch(() => null)
-      if (refused) created.manualCleanup = { ...(created.manualCleanup || {}), instance: refused }
+      const refused: string[] = []
+      for (const id of new Set([...oldDedicated, ...(await k8s.removeTenantNodes(tenant.slug))])) {
+        const why = await terminateOwnInstance(provider, tenant.slug, id, true).catch(() => null)
+        if (why) refused.push(why)
+      }
+      if (refused.length) created.manualCleanup = { ...(created.manualCleanup || {}), instance: refused.join('; ') }
       const { clearTenantEc2Instance } = await import('../tenant-registry/lifecycle')
       await clearTenantEc2Instance(tenantId)
       delete created.ec2InstanceId
+      delete created.nodeInstances
     } else if (created.ec2InstanceId) {
       await writeTenantEc2(tenantId, k8s.clusterIngressIp(), created.ec2InstanceId)
     }
@@ -1143,10 +1257,12 @@ export async function reconcileK8sPlan(
       'k8sPlanErrorAt',
       'k8sPlanAttempts',
       'k8sPendingSince',
+      'k8sPlanLaunched',
       'k8sPlanLaunchedInstanceId',
     ])
       delete created[k]
     await save({ dnsHosts: desired })
+    await recordApplied(tenantId, tenant.slug, c.spec, c.nodeGen)
     return { ok: true, added, removed }
   } catch (e: any) {
     const msg = e?.message || 'k8s reconcile failed'

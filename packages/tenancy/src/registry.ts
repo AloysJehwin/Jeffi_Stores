@@ -6,7 +6,7 @@ const cache = new Map<string, { ctx: TenantContext | null; expires: number }>()
 const TTL = 60_000
 
 const SELECT = `SELECT t.id, t.slug, t.display_name, t.status, p.slug AS plan,
-  i.rds_endpoint, i.rds_db, i.rds_port, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
+  i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
   FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id LEFT JOIN tenant_infra i ON i.tenant_id = t.id`
 
 function toCtx(r: any): TenantContext | null {
@@ -21,6 +21,7 @@ function toCtx(r: any): TenantContext | null {
           rdsEndpoint: r.rds_endpoint,
           rdsDb: r.rds_db || 'jeffi_stores',
           rdsPort: r.rds_port || 5432,
+          rdsUser: r.rds_user ?? null,
           dbSecretRef: r.db_secret_ref ?? null,
           iamAuth: r.iam_auth !== false,
           s3Bucket: r.s3_bucket ?? null,

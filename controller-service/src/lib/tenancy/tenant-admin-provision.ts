@@ -194,7 +194,7 @@ async function resolveTenantCtx(tenantId: string): Promise<TenantContext | null>
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT t.id, t.slug, t.display_name, p.slug AS plan,
-            i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.region
+            i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.iam_auth, i.s3_bucket, i.region
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
@@ -212,6 +212,7 @@ async function resolveTenantCtx(tenantId: string): Promise<TenantContext | null>
       rdsEndpoint: r.rds_endpoint,
       rdsDb: r.rds_db || 'jeffi_stores',
       rdsPort: r.rds_port || 5432,
+      rdsUser: r.rds_user ?? null,
       dbSecretRef: null,
       iamAuth: r.iam_auth !== false,
       s3Bucket: r.s3_bucket ?? null,

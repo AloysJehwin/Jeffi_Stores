@@ -41,6 +41,14 @@ vi.mock('@/lib/tenancy/tenant-backup-store', () => backupStore)
 const seedMod = { seedTenantData: vi.fn().mockResolvedValue(undefined) }
 vi.mock('@/lib/provisioning/seed', () => seedMod)
 
+const sharedDb = vi.hoisted(() => ({
+  reserveSharedDbHost: vi.fn(),
+  markSharedDbHostAvailable: vi.fn(),
+  releaseSharedDbSeat: vi.fn(),
+  tenantDbNames: (slug: string) => ({ db: `t_${slug}`, role: `app_${slug}` }),
+}))
+vi.mock('@/lib/compute/shared-db', () => sharedDb)
+
 // ---------------------------------------------------------------------------
 const TENANT = { id: 't-1', slug: 'acme', plan: 'basic', rds_endpoint: null, s3_bucket: null, rds_db: null }
 
@@ -233,6 +241,43 @@ describe('provisioning state machine', () => {
         provider
       )
       expect(reg.writeTenantInfra).toHaveBeenCalledWith('t-1', { rdsEndpoint: 'ep-1', s3Bucket: 'b-1' })
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  describe('Starter: a database of its own on a shared host', () => {
+    const shared = {
+      node: { placement: 'pool', type: null, count: 1 },
+      db: { mode: 'shared', class: null, storageGb: 10, multiAz: false },
+      services: {
+        controller: { replicas: 1, maxReplicas: 1, size: 'S' },
+        messaging: { replicas: 1, maxReplicas: 1, size: 'S' },
+        documents: { replicas: 1, maxReplicas: 1, size: 'S' },
+      },
+    }
+
+    it('takes a seat, creates the store database + login, and rollback drops only that database', async () => {
+      sharedDb.reserveSharedDbHost.mockResolvedValue({ id: 'jeffi-starter-1' })
+      sharedDb.markSharedDbHostAvailable.mockResolvedValue(undefined)
+      sharedDb.releaseSharedDbSeat.mockResolvedValue(undefined)
+      const { advanceProvisioningJob, rollbackProvisioning } = await import('@/lib/provisioning/steps')
+      await advanceProvisioningJob(job({ step: 'create_db_instance', created_resources: { computeSpec: shared } }), provider)
+      const reserved = patches().find(x => x.step === 'wait_db_available')?.created_resources
+      expect(reserved).toMatchObject({ sharedDbHost: 'jeffi-starter-1' })
+      expect(reserved.dbInstanceId).toBeUndefined()
+
+      await provider.createDbInstance({ dbInstanceId: 'jeffi-starter-1', paramGroup: 'pg', maxConnections: 200 })
+      await advanceProvisioningJob(job({ step: 'wait_db_available', created_resources: reserved }), provider)
+      const ready = patches().find(x => x.step === 'load_schema')?.created_resources
+      expect(ready).toMatchObject({ dbName: 't_acme', rdsUser: 'app_acme' })
+      expect(provider.databases.has(`${ready.endpoint}/t_acme`)).toBe(true)
+
+      const del = vi.spyOn(provider, 'deleteDbInstance')
+      reg.getProvisioningJob.mockResolvedValue(job({ created_resources: ready }))
+      await rollbackProvisioning('t-1', provider)
+      expect(provider.databases.size).toBe(0)
+      expect(del).not.toHaveBeenCalled()
+      expect(sharedDb.releaseSharedDbSeat).toHaveBeenCalledWith('jeffi-starter-1')
     })
   })
 

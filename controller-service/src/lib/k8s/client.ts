@@ -118,6 +118,15 @@ export async function list<T = any>(kind: string, namespace?: string, labelSelec
   return res?.items ?? []
 }
 
+/** Every namespace's objects of a namespaced kind. */
+export async function listAll<T = any>(kind: string, labelSelector?: string): Promise<T[]> {
+  const [base, plural] = RESOURCES[kind] ?? []
+  if (!base) throw new Error(`k8s: unsupported kind ${kind}`)
+  const q = labelSelector ? `?labelSelector=${encodeURIComponent(labelSelector)}` : ''
+  const res = (await request('GET', `${base}/${plural}${q}`)) as { items?: T[] }
+  return res?.items ?? []
+}
+
 /** Delete; already-gone is success. */
 export async function remove(kind: string, name: string, namespace?: string): Promise<void> {
   try {

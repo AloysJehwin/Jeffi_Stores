@@ -168,12 +168,14 @@ export async function recordTenantStepEvent(
 
 export async function writeTenantInfra(
   tenantId: string,
-  infra: { rdsEndpoint: string; s3Bucket: string }
+  infra: { rdsEndpoint: string; s3Bucket: string; rdsDb?: string; rdsUser?: string; sharedDbHost?: string }
 ): Promise<void> {
   const pool = controlPlanePool()
+  // A Starter store has its own database + login on a shared host; a dedicated one the defaults.
   await pool.query(
-    `UPDATE tenant_infra SET rds_endpoint=$1, s3_bucket=$2, iam_auth=true, updated_at=now() WHERE tenant_id=$3`,
-    [infra.rdsEndpoint, infra.s3Bucket, tenantId]
+    `UPDATE tenant_infra SET rds_endpoint=$1, s3_bucket=$2, rds_db=COALESCE($4, 'jeffi_stores'), rds_user=$5, shared_db_host=$6,
+       iam_auth=true, updated_at=now() WHERE tenant_id=$3`,
+    [infra.rdsEndpoint, infra.s3Bucket, tenantId, infra.rdsDb ?? null, infra.rdsUser ?? null, infra.sharedDbHost ?? null]
   )
 }
 
@@ -181,7 +183,7 @@ export async function writeTenantInfra(
 export async function clearTenantInfra(tenantId: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
-    `UPDATE tenant_infra SET rds_endpoint=NULL, ec2_instance_id=NULL, ec2_target=NULL, s3_bucket=NULL, updated_at=now() WHERE tenant_id=$1`,
+    `UPDATE tenant_infra SET rds_endpoint=NULL, rds_user=NULL, shared_db_host=NULL, ec2_instance_id=NULL, ec2_target=NULL, s3_bucket=NULL, updated_at=now() WHERE tenant_id=$1`,
     [tenantId]
   )
   clearTenantCache()

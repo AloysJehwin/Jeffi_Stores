@@ -52,6 +52,7 @@ export default function InfrastructureTab({
 
       {onK8s && (
         <K8sWorkloadSection
+          tenantId={t.id}
           slug={t.slug}
           plan={t.plan}
           pendingPlan={str(res.k8sPendingPlan)}

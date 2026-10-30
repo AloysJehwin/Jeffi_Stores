@@ -105,6 +105,7 @@ export interface RunInstanceArgs {
   iamProfile?: string
   appTag?: string
   metadataHopLimit?: number
+  tags?: Record<string, string>
 }
 
 /** Launch a new EC2 running the app image. Config (AMI, SG, subnet, key, IAM profile) from env,
@@ -130,6 +131,10 @@ export async function runInstance(args: RunInstanceArgs): Promise<{ instanceId: 
     'TagSpecification.1.Tag.2.Key': 'app',
     'TagSpecification.1.Tag.2.Value': args.appTag || 'jeffi-tenant',
   }
+  Object.entries(args.tags ?? {}).forEach(([k, v], i) => {
+    params[`TagSpecification.1.Tag.${i + 3}.Key`] = k
+    params[`TagSpecification.1.Tag.${i + 3}.Value`] = v
+  })
   if (args.metadataHopLimit) {
     params['MetadataOptions.HttpTokens'] = 'required'
     params['MetadataOptions.HttpPutResponseHopLimit'] = String(args.metadataHopLimit)

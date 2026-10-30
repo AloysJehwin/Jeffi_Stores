@@ -17,7 +17,7 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 
 - The Next app is `controller-service/` (was `src/`). Every service runs as its own pod:
   - platform (`jeffi`): `jeffi-stores-{controller,messaging,document,public-api}-service`;
-  - each store tenant (`tenant-{slug}`): `{slug}-{controller,messaging,document}-service`, sized per plan (`provisioning/tiers.ts`) and pinned with `SERVICE_TENANT_SLUG`;
+  - each store tenant (`tenant-{slug}`): `{slug}-{controller,messaging,document}-service`, sized from the store's compute spec (below) and pinned with `SERVICE_TENANT_SLUG`;
   - public-api is shared.
 - A pinned pod serves and runs background loops for its own tenant only; the platform's pods skip store tenants (`SERVICE_SKIP_STORE_TENANTS`, `packages/tenancy/src/service-scope.ts`).
 - Routes: `public.` → public-api (`/webhooks/` → messaging); `invoice.`/`quotation.`/`purchaseorder.` → the platform document-service; `invoice-`/`quotation-`/`purchaseorder-{slug}.` → the store's own document-service.
@@ -30,13 +30,23 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 
 Tenant compute is moving from AMI-built EC2s to k3s. The plan is in [`K8S_MIGRATION_PLAN.md`](K8S_MIGRATION_PLAN.md) and the runbook in [`deploy/k8s/README.md`](../deploy/k8s/README.md).
 
-- **Selection:** `PROVISIONING_COMPUTE=k8s` switches `ensure_compute` to `controller-service/src/lib/k8s/tenant-compute.ts`. Each tenant gets the namespace `tenant-{slug}`, with per-plan pod sizing (`controller-service/src/lib/provisioning/tiers.ts`).
-  - Basic tenants run on shared `pool-basic-N` nodes.
-  - Growth and above get a dedicated `t-{slug}` node.
+- **Selection:** `PROVISIONING_COMPUTE=k8s` switches `ensure_compute` to `controller-service/src/lib/k8s/tenant-compute.ts`. Each tenant gets the namespace `tenant-{slug}`, sized from its compute spec (next section).
+  - Pool stores run on shared `pool-basic-N` nodes; empty ones are terminated after an hour (`reclaimEmptyPoolNodes`).
+  - A store with its own servers gets nodes `t-{slug}` (generation 0) or `t-{slug}.{gen}-{i}`, labelled `jeffi.io/tenant` + `jeffi.io/gen` and tagged `jeffi-tenant={slug}`.
 - **DNS:** a single `*.jeffistores.in` wildcard. `configure_dns` no longer writes per-host records in k8s mode.
 - **Plan changes:** go through `reconcileK8sPlan`. A node that is still joining parks the change as `k8sPendingPlan`, which the worker retries.
 - **Tenant-admin CA bundle:** is a Secret (`jeffi-edge/client-ca-bundle`) patched by `mtls-fleet` instead of being pushed over SSM.
 - **Live state:** live on k3s since 2026-10-09 (`5c4ffbf4`).
+
+## Configurable compute (2026-10-30, not deployed)
+
+Code: `controller-service/src/lib/compute/`.
+
+- **Spec:** each store's EC2 (pool or own type and count), RDS (shared or own class, storage, Multi-AZ) and copies/size per service, in `tenant_compute.desired`/`applied`. Presets Shared/Small/Medium/Large/X-Large; Advanced from Basic up.
+- **Price:** AWS cost (`compute_prices`) × USD→INR × (1 + margin), settings in `platform_infra.compute_pricing`; admin page Settings → Server Pricing; `deploy/k8s/db/refresh-compute-prices.sh` prints price updates.
+- **Flag:** `COMPUTE_SPEC_ENABLED=true` shows the picker at onboarding and makes provisioning use the owner's choice. Off, every store runs its plan's old tier (`compute/legacy.ts`) and `tenant_compute` records it.
+- **Provisioning (phase 2):** the database is created at the chosen class/storage/Multi-AZ with `max_connections` by class; each pod gets `DB_POOL_MAX` so all copies fit the database's connections. Starter stores get a database `t_{slug}` and IAM role `app_{slug}` on a shared host (`shared_db_hosts`, `tenant_infra.rds_user`/`shared_db_host`).
+- **Not done:** resizing a running store (phase 3), wallet billing for servers (phase 4), service role split (phase 5).
 
 ---
 

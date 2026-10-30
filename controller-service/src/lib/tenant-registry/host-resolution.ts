@@ -93,7 +93,7 @@ async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Pro
       : `t.${where} = $1`
   const res = await pool.query(
     `SELECT t.id, t.slug, t.display_name, t.status, p.slug AS plan,
-            i.rds_endpoint, i.rds_db, i.rds_port, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
+            i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
@@ -114,6 +114,7 @@ async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Pro
           rdsEndpoint: r.rds_endpoint,
           rdsDb: r.rds_db || 'jeffi_stores',
           rdsPort: r.rds_port || 5432,
+          rdsUser: r.rds_user ?? null,
           dbSecretRef: r.db_secret_ref ?? null,
           iamAuth: r.iam_auth !== false,
           s3Bucket: r.s3_bucket ?? null,
@@ -180,7 +181,7 @@ export async function lookupTenantContextById(tenantId: string): Promise<TenantC
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT t.id, t.slug, t.display_name, t.status, p.slug AS plan,
-            i.rds_endpoint, i.rds_db, i.rds_port, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
+            i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
@@ -198,6 +199,7 @@ export async function lookupTenantContextById(tenantId: string): Promise<TenantC
       rdsEndpoint: r.rds_endpoint,
       rdsDb: r.rds_db || 'jeffi_stores',
       rdsPort: r.rds_port || 5432,
+      rdsUser: r.rds_user ?? null,
       dbSecretRef: r.db_secret_ref ?? null,
       iamAuth: r.iam_auth !== false,
       s3Bucket: r.s3_bucket ?? null,

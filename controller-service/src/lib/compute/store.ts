@@ -11,6 +11,7 @@ export interface TenantCompute {
   status: 'pending' | 'applying' | 'applied' | 'failed' | 'paused'
   apply_mode: 'window' | 'now'
   rate_inr_hour: string | null
+  node_gen: number
   last_error: string | null
   applied_at: string | null
   updated_at: string

@@ -27,7 +27,8 @@ export { ensureTenantContext as resolveRequestTenant }
 // are merged in per source (DEFAULT env, or a tenant's infra).
 function basePoolConfig(): any {
   const workers = parseInt(process.env.WEB_CONCURRENCY || '1', 10)
-  const poolMax = Math.max(2, Math.floor(15 / workers))
+  // DB_POOL_MAX: the store's share of its database's connections, set per pod from its compute choice.
+  const poolMax = Math.max(2, Math.floor((Number(process.env.DB_POOL_MAX) || 15) / workers))
   return {
     max: poolMax,
     // Keep a connection warm so the pool is rarely fully cold. A cold IAM+TLS
@@ -111,7 +112,7 @@ function buildTenantPool(infra: NonNullable<ReturnType<typeof getCurrentTenant>>
   }
   config.ssl = rdsSslOption()
   if (infra.iamAuth) {
-    const user = process.env.RDS_USER || 'app_user'
+    const user = infra.rdsUser || process.env.RDS_USER || 'app_user'
     config.user = user
     config.password = rdsIamPassword(infra.rdsEndpoint, infra.rdsPort, user, infra.region)
   } else {
