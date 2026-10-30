@@ -741,15 +741,15 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_billing:read',
     label: 'Ecom Billing (Read)',
     description: 'View tenant subscriptions, settlement ledger and payouts',
-    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing'],
+    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing', '/admin/settings/compute-pricing'],
     group: 'Ecom Store',
     platformOnly: true,
   },
   {
     key: 'ecom_billing:write',
     label: 'Ecom Billing (Write)',
-    description: 'Manage tenant subscriptions, adjust settlements, trigger payouts and edit the AI price list',
-    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing'],
+    description: 'Manage tenant subscriptions, adjust settlements, trigger payouts and edit the AI and server price lists',
+    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing', '/admin/settings/compute-pricing'],
     group: 'Ecom Store',
     platformOnly: true,
   },
@@ -788,6 +788,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname === '/admin') return 'dashboard:read'
   // Under /admin/settings but gated as the control-plane billing page, not settings:*.
   if (pathname === '/admin/settings/ai-pricing' || pathname.startsWith('/admin/settings/ai-pricing/')) return 'ecom_billing:read'
+  if (pathname === '/admin/settings/compute-pricing' || pathname.startsWith('/admin/settings/compute-pricing/')) return 'ecom_billing:read'
 
   for (const scope of ADMIN_SCOPES) {
     for (const route of scope.routes) {
@@ -872,6 +873,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/ecom/instances')) return 'ecom_instances:read'
   if (pathname.startsWith('/api/admin/ecom/billing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/admin/ecom/ai-pricing')) return 'ecom_billing:read'
+  if (pathname.startsWith('/api/admin/ecom/compute-pricing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/admin/ecom/store-status')) return 'ecom_customers:read'
   if (pathname.startsWith('/api/internal/cron-record')) return null
   if (pathname.startsWith('/api/admin/business/customers')) return 'business_customers:read'

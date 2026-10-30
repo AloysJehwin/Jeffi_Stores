@@ -1058,7 +1058,7 @@ CREATE INDEX IF NOT EXISTS idx_razorpay_downtimes_open ON public.razorpay_downti
 
 --
 -- Owner-chosen store compute (configurable provisioning). compute_prices: AWS on-demand list prices the
--- calculator prices from, in USD (rewritten by deploy/aws/refresh-prices.sh). The rate, margin and pool
+-- calculator prices from, in USD (rewritten by deploy/k8s/db/refresh-compute-prices.sh). The rate, margin and pool
 -- sizes it prices with are platform_infra key 'compute_pricing'.
 --
 CREATE TABLE IF NOT EXISTS public.compute_prices (
