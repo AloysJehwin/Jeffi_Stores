@@ -72,8 +72,8 @@ describe('POST /api/webhooks/razorpay/[tenant]', () => {
     expect((await POST(r, params())).status).toBe(400)
   })
 
-  it('acks non-subscription events without processing', async () => {
-    const res = await POST(req({ event: 'payment.captured', payload: {} }), params())
+  it('acks Route events, which only the platform account handles', async () => {
+    const res = await POST(req({ event: 'transfer.processed', payload: { transfer: { entity: { id: 'trf_1' } } } }), params())
     expect(res.status).toBe(200)
     expect(processSubscriptionEvent).not.toHaveBeenCalled()
   })
