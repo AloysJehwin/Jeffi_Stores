@@ -23,7 +23,7 @@ import { RecordRefundLink } from '@/app/(admin)/admin/orders/[id]/_components/Ex
 import { externalRefundLabel } from '@/lib/payments/external-refund'
 import RetryPaymentEmailButton from '@/app/(admin)/admin/orders/[id]/_components/RetryPaymentEmailButton'
 import RetryRefundButton from '@/app/(admin)/admin/orders/[id]/_components/RetryRefundButton'
-import { orderRefunds, paidWith } from '@/lib/payments/order-payment-info'
+import { orderDisputes, orderRefunds, paidWith } from '@/lib/payments/order-payment-info'
 import CreateShipmentButton from '@/app/(admin)/admin/orders/[id]/_components/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductAdjustments from '@/app/(admin)/admin/orders/[id]/_components/ProductAdjustments'
@@ -120,7 +120,8 @@ export default async function OrderDetailsPage({
 
   const returnRequest = await getReturnRequest(id).catch(() => null)
   // Razorpay refunds, with their bank status. A replacement's payments sit on the original order.
-  const refunds = await orderRefunds([order.id, order.original_order_id].filter(Boolean))
+  const paymentOrderIds = [order.id, order.original_order_id].filter(Boolean)
+  const [refunds, disputes] = await Promise.all([orderRefunds(paymentOrderIds), orderDisputes(paymentOrderIds)])
   const addressChangeRequests = (await listAddressChangeRequests(id)).map(r => ({
     id: r.id,
     status: r.status,
@@ -1041,6 +1042,42 @@ export default async function OrderDetailsPage({
                       {r.status === 'failed' && !r.retried && canWrite && <RetryRefundButton orderId={order.id} refundId={r.id} amount={Number(r.amount)} />}
                     </div>
                   ))}
+                </div>
+              )}
+              {disputes.length > 0 && (
+                <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/5 p-3 space-y-2">
+                  <span className="text-xs font-semibold text-foreground">Chargebacks</span>
+                  {disputes.map(d => {
+                    const daysLeft = d.respond_by ? Math.floor((new Date(d.respond_by).getTime() - Date.now()) / 86400000) : null
+                    return (
+                      <div key={d.id} className="space-y-1 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="tabular-nums text-foreground">Rs. {Number(d.amount).toFixed(2)}</span>
+                          <Badge tone={d.status === 'won' ? 'green' : d.status === 'closed' ? 'muted' : d.status === 'under_review' ? 'amber' : 'red'}>
+                            {d.status === 'open' ? 'Needs response' : d.status === 'under_review' ? 'Under review' : d.status === 'won' ? 'Won' : d.status === 'lost' ? 'Lost' : 'Closed'}
+                          </Badge>
+                        </div>
+                        <div className="text-[11px] text-foreground-muted">
+                          <span className="font-mono [overflow-wrap:anywhere]">{d.razorpay_dispute_id}</span>
+                          {d.reason_description || d.reason_code ? ` · ${d.reason_description || d.reason_code}` : ''}
+                        </div>
+                        {d.status === 'open' && d.respond_by && (
+                          <div className={`text-[11px] ${daysLeft != null && daysLeft < 3 ? 'text-red-600 dark:text-red-400 font-medium' : 'text-foreground-muted'}`}>
+                            Respond by {new Date(d.respond_by).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}
+                            {daysLeft != null ? (daysLeft < 0 ? ' (overdue)' : daysLeft === 0 ? ' (today)' : ` (${daysLeft}d left)`) : ''}
+                          </div>
+                        )}
+                        <a
+                          href={`https://dashboard.razorpay.com/app/disputes/${d.razorpay_dispute_id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-accent-500 hover:underline"
+                        >
+                          {d.status === 'open' ? 'Respond on Razorpay' : 'View on Razorpay'}
+                        </a>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
               {canWrite && moneyIn && order.status !== 'cancelled' && order.status !== 'returned' && Number(order.total_amount) > 0 && (

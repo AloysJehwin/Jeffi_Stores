@@ -73,6 +73,7 @@ const KIND_SEGMENT: Record<string, string> = {
   review_flagged: 'orders',
   contact_failed_payment: 'orders',
   retry_failed_refund: 'orders',
+  respond_dispute: 'orders',
   abandoned_checkout: 'orders',
   support_pickup: 'support',
   support_urgent: 'support',

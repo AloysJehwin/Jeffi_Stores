@@ -8,6 +8,7 @@ export { sendAdminCertificateEmail, sendCertInviteEmail } from './certificates'
 export {
   sendNewReviewNotification,
   sendPaymentFailedAdminNotification,
+  sendDisputeAdminEmail,
   sendAdminContactEmail,
   adminContactHtml,
   sendSupportEscalationEmail,

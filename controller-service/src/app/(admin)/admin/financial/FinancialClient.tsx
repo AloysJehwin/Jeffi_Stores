@@ -14,6 +14,7 @@ import { CashflowTab } from './_components/CashflowTab'
 import { CodRemittanceTab } from './_components/CodRemittanceTab'
 import { MessagingTab } from './_components/MessagingTab'
 import { AiCostsTab } from './_components/AiCostsTab'
+import { DisputesTab } from './_components/DisputesTab'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -23,6 +24,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'pl', label: 'P&L' },
   { key: 'cashflow', label: 'Cashflow' },
   { key: 'cod_remittance', label: 'COD Remittance' },
+  { key: 'disputes', label: 'Disputes' },
   { key: 'messaging', label: 'Messaging' },
   { key: 'ai_costs', label: 'AI costs' },
 ]
@@ -39,6 +41,7 @@ export default function FinancialClient() {
     'pl',
     'cashflow',
     'cod_remittance',
+    'disputes',
     'messaging',
     'ai_costs',
   ]
@@ -90,6 +93,7 @@ export default function FinancialClient() {
         {tab === 'pl' && <PLTab />}
         {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
         {tab === 'cod_remittance' && <CodRemittanceTab />}
+        {tab === 'disputes' && <DisputesTab />}
         {tab === 'messaging' && <MessagingTab />}
         {tab === 'ai_costs' && <AiCostsTab />}
       </div>

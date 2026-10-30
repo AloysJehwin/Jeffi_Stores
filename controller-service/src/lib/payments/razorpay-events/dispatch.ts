@@ -5,7 +5,7 @@ import { resolveSubscriptionTenant, runInTenant, type WebhookTenant } from '@/li
 import { TransientWebhookError, type EventContext } from './context'
 import { onPaymentCaptured, onPaymentFailed, onPaymentLinkExpired, onPaymentLinkPaid, onQrCodeCredited } from './payments'
 import { onRefund } from './refunds'
-import { onDisputeLost } from './disputes'
+import { onDispute } from './disputes'
 import { onSettlementProcessed, onTransfer } from './settlements'
 
 export { TransientWebhookError, type EventContext, type EventSource } from './context'
@@ -23,6 +23,15 @@ const SUBSCRIPTION_EVENTS = [
   'subscription.updated',
 ]
 
+const DISPUTE_EVENTS = [
+  'payment.dispute.created',
+  'payment.dispute.action_required',
+  'payment.dispute.under_review',
+  'payment.dispute.won',
+  'payment.dispute.lost',
+  'payment.dispute.closed',
+]
+
 /** Every webhook event the app handles; platformOnly ones only reach the platform account (Route). */
 export const RAZORPAY_WEBHOOK_EVENTS: readonly { event: string; platformOnly?: boolean }[] = [
   { event: 'payment.captured' },
@@ -34,7 +43,7 @@ export const RAZORPAY_WEBHOOK_EVENTS: readonly { event: string; platformOnly?: b
   { event: 'refund.processed' },
   { event: 'refund.failed' },
   { event: 'refund.speed_changed' },
-  { event: 'payment.dispute.lost' },
+  ...DISPUTE_EVENTS.map(event => ({ event })),
   { event: 'settlement.processed' },
   { event: 'transfer.processed', platformOnly: true },
   { event: 'transfer.failed', platformOnly: true },
@@ -69,8 +78,6 @@ export async function dispatchRazorpayEvent(event: any, ctx: EventContext): Prom
     case 'refund.failed':
     case 'refund.speed_changed':
       return onRefund(type, p.refund?.entity, p.payment?.entity, ctx)
-    case 'payment.dispute.lost':
-      return onDisputeLost(p.dispute?.entity, p.payment?.entity, ctx)
     case 'settlement.processed':
       return onSettlementProcessed(p.settlement?.entity, ctx)
     case 'transfer.processed':
@@ -78,6 +85,7 @@ export async function dispatchRazorpayEvent(event: any, ctx: EventContext): Prom
     case 'transfer.reversed':
       return onTransfer(p.transfer?.entity, ctx)
   }
+  if (DISPUTE_EVENTS.includes(type)) return onDispute(type, p.dispute?.entity, p.payment?.entity, ctx)
   if (SUBSCRIPTION_EVENTS.includes(type)) return onSubscriptionEvent(type, event, ctx)
 }
 

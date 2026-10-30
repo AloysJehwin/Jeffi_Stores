@@ -32,6 +32,26 @@ export async function orderRefunds(orderIds: string[]): Promise<OrderRefund[]> {
   ).catch(() => [])
 }
 
+export interface OrderDispute {
+  id: string
+  razorpay_dispute_id: string
+  amount: string
+  amount_deducted: string
+  reason_code: string | null
+  reason_description: string | null
+  status: 'open' | 'under_review' | 'won' | 'lost' | 'closed'
+  respond_by: string | null
+  created_at: string
+}
+
+export async function orderDisputes(orderIds: string[]): Promise<OrderDispute[]> {
+  return queryMany<OrderDispute>(
+    `SELECT id, razorpay_dispute_id, amount, amount_deducted, reason_code, reason_description, status, respond_by, created_at
+       FROM payment_disputes WHERE order_id = ANY($1::uuid[]) ORDER BY created_at`,
+    [orderIds]
+  ).catch(() => [])
+}
+
 /** How a payment was made, as a customer would recognise it: "UPI · name@bank", "Visa credit ••4242". */
 export function paidWith(p: {
   gateway_method?: string | null
