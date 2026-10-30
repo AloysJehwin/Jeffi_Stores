@@ -8,6 +8,8 @@ up and cut production over to it.
 | `bootstrap/launch-core.sh` | One-time: security groups, RDS ingress, the core `r7g.medium`, as the account's EC2 limit is 1 vCPU (user-data `core-node.sh`), EIP `32.196.38.130` |
 | `bootstrap/core-node.sh` | Core user-data: Tailscale + k3s server (embedded etcd, 6-hourly snapshots) |
 | `bootstrap/secrets.sh` | Seeds cluster Secrets from Secrets Manager + local `certs/` (prints no values) |
+| `bootstrap/store-secret.sh` | Writes `jeffi/store` (storefront, admin and business pods) from `jeffi/production` without the control-plane keys in `store-secret-exclude.txt`; prints no values. Re-run after changing `jeffi/production`. Pods fall back to `jeffi/production` if it is missing |
+| `bootstrap/service-secrets-iam.sh` | Lets the core's role read each service's secret and `jeffi/store` |
 | `bootstrap/apply-platform.sh` | Applies `platform/` in dependency order |
 | `bootstrap/release.sh` | Builds the four service images from `HEAD`, pushes them to ECR, runs `rollout.sh`, smoke-tests |
 | `bootstrap/rollout.sh` | Rollout: platform, tenant schema fan-out, then every store namespace one at a time |

@@ -242,6 +242,7 @@ function appDeployment(a: {
               ports: [{ name: 'http', containerPort: 3000 }],
               env: [
                 { name: 'SM_SECRET_ID', value: a.secret },
+                ...(a.secret !== 'jeffi/production' ? [{ name: 'SM_SECRET_FALLBACK_ID', value: 'jeffi/production' }] : []),
                 // The image is the role; this pins the pod to its store.
                 ...(a.role ? [{ name: 'SERVICE_TENANT_SLUG', value: a.slug }] : []),
                 ...(a.role === 'admin' ? [{ name: 'STOREFRONT_URL', value: `http://${tenantRoleName(a.slug, 'storefront')}:3000` }] : []),
@@ -292,7 +293,8 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   const place = placement(slug, spec.node, input.nodeGen ?? 0)
   const poolEnv = input.dbPoolMax ? [{ name: 'DB_POOL_MAX', value: String(input.dbPoolMax) }] : []
   const image = (s: TenantService) => input.images?.[s] || DEFAULT_IMAGES[s]
-  const secret = input.storeSecret || 'jeffi/production'
+  // The store apps' narrower secret; the old all-in-one app keeps the platform's.
+  const secret = input.storeSecret || 'jeffi/store'
   const roles = activeServices(input.plan).filter((k): k is ServiceRole => (STORE_ROLES as readonly string[]).includes(k))
   const adminHosts = input.hosts.filter(h => h.startsWith(`admin-${slug}.`))
   const docHosts = input.hosts.filter(h => DOC_APPS.some(a => h.startsWith(`${a}-${slug}.`)))
@@ -389,7 +391,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   ]
 
   for (const a of apps) {
-    objs.push(appDeployment({ slug, ns, ...a, place, nodes, poolEnv, secret }), appService(ns, slug, a.name, a.role))
+    objs.push(appDeployment({ slug, ns, ...a, place, nodes, poolEnv, secret: a.role ? secret : 'jeffi/production' }), appService(ns, slug, a.name, a.role))
     objs.push(...scaling(ns, a.name, selector(slug, appLabel(a.role)), a.svc))
   }
 

@@ -38,7 +38,9 @@ const OUT_DIR = process.env.ENV_OUT_DIR ? resolve(process.env.ENV_OUT_DIR) : REP
 
 const isProduction = process.env.NODE_ENV === 'production' || process.env.SM_ENV === 'production'
 const DEFAULT_SECRET = isProduction ? 'jeffi/production' : 'jeffi/local'
-const SECRET_ID = process.env.SM_SECRET_ID || DEFAULT_SECRET
+let SECRET_ID = process.env.SM_SECRET_ID || DEFAULT_SECRET
+// Read when SM_SECRET_ID doesn't exist or can't be read yet (a new secret rolled out before it was made).
+const SECRET_FALLBACK_ID = process.env.SM_SECRET_FALLBACK_ID
 const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
 const FALLBACK = process.env.ALLOW_ENV_FALLBACK === 'true'
 
@@ -47,7 +49,12 @@ async function loadSecrets() {
 
   let secretString
   try {
-    const res = await client.send(new GetSecretValueCommand({ SecretId: SECRET_ID }))
+    const res = await client.send(new GetSecretValueCommand({ SecretId: SECRET_ID })).catch(err => {
+      if (!SECRET_FALLBACK_ID || !/ResourceNotFound|AccessDenied/.test(`${err.name} ${err.message}`)) throw err
+      process.stderr.write(`[load-secrets] "${SECRET_ID}" unavailable (${err.name}); using "${SECRET_FALLBACK_ID}"\n`)
+      SECRET_ID = SECRET_FALLBACK_ID
+      return client.send(new GetSecretValueCommand({ SecretId: SECRET_ID }))
+    })
     secretString = res.SecretString
   } catch (err) {
     const msg = `[load-secrets] Failed to fetch "${SECRET_ID}" from Secrets Manager: ${err.message}`
