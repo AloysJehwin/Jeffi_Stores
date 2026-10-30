@@ -10,6 +10,7 @@ import { badgeCls, useActionToast } from '@/components/admin/kit'
 import type { AwaitingRow, AwaitingSettlement, SettlementDetail, SettlementLine, SettlementOverview, SettlementRow } from '@/lib/payments/rzp-settlement-report'
 import { FinancePeriodBar, useFinancePeriod } from './finance'
 import { tableWrapCls, theadCls, thCls, thRight } from './shared'
+import RazorpayAccountCard from '@/components/admin/RazorpayAccountCard'
 
 const fmtDate = (v: string | null) =>
   v ? new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) : '-'
@@ -18,7 +19,19 @@ const fmtTime = (v: string | null) =>
 
 const TYPE_LABEL: Record<string, string> = { payment: 'Payment', refund: 'Refund', transfer: 'Transfer to store', adjustment: 'Adjustment', dispute: 'Dispute', reversal: 'Reversal' }
 
-export function RazorpaySettlementsTab() {
+/** `settlements` is false for a store marked for its own account whose keys aren't set yet. */
+export function RazorpaySettlementsTab({ settlements = true }: { settlements?: boolean }) {
+  if (!settlements)
+    return (
+      <div className="space-y-5">
+        <RazorpayAccountCard />
+        <p className="text-sm text-foreground-muted">Settlements show here once the store&apos;s own Razorpay keys are saved.</p>
+      </div>
+    )
+  return <Settlements />
+}
+
+function Settlements() {
   const { range } = useFinancePeriod()
   const canWrite = useCanWrite('financial:write')
   const toast = useActionToast()
@@ -54,6 +67,7 @@ export function RazorpaySettlementsTab() {
 
   return (
     <div className="space-y-5">
+      <RazorpayAccountCard />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FinancePeriodBar onRefresh={() => (overview.reload(), awaiting.reload())} busy={overview.loading} />
         <div className="flex items-center gap-3">

@@ -11,7 +11,9 @@ export default async function FinancialPage() {
   return (
     <PageBody>
       <PageHeader title="Financial" description="Receivables, payables, P&L and cashflow" />
-      <FinancialClient razorpayTab={!!account && account.kind !== 'route'} />
+      <FinancialClient
+        razorpayTab={account && (account.kind !== 'route' || account.ownFlag) ? { settlements: account.kind !== 'route' } : null}
+      />
     </PageBody>
   )
 }

@@ -31,7 +31,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'ai_costs', label: 'AI costs' },
 ]
 
-export default function FinancialClient({ razorpayTab }: { razorpayTab: boolean }) {
+export default function FinancialClient({ razorpayTab }: { razorpayTab: { settlements: boolean } | null }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const tabParam = searchParams.get('tab') as Tab | null
@@ -96,7 +96,7 @@ export default function FinancialClient({ razorpayTab }: { razorpayTab: boolean 
         {tab === 'pl' && <PLTab />}
         {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
         {tab === 'cod_remittance' && <CodRemittanceTab />}
-        {tab === 'razorpay' && razorpayTab && <RazorpaySettlementsTab />}
+        {tab === 'razorpay' && razorpayTab && <RazorpaySettlementsTab settlements={razorpayTab.settlements} />}
         {tab === 'disputes' && <DisputesTab />}
         {tab === 'messaging' && <MessagingTab />}
         {tab === 'ai_costs' && <AiCostsTab />}

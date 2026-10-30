@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runWithAuditActor } from '@/lib/auth/audit-context'
 import { dispatchRazorpayEvent, TransientWebhookError, verifyRazorpaySignature } from '@/lib/payments/razorpay-events/dispatch'
+import { noteRazorpayWebhook } from '@/lib/payments/rzp-webhook-health'
 
 /**
  * The platform Razorpay account's webhook. It hits one fixed URL with no store host, so each handler
@@ -14,6 +15,7 @@ async function handle(request: NextRequest) {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET
   if (!secret) return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
   if (!verifyRazorpaySignature(rawBody, signature, secret)) return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+  noteRazorpayWebhook(null)
 
   try {
     const event = JSON.parse(rawBody)

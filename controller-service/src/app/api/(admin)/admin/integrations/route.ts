@@ -46,6 +46,10 @@ export async function GET(request: NextRequest) {
 // own-account tenant shipping on the platform key with no wallet charge.
 const DELHIVERY_OWNER_MANAGED = 'The Delhivery account is managed by the store owner in the ecom portal.'
 
+// Razorpay keys decide whose bank the store's sales reach: set by the owner, checked live, on the
+// Financial → Razorpay settlements card (/api/admin/integrations/razorpay).
+const RAZORPAY_OWNER_MANAGED = 'The Razorpay account is managed by the store owner under Financial → Razorpay settlements.'
+
 const PostSchema = z.object({
   provider: z.enum(PROVIDERS),
   config: z.record(z.string(), z.any()),
@@ -91,15 +95,7 @@ export async function POST(request: NextRequest) {
   } else if (provider === 'delhivery') {
     return NextResponse.json({ error: DELHIVERY_OWNER_MANAGED }, { status: 403 })
   } else if (provider === 'razorpay') {
-    if (!config.key_id || !config.key_secret) {
-      return NextResponse.json({ error: 'key_id and key_secret are required' }, { status: 400 })
-    }
-    normalized = {
-      key_id: String(config.key_id),
-      key_secret: String(config.key_secret),
-      webhook_secret: config.webhook_secret ? String(config.webhook_secret) : undefined,
-    }
-    meta = { key_id: String(config.key_id) }
+    return NextResponse.json({ error: RAZORPAY_OWNER_MANAGED }, { status: 403 })
   } else {
     const f = Object.fromEntries(
       ['client_id', 'client_secret', 'refresh_token', 'seller_id', 'marketplace_id'].map(k => [
@@ -150,6 +146,9 @@ export async function DELETE(request: NextRequest) {
 
   if (parsed.data.provider === 'delhivery') {
     return NextResponse.json({ error: DELHIVERY_OWNER_MANAGED }, { status: 403 })
+  }
+  if (parsed.data.provider === 'razorpay') {
+    return NextResponse.json({ error: RAZORPAY_OWNER_MANAGED }, { status: 403 })
   }
 
   await deleteIntegrationCredential(gate.tenantId, parsed.data.provider)
