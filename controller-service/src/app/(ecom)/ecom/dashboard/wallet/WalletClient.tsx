@@ -7,12 +7,15 @@ import { ChoiceChips, fieldCls } from '../../_ui'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import Pager from '../_components/Pager'
 import { topupAmounts } from '@/lib/billing/topup-amounts'
+import type { ServersBilling } from '@controller/lib/billing/infra-status'
+import ServersNotice from '../_components/ServersNotice'
 
 interface Entry { entry_type: string; category: string | null; amount: number; note: string | null; occurred_at: string }
 
 const AMOUNTS = [500, 1000, 2500, 5000]
+const CATEGORY: Record<string, string> = { infra: 'servers', ad_free: 'ad-free' }
 
-export default function WalletClient({ initial, keyId, tenantName }: { initial: { balance: number; ledger: Entry[] }; keyId: string; tenantName: string }) {
+export default function WalletClient({ initial, keyId, tenantName, servers }: { initial: { balance: number; ledger: Entry[] }; keyId: string; tenantName: string; servers: ServersBilling | null }) {
   const router = useRouter()
   const [amount, setAmount] = useState(1000)
   const [busy, setBusy] = useState(false)
@@ -45,10 +48,11 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[['Balance', fmt(initial.balance), true], ['Spent today', fmt(spentToday)], ['Entries', String(initial.ledger.length)]].map(([l, v, a]) => (
+        {[['Balance', fmt(initial.balance), true], ['Spent today', fmt(spentToday)], ...(servers ? [['Servers a day', fmt(servers.dailyInr)]] : []), ['Entries', String(initial.ledger.length)]].map(([l, v, a]) => (
           <div key={l as string} className="rounded-2xl org-sand p-4 last:col-span-2 sm:p-5 sm:last:col-span-1"><div className="text-xs text-foreground-muted uppercase tracking-widest mb-2">{l}</div><div className={`font-display font-black text-lg sm:text-2xl lg:text-3xl tabular-nums [overflow-wrap:anywhere] sm:[overflow-wrap:normal] ${a ? 'ecom-accent-text' : ''}`}>{v}</div></div>
         ))}
       </div>
+      {servers && <ServersNotice servers={servers} />}
       <Card title="Top up">
         <div className="flex flex-wrap items-center gap-3">
           <ChoiceChips size="md" ariaLabel="Top-up amount" value={String(amount)} onChange={v => setAmount(Number(v))}
@@ -65,7 +69,7 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
       </Card>
       <Card title="Ledger">
         <div className="-mx-6 -mb-6 overflow-x-auto"><table className="w-full text-sm min-w-[560px]"><thead className="org-sand text-foreground-secondary"><tr>{['When', 'Category', 'Amount', 'Note'].map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
-          <tbody className="divide-y divide-border-default">{initial.ledger.slice((page - 1) * 20, page * 20).map((e, i) => <tr key={i}><td className="px-6 py-2.5 whitespace-nowrap text-foreground-secondary">{fmtDate(e.occurred_at)}</td><td className="px-6 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${e.amount >= 0 ? STATUS_PILL.captured : 'org-sand'}`}>{(e.category ?? e.entry_type).replace(/_/g, ' ')}</span></td><td className={`px-6 py-2.5 font-semibold tabular-nums ${e.amount >= 0 ? 'text-green-600' : ''}`}>{e.amount >= 0 ? '+' : '−'}{fmt(e.amount)}</td><td className="px-6 py-2.5 text-xs text-foreground-secondary">{e.note ?? '—'}</td></tr>)}</tbody></table></div>
+          <tbody className="divide-y divide-border-default">{initial.ledger.slice((page - 1) * 20, page * 20).map((e, i) => <tr key={i}><td className="px-6 py-2.5 whitespace-nowrap text-foreground-secondary">{fmtDate(e.occurred_at)}</td><td className="px-6 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${e.amount >= 0 ? STATUS_PILL.captured : 'org-sand'}`}>{(CATEGORY[e.category ?? ''] ?? e.category ?? e.entry_type).replace(/_/g, ' ')}</span></td><td className={`px-6 py-2.5 font-semibold tabular-nums ${e.amount >= 0 ? 'text-green-600' : ''}`}>{e.amount >= 0 ? '+' : '−'}{fmt(e.amount)}</td><td className="px-6 py-2.5 text-xs text-foreground-secondary">{e.note ?? '—'}</td></tr>)}</tbody></table></div>
       </Card>
       <Pager page={page} total={initial.ledger.length} onPage={setPage} />
     </div>

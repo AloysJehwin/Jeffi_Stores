@@ -45,11 +45,13 @@ export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
     `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id, t.noreply_email, t.campaign_email,
+            pp.slug AS pending_plan, t.pending_billing_interval,
             p.slug AS plan, p.monthly_price_inr, COALESCE(p.max_custom_domains, 0) AS max_custom_domains,
             i.rds_endpoint, i.s3_bucket, i.ec2_target, i.region
      FROM owner_tenants ot
      JOIN tenants t ON t.id = ot.tenant_id
      LEFT JOIN plans p ON p.id = t.plan_id
+     LEFT JOIN plans pp ON pp.id = t.pending_plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
      WHERE ot.owner_id = $1 ORDER BY t.created_at DESC`,
     [ownerId]

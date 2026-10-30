@@ -107,6 +107,12 @@ export default function EcomBillingOverview() {
                 sub="SMS, WhatsApp, email"
               />
               <Kpi label="Documents revenue" value={money(w.documents, 2)} sub={`shipping ${money(w.shipping, 2)}`} />
+              <Kpi
+                label="Servers revenue"
+                value={money(w.infra, 2)}
+                delta={d.deltas.infra}
+                sub={`AWS est. ${money(w.infra_cost, 2)}, margin ${money(w.infra_margin, 2)}`}
+              />
             </KpiGrid>
 
             <AttentionList items={d.attention} />

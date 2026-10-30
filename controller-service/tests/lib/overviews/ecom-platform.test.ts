@@ -48,11 +48,12 @@ describe('storage and wallet', () => {
       { category: 'sms', entry_type: 'debit', amount: -110.6 },
       { category: 'whatsapp', entry_type: 'debit', amount: -21.8 },
       { category: 'document', entry_type: 'debit', amount: -33.46 },
+      { category: 'infra', entry_type: 'debit', amount: -312 },
       { category: 'shipping_forward', entry_type: 'debit', amount: -68.94 },
       { category: 'shipping_cancel_credit', entry_type: 'adjustment', amount: 100 },
       { category: null, entry_type: 'debit', amount: -5 },
     ])
-    expect(m).toEqual({ topups: 2100, topup_count: 2, messaging: 132.4, documents: 33.46, shipping: -31.06, other: 5 })
+    expect(m).toEqual({ topups: 2100, topup_count: 2, messaging: 132.4, documents: 33.46, shipping: -31.06, infra: 312, other: 5 })
   })
 })
 

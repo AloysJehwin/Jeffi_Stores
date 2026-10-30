@@ -53,7 +53,10 @@ Code: `controller-service/src/lib/compute/`.
   - **Servers:** more servers of the same type join the current generation; any other change starts a new generation `t-{slug}.{gen}-{i}`, pods roll over, then the old servers are removed.
   - **Own database:** storage and standby change at once; the class changes in the maintenance window (or now), with pods lowered to the smaller connection pool first.
   - A failed change retries with backoff, then alerts; admin Infrastructure → Kubernetes has Retry.
-- **Not done:** wallet billing for servers (phase 4), service role split (phase 5).
+- **Wallet billing for servers (phase 4):** a store's price per hour is kept in `tenant_compute_periods` (one open period, a new one at each price change or pause; `lib/billing/infra-billing.ts`). The `infra_billing` cron (00:30 IST) debits each IST day once, category `infra`, keyed `infra:{tenant}:{day}`, into a negative balance if need be, catching up three days. Then `infra-balance.ts`: a week of runway left → an email every 3 days; below zero → `graceDays` (3), then the store pauses (not served, pods at 0, its own servers and database stopped, billed for storage only). The provisioning worker starts it again once the wallet covers a day. Owner Wallet and Servers pages show the daily cost, runway and pause state; admin Billing shows servers revenue against estimated AWS cost. Off while `COMPUTE_SPEC_ENABLED` is off; the flagship is never billed.
+- **Onboarding prepay:** after the plan is paid, a new store's wallet must hold `minPrepayDays` (30) of its servers before it is built (`onboard/FundServers.tsx`, `startStoreIfReady`).
+- **Plan fees:** Razorpay plans take `plans.monthly_price_inr` (yearly ten months), cached by slug, interval and amount. An upgrade cancels the old subscription only after the new one is saved; a downgrade waits in `tenants.pending_plan_id` until the next recurring charge.
+- **Service split (phase 5):** done, see `docs/MICROSERVICES.md`.
 
 ---
 

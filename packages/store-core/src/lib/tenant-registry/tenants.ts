@@ -16,6 +16,9 @@ export interface TenantRow {
   service_types: string[] // store | messaging | documents
   store_request?: StoreRequest | null
   billing_interval: string
+  /** A downgrade waiting for the paid cycle to end (owner queries only). */
+  pending_plan?: string | null
+  pending_billing_interval?: string | null
   razorpay_subscription_id: string | null
   razorpay_checkout_url: string | null
   razorpay_linked_account_id: string | null
