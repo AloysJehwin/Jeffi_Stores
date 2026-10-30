@@ -27,8 +27,7 @@ import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getRazorpayInstanceFor } from '@/lib/payments/razorpay'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { settleVariantChangePayment } from '@/lib/orders/variant-change'
-import { recordCapturedPayment } from '@/lib/payments/route-settlement'
-import { controlPlanePool } from '@/lib/tenant-registry'
+import { routeCapturedPayment } from '@/lib/payments/capture'
 
 const VerifySchema = z.object({
   razorpay_order_id: zNonEmpty,
@@ -157,57 +156,6 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Payment verification failed' }, { status: 500 })
   }
-}
-
-async function fireRouteTransfer(opts: {
-  paymentId: string
-  totalAmountInr: number
-  shippingAmountInr?: number
-  orderId: string
-  orderRef: string
-  isCod: boolean
-}) {
-  const tenant = await resolveRequestTenant()
-  if (!tenant?.tenantId) return // platform's own store — no tenant billing
-
-  // Which keys actually signed (creds.isOwn) and the own_razorpay flag can drift; recordCapturedPayment
-  // resolves the linked account and payout mode itself, so here we only need to decide own vs platform.
-  const pool = controlPlanePool()
-  const row = await pool
-    .query(`SELECT own_razorpay FROM tenants WHERE id=$1 AND status='active'`, [tenant.tenantId])
-    .catch(() => null)
-  const ownRazorpayFlag = row?.rows[0]?.own_razorpay === true
-
-  // The own_razorpay column (skip-split) and which keys actually signed can drift. Reconcile to
-  // the account that really holds the money: column says own but platform keys collected -> the
-  // platform must still transfer or the tenant is never paid; column says platform but tenant keys
-  // collected -> a transfer would be rejected.
-  const { isOwn } = await resolveRazorpayCreds(tenant.tenantId).catch(() => ({ isOwn: ownRazorpayFlag }))
-  const ownRazorpay = ownRazorpayFlag && isOwn
-  if (ownRazorpayFlag !== isOwn) {
-    console.warn('[fireRouteTransfer] own_razorpay/creds mismatch', {
-      tenantId: tenant.tenantId,
-      orderRef: opts.orderRef,
-      ownRazorpayFlag,
-      isOwn,
-    })
-  }
-
-  // One entry point for both modes: own-account tenants record the sale with no split (the
-  // platform never held the money); platform-account tenants record the capture and, when a
-  // linked account exists, fire the Route transfer and the real split. Shipping is NOT withheld
-  // here — it is charged once from the prepaid wallet at the real invoiced amount once the AWB is
-  // billed. The transfer is resolved and recorded inside recordCapturedPayment.
-  await recordCapturedPayment({
-    tenantId: tenant.tenantId,
-    tenantSlug: tenant.slug ?? '',
-    orderRef: opts.orderRef,
-    orderId: opts.orderId,
-    paymentId: opts.paymentId,
-    grossInr: opts.totalAmountInr,
-    collectedOn: ownRazorpay ? 'own' : 'platform',
-    isCod: opts.isCod,
-  })
 }
 
 async function commitDraft(args: {
@@ -367,14 +315,13 @@ async function commitDraft(args: {
     args.razorpay_order_id,
   ]).catch(() => {})
 
-  // Route transfer — split payment to tenant's linked account (fire-and-forget)
-  fireRouteTransfer({
+  // The store's Route share (fire-and-forget). commitOrder's unique payment id makes this run once.
+  routeCapturedPayment({
+    store: await resolveRequestTenant(),
     paymentId: args.razorpay_payment_id,
     totalAmountInr: parseFloat(created.total_amount),
-    shippingAmountInr: draft.shippingAmount || 0,
     orderId: created.id,
     orderRef: created.order_number,
-    isCod: false,
   }).catch(() => {})
 
   const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
@@ -471,12 +418,14 @@ async function markLegacyOrderPaid(args: {
     })
   }
 
+  let flipped = false
   await withTransaction(async client => {
-    await client.query(
+    const upd = await client.query(
       `UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW()
        WHERE id = $1 AND payment_status != 'paid'`,
       [args.orderId]
     )
+    flipped = (upd.rowCount ?? 0) > 0
 
     const updateResult = await client.query(
       `UPDATE payments
@@ -553,14 +502,16 @@ async function markLegacyOrderPaid(args: {
       'purchased'
     ).catch(() => {})
 
-    // Route transfer for tenant storefront payments
-    fireRouteTransfer({
+  }
+
+  // Only the call that flipped the order to paid moves money: the webhook may have won the race.
+  if (flipped) {
+    routeCapturedPayment({
+      store: await resolveRequestTenant(),
       paymentId: args.razorpay_payment_id,
       totalAmountInr: parseFloat(order.total_amount),
-      shippingAmountInr: parseFloat(order.shipping_amount) || 0,
       orderId: args.orderId,
       orderRef: order.order_number,
-      isCod: false,
     }).catch(() => {})
   }
 
