@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1793381600.6642056,
-    "ast_hash": "fe6f45a5b73b8456e636fa18666b6e1a",
+    "mtime": 1793391846.4291568,
+    "ast_hash": "3febab08d70734a93197b873c636aed6",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -745,8 +745,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/rollout.sh": {
-    "mtime": 1793382111.0825129,
-    "ast_hash": "befa9399439eb9afabd1ca8ef3533ab5",
+    "mtime": 1793391776.0268557,
+    "ast_hash": "5e3dc0a05b8737cf364a2491db3416d5",
     "semantic_hash": ""
   },
   "deploy/k8s/gen-cronjobs.ts": {
@@ -755,8 +755,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/README.md": {
-    "mtime": 1793390588.4603658,
-    "ast_hash": "cd35b932bce44f8121980669b4dc107d",
+    "mtime": 1793391852.5946329,
+    "ast_hash": "79b02c11f4125d17e42644943491aa2f",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/00-namespaces.yaml": {
@@ -3120,8 +3120,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/service-secrets-iam.sh": {
-    "mtime": 1793390535.3941245,
-    "ast_hash": "7d6325d6c28356b4a1e178e6cd8893ae",
+    "mtime": 1793391312.786604,
+    "ast_hash": "d0a13eb990befc347d0c9b2603d3e389",
     "semantic_hash": ""
   },
   "deploy/k8s/db/05-table-owner.sh": {
@@ -3135,8 +3135,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/github-oidc.sh": {
-    "mtime": 1792943292.258625,
-    "ast_hash": "e9d12deaa78ee950d0c48a2650b8459a",
+    "mtime": 1793391702.837108,
+    "ast_hash": "141c1351097d97467c05739ae6a758e5",
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/image-tag.sh": {
@@ -25147,6 +25147,11 @@
   "deploy/k8s/bootstrap/store-secret-exclude.txt": {
     "mtime": 1793390535.3597336,
     "ast_hash": "ef61be696b002654fd59f2dd9551db89",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/bootstrap/core-room.py": {
+    "mtime": 1793391824.791326,
+    "ast_hash": "88d808ffcbe40233e3ac037d499a3930",
     "semantic_hash": ""
   }
 }
