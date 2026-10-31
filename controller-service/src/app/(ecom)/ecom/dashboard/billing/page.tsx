@@ -1,6 +1,6 @@
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { listPlans } from '@/lib/tenant-registry'
-import { getSubscription } from '@/lib/payments/razorpay-subscriptions'
+import { getSubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import PageHeader from '../_components/PageHeader'
 import BillingClient from './BillingClient'
 import AdFreeCard from './AdFreeCard'

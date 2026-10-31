@@ -1,6 +1,6 @@
 import { priceList } from '@jeffi/pricing'
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
-import { serviceStates } from '@/lib/ecom/service-states'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
+import { serviceStates } from '@controller/lib/ecom/service-states'
 import PageHeader from '../_components/PageHeader'
 import ServicesClient from './ServicesClient'
 

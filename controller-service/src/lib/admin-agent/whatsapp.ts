@@ -15,7 +15,7 @@ import { contextBySend } from '@/lib/replies/context'
 import { leadingYesNo, yesNo } from '@/lib/support/agent/actions'
 import { whatsappConversation } from '@/lib/admin-agent/conversations'
 import { runTurn } from '@/lib/admin-agent/turn'
-import { AGENT_USER_AGENT, loadAdminActor, withInternalAdminSession, type AdminActor } from '@/lib/admin-agent/internal-session'
+import { AGENT_USER_AGENT, loadAdminActor, withInternalAdminSession, type AdminActor } from '@controller/lib/admin-agent/internal-session'
 import { approveAgentAction, rejectAgentAction } from '@/lib/admin-agent/actions/approve'
 import { storeTarget, withApproveTarget } from '@/lib/admin-agent/actions/shared'
 

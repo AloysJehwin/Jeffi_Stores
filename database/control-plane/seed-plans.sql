@@ -15,12 +15,16 @@
 
 BEGIN;
 
-INSERT INTO public.plans (slug, name, tier, monthly_price_inr, max_custom_domains, is_active, storage_quota_bytes, max_file_bytes, product) VALUES
-  ('services', 'Services', 0, 0.00, 0, true, 0, 0, 'services'),
-  ('basic', 'Basic', 1, 2999.00, 0, true, 10737418240, 5368709120, 'store'),
-  ('growth', 'Grow', 2, 4999.00, 0, true, 53687091200, 5368709120, 'store'),
-  ('pro', 'Pro', 3, 7999.00, 1, true, 214748364800, 5368709120, 'store'),
-  ('enterprise', 'Enterprise', 4, 9999.00, 3, true, 1099511627776, 5368709120, 'store')
+-- Starter shares a pool node and database server; it stays inactive (hidden from the plan picker) until
+-- infrastructure billing ships. It has Basic's features (see the starter→basic mapping below).
+INSERT INTO public.plans (slug, name, tier, monthly_price_inr, max_custom_domains, is_active, storage_quota_bytes, max_file_bytes, product,
+                          default_preset, min_placement, advanced_compute) VALUES
+  ('services', 'Services', 0, 0.00, 0, true, 0, 0, 'services', NULL, 'pool', false),
+  ('starter', 'Starter', 1, 999.00, 0, false, 5368709120, 5368709120, 'store', 'shared', 'pool', false),
+  ('basic', 'Basic', 2, 2999.00, 0, true, 10737418240, 5368709120, 'store', 'small', 'dedicated', true),
+  ('growth', 'Grow', 3, 4999.00, 0, true, 53687091200, 5368709120, 'store', 'small', 'dedicated', true),
+  ('pro', 'Pro', 4, 7999.00, 1, true, 214748364800, 5368709120, 'store', 'medium', 'dedicated', true),
+  ('enterprise', 'Enterprise', 5, 9999.00, 3, true, 1099511627776, 5368709120, 'store', 'large', 'dedicated', true)
 ON CONFLICT (slug) DO UPDATE SET
   name = EXCLUDED.name, tier = EXCLUDED.tier,
   monthly_price_inr = EXCLUDED.monthly_price_inr,
@@ -29,6 +33,9 @@ ON CONFLICT (slug) DO UPDATE SET
   storage_quota_bytes = EXCLUDED.storage_quota_bytes,
   max_file_bytes = EXCLUDED.max_file_bytes,
   product = EXCLUDED.product,
+  default_preset = EXCLUDED.default_preset,
+  min_placement = EXCLUDED.min_placement,
+  advanced_compute = EXCLUDED.advanced_compute,
   updated_at = now();
 
 INSERT INTO public.plan_features (plan_id, scope_key)
@@ -300,7 +307,7 @@ JOIN (VALUES
   ('enterprise', 'vault:read'), ('enterprise', 'vault:write'),
   ('enterprise', 'drive:read'), ('enterprise', 'drive:write'),
   ('enterprise', 'subscriptions:read'), ('enterprise', 'subscriptions:write')
-) AS v(plan_slug, scope_key) ON v.plan_slug = p.slug
+) AS v(plan_slug, scope_key) ON v.plan_slug = CASE p.slug WHEN 'starter' THEN 'basic' ELSE p.slug END
 ON CONFLICT (plan_id, scope_key) DO NOTHING;
 
 -- Authoritative, not merely additive: prune any plan_features row not in the desired set above.
@@ -578,7 +585,7 @@ WHERE pf.plan_id = p.id
       ('enterprise', 'drive:read'), ('enterprise', 'drive:write'),
       ('enterprise', 'subscriptions:read'), ('enterprise', 'subscriptions:write')
     ) AS d(plan_slug, scope_key)
-    WHERE d.plan_slug = p.slug AND d.scope_key = pf.scope_key
+    WHERE d.plan_slug = CASE p.slug WHEN 'starter' THEN 'basic' ELSE p.slug END AND d.scope_key = pf.scope_key
   );
 
 -- Platform sentinel tenant (also in schema.sql, which the pipeline only structure-diffs, so its row
@@ -627,5 +634,43 @@ INSERT INTO public.ai_price_list (capability, provider, model, unit_type, cost_i
   ('video', 'replicate', 'wan-video/wan-2.2-i2v-fast',     'video_second',  2.0000,  5.0000),
   ('video', 'replicate', '*',                              'video_second',  2.0000,  5.0000)
 ON CONFLICT (capability, provider, model, unit_type) DO NOTHING;
+
+-- Compute prices: AWS us-east-1 on-demand, Linux, USD (checked 2026-10-30). Inserted once so the platform
+-- admin's edits stand; deploy/k8s/db/refresh-compute-prices.sh prints UPDATEs for a refresh. RDS storage is gp3.
+INSERT INTO public.compute_prices (code, kind, label, vcpu, memory_mib, usd_hourly, usd_hourly_multi_az, usd_gb_month, usd_gb_month_multi_az, sellable, sort) VALUES
+  ('ec2:t4g.small',     'ec2',         't4g.small (2 vCPU, 2 GB)',    2,  2048, 0.0168, NULL,  NULL,  NULL,  true,  10),
+  ('ec2:t4g.medium',    'ec2',         't4g.medium (2 vCPU, 4 GB)',   2,  4096, 0.0336, NULL,  NULL,  NULL,  true,  20),
+  ('ec2:t4g.large',     'ec2',         't4g.large (2 vCPU, 8 GB)',    2,  8192, 0.0672, NULL,  NULL,  NULL,  true,  30),
+  ('ec2:t4g.xlarge',    'ec2',         't4g.xlarge (4 vCPU, 16 GB)',  4, 16384, 0.1344, NULL,  NULL,  NULL,  true,  40),
+  ('ec2:m7g.large',     'ec2',         'm7g.large (2 vCPU, 8 GB)',    2,  8192, 0.0816, NULL,  NULL,  NULL,  true,  50),
+  ('ec2:c7g.large',     'ec2',         'c7g.large (2 vCPU, 4 GB)',    2,  4096, 0.0725, NULL,  NULL,  NULL,  true,  60),
+  ('rds:db.t4g.micro',  'rds',         'db.t4g.micro (2 vCPU, 1 GB)', 2,  1024, 0.016,  0.032, NULL,  NULL,  true, 110),
+  ('rds:db.t4g.small',  'rds',         'db.t4g.small (2 vCPU, 2 GB)', 2,  2048, 0.032,  0.065, NULL,  NULL,  true, 120),
+  ('rds:db.t4g.medium', 'rds',         'db.t4g.medium (2 vCPU, 4 GB)',2,  4096, 0.065,  0.129, NULL,  NULL,  true, 130),
+  ('rds:db.t4g.large',  'rds',         'db.t4g.large (2 vCPU, 8 GB)', 2,  8192, 0.129,  0.258, NULL,  NULL,  true, 140),
+  ('rds_storage:gp3',   'rds_storage', 'Database storage (gp3)',      NULL, NULL, NULL,  NULL,  0.115, 0.23,  true, 200),
+  ('ebs:gp3',           'ebs',         'Server disk (gp3)',           NULL, NULL, NULL,  NULL,  0.08,  NULL,  true, 210)
+ON CONFLICT (code) DO NOTHING;
+
+-- Pricing settings for the compute calculator (lib/compute/catalog.ts). Inserted once; edited by the platform admin.
+INSERT INTO public.platform_infra (key, value) VALUES ('compute_pricing',
+  '{"usdInr":88,"margin":0.25,"gstRate":0.18,"platformShareUsd":3,"rootVolumeGb":20,"poolNodeType":"t4g.medium","poolCapacity":3,"sharedDbClass":"db.t4g.small","sharedDbCapacity":8,"sharedDbStorageGb":10,"sharedDbMaxConnections":200,"minPrepayDays":30,"graceDays":3}')
+ON CONFLICT (key) DO NOTHING;
+
+-- Stores provisioned before compute was configurable: record what they run (their plan's old tier, a micro
+-- database) so nothing moves until the owner picks a size. Inserted once per store.
+INSERT INTO public.tenant_compute (tenant_id, preset, desired, applied, status, applied_at)
+SELECT t.id, 'custom', s.spec, s.spec, 'applied', now()
+  FROM public.tenants t
+  JOIN public.plans p ON p.id = t.plan_id
+  JOIN public.tenant_infra i ON i.tenant_id = t.id AND i.rds_endpoint IS NOT NULL
+  JOIN (VALUES
+    ('basic', '{"node":{"placement":"pool","type":null,"count":1},"db":{"mode":"dedicated","class":"db.t4g.micro","storageGb":20,"multiAz":false},"services":{"controller":{"replicas":1,"maxReplicas":1,"size":"S"},"messaging":{"replicas":1,"maxReplicas":1,"size":"S"},"documents":{"replicas":1,"maxReplicas":1,"size":"S"}}}'::jsonb),
+    ('growth', '{"node":{"placement":"dedicated","type":"t4g.small","count":1},"db":{"mode":"dedicated","class":"db.t4g.micro","storageGb":20,"multiAz":false},"services":{"controller":{"replicas":2,"maxReplicas":2,"size":"S"},"messaging":{"replicas":1,"maxReplicas":1,"size":"S"},"documents":{"replicas":1,"maxReplicas":1,"size":"S"}}}'::jsonb),
+    ('pro', '{"node":{"placement":"dedicated","type":"t4g.medium","count":1},"db":{"mode":"dedicated","class":"db.t4g.micro","storageGb":20,"multiAz":false},"services":{"controller":{"replicas":2,"maxReplicas":3,"size":"M"},"messaging":{"replicas":2,"maxReplicas":2,"size":"M"},"documents":{"replicas":2,"maxReplicas":2,"size":"M"}}}'::jsonb),
+    ('enterprise', '{"node":{"placement":"dedicated","type":"t4g.large","count":1},"db":{"mode":"dedicated","class":"db.t4g.micro","storageGb":20,"multiAz":false},"services":{"controller":{"replicas":2,"maxReplicas":5,"size":"L"},"messaging":{"replicas":2,"maxReplicas":2,"size":"L"},"documents":{"replicas":2,"maxReplicas":2,"size":"L"}}}'::jsonb)
+  ) AS s(slug, spec) ON s.slug = p.slug
+ WHERE 'store' = ANY(t.service_types)
+ON CONFLICT (tenant_id) DO NOTHING;
 
 COMMIT;

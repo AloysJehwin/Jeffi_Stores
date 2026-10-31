@@ -2,11 +2,13 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckMark } from '@/app/(ecom)/ecom/Shapes'
+import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import { ChoiceCards, ChoiceChips, Segmented, focusRing } from '../_ui'
 import { useToast } from '@/contexts/ToastContext'
 import { PhoneInput } from '../_ui/phone'
-import { trackStoreApplication } from '@/lib/client/ecom-analytics'
+import { trackStoreApplication } from '@controller/lib/client/ecom-analytics'
+import { ComputeConfigurator, type ComputeChoice } from '../_compute/ComputeConfigurator'
+import { PRESETS } from '@/lib/compute/presets'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -153,8 +155,11 @@ export default function OnboardWizard({
   ownerName,
   extraServices = [],
   upgrade,
+  computeEnabled = false,
 }: {
   plans: Plan[]
+  /** Owners pick their server size here (COMPUTE_SPEC_ENABLED). */
+  computeEnabled?: boolean
   /** A services workspace adding a store: the tenant (and its subdomain) already exists. */
   upgrade?: { tenantId: string; slug: string; displayName: string }
   /** Messaging / documents picked alongside the store on the service picker. */
@@ -176,6 +181,7 @@ export default function OnboardWizard({
   // Step 0 — Plan
   const [planSlug, setPlanSlug] = useState<string>(init.planSlug ?? plans[0]?.slug ?? 'basic')
   const [interval, setInterval] = useState<Interval>(init.interval ?? 'monthly')
+  const [compute, setCompute] = useState<ComputeChoice | null>(null)
 
   // Step 1 — Store
   const [displayName, setDisplayName] = useState(init.displayName ?? '')
@@ -265,6 +271,7 @@ export default function OnboardWizard({
       const data = {
         planSlug,
         interval,
+        computeSpec: compute?.spec ?? null,
         displayName,
         slug: effectiveSlug,
         productCats,
@@ -301,6 +308,7 @@ export default function OnboardWizard({
     [
       planSlug,
       interval,
+      compute,
       displayName,
       effectiveSlug,
       productCats,
@@ -429,6 +437,7 @@ export default function OnboardWizard({
         body: JSON.stringify({
           planSlug,
           billingInterval: interval,
+          ...(computeEnabled && compute ? { compute: compute.spec } : {}),
           extraServices,
           displayName,
           slug: effectiveSlug,
@@ -510,7 +519,7 @@ export default function OnboardWizard({
   }, [wh.originPincode])
 
   function canNext(): boolean {
-    if (step === 0) return !!planSlug
+    if (step === 0) return !!planSlug && (!computeEnabled || !!compute?.valid)
     if (step === 1) return displayName.trim().length > 0 && effectiveSlug.length >= 3 && productCats.length > 0
     if (step === 2)
       return bizName.trim().length > 0 && !!bizType && pan.trim().length === 10 && bizAddress.trim().length > 5
@@ -661,6 +670,18 @@ export default function OnboardWizard({
                     ),
                   }
                 })} />
+              {computeEnabled && (
+                <div className="mt-8">
+                  <h2 className="text-lg font-bold text-foreground mb-1">Server size</h2>
+                  <p className="text-sm text-foreground-muted mb-4">Your store runs on servers sized to your traffic. You can change this any time.</p>
+                  <ComputeConfigurator
+                    planSlug={planSlug}
+                    value={compute?.spec ?? init.computeSpec ?? null}
+                    onChange={setCompute}
+                    planFeeInr={interval === 'yearly' ? (monthly * 10) / 12 : monthly}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -1254,6 +1275,12 @@ export default function OnboardWizard({
                     'Plan',
                     `${selectedPlan?.name} · ${interval} · ₹${price.toLocaleString('en-IN')}/${interval === 'yearly' ? 'yr' : 'mo'}`,
                   ],
+                  ...(computeEnabled && compute?.quote
+                    ? [[
+                        'Servers',
+                        `${compute.preset === 'custom' ? 'Custom' : PRESETS[compute.preset].label} · ₹${Math.round(compute.quote.inrMonth).toLocaleString('en-IN')}/mo + GST, from your wallet`,
+                      ]]
+                    : []),
                   ['Store', `${displayName} (${effectiveSlug}.jeffistores.in)`],
                   ['Products', productCats.join(', ') || '—'],
                   ['Business', `${bizName} · ${bizType}`],

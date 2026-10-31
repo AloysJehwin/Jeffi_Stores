@@ -1,4 +1,4 @@
-import type { TenantTransaction, LedgerEntry } from '@/lib/tenant-registry'
+import type { TenantTransaction, LedgerEntry, LinkedPayout } from '@/lib/tenant-registry'
 
 export const STATUS_PILL: Record<string, string> = {
   captured: 'org-sage org-sage-text',
@@ -78,7 +78,7 @@ export function TransactionsTable({
       <table className="w-full text-sm min-w-[700px]">
         <thead>
           <tr className="bg-surface-secondary text-left">
-            {['Order ref', 'Date', 'Gross', 'Your share', 'Commission', 'Gateway fee', 'Method', 'Status'].map(h => (
+            {['Order ref', 'Date', 'Gross', 'Your share', 'Commission', 'Gateway fee', 'Method', 'Status', 'Paid out'].map(h => (
               <th key={h} className={TH}>{h}</th>
             ))}
           </tr>
@@ -100,6 +100,16 @@ export function TransactionsTable({
                   {t.status}
                 </span>
               </td>
+              <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+                {t.payout_at ? (
+                  <>
+                    {fmtDate(t.payout_at)}
+                    {t.payout_utr && <span className="block font-mono text-[10px] text-foreground-muted">UTR {t.payout_utr}</span>}
+                  </>
+                ) : (
+                  '-'
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -110,7 +120,7 @@ export function TransactionsTable({
             <td className="px-4 py-3 font-bold org-sage-text">{fmt(totals.tenantShare)}</td>
             <td className="px-4 py-3 font-bold text-foreground-secondary">{fmt(totals.commission)}</td>
             <td className="px-4 py-3 font-bold text-foreground-secondary">{fmt(totals.fees)}</td>
-            <td colSpan={2} />
+            <td colSpan={3} />
           </tr>
         </tfoot>
       </table>
@@ -160,6 +170,37 @@ export function LedgerTable({ ledger, balance }: { ledger: LedgerEntry[]; balanc
             <td />
           </tr>
         </tfoot>
+      </table>
+    </div>
+  )
+}
+
+/** What the payment provider paid into the store's bank, newest first. */
+export function PayoutsTable({ payouts }: { payouts: LinkedPayout[] }) {
+  if (payouts.length === 0) {
+    return <div className={`${WRAP} py-10 text-center text-foreground-secondary text-sm`}>No payouts yet. Sales are paid out once the payment provider settles them.</div>
+  }
+  return (
+    <div className={WRAP}>
+      <table className="w-full text-sm min-w-[500px]">
+        <thead>
+          <tr className="bg-surface-secondary text-left">
+            {['Paid on', 'Amount', 'Fees', 'Bank reference (UTR)', 'Status'].map(h => (
+              <th key={h} className={TH}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {payouts.map(p => (
+            <tr key={p.id} className={TR}>
+              <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{p.settled_at ? fmtDate(p.settled_at) : '-'}</td>
+              <td className="px-4 py-3 font-semibold org-sage-text">{fmt(Number(p.amount))}</td>
+              <td className="px-4 py-3 text-foreground-secondary">{fmt(Number(p.fees))}</td>
+              <td className="px-4 py-3 font-mono text-xs">{p.utr || '-'}</td>
+              <td className="px-4 py-3 text-foreground-secondary">{p.status || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
       </table>
     </div>
   )

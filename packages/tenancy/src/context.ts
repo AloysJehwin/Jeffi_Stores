@@ -4,6 +4,8 @@ export interface TenantInfra {
   rdsEndpoint: string | null
   rdsDb: string
   rdsPort: number
+  /** IAM login for the store's database: its own role on a shared Starter host, else RDS_USER. */
+  rdsUser?: string | null
   dbSecretRef: string | null
   iamAuth: boolean
   s3Bucket: string | null

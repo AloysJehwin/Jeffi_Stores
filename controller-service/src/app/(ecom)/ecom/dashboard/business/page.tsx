@@ -1,6 +1,6 @@
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { getKyc } from '@/lib/tenant-registry'
-import { StatusPill } from '@/components/admin/ecom/EcomUI'
+import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import PageHeader from '../_components/PageHeader'
 import { Card, Row } from '../_components/Card'
 

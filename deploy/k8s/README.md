@@ -8,15 +8,17 @@ up and cut production over to it.
 | `bootstrap/launch-core.sh` | One-time: security groups, RDS ingress, the core `r7g.medium`, as the account's EC2 limit is 1 vCPU (user-data `core-node.sh`), EIP `32.196.38.130` |
 | `bootstrap/core-node.sh` | Core user-data: Tailscale + k3s server (embedded etcd, 6-hourly snapshots) |
 | `bootstrap/secrets.sh` | Seeds cluster Secrets from Secrets Manager + local `certs/` (prints no values) |
+| `bootstrap/store-secret.sh` | Writes `jeffi/store` (storefront, admin and business pods) from `jeffi/production` without the control-plane keys in `store-secret-exclude.txt`; prints no values. Each release runs it (Deploy · flagship), and skips the write when nothing changed. Pods fall back to `jeffi/production` if it is missing |
+| `bootstrap/service-secrets-iam.sh` | Lets the core's role read each service's secret and `jeffi/store` |
 | `bootstrap/apply-platform.sh` | Applies `platform/` in dependency order |
 | `bootstrap/release.sh` | Builds the four service images from `HEAD`, pushes them to ECR, runs `rollout.sh`, smoke-tests |
 | `bootstrap/rollout.sh` | Rollout: platform, tenant schema fan-out, then every store namespace one at a time |
 | `db/` | Production DB release scripts (backup, schema, control-plane merge, secrets, fan-out, seeds); see `docs/GO_LIVE_RUNBOOK.md` |
 | `platform/` | Traefik config, cert-manager + wildcard, mTLS edge, the controller/messaging/document/public-api services, Redis, CronJobs, Coroot + Headlamp |
-| `gen-cronjobs.ts` | Regenerates `platform/cronjobs.yaml` from `controller-service/src/lib/shared/cron-jobs.ts` (a test fails on drift) |
+| `gen-cronjobs.ts` | Regenerates `platform/cronjobs.yaml` from `packages/store-core/src/lib/shared/cron-jobs.ts` (a test fails on drift) |
 
 Tenant namespaces are **not** in git. The provisioning engine renders them
-(`controller-service/src/lib/k8s/tenant-workload.ts`) and applies them (`controller-service/src/lib/k8s/tenant-compute.ts`) when
+(`packages/store-core/src/lib/k8s/tenant-workload.ts`) and applies them (`packages/store-core/src/lib/k8s/tenant-compute.ts`) when
 `PROVISIONING_COMPUTE=k8s` (set by the `provisioning` ConfigMap).
 
 ## Bring-up (in order)
@@ -54,14 +56,14 @@ Tenant namespaces are **not** in git. The provisioning engine renders them
 
 ## Releasing
 
-Every release is `deploy/k8s/bootstrap/release.sh`: it builds the committed `HEAD` (arm64, from `git archive`, so uncommitted and local files never ship) into four images (`jeffi-stores-{controller,messaging,document,public-api}-service:local-<sha>`), pushes them to ECR (tags already there are skipped), rolls them out with `rollout.sh`, then smoke-tests that the live `/api/health` reports the new commit. The tag is the last commit that changed the image contents (`lib.sh image_sha`), so a Mac and GitHub build of the same commit share images. Schema changes are never applied by it: see `deploy/k8s/db/` and `docs/GO_LIVE_RUNBOOK.md`.
+Every release is `deploy/k8s/bootstrap/release.sh`: it builds the committed `HEAD` (arm64, from `git archive`, so uncommitted and local files never ship) into eight images (`jeffi-stores-{controller,storefront,admin,business,messaging,document,public-api,mobile}-service:local-<sha>`; the four Next apps from `deploy/next-app.Dockerfile` with `APP=<app>-service`), pushes them to ECR (tags already there are skipped), rolls them out with `rollout.sh`, then smoke-tests that the live `/api/health` reports the new commit. The tag is the last commit that changed the image contents (`lib.sh image_sha`), so a Mac and GitHub build of the same commit share images. Schema changes are never applied by it: see `deploy/k8s/db/` and `docs/GO_LIVE_RUNBOOK.md`.
 
-**From GitHub (the normal path).** A push to `main` (a squash-merged PR) runs `.github/workflows/ci.yml`. The checks, the four images (arm runners) and `Release notes` (the commits since the live commit, and whether `database/` changed) start together; once the checks pass, `Approve release` waits on the `production` environment. The database stages run while the images are still building; the rollout waits for both, and CloudFront is invalidated beside the store stages. Approve it there; each stage after it is its own job in the graph (environment `production-release`: no reviewer, same branches), each over an SSM tunnel, stopping at the first failure:
+**From GitHub (the normal path).** A push to `main` (a squash-merged PR) runs `.github/workflows/ci.yml`. The checks, the eight images (arm runners) and `Release notes` (the commits since the live commit, and whether `database/` changed) start together; once the checks pass, `Approve release` waits on the `production` environment. The database stages run while the images are still building; the rollout waits for both, and CloudFront is invalidated beside the store stages. Approve it there; each stage after it is its own job in the graph (environment `production-release`: no reviewer, same branches), each over an SSM tunnel, stopping at the first failure:
 1. **Database · schema** (when `database/` changed since the live commit, or forced): `deploy/k8s/db/release-db.sh --schema` → `10-platform-schema.sh` (table ownership, the additive diff of `database/*.sql`, `manual.sql`) and the control-plane diff with the plan seed, all on `jeffi_stores`.
 2. **Database · migrations** (every deploy): pending `database/migrations` files (`release-db.sh --migrations`); a no-op when all are recorded in `schema_migrations`.
-3. **Roll out · platform**: `rollout.sh <tag> platform` (the four services and CronJobs).
+3. **Roll out · platform**: `rollout.sh <tag> platform`: the flagship's storefront, admin and business first, then the platform routes (`platform/49-routes.yaml`, from `npx tsx deploy/k8s/gen-routes.ts`) once those serve, then the controller, the other services and the CronJobs.
 4. **Database · tenants**: `rollout.sh <tag> tenant-db`, the schema and migration files fanned out to every store's database.
-5. **Roll out · stores**: `rollout.sh <tag> stores`.
+5. **Roll out · stores**: `rollout.sh <tag> stores`: every store re-applied at the release images, then each still on the old all-in-one app moved onto its own services, one store at a time (`switch-layout`; a store that fails goes back to its old app and the stage stops).
 6. **Verify**: CloudFront invalidation, then `smoke.sh` (the live commit and every host).
 7. **Templates · catalog** (after the platform smoke test and the store schema): `deploy/k8s/db/50-seeds.sh`, run in the new messaging pod. It adds catalog templates the database lacks, brings email content up to the catalog (platform defaults, and store copies nobody edited), and moves WhatsApp bodies to `{{brand_name}}`. Idempotent; a dry run prints what it would change.
 

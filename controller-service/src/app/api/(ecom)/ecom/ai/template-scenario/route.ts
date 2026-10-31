@@ -4,7 +4,7 @@ export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse } from 'next/server'
 
-import { ownerApi } from '@/lib/ecom/owner-api'
+import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { hasService, listServiceApprovals, blockedServices } from '@/lib/tenant-registry'
 import { TemplateScenarioRequest } from '@/lib/ai/template-scenario.schema'
 import { fillFromScenario, rateLimit, TemplateScenarioError } from '@/lib/ai/template-scenario'

@@ -1,6 +1,6 @@
 import { Pool } from 'pg'
 import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
-import { getTenant, getKyc, getDraft } from '../tenant-registry'
+import { getTenant, getKyc, getDraft } from '@/lib/tenant-registry'
 
 /**
  * Seed a freshly-provisioned tenant's own `site_settings` from what the owner entered during

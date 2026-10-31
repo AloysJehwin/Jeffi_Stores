@@ -4,7 +4,7 @@ import { debitMessageCost, refundMessageEstimate } from '@/lib/shared/messaging/
 import { usdToInr } from '@/lib/shared/messaging/pricing'
 import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
-import { applyDeliveryStatus } from '@/lib/shared/messaging/delivery-status'
+import { applyDeliveryStatus } from '@controller/lib/shared/messaging/delivery-status'
 
 export const dynamic = 'force-dynamic'
 

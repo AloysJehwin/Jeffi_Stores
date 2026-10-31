@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { verifyBankAccountFAV } from '@/lib/payments/bank-verify'
+import { verifyBankAccountFAV } from '@controller/lib/payments/bank-verify'
 
 export const dynamic = 'force-dynamic'
 

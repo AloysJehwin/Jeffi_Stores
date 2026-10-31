@@ -19,10 +19,15 @@ import {
   applyStoreUpgrade,
 } from '@/lib/tenant-registry'
 import { sendKycSubmittedEmail } from '@/lib/shared/ecom-emails'
-import { OnboardSchema } from '@/lib/catalog/onboard-schema'
+import { OnboardSchema } from '@controller/lib/catalog/onboard-schema'
 import { encryptToken } from '@/lib/crypto/token-cipher'
-import { dedicatedCapacityError } from '@/lib/k8s/capacity'
+import { dedicatedCapacityError } from '@controller/lib/k8s/capacity'
 import { verifyDelhiveryToken } from '@/lib/shipping/delhivery'
+import { computeSpecEnabled, getCatalog, planCompute } from '@controller/lib/compute/catalog'
+import { presetSpec } from '@/lib/compute/presets'
+import { quoteForPlan } from '@controller/lib/compute/quote'
+import { saveDesiredCompute } from '@controller/lib/compute/store'
+import type { ComputeSpec } from '@/lib/compute/spec'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,8 +68,20 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const capacityError = await dedicatedCapacityError(d.planSlug)
-  if (capacityError) return NextResponse.json({ error: capacityError, code: 'capacity' }, { status: 409 })
+  // The server size the owner chose (or the plan's default), priced and checked again here.
+  let compute: ComputeSpec | null = null
+  if (computeSpecEnabled()) {
+    const plan = await planCompute(d.planSlug)
+    if (!plan) return NextResponse.json({ error: 'Unknown plan' }, { status: 400 })
+    const spec = d.compute ?? presetSpec(plan.defaultPreset ?? 'small')
+    const q = await quoteForPlan(spec, plan, await getCatalog())
+    if (!q.validation.ok) return NextResponse.json({ error: q.validation.errors[0] ?? 'Choose a server size.' }, { status: 400 })
+    if (q.capacityError) return NextResponse.json({ error: q.capacityError, code: 'capacity' }, { status: 409 })
+    compute = spec
+  } else {
+    const capacityError = await dedicatedCapacityError(d.planSlug)
+    if (capacityError) return NextResponse.json({ error: capacityError, code: 'capacity' }, { status: 409 })
+  }
 
   // 1. Create tenant with status='pending_approval' (NOT provisioning yet). An upgrade keeps its
   //    tenant (and status); the application is tracked on store_request until the first payment.
@@ -88,6 +105,7 @@ export async function POST(request: NextRequest) {
 
   // 2. Link owner → tenant.
   if (!upgrade) await linkOwnerTenant(owner.id, result.tenantId)
+  if (compute) await saveDesiredCompute(result.tenantId, compute)
 
   // 2a. Provisioning names the owner admin and addresses the access certificate from owners.name.
   await updateOwnerName(owner.id, d.ownerName)

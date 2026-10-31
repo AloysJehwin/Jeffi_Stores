@@ -7,7 +7,7 @@ import {
   updateProvisioningJob,
   controlPlanePool,
   getDraft,
-} from '../tenant-registry'
+} from '@/lib/tenant-registry'
 import { findLatestBackup } from '@/lib/tenancy/tenant-backup-store'
 import { SEED_PROFILES } from './seed-catalog'
 

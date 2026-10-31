@@ -1,4 +1,4 @@
-import { getTenant, getKyc, controlPlanePool } from '../tenant-registry'
+import { getTenant, getKyc, controlPlanePool } from '@/lib/tenant-registry'
 import { getS3Url } from '@/lib/shared/s3'
 import { buildTenantPolicies, POLICY_VERSION, type TenantLegalInfo } from './generate'
 

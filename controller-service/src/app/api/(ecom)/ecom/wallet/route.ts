@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ownerApi } from '@/lib/ecom/owner-api'
+import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { getTenantWallet } from '@/lib/payments/wallet'
 
 export const dynamic = 'force-dynamic'

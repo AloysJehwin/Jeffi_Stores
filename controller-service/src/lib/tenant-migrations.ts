@@ -3,7 +3,7 @@ import path from 'path'
 import { Pool } from 'pg'
 import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { buildTenantSchemaSql, desiredTableColumns } from '@/lib/tenant-migrations-schema'
+import { buildTenantSchemaSql, desiredTableColumns } from '@controller/lib/tenant-migrations-schema'
 import { repoPath } from '@/lib/shared/paths'
 
 /**

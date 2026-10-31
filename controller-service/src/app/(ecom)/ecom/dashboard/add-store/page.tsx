@@ -1,9 +1,11 @@
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { hasService } from '@/lib/tenant-registry'
-import { StatusPill } from '@/components/admin/ecom/EcomUI'
+import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
 import AddStoreClient from './AddStoreClient'
+import FundServers from '../../onboard/FundServers'
+import { storePrepay } from '@controller/lib/billing/prepay'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +21,15 @@ export default async function AddStorePage() {
           </p>
           {tenant.status === 'awaiting_payment' && <a href="/onboard" className="ecom-accent-bg inline-block mt-4 rounded-full px-5 py-2 text-sm font-semibold text-white">Complete payment →</a>}
         </Card>
+      </>
+    )
+  }
+  if (tenant.store_request === 'awaiting_payment' && tenant.subscription_status === 'active') {
+    const prepay = await storePrepay(tenant.id, tenant.plan ?? null)
+    return (
+      <>
+        <PageHeader eyebrow="Store" title="Add an online store" />
+        <FundServers slug={tenant.slug} displayName={tenant.display_name} keyId={process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? ''} requiredInr={prepay.requiredInr} balance={prepay.balance} dailyInr={prepay.dailyInr} days={prepay.days} />
       </>
     )
   }

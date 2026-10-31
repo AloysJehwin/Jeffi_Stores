@@ -1,6 +1,6 @@
 import { describeInstance, stopInstance, startInstance, modifyInstanceType, waitForState } from '@/lib/shared/ec2-client'
 import { activeTenantCount, getPlatformInfra, setPlatformInfra } from '@/lib/tenant-registry'
-import { getProvisioningProvider } from '@/lib/provisioning'
+import { getProvisioningProvider } from '@controller/lib/provisioning'
 
 /**
  * Tenant-pool auto-scale-UP controller. The pool is a SINGLE EC2 whose instance TYPE steps
@@ -100,7 +100,7 @@ export async function ensurePoolInstance(): Promise<{ instanceId: string; ip: st
     if (ip) return { instanceId: existingId, ip }
   }
   // Create the pool instance (smallest tier — autoscale grows it later).
-  const { appBootUserData } = await import('@/lib/provisioning/user-data')
+  const { appBootUserData } = await import('@controller/lib/provisioning/user-data')
   const { instanceId, ip } = await provider.ensureAppInstance(
     { name: 'jeffi-pool', instanceType: POOL_SIZE_TIERS[0].type, userData: appBootUserData() },
     // Persist before the readiness wait: if that throws, the next run finds this instance

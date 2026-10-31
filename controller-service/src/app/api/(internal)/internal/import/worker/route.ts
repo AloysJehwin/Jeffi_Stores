@@ -9,7 +9,7 @@ import {
 import { lookupTenantContextById } from '@/lib/tenant-registry'
 import { runWithTenantContext, type TenantContext } from '@/lib/tenancy/tenant-context'
 import { getImportFile } from '@/lib/shared/s3'
-import { runImport } from '@/lib/catalog/product-import'
+import { runImport } from '@controller/lib/catalog/product-import'
 import { upsertSheetLinks, computeOrphans } from '@/lib/import/sheet-links'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 

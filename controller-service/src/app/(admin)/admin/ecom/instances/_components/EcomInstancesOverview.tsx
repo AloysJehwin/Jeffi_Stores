@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { AttentionList } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, Badge, count, pct, when, type Col } from '@/components/admin/channels/ui'
 import { RankedBars } from '@/components/admin/dashboard/Charts'
-import type { EcomInstancesOverview as Data } from '@/lib/overviews/ecom-instances'
+import type { EcomInstancesOverview as Data } from '@controller/lib/overviews/ecom-instances'
 import { OverviewShell, Grid2, bytes, label, useEcomOverview } from '../../_components/overview-shell'
 
 type Job = Data['open_jobs'][number]

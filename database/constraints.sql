@@ -4124,10 +4124,10 @@ ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenan
 ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenant_settings_mode_check CHECK (((standard_templates)::text = ANY ((ARRAY['all'::character varying, 'selected'::character varying])::text[])));
 
 ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying, 'razorpay'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_status_check CHECK (((status)::text = ANY ((ARRAY['running'::character varying, 'success'::character varying, 'partial'::character varying, 'error'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying, 'razorpay'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_status_check CHECK (((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying, 'resolved'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_severity_check CHECK (((severity)::text = ANY ((ARRAY['info'::character varying, 'warning'::character varying, 'critical'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_change_log ADD CONSTRAINT channel_change_log_pkey PRIMARY KEY (id);
@@ -4192,3 +4192,25 @@ ALTER TABLE ONLY public.ai_prompt_presets
 
 ALTER TABLE ONLY public.ai_prompt_presets
     ADD CONSTRAINT ai_prompt_presets_kind_check CHECK (kind IN ('image','video')) NOT VALID;
+
+ALTER TABLE ONLY public.payments ADD CONSTRAINT payments_gateway_account_check CHECK (gateway_account IS NULL OR gateway_account IN ('platform','own')) NOT VALID;
+ALTER TABLE ONLY public.orders ADD CONSTRAINT orders_dispute_status_check CHECK (dispute_status IS NULL OR dispute_status IN ('open','under_review','won','lost','closed')) NOT VALID;
+
+ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_razorpay_refund_id_key UNIQUE (razorpay_refund_id);
+ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_status_check CHECK (status IN ('pending','processed','failed'));
+ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_initiated_by_check CHECK (initiated_by IN ('app','dashboard','dispute','retry'));
+ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.payments(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_retry_of_fkey FOREIGN KEY (retry_of) REFERENCES public.payment_refunds(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_razorpay_dispute_id_key UNIQUE (razorpay_dispute_id);
+ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_status_check CHECK (status IN ('open','under_review','won','lost','closed'));
+ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.payments(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.razorpay_settlements ADD CONSTRAINT razorpay_settlements_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.razorpay_settlements ADD CONSTRAINT razorpay_settlements_account_check CHECK (account IN ('platform','own'));
+ALTER TABLE ONLY public.razorpay_settlement_items ADD CONSTRAINT razorpay_settlement_items_pkey PRIMARY KEY (settlement_id, entity_id);
+ALTER TABLE ONLY public.razorpay_settlement_items ADD CONSTRAINT razorpay_settlement_items_scope_check CHECK (scope IN ('order','other_store','platform_billing','adjustment','unmatched'));

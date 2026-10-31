@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { priceList } from '@jeffi/pricing'
 import { getTenantWallet } from '@/lib/payments/wallet'
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { hasService } from '@/lib/tenant-registry'
 import PageHeader from '../_components/PageHeader'
 import MessagingClient from './MessagingClient'

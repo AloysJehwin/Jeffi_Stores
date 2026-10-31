@@ -1,0 +1,292 @@
+# The flagship's store services: jeffistores.in's storefront, admin and B2B portal, one Deployment each.
+# Unpinned (no SERVICE_TENANT_SLUG), so they also answer hosts no store namespace claims. Routes: 49-routes.yaml.
+# Sized small: the 1-vCPU core runs them beside the controller until the EC2 quota rises. rollout.sh applies
+# them (label jeffi.io/step=store) before anything else, so their routes only move once they serve.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-storefront-service
+  namespace: jeffi
+  labels: { app: storefront-service, jeffi.io/service: storefront, jeffi.io/tenant: jeffi-stores, jeffi.io/step: store }
+spec:
+  # No replicas: the HPA owns the count.
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: storefront-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: storefront-service, jeffi.io/service: storefront, jeffi.io/tenant: jeffi-stores }
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      terminationGracePeriodSeconds: 60
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-storefront-service:latest
+          ports: [{ name: http, containerPort: 3000 }]
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/store }
+            - { name: SM_SECRET_FALLBACK_ID, value: jeffi/production }
+            - { name: WEB_CONCURRENCY, value: '1' }
+            - { name: IN_PROCESS_CRON, value: 'false' }
+            - { name: CLIENT_CERT_PROXY, value: traefik }
+            - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
+            - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
+            - { name: OTEL_SERVICE_NAME, value: jeffi-stores-storefront-service }
+            - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            - { name: OTEL_TRACES_SAMPLER, value: parentbased_traceidratio }
+            - { name: OTEL_TRACES_SAMPLER_ARG, value: '1.0' }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=768 }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
+            - name: GOOGLE_SERVICE_ACCOUNT_JSON
+              valueFrom: { secretKeyRef: { name: google-sa, key: json, optional: true } }
+          resources:
+            requests: { cpu: 75m, memory: 384Mi }
+            limits: { cpu: 1500m, memory: 1Gi }
+          startupProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /api/ready, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop: { exec: { command: [sleep, '10'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          projected:
+            sources:
+              - configMap: { name: rds-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-storefront-service, namespace: jeffi, labels: { jeffi.io/step: store } }
+spec:
+  selector: { app: storefront-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3000, targetPort: http }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: jeffi-stores-storefront-service, namespace: jeffi, labels: { jeffi.io/step: store } }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: jeffi-stores-storefront-service }
+  minReplicas: 2
+  maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+  behavior:
+    scaleDown: { stabilizationWindowSeconds: 300 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: jeffi-stores-storefront-service, namespace: jeffi, labels: { jeffi.io/step: store } }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: storefront-service, jeffi.io/tenant: jeffi-stores } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-admin-service
+  namespace: jeffi
+  labels: { app: admin-service, jeffi.io/service: admin, jeffi.io/tenant: jeffi-stores, jeffi.io/step: store }
+spec:
+  # No replicas: the HPA owns the count.
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 1, maxSurge: 0 } }
+  selector: { matchLabels: { app: admin-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: admin-service, jeffi.io/service: admin, jeffi.io/tenant: jeffi-stores }
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      terminationGracePeriodSeconds: 60
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-admin-service:latest
+          ports: [{ name: http, containerPort: 3000 }]
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/store }
+            - { name: SM_SECRET_FALLBACK_ID, value: jeffi/production }
+            - { name: WEB_CONCURRENCY, value: '1' }
+            - { name: IN_PROCESS_CRON, value: 'false' }
+            - { name: CLIENT_CERT_PROXY, value: traefik }
+            - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
+            - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
+            # Platform cron jobs triggered from the admin's Crons page run on the controller.
+            - { name: CONTROLLER_URL, value: 'http://jeffi-stores-controller-service.jeffi.svc.cluster.local:3000' }
+            # Homepage publish drops the storefront's cached home page.
+            - { name: STOREFRONT_URL, value: 'http://jeffi-stores-storefront-service.jeffi.svc.cluster.local:3000' }
+            - { name: OTEL_SERVICE_NAME, value: jeffi-stores-admin-service }
+            - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            - { name: OTEL_TRACES_SAMPLER, value: parentbased_traceidratio }
+            - { name: OTEL_TRACES_SAMPLER_ARG, value: '1.0' }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=1024 }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
+            - name: GOOGLE_SERVICE_ACCOUNT_JSON
+              valueFrom: { secretKeyRef: { name: google-sa, key: json, optional: true } }
+          resources:
+            requests: { cpu: 75m, memory: 512Mi }
+            limits: { cpu: 1500m, memory: 1400Mi }
+          startupProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /api/ready, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop: { exec: { command: [sleep, '10'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          projected:
+            sources:
+              - configMap: { name: rds-ca }
+              - secret: { name: platform-ca-key }
+        - name: tmp
+          emptyDir: { sizeLimit: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-admin-service, namespace: jeffi, labels: { jeffi.io/step: store } }
+spec:
+  selector: { app: admin-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3000, targetPort: http }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: jeffi-stores-admin-service, namespace: jeffi, labels: { jeffi.io/step: store } }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: jeffi-stores-admin-service }
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+  behavior:
+    scaleDown: { stabilizationWindowSeconds: 300 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-business-service
+  namespace: jeffi
+  labels: { app: business-service, jeffi.io/service: business, jeffi.io/tenant: jeffi-stores, jeffi.io/step: store }
+spec:
+  # No replicas: the HPA owns the count.
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 1, maxSurge: 0 } }
+  selector: { matchLabels: { app: business-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: business-service, jeffi.io/service: business, jeffi.io/tenant: jeffi-stores }
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      terminationGracePeriodSeconds: 60
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-business-service:latest
+          ports: [{ name: http, containerPort: 3000 }]
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/store }
+            - { name: SM_SECRET_FALLBACK_ID, value: jeffi/production }
+            - { name: WEB_CONCURRENCY, value: '1' }
+            - { name: IN_PROCESS_CRON, value: 'false' }
+            - { name: CLIENT_CERT_PROXY, value: traefik }
+            - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
+            - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
+            - { name: OTEL_SERVICE_NAME, value: jeffi-stores-business-service }
+            - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            - { name: OTEL_TRACES_SAMPLER, value: parentbased_traceidratio }
+            - { name: OTEL_TRACES_SAMPLER_ARG, value: '1.0' }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=512 }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
+            - name: GOOGLE_SERVICE_ACCOUNT_JSON
+              valueFrom: { secretKeyRef: { name: google-sa, key: json, optional: true } }
+          resources:
+            requests: { cpu: 25m, memory: 256Mi }
+            limits: { cpu: 1500m, memory: 768Mi }
+          startupProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /api/ready, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop: { exec: { command: [sleep, '10'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          projected:
+            sources:
+              - configMap: { name: rds-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-business-service, namespace: jeffi, labels: { jeffi.io/step: store } }
+spec:
+  selector: { app: business-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3000, targetPort: http }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: jeffi-stores-business-service, namespace: jeffi, labels: { jeffi.io/step: store } }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: jeffi-stores-business-service }
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+  behavior:
+    scaleDown: { stabilizationWindowSeconds: 300 }

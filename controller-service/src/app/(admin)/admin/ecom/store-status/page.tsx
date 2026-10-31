@@ -5,7 +5,7 @@ import { Suspense } from 'react'
 import { PageHeader } from '@/components/admin/kit/layout'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants, tenantSummary } from '@/lib/tenant-registry'
-import { EcomHero, EcomFilters } from '@/components/admin/ecom/EcomUI'
+import { EcomHero, EcomFilters } from '@controller/components/admin/ecom/EcomUI'
 import EcomTabs, { ecomTab } from '../_components/EcomTabs'
 import EcomStoreStatusOverview from './_components/EcomStoreStatusOverview'
 

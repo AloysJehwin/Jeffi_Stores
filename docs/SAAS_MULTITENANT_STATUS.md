@@ -15,13 +15,15 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 
 ## Service pods and go-live (2026-10-14)
 
-- The Next app is `controller-service/` (was `src/`). Every service runs as its own pod:
-  - platform (`jeffi`): `jeffi-stores-{controller,messaging,document,public-api}-service`;
-  - each store tenant (`tenant-{slug}`): `{slug}-{controller,messaging,document}-service`, sized per plan (`provisioning/tiers.ts`) and pinned with `SERVICE_TENANT_SLUG`;
-  - public-api is shared.
+- The Next app is split (2026-10-30) into `controller-service/` (the control plane only), `storefront-service/`, `admin-service/` and `business-service/`, sharing `packages/store-core` ([`MICROSERVICES.md`](MICROSERVICES.md)). Every service runs as its own pod, from its own image:
+  - platform (`jeffi`): `jeffi-stores-{controller,storefront,admin,business,messaging,document,public-api,mobile}-service`; the storefront, admin and business pods serve the flagship;
+  - each store tenant (`tenant-{slug}`): `{slug}-{storefront,admin,business,messaging,document}-service` (business from Pro), sized from the store's compute spec (below) and pinned with `SERVICE_TENANT_SLUG`;
+  - public-api and mobile are shared.
+- Routing is one table, `ROUTES` in `packages/store-core/src/lib/service-routing.ts`: each app's middleware gate, the local dev router and both ingress renderers (`deploy/k8s/gen-routes.ts` → `platform/49-routes.yaml`, `lib/k8s/tenant-workload.ts`) follow it, and tests check the rendered routes against it.
+- Crons: store jobs run on the store's own admin pod (`CRON_STORE_BASE`), the flagship's on `jeffi-stores-admin-service`; platform jobs stay on the controller.
 - A pinned pod serves and runs background loops for its own tenant only; the platform's pods skip store tenants (`SERVICE_SKIP_STORE_TENANTS`, `packages/tenancy/src/service-scope.ts`).
 - Routes: `public.` → public-api (`/webhooks/` → messaging); `invoice.`/`quotation.`/`purchaseorder.` → the platform document-service; `invoice-`/`quotation-`/`purchaseorder-{slug}.` → the store's own document-service.
-- Existing stores move to the new layout through `POST /api/internal/provisioning/reconcile-k8s`, which `rollout.sh` runs.
+- Existing stores re-apply at the release images through `POST /api/internal/provisioning/reconcile-k8s`; a store still on the old all-in-one app keeps that app's image. `rollout.sh` then moves each onto its own services, one at a time, with `POST /api/internal/provisioning/switch-layout?slug=` (`lib/provisioning/layout-switch.ts`): the services start beside the old app, the routes move once they are Ready, the old app drains and goes. A store that can't start its services goes back to the old app and the release stops; the provisioning worker resumes a move left half done. Compute changes wait while a store moves.
 - Production DB: the control plane merges into `jeffi_stores` at go-live (`CONTROL_PLANE_RDS_DB=jeffi_stores`); `jeffi_control_plane` stays a week as the fallback.
 - Releases without CI: `deploy/k8s/bootstrap/release.sh`. DB changes are user-run scripts in `deploy/k8s/db/`. Go-live steps: [`GO_LIVE_RUNBOOK.md`](GO_LIVE_RUNBOOK.md).
 - **Live state:** not deployed yet; production runs `5c4ffbf4`.
@@ -30,13 +32,31 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 
 Tenant compute is moving from AMI-built EC2s to k3s. The plan is in [`K8S_MIGRATION_PLAN.md`](K8S_MIGRATION_PLAN.md) and the runbook in [`deploy/k8s/README.md`](../deploy/k8s/README.md).
 
-- **Selection:** `PROVISIONING_COMPUTE=k8s` switches `ensure_compute` to `controller-service/src/lib/k8s/tenant-compute.ts`. Each tenant gets the namespace `tenant-{slug}`, with per-plan pod sizing (`controller-service/src/lib/provisioning/tiers.ts`).
-  - Basic tenants run on shared `pool-basic-N` nodes.
-  - Growth and above get a dedicated `t-{slug}` node.
+- **Selection:** `PROVISIONING_COMPUTE=k8s` switches `ensure_compute` to `controller-service/src/lib/k8s/tenant-compute.ts`. Each tenant gets the namespace `tenant-{slug}`, sized from its compute spec (next section).
+  - Pool stores run on shared `pool-basic-N` nodes; empty ones are terminated after an hour (`reclaimEmptyPoolNodes`).
+  - A store with its own servers gets nodes `t-{slug}` (generation 0) or `t-{slug}.{gen}-{i}`, labelled `jeffi.io/tenant` + `jeffi.io/gen` and tagged `jeffi-tenant={slug}`.
 - **DNS:** a single `*.jeffistores.in` wildcard. `configure_dns` no longer writes per-host records in k8s mode.
 - **Plan changes:** go through `reconcileK8sPlan`. A node that is still joining parks the change as `k8sPendingPlan`, which the worker retries.
 - **Tenant-admin CA bundle:** is a Secret (`jeffi-edge/client-ca-bundle`) patched by `mtls-fleet` instead of being pushed over SSM.
 - **Live state:** live on k3s since 2026-10-09 (`5c4ffbf4`).
+
+## Configurable compute (2026-10-30, not deployed)
+
+Code: `controller-service/src/lib/compute/`.
+
+- **Spec:** each store's EC2 (pool or own type and count), RDS (shared or own class, storage, Multi-AZ) and copies/size per service, in `tenant_compute.desired`/`applied`. Presets Shared/Small/Medium/Large/X-Large; Advanced from Basic up.
+- **Price:** AWS cost (`compute_prices`) × USD→INR × (1 + margin), settings in `platform_infra.compute_pricing`; admin page Settings → Server Pricing; `deploy/k8s/db/refresh-compute-prices.sh` prints price updates.
+- **Flag:** `COMPUTE_SPEC_ENABLED=true` shows the picker at onboarding and makes provisioning use the owner's choice. Off, every store runs its plan's old tier (`compute/legacy.ts`) and `tenant_compute` records it.
+- **Provisioning (phase 2):** the database is created at the chosen class/storage/Multi-AZ with `max_connections` by class; each pod gets `DB_POOL_MAX` so all copies fit the database's connections. Starter stores get a database `t_{slug}` and IAM role `app_{slug}` on a shared host (`shared_db_hosts`, `tenant_infra.rds_user`/`shared_db_host`).
+- **Resizing a running store (phase 3):** owner page `/ecom/dashboard/compute` (Servers, shown when the flag is on) or the admin `PUT /api/admin/ecom/[tenantId]/compute`. A price rise needs 7 days of wallet. The provisioning worker runs `reconcileCompute` (`lib/provisioning/compute-reconcile.ts`) one step per tick:
+  - **Shared ↔ own database:** create the target, take the store offline (`instance_state='migrating'`), wait 90 s for requests to finish, copy, switch `tenant_infra`, restart pods, bring it back. The old database is dropped after 24 h.
+  - **Servers:** more servers of the same type join the current generation; any other change starts a new generation `t-{slug}.{gen}-{i}`, pods roll over, then the old servers are removed.
+  - **Own database:** storage and standby change at once; the class changes in the maintenance window (or now), with pods lowered to the smaller connection pool first.
+  - A failed change retries with backoff, then alerts; admin Infrastructure → Kubernetes has Retry.
+- **Wallet billing for servers (phase 4):** a store's price per hour is kept in `tenant_compute_periods` (one open period, a new one at each price change or pause; `lib/billing/infra-billing.ts`). The `infra_billing` cron (00:30 IST) debits each IST day once, category `infra`, keyed `infra:{tenant}:{day}`, into a negative balance if need be, catching up three days. Then `infra-balance.ts`: a week of runway left → an email every 3 days; below zero → `graceDays` (3), then the store pauses (not served, pods at 0, its own servers and database stopped, billed for storage only). The provisioning worker starts it again once the wallet covers a day. Owner Wallet and Servers pages show the daily cost, runway and pause state; admin Billing shows servers revenue against estimated AWS cost. Off while `COMPUTE_SPEC_ENABLED` is off; the flagship is never billed.
+- **Onboarding prepay:** after the plan is paid, a new store's wallet must hold `minPrepayDays` (30) of its servers before it is built (`onboard/FundServers.tsx`, `startStoreIfReady`).
+- **Plan fees:** Razorpay plans take `plans.monthly_price_inr` (yearly ten months), cached by slug, interval and amount. An upgrade cancels the old subscription only after the new one is saved; a downgrade waits in `tenants.pending_plan_id` until the next recurring charge.
+- **Service split (phase 5):** done, see `docs/MICROSERVICES.md`.
 
 ---
 

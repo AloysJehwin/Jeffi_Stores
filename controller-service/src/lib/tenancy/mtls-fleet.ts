@@ -5,7 +5,7 @@ import { execFileSync } from 'child_process'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { describeRunningTenantInstanceIds } from '@/lib/shared/ec2-client'
-import { sendShellCommand } from '@/lib/shared/ssm-client'
+import { sendShellCommand } from '@controller/lib/shared/ssm-client'
 import { repoPath } from '@/lib/shared/paths'
 
 /**

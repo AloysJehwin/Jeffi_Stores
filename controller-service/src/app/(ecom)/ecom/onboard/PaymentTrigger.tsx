@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
-import { trackSubscriptionCheckout, type PlanInfo } from '@/lib/client/ecom-analytics'
+import { trackSubscriptionCheckout, type PlanInfo } from '@controller/lib/client/ecom-analytics'
 
 interface Props {
   subscriptionId: string

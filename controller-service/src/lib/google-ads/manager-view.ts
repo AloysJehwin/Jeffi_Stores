@@ -1,6 +1,6 @@
 import { controlPlanePool, deleteIntegrationCredential } from '@/lib/tenant-registry'
-import { GoogleAdsApiError, normalizeCustomerId, type AdsRow, type GoogleAdsClient } from './client'
-import { GOOGLE_ADS_PROVIDER } from './credentials'
+import { GoogleAdsApiError, normalizeCustomerId, type AdsRow, type GoogleAdsClient } from '@/lib/google-ads/client'
+import { GOOGLE_ADS_PROVIDER } from '@/lib/google-ads/credentials'
 
 // The platform manager account's view for platform admins: every client account under the Jeffi
 // manager (customer_client), which store it belongs to (tenant_integration_credentials), its

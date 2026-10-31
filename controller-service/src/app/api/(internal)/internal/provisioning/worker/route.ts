@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { activeProvisioningJobs, getProvisioningJob, controlPlanePool } from '@/lib/tenant-registry'
 import { pendingK8sPlanTenants } from '@/lib/tenant-registry/provisioning'
-import { advanceProvisioningJob, reconcileK8sPlan } from '@/lib/provisioning/steps'
-import { getProvisioningProvider } from '@/lib/provisioning'
-import { provisionTenantOwnerAdmin } from '@/lib/tenancy/tenant-admin-provision'
+import { advanceProvisioningJob, reconcileK8sPlan } from '@controller/lib/provisioning/steps'
+import { getProvisioningProvider } from '@controller/lib/provisioning'
+import { provisionTenantOwnerAdmin } from '@controller/lib/tenancy/tenant-admin-provision'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
@@ -57,6 +57,48 @@ async function tick() {
     results.push({ tenantId, step: 'k8s_plan', status: r.ok ? (r.error ?? 'applied') : `error: ${r.error}` })
   }
 
+  // Owners' compute changes to running stores (and old databases due to be dropped).
+  const { dueComputeChanges } = await import('@controller/lib/compute/store')
+  const { reconcileCompute } = await import('@controller/lib/provisioning/compute-reconcile')
+  for (const tenantId of await dueComputeChanges().catch(() => [])) {
+    const r = await reconcileCompute(tenantId, provider).catch((e: any) => ({ ok: false, status: 'error', error: e?.message }))
+    results.push({ tenantId, step: 'compute_change', status: r.ok ? r.status : `error: ${r.error}` })
+  }
+
+  // Stores part-way off the old all-in-one app (the release starts each move; see switch-layout).
+  const { dueLayoutSwitches } = await import('@controller/lib/compute/store')
+  const { reconcileLayout } = await import('@controller/lib/provisioning/layout-switch')
+  for (const tenantId of await dueLayoutSwitches().catch(() => [])) {
+    const r = await reconcileLayout(tenantId).catch((e: any) => ({ ok: false, status: 'error', detail: e?.message }))
+    results.push({ tenantId, step: 'layout_switch', status: r.ok ? `${r.status}${r.detail ? `: ${r.detail}` : ''}` : `error: ${r.detail}` })
+  }
+
+  // New stores whose plan is paid and whose servers' prepayment has since arrived (a top-up the webhook credited).
+  const { startStoreIfReady } = await import('@controller/lib/provisioning/start-store')
+  const waiting = await controlPlanePool()
+    .query<{ id: string }>(
+      `SELECT id FROM tenants WHERE subscription_status = 'active'
+          AND (store_request = 'awaiting_payment' OR (store_request IS NULL AND status = 'awaiting_payment'))`
+    )
+    .catch(() => ({ rows: [] as { id: string }[] }))
+  for (const { id } of waiting.rows) {
+    if (await startStoreIfReady(id).catch(() => false)) results.push({ tenantId: id, step: 'start_store', status: 'started' })
+  }
+
+  // Stores paused for an unpaid wallet that has since been topped up.
+  const { resumeFundedStores } = await import('@controller/lib/billing/infra-balance')
+  for (const r of await resumeFundedStores(provider).catch(() => [])) results.push({ tenantId: r.tenantId, step: 'resume', status: r.status })
+
+  // Pool servers left empty (stores moved to their own servers or left) are terminated after an hour.
+  const k8s = await import('@/lib/k8s/tenant-compute')
+  if (k8s.k8sComputeEnabled()) {
+    const reclaimed = await k8s.reclaimEmptyPoolNodes(id => provider.deleteAppInstance(id)).catch((e: any) => {
+      console.error('[provisioning] pool reclaim failed:', e?.message)
+      return []
+    })
+    for (const id of reclaimed) results.push({ tenantId: '-', step: 'pool_reclaim', status: `terminated ${id}` })
+  }
+
   return { success: true, advanced: results.length, results }
 }
 
@@ -91,13 +133,13 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
   // tenant's admin host advertises its CA (and prompts for the cert) without waiting for the
   // next deploy. Non-fatal — the store is live regardless.
   try {
-    const { refreshTenantMtlsFleet } = await import('@/lib/tenancy/mtls-fleet')
+    const { refreshTenantMtlsFleet } = await import('@controller/lib/tenancy/mtls-fleet')
     await refreshTenantMtlsFleet(r.slug)
   } catch (e: any) {
     const reason = e?.message ?? String(e)
     console.error(`[mtls-fleet] ${r.slug}: ${reason}`)
     try {
-      const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+      const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
       await alertProvisioningFailure(r.slug, 'mtls_fleet_refresh', reason)
     } catch {
       /* alerting must never mask the original failure */
@@ -110,7 +152,7 @@ async function reportOwnerAdminFailure(slug: string, error?: string): Promise<vo
   const msg = `[provisionTenantOwnerAdmin] ${slug}: ${error ?? 'unknown error'}`
   console.error(msg)
   try {
-    const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+    const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
     await alertProvisioningFailure(slug, 'owner_admin_cert', error ?? 'unknown error')
   } catch {
     /* alerting must never mask the original failure */
