@@ -46,6 +46,7 @@ const flags = vi.hoisted(() => ({ gstEnabled: true, inventoryValidationEnabled: 
 vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: async () => ({ ...flags }),
   getBusinessValues: async () => ({ businessStateCode: '33' }),
+  getStoreIdentity: async () => ({ name: 'Acme Store' }),
 }))
 
 vi.mock('@/lib/orders/inventory-deduct', async () => ({
@@ -63,17 +64,6 @@ vi.mock('@/lib/shared/email-business', () => ({
 
 vi.mock('@/lib/catalog/pricing', () => ({
   lineItemExGst: vi.fn(),
-}))
-
-vi.mock('@/lib/payments/razorpay', () => ({
-  getRazorpayInstance: vi.fn().mockReturnValue({
-    qrCode: {
-      create: vi.fn().mockResolvedValue({
-        id: 'qr_test_123',
-        image_url: 'https://rzp.io/qr/test.png',
-      }),
-    },
-  }),
 }))
 
 vi.mock('sharp', () => {
@@ -340,31 +330,20 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
 
   // --- Payment modes ---
 
-  it('marks order as unpaid for upi_qr paymentMode and returns qrImageUrl', async () => {
+  it('on upi_qr returns a QR request for the controller, which makes it on the store\'s own keys', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     const res = await POST(postReq({ paymentMode: 'upi_qr' }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
-    expect(json).toHaveProperty('qrImageUrl')
-  })
-
-  it('handles upi_qr QR creation failure gracefully (non-fatal)', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
-    const { getRazorpayInstance } = await import('@/lib/payments/razorpay')
-    vi.mocked(getRazorpayInstance).mockReturnValue({
-      qrCode: { create: vi.fn().mockRejectedValue(new Error('RZP down')) },
-    } as any)
-    const res = await POST(postReq({ paymentMode: 'upi_qr' }), { params: Promise.resolve({ id: QUOT_ID }) })
-    const json = await res.json()
-    expect(res.status).toBe(200)
-    expect(json.success).toBe(true)
     expect(json.qrImageUrl).toBeNull()
+    expect(json.qrRequest).toMatchObject({ amountPaise: expect.any(Number), description: expect.stringContaining('Acme Store') })
   })
 
   it('marks order as paid for bank_transfer paymentMode', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     const res = await POST(postReq({ paymentMode: 'bank_transfer' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
+    expect((await res.json()).qrRequest).toBeNull()
   })
 
   // --- Buyer ≠ consignee path ---
