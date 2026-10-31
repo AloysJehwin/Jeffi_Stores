@@ -7,6 +7,7 @@ vi.mock('@/lib/catalog/digital-guard', () => ({ findDigitalProductIds: vi.fn(asy
 vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: async () => ({ gstEnabled: true, inventoryValidationEnabled: true }),
   getBusinessValues: async () => ({ businessStateCode: '33' }),
+  getStoreIdentity: async () => ({ name: 'Acme Store' }),
 }))
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
@@ -39,9 +40,6 @@ vi.mock('@/lib/shared/email-business', () => ({
 vi.mock('@/lib/catalog/pricing', () => ({
   lineItemExGst: vi.fn((qty: number, rate: number, disc: number) => qty * rate * (1 - disc / 100)),
 }))
-vi.mock('@/lib/payments/razorpay', () => ({
-  getRazorpayInstance: vi.fn(),
-}))
 vi.mock('sharp', () => ({
   default: vi.fn(),
 }))
@@ -52,7 +50,6 @@ import { POST } from '@/app/api/(admin)/admin/quotations/[id]/convert-to-invoice
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
-import { getRazorpayInstance } from '@/lib/payments/razorpay'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -354,7 +351,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     expect((await res.json()).success).toBe(true)
   })
 
-  it('generates UPI QR code when paymentMode is upi_qr', async () => {
+  it('asks the controller for a UPI QR when paymentMode is upi_qr', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryOne).mockResolvedValue(FINAL_QUOTATION as any)
@@ -365,18 +362,12 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     const client = makeMockClient()
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
 
-    // QR generation throws internally — non-fatal
-    vi.mocked(getRazorpayInstance).mockReturnValue({
-      qrCode: {
-        create: vi.fn().mockRejectedValue(new Error('rzp fail')),
-      },
-    } as any)
-
     const res = await POST(makePost({ paymentMode: 'upi_qr' }), PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(body.qrImageUrl).toBeNull()
+    expect(body.qrRequest).toMatchObject({ amountPaise: expect.any(Number), description: expect.stringContaining('Acme Store') })
   })
 
   it('returns 500 when withTransaction throws', async () => {

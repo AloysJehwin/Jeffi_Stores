@@ -33,7 +33,7 @@
     "dev:documents": "npm --prefix document-service run dev",
     "dev:public-api": "npm --prefix public-api-service run dev",
     "dev:services": "concurrently -n msg,doc,api -c blue,green,magenta \"npm run dev:messaging\" \"npm run dev:documents\" \"npm run dev:public-api\"",
-    "typecheck:services": "npm --prefix messaging-service run typecheck && npm --prefix document-service run typecheck && npm --prefix public-api-service run typecheck"
+    "typecheck:services": "npm --prefix messaging-service run typecheck && npm --prefix document-service run typecheck && npm --prefix public-api-service run typecheck && npm --prefix mobile-service run typecheck"
   },
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.1038.0",

@@ -1,1 +1,1 @@
-{ "extends": "../tsconfig.services.json", "include": ["src/**/*.ts", "../packages/*/src/**/*.ts"] }
+{ "extends": "../tsconfig.services.json", "include": ["src/**/*.ts", "../packages/*/src/**/*.ts"], "exclude": ["../packages/store-core"] }
