@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config'
 import path from 'path'
 
+// CI runs each project in its own job (VITEST_PART) and checks the thresholds once, over the merged parts.
+const part = !!process.env.VITEST_PART
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default defineConfig({
   oxc: { jsx: { runtime: 'automatic' } },
@@ -34,13 +37,13 @@ export default defineConfig({
     ].map(([name, dir]) => ({ extends: true as const, test: { name, include: [`${dir}/tests/**/*.test.{ts,tsx}`] } })),
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'lcov', 'json-summary', 'json'],
+      reporter: part ? ['json-summary'] : ['text', 'lcov', 'json-summary', 'json'],
       include: ['{controller,storefront,admin,business}-service/src/**/*.{ts,tsx}', 'packages/store-core/src/**/*.{ts,tsx}'],
       // Baseline after adding .tsx to coverage (#524) and the service split: measured
       // statements 38.9 / lines 39.7 / branches 31.8 / functions 25.1. Floored a point below
       // the measured numbers so a single new gated branch can't tip CI red; raise as coverage grows.
       // Branches lowered to 30 after support 2.0 + Drive (measured 30.8) until their tests land.
-      thresholds: {
+      thresholds: part ? undefined : {
         lines: 39,
         branches: 30,
         statements: 38,
