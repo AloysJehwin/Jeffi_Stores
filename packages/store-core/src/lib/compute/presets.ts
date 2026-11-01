@@ -29,6 +29,11 @@ export interface Preset {
   spec: ComputeSpec
 }
 
+// Basic runs Postgres on the same EC2 node. The 'basic' plan activates storefront/admin/messaging/
+// documents only — the business portal is Pro-and-up. The Record<ServiceName,…> type still needs
+// every key, so inactive services get the same {1,1,'S'} baseline the plan never activates.
+const basicServices = (): Record<ServiceName, ServiceSpec> => all(svc(1, 1, 'S'))
+
 export const PRESETS: Record<PresetKey, Preset> = {
   shared: {
     key: 'shared',
@@ -38,6 +43,18 @@ export const PRESETS: Record<PresetKey, Preset> = {
       node: { placement: 'pool', type: null, count: 1 },
       db: { mode: 'shared', class: null, storageGb: 10, multiAz: false },
       services: all(svc(1, 1, 'S')),
+      storage: { s3Gb: 10 },
+    },
+  },
+  basic: {
+    key: 'basic',
+    label: 'Basic',
+    blurb: 'Own server with its own PostgreSQL — nightly backups to S3.',
+    spec: {
+      node: { placement: 'dedicated', type: 't4g.small', count: 1 },
+      db: { mode: 'node', class: null, storageGb: 10, multiAz: false },
+      services: basicServices(),
+      storage: { s3Gb: 10 },
     },
   },
   small: {
@@ -49,6 +66,7 @@ export const PRESETS: Record<PresetKey, Preset> = {
       db: { mode: 'dedicated', class: 'db.t4g.micro', storageGb: 20, multiAz: false },
       // A second storefront copy takes the room a rollout needs anyway.
       services: { ...all(svc(1, 1, 'S')), storefront: svc(1, 2, 'S') },
+      storage: { s3Gb: 20 },
     },
   },
   medium: {
@@ -59,6 +77,7 @@ export const PRESETS: Record<PresetKey, Preset> = {
       node: { placement: 'dedicated', type: 't4g.medium', count: 1 },
       db: { mode: 'dedicated', class: 'db.t4g.small', storageGb: 20, multiAz: false },
       services: { storefront: svc(2, 3, 'M'), admin: svc(1, 1, 'S'), business: svc(1, 1, 'S'), messaging: svc(2, 2, 'M'), documents: svc(2, 2, 'M') },
+      storage: { s3Gb: 20 },
     },
   },
   large: {
@@ -69,6 +88,7 @@ export const PRESETS: Record<PresetKey, Preset> = {
       node: { placement: 'dedicated', type: 't4g.large', count: 1 },
       db: { mode: 'dedicated', class: 'db.t4g.medium', storageGb: 50, multiAz: false },
       services: { storefront: svc(2, 4, 'L'), admin: svc(1, 1, 'M'), business: svc(1, 1, 'S'), messaging: svc(2, 2, 'L'), documents: svc(2, 2, 'L') },
+      storage: { s3Gb: 50 },
     },
   },
   xlarge: {
@@ -79,13 +99,20 @@ export const PRESETS: Record<PresetKey, Preset> = {
       node: { placement: 'dedicated', type: 't4g.xlarge', count: 1 },
       db: { mode: 'dedicated', class: 'db.t4g.large', storageGb: 100, multiAz: false },
       services: { storefront: svc(3, 8, 'L'), admin: svc(2, 2, 'M'), business: svc(1, 2, 'S'), messaging: svc(3, 3, 'L'), documents: svc(3, 3, 'L') },
+      storage: { s3Gb: 100 },
     },
   },
 }
 
 export const DEDICATED_PRESETS: PresetKey[] = ['small', 'medium', 'large', 'xlarge']
+export const BASIC_PRESET: PresetKey[] = ['basic']
 
-export const presetSpec = (key: PresetKey): ComputeSpec => cloneSpec(PRESETS[key].spec)
+/** presetSpec clones the preset's spec; shared defaults s3Gb to 10 if the preset entry is missing it. */
+export const presetSpec = (key: PresetKey): ComputeSpec => {
+  const s = cloneSpec(PRESETS[key].spec)
+  if (!s.storage) s.storage = { s3Gb: key === 'shared' ? 10 : (PRESETS[key].spec.storage?.s3Gb ?? 10) }
+  return s
+}
 
 /** A second node and a standby database in another zone. */
 export function withHighAvailability(spec: ComputeSpec): ComputeSpec {
@@ -100,7 +127,8 @@ export function specKey(s: ComputeSpec): string {
   const n = s.node
   const d = s.db
   const svcs = SERVICE_NAMES.map(k => `${k}:${s.services[k]?.replicas}/${s.services[k]?.maxReplicas}/${s.services[k]?.size}`)
-  return [n.placement, n.type ?? '', n.count, d.mode, d.class ?? '', d.storageGb, d.multiAz ? 1 : 0, ...svcs].join('|')
+  const s3 = s.storage?.s3Gb ?? 0
+  return [n.placement, n.type ?? '', n.count, d.mode, d.class ?? '', d.storageGb, d.multiAz ? 1 : 0, ...svcs, `s3:${s3}`].join('|')
 }
 
 /** The preset a spec is, or 'custom'. High availability on a preset still counts as that preset. */
