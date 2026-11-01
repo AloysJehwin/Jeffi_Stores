@@ -20,21 +20,26 @@ export interface ServiceSpec {
 export interface ComputeSpec {
   // pool: a share of a node with other Starter stores; dedicated: the store's own node(s).
   node: { placement: 'pool' | 'dedicated'; type: string | null; count: number }
-  // shared: a database on a server shared with other Starter stores; dedicated: its own RDS.
-  db: { mode: 'shared' | 'dedicated'; class: string | null; storageGb: number; multiAz: boolean }
+  // shared: a database on a server shared with other Starter stores; dedicated: its own RDS;
+  // node: Postgres on the same EC2 node (Basic plan).
+  db: { mode: 'shared' | 'dedicated' | 'node'; class: string | null; storageGb: number; multiAz: boolean }
   services: Record<ServiceName, ServiceSpec>
+  // S3 bucket for backups and media. Optional while callers (legacy.ts, tenant-workload.ts and friends)
+  // are migrated in later phases; every PRESET and presetSpec() populates it.
+  storage?: { s3Gb: number }
   layout?: StoreLayout
 }
 
-export type PresetKey = 'shared' | 'small' | 'medium' | 'large' | 'xlarge'
+export type PresetKey = 'shared' | 'basic' | 'small' | 'medium' | 'large' | 'xlarge'
 export type Placement = 'pool' | 'dedicated'
 
-/** What a plan lets its owner choose (plans.default_preset / min_placement / advanced_compute). */
+/** What a plan lets its owner choose (plans.default_preset / min_placement / advanced_compute / min_preset). */
 export interface PlanCompute {
   slug: string
   defaultPreset: PresetKey | null
   minPlacement: Placement
   advanced: boolean
+  minPreset?: PresetKey
 }
 
 export interface PriceRow {

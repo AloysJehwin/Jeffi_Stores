@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS public.plans (
     name           character varying(80) NOT NULL,
     tier           integer NOT NULL,                        -- 1..5, ordering
     monthly_price_inr  numeric(12,2) NOT NULL DEFAULT 0,
+    infra_margin       numeric(4,3)  NOT NULL DEFAULT 0,       -- markup on AWS cost (0.5 = +50%)
+    min_preset         text          NOT NULL DEFAULT 'small', -- floor compute preset for this plan
     max_custom_domains integer       NOT NULL DEFAULT 0,  -- 0=none, 1=Pro, 3=Enterprise
     is_active          boolean       NOT NULL DEFAULT true,
     created_at     timestamp with time zone NOT NULL DEFAULT now(),
@@ -871,6 +873,10 @@ ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS storage_quota_bytes bigint NOT
 ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS max_file_bytes      bigint NOT NULL DEFAULT 5368709120;
 ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS egress_quota_bytes  bigint;
 
+-- Infra-cost pricing: each paid plan marks up AWS cost by infra_margin and floors compute to min_preset.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS infra_margin numeric(4,3) NOT NULL DEFAULT 0;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS min_preset   text         NOT NULL DEFAULT 'small';
+
 -- Own-key tenants verify their customer webhook with their own secret (platform secret can't).
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS razorpay_webhook_secret character varying(255);
 
@@ -1097,6 +1103,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_compute (
     status        text NOT NULL DEFAULT 'pending',
     apply_mode    text NOT NULL DEFAULT 'window',       -- window: RDS class changes wait for the maintenance window
     rate_inr_hour numeric(12,4),                        -- applied spec's price, margin included, GST excluded
+    price_inr_month integer,                            -- store's monthly subscription price (replaces plan fee)
     node_gen      integer NOT NULL DEFAULT 0,           -- dedicated servers' generation; a type change starts the next
     progress      jsonb,                                -- where a change of a running store has got to (compute-reconcile.ts)
     attempts      integer NOT NULL DEFAULT 0,
@@ -1116,6 +1123,9 @@ ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_status_chec
 ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_apply_mode_check
     CHECK (apply_mode IN ('window','now'));
 CREATE INDEX IF NOT EXISTS idx_tenant_compute_pending ON public.tenant_compute USING btree (next_at) WHERE (status IN ('pending','applying'));
+
+-- Store's monthly subscription price (replaces plan.monthly_price_inr as MRR source).
+ALTER TABLE public.tenant_compute ADD COLUMN IF NOT EXISTS price_inr_month integer;
 
 --
 -- tenant_compute_periods: a store's server price per hour over time, for the daily wallet debit

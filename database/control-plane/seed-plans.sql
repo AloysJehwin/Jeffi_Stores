@@ -17,17 +17,19 @@ BEGIN;
 
 -- Starter shares a pool node and database server; it stays inactive (hidden from the plan picker) until
 -- infrastructure billing ships. It has Basic's features (see the starter→basic mapping below).
-INSERT INTO public.plans (slug, name, tier, monthly_price_inr, max_custom_domains, is_active, storage_quota_bytes, max_file_bytes, product,
+INSERT INTO public.plans (slug, name, tier, monthly_price_inr, infra_margin, min_preset, max_custom_domains, is_active, storage_quota_bytes, max_file_bytes, product,
                           default_preset, min_placement, advanced_compute) VALUES
-  ('services', 'Services', 0, 0.00, 0, true, 0, 0, 'services', NULL, 'pool', false),
-  ('starter', 'Starter', 1, 999.00, 0, false, 5368709120, 5368709120, 'store', 'shared', 'pool', false),
-  ('basic', 'Basic', 2, 2999.00, 0, true, 10737418240, 5368709120, 'store', 'small', 'dedicated', true),
-  ('growth', 'Grow', 3, 4999.00, 0, true, 53687091200, 5368709120, 'store', 'small', 'dedicated', true),
-  ('pro', 'Pro', 4, 7999.00, 1, true, 214748364800, 5368709120, 'store', 'medium', 'dedicated', true),
-  ('enterprise', 'Enterprise', 5, 9999.00, 3, true, 1099511627776, 5368709120, 'store', 'large', 'dedicated', true)
+  ('services', 'Services', 0, 0.00, 0,    'small',  0, true, 0, 0, 'services', NULL, 'pool', false),
+  ('starter', 'Starter', 1, 999.00, 0,    'small',  0, false, 5368709120, 5368709120, 'store', 'shared', 'pool', false),
+  ('basic', 'Basic', 2, 0,    0,    'basic',  0, true, 10737418240, 5368709120, 'store', 'small', 'dedicated', true),
+  ('growth', 'Grow', 3, 0,    0.5,  'small',  0, true, 53687091200, 5368709120, 'store', 'small', 'dedicated', true),
+  ('pro', 'Pro', 4, 0,    0.4,  'medium', 1, true, 214748364800, 5368709120, 'store', 'medium', 'dedicated', true),
+  ('enterprise', 'Enterprise', 5, 0, 0.3, 'large',  3, true, 1099511627776, 5368709120, 'store', 'large', 'dedicated', true)
 ON CONFLICT (slug) DO UPDATE SET
   name = EXCLUDED.name, tier = EXCLUDED.tier,
   monthly_price_inr = EXCLUDED.monthly_price_inr,
+  infra_margin = EXCLUDED.infra_margin,
+  min_preset = EXCLUDED.min_preset,
   max_custom_domains = EXCLUDED.max_custom_domains,
   is_active = EXCLUDED.is_active,
   storage_quota_bytes = EXCLUDED.storage_quota_bytes,
@@ -541,7 +543,7 @@ WHERE pf.plan_id = p.id
       ('enterprise', 'quotations:write'),
       ('enterprise', 'replacements:read'),
       ('enterprise', 'replacements:write'),
-          ('enterprise', 'returns:read'),
+      ('enterprise', 'returns:read'),
       ('enterprise', 'returns:write'),
       ('enterprise', 'review_forms:read'),
       ('enterprise', 'review_forms:write'),

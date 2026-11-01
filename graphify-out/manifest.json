@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1793430071.4370537,
-    "ast_hash": "022976ea101ef304f7122c201f71b674",
+    "mtime": 1793430385.5802305,
+    "ast_hash": "72a30679837d870b43b216c1f9fcd90e",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -345,8 +345,8 @@
     "semantic_hash": ""
   },
   "database/control-plane/schema.sql": {
-    "mtime": 1793384551.6432884,
-    "ast_hash": "422bcf439f2f901ec53f2dfc6350e1dd",
+    "mtime": 1793532008.0750663,
+    "ast_hash": "ac65ee4fe226a1fe76fe238ead3aa7f4",
     "semantic_hash": ""
   },
   "docs/PLAN_FEATURE_MATRIX.md": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "database/control-plane/seed-plans.sql": {
-    "mtime": 1793374573.7741537,
-    "ast_hash": "a0bd4d58ac2a1d541c0a3fafa45a4259",
+    "mtime": 1793532296.058141,
+    "ast_hash": "18ee6e72510a04accea9c7e1fdd79f31",
     "semantic_hash": ""
   },
   ".github/workflows/commitlint.yml": {
@@ -9500,18 +9500,18 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/compute/presets.ts": {
-    "mtime": 1793374713.8886378,
-    "ast_hash": "1e231350027900983e0555fa93db5a88",
+    "mtime": 1793532328.6581745,
+    "ast_hash": "5c9bf444595015f1fc7c069e739ba40b",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/compute/spec.ts": {
-    "mtime": 1793377123.2026432,
-    "ast_hash": "306c54eff99f86bfc0d1414d3f9a6b45",
+    "mtime": 1793532440.139836,
+    "ast_hash": "eec45eab8cdeaadfb5e4461bf954b544",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/compute/validate.ts": {
-    "mtime": 1793374199.6528244,
-    "ast_hash": "b305fcc2e53fe7495136407059813961",
+    "mtime": 1793532298.886887,
+    "ast_hash": "cd9d68f32e71e1cf63681e86e032880b",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/customer-agent/tools.ts": {
