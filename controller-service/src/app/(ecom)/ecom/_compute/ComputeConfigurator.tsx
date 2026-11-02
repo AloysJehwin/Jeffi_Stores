@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { ChoiceCards, Segmented, fieldCls } from '../_ui'
-import { DEDICATED_PRESETS, PRESETS, presetOf, presetSpec, withHighAvailability } from '@/lib/compute/presets'
+import { BASIC_PRESET, DEDICATED_PRESETS, PRESETS, TRAFFIC_BANDS, presetOf, presetSpec, recommendedPresetKey, withHighAvailability } from '@/lib/compute/presets'
 import { monthlyTotal, quoteSpec, type Quote } from '@controller/lib/compute/pricing'
 import { LIMITS, planCompatibilityError, smallestFittingNode, validateSpec, type Validation } from '@/lib/compute/validate'
 import { activeServices, cloneSpec, type Catalog, type ComputeSpec, type PodSize, type PresetKey, type ServiceName } from '@/lib/compute/spec'
@@ -14,6 +14,8 @@ export interface ComputePlan {
   defaultPreset: PresetKey | null
   minPlacement: 'pool' | 'dedicated'
   advanced: boolean
+  minPreset?: PresetKey
+  infraMargin?: number
 }
 
 export interface ComputeChoice {
@@ -22,6 +24,8 @@ export interface ComputeChoice {
   total: ReturnType<typeof monthlyTotal> | null
   valid: boolean
   preset: PresetKey | 'custom'
+  planSlug: string
+  visitorsPerMonth: number
 }
 
 const SERVICE_LABEL: Record<ServiceName, string> = {
@@ -34,11 +38,12 @@ const SERVICE_LABEL: Record<ServiceName, string> = {
 const SIZE_LABEL: Record<PodSize, string> = { S: 'Small', M: 'Medium', L: 'Large' }
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
+const fmtVisitors = (n: number) => n >= 1_000_000 ? `${n / 1_000_000}M` : n >= 1_000 ? `${n / 1_000}k` : `${n}`
 const selectCls = `w-full rounded-xl border bg-surface px-3 py-2 text-sm text-foreground ${fieldCls}`
 
 /**
- * Picks a store's compute: a size preset (with an optional standby), or every setting under Customise,
- * with the price worked out as it changes. The server re-prices on submit; this is for display.
+ * Picks a plan and server size for a store. Owners pick a plan card (price shown "from" the plan's floor),
+ * then a traffic estimate on non-basic plans, which drives a recommended size. Customise exposes every knob.
  */
 export function ComputeConfigurator({
   planSlug,
@@ -46,20 +51,24 @@ export function ComputeConfigurator({
   onChange,
   current,
   planFeeInr,
+  onPlanChange,
 }: {
   planSlug: string
   value: ComputeSpec | null
   onChange: (choice: ComputeChoice) => void
   /** The running spec, when resizing an existing store (storage can only grow). */
   current?: ComputeSpec | null
-  /** Shown in the total; defaults to the plan's monthly fee. */
+  /** Shown in the total; defaults to the plan's monthly fee (0 for new sign-ups). */
   planFeeInr?: number
+  /** Caller controls planSlug (onboard switches the plan here instead of a separate step). */
+  onPlanChange?: (slug: string) => void
 }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [plans, setPlans] = useState<ComputePlan[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [custom, setCustom] = useState(false)
   const [capacityError, setCapacityError] = useState<string | null>(null)
+  const [visitorIdx, setVisitorIdx] = useState(2) // 5k default
 
   useEffect(() => {
     fetch('/api/ecom/compute/catalog')
@@ -72,33 +81,42 @@ export function ComputeConfigurator({
   }, [])
 
   const plan = plans.find(p => p.slug === planSlug) ?? null
-  const fallback = plan?.defaultPreset ?? (plan?.minPlacement === 'pool' ? 'shared' : 'small')
+  const isBasic = plan?.minPreset === 'basic'
+  const fallback = plan?.defaultPreset ?? (plan?.minPreset === 'basic' ? 'basic' : plan?.minPlacement === 'pool' ? 'shared' : (plan?.minPreset ?? 'small'))
 
-  const evaluate = (spec: ComputeSpec): ComputeChoice | null => {
-    if (!catalog || !plan) return null
-    const validation: Validation = validateSpec(spec, catalog, plan, { current })
+  const visitorsPerMonth = TRAFFIC_BANDS[visitorIdx] ?? 5_000
+
+  const evaluate = (spec: ComputeSpec, slug: string): ComputeChoice | null => {
+    if (!catalog) return null
+    const p = plans.find(x => x.slug === slug) ?? plan
+    if (!p) return null
+    const validation: Validation = validateSpec(spec, catalog, p, { current })
     let quote: Quote | null = null
     try {
-      quote = quoteSpec(spec, catalog)
+      quote = quoteSpec(spec, catalog, { infraMargin: p.infraMargin })
     } catch {
       validation.ok = false
     }
-    const fee = planFeeInr ?? plan.monthlyPriceInr
-    return { spec, quote, total: quote ? monthlyTotal(quote, fee, catalog.settings.gstRate) : null, valid: validation.ok, preset: presetOf(spec) }
+    const fee = planFeeInr ?? p.monthlyPriceInr
+    return {
+      spec, quote,
+      total: quote ? monthlyTotal(quote, fee, catalog.settings.gstRate) : null,
+      valid: validation.ok, preset: presetOf(spec), planSlug: slug, visitorsPerMonth,
+    }
   }
 
   // A spec the plan doesn't allow (a new plan picked) starts again from that plan's default size.
   useEffect(() => {
     if (!catalog || !plan) return
-    const spec = value && !planCompatibilityError(value, plan) ? value : presetSpec(fallback)
-    const c = evaluate(spec)
+    const spec = value && !planCompatibilityError(value, plan) ? value : presetSpec(fallback as PresetKey)
+    const c = evaluate(spec, planSlug)
     if (c) onChange(c)
     if (presetOf(spec) === 'custom') setCustom(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, planSlug])
 
   const spec = value
-  const choice = useMemo(() => (spec ? evaluate(spec) : null), [spec, catalog, plan, planFeeInr]) // eslint-disable-line react-hooks/exhaustive-deps
+  const choice = useMemo(() => (spec ? evaluate(spec, planSlug) : null), [spec, catalog, plan, planFeeInr, visitorIdx]) // eslint-disable-line react-hooks/exhaustive-deps
   const validation = useMemo(() => (spec && catalog && plan ? validateSpec(spec, catalog, plan, { current }) : null), [spec, catalog, plan, current])
 
   // Server capacity (the vCPU quota) is only known to the server.
@@ -117,7 +135,7 @@ export function ComputeConfigurator({
   if (!catalog || !plan || !spec) return <p className="text-sm text-foreground-muted">Loading server prices…</p>
 
   const set = (next: ComputeSpec) => {
-    const c = evaluate(next)
+    const c = evaluate(next, planSlug)
     if (c) onChange(c)
   }
   const edit = (fn: (s: ComputeSpec) => void) => {
@@ -127,22 +145,80 @@ export function ComputeConfigurator({
   }
   const preset = presetOf(spec)
   const ha = spec.node.count > 1 && spec.db.multiAz
-  const priceFor = (key: PresetKey) => quoteSpec(presetSpec(key), catalog).inrMonth
+  const priceFor = (key: PresetKey, p: ComputePlan) => quoteSpec(presetSpec(key), catalog, { infraMargin: p.infraMargin }).inrMonth
+  const planFloorPrice = (p: ComputePlan) => {
+    const k = (p.minPreset ?? p.defaultPreset ?? (p.minPlacement === 'pool' ? 'shared' : 'small')) as PresetKey
+    const base = quoteSpec(presetSpec(k), catalog, { infraMargin: p.infraMargin })
+    return monthlyTotal(base, p.monthlyPriceInr, catalog.settings.gstRate).total
+  }
   const ec2 = catalog.prices.filter(p => p.kind === 'ec2' && p.sellable)
   const rds = catalog.prices.filter(p => p.kind === 'rds' && p.sellable)
   const fit = validation?.fit
   const bigger = validation && !validation.ok && fit && spec.node.placement === 'dedicated' ? smallestFittingNode(spec, catalog, planSlug) : null
+  const recKey = plan.minPreset !== 'basic' ? recommendedPresetKey(planSlug, visitorsPerMonth, plan) : null
 
   return (
     <div className="space-y-5">
-      {plan.minPlacement === 'pool' ? (
+      {/* ── Plan cards ── */}
+      {plans.length > 0 && (
+        <ChoiceCards<string>
+          ariaLabel="Plan"
+          columns="grid-cols-2 xl:grid-cols-4"
+          cardClassName="bg-surface-elevated p-4"
+          value={planSlug}
+          onChange={s => onPlanChange?.(s)}
+          options={plans.map(p => ({
+            value: p.slug,
+            label: p.name,
+            content: (
+              <>
+                <div className="pr-6 font-semibold text-foreground">{p.name}</div>
+                <div className="mt-1 text-lg font-bold text-foreground">from {inr(planFloorPrice(p))}<span className="text-xs font-normal text-foreground-muted">/mo</span></div>
+                <div className="mt-1 text-xs text-foreground-secondary">Incl. GST · servers &amp; plan in one subscription</div>
+              </>
+            ),
+          }))}
+        />
+      )}
+
+      {/* ── Basic: fixed summary ── */}
+      {isBasic ? (
+        <div className="rounded-2xl border border-border-default bg-surface-elevated p-4">
+          <div className="font-semibold text-foreground">{PRESETS.basic.label}</div>
+          <p className="mt-1 text-sm text-foreground-secondary">{PRESETS.basic.blurb}</p>
+          <p className="mt-2 text-sm text-foreground">{inr(priceFor('basic', plan))}/mo + GST for servers</p>
+        </div>
+      ) : plan.minPlacement === 'pool' ? (
         <div className="rounded-2xl border border-border-default bg-surface-elevated p-4">
           <div className="font-semibold text-foreground">{PRESETS.shared.label}</div>
           <p className="mt-1 text-sm text-foreground-secondary">{PRESETS.shared.blurb}</p>
-          <p className="mt-2 text-sm text-foreground">{inr(priceFor('shared'))}/mo for servers</p>
+          <p className="mt-2 text-sm text-foreground">{inr(priceFor('shared', plan))}/mo for servers</p>
         </div>
       ) : (
         <>
+          {/* ── Visitors slider ── */}
+          <div>
+            <div className="flex items-baseline justify-between mb-1">
+              <label htmlFor="visitors-range" className="text-sm font-medium text-foreground">Visitors per month</label>
+              <span className="text-sm font-semibold text-foreground">{fmtVisitors(visitorsPerMonth)}</span>
+            </div>
+            <input
+              id="visitors-range"
+              type="range"
+              min={0}
+              max={TRAFFIC_BANDS.length - 1}
+              step={1}
+              value={visitorIdx}
+              onChange={e => setVisitorIdx(Number(e.target.value))}
+              className="w-full accent-foreground"
+            />
+            <div className="mt-1 flex justify-between text-[10px] text-foreground-muted">
+              {TRAFFIC_BANDS.map((v, i) => <span key={i} className={i === visitorIdx ? 'text-foreground font-semibold' : ''}>{fmtVisitors(v)}</span>)}
+            </div>
+            <p className="mt-2 text-xs text-foreground-muted">Recommended server size follows your traffic — change it any time.</p>
+          </div>
+
+          {/* ── Size cards ── */}
           <ChoiceCards<PresetKey>
             ariaLabel="Server size"
             columns="grid-cols-2 xl:grid-cols-4"
@@ -157,8 +233,11 @@ export function ComputeConfigurator({
               label: PRESETS[k].label,
               content: (
                 <>
-                  <div className="pr-6 font-semibold text-foreground">{PRESETS[k].label}</div>
-                  <div className="mt-1 text-lg font-bold text-foreground">{inr(priceFor(k))}<span className="text-xs font-normal text-foreground-muted">/mo</span></div>
+                  <div className="flex items-center justify-between pr-6">
+                    <div className="font-semibold text-foreground">{PRESETS[k].label}</div>
+                    {recKey === k && <span className="ml-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold org-sage org-sage-text">Recommended</span>}
+                  </div>
+                  <div className="mt-1 text-lg font-bold text-foreground">{inr(priceFor(k, plan))}<span className="text-xs font-normal text-foreground-muted">/mo</span></div>
                   <div className="mt-1 text-xs text-foreground-secondary">{PRESETS[k].blurb}</div>
                 </>
               ),
@@ -183,6 +262,31 @@ export function ComputeConfigurator({
               <span className="block text-xs text-foreground-muted">A second server and a standby database in another zone, so one failing never stops the store.</span>
             </span>
           </label>
+          {/* ── Database: node (included) vs dedicated RDS ── */}
+          <div>
+            <div className="mb-1 text-sm font-medium text-foreground">Database</div>
+            <Segmented<'node' | 'dedicated'>
+              ariaLabel="Database"
+              size="sm"
+              value={spec.db.mode === 'dedicated' ? 'dedicated' : 'node'}
+              onChange={mode => edit(s => {
+                if (mode === 'dedicated') {
+                  s.db = { mode: 'dedicated', class: s.db.class ?? 'db.t4g.micro', storageGb: s.db.storageGb, multiAz: s.db.multiAz }
+                } else {
+                  s.db = { mode: 'node', class: null, storageGb: s.db.storageGb, multiAz: false }
+                }
+              })}
+              options={[
+                { value: 'node', label: 'On your server (included)' },
+                { value: 'dedicated', label: 'Dedicated database (RDS)' },
+              ]}
+            />
+            <p className="mt-1 text-xs text-foreground-muted">
+              {spec.db.mode === 'dedicated'
+                ? 'A managed PostgreSQL server, separate from your app server.'
+                : 'PostgreSQL runs on your own server — nightly backups to S3.'}
+            </p>
+          </div>
           {plan.advanced && (
             <Segmented<'preset' | 'custom'>
               ariaLabel="Settings"
@@ -195,7 +299,7 @@ export function ComputeConfigurator({
         </>
       )}
 
-      {custom && spec.node.placement === 'dedicated' && (
+      {custom && spec.node.placement === 'dedicated' && !isBasic && (
         <div className="space-y-4 rounded-2xl border border-border-default bg-surface-elevated p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="text-sm">
@@ -212,27 +316,47 @@ export function ComputeConfigurator({
             </label>
             <label className="text-sm">
               <span className="mb-1 block text-foreground-secondary">Database</span>
-              <select className={selectCls} value={spec.db.class ?? ''} onChange={e => edit(s => void (s.db.class = e.target.value))}>
-                {rds.map(p => <option key={p.code} value={p.code.slice(4)}>{p.label}</option>)}
-              </select>
+              {spec.db.mode === 'dedicated' ? (
+                <select className={selectCls} value={spec.db.class ?? ''} onChange={e => edit(s => void (s.db.class = e.target.value))}>
+                  {rds.map(p => <option key={p.code} value={p.code.slice(4)}>{p.label}</option>)}
+                </select>
+              ) : (
+                <div className="rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground-secondary">On your server (included)</div>
+              )}
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-foreground-secondary">Database storage (GB)</span>
+              <span className="mb-1 block text-foreground-secondary">{spec.db.mode === 'dedicated' ? 'Database storage (GB)' : 'Database disk (GB)'}</span>
               <input
                 type="number"
                 className={selectCls}
-                min={current?.db.mode === 'dedicated' ? current.db.storageGb : LIMITS.minStorageGb}
+                min={current && current.db.storageGb && current.db.mode === spec.db.mode ? current.db.storageGb : LIMITS.minStorageGb}
                 max={LIMITS.maxStorageGb}
                 step={10}
                 value={spec.db.storageGb}
                 onChange={e => edit(s => void (s.db.storageGb = Math.round(Number(e.target.value) || 0)))}
               />
             </label>
+            <label className="text-sm sm:col-span-2">
+              <span className="mb-1 block text-foreground-secondary">Object storage, S3 (GB)</span>
+              <input
+                type="number"
+                className={selectCls}
+                min={Math.max(10, current?.storage?.s3Gb ?? 10)}
+                step={10}
+                value={spec.storage?.s3Gb ?? 10}
+                onChange={e => edit(s => {
+                  const v = Math.round(Number(e.target.value) || 0)
+                  s.storage = { s3Gb: Math.max(10, v) }
+                })}
+              />
+            </label>
           </div>
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input type="checkbox" checked={spec.db.multiAz} onChange={e => edit(s => void (s.db.multiAz = e.target.checked))} />
-            Standby database in a second zone
-          </label>
+          {spec.db.mode === 'dedicated' && (
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input type="checkbox" checked={spec.db.multiAz} onChange={e => edit(s => void (s.db.multiAz = e.target.checked))} />
+              Standby database in a second zone
+            </label>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -303,18 +427,19 @@ export function ComputeConfigurator({
               <span className="text-foreground">{inr(l.inrMonth)}</span>
             </div>
           ))}
-          <div className="mt-2 flex justify-between border-t border-border-default/60 pt-2 font-medium">
-            <span>Servers, per month</span>
-            <span>{inr(choice.quote.inrMonth)} <span className="text-xs font-normal text-foreground-muted">({inr(choice.quote.inrDay)}/day from your wallet)</span></span>
+          <div className="mt-2 flex justify-between border-t border-border-default/60 pt-2 text-foreground-secondary">
+            <span>GST (18%)</span>
+            <span>{inr(choice.total.gstOnInfra)}</span>
           </div>
-          <div className="flex justify-between text-foreground-secondary"><span>GST on servers (18%)</span><span>{inr(choice.total.gstOnInfra)}</span></div>
-          <div className="flex justify-between text-foreground-secondary"><span>{plan.name} plan (GST included)</span><span>{inr(choice.total.planFee)}</span></div>
+          {choice.total.planFee > 0 && (
+            <div className="flex justify-between text-foreground-secondary"><span>{plan.name} plan fee (GST included)</span><span>{inr(choice.total.planFee)}</span></div>
+          )}
           <div className="mt-2 flex justify-between border-t border-border-default/60 pt-2 text-base font-bold">
             <span>Total per month</span>
             <span>{inr(choice.total.total)}</span>
           </div>
           <p className="mt-2 text-xs text-foreground-muted">
-            Servers are paid from your wallet by the hour they run, so a change takes effect from that hour. The plan is billed by subscription.
+            One subscription covers your plan and servers. {BASIC_PRESET.includes('basic') && isBasic ? 'Basic is a fixed size.' : 'Change size any time from Plan & servers.'}
           </p>
         </div>
       )}

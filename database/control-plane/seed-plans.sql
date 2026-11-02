@@ -21,10 +21,10 @@ INSERT INTO public.plans (slug, name, tier, monthly_price_inr, infra_margin, min
                           default_preset, min_placement, advanced_compute) VALUES
   ('services', 'Services', 0, 0.00, 0,    'small',  0, true, 0, 0, 'services', NULL, 'pool', false),
   ('starter', 'Starter', 1, 999.00, 0,    'small',  0, false, 5368709120, 5368709120, 'store', 'shared', 'pool', false),
-  ('basic', 'Basic', 2, 0,    0,    'basic',  0, true, 10737418240, 5368709120, 'store', 'small', 'dedicated', true),
-  ('growth', 'Grow', 3, 0,    0.5,  'small',  0, true, 53687091200, 5368709120, 'store', 'small', 'dedicated', true),
-  ('pro', 'Pro', 4, 0,    0.4,  'medium', 1, true, 214748364800, 5368709120, 'store', 'medium', 'dedicated', true),
-  ('enterprise', 'Enterprise', 5, 0, 0.3, 'large',  3, true, 1099511627776, 5368709120, 'store', 'large', 'dedicated', true)
+  ('basic', 'Basic', 2, 0,    0,    'basic',  0, true, 10737418240, 5368709120, 'store', 'basic', 'dedicated', true),
+  ('growth', 'Grow', 3, 500,  0.2,  'small',  0, true, 53687091200, 5368709120, 'store', 'small', 'dedicated', true),
+  ('pro', 'Pro', 4, 1000,  0.2,  'medium', 1, true, 214748364800, 5368709120, 'store', 'medium', 'dedicated', true),
+  ('enterprise', 'Enterprise', 5, 2000, 0.2, 'large',  3, true, 1099511627776, 5368709120, 'store', 'large', 'dedicated', true)
 ON CONFLICT (slug) DO UPDATE SET
   name = EXCLUDED.name, tier = EXCLUDED.tier,
   monthly_price_inr = EXCLUDED.monthly_price_inr,
@@ -654,10 +654,14 @@ INSERT INTO public.compute_prices (code, kind, label, vcpu, memory_mib, usd_hour
   ('ebs:gp3',           'ebs',         'Server disk (gp3)',           NULL, NULL, NULL,  NULL,  0.08,  NULL,  true, 210)
 ON CONFLICT (code) DO NOTHING;
 
--- Pricing settings for the compute calculator (lib/compute/catalog.ts). Inserted once; edited by the platform admin.
+-- Pricing settings for the compute calculator (lib/compute/catalog.ts). Seeded once, then edited by
+-- the platform admin. Guarded merge: refresh the row only when it predates the per-plan-margin model
+-- (no ipv4UsdHour key), so stale pre-reversal rows pick up platformShareUsd=1 + the storage rates
+-- while later admin edits survive.
 INSERT INTO public.platform_infra (key, value) VALUES ('compute_pricing',
-  '{"usdInr":88,"margin":0.25,"gstRate":0.18,"platformShareUsd":3,"rootVolumeGb":20,"poolNodeType":"t4g.medium","poolCapacity":3,"sharedDbClass":"db.t4g.small","sharedDbCapacity":8,"sharedDbStorageGb":10,"sharedDbMaxConnections":200,"minPrepayDays":30,"graceDays":3}')
-ON CONFLICT (key) DO NOTHING;
+  '{"usdInr":88,"margin":0.25,"gstRate":0.18,"platformShareUsd":1,"rootVolumeGb":20,"poolNodeType":"t4g.medium","poolCapacity":3,"sharedDbClass":"db.t4g.small","sharedDbCapacity":8,"sharedDbStorageGb":10,"sharedDbMaxConnections":200,"minPrepayDays":30,"graceDays":3,"ipv4UsdHour":0.005,"ebsGp3UsdGbMonth":0.08,"snapshotUsdGbMonth":0.05,"s3UsdGbMonth":0.023}')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+  WHERE (public.platform_infra.value::jsonb ? 'ipv4UsdHour') IS NOT TRUE;
 
 -- Stores provisioned before compute was configurable: record what they run (their plan's old tier, a micro
 -- database) so nothing moves until the owner picks a size. Inserted once per store.

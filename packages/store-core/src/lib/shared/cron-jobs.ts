@@ -502,14 +502,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
-    id: 'infra_billing',
-    name: 'Server billing',
-    path: '/api/cron/infra-billing',
+    // Platform job: nightly sum of every tenant's S3 bucket, drives the storage.s3Gb cap guard.
+    id: 's3_usage',
+    name: 'Tenant S3 bucket usage',
+    path: '/api/cron/s3-usage',
     method: 'GET',
     intervalMs: DAY,
-    intervalLabel: 'daily',
+    intervalLabel: 'every 24 h',
     startDelayMs: 705 * SEC,
-    lockTtlMs: DAY - MIN,
+    lockTtlMs: HOUR,
     tenantScope: null,
   },
   {
@@ -547,8 +548,7 @@ const DAILY_AT_IST: Record<string, string> = {
   ad_free_renew: '0 5',
   drive_purge_trash: '15 3',
   wallet_drift: '45 3',
-  // Just after midnight IST, so yesterday's servers are charged once the day is over.
-  infra_billing: '30 0',
+  s3_usage: '30 2',
 }
 
 // Weekly jobs: minute hour * * day-of-week (IST).

@@ -3,15 +3,14 @@ import { controlPlanePool } from '@/lib/tenant-registry'
 
 export type BillingInterval = 'monthly' | 'yearly'
 
-/** The plan's fee in paise, from plans.monthly_price_inr (GST included); yearly is ten months (two free). */
-export async function planPaise(slug: string, interval: BillingInterval): Promise<number> {
-  const r = await controlPlanePool().query<{ monthly_price_inr: string }>(`SELECT monthly_price_inr FROM plans WHERE slug = $1`, [slug])
-  const monthly = Math.round(Number(r.rows[0]?.monthly_price_inr ?? 0) * 100)
-  return interval === 'yearly' ? monthly * 10 : monthly
+/** Paise for a store's subscription: monthly = priceInrMonth, yearly = 10× monthly (2 free months baked in). */
+export function subscriptionPaise(priceInrMonth: number, interval: BillingInterval): number {
+  const paise = Math.round(priceInrMonth * 100)
+  return interval === 'yearly' ? paise * 10 : paise
 }
 
-// Razorpay plans by "slug:interval:paise", so a fee change gets a new Razorpay plan: in process, and in
-// platform_infra 'razorpay_plans' so a restart doesn't create another.
+// Razorpay plans keyed by "slug:interval:paise"; a price change gets a new Razorpay plan. Memoised in process
+// and in platform_infra 'razorpay_plans' so a restart doesn't create another.
 const planIdCache = new Map<string, string>()
 const STORED = 'razorpay_plans'
 
@@ -32,19 +31,11 @@ async function storePlanId(key: string, id: string): Promise<void> {
   )
 }
 
-// A plan pinned in env (RAZORPAY_PLAN_ID_<SLUG>_<INTERVAL>) is used only while it still charges the DB's fee.
-async function pinnedPlanId(slug: string, interval: BillingInterval, amount: number): Promise<string | undefined> {
-  const id = process.env[`RAZORPAY_PLAN_ID_${slug.toUpperCase()}_${interval.toUpperCase()}`]
-  if (!id) return undefined
-  const plan = await (getRazorpayInstance().plans as any).fetch(id).catch(() => null)
-  return plan?.item?.amount === amount ? id : undefined
-}
-
-async function ensureRazorpayPlan(slug: string, displayName: string, interval: BillingInterval): Promise<string> {
-  const amount = await planPaise(slug, interval)
-  if (!amount) throw new Error(`Unknown plan slug: ${slug}`)
+async function ensureRazorpayPlan(slug: string, displayName: string, interval: BillingInterval, priceInrMonth: number): Promise<string> {
+  const amount = subscriptionPaise(priceInrMonth, interval)
+  if (!amount) throw new Error(`Price for ${slug} must be positive (got ${priceInrMonth})`)
   const cacheKey = `${slug}:${interval}:${amount}`
-  const known = planIdCache.get(cacheKey) ?? (await storedPlanId(cacheKey)) ?? (await pinnedPlanId(slug, interval, amount))
+  const known = planIdCache.get(cacheKey) ?? (await storedPlanId(cacheKey))
   if (known) {
     planIdCache.set(cacheKey, known)
     return known
@@ -61,7 +52,7 @@ async function ensureRazorpayPlan(slug: string, displayName: string, interval: B
       currency: 'INR',
       description: `${intervalLabel} subscription for the ${displayName} plan`,
     },
-    notes: { plan_slug: slug, billing_interval: interval },
+    notes: { plan_slug: slug, billing_interval: interval, price_inr_month: String(priceInrMonth) },
   })
 
   planIdCache.set(cacheKey, plan.id)
@@ -75,13 +66,14 @@ export interface SubscriptionResult {
 }
 
 /**
- * Create a Razorpay Subscription for a given plan + owner.
+ * Create a Razorpay Subscription for a given plan + owner at the given monthly price (plan fee + infra, GST included).
  * Returns the subscription id and Razorpay's hosted short_url for redirect.
  */
 export async function createRazorpaySubscription(opts: {
   planSlug: string
   planName: string
   interval: BillingInterval
+  priceInrMonth: number
   ownerEmail: string
   ownerName: string | null
   tenantId: string
@@ -89,19 +81,18 @@ export async function createRazorpaySubscription(opts: {
   callbackUrl: string
 }): Promise<SubscriptionResult> {
   const rz = getRazorpayInstance()
-  const planId = await ensureRazorpayPlan(opts.planSlug, opts.planName, opts.interval)
+  const planId = await ensureRazorpayPlan(opts.planSlug, opts.planName, opts.interval, opts.priceInrMonth)
 
   const sub = await (rz.subscriptions as any).create({
     plan_id: planId,
     total_count: 120, // max cycles (10 yrs monthly / ~8 yrs yearly); Razorpay requires ≥1
     quantity: 1,
     customer_notify: 1,
-    // For yearly plans, apply the 20% discount offer if configured.
-    offer_id: opts.interval === 'yearly' ? process.env.RAZORPAY_YEARLY_OFFER_ID || null : null,
     notes: {
       tenant_id: opts.tenantId,
       tenant_slug: opts.tenantSlug,
       billing_interval: opts.interval,
+      price_inr_month: String(opts.priceInrMonth),
     },
     notify_info: {
       notify_phone: '',
@@ -116,7 +107,7 @@ export async function createRazorpaySubscription(opts: {
 }
 
 /**
- * Upgrade: a new subscription on the higher plan, with the unused days of the old cycle as a credit
+ * Upgrade: a new subscription on the higher price, with the unused days of the old cycle as a credit
  * addon (Razorpay has no native proration). The caller saves the new id, then cancelOldSubscription.
  */
 export async function upgradeSubscription(opts: {
@@ -124,6 +115,7 @@ export async function upgradeSubscription(opts: {
   newPlanSlug: string
   newPlanName: string
   newInterval: BillingInterval
+  priceInrMonth: number
   ownerEmail: string
   ownerName: string | null
   tenantId: string
@@ -144,7 +136,7 @@ export async function upgradeSubscription(opts: {
 
   // The new subscription first: the old one is cancelled only once the caller has saved the new id
   // (cancelOldSubscription), so the old one's cancellation webhook finds a superseded id and is ignored.
-  const planId = await ensureRazorpayPlan(opts.newPlanSlug, opts.newPlanName, opts.newInterval)
+  const planId = await ensureRazorpayPlan(opts.newPlanSlug, opts.newPlanName, opts.newInterval, opts.priceInrMonth)
   const addons =
     proratedCreditPaise > 0
       ? [{ item: { name: 'Prorated credit from previous plan', amount: -proratedCreditPaise, currency: 'INR' } }]
@@ -152,15 +144,15 @@ export async function upgradeSubscription(opts: {
 
   const sub = await (rz.subscriptions as any).create({
     plan_id: planId,
-    total_count: 0,
+    total_count: 120, // Razorpay requires ≥1; same horizon as createRazorpaySubscription
     quantity: 1,
     customer_notify: 1,
-    offer_id: opts.newInterval === 'yearly' ? process.env.RAZORPAY_YEARLY_OFFER_ID || null : null,
     addons,
     notes: {
       tenant_id: opts.tenantId,
       tenant_slug: opts.tenantSlug,
       billing_interval: opts.newInterval,
+      price_inr_month: String(opts.priceInrMonth),
       upgraded_from: opts.oldSubscriptionId,
     },
     notify_info: { notify_phone: '', notify_email: opts.ownerEmail },
@@ -179,18 +171,18 @@ export async function cancelOldSubscription(oldSubscriptionId: string): Promise<
 }
 
 /**
- * Downgrade: schedule the plan change at the end of the current billing cycle.
- * The customer keeps their current plan until renewal, then switches.
- * Returns the scheduled change details.
+ * Downgrade: schedule the price change at the end of the current billing cycle.
+ * The customer keeps their current price until renewal, then switches.
  */
 export async function downgradeSubscription(opts: {
   subscriptionId: string
   newPlanSlug: string
   newPlanName: string
   newInterval: BillingInterval
+  priceInrMonth: number
 }): Promise<{ scheduledAt: number }> {
   const rz = getRazorpayInstance()
-  const newPlanId = await ensureRazorpayPlan(opts.newPlanSlug, opts.newPlanName, opts.newInterval)
+  const newPlanId = await ensureRazorpayPlan(opts.newPlanSlug, opts.newPlanName, opts.newInterval, opts.priceInrMonth)
 
   await (rz.subscriptions as any).update(opts.subscriptionId, {
     plan_id: newPlanId,

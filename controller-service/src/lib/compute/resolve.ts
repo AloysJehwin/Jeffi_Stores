@@ -85,6 +85,4 @@ export async function markComputeApplied(tenantId: string, spec: ComputeSpec, no
        attempts = 0, last_error = NULL, updated_at = now()`,
     [tenantId, JSON.stringify(spec), rate, nodeGen, follow, presetOf(spec)]
   )
-  const { syncComputePeriod } = await import('@controller/lib/billing/infra-billing')
-  await syncComputePeriod(tenantId)
 }

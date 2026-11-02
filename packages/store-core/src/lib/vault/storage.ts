@@ -8,6 +8,29 @@ import {
   CopyObjectCommand,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
+import { controlPlanePool } from '@/lib/tenant-registry/shared'
+
+/** Thrown when a tenant's S3 writes would push them past spec.storage.s3Gb. Mirrors @jeffi/tenancy's. */
+export class StorageCapExceededError extends Error {
+  readonly code = 'STORAGE_CAP_EXCEEDED'
+  constructor() { super('S3 storage cap reached') }
+}
+
+async function assertCap(): Promise<void> {
+  const t = getCurrentTenant()
+  if (!t) return
+  // Legacy behaviour (no cap) when the tenant has no spec yet.
+  const r = await controlPlanePool().query<{ desired: any; usage: string | null }>(
+    `SELECT c.desired, i.s3_usage_bytes AS usage
+       FROM tenant_compute c LEFT JOIN tenant_infra i ON i.tenant_id = c.tenant_id
+      WHERE c.tenant_id = $1`,
+    [t.tenantId]
+  )
+  const capGb = r.rows[0]?.desired?.storage?.s3Gb
+  if (typeof capGb !== 'number' || capGb <= 0) return
+  if (Number(r.rows[0]?.usage ?? 0) >= capGb * 1024 * 1024 * 1024) throw new StorageCapExceededError()
+}
 
 // Private storage for vault (digital-product) files. Separate from src/lib/shared/s3.ts, whose
 // bucket is PUBLIC — vault bytes must never be world-readable. Two drivers behind one interface:
@@ -78,7 +101,8 @@ class S3StorageDriver implements StorageDriver {
   readonly name = 's3' as const
   constructor(readonly bucket: string) {}
 
-  signUpload(key: string, contentType: string, ttlSeconds = DEFAULT_PUT_TTL): Promise<string> {
+  async signUpload(key: string, contentType: string, ttlSeconds = DEFAULT_PUT_TTL): Promise<string> {
+    await assertCap()
     return getSignedUrl(s3, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }), {
       expiresIn: ttlSeconds,
     })
@@ -117,6 +141,7 @@ class S3StorageDriver implements StorageDriver {
   }
 
   async put(key: string, body: Buffer, contentType: string): Promise<void> {
+    await assertCap()
     await s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }))
   }
 

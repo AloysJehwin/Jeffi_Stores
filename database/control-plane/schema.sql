@@ -494,7 +494,7 @@ ALTER TABLE ONLY public.tenant_custom_domains ADD CONSTRAINT tenant_custom_domai
 ALTER TABLE ONLY public.tenant_custom_domains ADD CONSTRAINT tenant_custom_domains_tenant_fkey
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.tenant_custom_domains ADD CONSTRAINT tenant_custom_domains_status_check
-    CHECK (status IN ('pending','verifying','verified','failed'));
+    CHECK (status IN ('pending','verifying','dns-verified','cert-pending','verified','failed','expired'));
 CREATE INDEX IF NOT EXISTS idx_tcd_tenant ON public.tenant_custom_domains USING btree (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tcd_domain ON public.tenant_custom_domains USING btree (domain) WHERE status='verified';
 
@@ -884,6 +884,10 @@ ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS razorpay_webhook_secret char
 ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS used_storage_bytes bigint NOT NULL DEFAULT 0;
 ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS file_count         integer NOT NULL DEFAULT 0;
 
+-- Nightly S3 bucket size, read by the cap guard in @jeffi/tenancy s3.ts.
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS s3_usage_bytes     bigint NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS s3_usage_updated_at timestamptz;
+
 --
 -- razorpay_subscription_index: platform-account subscription events carry notes.tenant_id, but
 -- we verify them against this authoritative index (and the collecting account) before trusting
@@ -1119,13 +1123,18 @@ ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_pkey PRIMAR
 ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_tenant_id_fkey
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_status_check
-    CHECK (status IN ('pending','applying','applied','failed','paused'));
+    CHECK (status IN ('pending','applying','applied','failed','paused','scheduled'));
 ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_apply_mode_check
     CHECK (apply_mode IN ('window','now'));
 CREATE INDEX IF NOT EXISTS idx_tenant_compute_pending ON public.tenant_compute USING btree (next_at) WHERE (status IN ('pending','applying'));
 
 -- Store's monthly subscription price (replaces plan.monthly_price_inr as MRR source).
 ALTER TABLE public.tenant_compute ADD COLUMN IF NOT EXISTS price_inr_month integer;
+
+-- 'scheduled': the owner picked a smaller spec that becomes active at the next subscription cycle.
+ALTER TABLE public.tenant_compute DROP CONSTRAINT IF EXISTS tenant_compute_status_check;
+ALTER TABLE public.tenant_compute ADD CONSTRAINT tenant_compute_status_check
+    CHECK (status IN ('pending','applying','applied','failed','paused','scheduled'));
 
 --
 -- tenant_compute_periods: a store's server price per hour over time, for the daily wallet debit

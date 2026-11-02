@@ -44,6 +44,20 @@ export function getStateCode(stateName: string): string {
   return STATE_CODES[normalized] || ''
 }
 
+// Reverse of STATE_CODES: Title Case the matching key, '' if no match.
+const CODE_TO_STATE: Record<string, string> = Object.fromEntries(
+  Object.entries(STATE_CODES).map(([name, code]) => [
+    code,
+    name.replace(/\b\w/g, c => c.toUpperCase()),
+  ])
+)
+
+/** State name for a 2-digit GST state code (e.g. '22' → 'Chhattisgarh'); '' if unknown. */
+export function stateNameFromCode(code: string | null | undefined): string {
+  if (!code) return ''
+  return CODE_TO_STATE[code.trim()] || ''
+}
+
 export function isInterState(buyerState: string, sellerStateCode: string): boolean {
   const buyerCode = getStateCode(buyerState)
   if (!buyerCode || !sellerStateCode) return false

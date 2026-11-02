@@ -187,14 +187,32 @@ export async function recordTenantStepEvent(
 
 export async function writeTenantInfra(
   tenantId: string,
-  infra: { rdsEndpoint: string; s3Bucket: string; rdsDb?: string; rdsUser?: string; sharedDbHost?: string }
+  infra: {
+    rdsEndpoint: string
+    s3Bucket: string
+    rdsDb?: string
+    rdsUser?: string
+    sharedDbHost?: string
+    dbSecretRef?: string
+    iamAuth?: boolean
+  }
 ): Promise<void> {
   const pool = controlPlanePool()
   // A Starter store has its own database + login on a shared host; a dedicated one the defaults.
+  // Node-mode stores run their own Postgres with password auth (iamAuth=false + db_secret_ref).
   await pool.query(
     `UPDATE tenant_infra SET rds_endpoint=$1, s3_bucket=$2, rds_db=COALESCE($4, 'jeffi_stores'), rds_user=$5, shared_db_host=$6,
-       iam_auth=true, updated_at=now() WHERE tenant_id=$3`,
-    [infra.rdsEndpoint, infra.s3Bucket, tenantId, infra.rdsDb ?? null, infra.rdsUser ?? null, infra.sharedDbHost ?? null]
+       iam_auth=COALESCE($7, true), db_secret_ref=$8, updated_at=now() WHERE tenant_id=$3`,
+    [
+      infra.rdsEndpoint,
+      infra.s3Bucket,
+      tenantId,
+      infra.rdsDb ?? null,
+      infra.rdsUser ?? null,
+      infra.sharedDbHost ?? null,
+      infra.iamAuth ?? null,
+      infra.dbSecretRef ?? null,
+    ]
   )
 }
 

@@ -28,7 +28,7 @@ export default function ConsoleShell({ owner, tenants, current, flags = [], chil
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
   const storeUrl = `https://${current.slug}.jeffistores.in`
-  const groups = navFor(current.service_types, flags)
+  const groups = navFor(current.service_types)
   const hasStore = current.service_types.includes('store')
 
   async function signOut() {

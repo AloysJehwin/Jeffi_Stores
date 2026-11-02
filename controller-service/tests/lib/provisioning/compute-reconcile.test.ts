@@ -57,6 +57,10 @@ const SHARED_SOURCE = { kind: 'shared', id: 'jeffi-starter-1', endpoint: 'host-e
 const OWN_TARGET = { kind: 'dedicated', id: 'jeffi-tenant-acme', endpoint: 'new-ep', dbName: 'jeffi_stores', role: null }
 const small = presetSpec('small')
 const medium = presetSpec('medium')
+// Presets default to node-Postgres now; these two cases exercise the RDS/dedicated path, so pin an
+// explicit dedicated db spec (the old small.db shape) and its dedicated small/micro variants.
+const dedicatedDb = { mode: 'dedicated' as const, class: 'db.t4g.micro', storageGb: 20, multiAz: false }
+const smallRds: ComputeSpec = { ...small, db: dedicatedDb }
 
 function given(applied: ComputeSpec, desired: ComputeSpec, extra: any = {}) {
   row = { tenant_id: 't-1', applied, desired, status: 'pending', apply_mode: 'window', node_gen: 0, attempts: 0, progress: null, last_error: null, ...extra }
@@ -104,7 +108,7 @@ describe('reconcileCompute', () => {
   })
 
   it('grows storage at once and queues a class change for the maintenance window', async () => {
-    given(small, { ...small, db: { ...small.db, class: 'db.t4g.small', storageGb: 50 } })
+    given(smallRds, { ...smallRds, db: { ...smallRds.db, class: 'db.t4g.small', storageGb: 50 } })
     const provider = new StubProvisioningProvider(0)
     await provider.createDbInstance({ dbInstanceId: 'jeffi-tenant-acme', paramGroup: 'pg', maxConnections: 50, instanceClass: 'db.t4g.micro', storageGb: 20 })
     const modify = vi.spyOn(provider, 'modifyDbInstance')
@@ -124,7 +128,7 @@ describe('reconcileCompute', () => {
   it('moves a Starter store onto its own database: copy while offline, switch, keep the old one a day', async () => {
     const starter = presetSpec('shared')
     reg.getTenant.mockResolvedValue({ ...TENANT, plan: 'starter', rds_endpoint: 'host-ep', rds_db: 't_acme', rds_user: 'app_acme', shared_db_host: 'jeffi-starter-1' })
-    given(starter, { ...starter, db: small.db })
+    given(starter, { ...starter, db: dedicatedDb })
     k8s.ensureTenantNodes.mockResolvedValue({ ready: true })
     const provider = new StubProvisioningProvider(0)
     const backup = vi.spyOn(provider, 'backupDb').mockResolvedValue(Buffer.from('dump'))

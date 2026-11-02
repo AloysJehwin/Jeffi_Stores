@@ -70,6 +70,11 @@ export interface PricingSettings {
   sharedDbMaxConnections: number
   minPrepayDays: number
   graceDays: number
+  // Separately-priced bedrock: IPv4 per node, EBS and snapshot GB on node-mode databases, and S3.
+  ipv4UsdHour?: number
+  ebsGp3UsdGbMonth?: number
+  snapshotUsdGbMonth?: number
+  s3UsdGbMonth?: number
 }
 
 export interface Catalog {

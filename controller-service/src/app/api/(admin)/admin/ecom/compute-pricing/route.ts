@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { clearCatalogCache, getCatalog } from '@controller/lib/compute/catalog'
+import { clearCatalogCache, computePlans, getCatalog } from '@controller/lib/compute/catalog'
 import { PRESETS } from '@/lib/compute/presets'
 import { quoteSpec } from '@controller/lib/compute/pricing'
 import type { PricingSettings } from '@/lib/compute/spec'
@@ -19,11 +19,16 @@ function platformOnly(admin: Awaited<ReturnType<typeof requireAdminScope>>) {
 
 async function view() {
   const catalog = await getCatalog()
+  const plans = await computePlans()
   const presets = Object.values(PRESETS).map(p => {
     const q = quoteSpec(p.spec, catalog)
     return { key: p.key, label: p.label, awsInrMonth: q.awsInrMonth, inrMonth: q.inrMonth, inrDay: q.inrDay }
   })
-  return { ...catalog, presets }
+  return {
+    ...catalog,
+    plans: plans.map(p => ({ slug: p.slug, name: p.name, tier: p.tier, infraMargin: p.infraMargin ?? 0, minPreset: p.minPreset ?? null })),
+    presets,
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -45,6 +50,10 @@ const SETTING_BOUNDS: Partial<Record<keyof PricingSettings, [number, number]>> =
   sharedDbMaxConnections: [20, 5000],
   minPrepayDays: [0, 365],
   graceDays: [0, 60],
+  ipv4UsdHour: [0, 1],
+  ebsGp3UsdGbMonth: [0, 10],
+  snapshotUsdGbMonth: [0, 10],
+  s3UsdGbMonth: [0, 10],
 }
 
 /** { code, usd_hourly?, …, sellable? } edits one price; { settings: {...} } edits the pricing settings. */
@@ -68,6 +77,14 @@ export async function PATCH(req: NextRequest) {
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
       [JSON.stringify({ ...settings, ...next })]
     )
+  } else if (typeof b.plan === 'string' && b.infraMargin !== undefined) {
+    const n = Number(b.infraMargin)
+    if (!Number.isFinite(n) || n < 0 || n > 3) return NextResponse.json({ error: 'infraMargin must be between 0 and 3' }, { status: 400 })
+    const r = await pool.query(
+      `UPDATE plans SET infra_margin = $2, updated_at = now() WHERE slug = $1 AND product = 'store'`,
+      [b.plan, n]
+    )
+    if (!r.rowCount) return NextResponse.json({ error: 'Unknown plan' }, { status: 404 })
   } else {
     const code = typeof b.code === 'string' ? b.code : ''
     const sets: string[] = []

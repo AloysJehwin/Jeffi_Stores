@@ -16,14 +16,14 @@ const byKind = (objs: any[], kind: string, name?: string) =>
   objs.filter(o => o.kind === kind && (!name || o.metadata.name === name))
 
 describe('renderTenantWorkload', () => {
-  it('basic: one pod on the shared pool, no HPA/PDB, isolated namespace', () => {
+  it('basic: one pod on its own node, no HPA/PDB, isolated namespace', () => {
     const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme') })
     expect(objs[0]).toMatchObject({ kind: 'Namespace', metadata: { name: 'tenant-acme' } })
     expect(objs.every(o => o.kind === 'Namespace' || o.metadata.namespace === 'tenant-acme')).toBe(true)
     const app = appDep(objs) as any
     expect(app.metadata.name).toBe('acme-controller-service')
     expect(app.spec.replicas).toBe(1)
-    expect(app.spec.template.spec.nodeSelector).toEqual({ 'jeffi.io/pool': 'basic' })
+    expect(app.spec.template.spec.nodeSelector).toEqual({ 'jeffi.io/tenant': 'acme' })
     expect(app.spec.template.spec.automountServiceAccountToken).toBe(false)
     expect(envOf(app)).toMatchObject({
       WEB_CONCURRENCY: '1',
@@ -190,7 +190,7 @@ describe('tracing env', () => {
 
     it('runs storefront and admin, pinned to the store, and no controller', () => {
       const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme'), layout: 'services' }) as any[]
-      expect(deps(objs)).toEqual(['redis', 'acme-storefront-service', 'acme-admin-service', 'acme-messaging-service', 'acme-document-service'])
+      expect(deps(objs)).toEqual(['redis', 'acme-storefront-service', 'acme-admin-service', 'acme-messaging-service', 'acme-document-service', 'acme-postgres'])
       const sf = byKind(objs, 'Deployment', 'acme-storefront-service')[0] as any
       expect(envOf(sf)).toMatchObject({ SERVICE_TENANT_SLUG: 'acme' })
       expect(sf.spec.template.spec.containers[0].image).toContain('jeffi-stores-storefront-service')
@@ -242,7 +242,7 @@ describe('tracing env', () => {
 
     it('keeps traffic on the old app while the new services start', () => {
       const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme'), layout: 'services', routeTo: 'controller' }) as any[]
-      expect(deps(objs)).toEqual(['redis', 'acme-controller-service', 'acme-storefront-service', 'acme-admin-service', 'acme-messaging-service', 'acme-document-service'])
+      expect(deps(objs)).toEqual(['redis', 'acme-controller-service', 'acme-storefront-service', 'acme-admin-service', 'acme-messaging-service', 'acme-document-service', 'acme-postgres'])
       const ctrl = byKind(objs, 'Deployment', 'acme-controller-service')[0] as any
       expect(ctrl.spec.replicas).toBe(1)
       expect(ctrl.spec.selector.matchLabels).toEqual({ app: 'controller-service', 'jeffi.io/tenant': 'acme' })

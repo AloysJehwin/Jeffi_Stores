@@ -1,4 +1,4 @@
-import { DB_POOL_CAP, DB_POOL_MIN, DB_RESERVED_CONNECTIONS, POD_RESOURCES, REDIS_RESOURCES, dbMaxConnections, presetOf } from './presets'
+import { DB_POOL_CAP, DB_POOL_MIN, DB_RESERVED_CONNECTIONS, POD_RESOURCES, REDIS_RESOURCES, dbMaxConnections, presetOf, presetSpec } from './presets'
 import { POD_SIZES, SERVICE_NAMES, activeServices, ec2Code, priceOf, rdsCode, type Catalog, type ComputeSpec, type PlanCompute, type PresetKey, type ServiceName, type ServiceSpec } from './spec'
 
 // Numeric floor rank — Basic is 0, each dedicated tier is one step up. Shared is intentionally
@@ -14,11 +14,12 @@ export const PRESET_RANK: Record<Exclude<PresetKey, 'shared'>, number> = {
 const NODE_RANK: Record<string, number> = { 't4g.small': 1, 't4g.medium': 2, 't4g.large': 3, 't4g.xlarge': 4 }
 const DB_RANK: Record<string, number> = { 'db.t4g.micro': 1, 'db.t4g.small': 2, 'db.t4g.medium': 3, 'db.t4g.large': 4 }
 
-/** The preset-rank the spec is at least as big as. Basic (db.mode='node') is rank 0; otherwise the
- * smaller of its node and db tiers (both must clear a floor to count). */
+/** The preset-rank the spec is at least as big as. A node-DB spec ranks by its server tier (the DB
+ * rides on the node, so the node size sets the floor); a dedicated-RDS spec takes the smaller of its
+ * node and db tiers (both must clear a floor to count). */
 export function rankOfSpec(spec: ComputeSpec): number {
-  if (spec.db.mode === 'node') return 0
   const nodeRank = NODE_RANK[spec.node.type ?? ''] ?? 0
+  if (spec.db.mode === 'node') return nodeRank
   const dbRank = DB_RANK[spec.db.class ?? ''] ?? 0
   return Math.min(nodeRank, dbRank)
 }
@@ -117,9 +118,13 @@ export function planCompatibilityError(spec: ComputeSpec, plan: PlanCompute): st
   if (!plan.advanced && preset === 'custom') return 'Choose one of the sizes; custom settings need a higher plan.'
   if (plan.minPreset) {
     if (plan.minPreset === 'basic') {
-      // Basic is fixed — only the exact Basic shape, nothing bigger or smaller. presetOf matches the
-      // whole spec via specKey, so this is equivalent to equality with presetSpec('basic').
-      if (preset !== 'basic') return 'Basic requires the fixed Basic configuration.'
+      // Basic is fixed — a dedicated single Basic node with Postgres on the node. Check the shape
+      // structurally, not whole-spec equality: a reconstructed spec drifts on inactive-service shape /
+      // storageGb / s3 fields that don't change what Basic actually runs.
+      const b = presetSpec('basic')
+      if (!(spec.node.placement === 'dedicated' && spec.node.type === b.node.type && spec.node.count === 1 && spec.db.mode === 'node')) {
+        return 'Basic requires the fixed Basic configuration.'
+      }
     } else {
       const floor = PRESET_RANK[plan.minPreset as Exclude<PresetKey, 'shared'>] ?? 0
       if (rankOfSpec(spec) < floor) return `This server is below your plan's minimum (${plan.minPreset}).`

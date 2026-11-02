@@ -33,6 +33,11 @@ import { startStore } from '@controller/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
 
+// Payments are off by default while Razorpay subscriptions are disabled platform-wide. When off,
+// KYC approval starts provisioning directly (what the bypass does for one owner, now for everyone);
+// flip ECOM_PAYMENTS_ENABLED=true to restore the subscription + first-charge-webhook path.
+const PAYMENTS_ENABLED = process.env.ECOM_PAYMENTS_ENABLED === 'true'
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -232,16 +237,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   // ── end TEMPORARY payment bypass ────────────────────────────────────────────
 
+  // Payments off (default): start provisioning on approval, same call the bypass uses. The
+  // subscription path below (and the first-charge webhook that normally starts the store) is
+  // skipped but kept intact, re-enablable via ECOM_PAYMENTS_ENABLED=true.
+  if (!PAYMENTS_ENABLED) {
+    await startStore({ id: tenantId, store_request: tenant.store_request ? 'awaiting_payment' : null })
+    return NextResponse.json({ ok: true, provisioningStarted: true, linkedAccountId })
+  }
+
   // 2. Create Razorpay Subscription and return checkout URL.
   const plans = await listPlans()
   const plan = plans.find(p => p.slug === tenant.plan) ?? plans[0]
   const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
+  // Price was computed and saved onto tenant_compute by onboard/submit; the subscription charges that total.
+  const priceRow = await controlPlanePool().query<{ price: number | null }>(
+    `SELECT price_inr_month::int AS price FROM tenant_compute WHERE tenant_id = $1`, [tenantId]
+  )
+  const priceInrMonth = Number(priceRow.rows[0]?.price ?? plan?.monthly_price_inr ?? 0)
+  if (!(priceInrMonth > 0)) {
+    return NextResponse.json({ ok: false, kycApproved: true, linkedAccountId, error: 'No subscription price on tenant_compute.price_inr_month' }, { status: 500 })
+  }
 
   try {
     const { subscriptionId, shortUrl } = await createRazorpaySubscription({
       planSlug: tenant.plan ?? 'basic',
       planName: plan?.name ?? 'Basic',
       interval: (tenant.billing_interval as any) ?? 'monthly',
+      priceInrMonth,
       ownerEmail: owner.email,
       ownerName: owner.name,
       tenantId,

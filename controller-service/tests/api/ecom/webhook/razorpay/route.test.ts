@@ -21,7 +21,6 @@ vi.mock('@/lib/tenant-registry', () => ({
   applyPendingPlan: vi.fn().mockResolvedValue(null),
   controlPlanePool: () => ({ query: m.query }),
 }))
-vi.mock('@controller/lib/billing/prepay', () => ({ storePrepay: vi.fn().mockResolvedValue({ requiredInr: 0, balance: 0, dailyInr: 0, days: 0 }) }))
 vi.mock('@/lib/shared/ecom-emails', () => ({ sendStoreLiveEmail: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/billing/platform-invoice', () => ({ issuePlatformInvoiceLater: vi.fn() }))
 vi.mock('@controller/lib/provisioning/trigger', () => ({
@@ -37,6 +36,9 @@ const charged = () =>
     body: JSON.stringify({ event: 'subscription.charged', payload: { subscription: { entity: { id: 'sub_1' } } } }),
   })
 
+// Payments are off by default (ECOM_PAYMENTS_ENABLED unset), so KYC-approve starts provisioning
+// directly and no subscription.charged fires in production today. These cases still cover the
+// charged handler so re-enabling payments restores the first-charge-starts-store flow unchanged.
 describe('subscription.charged on an approved store upgrade', () => {
   beforeEach(() => {
     vi.clearAllMocks()

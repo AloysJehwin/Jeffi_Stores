@@ -8,7 +8,8 @@ export const DEFAULT_SETTINGS: PricingSettings = {
   usdInr: 88,
   margin: 0.25,
   gstRate: 0.18,
-  platformShareUsd: 3,
+  // Lowered from 3.0: storage portion now priced separately via ebsGp3UsdGbMonth / snapshotUsdGbMonth / s3UsdGbMonth.
+  platformShareUsd: 1,
   rootVolumeGb: 20,
   poolNodeType: 't4g.medium',
   poolCapacity: 3,
@@ -18,6 +19,10 @@ export const DEFAULT_SETTINGS: PricingSettings = {
   sharedDbMaxConnections: 200,
   minPrepayDays: 30,
   graceDays: 3,
+  ipv4UsdHour: 0.005,
+  ebsGp3UsdGbMonth: 0.08,
+  snapshotUsdGbMonth: 0.05,
+  s3UsdGbMonth: 0.023,
 }
 
 const num = (v: unknown) => (v == null ? null : Number(v))
@@ -66,12 +71,14 @@ export interface PlanOption extends PlanCompute {
   name: string
   tier: number
   monthlyPriceInr: number
+  // Per-plan markup applied to the AWS infra bill (plan.infra_margin). Resolved in quoteSpec against settings.margin.
+  infraMargin?: number
 }
 
 /** Store plans with what each lets the owner choose. Inactive plans only when asked (Starter until it launches). */
 export async function computePlans(opts: { includeInactive?: boolean } = {}): Promise<PlanOption[]> {
   const r = await controlPlanePool().query(
-    `SELECT slug, name, tier, monthly_price_inr, default_preset, min_placement, advanced_compute
+    `SELECT slug, name, tier, monthly_price_inr, default_preset, min_placement, advanced_compute, infra_margin, min_preset
        FROM plans WHERE product = 'store' ${opts.includeInactive ? '' : 'AND is_active = true'} ORDER BY tier`
   )
   return r.rows.map(p => ({
@@ -82,6 +89,8 @@ export async function computePlans(opts: { includeInactive?: boolean } = {}): Pr
     defaultPreset: (p.default_preset as PresetKey | null) ?? null,
     minPlacement: p.min_placement,
     advanced: p.advanced_compute,
+    infraMargin: p.infra_margin == null ? undefined : Number(p.infra_margin),
+    minPreset: (p.min_preset as PresetKey | null) ?? undefined,
   }))
 }
 
