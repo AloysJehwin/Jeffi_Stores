@@ -8,7 +8,6 @@ import { useToast } from '@/contexts/ToastContext'
 import { PhoneInput } from '../_ui/phone'
 import { trackStoreApplication } from '@controller/lib/client/ecom-analytics'
 import { ComputeConfigurator, type ComputeChoice } from '../_compute/ComputeConfigurator'
-import { PRESETS } from '@/lib/compute/presets'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -519,7 +518,7 @@ export default function OnboardWizard({
   }, [wh.originPincode])
 
   function canNext(): boolean {
-    if (step === 0) return !!planSlug && (!computeEnabled || !!compute?.valid)
+    if (step === 0) return !!planSlug && !!compute?.valid
     if (step === 1) return displayName.trim().length > 0 && effectiveSlug.length >= 3 && productCats.length > 0
     if (step === 2)
       return bizName.trim().length > 0 && !!bizType && pan.trim().length === 10 && bizAddress.trim().length > 5
@@ -639,7 +638,7 @@ export default function OnboardWizard({
           {step === 0 && (
             <div className="w-full max-w-3xl">
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Choose your plan</h1>
-              <p className="text-foreground-muted mb-6 sm:mb-8">All plans include the full storefront. Cancel anytime.</p>
+              <p className="text-foreground-muted mb-6 sm:mb-8">All plans include the full storefront. One subscription — plan and servers together. Cancel anytime.</p>
               {reusingPreviousDetails && (
                 <div className="mb-6 sm:mb-8 rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
                   <p className="text-sm text-foreground">
@@ -652,36 +651,13 @@ export default function OnboardWizard({
               )}
               <Segmented<Interval> ariaLabel="Billing interval" className="mb-6 sm:mb-8" value={interval} onChange={setInterval}
                 options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: '2 months free' }]} />
-              <ChoiceCards ariaLabel="Plan" columns="grid-cols-2 xl:grid-cols-4" cardClassName="bg-surface-elevated p-4 sm:p-5" value={planSlug} onChange={setPlanSlug}
-                options={plans.map(p => {
-                  const m = Number(p.monthly_price_inr)
-                  const pr = interval === 'yearly' ? m * 10 : m
-                  return {
-                    value: p.slug, label: p.name,
-                    content: (
-                      <>
-                        <div className="pr-6 font-bold text-foreground text-base">{p.name}</div>
-                        <div className="text-2xl font-extrabold text-foreground mt-2">₹{pr.toLocaleString('en-IN')}</div>
-                        <div className="text-xs text-foreground-muted">/{interval === 'yearly' ? 'yr' : 'mo'}</div>
-                        {interval === 'yearly' && (
-                          <div className="text-xs org-sage-text mt-1">2 months free</div>
-                        )}
-                      </>
-                    ),
-                  }
-                })} />
-              {computeEnabled && (
-                <div className="mt-8">
-                  <h2 className="text-lg font-bold text-foreground mb-1">Server size</h2>
-                  <p className="text-sm text-foreground-muted mb-4">Your store runs on servers sized to your traffic. You can change this any time.</p>
-                  <ComputeConfigurator
-                    planSlug={planSlug}
-                    value={compute?.spec ?? init.computeSpec ?? null}
-                    onChange={setCompute}
-                    planFeeInr={interval === 'yearly' ? (monthly * 10) / 12 : monthly}
-                  />
-                </div>
-              )}
+              <ComputeConfigurator
+                planSlug={planSlug}
+                onPlanChange={setPlanSlug}
+                value={compute?.spec ?? init.computeSpec ?? null}
+                onChange={setCompute}
+                planFeeInr={interval === 'yearly' ? (monthly * 10) / 12 : monthly}
+              />
             </div>
           )}
 
@@ -1272,15 +1248,11 @@ export default function OnboardWizard({
               <div className="rounded-2xl border border-border-default bg-surface-elevated divide-y divide-border-default/60 overflow-hidden mb-6">
                 {[
                   [
-                    'Plan',
-                    `${selectedPlan?.name} · ${interval} · ₹${price.toLocaleString('en-IN')}/${interval === 'yearly' ? 'yr' : 'mo'}`,
+                    'Subscription',
+                    compute?.quote
+                      ? `${selectedPlan?.name} · ${interval} · ₹${Math.round((compute.quote.inrMonth + monthly) * 1.18).toLocaleString('en-IN')}/mo incl. GST`
+                      : `${selectedPlan?.name} · ${interval} · ₹${price.toLocaleString('en-IN')}/${interval === 'yearly' ? 'yr' : 'mo'}`,
                   ],
-                  ...(computeEnabled && compute?.quote
-                    ? [[
-                        'Servers',
-                        `${compute.preset === 'custom' ? 'Custom' : PRESETS[compute.preset].label} · ₹${Math.round(compute.quote.inrMonth).toLocaleString('en-IN')}/mo + GST, from your wallet`,
-                      ]]
-                    : []),
                   ['Store', `${displayName} (${effectiveSlug}.jeffistores.in)`],
                   ['Products', productCats.join(', ') || '—'],
                   ['Business', `${bizName} · ${bizType}`],

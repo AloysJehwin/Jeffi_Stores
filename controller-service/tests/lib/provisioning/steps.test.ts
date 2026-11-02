@@ -164,9 +164,26 @@ describe('provisioning state machine', () => {
 
   // -------------------------------------------------------------------------
   describe('infrastructure steps', () => {
+    // Presets now default to node-mode Postgres (db on the tenant's own node), so a default
+    // basic tenant SKIPS the RDS path. These tests specifically exercise the RDS path, so each
+    // pins an explicit DEDICATED (RDS) spec via created_resources.computeSpec — jobCompute reads
+    // res.computeSpec and resolveCompute honours it over the plan default.
+    const dedicatedRds = {
+      node: { placement: 'dedicated', type: 't4g.small', count: 1 },
+      db: { mode: 'dedicated', class: 'db.t4g.micro', storageGb: 20, multiAz: false },
+      services: {
+        storefront: { replicas: 1, maxReplicas: 1, size: 'S' },
+        admin: { replicas: 1, maxReplicas: 1, size: 'S' },
+        business: { replicas: 1, maxReplicas: 1, size: 'S' },
+        messaging: { replicas: 1, maxReplicas: 1, size: 'S' },
+        documents: { replicas: 1, maxReplicas: 1, size: 'S' },
+      },
+      storage: { s3Gb: 20 },
+    }
+
     it('create_param_group creates the group and records it', async () => {
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
-      await advanceProvisioningJob(job({ step: 'create_param_group' }), provider)
+      await advanceProvisioningJob(job({ step: 'create_param_group', created_resources: { computeSpec: dedicatedRds } }), provider)
       expect(provider.hasParamGroup('jeffi-tenant-acme-pg16')).toBe(true)
       const p = patches().find(x => x.step === 'create_db_instance')
       expect(p?.created_resources).toMatchObject({ paramGroup: 'jeffi-tenant-acme-pg16' })
@@ -174,7 +191,7 @@ describe('provisioning state machine', () => {
 
     it('create_db_instance records the instance id and moves to the wait step', async () => {
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
-      await advanceProvisioningJob(job({ step: 'create_db_instance' }), provider)
+      await advanceProvisioningJob(job({ step: 'create_db_instance', created_resources: { computeSpec: dedicatedRds } }), provider)
       const p = patches().find(x => x.step === 'wait_db_available')
       expect(p?.created_resources).toMatchObject({ dbInstanceId: 'jeffi-tenant-acme' })
     })
@@ -184,7 +201,7 @@ describe('provisioning state machine', () => {
       await slow.createDbInstance({ dbInstanceId: 'jeffi-tenant-acme', paramGroup: 'pg', maxConnections: 50 })
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
       const res = await advanceProvisioningJob(
-        job({ step: 'wait_db_available', created_resources: { dbInstanceId: 'jeffi-tenant-acme' } }),
+        job({ step: 'wait_db_available', created_resources: { dbInstanceId: 'jeffi-tenant-acme', computeSpec: dedicatedRds } }),
         slow
       )
       expect(res).toBe('pending')
@@ -196,7 +213,7 @@ describe('provisioning state machine', () => {
       await provider.createDbInstance({ dbInstanceId: 'jeffi-tenant-acme', paramGroup: 'pg', maxConnections: 50 })
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
       await advanceProvisioningJob(
-        job({ step: 'wait_db_available', created_resources: { dbInstanceId: 'jeffi-tenant-acme' } }),
+        job({ step: 'wait_db_available', created_resources: { dbInstanceId: 'jeffi-tenant-acme', computeSpec: dedicatedRds } }),
         provider
       )
       const p = patches().find(x => x.step === 'load_schema')
@@ -211,7 +228,7 @@ describe('provisioning state machine', () => {
       const res = await advanceProvisioningJob(
         job({
           step: 'wait_db_available',
-          created_resources: { dbInstanceId: 'jeffi-tenant-acme', dbWaitStartedAt: started },
+          created_resources: { dbInstanceId: 'jeffi-tenant-acme', dbWaitStartedAt: started, computeSpec: dedicatedRds },
         }),
         never
       )
@@ -223,7 +240,7 @@ describe('provisioning state machine', () => {
     it('load_schema loads then advances to restore_data', async () => {
       const spy = vi.spyOn(provider, 'loadSchema')
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
-      await advanceProvisioningJob(job({ step: 'load_schema', created_resources: { endpoint: 'ep-1' } }), provider)
+      await advanceProvisioningJob(job({ step: 'load_schema', created_resources: { endpoint: 'ep-1', computeSpec: dedicatedRds } }), provider)
       expect(spy).toHaveBeenCalledWith('ep-1', 'jeffi_stores')
       expect(patches().some(p => p.step === 'restore_data')).toBe(true)
     })
@@ -237,7 +254,7 @@ describe('provisioning state machine', () => {
     it('write_infra persists the endpoint + bucket pointers', async () => {
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
       await advanceProvisioningJob(
-        job({ step: 'write_infra', created_resources: { endpoint: 'ep-1', bucket: 'b-1' } }),
+        job({ step: 'write_infra', created_resources: { endpoint: 'ep-1', bucket: 'b-1', computeSpec: dedicatedRds } }),
         provider
       )
       expect(reg.writeTenantInfra).toHaveBeenCalledWith('t-1', { rdsEndpoint: 'ep-1', s3Bucket: 'b-1' })

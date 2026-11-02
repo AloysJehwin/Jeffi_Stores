@@ -32,7 +32,12 @@ vi.mock('@/lib/shipping/delhivery', () => ({
 
 const k8s = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), apply: vi.fn(), remove: vi.fn() }))
 vi.mock('@/lib/k8s/client', () => k8s)
-const ec2 = vi.hoisted(() => ({ runInstance: vi.fn(), describeInstanceName: vi.fn() }))
+const ec2 = vi.hoisted(() => ({
+  runInstance: vi.fn(),
+  describeInstanceName: vi.fn(),
+  describeTenantDbVolume: vi.fn().mockResolvedValue(null),
+  attachVolume: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('@/lib/shared/ec2-client', () => ec2)
 
 const TENANT = { id: 't-1', slug: 'acme', plan: 'basic', status: 'active', rds_endpoint: 'db', ec2_instance_id: null }
@@ -254,7 +259,22 @@ describe('reconcileK8sPlan', () => {
   })
 
   it('a downgrade keeps the dedicated node until the pods have rolled onto the pool', async () => {
-    reg.getTenant.mockResolvedValue({ ...TENANT, plan: 'basic', ec2_instance_id: 'i-ded' })
+    // Downgrade to the shared (pool) tier — the only placement that drains pods off the dedicated node.
+    // basic is now dedicated+node, so it no longer rolls onto the pool.
+    process.env.COMPUTE_SPEC_ENABLED = 'true'
+    const shared = {
+      node: { placement: 'pool', type: null, count: 1 },
+      db: { mode: 'shared', class: null, storageGb: 10, multiAz: false },
+      layout: 'services',
+      services: Object.fromEntries(
+        ['storefront', 'admin', 'business', 'messaging', 'documents'].map(n => [n, { replicas: 1, maxReplicas: 1, size: 'S' }])
+      ),
+      storage: { s3Gb: 10 },
+    }
+    reg.controlPlanePool.mockReturnValue({
+      query: vi.fn().mockResolvedValue({ rows: [{ tenant_id: 't-1', desired: shared, applied: shared, node_gen: 0 }] }),
+    })
+    reg.getTenant.mockResolvedValue({ ...TENANT, plan: 'shared', ec2_instance_id: 'i-ded' })
     reg.getProvisioningJob.mockResolvedValue(
       job({ status: 'done', created_resources: { computeMode: 'k8s', ec2InstanceId: 'i-ded' } })
     )
@@ -270,7 +290,7 @@ describe('reconcileK8sPlan', () => {
     const pending = await reconcileK8sPlan('t-1', provider, { force: true })
     expect(pending.error).toMatch(/pods to move/)
     expect(del).not.toHaveBeenCalled()
-    expect(lastResources()).toMatchObject({ k8sPendingPlan: 'basic' })
+    expect(lastResources()).toMatchObject({ k8sPendingPlan: 'shared' })
 
     deployment.status = { observedGeneration: 2, replicas: 1, updatedReplicas: 1, readyReplicas: 1 }
     reg.getProvisioningJob.mockResolvedValue(job({ status: 'done', created_resources: lastResources() }))
@@ -280,5 +300,6 @@ describe('reconcileK8sPlan', () => {
     expect(del).toHaveBeenCalledWith('i-ded')
     expect(lifecycle.clearTenantEc2Instance).toHaveBeenCalledWith('t-1')
     expect(lastResources().k8sPendingPlan).toBeUndefined()
+    delete process.env.COMPUTE_SPEC_ENABLED
   })
 })

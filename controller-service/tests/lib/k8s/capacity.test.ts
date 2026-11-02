@@ -13,10 +13,11 @@ describe('dedicatedCapacityError', () => {
     process.env.EC2_VCPU_QUOTA = '8'
   })
 
-  it('never blocks Basic (shared pool)', async () => {
+  it('guards Basic (its own dedicated node) against the quota', async () => {
     process.env.EC2_VCPU_QUOTA = '1'
-    expect(await dedicatedCapacityError('basic')).toBeNull()
-    expect(ec2.describeActiveInstanceTypes).not.toHaveBeenCalled()
+    ec2.describeActiveInstanceTypes.mockResolvedValue([])
+    expect(await dedicatedCapacityError('basic')).toBe(CAPACITY_MESSAGE)
+    expect(ec2.describeActiveInstanceTypes).toHaveBeenCalled()
   })
 
   it('blocks a dedicated plan when the quota has no room for its node', async () => {

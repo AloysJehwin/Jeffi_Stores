@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
+// The route reads ECOM_PAYMENTS_ENABLED into a module-level const at import time. Most tests
+// below exercise the subscription path, so enable payments before the route module is evaluated.
+// The dedicated payments-off test re-imports the route with the flag unset.
+vi.hoisted(() => {
+  process.env.ECOM_PAYMENTS_ENABLED = 'true'
+})
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -85,6 +92,7 @@ import {
   getOwnerBankWithRoute,
   persistLinkedAccountToOwnerBank,
   reviewServiceApproval,
+  controlPlanePool,
 } from '@/lib/tenant-registry'
 import { createRazorpaySubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import {
@@ -96,6 +104,7 @@ import {
   normalizeIndianPhone,
 } from '@/lib/payments/razorpay-route'
 import { sendKycApprovedEmail } from '@/lib/shared/ecom-emails'
+import { startStore } from '@controller/lib/provisioning/start-store'
 
 // ---------------------------------------------------------------------------
 // Helpers / fixtures
@@ -172,6 +181,11 @@ function primeHappyPath() {
     shortUrl: 'https://rzp.io/i/checkout',
   } as any)
   vi.mocked(saveSubscriptionId).mockResolvedValue(undefined)
+  vi.mocked(startStore).mockResolvedValue(undefined)
+  // controlPlanePool().query() is used for KYC status update and price lookup
+  vi.mocked(controlPlanePool).mockReturnValue({
+    query: vi.fn().mockResolvedValue({ rows: [{ price: 499 }] }),
+  } as any)
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +231,7 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
 
   // --- Happy path ---
 
-  it('approves KYC, creates linked account + subscription, returns checkoutUrl', async () => {
+  it('approves KYC, creates linked account + subscription, returns checkoutUrl (payments on)', async () => {
     const res = await POST(postReq(), params)
     const json = await res.json()
     expect(res.status).toBe(200)
@@ -231,6 +245,33 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(createRazorpaySubscription).toHaveBeenCalled()
     expect(saveSubscriptionId).toHaveBeenCalled()
     expect(sendKycApprovedEmail).toHaveBeenCalled()
+  })
+
+  // Payments off (default): KYC approval starts provisioning directly, no subscription. The route
+  // reads the flag at module load, so re-import it with the flag unset.
+  it('starts provisioning on approval and skips the subscription when payments are off', async () => {
+    const prev = process.env.ECOM_PAYMENTS_ENABLED
+    delete process.env.ECOM_PAYMENTS_ENABLED
+    vi.resetModules()
+    try {
+      const { POST: POST_OFF } = await import(
+        '@controller/app/api/(admin)/admin/ecom/kyc/[tenantId]/approve/route'
+      )
+      const res = await POST_OFF(postReq(), params)
+      const json = await res.json()
+      expect(res.status).toBe(200)
+      expect(json.ok).toBe(true)
+      expect(json.provisioningStarted).toBe(true)
+      expect(json.linkedAccountId).toBe('acc_link_123')
+      expect(approveKyc).toHaveBeenCalledWith(TENANT_ID, ADMIN.email)
+      expect(createLinkedAccount).toHaveBeenCalled()
+      expect(startStore).toHaveBeenCalledWith({ id: TENANT_ID, store_request: null })
+      expect(createRazorpaySubscription).not.toHaveBeenCalled()
+      expect(json.checkoutUrl).toBeUndefined()
+    } finally {
+      if (prev !== undefined) process.env.ECOM_PAYMENTS_ENABLED = prev
+      vi.resetModules()
+    }
   })
 
   it('falls back to "admin" reviewer email when admin.email is absent', async () => {

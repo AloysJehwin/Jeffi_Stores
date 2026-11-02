@@ -2,6 +2,7 @@ import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
 import path from 'path'
 import fs from 'fs'
 import { createPgPool, rdsSslOption, rdsIamPassword } from '@/lib/shared/pg-pool'
+import { fetchDbSecret } from '@/lib/shared/db-secret'
 import { getCurrentAuditActor, getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext, runWithAuditActor } from '@/lib/auth/audit-context'
 import { getCurrentTenant, getCurrentTenantId, runWithTenantContext, setTenantContext } from '@/lib/tenancy/tenant-context'
 import type { TenantContext as TenantContextType } from '@/lib/tenancy/tenant-context'
@@ -111,16 +112,22 @@ function buildTenantPool(infra: NonNullable<ReturnType<typeof getCurrentTenant>>
     config.ssl = false
     return createPgPool(config)
   }
-  config.ssl = rdsSslOption()
   if (infra.iamAuth) {
+    config.ssl = rdsSslOption()
     const user = infra.rdsUser || process.env.RDS_USER || 'app_user'
     config.user = user
     config.password = rdsIamPassword(infra.rdsEndpoint, infra.rdsPort, user, infra.region)
-  } else {
-    // Password-based tenants would resolve creds from db_secret_ref; not used on
-    // the IAM-first path. Left explicit so the branch is obvious.
-    throw new Error('Password-auth tenant pools not yet implemented; use IAM auth')
+    return createPgPool(config)
   }
+  // Password auth: the store's own Postgres on its EC2 node. Creds live in a Secrets Manager
+  // secret (JSON with password/username/database) referenced by tenant_infra.db_secret_ref; TLS
+  // is unverified because the pod serves a self-signed cert. Cached per secret ref for 5 min.
+  if (!infra.dbSecretRef) throw new Error('Tenant has neither IAM auth nor db_secret_ref set')
+  const ref = infra.dbSecretRef
+  const region = infra.region
+  config.ssl = { rejectUnauthorized: false }
+  config.user = infra.rdsUser || 'jeffi'
+  config.password = async () => (await fetchDbSecret(ref, region)).password
   return createPgPool(config)
 }
 

@@ -1,0 +1,39 @@
+# Custom-domain verification cron. Runs every 10 min; advances each in-flight tenant_custom_domains
+# row by one step (pending → dns-verified → cert-pending → verified). See
+# controller-service/src/lib/domains/verify-cron.ts and the POST endpoint
+# /api/internal/domains/verify-cron.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: custom-domain-verify
+  namespace: jeffi
+  labels: { app.kubernetes.io/part-of: jeffi-cron }
+spec:
+  schedule: '*/10 * * * *'
+  timeZone: Asia/Kolkata
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 570
+      ttlSecondsAfterFinished: 600
+      template:
+        metadata:
+          labels: { app.kubernetes.io/part-of: jeffi-cron }
+        spec:
+          restartPolicy: Never
+          nodeSelector: { jeffi.io/role: core }
+          imagePullSecrets: [{ name: regcred }]
+          containers:
+            - name: run
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs custom_domain_verify POST /api/internal/domains/verify-cron']
+              env:
+                - name: CRON_SECRET
+                  valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
+              resources:
+                requests: { cpu: 10m, memory: 48Mi }
+                limits: { memory: 128Mi }

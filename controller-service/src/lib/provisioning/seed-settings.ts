@@ -1,6 +1,8 @@
 import { Pool } from 'pg'
 import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
-import { getTenant, getKyc, getDraft } from '@/lib/tenant-registry'
+import { getTenant, getKyc, getDraft, getOwnerById, getOwnerBankAccount } from '@/lib/tenant-registry'
+import { fetchDbSecret } from '@/lib/shared/db-secret'
+import { stateNameFromCode } from '@/lib/catalog/gst'
 
 /**
  * Seed a freshly-provisioned tenant's own `site_settings` from what the owner entered during
@@ -30,6 +32,24 @@ function tenantMasterPool(endpoint: string, dbName: string): Pool {
     user,
     password: masterPassword,
     ssl: rdsSslOption(),
+    max: 2,
+    connectionTimeoutMillis: 20000,
+  })
+}
+
+/**
+ * Node-mode tenants run their own Postgres inside their namespace with password auth; the
+ * credentials live in Secrets Manager at jeffi/tenant-db/<slug>. Connect in-cluster as 'jeffi'.
+ */
+async function tenantNodePool(slug: string): Promise<Pool> {
+  const secret = await fetchDbSecret(`jeffi/tenant-db/${slug}`, AWS_REGION)
+  return createPgPool({
+    host: `${slug}-postgres.tenant-${slug}.svc.cluster.local`,
+    port: 5432,
+    database: secret.database || 'jeffi',
+    user: secret.username || 'jeffi',
+    password: secret.password,
+    ssl: { rejectUnauthorized: false },
     max: 2,
     connectionTimeoutMillis: 20000,
   })
@@ -72,13 +92,16 @@ export async function seedTenantSiteSettings(
   if (!tenant) throw new Error('tenant not found')
   const kyc = await getKyc(tenantId).catch(() => null)
   const draft = await getDraft(ownerId).catch(() => null)
+  const owner = await getOwnerById(ownerId).catch(() => null)
+  const bank = await getOwnerBankAccount(ownerId).catch(() => null)
   const wh = (draft?.data as any)?.wh ?? {}
   const identity = (draft?.data as any)?.identity ?? {}
 
   const businessName = kyc?.business_name || tenant.display_name || ''
   const businessAddress = kyc?.business_address || ''
   const businessPhone = kyc?.mobile || wh.sellerPhone || ''
-  const businessEmail = identity.email || ''
+  // The wizard never populates draft.data.identity.email — fall back to the owner's account email.
+  const businessEmail = identity.email || owner?.email || ''
   const domain = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
   const businessWeb = tenant.custom_domain || `${tenant.slug}.${domain}`
   const stateCode = stateCodeFromGst(kyc?.gst_number) || (identity.state_code ?? '')
@@ -94,7 +117,19 @@ export async function seedTenantSiteSettings(
     business_phone: businessPhone,
     business_web: businessWeb,
     business_logo_url: logoUrl,
+    // No separate favicon asset at onboarding — reuse the logo until the owner uploads one.
+    business_favicon_url: logoUrl,
     business_state_code: stateCode,
+    // Legal & Banking card (admin site-controls) — printed on invoices/quotations/POs.
+    business_legal_name: kyc?.business_name || '',
+    business_trade_name: tenant.display_name || '',
+    business_gstin: kyc?.gst_number || '',
+    business_address: businessAddress,
+    business_state: stateNameFromCode(stateCode),
+    // tenant_bank_accounts stores only the account number + IFSC; bank name/branch are left for
+    // the owner to fill on the Legal & Banking card (no source at onboarding).
+    bank_account: bank?.account_number || '',
+    bank_ifsc: bank?.ifsc || '',
     delhivery_origin_pincode: wh.originPincode ?? '',
     delhivery_pickup_location: wh.pickupLocation ?? '',
     delhivery_seller_name: wh.sellerName || businessName,
@@ -105,7 +140,10 @@ export async function seedTenantSiteSettings(
   const entries = Object.entries(settings).filter(([, v]) => v != null && String(v).trim() !== '')
   if (entries.length === 0) return
 
-  const pool = tenantMasterPool(endpoint, dbName)
+  // Node-mode tenants (iam_auth=false) run their own in-namespace Postgres; RDS/shared tenants
+  // use the RDS master credentials.
+  const pool =
+    tenant.iam_auth === false ? await tenantNodePool(tenant.slug) : tenantMasterPool(endpoint, dbName)
   const client = await pool.connect()
   try {
     await client.query('BEGIN')

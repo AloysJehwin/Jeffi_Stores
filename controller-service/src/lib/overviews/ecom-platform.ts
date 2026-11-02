@@ -20,11 +20,18 @@ export const istBucket = (expr: string, bucket: string) =>
 export const bucketSeries = (bucket: string, a: number, b: number) =>
   `SELECT generate_series(date_trunc('${bucket}', $${a}::date), $${b}::date, interval '1 ${bucket}')::date AS b`
 
-/** Monthly value of a plan: yearly billing is ten months' price over twelve. */
-export const MRR_SQL = `(CASE WHEN t.billing_interval = 'yearly' THEN p.monthly_price_inr * 10 / 12 ELSE COALESCE(p.monthly_price_inr, 0) END)`
+// Monthly subscription price: tenant_compute.price_inr_month wins (set when the owner picked their spec);
+// grandfathered stores (no tc row yet) fall back to plan.monthly_price_inr. Yearly billing is 10/12 of monthly.
+export const PRICE_INR_MONTH_SQL = `COALESCE((SELECT tc.price_inr_month FROM tenant_compute tc WHERE tc.tenant_id = t.id), p.monthly_price_inr, 0)`
+
+/** Monthly value of a store: yearly billing is ten months' price over twelve. */
+export const MRR_SQL = `(CASE WHEN t.billing_interval = 'yearly' THEN ${PRICE_INR_MONTH_SQL} * 10 / 12 ELSE ${PRICE_INR_MONTH_SQL} END)`
+
+/** Platform margin earned (not yet due to AWS): price minus (price / (1+GST) / (1+plan.infra_margin)). */
+export const INFRA_MARGIN_MRR_SQL = `(${PRICE_INR_MONTH_SQL} - (${PRICE_INR_MONTH_SQL}::numeric / (1 + 0.18) / (1 + COALESCE(p.infra_margin, 0))))`
 
 /** A tenant on a paid store plan (needs the tenants t / plans p aliases). */
-export const PAID_STORE_SQL = `(p.product = 'store' AND p.monthly_price_inr > 0 AND 'store' = ANY(t.service_types))`
+export const PAID_STORE_SQL = `(p.product = 'store' AND ${PRICE_INR_MONTH_SQL} > 0 AND 'store' = ANY(t.service_types))`
 
 /** Paying now: live store on a paid plan. */
 export const PAYING_SQL = `(t.status = 'active' AND ${PAID_STORE_SQL})`

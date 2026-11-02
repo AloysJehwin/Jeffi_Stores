@@ -8,8 +8,7 @@ import { describeChange } from '@controller/lib/compute/changes'
 import { specKey } from '@/lib/compute/presets'
 import type { ComputeSpec } from '@/lib/compute/spec'
 import { Card, Row } from '../_components/Card'
-import ServersNotice from '../_components/ServersNotice'
-import type { ServersBilling } from '@controller/lib/billing/infra-status'
+type ComparisonRow = { group: string; label: string; scopeKey: string | null }
 
 type ApplyMode = 'window' | 'now'
 
@@ -25,8 +24,25 @@ const STATUS: Record<string, string> = {
 const summary = (s: ComputeSpec) =>
   [
     s.node.placement === 'pool' ? 'Shared servers' : `${s.node.count > 1 ? `${s.node.count}× ` : ''}${s.node.type}`,
-    s.db.mode === 'shared' ? 'shared database' : `${s.db.class?.replace(/^db\./, '')} database, ${s.db.storageGb} GB${s.db.multiAz ? ', with standby' : ''}`,
+    s.db.mode === 'shared' ? 'shared database' : s.db.mode === 'node' ? 'on-node database' : `${s.db.class?.replace(/^db\./, '')} database, ${s.db.storageGb} GB${s.db.multiAz ? ', with standby' : ''}`,
   ].join(' · ')
+
+/** Features gained/lost moving from one plan to another, from the comparison rows + feature matrix. */
+function planDelta(from: string, to: string, matrix: Record<string, string[]>, rows: ComparisonRow[]): { gained: string[]; lost: string[] } {
+  if (from === to) return { gained: [], lost: [] }
+  const fromKeys = new Set(matrix[from] ?? [])
+  const toKeys = new Set(matrix[to] ?? [])
+  const gained: string[] = []
+  const lost: string[] = []
+  for (const row of rows) {
+    if (!row.scopeKey) continue
+    const inFrom = fromKeys.has(row.scopeKey)
+    const inTo = toKeys.has(row.scopeKey)
+    if (inTo && !inFrom) gained.push(row.label)
+    else if (inFrom && !inTo) lost.push(row.label)
+  }
+  return { gained, lost }
+}
 
 export default function ComputeClient({
   tenantId,
@@ -36,7 +52,9 @@ export default function ComputeClient({
   change,
   rateInrHour,
   paused,
-  servers,
+  plans,
+  featureMatrix,
+  comparisonRows,
 }: {
   tenantId: string
   planSlug: string
@@ -45,17 +63,24 @@ export default function ComputeClient({
   change: { desired: ComputeSpec; status: string; error: string | null; applyMode: ApplyMode } | null
   rateInrHour: number | null
   paused: boolean
-  servers: ServersBilling | null
+  plans: { slug: string; name: string }[]
+  featureMatrix: Record<string, string[]>
+  comparisonRows: ComparisonRow[]
 }) {
   const router = useRouter()
   const [choice, setChoice] = useState<ComputeChoice | null>(null)
+  const [nextPlan, setNextPlan] = useState<string>(planSlug)
   const [applyMode, setApplyMode] = useState<ApplyMode>(change?.applyMode ?? 'window')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const busy = change?.status === 'applying'
   const next = choice?.spec ?? null
-  const changed = !!next && specKey(next) !== specKey(current)
-  const what = next && changed ? describeChange(current, next, applyMode) : null
+  const specChanged = !!next && specKey(next) !== specKey(current)
+  const planChanged = nextPlan !== planSlug
+  const changed = specChanged || planChanged
+  const what = next && specChanged ? describeChange(current, next, applyMode) : null
+  const delta = planChanged ? planDelta(planSlug, nextPlan, featureMatrix, comparisonRows) : { gained: [], lost: [] }
+  const planName = (slug: string) => plans.find(p => p.slug === slug)?.name ?? slug
 
   async function apply() {
     if (!next) return
@@ -64,7 +89,7 @@ export default function ComputeClient({
     const r = await fetch('/api/ecom/compute', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantId, spec: next, applyMode }),
+      body: JSON.stringify({ tenantId, spec: next, applyMode, planSlug: nextPlan }),
     }).catch(() => null)
     const d = await r?.json().catch(() => null)
     setSaving(false)
@@ -74,9 +99,9 @@ export default function ComputeClient({
 
   return (
     <div className="space-y-6">
-      {servers && <ServersNotice servers={servers} />}
       <Card title="Running now">
         <div className="space-y-2">
+          <Row label="Plan" value={planName(planSlug)} />
           <Row label="Servers" value={summary(current)} />
           {rateInrHour != null && <Row label="Cost" value={`${inr(rateInrHour * 730)}/month (${inr(rateInrHour * 24)}/day) + GST`} />}
           {change && (
@@ -93,23 +118,52 @@ export default function ComputeClient({
         </div>
       </Card>
 
-      <Card title="Change servers">
+      <Card title="Change plan or servers">
         {paused ? (
-          <p className="text-sm text-foreground-secondary">Your store is paused. You can change its servers once it runs again.</p>
+          <p className="text-sm text-foreground-secondary">Your store is paused. You can change it once it runs again.</p>
         ) : busy ? (
           <p className="text-sm text-foreground-secondary">A change is being applied. You can make another once it has finished.</p>
         ) : (
           <div className="space-y-6">
-            <ComputeConfigurator planSlug={planSlug} value={change?.desired ?? current} onChange={setChoice} current={current} planFeeInr={planFeeInr} />
-            {what && (
+            <ComputeConfigurator
+              planSlug={nextPlan}
+              onPlanChange={setNextPlan}
+              value={change?.desired ?? current}
+              onChange={setChoice}
+              current={current}
+              planFeeInr={planFeeInr}
+            />
+
+            {changed && (
               <div className="space-y-3 rounded-xl border border-border-default p-4">
-                <p className="text-sm font-medium text-foreground">What happens</p>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-foreground-secondary">
-                  {what.notes.map(n => (
-                    <li key={n}>{n}</li>
-                  ))}
-                </ul>
-                {what.classChange && (
+                <p className="text-sm font-medium text-foreground">What changes</p>
+                {planChanged && (
+                  <div className="text-sm text-foreground-secondary">
+                    Plan: <span className="font-medium text-foreground">{planName(planSlug)}</span> → <span className="font-medium text-foreground">{planName(nextPlan)}</span>
+                  </div>
+                )}
+                {delta.gained.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-foreground-muted">Gained</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-foreground-secondary">
+                      {delta.gained.map(f => <li key={`g:${f}`}>{f}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {delta.lost.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-foreground-muted">Lost</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-foreground-secondary">
+                      {delta.lost.map(f => <li key={`l:${f}`}>{f}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {what?.notes.length ? (
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-foreground-secondary">
+                    {what.notes.map(n => <li key={n}>{n}</li>)}
+                  </ul>
+                ) : null}
+                {what?.classChange && (
                   <Segmented
                     ariaLabel="When to change the database size"
                     options={[
@@ -120,8 +174,12 @@ export default function ComputeClient({
                     onChange={setApplyMode}
                   />
                 )}
+                <p className="text-xs text-foreground-muted">
+                  Plan changes are billed on your subscription (upgrade now, downgrade at renewal). Server changes {what?.classChange ? (applyMode === 'now' ? 'apply right away.' : 'apply in the maintenance window.') : 'apply right away.'}
+                </p>
               </div>
             )}
+
             {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
             <button
               type="button"

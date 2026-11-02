@@ -3,7 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('server-only', () => ({}))
 const k8s = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), apply: vi.fn(), remove: vi.fn() }))
 vi.mock('@/lib/k8s/client', () => k8s)
-const ec2 = vi.hoisted(() => ({ runInstance: vi.fn(), describeInstanceName: vi.fn() }))
+const ec2 = vi.hoisted(() => ({
+  runInstance: vi.fn(),
+  describeInstanceName: vi.fn(),
+  describeTenantDbVolume: vi.fn().mockResolvedValue(null),
+  attachVolume: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('@/lib/shared/ec2-client', () => ec2)
 
 import { ensureTenantNodes, poolCapacity, terminateTenantInstance } from '@/lib/k8s/tenant-compute'

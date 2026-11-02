@@ -69,6 +69,10 @@ export async function POST(request: NextRequest) {
   // 3. Create Razorpay Subscription and get hosted checkout URL.
   const plans = await listPlans()
   const plan = plans.find(p => p.slug === parsed.data.planSlug)
+  const priceInrMonth = Number(plan?.monthly_price_inr ?? 0)
+  if (!(priceInrMonth > 0)) {
+    return NextResponse.json({ error: `Plan ${parsed.data.planSlug} has no subscription price` }, { status: 400 })
+  }
 
   const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
   const callbackUrl = `${baseUrl}/onboard/success?tenant=${result.slug}`
@@ -77,6 +81,7 @@ export async function POST(request: NextRequest) {
     planSlug: parsed.data.planSlug,
     planName: plan?.name ?? parsed.data.planSlug,
     interval: parsed.data.billingInterval,
+    priceInrMonth,
     ownerEmail: owner.email,
     ownerName: owner.name,
     tenantId: result.tenantId,

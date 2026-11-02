@@ -1,6 +1,6 @@
 import 'server-only'
 import type { ProvisioningProvider } from './provider'
-import { dbInstanceId, isTerminalError, paramGroupName, tenantHostnames } from './steps'
+import { dbInstanceId, ensureTenantDbSecret, genDbPassword, isTerminalError, paramGroupName, tenantHostnames } from './steps'
 import {
   clearTenantCache,
   getProvisioningJob,
@@ -34,8 +34,8 @@ const MAX_ATTEMPTS = 6
 const TENANT_DB = 'jeffi_stores'
 
 interface DbRef {
-  kind: 'dedicated' | 'shared'
-  id: string // the RDS instance (own, or the shared host)
+  kind: 'dedicated' | 'shared' | 'node'
+  id: string // the RDS instance (own, or the shared host). For 'node': the tenant slug.
   endpoint?: string
   dbName: string
   role: string | null
@@ -49,6 +49,7 @@ interface Progress {
   poolInstanceId?: string
   podsApplied?: boolean
   poolMax?: number
+  dbPassword?: string
   dbOnline?: number
   dbClass?: number
   move?: { step: 'create' | 'wait' | 'freeze' | 'copy'; since?: number; frozenAt?: number; source?: DbRef; target?: DbRef; switched?: boolean }
@@ -124,8 +125,6 @@ export async function reconcileCompute(tenantId: string, provider: ProvisioningP
       last_error: null,
       applied_at: new Date(),
     })
-    const { syncComputePeriod } = await import('@controller/lib/billing/infra-billing')
-    await syncComputePeriod(tenantId).catch(e => console.error(`[compute] ${tenantId}: billing period not synced: ${e?.message}`))
     return { ok: true, status: 'applied' }
   } catch (e: any) {
     return fail(ctx, e?.message || 'compute change failed')
@@ -188,6 +187,17 @@ async function moveDatabase(ctx: Ctx): Promise<Outcome> {
         multiAz: want.multiAz,
       })
       m.target = { kind: 'dedicated', id: created.dbInstanceId, dbName: TENANT_DB, role: null, class: created.instanceClass ?? want.class ?? undefined }
+    } else if (want.mode === 'node') {
+      // Basic: the Postgres pod comes up via serversAndPods on the tenant's own node (which
+      // mounts a tagged EBS data volume). The pod's cluster-DNS endpoint is known now, so skip
+      // straight to the freeze step; schema+copy happens once the pod is Ready.
+      m.target = {
+        kind: 'node',
+        id: slug,
+        endpoint: `${slug}-postgres.tenant-${slug}.svc.cluster.local`,
+        dbName: TENANT_DB,
+        role: null,
+      }
     } else {
       const { reserveSharedDbHost, tenantDbNames } = await import('@controller/lib/compute/shared-db')
       const host = await reserveSharedDbHost(provider)
@@ -201,6 +211,19 @@ async function moveDatabase(ctx: Ctx): Promise<Outcome> {
 
   const target = m.target!
   if (m.step === 'wait') {
+    if (target.kind === 'node') {
+      // Postgres pod comes up via serversAndPods — wait for it before loading schema. On a very
+      // first boot the pod init formats the EBS data volume, so this can take a few minutes.
+      const k8s = await import('@/lib/k8s/tenant-compute')
+      if (!(await k8s.postgresPodReady(slug))) {
+        if (Date.now() - (m.since ?? Date.now()) < DB_DEADLINE_MS) return 'wait'
+        delete p.move
+        throw new Error('the node Postgres pod did not become ready within 40 min')
+      }
+      await provider.loadSchema(target.endpoint!, target.dbName)
+      m.step = 'freeze'
+      return 'wait'
+    }
     const endpoint = await provider.getDbEndpoint(target.id)
     if (!endpoint) {
       if (Date.now() - (m.since ?? Date.now()) < DB_DEADLINE_MS) return 'wait'
@@ -224,15 +247,18 @@ async function moveDatabase(ctx: Ctx): Promise<Outcome> {
     // Recorded once: after the switch the registry points at the target, not the database left behind.
     if (!m.source) {
       const job = await getProvisioningJob(tenantId)
-      m.source = tenant.shared_db_host
-        ? { kind: 'shared', id: tenant.shared_db_host, endpoint: tenant.rds_endpoint!, dbName: tenant.rds_db!, role: tenant.rds_user }
-        : {
-            kind: 'dedicated',
-            id: (job?.created_resources as any)?.dbInstanceId || dbInstanceId(slug),
-            endpoint: tenant.rds_endpoint!,
-            dbName: tenant.rds_db || TENANT_DB,
-            role: null,
-          }
+      const isNodeSource = applied.db.mode === 'node' || /\.svc\.cluster\.local$/.test(tenant.rds_endpoint ?? '')
+      m.source = isNodeSource
+        ? { kind: 'node', id: slug, endpoint: tenant.rds_endpoint!, dbName: tenant.rds_db || TENANT_DB, role: null }
+        : tenant.shared_db_host
+          ? { kind: 'shared', id: tenant.shared_db_host, endpoint: tenant.rds_endpoint!, dbName: tenant.rds_db!, role: tenant.rds_user }
+          : {
+              kind: 'dedicated',
+              id: (job?.created_resources as any)?.dbInstanceId || dbInstanceId(slug),
+              endpoint: tenant.rds_endpoint!,
+              dbName: tenant.rds_db || TENANT_DB,
+              role: null,
+            }
     }
     // No request may write to the old database from here: the store resolves to nothing.
     await setTenantInstanceState(tenantId, 'migrating')
@@ -248,12 +274,22 @@ async function moveDatabase(ctx: Ctx): Promise<Outcome> {
   if (tenant.rds_endpoint === target.endpoint && (tenant.rds_db || TENANT_DB) === target.dbName) m.switched = true
   if (!m.switched) {
     try {
-      const archive = await provider.backupDb(source.endpoint!, source.dbName)
-      await provider.restoreDb(target.endpoint!, target.dbName, archive) // one transaction
+      // pg_dump / pg_restore via kubectl exec when either end lives in a pod — the pod has the
+      // password + cluster-local reachability, so we never need to expose it to the controller.
+      const archive =
+        source.kind === 'node'
+          ? await dumpFromNodePod(slug, source.dbName)
+          : await provider.backupDb(source.endpoint!, source.dbName)
+      if (target.kind === 'node') await restoreIntoNodePod(slug, target.dbName, archive)
+      else await provider.restoreDb(target.endpoint!, target.dbName, archive) // one transaction
       await writeTenantInfra(tenantId, {
         rdsEndpoint: target.endpoint!,
         s3Bucket: tenant.s3_bucket!,
         ...(target.kind === 'shared' ? { rdsDb: target.dbName, rdsUser: target.role!, sharedDbHost: target.id } : {}),
+        // Node destination: password auth, creds in Secrets Manager. RDS/dedicated/shared keep IAM.
+        ...(target.kind === 'node'
+          ? { rdsDb: target.dbName, iamAuth: false, dbSecretRef: `jeffi/tenant-db/${slug}`, rdsUser: 'jeffi' }
+          : {}),
       })
     } catch (e) {
       // Nothing switched: serve from the old database while waiting to retry, and copy afresh then.
@@ -283,9 +319,34 @@ async function moveDatabase(ctx: Ctx): Promise<Outcome> {
 /** A database the store no longer uses: its own instance, or its database on a shared host. */
 async function dropDatabase(provider: ProvisioningProvider, db: DbRef): Promise<void> {
   if (db.kind === 'dedicated') return provider.deleteDbInstance(db.id)
+  // Node (Basic): the pod + EBS volume are torn down by deprovisionTenant / layout-switch.
+  if (db.kind === 'node') return
   if (db.endpoint) await provider.dropTenantDatabase(db.endpoint, db.dbName, db.role)
   const { releaseSharedDbSeat } = await import('@controller/lib/compute/shared-db')
   await releaseSharedDbSeat(db.id)
+}
+
+// pg_dump / pg_restore inside the `app=postgres` pod on the tenant's own node. The pod's
+// POSTGRES_PASSWORD is already in its env, so we don't materialize it in the controller.
+async function dumpFromNodePod(slug: string, dbName: string): Promise<Buffer> {
+  const { execPostgresPod } = await import('@/lib/k8s/tenant-compute')
+  return execPostgresPod(slug, [
+    'sh',
+    '-c',
+    `PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d ${dbName} -Fc`,
+  ])
+}
+async function restoreIntoNodePod(slug: string, dbName: string, archive: Buffer): Promise<void> {
+  const { execPostgresPod } = await import('@/lib/k8s/tenant-compute')
+  await execPostgresPod(
+    slug,
+    [
+      'sh',
+      '-c',
+      `PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d ${dbName} --no-owner --no-acl --single-transaction`,
+    ],
+    archive
+  )
 }
 
 // ── 2. Servers and pods ──────────────────────────────────────────────────────────────────────────
@@ -318,7 +379,24 @@ async function serversAndPods(ctx: Ctx): Promise<Outcome> {
   // Pods pooled for the database as it runs now and as it will, whichever allows fewer connections.
   const poolMax = Math.min(await poolMaxFor(target, tenant.plan), await poolMaxFor(desired, tenant.plan))
   if (!p.podsApplied) {
-    await k8s.applyTenantWorkload({ ...(await workloadInput(ctx)), compute: target, dbPoolMax: poolMax, nodeGen: gen })
+    // Node mode: the store's own Postgres pod needs a password. Generate once (reused on retry via
+    // p.dbPassword), store it in Secrets Manager, and seed it into the pod Secret. Never logged.
+    let dbPassword: string | undefined
+    if (target.db.mode === 'node') {
+      if (!p.dbPassword) {
+        p.dbPassword = genDbPassword()
+        await ctx.save()
+      }
+      dbPassword = p.dbPassword
+      await ensureTenantDbSecret(slug, dbPassword)
+    }
+    await k8s.applyTenantWorkload({
+      ...(await workloadInput(ctx)),
+      compute: target,
+      dbPoolMax: poolMax,
+      nodeGen: gen,
+      ...(dbPassword ? { dbPassword } : {}),
+    })
     p.podsApplied = true
     p.poolMax = poolMax
     await ctx.save()

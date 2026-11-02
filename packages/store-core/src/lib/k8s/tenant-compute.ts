@@ -65,16 +65,25 @@ export function poolCapacity(node: any): number {
 const isReady = (node: any) =>
   !!node?.status?.conditions?.some((c: any) => c.type === 'Ready' && c.status === 'True') && !node?.spec?.unschedulable
 
+// A tenant's db-mode Postgres lives on a tagged gp3 data volume that outlives the node
+// instance. On first launch we create it (DeleteOnTermination=false); on a replacement we
+// find it by tag, launch into its AZ, then re-attach after boot.
+const DB_DEVICE_NAME = '/dev/sdf' // surfaces as /dev/nvme1n1 on Nitro arm64
+
 async function launchNode(
   nodeName: string,
   instanceType: string,
   labels: Record<string, string>,
   taints: string[] = [],
-  tags?: Record<string, string>
+  tags?: Record<string, string>,
+  dbVolume?: { slug: string; sizeGb: number }
 ) {
-  const { runInstance } = await import('@/lib/shared/ec2-client')
+  const { runInstance, describeTenantDbVolume, attachVolume } = await import('@/lib/shared/ec2-client')
   const cfg = nodeLaunchConfig()
-  return runInstance({
+  // Replacement path: a volume already exists for this tenant → launch into its AZ and re-attach.
+  const existing = dbVolume ? await describeTenantDbVolume(dbVolume.slug) : null
+  const extraUserData = dbVolume ? dbNodeUserDataFragment() : ''
+  const result = await runInstance({
     name: `jeffi-k8s-${nodeName}`,
     instanceType,
     imageId: cfg.imageId,
@@ -83,8 +92,51 @@ async function launchNode(
     appTag: 'jeffi-k8s',
     metadataHopLimit: 2,
     tags,
-    userData: agentNodeUserData({ nodeName, labels, taints, server: cfg.server }),
+    userData: agentNodeUserData({ nodeName, labels, taints, server: cfg.server, extra: extraUserData }),
+    ...(existing ? { availabilityZone: existing.availabilityZone } : {}),
+    // Only on first launch — a replacement attaches the existing volume after boot.
+    ...(dbVolume && !existing
+      ? {
+          blockDeviceMappings: [
+            {
+              deviceName: DB_DEVICE_NAME,
+              sizeGb: dbVolume.sizeGb,
+              volumeType: 'gp3',
+              deleteOnTermination: false,
+              volumeTags: {
+                Name: `jeffi-db-${dbVolume.slug}`,
+                'jeffi-tenant': dbVolume.slug,
+                'jeffi:role': 'db',
+              },
+            },
+          ],
+        }
+      : {}),
   })
+  if (dbVolume && existing && !existing.attachedInstanceId) {
+    await attachVolume(existing.volumeId, result.instanceId, DB_DEVICE_NAME).catch(e =>
+      console.error(`[tenant-compute] attach db volume ${existing.volumeId} to ${result.instanceId}: ${e?.message}`)
+    )
+  }
+  return result
+}
+
+/** cloud-init fragment that formats /dev/nvme1n1 if empty and mounts it at /var/lib/jeffi/db. */
+function dbNodeUserDataFragment(): string {
+  return `
+# Basic-plan db-node data disk: format if empty, mount at /var/lib/jeffi/db.
+DEV=/dev/nvme1n1
+MNT=/var/lib/jeffi/db
+mkdir -p "$MNT"
+# Wait for the volume to attach (replacement path attaches post-boot).
+for i in 1 2 3 4 5 6 7 8 9 10; do [ -b "$DEV" ] && break; sleep 3; done
+if [ -b "$DEV" ]; then
+  if ! blkid "$DEV" >/dev/null 2>&1; then mkfs.ext4 -F "$DEV"; fi
+  UUID=$(blkid -s UUID -o value "$DEV")
+  grep -q "$UUID" /etc/fstab || echo "UUID=$UUID $MNT ext4 defaults,noatime 0 2" >> /etc/fstab
+  mountpoint -q "$MNT" || mount "$MNT"
+fi
+`
 }
 
 // instances are the tenant's OWN EC2s by node name (dedicated only). Pool launches report poolInstanceId
@@ -115,7 +167,8 @@ export async function ensureTenantNodes(
   node: ComputeSpec['node'],
   gen: number,
   known: { instances?: Record<string, string>; poolInstanceId?: string },
-  onLaunched: (instanceId: string, kind: 'dedicated' | 'pool', nodeName: string) => Promise<void>
+  onLaunched: (instanceId: string, kind: 'dedicated' | 'pool', nodeName: string) => Promise<void>,
+  opts?: { dbVolume?: { sizeGb: number } }
 ): Promise<PlacementResult> {
   if (node.placement === 'dedicated') {
     if (!node.type) throw new Error(`no server type for "${slug}"`)
@@ -127,12 +180,15 @@ export async function ensureTenantNodes(
       if (isReady(n)) continue
       ready = false
       if (n || instances[name]) continue
+      // The data volume lives on the FIRST node of the tenant (Basic shape is a single node).
+      const withDbVolume = opts?.dbVolume && i === 0 ? { slug, sizeGb: opts.dbVolume.sizeGb } : undefined
       const { instanceId } = await launchNode(
         name,
         node.type,
         { 'jeffi.io/role': 'dedicated', 'jeffi.io/tenant': slug, 'jeffi.io/gen': String(gen) },
         [`jeffi.io/tenant=${slug}:NoSchedule`],
-        { 'jeffi-tenant': slug }
+        { 'jeffi-tenant': slug },
+        withDbVolume
       )
       instances[name] = instanceId
       await onLaunched(instanceId, 'dedicated', name)
@@ -332,6 +388,14 @@ export async function tenantWorkloadReady(slug: string): Promise<boolean> {
   return ready
 }
 
+/** Basic shape: the Postgres pod (`app=postgres`) in the tenant namespace is Ready.
+ * Used to defer load_schema until the renderer-provisioned pod has started. */
+export async function postgresPodReady(slug: string): Promise<boolean> {
+  const pods = await list<any>('Pod', tenantNamespace(slug), 'app=postgres')
+  if (!pods.length) return false
+  return pods.every(p => (p.status?.containerStatuses ?? []).every((c: any) => c.ready))
+}
+
 /** Rolled out: every replica of every store Deployment is on the current template and ready. */
 export async function tenantRolloutComplete(slug: string): Promise<boolean> {
   const ds = await workloads(slug)
@@ -410,4 +474,31 @@ export async function getTenantWorkloadStatus(slug: string): Promise<TenantWorkl
       }
     }),
   }
+}
+
+/**
+ * Run a command inside the tenant's Postgres pod (Basic shape db) and return stdout as a Buffer.
+ * Used by moveDatabase to pg_dump / pg_restore without exposing the pod's password to the
+ * controller. Shells out to `kubectl exec` — the controller image includes kubectl, and
+ * KUBECONFIG points at the k3s cluster in-pod (or the dev user's cluster locally).
+ */
+export async function execPostgresPod(slug: string, cmd: string[], stdin?: Buffer): Promise<Buffer> {
+  const { spawn } = await import('node:child_process')
+  const ns = tenantNamespace(slug)
+  // -l selector resolves to the single `app=postgres` pod in the namespace.
+  const args = ['exec', '-n', ns, '-i', `deploy/${slug}-postgres`, '--', ...cmd]
+  return new Promise((resolve, reject) => {
+    const child = spawn('kubectl', args, { stdio: ['pipe', 'pipe', 'pipe'] })
+    const out: Buffer[] = []
+    const err: Buffer[] = []
+    child.stdout.on('data', (d: Buffer) => out.push(d))
+    child.stderr.on('data', (d: Buffer) => err.push(d))
+    child.on('error', reject)
+    child.on('close', (code: number) => {
+      if (code === 0) return resolve(Buffer.concat(out))
+      reject(new Error(`kubectl exec ${slug}-postgres exited ${code}: ${Buffer.concat(err).toString('utf8').slice(0, 400)}`))
+    })
+    if (stdin) child.stdin.end(stdin)
+    else child.stdin.end()
+  })
 }

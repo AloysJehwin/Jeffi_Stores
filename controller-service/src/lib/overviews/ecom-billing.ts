@@ -5,6 +5,7 @@ import {
   NOT_PLATFORM,
   PAID_STORE_SQL,
   PAYING_SQL,
+  PRICE_INR_MONTH_SQL,
   PLATFORM_TENANT_ID,
   bucketSeries,
   inIst,
@@ -106,7 +107,7 @@ export async function getEcomBillingOverview(pool: Pool, cur: Period, margin = 0
     ),
     pool.query(
       `SELECT t.id, t.display_name AS name, p.slug AS plan, t.billing_interval, ${MRR_SQL}::numeric AS mrr,
-              CASE WHEN t.billing_interval = 'yearly' THEN p.monthly_price_inr * 10 ELSE p.monthly_price_inr END::numeric AS amount,
+              CASE WHEN t.billing_interval = 'yearly' THEN ${PRICE_INR_MONTH_SQL} * 10 ELSE ${PRICE_INR_MONTH_SQL} END::numeric AS amount,
               (SELECT max(l.occurred_at) FROM settlement_ledger l WHERE l.tenant_id = t.id AND l.entry_type = 'subscription_charge') AS last_charge
        FROM tenants t JOIN plans p ON p.id = t.plan_id
        WHERE ${NOT_PLATFORM} AND ${PAYING_SQL} AND t.subscription_status IN ('active', 'authenticated')`

@@ -6,9 +6,12 @@ import { api, btnPrimary, inputCls } from '@/components/admin/kit/core'
 import { useActionToast } from '@/components/admin/kit/toast'
 import type { PriceRow, PricingSettings } from '@/lib/compute/spec'
 
+type PlanRow = { slug: string; name: string; tier: number; infraMargin: number; minPreset: string | null }
+
 type View = {
   prices: PriceRow[]
   settings: PricingSettings
+  plans: PlanRow[]
   presets: { key: string; label: string; awsInrMonth: number; inrMonth: number; inrDay: number }[]
 }
 
@@ -27,6 +30,10 @@ const SETTINGS: { key: keyof PricingSettings; label: string; step: string }[] = 
   { key: 'sharedDbMaxConnections', label: 'Shared database connections', step: '10' },
   { key: 'minPrepayDays', label: 'Days of servers paid upfront', step: '1' },
   { key: 'graceDays', label: 'Grace days on a negative wallet', step: '1' },
+  { key: 'ipv4UsdHour', label: 'IPv4 (USD/hour)', step: '0.0001' },
+  { key: 'ebsGp3UsdGbMonth', label: 'EBS gp3 (USD/GB-month)', step: '0.001' },
+  { key: 'snapshotUsdGbMonth', label: 'Snapshots (USD/GB-month)', step: '0.001' },
+  { key: 's3UsdGbMonth', label: 'S3 (USD/GB-month)', step: '0.001' },
 ]
 
 export default function ComputePricingClient() {
@@ -72,6 +79,36 @@ export default function ComputePricingClient() {
                 <td className="px-4 py-2.5 text-right tabular-nums">{inr(p.awsInrMonth)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{inr(p.inrMonth)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{inr(p.inrDay)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="overflow-x-auto rounded-xl border border-border-default bg-surface-elevated">
+        <table className="w-full text-sm">
+          <thead className="bg-surface-secondary text-foreground-muted">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium">Plan</th>
+              <th className="px-4 py-3 text-left font-medium">Minimum size</th>
+              <th className="px-4 py-3 text-right font-medium">Infra margin</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-default">
+            {view.plans.map(p => (
+              <tr key={p.slug}>
+                <td className="px-4 py-2.5 text-foreground">
+                  {p.name}
+                  <span className="block font-mono text-xs text-foreground-muted">{p.slug}</span>
+                </td>
+                <td className="px-4 py-2.5 text-foreground-muted">{p.minPreset ?? '—'}</td>
+                <td className="px-4 py-2.5 text-right">
+                  <MarginCell
+                    value={p.infraMargin}
+                    editable={canWrite}
+                    onSave={v => save({ plan: p.slug, infraMargin: v })}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -164,6 +201,30 @@ function UsdCell({ value, editable, onSave }: { value: number; editable: boolean
       type="number"
       min="0"
       step="0.0001"
+      value={v}
+      onChange={e => setV(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => e.key === 'Enter' && commit()}
+    />
+  )
+}
+
+function MarginCell({ value, editable, onSave }: { value: number; editable: boolean; onSave: (v: number) => void }) {
+  const [v, setV] = useState(String(value))
+  useEffect(() => setV(String(value)), [value])
+  if (!editable) return <span className="tabular-nums">{value.toFixed(3)}</span>
+  const commit = () => {
+    const n = Number(v)
+    if (Number.isFinite(n) && n >= 0 && n <= 3 && n !== value) onSave(n)
+    else setV(String(value))
+  }
+  return (
+    <input
+      className={`${ctl} w-24 text-right tabular-nums`}
+      type="number"
+      min="0"
+      max="3"
+      step="0.01"
       value={v}
       onChange={e => setV(e.target.value)}
       onBlur={commit}

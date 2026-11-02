@@ -22,6 +22,7 @@ const EDITABLE_KEYS = [
   'business_name',
   'business_web',
   'business_logo_url',
+  'business_favicon_url',
   'business_email_accent',
   'business_email',
   'business_phone',

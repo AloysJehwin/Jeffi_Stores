@@ -7,15 +7,13 @@ import { ChoiceChips, fieldCls } from '../../_ui'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import Pager from '../_components/Pager'
 import { topupAmounts } from '@/lib/billing/topup-amounts'
-import type { ServersBilling } from '@controller/lib/billing/infra-status'
-import ServersNotice from '../_components/ServersNotice'
 
 interface Entry { entry_type: string; category: string | null; amount: number; note: string | null; occurred_at: string }
 
 const AMOUNTS = [500, 1000, 2500, 5000]
-const CATEGORY: Record<string, string> = { infra: 'servers', ad_free: 'ad-free' }
+const CATEGORY: Record<string, string> = { ad_free: 'ad-free' }
 
-export default function WalletClient({ initial, keyId, tenantName, servers }: { initial: { balance: number; ledger: Entry[] }; keyId: string; tenantName: string; servers: ServersBilling | null }) {
+export default function WalletClient({ initial, keyId, tenantName }: { initial: { balance: number; ledger: Entry[] }; keyId: string; tenantName: string }) {
   const router = useRouter()
   const [amount, setAmount] = useState(1000)
   const [busy, setBusy] = useState(false)
@@ -47,12 +45,11 @@ export default function WalletClient({ initial, keyId, tenantName, servers }: { 
   const spentToday = initial.ledger.filter(e => e.entry_type === 'debit' && new Date(e.occurred_at).toDateString() === new Date().toDateString()).reduce((a, e) => a + Math.abs(e.amount), 0)
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[['Balance', fmt(initial.balance), true], ['Spent today', fmt(spentToday)], ...(servers ? [['Servers a day', fmt(servers.dailyInr)]] : []), ['Entries', String(initial.ledger.length)]].map(([l, v, a]) => (
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {[['Balance', fmt(initial.balance), true], ['Spent today', fmt(spentToday)], ['Entries', String(initial.ledger.length)]].map(([l, v, a]) => (
           <div key={l as string} className="rounded-2xl org-sand p-4 last:col-span-2 sm:p-5 sm:last:col-span-1"><div className="text-xs text-foreground-muted uppercase tracking-widest mb-2">{l}</div><div className={`font-display font-black text-lg sm:text-2xl lg:text-3xl tabular-nums [overflow-wrap:anywhere] sm:[overflow-wrap:normal] ${a ? 'ecom-accent-text' : ''}`}>{v}</div></div>
         ))}
       </div>
-      {servers && <ServersNotice servers={servers} />}
       <Card title="Top up">
         <div className="flex flex-wrap items-center gap-3">
           <ChoiceChips size="md" ariaLabel="Top-up amount" value={String(amount)} onChange={v => setAmount(Number(v))}

@@ -200,6 +200,27 @@ export default async function SiteControlsPage() {
                       <FullSpan>
                         <LogoUploader initialUrl={c.identity.logoUrl} storeName={c.identity.name} />
                       </FullSpan>
+                      <FullSpan>
+                        <div className="flex items-center gap-3">
+                          {inv.business_favicon_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={inv.business_favicon_url}
+                              alt="Favicon"
+                              className="h-8 w-8 rounded border border-border-default object-contain"
+                            />
+                          ) : null}
+                          <div className="flex-1">
+                            <TextControl
+                              settingKey="business_favicon_url"
+                              label="Favicon URL"
+                              hint="Shown in the browser tab. Defaults to your logo until you set a dedicated icon."
+                              initial={inv.business_favicon_url || ''}
+                              placeholder="https://…/favicon.png"
+                            />
+                          </div>
+                        </div>
+                      </FullSpan>
                       <TextControl
                         settingKey="business_name"
                         label="Store name"

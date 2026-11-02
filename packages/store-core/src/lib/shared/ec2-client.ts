@@ -95,6 +95,14 @@ export async function waitForState(instanceId: string, want: string, timeoutMs =
 
 // ── Instance lifecycle: launch / terminate / ip (tenant + pool provisioning) ──────
 
+export interface BlockDeviceMapping {
+  deviceName: string // e.g. /dev/sdf (surfaces as /dev/nvme1n1 on Nitro)
+  volumeType?: string // gp3 by default
+  sizeGb: number
+  deleteOnTermination?: boolean
+  volumeTags?: Record<string, string>
+}
+
 export interface RunInstanceArgs {
   instanceType: string
   name: string
@@ -106,6 +114,10 @@ export interface RunInstanceArgs {
   appTag?: string
   metadataHopLimit?: number
   tags?: Record<string, string>
+  // Extra EBS volumes attached at launch (Basic db node: a tagged data disk that survives
+  // instance replacement — the replacement launches in the same AZ and re-attaches it).
+  blockDeviceMappings?: BlockDeviceMapping[]
+  availabilityZone?: string
 }
 
 /** Launch a new EC2 running the app image. Config (AMI, SG, subnet, key, IAM profile) from env,
@@ -143,7 +155,25 @@ export async function runInstance(args: RunInstanceArgs): Promise<{ instanceId: 
   if (subnet) params['SubnetId'] = subnet
   if (keyName) params['KeyName'] = keyName
   if (iamProfile) params['IamInstanceProfile.Name'] = iamProfile
+  if (args.availabilityZone) params['Placement.AvailabilityZone'] = args.availabilityZone
   if (args.userData) params['UserData'] = Buffer.from(args.userData, 'utf8').toString('base64')
+  // Extra EBS data volumes (indexed from 2 — index 1 is the root volume AWS gives us).
+  for (const [i, m] of (args.blockDeviceMappings ?? []).entries()) {
+    const n = i + 2
+    params[`BlockDeviceMapping.${n}.DeviceName`] = m.deviceName
+    params[`BlockDeviceMapping.${n}.Ebs.VolumeSize`] = String(m.sizeGb)
+    params[`BlockDeviceMapping.${n}.Ebs.VolumeType`] = m.volumeType || 'gp3'
+    params[`BlockDeviceMapping.${n}.Ebs.DeleteOnTermination`] = String(m.deleteOnTermination ?? false)
+    // Tag the volume at creation so it survives instance replacement — described/attached by tag.
+    const tags = m.volumeTags
+    if (tags) {
+      params[`TagSpecification.2.ResourceType`] = 'volume'
+      Object.entries(tags).forEach(([k, v], j) => {
+        params[`TagSpecification.2.Tag.${j + 1}.Key`] = k
+        params[`TagSpecification.2.Tag.${j + 1}.Value`] = v
+      })
+    }
+  }
 
   const xml = await ec2(params)
   const instanceId = xmlTag(xml, 'instanceId')
@@ -254,6 +284,72 @@ export async function authorizeSgIngress(args: {
   } catch (err: any) {
     if (/InvalidPermission\.Duplicate/i.test(err?.message || '')) return
     throw err
+  }
+}
+
+// ── EBS data volumes (Basic db node — tag-tracked across instance replacement) ────
+
+export interface EbsVolume {
+  volumeId: string
+  availabilityZone: string
+  state: string
+  attachedInstanceId: string | null
+}
+
+/** The data volume (if any) tagged jeffi:role=db for this tenant slug. Null when none exists. */
+export async function describeTenantDbVolume(slug: string): Promise<EbsVolume | null> {
+  const xml = await ec2({
+    Action: 'DescribeVolumes',
+    'Filter.1.Name': 'tag:jeffi:role',
+    'Filter.1.Value.1': 'db',
+    'Filter.2.Name': 'tag:jeffi-tenant',
+    'Filter.2.Value.1': slug,
+  })
+  const volumeId = xmlTag(xml, 'volumeId')
+  if (!volumeId) return null
+  return {
+    volumeId,
+    availabilityZone: xmlTag(xml, 'availabilityZone') ?? '',
+    state: xmlTag(xml, 'status') ?? '',
+    // attachmentSet > item > instanceId
+    attachedInstanceId: xml.match(/<attachmentSet>[\s\S]*?<instanceId>([^<]+)<\/instanceId>/)?.[1] ?? null,
+  }
+}
+
+/** Attach an existing EBS data volume to an instance at `deviceName` (e.g. /dev/sdf). Idempotent. */
+export async function attachVolume(volumeId: string, instanceId: string, deviceName: string): Promise<void> {
+  try {
+    await ec2({ Action: 'AttachVolume', VolumeId: volumeId, InstanceId: instanceId, Device: deviceName })
+  } catch (e: any) {
+    if (/VolumeInUse|IncorrectState/i.test(e?.message || '')) return
+    throw e
+  }
+}
+
+/** Point-in-time snapshot of a volume, tagged for the tenant. Returns the snapshot id. */
+export async function snapshotVolume(volumeId: string, slug: string, description?: string): Promise<string> {
+  const xml = await ec2({
+    Action: 'CreateSnapshot',
+    VolumeId: volumeId,
+    ...(description ? { Description: description } : {}),
+    'TagSpecification.1.ResourceType': 'snapshot',
+    'TagSpecification.1.Tag.1.Key': 'jeffi-tenant',
+    'TagSpecification.1.Tag.1.Value': slug,
+    'TagSpecification.1.Tag.2.Key': 'jeffi:role',
+    'TagSpecification.1.Tag.2.Value': 'db',
+  })
+  const id = xmlTag(xml, 'snapshotId')
+  if (!id) throw new Error(`CreateSnapshot returned no snapshotId: ${xml.slice(0, 300)}`)
+  return id
+}
+
+/** Delete an EBS volume. Idempotent: NotFound is success. */
+export async function deleteVolume(volumeId: string): Promise<void> {
+  try {
+    await ec2({ Action: 'DeleteVolume', VolumeId: volumeId })
+  } catch (e: any) {
+    if (/InvalidVolume\.NotFound|NotFound/i.test(e?.message || '')) return
+    throw e
   }
 }
 

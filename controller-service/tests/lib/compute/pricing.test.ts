@@ -45,6 +45,8 @@ const catalog: Catalog = {
     sharedDbMaxConnections: 200,
     minPrepayDays: 30,
     graceDays: 3,
+    ebsGp3UsdGbMonth: 0.08,
+    snapshotUsdGbMonth: 0.05,
   },
 }
 const starter: PlanCompute = { slug: 'starter', defaultPreset: 'shared', minPlacement: 'pool', advanced: false }
@@ -55,16 +57,18 @@ const growth: PlanCompute = { slug: 'growth', defaultPreset: 'small', minPlaceme
 describe('quoteSpec', () => {
   it('prices each preset as AWS cost × rate × (1 + margin)', () => {
     const month = (k: keyof typeof PRESETS) => Math.round(quoteSpec(presetSpec(k), catalog).inrMonth)
-    expect([month('shared'), month('small'), month('medium'), month('large'), month('xlarge')]).toEqual([1496, 3393, 6027, 11754, 22922])
+    expect([month('shared'), month('small'), month('medium'), month('large'), month('xlarge')]).toEqual([1496, 2141, 3490, 6617, 12728])
     const small = quoteSpec(presetSpec('small'), catalog)
-    expect(Math.round(small.awsInrMonth)).toBe(2714)
-    expect(small.inrDay).toBeCloseTo(111.55, 1)
+    expect(Math.round(small.awsInrMonth)).toBe(1713)
+    expect(small.inrDay).toBeCloseTo(70.39, 1)
     expect(small.marginInrMonth).toBeCloseTo(small.inrMonth - small.awsInrMonth, 1)
-    expect(small.lines.map(l => l.key)).toEqual(['node', 'db', 'storage', 'platform'])
+    expect(small.lines.map(l => l.key)).toEqual(['node', 'db:disk', 'db:snapshot', 'platform'])
   })
 
   it('doubles the database for a standby and adds a second server for high availability', () => {
-    expect(Math.round(quoteSpec(withHighAvailability(presetSpec('large')), catalog).inrMonth)).toBe(23098)
+    const large = presetSpec('large')
+    large.db = { mode: 'dedicated', class: 'db.t4g.large', storageGb: 50, multiAz: false }
+    expect(Math.round(quoteSpec(withHighAvailability(large), catalog).inrMonth)).toBe(33457)
   })
 
   it('adds GST on servers to the plan fee, and bills by the hour', () => {
@@ -83,6 +87,18 @@ describe('validateSpec', () => {
     expect(validateSpec(presetSpec('shared'), catalog, starter).ok).toBe(true)
     expect(validateSpec(presetSpec('small'), catalog, growth).errors).toEqual([])
     for (const k of ['medium', 'large', 'xlarge'] as const) expect(validateSpec(presetSpec(k), catalog, pro).errors).toEqual([])
+  })
+
+  it('clears the plan floor for node-default presets, and rejects one below it', () => {
+    // presets default to node-Postgres; the floor rank must come from the server tier, not be forced
+    // to 0 by db.mode==='node' (which would block every paid plan's own default spec).
+    const growF: PlanCompute = { ...growth, minPreset: 'small' }
+    const proF: PlanCompute = { ...pro, minPreset: 'medium' }
+    const entF: PlanCompute = { slug: 'enterprise', defaultPreset: 'large', minPlacement: 'dedicated', minPreset: 'large', advanced: true }
+    expect(planCompatibilityError(presetSpec('small'), growF)).toBeNull()
+    expect(planCompatibilityError(presetSpec('medium'), proF)).toBeNull()
+    expect(planCompatibilityError(presetSpec('large'), entF)).toBeNull()
+    expect(planCompatibilityError(presetSpec('small'), proF)).toMatch(/minimum \(medium\)/)
   })
 
   it('fits storefront and admin on Small, but not the Pro business portal or a third storefront copy', () => {
@@ -120,15 +136,21 @@ describe('validateSpec', () => {
   })
 
   it('only lets database storage grow', () => {
-    const current = presetSpec('small')
-    current.db.storageGb = 50
-    expect(validateSpec(presetSpec('small'), catalog, pro, { current }).errors).toEqual(['Database storage can only grow (it is 50 GB now).'])
+    // Storage-grow is an RDS (dedicated) rule; use a dedicated spec so the check runs.
+    const dedicated = (storageGb: number) => {
+      const s = presetSpec('small')
+      s.node.type = 't4g.medium'
+      s.db = { mode: 'dedicated', class: 'db.t4g.small', storageGb, multiAz: false }
+      return s
+    }
+    const current = dedicated(50)
+    expect(validateSpec(dedicated(20), catalog, pro, { current }).errors).toEqual(['Database storage can only grow (it is 50 GB now).'])
   })
 })
 
 describe('presetOf', () => {
   it('recognises a preset whatever order its keys were stored in, with or without high availability', () => {
-    const fromJsonb = JSON.parse(JSON.stringify({ services: presetSpec('medium').services, db: presetSpec('medium').db, node: presetSpec('medium').node }))
+    const fromJsonb = JSON.parse(JSON.stringify({ services: presetSpec('medium').services, db: presetSpec('medium').db, node: presetSpec('medium').node, storage: presetSpec('medium').storage }))
     expect(presetOf(fromJsonb)).toBe('medium')
     expect(presetOf(withHighAvailability(presetSpec('medium')))).toBe('medium')
     expect(presetOf({ ...presetSpec('medium'), db: { ...presetSpec('medium').db, storageGb: 30 } })).toBe('custom')

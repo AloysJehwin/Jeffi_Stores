@@ -4,13 +4,19 @@ import { listPlans, planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-regi
 import PricingCards from './PricingCards'
 import { computePlans, computeSpecEnabled, getCatalog } from '@controller/lib/compute/catalog'
 import { presetSpec } from '@/lib/compute/presets'
-import { quoteSpec } from '@controller/lib/compute/pricing'
+import { quoteSpec, monthlyTotal } from '@controller/lib/compute/pricing'
 
-/** Each plan's default server size, priced, when owners pay for servers separately. */
-async function serversFrom(): Promise<Record<string, number> | null> {
+/** Each plan's "from" price: its minPreset at its own margin, GST included, plus the plan fee. */
+async function floorPrices(): Promise<Record<string, number> | null> {
   if (!computeSpecEnabled()) return null
   const [catalog, plans] = await Promise.all([getCatalog(), computePlans()])
-  return Object.fromEntries(plans.filter(p => p.defaultPreset).map(p => [p.slug, quoteSpec(presetSpec(p.defaultPreset!), catalog).inrMonth]))
+  return Object.fromEntries(
+    plans.map(p => {
+      const key = p.minPreset ?? p.defaultPreset ?? (p.minPlacement === 'pool' ? 'shared' : 'small')
+      const q = quoteSpec(presetSpec(key), catalog, { infraMargin: p.infraMargin })
+      return [p.slug, monthlyTotal(q, p.monthlyPriceInr, catalog.settings.gstRate).total]
+    })
+  )
 }
 
 export const dynamic = 'force-dynamic'
@@ -33,7 +39,7 @@ function Dash() {
 }
 
 export default async function PricingPage() {
-  const [plans, matrix, servers] = await Promise.all([listPlans(), planFeatureMatrix(), serversFrom()])
+  const [plans, matrix, floors] = await Promise.all([listPlans(), planFeatureMatrix(), floorPrices()])
   const ordered = [...plans].sort((a, b) => a.tier - b.tier)
 
   const has = (planSlug: string, scopeKey: string | null) => {
@@ -63,7 +69,7 @@ export default async function PricingPage() {
 
       {/* Interactive plan cards with monthly/yearly toggle */}
       <section className="w-full px-4 sm:px-6 lg:px-12 pb-12 sm:pb-16">
-        <PricingCards plans={plans} serversFrom={servers} />
+        <PricingCards plans={plans} fromInr={floors} />
       </section>
 
       {/* Detailed comparison table */}

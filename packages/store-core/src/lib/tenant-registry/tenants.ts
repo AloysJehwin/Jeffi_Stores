@@ -73,11 +73,14 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
 /** Summary counts for the control-plane dashboard. */
 export async function tenantSummary(): Promise<{ total: number; active: number; mrr: number }> {
   const pool = controlPlanePool()
+  // MRR: per-store subscription price from tenant_compute.price_inr_month (grandfathered stores fall back to plan fee).
   const res = await pool.query(
     `SELECT count(*)::int AS total,
             count(*) FILTER (WHERE t.status='active')::int AS active,
-            COALESCE(SUM(p.monthly_price_inr) FILTER (WHERE t.status='active'), 0)::numeric AS mrr
-     FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id`
+            COALESCE(SUM(COALESCE(tc.price_inr_month, p.monthly_price_inr, 0)) FILTER (WHERE t.status='active'), 0)::numeric AS mrr
+     FROM tenants t
+       LEFT JOIN plans p ON p.id = t.plan_id
+       LEFT JOIN tenant_compute tc ON tc.tenant_id = t.id`
   )
   const r = res.rows[0]
   return { total: r.total, active: r.active, mrr: Number(r.mrr) }
@@ -327,7 +330,10 @@ export async function billingSummary(): Promise<{
   const pool = controlPlanePool()
   const res = await pool.query(`
     SELECT
-      (SELECT COALESCE(SUM(p.monthly_price_inr),0) FROM tenants t JOIN plans p ON p.id=t.plan_id WHERE t.status='active')::numeric AS mrr,
+      (SELECT COALESCE(SUM(COALESCE(tc.price_inr_month, p.monthly_price_inr, 0)),0)
+         FROM tenants t JOIN plans p ON p.id=t.plan_id
+         LEFT JOIN tenant_compute tc ON tc.tenant_id = t.id
+         WHERE t.status='active')::numeric AS mrr,
       (SELECT COUNT(*) FROM tenants WHERE status='active' AND 'store' = ANY(service_types))::int AS paying,
       (SELECT COALESCE(SUM(platform_commission),0) FROM tenant_transactions WHERE occurred_at > now() - interval '30 days')::numeric AS comm,
       (SELECT COALESCE(SUM(gross_amount),0) FROM tenant_transactions WHERE occurred_at > now() - interval '30 days')::numeric AS gmv

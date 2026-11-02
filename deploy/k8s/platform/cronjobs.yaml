@@ -1593,11 +1593,11 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: cron-infra-billing
+  name: cron-s3-usage
   namespace: jeffi
   labels: { app.kubernetes.io/part-of: jeffi-cron }
 spec:
-  schedule: '30 0 * * *'
+  schedule: '30 2 * * *'
   timeZone: Asia/Kolkata
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 120
@@ -1619,7 +1619,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs infra_billing GET /api/cron/infra-billing']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs s3_usage GET /api/cron/s3-usage']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }

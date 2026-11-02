@@ -2,13 +2,14 @@ import 'server-only'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { presetOf } from '@/lib/compute/presets'
 import { normalizeSpec, type ComputeSpec } from '@/lib/compute/spec'
+import { priceInrMonthFor } from './pricing-month'
 
 export interface TenantCompute {
   tenant_id: string
   preset: string | null
   desired: ComputeSpec
   applied: ComputeSpec | null
-  status: 'pending' | 'applying' | 'applied' | 'failed' | 'paused'
+  status: 'pending' | 'applying' | 'applied' | 'failed' | 'paused' | 'scheduled'
   apply_mode: 'window' | 'now'
   rate_inr_hour: string | null
   node_gen: number
@@ -21,13 +22,16 @@ export interface TenantCompute {
   updated_at: string
 }
 
-/** The store's compute choice, to be applied by provisioning (or the resize reconciler). */
+/** The store's compute choice, to be applied by provisioning (or the resize reconciler).
+ *  Also writes the subscription price (rupee-rounded total incl. plan margin and GST) that Razorpay charges. */
 export async function saveDesiredCompute(tenantId: string, spec: ComputeSpec, applyMode: 'window' | 'now' = 'window'): Promise<void> {
+  const price = await priceInrMonthFor(tenantId, spec)
   await controlPlanePool().query(
-    `INSERT INTO tenant_compute (tenant_id, preset, desired, status, apply_mode) VALUES ($1, $2, $3, 'pending', $4)
+    `INSERT INTO tenant_compute (tenant_id, preset, desired, status, apply_mode, price_inr_month) VALUES ($1, $2, $3, 'pending', $4, $5)
      ON CONFLICT (tenant_id) DO UPDATE SET preset = EXCLUDED.preset, desired = EXCLUDED.desired, apply_mode = EXCLUDED.apply_mode,
-       status = 'pending', attempts = 0, next_at = NULL, last_error = NULL, updated_at = now()`,
-    [tenantId, presetOf(spec), JSON.stringify(spec), applyMode]
+       status = 'pending', attempts = 0, next_at = NULL, last_error = NULL,
+       price_inr_month = COALESCE(EXCLUDED.price_inr_month, tenant_compute.price_inr_month), updated_at = now()`,
+    [tenantId, presetOf(spec), JSON.stringify(spec), applyMode, price]
   )
 }
 

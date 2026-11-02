@@ -46,18 +46,15 @@ export async function startStore(tenant: { id: string; store_request?: string | 
 }
 
 /**
- * Start a store waiting on payment once its plan is paid (subscription active) and its wallet holds the
- * servers' first days (billing/prepay.ts). Called from the subscription webhook, the checkout return page,
- * an owner's top-up and the provisioning worker; only the first of them starts it.
+ * Start a store waiting on payment once its subscription is active. The subscription now covers
+ * both the plan fee and infra, so no wallet prepayment is required. Called from the subscription
+ * webhook, the checkout return page and the provisioning worker; only the first of them starts it.
  */
 export async function startStoreIfReady(tenantId: string): Promise<boolean> {
   const t = await getTenant(tenantId)
   if (!t || t.subscription_status !== 'active') return false
   const waiting = t.store_request ? t.store_request === 'awaiting_payment' : t.status === 'awaiting_payment'
   if (!waiting) return false
-  const { storePrepay } = await import('@controller/lib/billing/prepay')
-  const p = await storePrepay(tenantId, t.plan ?? null)
-  if (p.balance < p.requiredInr) return false
   const claimed = await controlPlanePool().query(
     t.store_request
       ? `UPDATE tenants SET store_request = 'provisioning', updated_at = now() WHERE id = $1 AND store_request = 'awaiting_payment'`

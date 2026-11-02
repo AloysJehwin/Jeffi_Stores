@@ -63,7 +63,7 @@ export const PRESETS: Record<PresetKey, Preset> = {
     blurb: 'Your own server and database, for a store getting started.',
     spec: {
       node: { placement: 'dedicated', type: 't4g.small', count: 1 },
-      db: { mode: 'dedicated', class: 'db.t4g.micro', storageGb: 20, multiAz: false },
+      db: { mode: 'node', class: null, storageGb: 20, multiAz: false },
       // A second storefront copy takes the room a rollout needs anyway.
       services: { ...all(svc(1, 1, 'S')), storefront: svc(1, 2, 'S') },
       storage: { s3Gb: 20 },
@@ -75,7 +75,7 @@ export const PRESETS: Record<PresetKey, Preset> = {
     blurb: 'Two copies of the storefront, so a restart never takes the store down.',
     spec: {
       node: { placement: 'dedicated', type: 't4g.medium', count: 1 },
-      db: { mode: 'dedicated', class: 'db.t4g.small', storageGb: 20, multiAz: false },
+      db: { mode: 'node', class: null, storageGb: 20, multiAz: false },
       services: { storefront: svc(2, 3, 'M'), admin: svc(1, 1, 'S'), business: svc(1, 1, 'S'), messaging: svc(2, 2, 'M'), documents: svc(2, 2, 'M') },
       storage: { s3Gb: 20 },
     },
@@ -86,7 +86,7 @@ export const PRESETS: Record<PresetKey, Preset> = {
     blurb: 'For busy stores: scales the storefront up to four copies under load.',
     spec: {
       node: { placement: 'dedicated', type: 't4g.large', count: 1 },
-      db: { mode: 'dedicated', class: 'db.t4g.medium', storageGb: 50, multiAz: false },
+      db: { mode: 'node', class: null, storageGb: 50, multiAz: false },
       services: { storefront: svc(2, 4, 'L'), admin: svc(1, 1, 'M'), business: svc(1, 1, 'S'), messaging: svc(2, 2, 'L'), documents: svc(2, 2, 'L') },
       storage: { s3Gb: 50 },
     },
@@ -97,7 +97,7 @@ export const PRESETS: Record<PresetKey, Preset> = {
     blurb: 'High traffic and large catalogues.',
     spec: {
       node: { placement: 'dedicated', type: 't4g.xlarge', count: 1 },
-      db: { mode: 'dedicated', class: 'db.t4g.large', storageGb: 100, multiAz: false },
+      db: { mode: 'node', class: null, storageGb: 100, multiAz: false },
       services: { storefront: svc(3, 8, 'L'), admin: svc(2, 2, 'M'), business: svc(1, 2, 'S'), messaging: svc(3, 3, 'L'), documents: svc(3, 3, 'L') },
       storage: { s3Gb: 100 },
     },
@@ -106,6 +106,51 @@ export const PRESETS: Record<PresetKey, Preset> = {
 
 export const DEDICATED_PRESETS: PresetKey[] = ['small', 'medium', 'large', 'xlarge']
 export const BASIC_PRESET: PresetKey[] = ['basic']
+
+/** Stepped visitor-per-month bands shown in the traffic slider. */
+export const TRAFFIC_BANDS: number[] = [1_000, 2_000, 5_000, 10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 2_000_000]
+
+// Band thresholds → preset. ≤10k=small, ≤50k=medium, ≤250k=large, ≤1M=xlarge, >1M=xlarge+HA.
+const BAND_PRESET_RANK: { max: number; key: Exclude<PresetKey, 'shared' | 'basic'> }[] = [
+  { max: 10_000, key: 'small' },
+  { max: 50_000, key: 'medium' },
+  { max: 250_000, key: 'large' },
+  { max: 1_000_000, key: 'xlarge' },
+]
+
+function bandPreset(visitorsPerMonth: number): Exclude<PresetKey, 'shared' | 'basic'> {
+  for (const b of BAND_PRESET_RANK) if (visitorsPerMonth <= b.max) return b.key
+  return 'xlarge'
+}
+
+const DEDICATED_RANK: Record<Exclude<PresetKey, 'shared'>, number> = { basic: 0, small: 1, medium: 2, large: 3, xlarge: 4 }
+
+/**
+ * The recommended spec for a plan at a traffic estimate: at least the plan's minPreset floor, and at least
+ * the band for the chosen visitors/month. Above 1M visitors, applies high availability. Basic is a fixed
+ * shape; it ignores traffic.
+ */
+export function recommendSpec(planSlug: string, visitorsPerMonth: number, plan: { minPreset?: PresetKey } | null): ComputeSpec {
+  const floor = plan?.minPreset ?? 'small'
+  if (floor === 'basic') return presetSpec('basic')
+  const band = bandPreset(visitorsPerMonth)
+  const floorRank = DEDICATED_RANK[floor as Exclude<PresetKey, 'shared'>] ?? 1
+  const bandRank = DEDICATED_RANK[band]
+  const key: Exclude<PresetKey, 'shared' | 'basic'> =
+    (floorRank >= bandRank ? (floor as Exclude<PresetKey, 'shared' | 'basic'>) : band)
+  const spec = presetSpec(key)
+  return visitorsPerMonth > 1_000_000 ? withHighAvailability(spec) : spec
+}
+
+/** The band key for a visitor-per-month estimate, for "Recommended" marks on the size cards. */
+export function recommendedPresetKey(planSlug: string, visitorsPerMonth: number, plan: { minPreset?: PresetKey } | null): Exclude<PresetKey, 'shared' | 'basic'> {
+  const floor = plan?.minPreset ?? 'small'
+  if (floor === 'basic') return 'small'
+  const band = bandPreset(visitorsPerMonth)
+  const floorRank = DEDICATED_RANK[floor as Exclude<PresetKey, 'shared'>] ?? 1
+  const bandRank = DEDICATED_RANK[band]
+  return floorRank >= bandRank ? (floor as Exclude<PresetKey, 'shared' | 'basic'>) : band
+}
 
 /** presetSpec clones the preset's spec; shared defaults s3Gb to 10 if the preset entry is missing it. */
 export const presetSpec = (key: PresetKey): ComputeSpec => {

@@ -1,8 +1,9 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
-import { computeSpecEnabled, planCompute } from '@controller/lib/compute/catalog'
+import { computeSpecEnabled, computePlans, planCompute } from '@controller/lib/compute/catalog'
 import { legacySpecFor } from '@/lib/compute/legacy'
 import { getTenantCompute } from '@controller/lib/compute/store'
-import { serversBilling } from '@controller/lib/billing/infra-status'
+import { planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-registry'
+import { getTenantS3UsageBytes } from '@jeffi/tenancy'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
 import ComputeClient from './ComputeClient'
@@ -12,25 +13,31 @@ export const dynamic = 'force-dynamic'
 export default async function ComputePage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const { tenant: tenantSlug } = await searchParams
   const { tenant } = await loadOwnerContext({ tenantSlug })
-  const header = <PageHeader eyebrow="Store" title="Servers" description="The servers and database your store runs on, and what they cost." />
+  const header = <PageHeader eyebrow="Store" title="Plan & servers" description="The plan your store runs on, its servers and database, and what they cost." />
   if (!computeSpecEnabled() || tenant.status !== 'active') {
     return (
       <>
         {header}
         <Card>
           <p className="text-sm text-foreground-secondary">
-            {tenant.status !== 'active' ? 'You can change your servers once your store is live.' : 'Choosing server sizes is not available yet.'}
+            {tenant.status !== 'active' ? 'You can change your plan and servers once your store is live.' : 'Choosing a plan and server size is not available yet.'}
           </p>
         </Card>
       </>
     )
   }
-  const [row, plan, servers] = await Promise.all([
+  const [row, plan, plans, matrix, s3Bytes] = await Promise.all([
     getTenantCompute(tenant.id),
     planCompute(tenant.plan ?? ''),
-    serversBilling(tenant.id).catch(() => null),
+    computePlans(),
+    planFeatureMatrix(),
+    getTenantS3UsageBytes(tenant.id).catch(() => 0),
   ])
   const current = row?.applied ?? legacySpecFor(tenant.plan)
+  const featureMatrix = Object.fromEntries(Object.entries(matrix).map(([k, v]) => [k, Array.from(v)]))
+  const s3CapGb = (row?.desired ?? current)?.storage?.s3Gb ?? 0
+  const s3UsedGb = s3Bytes / (1024 * 1024 * 1024)
+  const s3Pct = s3CapGb > 0 ? Math.min(100, Math.round((s3UsedGb / s3CapGb) * 100)) : 0
   return (
     <>
       {header}
@@ -46,8 +53,17 @@ export default async function ComputePage({ searchParams }: { searchParams: Prom
         }
         rateInrHour={row?.rate_inr_hour ? Number(row.rate_inr_hour) : null}
         paused={row?.status === 'paused'}
-        servers={servers}
+        plans={plans.map(p => ({ slug: p.slug, name: p.name }))}
+        featureMatrix={featureMatrix}
+        comparisonRows={COMPARISON_ROWS}
       />
+      {s3CapGb > 0 ? (
+        <Card>
+          <p className="text-sm text-foreground-secondary">
+            S3 storage: {s3UsedGb.toFixed(2)} GB of {s3CapGb} GB used ({s3Pct}%).
+          </p>
+        </Card>
+      ) : null}
     </>
   )
 }

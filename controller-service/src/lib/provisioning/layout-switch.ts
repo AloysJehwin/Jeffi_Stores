@@ -88,8 +88,6 @@ async function advance(tenantId: string, retry: boolean): Promise<LayoutResult> 
     await k8s.applyTenantWorkload(input)
     delete p.layout
     await patchTenantCompute(tenantId, { applied, progress: Object.keys(p).length ? p : null, rate_inr_hour: await rateFor(applied) })
-    const { syncComputePeriod } = await import('@controller/lib/billing/infra-billing')
-    await syncComputePeriod(tenantId).catch(e => console.error(`[layout] ${tenant.slug}: billing period not synced: ${e?.message}`))
     return { ok: true, status: 'services' }
   } catch (e: any) {
     const msg = e?.message || 'layout switch failed'

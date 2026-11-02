@@ -5,6 +5,8 @@ export interface AgentNodeSpec {
   labels: Record<string, string>
   taints?: string[] // key=value:Effect
   server: string // https://<core private ip>:6443
+  // Shell script appended after k3s install (e.g. mount a tenant data volume on Basic db nodes).
+  extra?: string
 }
 
 const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
@@ -31,5 +33,5 @@ TSKEY=$(sec TS_AUTHKEY)
 if ! command -v k3s >/dev/null; then
   curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable K3S_URL=${shq(spec.server)} K3S_TOKEN="$(sec K3S_TOKEN)" sh -s - ${args}
 fi
-`
+${spec.extra ?? ''}`
 }

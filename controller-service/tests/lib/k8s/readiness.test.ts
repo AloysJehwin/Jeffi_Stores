@@ -64,8 +64,9 @@ describe('cron scheduling for k8s', () => {
 })
 
 describe('compute tiers', () => {
-  it('places basic on the pool and paid tiers on dedicated nodes', () => {
-    expect(legacySpecFor('basic').node.placement).toBe('pool')
+  it('places basic (node mode) and paid tiers on dedicated nodes', () => {
+    expect(legacySpecFor('basic').node.placement).toBe('dedicated')
+    expect(legacySpecFor('basic').db.mode).toBe('node')
     for (const p of ['growth', 'pro', 'enterprise']) expect(legacySpecFor(p).node.placement).toBe('dedicated')
     expect(legacySpecFor('unknown')).toEqual(legacySpecFor('basic'))
   })

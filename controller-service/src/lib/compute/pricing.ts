@@ -39,9 +39,11 @@ function perGb(catalog: Catalog, code: string, multiAz = false): number {
   return v
 }
 
-export function quoteSpec(spec: ComputeSpec, catalog: Catalog): Quote {
+export function quoteSpec(spec: ComputeSpec, catalog: Catalog, plan?: { infraMargin?: number }): Quote {
   const s = catalog.settings
-  const toInr = (usd: number) => usd * s.usdInr * (1 + s.margin)
+  // Margin resolution: per-plan markup wins, else the catalog's global setting, else 0.
+  const margin = plan?.infraMargin ?? s.margin ?? 0
+  const toInr = (usd: number) => usd * s.usdInr * (1 + margin)
   const raw: Omit<QuoteLine, 'inrMonth'>[] = []
   const disk = s.rootVolumeGb * perGb(catalog, 'ebs:gp3')
 
@@ -59,6 +61,16 @@ export function quoteSpec(spec: ComputeSpec, catalog: Catalog): Quote {
     const host = hourly(catalog, rdsCode(s.sharedDbClass)) * HOURS_PER_MONTH
     raw.push({ key: 'db', label: 'Database', detail: `Share of a ${s.sharedDbClass} with ${s.sharedDbCapacity - 1} other stores`, awsUsdMonth: host / s.sharedDbCapacity })
     raw.push({ key: 'storage', label: 'Database storage', detail: `${s.sharedDbStorageGb} GB`, awsUsdMonth: s.sharedDbStorageGb * perGb(catalog, 'rds_storage:gp3') })
+  } else if (spec.db.mode === 'node') {
+    // Postgres runs on the EC2 node itself (Basic). Disk + snapshot are billed separately.
+    const ebs = s.ebsGp3UsdGbMonth ?? 0
+    const snap = s.snapshotUsdGbMonth ?? 0
+    if (spec.db.storageGb > 0 && ebs > 0) {
+      raw.push({ key: 'db:disk', label: 'Database disk', detail: `${spec.db.storageGb} GB`, awsUsdMonth: spec.db.storageGb * ebs })
+    }
+    if (spec.db.storageGb > 0 && snap > 0) {
+      raw.push({ key: 'db:snapshot', label: 'Database snapshots', detail: `${spec.db.storageGb} GB`, awsUsdMonth: spec.db.storageGb * snap })
+    }
   } else {
     const cls = spec.db.class ?? ''
     const az = spec.db.multiAz
@@ -71,7 +83,21 @@ export function quoteSpec(spec: ComputeSpec, catalog: Catalog): Quote {
     raw.push({ key: 'storage', label: 'Database storage', detail: `${spec.db.storageGb} GB`, awsUsdMonth: spec.db.storageGb * perGb(catalog, 'rds_storage:gp3', az) })
   }
 
-  raw.push({ key: 'platform', label: 'Platform', detail: 'File storage, bandwidth, backups and monitoring', awsUsdMonth: s.platformShareUsd })
+  // One public IPv4 per node (AWS now charges for every attached IPv4).
+  const ipv4Rate = s.ipv4UsdHour ?? 0
+  if (ipv4Rate > 0 && spec.node.count > 0) {
+    const n = spec.node.count
+    raw.push({ key: 'ipv4', label: n > 1 ? `IPv4 (${n})` : 'IPv4', detail: `${n} × public IPv4`, awsUsdMonth: n * ipv4Rate * HOURS_PER_MONTH })
+  }
+
+  // S3 bucket for backups and media.
+  const s3Rate = s.s3UsdGbMonth ?? 0
+  const s3Gb = spec.storage?.s3Gb ?? 0
+  if (s3Rate > 0 && s3Gb > 0) {
+    raw.push({ key: 's3', label: 'Object storage', detail: `${s3Gb} GB in S3`, awsUsdMonth: s3Gb * s3Rate })
+  }
+
+  raw.push({ key: 'platform', label: 'Platform', detail: 'Bandwidth and monitoring', awsUsdMonth: s.platformShareUsd })
 
   const lines = raw.map(l => ({ ...l, awsUsdMonth: round2(l.awsUsdMonth), inrMonth: round2(toInr(l.awsUsdMonth)) }))
   const awsUsdMonth = raw.reduce((n, l) => n + l.awsUsdMonth, 0)
@@ -88,7 +114,11 @@ export function quoteSpec(spec: ComputeSpec, catalog: Catalog): Quote {
   }
 }
 
-/** The owner's monthly total: the plan fee (GST included) plus infrastructure with GST on top. */
+/**
+ * The owner's monthly total: the plan fee (GST included) plus infrastructure with GST on top.
+ * planFeeInr is the plan's monthly_price_inr (0 for margin-on-infra plans), passed by both the
+ * MRR calculation and change-plan so grandfathered plans with a stored fee are billed correctly.
+ */
 export function monthlyTotal(quote: Quote, planFeeInr: number, gstRate: number) {
   const gst = round2(quote.inrMonth * gstRate)
   return { planFee: round2(planFeeInr), infra: quote.inrMonth, gstOnInfra: gst, total: round2(planFeeInr + quote.inrMonth + gst) }

@@ -24,8 +24,9 @@ export async function quoteForPlan(
 ): Promise<PlanQuote> {
   const validation = validateSpec(spec, catalog, plan, opts)
   let quote: Quote | null = null
+  const infraMargin = 'infraMargin' in plan ? plan.infraMargin : undefined
   try {
-    quote = quoteSpec(spec, catalog)
+    quote = quoteSpec(spec, catalog, { infraMargin })
   } catch (e) {
     if (!(e instanceof UnknownPriceError)) throw e
     validation.ok = false
