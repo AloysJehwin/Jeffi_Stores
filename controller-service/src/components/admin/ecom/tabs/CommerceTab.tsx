@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import type { TenantDetail, BankAccount } from '@/lib/tenant-registry'
+import type { TenantDetail, BankAccount, TenantBilling } from '@/lib/tenant-registry'
 import { Field, FieldGrid, Mono, Section, StatusPill } from '../EcomUI'
-
-type Billing = Awaited<ReturnType<typeof import('@/lib/tenant-registry').getTenantBilling>> | null
-
-const inr = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
+import { inr } from '../cells'
+import { LedgerTable, TransactionsTable } from '../detail/BillingTables'
+import Pager from '../detail/Pager'
+import { detailHref } from '../detail/labels'
 
 function maskAccount(n: string | null): string {
   if (!n) return '—'
@@ -13,15 +13,11 @@ function maskAccount(n: string | null): string {
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'bad' }) {
   return (
-    <div className="rounded-lg border border-border-default bg-surface-secondary px-4 py-3 min-w-0">
-      <div className="text-xs uppercase tracking-wide text-foreground-muted">{label}</div>
+    <div className="rounded-lg border border-border-default bg-surface-secondary px-3 py-2.5 sm:px-4 sm:py-3 min-w-0">
+      <div className="text-[11px] sm:text-xs uppercase tracking-wide text-foreground-muted truncate">{label}</div>
       <div
-        className={`text-lg font-semibold mt-0.5 break-words ${
-          tone === 'good'
-            ? 'text-green-600 dark:text-green-400'
-            : tone === 'bad'
-              ? 'text-red-600 dark:text-red-400'
-              : 'text-foreground'
+        className={`text-base sm:text-lg font-semibold mt-0.5 tabular-nums break-words ${
+          tone === 'good' ? 'text-green-600 dark:text-green-400' : tone === 'bad' ? 'text-red-600 dark:text-red-400' : 'text-foreground'
         }`}
       >
         {value}
@@ -30,170 +26,90 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'go
   )
 }
 
+export interface PageInfo {
+  page: number
+  pageSize: number
+  href: (page: number) => string
+}
+
 export default function CommerceTab({
   tenant: t,
   billing,
   bank,
+  txPage,
+  ledgerPage,
 }: {
   tenant: TenantDetail
-  billing: Billing
+  billing: TenantBilling | null
   bank: BankAccount | null
+  txPage: PageInfo
+  ledgerPage: PageInfo
 }) {
-  const txns = billing?.transactions ?? []
-  const ledger = billing?.ledger ?? []
   const totals = billing?.totals
-
-  const cod = txns.filter(x => x.is_cod)
-  const codGross = cod.reduce((s, x) => s + Number(x.gross_amount), 0)
-  const prepaidGross = (totals?.gross ?? 0) - codGross
+  const prepaidGross = (totals?.gross ?? 0) - (totals?.codGross ?? 0)
 
   return (
-    <div className="space-y-6 min-w-0">
+    <div className="space-y-5 sm:space-y-6 min-w-0">
       <Section
         title="Money"
         action={
-          <Link
-            href={`/admin/ecom/billing/${t.id}/view`}
-            className="text-sm text-accent-600 hover:underline"
-          >
+          <Link href={detailHref(t.id, 'billing')} className="text-sm text-accent-600 hover:underline">
             Full billing →
           </Link>
         }
       >
-        {!billing || txns.length === 0 ? (
-          <p className="text-sm text-foreground-muted">
-            No transactions recorded for this store yet, so there is nothing to settle.
-          </p>
+        {!billing || billing.transactionCount === 0 ? (
+          <p className="text-sm text-foreground-muted">No transactions recorded for this store yet, so there is nothing to settle.</p>
         ) : (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <Stat label="GMV" value={inr(totals!.gross)} />
-              <Stat label="Your commission" value={inr(totals!.commission)} />
-              <Stat label="Gateway fees" value={inr(totals!.fees)} />
-              <Stat label="Store share" value={inr(totals!.tenantShare)} />
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
-              <Stat
-                label="Settlement balance"
-                value={inr(billing.balance)}
-                tone={billing.balance >= 0 ? 'good' : 'bad'}
-              />
-              <Stat label="Transactions" value={String(txns.length)} />
-              <Stat label="Prepaid" value={inr(prepaidGross)} />
-              <Stat label="COD" value={`${inr(codGross)} · ${cod.length}`} />
-            </div>
-          </>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <Stat label="GMV" value={inr(totals!.gross, 2)} />
+            <Stat label="Your commission" value={inr(totals!.commission, 2)} />
+            <Stat label="Gateway fees" value={inr(totals!.fees, 2)} />
+            <Stat label="Store share" value={inr(totals!.tenantShare, 2)} />
+            <Stat label="Settlement balance" value={inr(billing.balance, 2)} tone={billing.balance >= 0 ? 'good' : 'bad'} />
+            <Stat label="Transactions" value={billing.transactionCount.toLocaleString('en-IN')} />
+            <Stat label="Prepaid" value={inr(prepaidGross, 2)} />
+            <Stat label="COD" value={inr(totals!.codGross, 2)} />
+          </div>
         )}
       </Section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Section title="Payout account">
-          {!bank ? (
-            <p className="text-sm text-foreground-muted">
-              No payout account on file. Settlements cannot be released to this store.
-            </p>
-          ) : (
-            <FieldGrid>
-              <Field label="Status" value={<StatusPill status={bank.verification_status} />} />
-              <Field label="Holder" value={bank.verified_name || bank.holder_name} />
-              <Field label="Account" value={<Mono>{maskAccount(bank.account_number)}</Mono>} />
-              <Field label="IFSC" value={<Mono>{bank.ifsc || '—'}</Mono>} />
-              {bank.upi_id && <Field wide label="UPI" value={<Mono>{bank.upi_id}</Mono>} />}
-              {bank.verified_name && bank.holder_name && bank.verified_name !== bank.holder_name && (
-                <Field
-                  wide
-                  label="Name mismatch"
-                  value={
-                    <span className="text-amber-600 dark:text-amber-400 text-xs">
-                      entered “{bank.holder_name}”, bank returned “{bank.verified_name}”
-                    </span>
-                  }
-                />
-              )}
-            </FieldGrid>
-          )}
-        </Section>
+      <Section title="Payout account">
+        {!bank ? (
+          <p className="text-sm text-foreground-muted">No payout account on file. Settlements cannot be released to this store.</p>
+        ) : (
+          <FieldGrid>
+            <Field label="Status" value={<StatusPill status={bank.verification_status} />} />
+            <Field label="Holder" value={bank.verified_name || bank.holder_name} />
+            <Field label="Account" value={<Mono>{maskAccount(bank.account_number)}</Mono>} />
+            <Field label="IFSC" value={<Mono>{bank.ifsc || '—'}</Mono>} />
+            {bank.upi_id && <Field wide label="UPI" value={<Mono>{bank.upi_id}</Mono>} />}
+            {bank.verified_name && bank.holder_name && bank.verified_name !== bank.holder_name && (
+              <Field
+                wide
+                label="Name mismatch"
+                value={
+                  <span className="text-amber-600 dark:text-amber-400 text-xs">
+                    entered “{bank.holder_name}”, bank returned “{bank.verified_name}”
+                  </span>
+                }
+              />
+            )}
+          </FieldGrid>
+        )}
+      </Section>
 
-        <Section title="Settlement ledger">
-          {ledger.length === 0 ? (
-            <p className="text-sm text-foreground-muted">No ledger entries.</p>
-          ) : (
-            <ul className="space-y-2.5">
-              {ledger.slice(0, 8).map(e => {
-                const amt = Number(e.amount)
-                return (
-                  <li key={e.id} className="flex items-start justify-between gap-3 text-sm min-w-0">
-                    <div className="min-w-0">
-                      <div className="text-foreground capitalize">{e.entry_type.replace(/_/g, ' ')}</div>
-                      {e.note && <div className="text-xs text-foreground-muted break-words">{e.note}</div>}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div
-                        className={amt >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
-                      >
-                        {amt >= 0 ? '+' : ''}
-                        {inr(amt)}
-                      </div>
-                      <div className="text-xs text-foreground-muted">
-                        {new Date(e.occurred_at).toLocaleDateString('en-IN')}
-                      </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </Section>
-      </div>
-
-      {txns.length > 0 && (
-        <Section title="Recent transactions">
-          <div className="overflow-x-auto -mx-5 px-5">
-            <table className="w-full text-sm min-w-[40rem]">
-              <thead className="text-foreground-muted">
-                <tr className="text-left border-b border-border-default">
-                  <th className="pb-2 font-medium">Order</th>
-                  <th className="pb-2 font-medium">Gross</th>
-                  <th className="pb-2 font-medium">Commission</th>
-                  <th className="pb-2 font-medium">Fee</th>
-                  <th className="pb-2 font-medium">Mode</th>
-                  <th className="pb-2 font-medium">Status</th>
-                  <th className="pb-2 font-medium">When</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {txns.slice(0, 15).map(x => (
-                  <tr key={x.id}>
-                    <td className="py-2.5">
-                      <Mono>{x.order_ref || '—'}</Mono>
-                    </td>
-                    <td className="py-2.5 text-foreground">{inr(Number(x.gross_amount))}</td>
-                    <td className="py-2.5 text-foreground-muted">{inr(Number(x.platform_commission))}</td>
-                    <td className="py-2.5 text-foreground-muted">{inr(Number(x.gateway_fee))}</td>
-                    <td className="py-2.5 text-xs text-foreground-muted">{x.is_cod ? 'COD' : x.gateway}</td>
-                    <td className="py-2.5">
-                      <StatusPill status={x.status} />
-                    </td>
-                    <td className="py-2.5 text-xs text-foreground-muted">
-                      {new Date(x.occurred_at).toLocaleDateString('en-IN')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {txns.length > 15 && (
-            <p className="text-xs text-foreground-muted mt-3">
-              Showing 15 of {txns.length}.{' '}
-              <Link
-                href={`/admin/ecom/billing/${t.id}/view`}
-                className="text-accent-600 hover:underline"
-              >
-                See all →
-              </Link>
-            </p>
-          )}
-        </Section>
+      {billing && (
+        <>
+          <Section title="Transactions">
+            <TransactionsTable rows={billing.transactions} total={billing.transactionCount} />
+            <Pager {...txPage} total={billing.transactionCount} />
+          </Section>
+          <Section title="Settlement ledger">
+            <LedgerTable rows={billing.ledger} total={billing.ledgerCount} balance={billing.balance} />
+            <Pager {...ledgerPage} total={billing.ledgerCount} />
+          </Section>
+        </>
       )}
     </div>
   )

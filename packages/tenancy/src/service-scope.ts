@@ -21,7 +21,7 @@ export async function resolveServiceScope(): Promise<ServiceScope> {
 export function scopeSql(scope: ServiceScope, col: string, p: number): { sql: string; params: unknown[] } {
   if (scope.tenantId) return { sql: `${col} = $${p}`, params: [scope.tenantId] }
   if (scope.skipStoreTenants) {
-    // The platform's own rows stay here: its control-plane row reads as a store (service_types defaults to {store}).
+    // The platform's own rows stay here (its id has no tenants row; kept explicit).
     return {
       sql: `(${col} = '${PLATFORM_TENANT_ID}' OR NOT EXISTS (SELECT 1 FROM tenants st WHERE st.id = ${col} AND 'store' = ANY(st.service_types)))`,
       params: [],

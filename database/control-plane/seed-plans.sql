@@ -590,13 +590,6 @@ WHERE pf.plan_id = p.id
     WHERE d.plan_slug = CASE p.slug WHEN 'starter' THEN 'basic' ELSE p.slug END AND d.scope_key = pf.scope_key
   );
 
--- Platform sentinel tenant (also in schema.sql, which the pipeline only structure-diffs, so its row
--- never reached live). Flagship writes keyed to the NIL uuid (import_jobs, tenant_integration_credentials)
--- FK to tenants(id) and fail without it.
-INSERT INTO public.tenants (id, slug, display_name, status)
-VALUES ('00000000-0000-0000-0000-000000000000', 'platform', 'Platform (flagship)', 'active')
-ON CONFLICT DO NOTHING;
-
 
 -- AI price list (ai_price_list). cost_inr = platform cost per unit, price_inr = tenant wallet
 -- charge per unit (gateway costs at ~Rs 85/USD, prices with a margin). Razer rows carry a non-zero

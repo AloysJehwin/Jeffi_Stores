@@ -64,7 +64,7 @@ export function poolCapacity(node: any): number {
   return Number.isInteger(n) && n >= 0 ? Math.min(n, POOL_NODE_CAPACITY) : POOL_NODE_CAPACITY
 }
 
-const isReady = (node: any) =>
+export const isReady = (node: any) =>
   !!node?.status?.conditions?.some((c: any) => c.type === 'Ready' && c.status === 'True') && !node?.spec?.unschedulable
 
 // A store's on-node Postgres lives on its tagged, encrypted gp3 data volume (ec2-client DB_VOLUME_TAGS),
@@ -153,7 +153,7 @@ export interface PlacementResult {
 export const nodeInstanceId = (node: any): string | null => node?.spec?.providerID?.match(/(i-[0-9a-f]+)$/)?.[1] ?? null
 
 /** True for a namespace whose store runs on the shared pool (older namespaces only carry the plan). */
-const onPool = (ns: any) => {
+export const onPool = (ns: any) => {
   const l = ns?.metadata?.labels ?? {}
   return l['jeffi.io/placement'] ? l['jeffi.io/placement'] === 'pool' : l['jeffi.io/plan'] === 'basic'
 }
@@ -502,7 +502,7 @@ async function appDeployment(slug: string): Promise<any> {
 
 /** The store's own Deployments (redis aside), in whichever layout it runs. */
 const workloads = (slug: string) => list<any>('Deployment', tenantNamespace(slug), 'jeffi.io/service')
-const isPostgres = (d: any) => d?.metadata?.labels?.['jeffi.io/service'] === 'postgres'
+export const isPostgres = (d: any) => d?.metadata?.labels?.['jeffi.io/service'] === 'postgres'
 
 /** True once the store's app, messaging and document Deployments each have a ready replica. */
 export async function tenantWorkloadReady(slug: string): Promise<boolean> {

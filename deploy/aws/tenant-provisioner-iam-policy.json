@@ -122,6 +122,15 @@
       }
     },
     {
+      "Sid": "DeleteOnlyStoreDatabaseSnapshots",
+      "Effect": "Allow",
+      "Action": "ec2:DeleteSnapshot",
+      "Resource": "arn:aws:ec2:us-east-1::snapshot/*",
+      "Condition": {
+        "StringEquals": { "ec2:ResourceTag/jeffi:role": "db" }
+      }
+    },
+    {
       "Sid": "TenantSecurityGroupIngressOnly",
       "Effect": "Allow",
       "Action": ["ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress"],

@@ -1,6 +1,7 @@
 import type { TenantDetail, TenantSocialAccount, IntegrationCredential } from '@/lib/tenant-registry'
 import type { AdminCertRow } from '@/lib/tenancy/tenant-ca'
 import { Field, FieldGrid, Mono, Section } from '../EcomUI'
+import CertsTable from '../detail/CertsTable'
 
 type Integration = Omit<IntegrationCredential, 'config_enc'>
 
@@ -44,7 +45,7 @@ export default function AccessTab({
   const active = certs.filter(c => !c.revoked_at && new Date(c.expires_at) > new Date())
 
   return (
-    <div className="space-y-6 min-w-0">
+    <div className="space-y-5 sm:space-y-6 min-w-0">
       <Section title="Admin certificate authority">
         {!ca ? (
           <Empty>
@@ -64,59 +65,11 @@ export default function AccessTab({
         {certs.length === 0 ? (
           <Empty>No client certificates issued. Nobody can reach this store&apos;s admin panel over mTLS.</Empty>
         ) : (
-          <div className="overflow-x-auto -mx-5 px-5">
-            <table className="w-full text-sm min-w-[36rem]">
-              <thead className="text-foreground-muted">
-                <tr className="text-left border-b border-border-default">
-                  <th className="pb-2 font-medium">Holder</th>
-                  <th className="pb-2 font-medium">Serial</th>
-                  <th className="pb-2 font-medium">Issued</th>
-                  <th className="pb-2 font-medium">Expires</th>
-                  <th className="pb-2 font-medium">State</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {certs.map(c => {
-                  const revoked = !!c.revoked_at
-                  const expired = new Date(c.expires_at) <= new Date()
-                  return (
-                    <tr key={c.id}>
-                      <td className="py-2.5 min-w-0">
-                        <div className="text-foreground break-all">{c.common_name}</div>
-                        {c.issued_to && c.issued_to !== c.common_name && (
-                          <div className="text-xs text-foreground-muted break-all">{c.issued_to}</div>
-                        )}
-                      </td>
-                      <td className="py-2.5">
-                        <Mono>{c.serial.slice(0, 16)}…</Mono>
-                      </td>
-                      <td className="py-2.5 text-foreground-muted text-xs">
-                        {new Date(c.issued_at).toLocaleDateString('en-IN')}
-                      </td>
-                      <td className="py-2.5 text-xs">
-                        <Expiry at={c.expires_at} />
-                      </td>
-                      <td className="py-2.5">
-                        {revoked ? (
-                          <span className="text-xs text-red-600 dark:text-red-400">
-                            revoked{c.revoked_by ? ` by ${c.revoked_by}` : ''}
-                          </span>
-                        ) : expired ? (
-                          <span className="text-xs text-foreground-muted">expired</span>
-                        ) : (
-                          <span className="text-xs text-green-600 dark:text-green-400">active</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <CertsTable tenantId={t.id} certs={certs} />
         )}
       </Section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         <Section title="Social accounts">
           {social.length === 0 ? (
             <Empty>No Meta account connected.</Empty>

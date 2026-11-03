@@ -1,12 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { useActionToast } from '@/components/admin/kit/toast'
 import { useRouter } from 'next/navigation'
-import { useConfirm } from '@/contexts/ConfirmContext'
+import { Play, Power, PowerOff, RotateCcw, Server } from 'lucide-react'
+import { ActionButton, useActionToast } from '@/components/admin/kit'
 
 // Operator actions on a tenant: Provision / Retry / Deprovision + test-tenant-only
-// Disable/Enable instance. Rendered on the tenant object pages.
+// Disable/Enable instance. Rendered in the tenant detail header.
 export default function TenantActions({
   tenantId,
   slug,
@@ -26,119 +25,75 @@ export default function TenantActions({
   rolledBack?: boolean
 }) {
   const router = useRouter()
-  const confirm = useConfirm()
-  const [busy, setBusy] = useState<string | null>(null)
   const toast = useActionToast()
-  const setMsg = (r: { ok: boolean; text: string } | null) => r && toast.result(r)
 
-  async function call(path: string, body?: object, label?: string) {
-    setBusy(label || path)
-    setMsg(null)
-    try {
-      const res = await fetch(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined,
-      })
-      const data = await res.json()
-      if (!res.ok) setMsg({ ok: false, text: data.error || 'Failed' })
-      else {
-        setMsg({ ok: true, text: 'Done' })
-        router.refresh()
-      }
-    } catch {
-      setMsg({ ok: false, text: 'Network error' })
-    } finally {
-      setBusy(null)
-    }
+  const call = (path: string, body?: object) => async () => {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    }).catch(() => null)
+    const data = await res?.json().catch(() => ({}))
+    if (!res) return toast.error('Network error')
+    if (!res.ok) return toast.error(data?.error || 'Failed')
+    toast.success('Done')
+    router.refresh()
   }
 
   const isTest = slug === 'test'
   const stopped = instanceState === 'stopped'
-
   const inFlight = jobStatus === 'pending' || jobStatus === 'running'
   const failed = jobStatus === 'failed'
-  // Rollback deleted what the run had built, so resuming mid-way is not available — only a
-  // fresh provision is correct.
+  // Rollback deleted what the run had built, so resuming mid-way is not available, only a fresh provision.
   const canResume = failed && !rolledBack
+  const base = `/api/admin/ecom/customers/${tenantId}`
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <>
       {inFlight && (
-        <span className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-border-default text-sm text-foreground-secondary">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          Provisioning{jobStep ? ` — ${jobStep}` : ''}
+        <span className="inline-flex max-w-full items-center gap-2 px-3 h-control rounded-lg border border-border-default text-sm text-foreground-secondary min-w-0">
+          <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-amber-500 animate-pulse" />
+          <span className="truncate">Provisioning{jobStep ? `: ${jobStep}` : ''}</span>
         </span>
       )}
 
       {canResume && (
-        <button
-          onClick={() => call(`/api/admin/ecom/customers/${tenantId}/retry`, undefined, 'retry')}
-          disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 px-3.5 h-control rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-          title={`Resume from "${jobStep}" — keeps everything the run already created`}
-        >
-          {busy === 'retry' ? 'Resuming…' : `Retry from ${jobStep ?? 'last step'}`}
-        </button>
+        <ActionButton variant="primary" action={{ label: `Retry from ${jobStep ?? 'last step'}`, icon: RotateCcw, onClick: call(`${base}/retry`) }} />
       )}
 
       {(status === 'provisioning' || (status === 'suspended' && rolledBack)) && !inFlight && (
-        <button
-          onClick={() => call(`/api/admin/ecom/customers/${tenantId}/provision`, undefined, 'provision')}
-          disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 px-3.5 h-control rounded-lg bg-secondary-500 hover:bg-secondary-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-          title={failed ? 'Start a fresh provisioning run from the first step' : undefined}
-        >
-          {busy === 'provision' ? 'Provisioning…' : failed ? 'Start fresh provision' : 'Provision infrastructure'}
-        </button>
+        <ActionButton variant="primary" action={{ label: failed ? 'Start fresh provision' : 'Provision infrastructure', icon: Play, onClick: call(`${base}/provision`) }} />
       )}
 
       {isTest && status === 'active' && (
-        <button
-          onClick={() =>
-            call(
-              `/api/admin/ecom/customers/${tenantId}/disable-instance`,
-              { action: stopped ? 'enable' : 'disable' },
-              'toggle'
-            )
-          }
-          disabled={busy !== null}
-          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg disabled:opacity-50 text-sm font-medium transition-colors text-white ${
-            stopped ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'
-          }`}
-          title="Test tenant only — stops/starts the RDS instance to save cost"
-        >
-          {busy === 'toggle' ? '…' : stopped ? 'Enable instance' : 'Disable instance (save cost)'}
-        </button>
-      )}
-
-      {isTest && stopped && (
-        <span className="text-xs text-amber-600 dark:text-amber-400">
-          Instance stopped — DB powered down (auto-restarts after 7 days)
-        </span>
+        <ActionButton
+          action={{
+            label: stopped ? 'Enable instance' : 'Disable instance',
+            icon: stopped ? Power : PowerOff,
+            onClick: call(`${base}/disable-instance`, { action: stopped ? 'enable' : 'disable' }),
+            confirm: stopped ? undefined : 'Stop the test tenant’s RDS instance to save cost? AWS restarts it after 7 days.',
+          }}
+        />
       )}
 
       {status === 'active' && (
-        <button
-          onClick={async () => {
-            const ok = await confirm({
+        <ActionButton
+          action={{
+            label: 'Deprovision',
+            icon: Server,
+            danger: true,
+            onClick: call(`${base}/deprovision`, { confirm: true }),
+            confirm: {
               title: `Deprovision "${slug}"?`,
-              message:
-                'The store goes offline immediately and its database is backed up to S3, then the RDS instance and bucket are DELETED. This cannot be undone.',
+              message: 'The store goes offline immediately and its database is backed up to S3, then the RDS instance and bucket are DELETED. This cannot be undone.',
               variant: 'danger',
               confirmLabel: 'Deprovision & back up',
-            })
-            if (!ok) return
-            call(`/api/admin/ecom/customers/${tenantId}/deprovision`, { confirm: true }, 'deprovision')
+            },
           }}
-          disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 px-3.5 h-control rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-          title="Take store down, back up its DB to S3, then delete RDS + bucket"
-        >
-          {busy === 'deprovision' ? 'Deprovisioning…' : 'Deprovision & back up'}
-        </button>
+        />
       )}
 
-    </div>
+      {isTest && stopped && <span className="w-full text-xs text-amber-600 dark:text-amber-400">Instance stopped: DB powered down (auto-restarts after 7 days)</span>}
+    </>
   )
 }

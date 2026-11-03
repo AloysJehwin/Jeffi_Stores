@@ -1,5 +1,6 @@
 import { controlPlanePool, RESERVED_LABELS } from './shared'
 import { clearTenantCache } from './host-resolution'
+import type { ComputeSpec } from '@/lib/compute/spec'
 
 export interface TenantRow {
   id: string
@@ -32,16 +33,45 @@ export interface TenantRow {
   created_at: string
 }
 
+/** A store or workspace waiting on Jeffi: store KYC or a requested Messaging/Documents service. */
+const NEEDS_REVIEW_SQL = `(EXISTS (SELECT 1 FROM tenant_kyc k WHERE k.tenant_id = t.id AND k.status = 'pending') OR EXISTS (SELECT 1 FROM tenant_service_approvals a WHERE a.tenant_id = t.id AND a.status = 'pending'))`
+const ISO = (col: string) => `to_char(${col} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`
+
+/** A listTenants row: the tenant plus what it runs, its wallet, owner, latest provisioning job and 30-day sales. */
+export interface TenantListRow extends TenantRow {
+  instance_state: string
+  ec2_instance_id: string | null
+  /** plans.infra_margin; null when the plan has none (the catalog margin applies). */
+  infra_margin: number | null
+  /** tenant_compute.applied as stored (normalizeSpec before use); null until compute is applied. */
+  applied: ComputeSpec | null
+  /** Subscription price (plan fee + infra + GST) in rupees; null when the store has none. */
+  price_inr_month: number | null
+  rate_inr_hour: number | null
+  /** ISO timestamp. */
+  applied_at: string | null
+  /** tenant_compute.status: pending | applying | applied | failed | paused | scheduled. */
+  compute_status: string | null
+  wallet_balance: number | null
+  owner_email: string | null
+  needs_review: boolean
+  job_status: string | null
+  job_step: string | null
+  job_error: string | null
+  /** ISO timestamp. */
+  job_updated_at: string | null
+  s3_usage_bytes: number | null
+  gmv_30d: number
+  commission_30d: number
+}
+
 /** List tenants (control-plane admin UI). Read-only, optional filters. */
-export async function listTenants(filters?: { status?: string; plan?: string; q?: string; product?: 'store' | 'api' }): Promise<TenantRow[]> {
+export async function listTenants(filters?: { status?: string; plan?: string; q?: string; product?: 'store' | 'api' }): Promise<TenantListRow[]> {
   const pool = controlPlanePool()
   const where: string[] = []
   const args: any[] = []
-  if (filters?.status === 'review') {
-    // Anything waiting on Jeffi: store KYC or a requested Messaging/Documents service.
-    where.push(`(EXISTS (SELECT 1 FROM tenant_kyc k WHERE k.tenant_id = t.id AND k.status = 'pending')
-              OR EXISTS (SELECT 1 FROM tenant_service_approvals a WHERE a.tenant_id = t.id AND a.status = 'pending'))`)
-  } else if (filters?.status) {
+  if (filters?.status === 'review') where.push(NEEDS_REVIEW_SQL)
+  else if (filters?.status) {
     args.push(filters.status)
     where.push(`t.status = $${args.length}`)
   }
@@ -58,16 +88,33 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
   }
   const res = await pool.query(
     `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at,
-            p.slug AS plan, p.monthly_price_inr,
-            i.rds_endpoint, i.s3_bucket, i.ec2_target, i.region
+            t.instance_state, t.billing_interval, t.subscription_status,
+            p.slug AS plan, p.monthly_price_inr, p.infra_margin::float8 AS infra_margin,
+            i.rds_endpoint, i.s3_bucket, i.ec2_target, i.ec2_instance_id, i.region, i.s3_usage_bytes::float8 AS s3_usage_bytes,
+            tc.applied, tc.price_inr_month, tc.rate_inr_hour::float8 AS rate_inr_hour, ${ISO('tc.applied_at')} AS applied_at, tc.status AS compute_status,
+            w.balance::float8 AS wallet_balance,
+            (SELECT o.email FROM owner_tenants ot JOIN owners o ON o.id = ot.owner_id WHERE ot.tenant_id = t.id ORDER BY (ot.role = 'owner') DESC, ot.created_at LIMIT 1) AS owner_email,
+            ${NEEDS_REVIEW_SQL} AS needs_review,
+            pj.status AS job_status, pj.step AS job_step, pj.last_error AS job_error, ${ISO('pj.updated_at')} AS job_updated_at,
+            COALESCE(tx.gmv, 0)::float8 AS gmv_30d, COALESCE(tx.commission, 0)::float8 AS commission_30d
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
+     LEFT JOIN tenant_compute tc ON tc.tenant_id = t.id
+     LEFT JOIN tenant_wallets w ON w.tenant_id = t.id
+     LEFT JOIN LATERAL (SELECT j.status, j.step, j.last_error, j.updated_at FROM provisioning_jobs j WHERE j.tenant_id = t.id ORDER BY j.created_at DESC LIMIT 1) pj ON true
+     LEFT JOIN (SELECT x.tenant_id, SUM(x.gross_amount) AS gmv, SUM(x.platform_commission) AS commission FROM tenant_transactions x WHERE x.occurred_at > now() - interval '30 days' GROUP BY x.tenant_id) tx ON tx.tenant_id = t.id
      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
      ORDER BY t.created_at DESC`,
     args
   )
-  return res.rows as TenantRow[]
+  return res.rows as TenantListRow[]
+}
+
+/** Store plans for filters, in tier order (inactive ones too: stores can still be on them). */
+export async function planSlugs(): Promise<{ slug: string; name: string; active: boolean }[]> {
+  const res = await controlPlanePool().query(`SELECT slug, name, is_active AS active FROM plans WHERE product = 'store' ORDER BY tier`)
+  return res.rows
 }
 
 /** Summary counts for the control-plane dashboard. */
@@ -268,39 +315,66 @@ export interface LedgerEntry {
   occurred_at: string
 }
 
-/** Per-tenant transactions + settlement ledger + computed balance (billing detail page). */
-export async function getTenantBilling(tenantId: string): Promise<{
+export interface BillingPage {
+  limit?: number // default 50; 0 skips the rows (counts and totals still come back)
+  offset?: number
+}
+
+export interface TenantBilling {
+  /** Newest first, one page. */
   transactions: TenantTransaction[]
   ledger: LedgerEntry[]
+  /** Rows in all, for paging. */
+  transactionCount: number
+  ledgerCount: number
+  /** Sum of the whole ledger. */
   balance: number
-  totals: { gross: number; tenantShare: number; commission: number; fees: number }
-}> {
+  /** Over every transaction, not just the page; codGross is the cash-on-delivery part of gross. */
+  totals: { gross: number; tenantShare: number; commission: number; fees: number; codGross: number }
+}
+
+const pageOf = (p?: BillingPage) => ({ limit: Math.max(0, Math.floor(p?.limit ?? 50)), offset: Math.max(0, Math.floor(p?.offset ?? 0)) })
+
+/** Per-tenant transactions + settlement ledger, a page of each, with totals and balance over all of them. */
+export async function getTenantBilling(tenantId: string, opts: { transactions?: BillingPage; ledger?: BillingPage } = {}): Promise<TenantBilling> {
   const pool = controlPlanePool()
-  const [txn, led] = await Promise.all([
+  const tp = pageOf(opts.transactions)
+  const lp = pageOf(opts.ledger)
+  const none = Promise.resolve({ rows: [] as any[] })
+  const [txn, led, agg] = await Promise.all([
+    tp.limit
+      ? pool.query(
+          `SELECT t.*, s.settled_at AS payout_at, s.utr AS payout_utr
+             FROM tenant_transactions t LEFT JOIN linked_account_settlements s ON s.id = t.recipient_settlement_id
+            WHERE t.tenant_id=$1 ORDER BY t.occurred_at DESC LIMIT $2 OFFSET $3`,
+          [tenantId, tp.limit, tp.offset]
+        )
+      : none,
+    lp.limit
+      ? pool.query(
+          `SELECT id, entry_type, amount, note, occurred_at FROM settlement_ledger WHERE tenant_id=$1 ORDER BY occurred_at DESC LIMIT $2 OFFSET $3`,
+          [tenantId, lp.limit, lp.offset]
+        )
+      : none,
     pool.query(
-      `SELECT t.*, s.settled_at AS payout_at, s.utr AS payout_utr
-         FROM tenant_transactions t LEFT JOIN linked_account_settlements s ON s.id = t.recipient_settlement_id
-        WHERE t.tenant_id=$1 ORDER BY t.occurred_at DESC`,
-      [tenantId]
-    ),
-    pool.query(
-      `SELECT id, entry_type, amount, note, occurred_at FROM settlement_ledger WHERE tenant_id=$1 ORDER BY occurred_at DESC`,
+      `SELECT x.n AS txn_count, x.gross, x.share, x.comm, x.fees, x.cod, l.n AS ledger_count, l.balance
+         FROM (SELECT count(*)::int AS n, COALESCE(SUM(gross_amount),0) AS gross, COALESCE(SUM(tenant_share),0) AS share,
+                      COALESCE(SUM(platform_commission),0) AS comm, COALESCE(SUM(gateway_fee),0) AS fees,
+                      COALESCE(SUM(gross_amount) FILTER (WHERE is_cod),0) AS cod
+                 FROM tenant_transactions WHERE tenant_id=$1) x,
+              (SELECT count(*)::int AS n, COALESCE(SUM(amount),0) AS balance FROM settlement_ledger WHERE tenant_id=$1) l`,
       [tenantId]
     ),
   ])
-  const transactions = txn.rows as TenantTransaction[]
-  const ledger = led.rows as LedgerEntry[]
-  const balance = ledger.reduce((s, e) => s + Number(e.amount), 0)
-  const totals = transactions.reduce(
-    (a, t) => ({
-      gross: a.gross + Number(t.gross_amount),
-      tenantShare: a.tenantShare + Number(t.tenant_share),
-      commission: a.commission + Number(t.platform_commission),
-      fees: a.fees + Number(t.gateway_fee),
-    }),
-    { gross: 0, tenantShare: 0, commission: 0, fees: 0 }
-  )
-  return { transactions, ledger, balance, totals }
+  const a = agg.rows[0] ?? {}
+  return {
+    transactions: txn.rows as TenantTransaction[],
+    ledger: led.rows as LedgerEntry[],
+    transactionCount: Number(a.txn_count ?? 0),
+    ledgerCount: Number(a.ledger_count ?? 0),
+    balance: Number(a.balance ?? 0),
+    totals: { gross: Number(a.gross ?? 0), tenantShare: Number(a.share ?? 0), commission: Number(a.comm ?? 0), fees: Number(a.fees ?? 0), codGross: Number(a.cod ?? 0) },
+  }
 }
 
 export interface LinkedPayout {
@@ -334,7 +408,7 @@ export async function billingSummary(): Promise<{
   const res = await pool.query(`
     SELECT
       (SELECT COALESCE(SUM(COALESCE(tc.price_inr_month, p.monthly_price_inr, 0) * CASE WHEN t.billing_interval = 'yearly' THEN 10.0 / 12 ELSE 1 END),0)
-         FROM tenants t JOIN plans p ON p.id=t.plan_id
+         FROM tenants t LEFT JOIN plans p ON p.id=t.plan_id
          LEFT JOIN tenant_compute tc ON tc.tenant_id = t.id
          WHERE t.status='active')::numeric AS mrr,
       (SELECT COUNT(*) FROM tenants WHERE status='active' AND 'store' = ANY(service_types))::int AS paying,
