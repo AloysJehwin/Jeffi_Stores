@@ -1,6 +1,6 @@
 import 'server-only'
 import { controlPlanePool, getTenant } from '@/lib/tenant-registry'
-import { rateFor, resolveCompute } from '@controller/lib/compute/resolve'
+import { rateFor, resolveCompute, tenantPlanMargin } from '@controller/lib/compute/resolve'
 import { getTenantCompute, patchTenantCompute } from '@controller/lib/compute/store'
 import { tenantHostnames } from './steps'
 
@@ -97,7 +97,7 @@ async function advance(tenantId: string, retry: boolean): Promise<LayoutResult> 
     if (now - sw.at < DRAIN_MS) return { ok: true, status: 'switching', detail: 'draining the old app' }
     await k8s.applyTenantWorkload(input)
     delete p.layout
-    await patchTenantCompute(tenantId, { applied, progress: Object.keys(p).length ? p : null, rate_inr_hour: await rateFor(applied) })
+    await patchTenantCompute(tenantId, { applied, progress: Object.keys(p).length ? p : null, rate_inr_hour: await rateFor(applied, await tenantPlanMargin(tenantId)) })
     return { ok: true, status: 'services' }
   } catch (e: any) {
     const msg = e?.message || 'layout switch failed'

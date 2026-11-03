@@ -16,6 +16,7 @@ export {
   activeTenantCount,
   createTenant,
   planMix,
+  planSlugs,
   listPlans,
   getTenant,
   getTenantBilling,
@@ -29,6 +30,9 @@ export {
   type ServiceType,
   type StoreRequest,
   type TenantRow,
+  type TenantListRow,
+  type TenantBilling,
+  type BillingPage,
   type CreateTenantInput,
   type CreateTenantResult,
   type TenantDetail,
@@ -71,6 +75,7 @@ export {
   setPlatformInfra,
   writeTenantEc2,
 } from './lifecycle'
+export { purgeBlocker, type PurgeCandidate } from './purge-rule'
 export {
   findOrCreateOwner,
   updateOwnerName,

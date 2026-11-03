@@ -34,7 +34,8 @@ async function main() {
     CATALOG.filter(c => c.channel === 'whatsapp').map(c => [c.slug, c])
   )
 
-  const { rows: tenants } = await db.query<{ id: string }>(`SELECT id FROM tenants ORDER BY id`)
+  const { rows } = await db.query<{ id: string }>(`SELECT id FROM tenants WHERE id <> $1 ORDER BY id`, [tpl.PLATFORM_TENANT_ID])
+  const tenants = [{ id: tpl.PLATFORM_TENANT_ID }, ...rows]
 
   for (const t of tenants) {
     const tenantId = t.id

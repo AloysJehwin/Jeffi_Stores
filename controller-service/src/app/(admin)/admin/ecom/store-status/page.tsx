@@ -1,25 +1,20 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { Suspense } from 'react'
 import { PageHeader } from '@/components/admin/kit/layout'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
-import { listTenants, tenantSummary } from '@/lib/tenant-registry'
-import { EcomHero, EcomFilters } from '@controller/components/admin/ecom/EcomUI'
+import { planSlugs } from '@/lib/tenant-registry'
+import { loadEcomRows } from '@controller/lib/ecom/rows'
+import { EcomHero, EcomStatCard, EcomFilters } from '@controller/components/admin/ecom/EcomUI'
+import { FLEET_UNKNOWN } from '@controller/components/admin/ecom/cells'
 import EcomTabs, { ecomTab } from '../_components/EcomTabs'
+import { EcomStoreStatusTable } from '../_components/EcomTables'
 import EcomStoreStatusOverview from './_components/EcomStoreStatusOverview'
 
 export const dynamic = 'force-dynamic'
 
 type SP = { [k: string]: string | string[] | undefined }
 const one = (sp: SP, k: string) => (Array.isArray(sp[k]) ? (sp[k] as string[])[0] : (sp[k] as string | undefined))
-
-const DOT: Record<string, string> = {
-  active: 'bg-green-500',
-  provisioning: 'bg-amber-500',
-  suspended: 'bg-red-500',
-  terminated: 'bg-foreground-muted',
-}
 
 export default async function EcomStoreStatusPage({ searchParams }: { searchParams: Promise<SP> }) {
   const h = await headers()
@@ -38,12 +33,13 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
         </Suspense>
       </div>
     )
-  const [tenants, summary] = await Promise.all([
-    listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q'), product: 'store' }),
-    tenantSummary(),
-  ])
-  const provisioning = tenants.filter(t => t.status === 'provisioning').length
-  const suspended = tenants.filter(t => t.status === 'suspended').length
+  const filters = { status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q'), product: 'store' as const }
+  const [{ rows, fleet, totals }, plans] = await Promise.all([loadEcomRows(filters), planSlugs()])
+  const count = (f: (r: (typeof rows)[number]) => boolean) => rows.filter(f).length
+  const amber = (n: number) => (n ? 'text-amber-600 dark:text-amber-400' : undefined)
+  // Active stores whose pods aren't all Ready, or that run none (only knowable in-cluster).
+  const degraded = fleet ? count(r => r.status === 'active' && (!r.fleet?.pods.total || r.fleet.pods.ready < r.fleet.pods.total)) : 0
+  const failed = count(r => r.job_status === 'failed')
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
@@ -53,42 +49,29 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <EcomHero
           label="Fleet health"
-          value={`${summary.active} / ${summary.total} active`}
+          value={`${totals.active} / ${totals.total} active`}
           tiles={[
-            { value: summary.active, label: 'Active' },
-            { value: provisioning, label: 'Provisioning' },
-            { value: suspended, label: 'Suspended' },
+            { value: totals.provisioning, label: 'Provisioning' },
+            { value: failed, label: 'Failed jobs' },
+            { value: totals.review, label: 'Needs review' },
+            { value: count(r => r.status === 'suspended'), label: 'Suspended' },
           ]}
         />
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5 lg:h-56 flex items-center justify-center">
-          <p className="text-sm text-foreground-muted text-center">
-            Uptime &amp; last-deploy status wire in once the tenant fleet + /api/ready probes are live.
-          </p>
-        </div>
+        <EcomStatCard
+          title="Serving"
+          note={fleet ? undefined : FLEET_UNKNOWN}
+          rows={[
+            { label: 'Pods ready', value: totals.podsTotal == null ? '—' : `${totals.podsReady}/${totals.podsTotal}`, tone: amber((totals.podsTotal ?? 0) - (totals.podsReady ?? 0)) },
+            { label: 'Active stores not fully serving', value: fleet ? degraded : '—', tone: amber(degraded) },
+            { label: 'Servers running', value: totals.serversRunning ?? '—' },
+            { label: 'Custom domains live', value: count(r => !!r.custom_domain) },
+          ]}
+        />
       </div>
 
-      <EcomFilters />
+      <EcomFilters plans={plans} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {tenants.length === 0 && <p className="text-foreground-muted">No tenants match.</p>}
-        {tenants.map(t => (
-          <Link
-            key={t.id}
-            href={`/admin/ecom/store-status/${t.id}/view`}
-            className="rounded-xl border border-border-default p-4 bg-surface-elevated hover:border-accent-400 transition-colors"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-medium text-foreground min-w-0 truncate">{t.display_name}</span>
-              <span className="shrink-0 flex items-center gap-1.5 text-xs text-foreground-muted">
-                <span className={`w-2 h-2 rounded-full ${DOT[t.status] || DOT.terminated}`} />
-                {t.status}
-              </span>
-            </div>
-            <div className="text-xs text-foreground-muted mt-1 break-all">{t.slug}.jeffistores.in</div>
-            <div className="text-xs text-foreground-muted mt-2 capitalize">Plan: {t.plan || '—'}</div>
-          </Link>
-        ))}
-      </div>
+      <EcomStoreStatusTable rows={rows} fleetKnown={fleet !== null} />
     </div>
   )
 }

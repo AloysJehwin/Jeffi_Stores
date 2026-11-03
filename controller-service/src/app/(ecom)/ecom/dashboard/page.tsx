@@ -19,7 +19,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const { tenant } = await loadOwnerContext({ tenantSlug })
 
   const [billing, rzpSub, services, plans, priceRow] = await Promise.all([
-    getTenantBilling(tenant.id),
+    getTenantBilling(tenant.id, { transactions: { limit: 5 }, ledger: { limit: 0 } }),
     tenant.razorpay_subscription_id && tenant.subscription_status === 'active'
       ? getSubscription(tenant.razorpay_subscription_id).catch(() => null)
       : Promise.resolve(null),

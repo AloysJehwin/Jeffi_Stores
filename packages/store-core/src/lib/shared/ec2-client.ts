@@ -222,6 +222,59 @@ export async function describeRunningTenantInstanceIds(): Promise<string[]> {
   return xmlTagAll(xml, 'instanceId')
 }
 
+export interface TenantServer {
+  id: string
+  type: string
+  state: string // pending | running | stopping | stopped
+  az: string
+  launchedAt: string | null
+  name: string
+}
+
+/**
+ * Every live k8s node instance (tag app=jeffi-k8s), one paginated DescribeInstances. Store servers carry
+ * jeffi-tenant=<slug> (byTenant); the rest (core, pool-basic-N) are shared.
+ */
+export async function describeTenantServers(): Promise<{ byTenant: Record<string, TenantServer[]>; shared: TenantServer[] }> {
+  const byTenant: Record<string, TenantServer[]> = {}
+  const shared: TenantServer[] = []
+  let token: string | null = null
+  do {
+    const xml = await ec2({
+      Action: 'DescribeInstances',
+      MaxResults: '1000',
+      'Filter.1.Name': 'tag:app',
+      'Filter.1.Value.1': 'jeffi-k8s',
+      'Filter.2.Name': 'instance-state-name',
+      'Filter.2.Value.1': 'pending',
+      'Filter.2.Value.2': 'running',
+      'Filter.2.Value.3': 'stopping',
+      'Filter.2.Value.4': 'stopped',
+      ...(token ? { NextToken: token } : {}),
+    })
+    // Instance items are the only <item>s that open with <instanceId>; each runs to the next one.
+    const starts = [...xml.matchAll(/<item>\s*<instanceId>i-[0-9a-f]+<\/instanceId>/g)].map(m => m.index!)
+    starts.forEach((at, i) => {
+      const item = xml.slice(at, starts[i + 1] ?? xml.length)
+      const tagSet = item.match(/<tagSet>([\s\S]*?)<\/tagSet>/)?.[1] ?? ''
+      const tags = Object.fromEntries([...tagSet.matchAll(/<key>([^<]*)<\/key>\s*<value>([^<]*)<\/value>/g)].map(m => [m[1], m[2]]))
+      const server: TenantServer = {
+        id: xmlTag(item, 'instanceId')!,
+        type: xmlTag(item, 'instanceType') ?? '',
+        state: item.match(/<instanceState>[\s\S]*?<name>([^<]*)<\/name>/)?.[1] ?? '',
+        az: item.match(/<placement>[\s\S]*?<availabilityZone>([^<]*)<\/availabilityZone>/)?.[1] ?? '',
+        launchedAt: xmlTag(item, 'launchTime'),
+        name: tags.Name ?? '',
+      }
+      const slug = tags['jeffi-tenant']
+      if (slug) (byTenant[slug] ??= []).push(server)
+      else shared.push(server)
+    })
+    token = xmlTag(xml, 'nextToken')
+  } while (token)
+  return { byTenant, shared }
+}
+
 /** Instance types of every running or pending instance in the account (for vCPU-quota headroom). */
 export async function describeActiveInstanceTypes(): Promise<string[]> {
   const xml = await ec2({
@@ -431,6 +484,16 @@ export async function describeSnapshotState(snapshotId: string): Promise<string 
     return xmlTag(xml, 'status')
   } catch (e: any) {
     if (/InvalidSnapshot\.NotFound/i.test(e?.message || '')) return null
+    throw e
+  }
+}
+
+/** Delete a snapshot. Idempotent: gone is success. */
+export async function deleteSnapshot(snapshotId: string): Promise<void> {
+  try {
+    await ec2({ Action: 'DeleteSnapshot', SnapshotId: snapshotId })
+  } catch (e: any) {
+    if (/InvalidSnapshot\.NotFound/i.test(e?.message || '')) return
     throw e
   }
 }

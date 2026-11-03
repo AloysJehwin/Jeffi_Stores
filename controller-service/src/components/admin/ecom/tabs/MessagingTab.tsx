@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Loader2, Plus, Search, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Archive, Check, Loader2, Plus, Save, Search, Send, X } from 'lucide-react'
+import { ActionButton } from '@/components/admin/kit'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 import PhonePreview from '@/components/admin/messaging-templates/PhonePreview'
 import { useToast } from '@/contexts/ToastContext'
@@ -16,9 +17,9 @@ interface ReviewRow { id: string; channel: Channel; slug: string; name: string; 
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
 const LABEL: Record<Channel, string> = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' }
-const card = 'rounded-xl border border-border-default bg-surface-elevated p-5'
-const btn = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50'
-const tabCls = (on: boolean) => `rounded-md px-3 py-1.5 text-sm font-medium ${on ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`
+const box = 'rounded-xl border border-border-default bg-surface-elevated min-w-0'
+const card = `${box} p-4 sm:p-5`
+const tabCls = (on: boolean) => `shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${on ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`
 
 function Toggle({ on, onChange, label, hint }: { on: boolean; onChange: (v: boolean) => void; label: string; hint: string }) {
   return (
@@ -72,8 +73,8 @@ export default function MessagingTab({ tenantId, storeName }: { tenantId: string
 
   const pending = (reviews ?? []).filter(r => r.review_status === 'pending').length
   return (
-    <div className="space-y-6">
-      <div className="inline-flex rounded-lg bg-surface-secondary p-1">
+    <div className="space-y-5 sm:space-y-6 min-w-0">
+      <div className="inline-flex max-w-full flex-wrap rounded-lg bg-surface-secondary p-1">
         <button className={tabCls(section === 'settings')} onClick={() => setSection('settings')}>Settings</button>
         <button className={tabCls(section === 'review')} onClick={() => setSection('review')}>Review{pending > 0 && <span className="ml-1.5 rounded-full bg-yellow-500 px-1.5 text-[10px] font-bold text-white">{pending}</span>}</button>
         <button className={tabCls(section === 'templates')} onClick={() => setSection('templates')}>Templates</button>
@@ -111,7 +112,7 @@ function SettingsPanel({ settings, setSettings, catalog, dirty, busy, onSave }: 
   const count = (c: Channel) => settings.allowed.filter(a => a.channel === c).length
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6 min-w-0">
       <div className={`${card} space-y-4`}>
         <h3 className="font-semibold text-foreground">Customer access</h3>
         <Toggle on={settings.editing_enabled} onChange={v => setSettings({ ...settings, editing_enabled: v })}
@@ -123,7 +124,7 @@ function SettingsPanel({ settings, setSettings, catalog, dirty, busy, onSave }: 
       <div className={card}>
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <h3 className="font-semibold text-foreground">Standard templates</h3>
-          <div className="inline-flex rounded-lg bg-surface-secondary p-1">
+          <div className="inline-flex max-w-full rounded-lg bg-surface-secondary p-1">
             {(['all', 'selected'] as const).map(m => <button key={m} className={tabCls(settings.standard_templates === m)} onClick={() => setSettings({ ...settings, standard_templates: m })}>{m === 'all' ? 'All' : 'Only selected'}</button>)}
           </div>
         </div>
@@ -133,17 +134,19 @@ function SettingsPanel({ settings, setSettings, catalog, dirty, busy, onSave }: 
           <>
             <p className="mb-3 text-sm text-foreground-muted">Only ticked templates are visible and sendable. Their own templates are not affected.</p>
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              {CHANNELS.map(c => <button key={c} className={tabCls(channel === c)} onClick={() => setChannel(c)}>{LABEL[c]} <span className="text-xs text-foreground-muted">{count(c)}</span></button>)}
-              <div className="ml-auto flex items-center gap-2 rounded-lg border border-border-default px-2"><Search className="w-4 h-4 text-foreground-muted" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter" className="h-8 w-40 bg-transparent text-sm outline-none" /></div>
-              <button className={`${btn} border border-border-default`} onClick={() => setAll(true)}>Tick all shown</button>
-              <button className={`${btn} border border-border-default`} onClick={() => setAll(false)}>Clear shown</button>
+              <div className="inline-flex max-w-full flex-wrap gap-1">
+                {CHANNELS.map(c => <button key={c} className={tabCls(channel === c)} onClick={() => setChannel(c)}>{LABEL[c]} <span className="text-xs text-foreground-muted">{count(c)}</span></button>)}
+              </div>
+              <div className="flex w-full items-center gap-2 rounded-lg border border-border-default px-2 sm:ml-auto sm:w-auto"><Search className="w-4 h-4 shrink-0 text-foreground-muted" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter" aria-label="Filter templates" className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none sm:w-40 sm:flex-none" /></div>
+              <ActionButton action={{ label: 'Tick all shown', icon: Check, onClick: () => setAll(true) }} />
+              <ActionButton action={{ label: 'Clear shown', icon: X, onClick: () => setAll(false) }} />
             </div>
             <div className="grid max-h-[420px] grid-cols-1 gap-x-6 overflow-y-auto sm:grid-cols-2">
               {shown.map(i => (
-                <label key={i.slug} className="flex cursor-pointer items-center gap-2 border-b border-border-default py-2 text-sm">
-                  <input type="checkbox" checked={isOn(i.slug)} onChange={() => toggle(i.slug)} className="h-4 w-4 accent-green-600" />
-                  <span className="truncate">{i.name || i.slug}</span>
-                  <span className="ml-auto truncate font-mono text-[11px] text-foreground-muted">{i.slug}</span>
+                <label key={i.slug} className="flex min-w-0 cursor-pointer items-center gap-2 border-b border-border-default py-2 text-sm">
+                  <input type="checkbox" checked={isOn(i.slug)} onChange={() => toggle(i.slug)} className="h-4 w-4 shrink-0 accent-green-600" />
+                  <span className="min-w-0 truncate">{i.name || i.slug}</span>
+                  <span className="ml-auto min-w-0 truncate font-mono text-[11px] text-foreground-muted">{i.slug}</span>
                 </label>
               ))}
             </div>
@@ -152,7 +155,7 @@ function SettingsPanel({ settings, setSettings, catalog, dirty, busy, onSave }: 
       </div>
 
       <div className="flex justify-end">
-        <button disabled={!dirty || busy} onClick={onSave} className={`${btn} bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700`}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} Save settings</button>
+        <ActionButton variant="primary" action={{ label: 'Save settings', icon: Save, busy, disabled: !dirty, onClick: onSave }} />
       </div>
     </div>
   )
@@ -178,26 +181,26 @@ function ReviewCard({ row, onDecide }: { row: ReviewRow; onDecide: (r: ReviewRow
   const [note, setNote] = useState('')
   return (
     <div className={card}>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <span className="font-semibold text-foreground">{row.name}</span>
-        <span className="font-mono text-xs text-foreground-muted">{row.slug}</span>
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
+        <span className="font-semibold text-foreground break-words">{row.name}</span>
+        <span className="font-mono text-xs text-foreground-muted break-all">{row.slug}</span>
         <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-xs">{LABEL[row.channel]}</span>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${row.review_status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{row.review_status === 'pending' ? 'Waiting for review' : `Rejected${row.review_note ? ` — ${row.review_note}` : ''}`}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold break-words ${row.review_status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{row.review_status === 'pending' ? 'Waiting for review' : `Rejected${row.review_note ? ` — ${row.review_note}` : ''}`}</span>
         {row.review_status === 'pending' && (
-          <div className="ml-auto flex gap-2">
-            <button className={`${btn} bg-green-600 text-white hover:bg-green-700`} onClick={() => onDecide(row, 'approved')}><Check className="w-3.5 h-3.5" /> Approve</button>
-            <button className={`${btn} border border-red-300 text-red-600`} onClick={() => setRejecting(v => !v)}><X className="w-3.5 h-3.5" /> Reject</button>
+          <div className="flex flex-wrap gap-2 sm:ml-auto">
+            <ActionButton variant="primary" action={{ label: 'Approve', icon: Check, onClick: () => onDecide(row, 'approved') }} />
+            <ActionButton action={{ label: 'Reject', icon: X, danger: true, onClick: () => setRejecting(v => !v) }} />
           </div>
         )}
       </div>
       {rejecting && (
-        <div className="mb-4 flex gap-2">
-          <input value={note} onChange={e => setNote(e.target.value)} placeholder="What should they change? (shown to the customer)" className="h-control-sm min-w-0 flex-1 rounded-lg border border-border-default bg-surface px-3 text-sm" />
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <input value={note} onChange={e => setNote(e.target.value)} placeholder="What should they change? (shown to the customer)" className="field-md min-w-0 flex-1 basis-full sm:basis-60 border border-border-default bg-surface text-foreground" />
           <AIEnrichButton placement="inline" fieldLabel="Review note to the customer" value={note} onChange={setNote} scope="mailer:write" format="plain" maxLength={300} write context={`Jeffi is rejecting a customer's ${row.channel} template "${row.name}" (slug ${row.slug}). Proposed text: "${(row.proposed_body ?? '').replace(/<[^>]+>/g, ' ').slice(0, 300)}". Write a polite, specific one- or two-sentence note telling them what to change.`} />
-          <button disabled={!note.trim()} className={`${btn} h-control-sm bg-red-600 text-white`} onClick={() => onDecide(row, 'rejected', note)}>Send</button>
+          <ActionButton action={{ label: 'Send', icon: Send, danger: true, disabled: !note.trim(), onClick: () => onDecide(row, 'rejected', note) }} />
         </div>
       )}
-      <div className="flex flex-col gap-4 lg:flex-row">
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row">
         <Version title={`Live${row.live_version ? ` · v${row.live_version}` : ''}`} channel={row.channel} subject={row.live_subject} body={row.live_body} />
         <Version title={`Proposed · v${row.proposed_version}`} channel={row.channel} subject={row.proposed_subject} body={row.proposed_body} />
       </div>
@@ -212,12 +215,18 @@ function TemplatesPanel({ base, storeName, onChanged }: { base: string; storeNam
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<EditorTemplate | null>(null)
   const [saving, setSaving] = useState(false)
+  const editor = useRef<HTMLDivElement>(null)
+  // One column below lg: bring the editor into view once a template opens under the list.
+  const pick = (t: EditorTemplate) => {
+    setSelected(t)
+    if (window.matchMedia('(max-width: 1023px)').matches) setTimeout(() => editor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+  }
   const load = useCallback(() => { setItems(null); fetch(`${base}/v2/templates?channel=${channel}`).then(r => r.json()).then(d => setItems(d.items ?? [])).catch(() => setItems([])) }, [base, channel])
   useEffect(() => { load() }, [load])
 
   async function open(i: Item) {
     const r = await fetch(`${base}/v2/templates/${i.channel}/${encodeURIComponent(i.slug)}`)
-    if (r.ok) setSelected(toEditorTemplate(await r.json())); else showToast('Could not open that template', 'error')
+    if (r.ok) pick(toEditorTemplate(await r.json())); else showToast('Could not open that template', 'error')
   }
   async function save(publish: boolean): Promise<EditorTemplate | null> {
     if (!selected) return null
@@ -240,31 +249,31 @@ function TemplatesPanel({ base, storeName, onChanged }: { base: string; storeNam
 
   const shown = (items ?? []).filter(i => `${i.name} ${i.slug}`.toLowerCase().includes(q.toLowerCase()))
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <div className={`${card} p-0`}>
-        <div className="flex gap-1 border-b border-border-default p-2">{CHANNELS.map(c => <button key={c} className={tabCls(channel === c)} onClick={() => { setChannel(c); setSelected(null) }}>{LABEL[c]}</button>)}</div>
+    <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className={box}>
+        <div className="flex flex-wrap gap-1 border-b border-border-default p-2">{CHANNELS.map(c => <button key={c} className={tabCls(channel === c)} onClick={() => { setChannel(c); setSelected(null) }}>{LABEL[c]}</button>)}</div>
         <div className="flex items-center gap-2 border-b border-border-default p-2">
-          <Search className="ml-1 w-4 h-4 text-foreground-muted" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter" className="h-8 flex-1 bg-transparent text-sm outline-none" />
-          <button title="New template" className={`${btn} bg-green-600 text-white`} onClick={() => setSelected({ slug: '', channel, name: '', subject: '', body: '', blocks_format: channel === 'email' ? 'tiptap' : channel === 'sms' ? 'sms-text' : 'wa-content' })}><Plus className="w-3.5 h-3.5" /></button>
+          <Search className="ml-1 w-4 h-4 shrink-0 text-foreground-muted" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter" aria-label="Filter templates" className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none" />
+          <ActionButton action={{ label: 'New', icon: Plus, onClick: () => pick({ slug: '', channel, name: '', subject: '', body: '', blocks_format: channel === 'email' ? 'tiptap' : channel === 'sms' ? 'sms-text' : 'wa-content' }) }} />
         </div>
-        <div className="max-h-[560px] overflow-y-auto">
+        <div className="max-h-[50vh] overflow-y-auto lg:max-h-[560px]">
           {items === null ? <p className="p-4 text-xs text-foreground-muted">Loading…</p> : shown.map(i => (
-            <button key={`${i.source}-${i.slug}`} onClick={() => open(i)} className="flex w-full items-center gap-2 border-b border-border-default px-3 py-2 text-left text-sm hover:bg-surface-secondary">
-              <span className="truncate">{i.name || i.slug}</span>
+            <button key={`${i.source}-${i.slug}`} onClick={() => open(i)} className="flex w-full min-w-0 items-center gap-2 border-b border-border-default px-3 py-2 text-left text-sm hover:bg-surface-secondary">
+              <span className="min-w-0 truncate">{i.name || i.slug}</span>
               <span className={`ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-semibold ${i.source === 'tenant' ? 'bg-sky-100 text-sky-700' : 'bg-surface-secondary text-foreground-muted'}`}>{i.source === 'tenant' ? 'Customer' : 'Standard'}</span>
               {i.review_status && i.review_status !== 'approved' && <span className="shrink-0 rounded-full bg-yellow-100 px-1.5 text-[10px] font-semibold text-yellow-700">{i.review_status}</span>}
             </button>
           ))}
         </div>
       </div>
-      <div className={card}>
+      <div ref={editor} className={`${card} scroll-mt-4`}>
         {!selected ? <p className="py-16 text-center text-sm text-foreground-muted">Pick a template to view or edit it for the customer. Saving a standard template creates the customer&apos;s own copy.</p> : (
           <>
             <div className="mb-4 flex flex-wrap items-center gap-3">
               {!selected.id ? (
                 <input value={selected.slug} onChange={e => setSelected({ ...selected, slug: e.target.value })} placeholder="slug, e.g. order/confirmed" className="h-9 w-full sm:w-72 rounded-lg border border-border-default bg-surface px-3 text-sm" />
-              ) : <span className="font-mono text-xs text-foreground-muted">{selected.slug}</span>}
-              {selected.id && <button className={`${btn} ml-auto border border-border-default`} onClick={archive}>Archive customer copy</button>}
+              ) : <span className="min-w-0 font-mono text-xs text-foreground-muted break-all">{selected.slug}</span>}
+              {selected.id && <div className="sm:ml-auto"><ActionButton action={{ label: 'Archive customer copy', icon: Archive, onClick: archive }} /></div>}
             </div>
             <TemplateEditor value={selected} apiBase={`${base}/v2/templates`} assetsBase="/api/admin/uploads/image" onChange={setSelected} onSave={save} saving={saving} tenantContext={{ storeName: storeName || 'This store' }} />
           </>

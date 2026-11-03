@@ -247,9 +247,9 @@ export async function syncTenant(pool: pg.Pool, tenantId: string, awsIndex = aws
 export async function syncAll(log: (m: string) => void = () => {}, scope: ServiceScope = { tenantId: null, skipStoreTenants: false }) {
   const tenants = scope.tenantId
     ? [{ id: scope.tenantId }]
-    : (await db.query<{ id: string }>(
-        `SELECT id FROM tenants WHERE (status='active' AND NOT ($2 AND 'store' = ANY(service_types))) OR id=$1`,
-        [tpl.PLATFORM_TENANT_ID, scope.skipStoreTenants])).rows
+    : [{ id: tpl.PLATFORM_TENANT_ID }, ...(await db.query<{ id: string }>(
+        `SELECT id FROM tenants WHERE status='active' AND NOT ($2 AND 'store' = ANY(service_types)) AND id <> $1`,
+        [tpl.PLATFORM_TENANT_ID, scope.skipStoreTenants])).rows]
   let checked = 0, changed = 0
   const awsIndex = awsTemplateIndex()
   for (const { id } of tenants) {

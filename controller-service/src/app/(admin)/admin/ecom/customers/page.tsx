@@ -3,8 +3,10 @@ import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { PageHeader } from '@/components/admin/kit/layout'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
-import { listTenants, tenantSummary, planMix } from '@/lib/tenant-registry'
+import { planMix, planSlugs } from '@/lib/tenant-registry'
+import { loadEcomRows } from '@controller/lib/ecom/rows'
 import { EcomHero, PlanMixChart, EcomFilters } from '@controller/components/admin/ecom/EcomUI'
+import { FLEET_UNKNOWN, inr } from '@controller/components/admin/ecom/cells'
 import EcomTabs, { ecomTab } from '../_components/EcomTabs'
 import { EcomCustomersTable } from '../_components/EcomTables'
 import EcomCustomersOverview from './_components/EcomCustomersOverview'
@@ -32,7 +34,7 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
       </div>
     )
   const filters = { status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q') }
-  const [tenants, summary, mix] = await Promise.all([listTenants(filters), tenantSummary(), planMix()])
+  const [{ rows, fleet, totals }, mix, plans] = await Promise.all([loadEcomRows(filters), planMix(), planSlugs()])
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
@@ -42,20 +44,23 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <EcomHero
           label="Monthly Recurring Revenue"
-          value={`₹${summary.mrr.toLocaleString('en-IN')}`}
+          value={inr(totals.mrr)}
+          note={fleet ? undefined : FLEET_UNKNOWN}
           tiles={[
-            { value: summary.total, label: 'Total' },
-            { value: summary.active, label: 'Active' },
-            { value: summary.total - summary.active, label: 'Inactive' },
-            { value: mix.length, label: 'Plans' },
+            { value: totals.total, label: 'Customers' },
+            { value: totals.active, label: 'Active' },
+            { value: totals.provisioning, label: 'Provisioning' },
+            { value: totals.review, label: 'Needs review' },
+            { value: totals.serversRunning ?? '—', label: 'Servers running' },
+            { value: inr(totals.awsMonth), label: 'AWS cost/mo' },
           ]}
         />
         <PlanMixChart mix={mix} />
       </div>
 
-      <EcomFilters />
+      <EcomFilters plans={plans} />
 
-      <EcomCustomersTable tenants={tenants} />
+      <EcomCustomersTable rows={rows} fleetKnown={fleet !== null} />
     </div>
   )
 }

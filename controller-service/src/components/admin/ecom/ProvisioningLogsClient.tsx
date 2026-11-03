@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { ActionButton } from '@/components/admin/kit'
 
 interface Job {
   id: string
@@ -107,7 +109,7 @@ function StepStage({
           <span className={`w-3 h-3 rounded-full border-2 ${dot} ${state === 'current' ? 'animate-pulse' : ''}`} />
         </span>
         <span className="text-[10px] tabular-nums text-foreground-muted w-4 shrink-0">{index + 1}</span>
-        <span className={`text-sm font-mono truncate ${text}`}>{name}</span>
+        <span className={`min-w-0 text-sm font-mono truncate ${text}`}>{name}</span>
 
         {errors > 0 && (
           <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-700 dark:text-red-400">
@@ -259,12 +261,7 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
   return (
     <div className="space-y-5 min-w-0">
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={load}
-          className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium hover:bg-surface-secondary transition-colors"
-        >
-          Refresh
-        </button>
+        <ActionButton action={{ label: 'Refresh', icon: RefreshCw, onClick: load }} />
         <label className="flex items-center gap-2 text-sm text-foreground-muted select-none cursor-pointer">
           <input type="checkbox" checked={live} onChange={e => setLive(e.target.checked)} className="rounded" />
           Live
@@ -284,7 +281,7 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
       )}
 
       {!job && !err && (
-        <div className="rounded-xl border border-border-default p-6 bg-surface-elevated">
+        <div className="rounded-xl border border-border-default p-4 sm:p-6 bg-surface-elevated">
           <p className="text-sm text-foreground-muted">
             No provisioning job for this tenant yet. One is created when the owner pays and provisioning is triggered.
           </p>
@@ -333,10 +330,10 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-start">
             <section className="lg:col-span-3 min-w-0 rounded-xl border border-border-default bg-surface-elevated overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-border-default">
+              <div className="px-4 sm:px-5 py-3.5 border-b border-border-default">
                 <h2 className="font-semibold text-foreground text-sm">Pipeline</h2>
               </div>
-              <div className="p-5 space-y-5">
+              <div className="p-4 sm:p-5 space-y-5">
                 {PHASES.map(phase => {
                   const rows = phase.steps.filter(s => steps.includes(s))
                   if (rows.length === 0) return null
@@ -368,10 +365,10 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
             </section>
 
             <section className="lg:col-span-2 min-w-0 rounded-xl border border-border-default bg-surface-elevated overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-border-default">
+              <div className="px-4 sm:px-5 py-3.5 border-b border-border-default">
                 <h2 className="font-semibold text-foreground text-sm">Created resources</h2>
               </div>
-              <div className="p-5">
+              <div className="p-4 sm:p-5">
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Res label="RDS endpoint" value={res.endpoint || data?.tenant.rds_endpoint} wide />
                   <Res label="DB instance" value={res.dbInstanceId} />

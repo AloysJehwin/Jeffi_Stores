@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { useActionToast } from '@/components/admin/kit/toast'
+import { useRef, useState } from 'react'
+import { Upload } from 'lucide-react'
+import { ActionButton, useActionToast } from '@/components/admin/kit'
 
 type ReconcileRow = { awb: string; billedAmount: number }
 
@@ -31,6 +32,7 @@ function parseBillingCsv(text: string): ReconcileRow[] {
 export default function BillingReconcile({ tenantId }: { tenantId: string }) {
   const [period, setPeriod] = useState('')
   const [busy, setBusy] = useState(false)
+  const file = useRef<HTMLInputElement>(null)
   const toast = useActionToast()
   const setMsg = (r: { ok: boolean; text: string } | null) => r && toast.result(r)
   const [summary, setSummary] = useState<Record<string, number> | null>(null)
@@ -79,28 +81,22 @@ export default function BillingReconcile({ tenantId }: { tenantId: string }) {
           onChange={e => setPeriod(e.target.value)}
           type="text"
           placeholder="Billing period e.g. 2026-08"
-          className="w-48 text-sm rounded-lg border border-border-default bg-surface-elevated px-3 h-control text-foreground"
+          aria-label="Billing period"
+          className="field-md w-full sm:w-56 border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted"
         />
-        <label
-          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
-            busy || !ready
-              ? 'bg-surface-secondary text-foreground-muted pointer-events-none opacity-50'
-              : 'bg-accent-600 hover:bg-accent-700 text-white'
-          }`}
-        >
-          {busy ? 'Reconciling…' : 'Upload billing CSV'}
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            disabled={busy || !ready}
-            onChange={e => {
-              const f = e.target.files?.[0]
-              if (f) reconcile(f)
-              e.target.value = ''
-            }}
-          />
-        </label>
+        <ActionButton variant="primary" action={{ label: busy ? 'Reconciling…' : 'Upload billing CSV', icon: Upload, busy, disabled: !ready, onClick: () => file.current?.click() }} />
+        <input
+          ref={file}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          disabled={busy || !ready}
+          onChange={e => {
+            const f = e.target.files?.[0]
+            if (f) reconcile(f)
+            e.target.value = ''
+          }}
+        />
       </div>
       {summary && (
         <div className="flex flex-wrap gap-3 text-xs text-foreground-secondary">
