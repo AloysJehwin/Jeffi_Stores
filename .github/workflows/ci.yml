@@ -10,22 +10,24 @@ name: Jeffi Stores Pipeline
 #         └→ Images (8, release only, after Lint and Type check)
 #
 # Release (push to main, or workflow_dispatch with deploy=true): Checks passed waits for the one approval, then:
-#   Checks passed (approval) ─┬→ DB · flagship schema ─────┬→ Deploy · flagship ───┬→ Smoke · flagship ─────────┬→ Deploy · tenants
-#                             └→ DB · flagship migrations ─┤                       ├→ CloudFront               │   → Smoke · tenants → Post
-#                                                          │                       ├→ DB · tenant schema ──────┤
-#                                                          │                       └→ DB · tenant migrations ──┘
+#   Checks passed (approval) ─┬→ DB · flagship schema ─────┬→ Deploy · prepare → Deploy (8) ─┬→ Smoke · flagship ─────────┬→ Deploy · tenants
+#                             └→ DB · flagship migrations ─┤                                 ├→ CloudFront               │   → Smoke · tenants → Post
+#                                                          │                                 ├→ DB · tenant schema ──────┤
+#                                                          │                                 └→ DB · tenant migrations ──┘
 #                                                          └→ Deploy · AI gateway ──→ Smoke · AI gateway  (Razer box; only Post waits for it)
 # Stacked stages start together; where order matters a stage waits for the one it depends on before doing
 # anything (.github/actions/wait-for-job): flagship migrations after flagship schema, tenant schema after
 # Smoke · flagship (no store is touched until the flagship is proven live), tenant migrations after tenant
-# schema. Each stage computes the release tag from history, so it needs only the stages before it.
+# schema, Deploy · controller after the flagship's storefront, admin and business (the store paths leave the
+# controller first). Each stage computes the release tag from history, so it needs only the stages before it.
 #
 # Flagship first: the platform database (jeffi_stores) and the platform services, proven live before any store
 # is touched. Tenants follow, since their schema fan-out runs inside the new controller. The schema is additive,
 # so it lands while the old code runs. Every stage after the approval runs in `production-release` (no
 # reviewer) over an SSM tunnel and a failure stops the rest. Both schema stages always run (they apply only what
-# is missing). Deploy · flagship first brings jeffi/store (the store pods' secret) up to date from jeffi/production
-# and stops if the core can't fit the flagship's store pods. dry_run (default on by hand) builds the images and
+# is missing). Deploy · prepare brings jeffi/store (the store pods' secret) up to date from jeffi/production,
+# stops if the core can't fit the flagship's store pods and applies what the services share; then each service
+# deploys in its own job, side by side. dry_run (default on by hand) builds the images and
 # shows each stage's SQL, kubectl diff and targets without changing production.
 
 on:
@@ -393,7 +395,7 @@ jobs:
   deploy-ai-gateway:
     name: Deploy · AI gateway
     runs-on: ubuntu-latest
-    needs: [db-flagship-schema, db-flagship-migrations] # beside Deploy · flagship; the stores never wait for it (the Razer box may be offline)
+    needs: [db-flagship-schema, db-flagship-migrations] # beside the flagship deploy; the stores never wait for it (the Razer box may be offline)
     environment: production-release
     concurrency: { group: deploy-production-deploy-ai-gateway, cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
@@ -422,12 +424,12 @@ jobs:
       - name: /healthz and /v1/providers from the core, the way the platform reaches the gateway
         run: bash deploy/k8s/bootstrap/razer-release.sh smoke
 
-  deploy-flagship:
-    name: Deploy · flagship
+  deploy-prep:
+    name: Deploy · prepare
     runs-on: ubuntu-latest
     needs: [db-flagship-schema, db-flagship-migrations]
     environment: production-release
-    concurrency: { group: deploy-production-deploy-flagship, cancel-in-progress: false }
+    concurrency: { group: deploy-production-deploy-prep, cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
     steps:
       - uses: actions/checkout@v4
@@ -436,8 +438,37 @@ jobs:
         with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
       - name: jeffi/store from jeffi/production, without the control-plane keys (prints no values)
         run: bash deploy/k8s/bootstrap/store-secret.sh ${{ env.DRY_FLAG }}
-      - name: Controller, the flagship's storefront, admin and business, messaging, documents, public-api, mobile and CronJobs at the release tag
-        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform ${{ env.DRY_FLAG }}
+      - name: Room on the core, the ECR pull secret, and what the services share (namespaces, edge, Redis, RBAC, config)
+        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform prep ${{ env.DRY_FLAG }}
+
+  deploy-flagship:
+    name: Deploy · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: deploy-prep
+    environment: production-release
+    concurrency: { group: "deploy-production-deploy-${{ matrix.service }}", cancel-in-progress: false }
+    permissions: { id-token: write, contents: read, actions: read }
+    strategy:
+      fail-fast: false # a service already rolling finishes; a failed one still stops everything after this stage
+      matrix:
+        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile]
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # the release tag is computed from history
+      # The controller is control plane only: it moves once the store paths have left it (the routes, applied with it).
+      - if: matrix.service == 'controller'
+        uses: ./.github/actions/wait-for-job
+        with: { job: "Deploy · storefront" }
+      - if: matrix.service == 'controller'
+        uses: ./.github/actions/wait-for-job
+        with: { job: "Deploy · admin" }
+      - if: matrix.service == 'controller'
+        uses: ./.github/actions/wait-for-job
+        with: { job: "Deploy · business" }
+      - uses: ./.github/actions/release-setup
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: ${{ matrix.service }} at the release tag${{ matrix.service == 'controller' && ', with the platform routes and CronJobs' || '' }}
+        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform ${{ matrix.service }} ${{ env.DRY_FLAG }}
 
   smoke-flagship:
     name: Smoke · flagship
