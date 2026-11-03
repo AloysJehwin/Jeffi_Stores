@@ -188,7 +188,7 @@ export default function RewardsGame({ game, eyebrow, title, ctaLabel }: RewardsG
   const heading = title ?? (game.mode === 'scratch' ? 'Scratch to win' : COPY.title)
 
   return (
-    <section className="py-12 md:py-20 bg-surface-secondary">
+    <section className="py-12 md:py-20 bg-surface-secondary overflow-x-clip">
       <div className="container mx-auto px-4">
         <div className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
           <div className="flex flex-col items-center gap-3 text-center md:items-start md:text-left">

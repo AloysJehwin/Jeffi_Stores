@@ -68,16 +68,20 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // The server size the owner chose (or the plan's default), priced and checked again here.
-  let compute: ComputeSpec | null = null
+  // The server size the owner chose (when they may choose), else the plan's floor; Basic is one fixed
+  // shape. Always saved with its price: approval and the dashboard read tenant_compute.price_inr_month.
+  const plan = await planCompute(d.planSlug)
+  if (!plan) return NextResponse.json({ error: 'Unknown plan' }, { status: 400 })
+  const compute: ComputeSpec =
+    d.planSlug === 'basic'
+      ? presetSpec('basic')
+      : computeSpecEnabled() && d.compute
+        ? d.compute
+        : presetSpec(plan.minPreset ?? plan.defaultPreset ?? 'small')
   if (computeSpecEnabled()) {
-    const plan = await planCompute(d.planSlug)
-    if (!plan) return NextResponse.json({ error: 'Unknown plan' }, { status: 400 })
-    const spec = d.compute ?? presetSpec(plan.defaultPreset ?? 'small')
-    const q = await quoteForPlan(spec, plan, await getCatalog())
+    const q = await quoteForPlan(compute, plan, await getCatalog())
     if (!q.validation.ok) return NextResponse.json({ error: q.validation.errors[0] ?? 'Choose a server size.' }, { status: 400 })
     if (q.capacityError) return NextResponse.json({ error: q.capacityError, code: 'capacity' }, { status: 409 })
-    compute = spec
   } else {
     const capacityError = await dedicatedCapacityError(d.planSlug)
     if (capacityError) return NextResponse.json({ error: capacityError, code: 'capacity' }, { status: 409 })
@@ -105,7 +109,7 @@ export async function POST(request: NextRequest) {
 
   // 2. Link owner → tenant.
   if (!upgrade) await linkOwnerTenant(owner.id, result.tenantId)
-  if (compute) await saveDesiredCompute(result.tenantId, compute)
+  await saveDesiredCompute(result.tenantId, compute)
 
   // 2a. Provisioning names the owner admin and addresses the access certificate from owners.name.
   await updateOwnerName(owner.id, d.ownerName)
@@ -154,6 +158,7 @@ export async function POST(request: NextRequest) {
     mobile: d.mobile ?? null,
     logo_s3_key: d.logoS3Key ?? null,
     seal_s3_key: d.sealS3Key ?? null,
+    warehouse: d.warehouse ?? (await getDraft(owner.id))?.data?.wh ?? null,
     legals_accepted: !!d.legalsAccepted,
     review_again: !!upgrade,
   })

@@ -19,9 +19,11 @@ const reg = vi.hoisted(() => ({
   controlPlanePool: vi.fn(),
 }))
 vi.mock('@/lib/tenant-registry', () => reg)
-vi.mock('@/lib/tenant-registry/custom-domains', () => ({ listCustomDomains: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/lib/tenant-registry/custom-domains', () => ({ listCustomDomains: vi.fn().mockResolvedValue([]), routedCustomDomains: vi.fn().mockResolvedValue([]) }))
 vi.mock('@/lib/tenant-registry/lifecycle', () => ({ clearTenantEc2Instance: vi.fn() }))
 vi.mock('@controller/lib/provisioning/alerts', () => ({ alertProvisioningFailure: vi.fn() }))
+const secret = vi.hoisted(() => ({ getOrCreateTenantDbPassword: vi.fn(), deleteTenantDbSecret: vi.fn() }))
+vi.mock('@controller/lib/provisioning/tenant-db-secret', () => secret)
 
 let row: any
 const store = vi.hoisted(() => ({ getTenantCompute: vi.fn(), patchTenantCompute: vi.fn() }))
@@ -47,6 +49,12 @@ const k8s = vi.hoisted(() => ({
   terminateTenantInstance: vi.fn(),
   clusterIngressIp: () => '198.51.100.7',
   restartTenantWorkload: vi.fn(),
+  nodeCanHostDb: vi.fn(),
+  handOffNodeDb: vi.fn(),
+  ensureNodeDbVolume: vi.fn(),
+  postgresPodReady: vi.fn(),
+  growNodeDbVolume: vi.fn(),
+  retireNodeDb: vi.fn(),
 }))
 vi.mock('@/lib/k8s/tenant-compute', () => k8s)
 
@@ -78,6 +86,9 @@ beforeEach(() => {
   k8s.tenantRolloutComplete.mockResolvedValue(true)
   k8s.removeTenantNodes.mockResolvedValue(['i-old'])
   k8s.terminateTenantInstance.mockResolvedValue('terminated')
+  k8s.nodeCanHostDb.mockResolvedValue(true)
+  k8s.handOffNodeDb.mockResolvedValue('done')
+  secret.getOrCreateTenantDbPassword.mockResolvedValue('stored-pw')
 })
 
 describe('reconcileCompute', () => {
@@ -90,7 +101,9 @@ describe('reconcileCompute', () => {
     const provider = new StubProvisioningProvider(0)
     expect(await reconcileCompute('t-1', provider)).toMatchObject({ ok: true, status: 'applied' })
     expect(k8s.ensureTenantNodes.mock.calls[0][2]).toBe(1)
-    expect(k8s.applyTenantWorkload.mock.calls[0][0]).toMatchObject({ nodeGen: 1 })
+    // The database on its server: the stored password in the render, its disk onto the new first server.
+    expect(k8s.applyTenantWorkload.mock.calls[0][0]).toMatchObject({ nodeGen: 1, dbPassword: 'stored-pw' })
+    expect(k8s.handOffNodeDb).toHaveBeenCalledWith('acme', 't-acme.1-0', expect.any(Function))
     expect(k8s.removeTenantNodes).toHaveBeenCalledWith('acme', ['t-acme.1-0'])
     expect(k8s.terminateTenantInstance).toHaveBeenCalledWith('acme', 'i-old', expect.any(Function))
     expect(reg.writeTenantEc2).toHaveBeenCalledWith('t-1', '198.51.100.7', 'i-new')

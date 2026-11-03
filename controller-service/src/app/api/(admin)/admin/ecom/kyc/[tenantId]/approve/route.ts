@@ -242,18 +242,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // skipped but kept intact, re-enablable via ECOM_PAYMENTS_ENABLED=true.
   if (!PAYMENTS_ENABLED) {
     await startStore({ id: tenantId, store_request: tenant.store_request ? 'awaiting_payment' : null })
+    sendKycApprovedEmail(
+      { email: owner.email, name: owner.name },
+      { display_name: tenant.display_name, slug: tenant.slug },
+      null
+    ).catch(() => {})
     return NextResponse.json({ ok: true, provisioningStarted: true, linkedAccountId })
   }
 
   // 2. Create Razorpay Subscription and return checkout URL.
+  // No fallback to another plan: charging a different plan than the owner chose is worse than failing.
   const plans = await listPlans()
-  const plan = plans.find(p => p.slug === tenant.plan) ?? plans[0]
+  const plan = plans.find(p => p.slug === tenant.plan)
+  if (!plan) {
+    return NextResponse.json(
+      { ok: false, kycApproved: true, linkedAccountId, error: `Plan '${tenant.plan ?? 'none'}' is not an active store plan — set the store's plan, then approve again` },
+      { status: 409 }
+    )
+  }
   const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
   // Price was computed and saved onto tenant_compute by onboard/submit; the subscription charges that total.
   const priceRow = await controlPlanePool().query<{ price: number | null }>(
     `SELECT price_inr_month::int AS price FROM tenant_compute WHERE tenant_id = $1`, [tenantId]
   )
-  const priceInrMonth = Number(priceRow.rows[0]?.price ?? plan?.monthly_price_inr ?? 0)
+  const priceInrMonth = Number(priceRow.rows[0]?.price ?? plan.monthly_price_inr ?? 0)
   if (!(priceInrMonth > 0)) {
     return NextResponse.json({ ok: false, kycApproved: true, linkedAccountId, error: 'No subscription price on tenant_compute.price_inr_month' }, { status: 500 })
   }
@@ -261,7 +273,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { subscriptionId, shortUrl } = await createRazorpaySubscription({
       planSlug: tenant.plan ?? 'basic',
-      planName: plan?.name ?? 'Basic',
+      planName: plan.name,
       interval: (tenant.billing_interval as any) ?? 'monthly',
       priceInrMonth,
       ownerEmail: owner.email,

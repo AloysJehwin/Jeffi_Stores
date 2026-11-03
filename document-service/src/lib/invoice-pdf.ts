@@ -15,6 +15,22 @@ export interface InvoiceBusinessSettings {
   bankAccount: string
   bankIfsc: string
   bankBranch: string
+  /** Payout account holder; falls back to the legal name. */
+  holderName?: string
+  /** Seal / signature image printed in the Authorised Signatory box. */
+  sealUrl?: string
+  /** Jurisdiction line; the state when unset. */
+  city?: string
+}
+
+async function fetchImage(url: string | undefined): Promise<Buffer | null> {
+  if (!url || !/^https?:\/\//i.test(url)) return null
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) })
+    return res.ok ? Buffer.from(await res.arrayBuffer()) : null
+  } catch {
+    return null
+  }
 }
 
 export interface InvoiceOrderItem {
@@ -223,6 +239,7 @@ export async function generateInvoicePDF(
 ): Promise<Buffer> {
   const nicQRBuf = order.signed_qr_code ? await buildQRBuffer(order.signed_qr_code, 80) : null
   const payQRBuf = order.payment_link_url ? await buildQRBuffer(order.payment_link_url, 80) : null
+  const sealBuf = await fetchImage(business.sealUrl)
   const allDigital = items.length > 0 && items.every(i => i.is_digital)
 
   return new Promise((resolve, reject) => {
@@ -913,7 +930,7 @@ export async function generateInvoicePDF(
     const bankValX = bankX + bankLabelW + 10
     const bankValW = bankW - bankLabelW - 14
     const bankDetails = [
-      { label: "A/c Holder's Name", value: business.tradeName.toUpperCase() },
+      { label: "A/c Holder's Name", value: (business.holderName || business.legalName || business.tradeName).toUpperCase() },
       { label: 'Bank Name', value: business.bankName.toUpperCase() },
       { label: 'A/c No.', value: business.bankAccount },
       { label: 'Branch & IFS Code', value: `${business.bankBranch} & ${business.bankIfsc}` },
@@ -945,6 +962,11 @@ export async function generateInvoicePDF(
       .font(FB)
       .fontSize(7)
       .text(`for ${business.tradeName.toUpperCase()}`, LM + declW + 2, sigY + 3, { width: bankW - 4, align: 'right' })
+    if (sealBuf) {
+      try {
+        doc.image(sealBuf, LM + declW + 4, sigY + 2, { fit: [sigH - 4, sigH - 4] })
+      } catch {}
+    }
     doc
       .font(F)
       .fontSize(7)
@@ -952,8 +974,11 @@ export async function generateInvoicePDF(
 
     y = sigY + sigH + 8
 
-    doc.font(F).fontSize(7).text('SUBJECT TO RAIPUR JURISDICTION', LM, y, { width: pw, align: 'center' })
-    y += 10
+    const jurisdiction = (business.city || business.state || '').trim().toUpperCase()
+    if (jurisdiction) {
+      doc.font(F).fontSize(7).text(`SUBJECT TO ${jurisdiction} JURISDICTION`, LM, y, { width: pw, align: 'center' })
+      y += 10
+    }
     doc.font(F).fontSize(6.5).text('This is a Computer Generated Invoice', LM, y, { width: pw, align: 'center' })
     y += 10
 

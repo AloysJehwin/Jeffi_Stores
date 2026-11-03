@@ -60,10 +60,20 @@ async function advance(tenantId: string, retry: boolean): Promise<LayoutResult> 
   if (!sw || sw.failed) sw = { step: 'both', since: now, at: now }
   p.layout = sw
   const k8s = await import('@/lib/k8s/tenant-compute')
-  const { listCustomDomains } = await import('@/lib/tenant-registry/custom-domains')
+  const { routedCustomDomains } = await import('@/lib/tenant-registry/custom-domains')
   const c = await resolveCompute(tenantId, tenant.plan, { which: 'applied' })
-  const customDomains = (await listCustomDomains(tenantId).catch(() => [])).filter(d => d.status === 'verified').map(d => d.domain)
-  const base = { slug: tenant.slug, plan: tenant.plan, hosts: tenantHostnames(tenant.slug, tenant.plan), customDomains, dbPoolMax: c.dbPoolMax, nodeGen: c.nodeGen }
+  const customDomains = await routedCustomDomains(tenantId).catch(() => [])
+  // A database on the store's server: every render carries its stored password (a re-created namespace's Secret needs it).
+  const dbPassword = c.spec.db.mode === 'node' ? await (await import('./tenant-db-secret')).getOrCreateTenantDbPassword(tenant.slug) : undefined
+  const base = {
+    slug: tenant.slug,
+    plan: tenant.plan,
+    hosts: tenantHostnames(tenant.slug, tenant.plan),
+    customDomains,
+    dbPoolMax: c.dbPoolMax,
+    nodeGen: c.nodeGen,
+    ...(dbPassword ? { dbPassword } : {}),
+  }
   const input = { ...base, compute: { ...c.spec, layout: 'services' as const } }
   const applied = { ...row.applied, layout: 'services' as const }
 

@@ -10,7 +10,7 @@ import { ComputeSpecSchema } from '@controller/lib/compute/schema'
 export const OnboardSchema = z
   .object({
     // Step 0 — Plan
-    planSlug: z.enum(['starter', 'basic', 'growth', 'pro', 'enterprise']),
+    planSlug: z.enum(['basic', 'growth', 'pro', 'enterprise']),
     billingInterval: z.enum(['monthly', 'yearly']).default('monthly'),
     // Server size, when owners choose it (COMPUTE_SPEC_ENABLED); otherwise the plan's default applies later.
     compute: ComputeSpecSchema.optional(),

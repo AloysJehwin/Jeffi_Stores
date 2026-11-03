@@ -41,19 +41,19 @@ export async function verifyPortalToken(token: string | undefined | null): Promi
   }
 }
 
-export function setPortalCookie(res: NextResponse, token: string): NextResponse {
+export function setPortalCookie(res: NextResponse, token: string, host?: string | null): NextResponse {
   res.cookies.set(PORTAL_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: PORTAL_TTL_S,
     path: '/',
-    ...cookieDomainOption(),
+    ...cookieDomainOption(host),
   })
   return res
 }
 
-export function clearPortalCookie(res: NextResponse): NextResponse {
-  res.cookies.set(PORTAL_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0, ...cookieDomainOption() })
+export function clearPortalCookie(res: NextResponse, host?: string | null): NextResponse {
+  res.cookies.set(PORTAL_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0, ...cookieDomainOption(host) })
   return res
 }

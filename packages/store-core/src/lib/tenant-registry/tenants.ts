@@ -57,7 +57,7 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
     where.push(`(lower(t.display_name) LIKE $${args.length} OR lower(t.slug) LIKE $${args.length})`)
   }
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at,
+    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at,
             p.slug AS plan, p.monthly_price_inr,
             i.rds_endpoint, i.s3_bucket, i.ec2_target, i.region
      FROM tenants t
@@ -73,11 +73,12 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
 /** Summary counts for the control-plane dashboard. */
 export async function tenantSummary(): Promise<{ total: number; active: number; mrr: number }> {
   const pool = controlPlanePool()
-  // MRR: per-store subscription price from tenant_compute.price_inr_month (grandfathered stores fall back to plan fee).
+  // MRR: per-store subscription price from tenant_compute.price_inr_month (grandfathered stores fall back to plan fee);
+  // yearly billing charges ten months a year, so its monthly value is 10/12 of that.
   const res = await pool.query(
     `SELECT count(*)::int AS total,
             count(*) FILTER (WHERE t.status='active')::int AS active,
-            COALESCE(SUM(COALESCE(tc.price_inr_month, p.monthly_price_inr, 0)) FILTER (WHERE t.status='active'), 0)::numeric AS mrr
+            COALESCE(SUM(COALESCE(tc.price_inr_month, p.monthly_price_inr, 0) * CASE WHEN t.billing_interval = 'yearly' THEN 10.0 / 12 ELSE 1 END) FILTER (WHERE t.status='active'), 0)::numeric AS mrr
      FROM tenants t
        LEFT JOIN plans p ON p.id = t.plan_id
        LEFT JOIN tenant_compute tc ON tc.tenant_id = t.id`
@@ -202,12 +203,14 @@ export async function planMix(): Promise<{ plan: string; count: number }[]> {
 }
 
 /** List active plans for the onboarding UI. */
-export async function listPlans(): Promise<
+/** Active plans; the store lineup unless `any` (which adds the services workspace plan). */
+export async function listPlans(product: 'store' | 'any' = 'store'): Promise<
   Array<{ slug: string; name: string; tier: number; monthly_price_inr: string }>
 > {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT slug, name, tier, monthly_price_inr FROM plans WHERE is_active = true ORDER BY tier`
+    `SELECT slug, name, tier, monthly_price_inr FROM plans
+      WHERE is_active = true ${product === 'store' ? `AND product = 'store'` : ''} ORDER BY tier`
   )
   return res.rows
 }
@@ -227,7 +230,7 @@ export interface TenantDetail extends TenantRow {
 export async function getTenant(id: string): Promise<TenantDetail | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at, t.instance_state,
+    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at, t.instance_state,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,
@@ -330,7 +333,7 @@ export async function billingSummary(): Promise<{
   const pool = controlPlanePool()
   const res = await pool.query(`
     SELECT
-      (SELECT COALESCE(SUM(COALESCE(tc.price_inr_month, p.monthly_price_inr, 0)),0)
+      (SELECT COALESCE(SUM(COALESCE(tc.price_inr_month, p.monthly_price_inr, 0) * CASE WHEN t.billing_interval = 'yearly' THEN 10.0 / 12 ELSE 1 END),0)
          FROM tenants t JOIN plans p ON p.id=t.plan_id
          LEFT JOIN tenant_compute tc ON tc.tenant_id = t.id
          WHERE t.status='active')::numeric AS mrr,

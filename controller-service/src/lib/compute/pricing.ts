@@ -1,7 +1,7 @@
 import { HOURS_PER_MONTH, ec2Code, priceOf, rdsCode, type Catalog, type ComputeSpec } from '@/lib/compute/spec'
 
-// What a store's compute costs: AWS on-demand price × USD→INR × (1 + margin), per month and per hour.
-// GST is not in these figures: it is charged on wallet top-ups (and is inside the plan fee).
+// What a store's compute costs: AWS on-demand price × USD→INR × (1 + the plan's infra margin), per month
+// and per hour. GST is not in these figures: monthlyTotal adds it on the infra (the plan fee already includes it).
 
 export interface QuoteLine {
   key: string
@@ -115,21 +115,24 @@ export function quoteSpec(spec: ComputeSpec, catalog: Catalog, plan?: { infraMar
 }
 
 /**
- * The owner's monthly total: the plan fee (GST included) plus infrastructure with GST on top.
- * planFeeInr is the plan's monthly_price_inr (0 for margin-on-infra plans), passed by both the
- * MRR calculation and change-plan so grandfathered plans with a stored fee are billed correctly.
+ * The owner's monthly total: the plan's flat fee (plans.monthly_price_inr, GST included; Basic's is 0)
+ * plus infrastructure with GST on top. This is the subscription price (tenant_compute.price_inr_month).
  */
 export function monthlyTotal(quote: Quote, planFeeInr: number, gstRate: number) {
   const gst = round2(quote.inrMonth * gstRate)
   return { planFee: round2(planFeeInr), infra: quote.inrMonth, gstOnInfra: gst, total: round2(planFeeInr + quote.inrMonth + gst) }
 }
 
-/** While a store is paused for an unpaid wallet: its disks, database storage and the platform share, per hour. */
-export function pausedInrHour(spec: ComputeSpec, catalog: Catalog): number {
+// What stays billed while a store's servers are stopped.
+const KEPT_WHILE_PAUSED = new Set(['storage', 'db:disk', 'db:snapshot', 's3', 'platform'])
+
+/** While a store is paused: its disks, database storage, S3 and the platform share, per hour, at the plan's margin. */
+export function pausedInrHour(spec: ComputeSpec, catalog: Catalog, plan?: { infraMargin?: number }): number {
   const s = catalog.settings
-  const kept = quoteSpec(spec, catalog).lines.filter(l => l.key === 'storage' || l.key === 'platform').reduce((n, l) => n + l.awsUsdMonth, 0)
+  const margin = plan?.infraMargin ?? s.margin ?? 0
+  const kept = quoteSpec(spec, catalog, plan).lines.filter(l => KEPT_WHILE_PAUSED.has(l.key)).reduce((n, l) => n + l.awsUsdMonth, 0)
   const disks = spec.node.placement === 'pool' ? 0 : spec.node.count * s.rootVolumeGb * perGb(catalog, 'ebs:gp3')
-  return Math.round((((kept + disks) * s.usdInr * (1 + s.margin)) / HOURS_PER_MONTH) * 10000) / 10000
+  return Math.round((((kept + disks) * s.usdInr * (1 + margin)) / HOURS_PER_MONTH) * 10000) / 10000
 }
 
 /** Billing for part of a month: the spec's hourly rate × hours it ran. */

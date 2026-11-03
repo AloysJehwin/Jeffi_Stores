@@ -39,6 +39,15 @@ export async function markDraftSubmitted(ownerId: string): Promise<void> {
 
 // ── Tenant KYC ────────────────────────────────────────────────────────────────
 
+/** The onboarding pickup warehouse (Delhivery origin), kept per tenant. */
+export interface TenantWarehouse {
+  originPincode?: string
+  pickupLocation?: string
+  sellerName?: string
+  sellerAddress?: string
+  sellerPhone?: string
+}
+
 export interface TenantKyc {
   id: string
   tenant_id: string
@@ -53,6 +62,7 @@ export interface TenantKyc {
   mobile: string | null
   logo_s3_key: string | null
   seal_s3_key: string | null
+  warehouse: TenantWarehouse | null
   legals_accepted_version: string | null
   legals_accepted_at: string | null
   status: string
@@ -76,6 +86,7 @@ export async function saveKyc(
     mobile?: string | null
     logo_s3_key?: string | null
     seal_s3_key?: string | null
+    warehouse?: TenantWarehouse | null
     legals_accepted?: boolean
     /** Re-submission on an existing tenant: back to the review queue. */
     review_again?: boolean
@@ -83,8 +94,8 @@ export async function saveKyc(
 ): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
-    `INSERT INTO tenant_kyc (tenant_id, owner_id, gst_number, gst_cert_s3_key, pan, business_name, business_type, business_address, product_categories, mobile, logo_s3_key, seal_s3_key, legals_accepted_version, legals_accepted_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+    `INSERT INTO tenant_kyc (tenant_id, owner_id, gst_number, gst_cert_s3_key, pan, business_name, business_type, business_address, product_categories, mobile, logo_s3_key, seal_s3_key, legals_accepted_version, legals_accepted_at, warehouse)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$16)
      ON CONFLICT (tenant_id) DO UPDATE SET
        gst_number=EXCLUDED.gst_number, gst_cert_s3_key=COALESCE(EXCLUDED.gst_cert_s3_key, tenant_kyc.gst_cert_s3_key),
        pan=EXCLUDED.pan, business_name=EXCLUDED.business_name, business_type=EXCLUDED.business_type,
@@ -92,6 +103,7 @@ export async function saveKyc(
        mobile=COALESCE(EXCLUDED.mobile, tenant_kyc.mobile),
        logo_s3_key=COALESCE(EXCLUDED.logo_s3_key, tenant_kyc.logo_s3_key),
        seal_s3_key=COALESCE(EXCLUDED.seal_s3_key, tenant_kyc.seal_s3_key),
+       warehouse=COALESCE(EXCLUDED.warehouse, tenant_kyc.warehouse),
        legals_accepted_version=COALESCE(EXCLUDED.legals_accepted_version, tenant_kyc.legals_accepted_version),
        legals_accepted_at=COALESCE(EXCLUDED.legals_accepted_at, tenant_kyc.legals_accepted_at),
        status=CASE WHEN $15 THEN 'pending' ELSE tenant_kyc.status END,
@@ -115,14 +127,38 @@ export async function saveKyc(
       kyc.legals_accepted ? process.env.POLICY_VERSION || '1' : null,
       kyc.legals_accepted ? new Date().toISOString() : null,
       !!kyc.review_again,
+      cleanWarehouse(kyc.warehouse),
     ]
   )
+}
+
+function cleanWarehouse(wh: TenantWarehouse | null | undefined): string | null {
+  if (!wh) return null
+  const out: Record<string, string> = {}
+  for (const k of ['originPincode', 'pickupLocation', 'sellerName', 'sellerAddress', 'sellerPhone'] as const) {
+    const v = typeof wh[k] === 'string' ? wh[k]!.trim() : ''
+    if (v) out[k] = v
+  }
+  return Object.keys(out).length ? JSON.stringify(out) : null
 }
 
 export async function getKyc(tenantId: string): Promise<TenantKyc | null> {
   const pool = controlPlanePool()
   const r = await pool.query(`SELECT * FROM tenant_kyc WHERE tenant_id=$1`, [tenantId])
   return r.rows[0] ?? null
+}
+
+/** The tenant's onboarding warehouse; falls back to the owner's onboarding draft for older stores. */
+export async function getTenantWarehouse(tenantId: string): Promise<TenantWarehouse | null> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `SELECT (SELECT warehouse FROM tenant_kyc WHERE tenant_id=$1) AS warehouse,
+            (SELECT d.data->'wh' FROM owner_tenants ot JOIN onboarding_drafts d ON d.owner_id = ot.owner_id
+              WHERE ot.tenant_id=$1 LIMIT 1) AS draft_wh`,
+    [tenantId]
+  )
+  const row = r.rows[0]
+  return (row?.warehouse as TenantWarehouse | null) ?? (row?.draft_wh as TenantWarehouse | null) ?? null
 }
 
 export async function approveKyc(tenantId: string, reviewerEmail: string): Promise<void> {

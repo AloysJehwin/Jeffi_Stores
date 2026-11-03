@@ -9,7 +9,7 @@
  * Same seams as steps.test.ts: tenant-registry, tenant-backup-store and seed are
  * mocked. Additionally the dynamically-imported modules these steps reach for —
  * ../legals/provision, ../pool-autoscale, ../delhivery — are mocked, plus the
- * getKyc/getDraft/controlPlanePool trio used by setup_delhivery.
+ * getKyc/getTenantWarehouse lookups used by setup_delhivery.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { StubProvisioningProvider } from '@controller/lib/provisioning/stub-provider'
@@ -25,6 +25,7 @@ const reg = {
   clearTenantInfra: vi.fn().mockResolvedValue(undefined),
   clearTenantCache: vi.fn(),
   getKyc: vi.fn(),
+  getTenantWarehouse: vi.fn(),
   getDraft: vi.fn(),
   controlPlanePool: vi.fn(),
 }
@@ -83,6 +84,7 @@ beforeEach(() => {
   reg.controlPlanePool.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [] }) })
   reg.getKyc.mockResolvedValue(null)
   reg.getDraft.mockResolvedValue(null)
+  reg.getTenantWarehouse.mockResolvedValue(null)
   poolAuto.ensurePoolInstance.mockResolvedValue({ ip: '10.0.0.9' })
   poolAuto.deletePoolIfEmpty.mockResolvedValue(undefined)
   legals.generateTenantLegals.mockResolvedValue(undefined)
@@ -229,17 +231,12 @@ describe('ensure_compute', () => {
 // ── setup_delhivery — non-fatal pickup registration ──────────────────────────
 describe('setup_delhivery', () => {
   it('registers the pickup location from the onboarding warehouse config', async () => {
-    reg.controlPlanePool.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [{ owner_id: 'o-1' }] }) })
-    reg.getDraft.mockResolvedValue({
-      data: {
-        wh: {
-          sellerPhone: '9876543210',
-          originPincode: '600001',
-          pickupLocation: 'WH1',
-          sellerAddress: 'Addr',
-          sellerName: 'Acme',
-        },
-      },
+    reg.getTenantWarehouse.mockResolvedValue({
+      sellerPhone: '9876543210',
+      originPincode: '600001',
+      pickupLocation: 'WH1',
+      sellerAddress: 'Addr',
+      sellerName: 'Acme',
     })
     const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
     await advanceProvisioningJob(
@@ -247,15 +244,15 @@ describe('setup_delhivery', () => {
       new StubProvisioningProvider(0)
     )
     expect(delhivery.createDelhiveryPickupLocation).toHaveBeenCalledWith(
-      expect.objectContaining({ phone: '9876543210', pincode: '600001', name: 'WH1' })
+      expect.objectContaining({ phone: '9876543210', pincode: '600001', name: 'WH1' }),
+      { db: null }
     )
     const p = patches().find(x => x.step === 'configure_dns')
     expect(p?.created_resources).toMatchObject({ delhiveryPickup: 'created' })
   })
 
   it('records an error string (not created) when Delhivery returns not-ok', async () => {
-    reg.controlPlanePool.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [{ owner_id: 'o-1' }] }) })
-    reg.getDraft.mockResolvedValue({ data: { wh: { sellerPhone: '9876543210', originPincode: '600001' } } })
+    reg.getTenantWarehouse.mockResolvedValue({ sellerPhone: '9876543210', originPincode: '600001' })
     delhivery.createDelhiveryPickupLocation.mockResolvedValue({ ok: false, error: 'dupe name' })
     const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
     await advanceProvisioningJob(
@@ -277,10 +274,9 @@ describe('setup_delhivery', () => {
     expect(p?.created_resources?.delhiveryPickup).toMatch(/skipped/)
   })
 
-  it('is non-fatal when the lookup throws — still advances to configure_dns', async () => {
-    reg.controlPlanePool.mockImplementation(() => {
-      throw new Error('control plane down')
-    })
+  it('is non-fatal when the registration throws — still advances to configure_dns', async () => {
+    reg.getTenantWarehouse.mockResolvedValue({ sellerPhone: '9876543210', originPincode: '600001' })
+    delhivery.createDelhiveryPickupLocation.mockRejectedValueOnce(new Error('delhivery down'))
     const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
     await advanceProvisioningJob(
       job({ step: 'setup_delhivery', created_resources: {} }),

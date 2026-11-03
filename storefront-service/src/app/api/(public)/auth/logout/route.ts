@@ -22,16 +22,17 @@ export async function POST(request: NextRequest) {
       maxAge: 0,
       path: '/',
     }
+    const cookieDomain = cookieDomainOption(request.headers.get('x-forwarded-host') ?? request.headers.get('host'))
     store.set('user_sid', '', baseOpts)
-    store.set('user_sid', '', { ...baseOpts, ...cookieDomainOption() })
+    store.set('user_sid', '', { ...baseOpts, ...cookieDomain })
     store.set('session_id', '', baseOpts)
-    store.set('session_id', '', { ...baseOpts, ...cookieDomainOption() })
+    store.set('session_id', '', { ...baseOpts, ...cookieDomain })
 
     const newGuestSessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
     store.set('session_id', newGuestSessionId, {
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
-      ...cookieDomainOption(),
+      ...cookieDomain,
     })
 
     const res = NextResponse.json({ message: 'Logged out successfully' })

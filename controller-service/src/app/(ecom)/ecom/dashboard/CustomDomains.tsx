@@ -24,6 +24,7 @@ export default function CustomDomains({
   const [domains, setDomains] = useState<Domain[]>([])
   const [loaded, setLoaded] = useState(false)
   const [cnameTarget, setCnameTarget] = useState(`${slug}.jeffistores.in`)
+  const [aRecord, setARecord] = useState<string | null>(null)
   const [newDomain, setNewDomain] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -45,6 +46,7 @@ export default function CustomDomains({
     if (res?.domains) {
       setDomains(res.domains)
       if (res.cnameTarget) setCnameTarget(res.cnameTarget)
+      setARecord(res.aRecord ?? null)
     }
   }
   useEffect(() => {
@@ -91,6 +93,17 @@ export default function CustomDomains({
     )
   }
 
+  const STATUS_LABEL: Record<string, string> = {
+    pending: 'Waiting for DNS',
+    'dns-verified': 'Waiting for pointing record',
+    'cert-pending': 'Issuing certificate',
+    verified: 'Live',
+    failed: 'Failed',
+    expired: 'Expired',
+  }
+  // Failed and expired claims don't hold a slot (custom-domains.ts).
+  const used = domains.filter(d => d.status !== 'failed' && d.status !== 'expired').length
+
   const statusColor: Record<string, string> = {
     verified: 'org-sage org-sage-text',
     verifying: 'org-sand org-brown',
@@ -106,7 +119,7 @@ export default function CustomDomains({
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs text-foreground-secondary uppercase tracking-widest">Custom domains</div>
         <span className="text-xs text-foreground-secondary">
-          {domains.length}/{maxDomains} used
+          {used}/{maxDomains} used
         </span>
       </div>
 
@@ -117,7 +130,7 @@ export default function CustomDomains({
             <div className="flex items-center gap-2 min-w-0">
               <span className="font-mono text-foreground truncate">{d.domain}</span>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColor[d.status] ?? ''}`}>
-                {d.status}
+                {STATUS_LABEL[d.status] ?? d.status}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -139,16 +152,32 @@ export default function CustomDomains({
               </button>
             </div>
           </div>
-          {d.status !== 'verified' && d.verification_token && (
-            <div className="mt-1 text-xs text-foreground-secondary">
-              Add a TXT record: <span className="font-mono text-foreground">_jeffi.{d.domain}</span> ={' '}
-              <span className="font-mono text-foreground break-all">{d.verification_token}</span>
-            </div>
+          {(d.status === 'pending' || d.status === 'dns-verified') && (
+            <ol className="mt-1 text-xs text-foreground-secondary list-decimal pl-4 space-y-0.5">
+              {d.status === 'pending' && d.verification_token && (
+                <li>
+                  TXT <span className="font-mono text-foreground">_jeffi.{d.domain}</span> ={' '}
+                  <span className="font-mono text-foreground break-all">{d.verification_token}</span>
+                </li>
+              )}
+              <li>
+                CNAME <span className="font-mono text-foreground">{d.domain}</span> →{' '}
+                <span className="font-mono text-foreground break-all">{cnameTarget}</span>
+                {aRecord && (
+                  <>
+                    {' '}(root domain: A record → <span className="font-mono text-foreground">{aRecord}</span>)
+                  </>
+                )}
+              </li>
+            </ol>
+          )}
+          {(d.status === 'failed' || d.status === 'expired') && (
+            <div className="mt-1 text-xs text-foreground-secondary">Delete it and add it again once the DNS records are in place.</div>
           )}
         </div>
       ))}
 
-      {domains.length < maxDomains && (
+      {used < maxDomains && (
         <div className="mt-4 space-y-2">
           <div className="flex gap-2">
             <input
@@ -178,11 +207,18 @@ export default function CustomDomains({
               A record that points the domain itself at{' '}
               <span className="font-mono text-foreground break-all">{cnameTarget}</span> — a{' '}
               <span className="font-mono text-foreground">CNAME</span> for a subdomain
-              (e.g. <span className="font-mono text-foreground">shop.yourbrand.com</span>), or an{' '}
-              <span className="font-mono text-foreground">A</span> record to that target&apos;s IP for a root domain.
+              (e.g. <span className="font-mono text-foreground">shop.yourbrand.com</span>)
+              {aRecord ? (
+                <>
+                  , or an <span className="font-mono text-foreground">A</span> record to{' '}
+                  <span className="font-mono text-foreground">{aRecord}</span> for a root domain.
+                </>
+              ) : (
+                '.'
+              )}
             </li>
           </ol>
-          <p className="text-xs text-foreground-secondary">Then click Verify.</p>
+          <p className="text-xs text-foreground-secondary">Then click Verify. We check every 10 minutes too, and issue the certificate once the domain points at us.</p>
         </div>
       )}
     </div>

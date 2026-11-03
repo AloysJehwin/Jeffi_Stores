@@ -1,4 +1,5 @@
 import type { ProvisioningProvider, CreateDbInstanceArgs, DbInstanceState, ModifyDbInstanceArgs } from './provider'
+import type { DbAuth } from './tenant-admin-pool'
 
 // In-memory stub: exercises the FULL state machine (including the async
 // "wait until available" polling) with zero real AWS. Swap for the real
@@ -68,7 +69,8 @@ export class StubProvisioningProvider implements ProvisioningProvider {
     return null // still provisioning
   }
 
-  async loadSchema(_endpoint: string, _dbName: string, _appUser?: string): Promise<void> {
+  // No database exists behind a stub endpoint, an on-node one included: nothing to load.
+  async loadSchema(_endpoint: string, _dbName: string, _appUser?: string, _db?: DbAuth): Promise<void> {
     /* no-op in stub */
   }
 
@@ -86,14 +88,14 @@ export class StubProvisioningProvider implements ProvisioningProvider {
     this.databases.delete(`${endpoint}/${dbName}`)
   }
 
-  async backupDb(endpoint: string, _dbName: string): Promise<Buffer> {
+  async backupDb(endpoint: string, _dbName: string, _db?: DbAuth): Promise<Buffer> {
     // Deterministic fake archive so callers get real bytes to round-trip through S3.
     const buf = Buffer.from(JSON.stringify({ stub: true, endpoint }), 'utf8')
     this.backups.set(endpoint, buf)
     return buf
   }
 
-  async restoreDb(endpoint: string, _dbName: string, archive: Buffer): Promise<void> {
+  async restoreDb(endpoint: string, _dbName: string, archive: Buffer, _db?: DbAuth): Promise<void> {
     this.restored.set(endpoint, archive)
   }
 

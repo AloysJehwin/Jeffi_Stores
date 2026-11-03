@@ -268,6 +268,12 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
       expect(startStore).toHaveBeenCalledWith({ id: TENANT_ID, store_request: null })
       expect(createRazorpaySubscription).not.toHaveBeenCalled()
       expect(json.checkoutUrl).toBeUndefined()
+      // Approved email without a checkout link ("we're building your store").
+      expect(sendKycApprovedEmail).toHaveBeenCalledWith(
+        { email: OWNER.email, name: OWNER.name },
+        { display_name: TENANT.display_name, slug: TENANT.slug },
+        null
+      )
     } finally {
       if (prev !== undefined) process.env.ECOM_PAYMENTS_ENABLED = prev
       vi.resetModules()
@@ -364,16 +370,6 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(res.status).toBe(200)
     const arg = vi.mocked(configureRouteSettlement).mock.calls[0][1]
     expect(arg.beneficiaryName).toBe(BANK.holder_name)
-  })
-
-  // --- Plan selection ---
-
-  it('falls back to the first plan when tenant.plan does not match any plan slug', async () => {
-    vi.mocked(getTenant).mockResolvedValue({ ...TENANT, plan: 'nonexistent' } as any)
-    const res = await POST(postReq(), params)
-    expect(res.status).toBe(200)
-    const opts = vi.mocked(createRazorpaySubscription).mock.calls[0][0] as any
-    expect(opts.planName).toBe('Basic')
   })
 
   // --- Subscription failure ---
@@ -483,19 +479,24 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(createRazorpaySubscription).toHaveBeenCalled()
   })
 
-  it('defaults plan slug and billing interval when tenant fields are null', async () => {
-    vi.mocked(getTenant).mockResolvedValue({
-      ...TENANT,
-      plan: null,
-      billing_interval: null,
-    } as any)
-    // no matching plan slug → first plan; interval null → 'monthly'
+  it('defaults the billing interval to monthly when the tenant has none', async () => {
+    vi.mocked(getTenant).mockResolvedValue({ ...TENANT, billing_interval: null } as any)
     const res = await POST(postReq(), params)
     expect(res.status).toBe(200)
     const opts = vi.mocked(createRazorpaySubscription).mock.calls[0][0] as any
     expect(opts.planSlug).toBe('basic')
     expect(opts.interval).toBe('monthly')
     expect(saveSubscriptionId).toHaveBeenCalledWith(TENANT_ID, 'sub_123', 'monthly', 'https://rzp.io/i/checkout')
+  })
+
+  it('refuses to subscribe a store whose plan is not an active store plan (no fallback to another plan)', async () => {
+    vi.mocked(getTenant).mockResolvedValue({ ...TENANT, plan: 'starter' } as any)
+    const res = await POST(postReq(), params)
+    const json = await res.json()
+    expect(res.status).toBe(409)
+    expect(json.kycApproved).toBe(true)
+    expect(json.error).toContain("'starter'")
+    expect(createRazorpaySubscription).not.toHaveBeenCalled()
   })
 
   it('uses the default ECOM base url for the callback when env var is unset', async () => {

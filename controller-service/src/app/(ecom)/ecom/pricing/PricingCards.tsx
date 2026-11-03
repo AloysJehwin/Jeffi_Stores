@@ -16,7 +16,7 @@ const PLAN_BLURB: Record<string, string> = {
   basic: 'Everything to launch — full storefront + core admin.',
   growth: 'Quotations, CRM, returns, coupons, inventory.',
   pro: 'Marketing, AI assistant, B2B portal, channel sync.',
-  enterprise: 'Dedicated infra, custom domain, priority support.',
+  enterprise: 'Large servers from the start, custom domains included, priority support.',
 }
 
 /**

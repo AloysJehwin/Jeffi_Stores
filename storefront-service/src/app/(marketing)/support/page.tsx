@@ -1,7 +1,8 @@
 import SupportChat from '@/components/visitor/SupportChat'
 import { cookies } from 'next/headers'
 import { verifyUserToken } from '@/lib/auth/jwt'
-import { getStoreIdentity } from '@/lib/catalog/site-controls'
+import { getStoreIdentity, getStorefrontContent } from '@/lib/catalog/site-controls'
+import { storeAddressLine } from '@/lib/catalog/brand'
 import type { Metadata } from 'next'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -23,9 +24,26 @@ async function getAuthUser() {
   }
 }
 
+// "Label: value" per line (or comma-separated); an entry without a colon spans both columns.
+function parseHours(text: string): Array<{ label: string; value: string }> {
+  return text
+    .split(/\r?\n|,\s*(?=[A-Za-z][^,:]*:)/)
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(l => {
+      const i = l.indexOf(':')
+      return i > 0 ? { label: l.slice(0, i).trim(), value: l.slice(i + 1).trim() } : { label: l, value: '' }
+    })
+}
+
 export default async function SupportPage() {
-  const storeIdentity = await getStoreIdentity()
-  const user = await getAuthUser()
+  const [storeIdentity, content, address, user] = await Promise.all([
+    getStoreIdentity(),
+    getStorefrontContent(),
+    storeAddressLine(),
+    getAuthUser(),
+  ])
+  const hours = parseHours(content.businessHours || '')
 
   return (
     <div className="bg-surface min-h-screen">
@@ -43,50 +61,56 @@ export default async function SupportPage() {
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
             <h2 className="font-bold text-foreground text-sm">Contact Us</h2>
 
-            <div>
-              <p className="text-xs text-foreground-muted mb-1">Phone</p>
-              <a
-                href={`tel:${storeIdentity.phone}`}
-                className="text-sm font-medium text-foreground hover:text-accent-500 block transition-colors"
-              >
-                {storeIdentity.phone}
-              </a>
-            </div>
+            {storeIdentity.phone && (
+              <div>
+                <p className="text-xs text-foreground-muted mb-1">Phone</p>
+                <a
+                  href={`tel:${storeIdentity.phone}`}
+                  className="text-sm font-medium text-foreground hover:text-accent-500 block transition-colors"
+                >
+                  {storeIdentity.phone}
+                </a>
+              </div>
+            )}
 
-            <div>
-              <p className="text-xs text-foreground-muted mb-1">Email</p>
-              <a
-                href={`mailto:${storeIdentity.email}`}
-                className="text-sm font-medium text-foreground hover:text-accent-500 transition-colors break-all"
-              >
-                {storeIdentity.email}
-              </a>
-            </div>
+            {storeIdentity.email && (
+              <div>
+                <p className="text-xs text-foreground-muted mb-1">Email</p>
+                <a
+                  href={`mailto:${storeIdentity.email}`}
+                  className="text-sm font-medium text-foreground hover:text-accent-500 transition-colors break-all"
+                >
+                  {storeIdentity.email}
+                </a>
+              </div>
+            )}
 
-            <div>
-              <p className="text-xs text-foreground-muted mb-1">Address</p>
-              <p className="text-sm font-medium text-foreground leading-snug">
-                Sanjay Gandhi Chowk, Station Road, Raipur, CG 490092
-              </p>
-            </div>
+            {address && (
+              <div>
+                <p className="text-xs text-foreground-muted mb-1">Address</p>
+                <p className="text-sm font-medium text-foreground leading-snug whitespace-pre-line">{address}</p>
+              </div>
+            )}
 
-            <div className="pt-1 border-t border-border-default">
-              <p className="text-xs text-foreground-muted mb-1.5">Business Hours</p>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-foreground-secondary">Mon – Fri</span>
-                  <span className="text-foreground font-medium">9 AM – 7 PM</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-foreground-secondary">Saturday</span>
-                  <span className="text-foreground font-medium">9 AM – 6 PM</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-foreground-secondary">Sunday</span>
-                  <span className="text-red-500 font-medium">Closed</span>
+            {hours.length > 0 && (
+              <div className="pt-1 border-t border-border-default">
+                <p className="text-xs text-foreground-muted mb-1.5">Business Hours</p>
+                <div className="space-y-1">
+                  {hours.map((h, i) => (
+                    <div key={i} className="flex justify-between gap-3 text-xs">
+                      <span className="text-foreground-secondary">{h.label}</span>
+                      {h.value && (
+                        <span
+                          className={/^closed$/i.test(h.value) ? 'text-red-500 font-medium' : 'text-foreground font-medium'}
+                        >
+                          {h.value}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Quick Links */}

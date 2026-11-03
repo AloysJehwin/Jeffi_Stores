@@ -1,8 +1,9 @@
 #!/bin/bash
-# Idempotent EBS Data Lifecycle Manager (DLM) policy that snapshots every tenant's db volume
-# (tag jeffi:role=db) once a day and keeps 7. Pairs with the logical pg_dump in
-# manifests/cronjobs.yaml: snapshots are fast point-in-time rollback; the S3 dumps are the
-# off-region archive.
+# Idempotent EBS Data Lifecycle Manager (DLM) policy that snapshots every store's database volume
+# (tag jeffi:role=db, set only on the data volume the provisioner creates) once a day and keeps 7.
+# Pairs with the node_db_backup cron (daily logical dump to S3 tenant-backups/by-slug/{slug}/daily/):
+# snapshots are the fast rollback, the S3 dumps the copy off the volume.
+# Run once, by hand (not by a release).
 # Usage: bash deploy/k8s/bootstrap/tenant-db-snapshots.sh [--dry-run]
 set -euo pipefail
 DRY=${1:-}

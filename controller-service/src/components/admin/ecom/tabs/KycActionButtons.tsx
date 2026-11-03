@@ -31,7 +31,7 @@ export default function KycActionButtons({
       setBusy(false)
       return
     }
-    setSuccess('Approved — payment link sent to owner.')
+    setSuccess(approvedMessage(data))
     router.refresh()
     setBusy(false)
   }
@@ -69,7 +69,7 @@ export default function KycActionButtons({
       setBusy(false)
       return
     }
-    setSuccess('Payment link generated — owner can now pay.')
+    setSuccess(data.provisioningStarted ? approvedMessage(data) : 'Payment link generated — owner can now pay.')
     router.refresh()
     setBusy(false)
   }
@@ -137,4 +137,9 @@ export default function KycActionButtons({
       )}
     </div>
   )
+}
+
+// Payments off: approval starts the build directly (no checkout link exists).
+function approvedMessage(data: { provisioningStarted?: boolean; paymentBypassed?: boolean }): string {
+  return data.provisioningStarted || data.paymentBypassed ? 'Approved — store setup started.' : 'Approved — payment link sent to owner.'
 }

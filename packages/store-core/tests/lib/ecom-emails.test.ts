@@ -81,6 +81,15 @@ describe('ecom-emails', () => {
       await sendKycApprovedEmail(OWNER_NO_NAME, { display_name: 'Acme', slug: 'acme' }, 'https://x')
       expect(lastMail().html).toContain('Hi there')
     })
+
+    it('with payments off (no checkout link) says the store is being built and asks for no payment', async () => {
+      const { sendKycApprovedEmail } = await import('@/lib/shared/ecom-emails')
+      await sendKycApprovedEmail(OWNER, { display_name: 'Acme Ltd', slug: 'acme' }, null)
+      const mail = lastMail()
+      expect(mail.subject).toMatch(/building your store/i)
+      expect(mail.html).toContain('acme.jeffistores.in')
+      expect(mail.html).not.toContain('Complete payment')
+    })
   })
 
   describe('sendKycRejectedEmail', () => {

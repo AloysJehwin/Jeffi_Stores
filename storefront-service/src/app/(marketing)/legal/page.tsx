@@ -1,7 +1,9 @@
 import Link from 'next/link'
-import { policies } from '@/lib/legals/policies'
+import { getStorePolicies, getStoreLegalContext, policyPdfName } from '@/lib/legals/store-policies'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import type { Metadata } from 'next'
+
+export const dynamic = 'force-dynamic'
 
 export async function generateMetadata(): Promise<Metadata> {
   const identity = await getStoreIdentity()
@@ -68,7 +70,8 @@ const icons: Record<string, React.ReactNode> = {
   ),
 }
 
-export default function LegalIndexPage() {
+export default async function LegalIndexPage() {
+  const [policies, { slug: storeSlug }] = await Promise.all([getStorePolicies(), getStoreLegalContext()])
   const listed = policies.filter(p => !p.unlisted)
   return (
     <div className="bg-surface min-h-screen">
@@ -121,7 +124,7 @@ export default function LegalIndexPage() {
                 </Link>
                 <a
                   href={`/api/legal/${policy.slug}/pdf`}
-                  download={`jeffistores-${policy.slug}.pdf`}
+                  download={policyPdfName(storeSlug, policy.slug)}
                   title="Download PDF"
                   aria-label={`Download ${policy.title} as PDF`}
                   className="shrink-0 self-stretch flex items-center justify-center px-3 border-l border-border-default text-foreground-muted hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-colors rounded-r-xl"

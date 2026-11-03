@@ -11,14 +11,6 @@ import { repoPath } from '@/lib/shared/paths'
 // event. pg has already evicted the bad client by the time it fires, so the pool
 // self-heals and the handler deliberately does nothing.
 export function createPgPool(config: PoolConfig): Pool {
-  // Password-auth path (tenant Postgres on the store's own node with a self-signed TLS cert):
-  // when a password is supplied by env or the caller's config, run TLS unverified. IAM auth
-  // sets `password` to a function and its own ssl, so that path is untouched.
-  const envPw = process.env.JEFFI_DB_PASSWORD
-  if (envPw && !config.password) config = { ...config, password: envPw }
-  if (typeof config.password === 'string' && config.password && config.ssl === undefined) {
-    config = { ...config, ssl: { rejectUnauthorized: false } }
-  }
   const pool = new Pool(config)
   pool.on('error', () => {
     /* idle-client error — pool already evicted it; no action needed */

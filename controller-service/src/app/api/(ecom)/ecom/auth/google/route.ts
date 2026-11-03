@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       message: 'Signed in',
       owner: { id: owner.id, email: owner.email, name: owner.name },
     })
-    return setOwnerCookie(res, sid)
+    return setOwnerCookie(res, sid, request.headers.get('x-forwarded-host') ?? request.headers.get('host'))
   } catch {
     return NextResponse.json({ error: 'Google sign-in failed' }, { status: 500 })
   }

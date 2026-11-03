@@ -1,16 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChoiceCards, Segmented, fieldCls } from '../_ui'
-import { BASIC_PRESET, DEDICATED_PRESETS, PRESETS, TRAFFIC_BANDS, presetOf, presetSpec, recommendedPresetKey, withHighAvailability } from '@/lib/compute/presets'
+import { DEDICATED_PRESETS, PRESETS, PRESET_DB_CLASS, TRAFFIC_BANDS, presetOf, presetSpec, recommendedPresetKey, specKey, withDedicatedDb, withHighAvailability } from '@/lib/compute/presets'
 import { monthlyTotal, quoteSpec, type Quote } from '@controller/lib/compute/pricing'
-import { LIMITS, planCompatibilityError, smallestFittingNode, validateSpec, type Validation } from '@/lib/compute/validate'
+import { LIMITS, PRESET_RANK, nodeTier, planCompatibilityError, smallestFittingNode, validateSpec, type Validation } from '@/lib/compute/validate'
 import { activeServices, cloneSpec, type Catalog, type ComputeSpec, type PodSize, type PresetKey, type ServiceName } from '@/lib/compute/spec'
 
 export interface ComputePlan {
   slug: string
   name: string
   monthlyPriceInr: number
+  /** False for a retired plan (Starter): offered only to a store already on it. */
+  active?: boolean
   defaultPreset: PresetKey | null
   minPlacement: 'pool' | 'dedicated'
   advanced: boolean
@@ -28,6 +30,8 @@ export interface ComputeChoice {
   visitorsPerMonth: number
 }
 
+type DbMode = 'node' | 'dedicated'
+
 const SERVICE_LABEL: Record<ServiceName, string> = {
   storefront: 'Storefront',
   admin: 'Admin panel',
@@ -36,10 +40,25 @@ const SERVICE_LABEL: Record<ServiceName, string> = {
   documents: 'Invoices & documents',
 }
 const SIZE_LABEL: Record<PodSize, string> = { S: 'Small', M: 'Medium', L: 'Large' }
+const SIZE_COLUMNS: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-1 sm:grid-cols-2', 3: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3', 4: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4' }
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
 const fmtVisitors = (n: number) => n >= 1_000_000 ? `${n / 1_000_000}M` : n >= 1_000 ? `${n / 1_000}k` : `${n}`
 const selectCls = `w-full rounded-xl border bg-surface px-3 py-2 text-sm text-foreground ${fieldCls}`
+
+const dbModeOf = (s: ComputeSpec): DbMode => (s.db.mode === 'dedicated' ? 'dedicated' : 'node')
+/** High availability: a second server, plus a standby database when it is on RDS. */
+const haOf = (s: ComputeSpec) => s.node.count > 1 && (s.db.mode !== 'dedicated' || s.db.multiAz)
+
+/** A size card's spec with the chosen database and high availability. A disk never shrinks, so a running store keeps a bigger one. */
+function shapeOf(k: PresetKey, mode: DbMode, ha: boolean, current?: ComputeSpec | null): ComputeSpec {
+  const sized = k !== 'basic' && k !== 'shared'
+  let s = presetSpec(k)
+  if (sized && mode === 'dedicated') s = withDedicatedDb(s, k)
+  if (sized && ha) s = withHighAvailability(s)
+  if (current && current.db.mode === s.db.mode && current.db.storageGb > s.db.storageGb) s.db.storageGb = current.db.storageGb
+  return s
+}
 
 /**
  * Picks a plan and server size for a store. Owners pick a plan card (price shown "from" the plan's floor),
@@ -58,7 +77,7 @@ export function ComputeConfigurator({
   onChange: (choice: ComputeChoice) => void
   /** The running spec, when resizing an existing store (storage can only grow). */
   current?: ComputeSpec | null
-  /** Shown in the total; defaults to the plan's monthly fee (0 for new sign-ups). */
+  /** The plan fee in the totals; defaults to the chosen plan's monthly fee (onboarding passes its yearly-billing equivalent). */
   planFeeInr?: number
   /** Caller controls planSlug (onboard switches the plan here instead of a separate step). */
   onPlanChange?: (slug: string) => void
@@ -69,6 +88,8 @@ export function ComputeConfigurator({
   const [custom, setCustom] = useState(false)
   const [capacityError, setCapacityError] = useState<string | null>(null)
   const [visitorIdx, setVisitorIdx] = useState(2) // 5k default
+  // The plan the spec was last set for: a different one starts again from its default size.
+  const shapedFor = useRef<string | null>(null)
 
   useEffect(() => {
     fetch('/api/ecom/compute/catalog')
@@ -81,8 +102,8 @@ export function ComputeConfigurator({
   }, [])
 
   const plan = plans.find(p => p.slug === planSlug) ?? null
+  const choosable = plans.filter(p => p.active !== false || p.slug === planSlug)
   const isBasic = plan?.minPreset === 'basic'
-  const fallback = plan?.defaultPreset ?? (plan?.minPreset === 'basic' ? 'basic' : plan?.minPlacement === 'pool' ? 'shared' : (plan?.minPreset ?? 'small'))
 
   const visitorsPerMonth = TRAFFIC_BANDS[visitorIdx] ?? 5_000
 
@@ -105,13 +126,32 @@ export function ComputeConfigurator({
     }
   }
 
-  // A spec the plan doesn't allow (a new plan picked) starts again from that plan's default size.
+  // The size card a server type belongs to (by its memory), for the selected card and the database class.
+  const sizeOfNode = (type: string | null): PresetKey | null => {
+    const t = nodeTier(type, catalog)
+    return t > 0 ? DEDICATED_PRESETS[Math.min(t, DEDICATED_PRESETS.length) - 1] : null
+  }
+  const defaultFor = (p: ComputePlan, mode: DbMode): ComputeSpec => {
+    if (p.minPreset === 'basic') return shapeOf('basic', 'node', false, current)
+    if (p.minPlacement === 'pool') return presetSpec('shared')
+    return shapeOf((p.defaultPreset ?? p.minPreset ?? 'small') as PresetKey, mode, false, current)
+  }
+  const isSizeCard = (s: ComputeSpec) => {
+    const k = sizeOfNode(s.node.type)
+    return !!k && specKey(shapeOf(k, dbModeOf(s), haOf(s), current)) === specKey(s)
+  }
+
+  // A saved choice the plan allows is kept when the configurator opens; Basic is always its fixed size, and
+  // a newly picked plan starts from its default size (keeping the database choice).
   useEffect(() => {
     if (!catalog || !plan) return
-    const spec = value && !planCompatibilityError(value, plan) ? value : presetSpec(fallback as PresetKey)
+    const planChanged = shapedFor.current !== null && shapedFor.current !== planSlug
+    shapedFor.current = planSlug
+    const keep = !planChanged && !!value && plan.minPreset !== 'basic' && !planCompatibilityError(value, plan, catalog)
+    const spec = keep && value ? value : defaultFor(plan, value && !isBasic ? dbModeOf(value) : 'node')
     const c = evaluate(spec, planSlug)
     if (c) onChange(c)
-    if (presetOf(spec) === 'custom') setCustom(true)
+    setCustom(keep && plan.minPlacement !== 'pool' && !isSizeCard(spec))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, planSlug])
 
@@ -124,8 +164,11 @@ export function ComputeConfigurator({
     if (!spec || !validation?.ok) return setCapacityError(null)
     const t = setTimeout(() => {
       fetch('/api/ecom/compute/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ planSlug, spec }) })
-        .then(r => (r.ok ? r.json() : null))
-        .then(d => setCapacityError(d?.capacityError ?? null))
+        .then(async r => {
+          const d = await r.json().catch(() => null)
+          if (!r.ok) return setCapacityError(d?.error || 'Could not check this size with the server. Try again.')
+          setCapacityError(d?.capacityError ?? (d?.validation?.ok === false ? (d.validation.errors?.[0] ?? null) : null))
+        })
         .catch(() => setCapacityError(null))
     }, 600)
     return () => clearTimeout(t)
@@ -143,8 +186,19 @@ export function ComputeConfigurator({
     fn(next)
     set(next)
   }
-  const preset = presetOf(spec)
-  const ha = spec.node.count > 1 && spec.db.multiAz
+  const fee = planFeeInr ?? plan.monthlyPriceInr
+  const ha = haOf(spec)
+  const dbMode = dbModeOf(spec)
+  const fallbackKey = (plan.defaultPreset ?? plan.minPreset ?? 'small') as PresetKey
+  const sizeKey = sizeOfNode(spec.node.type) ?? fallbackKey
+  // The full monthly price (plan fee, infra, GST on infra) of a spec on this plan; null when a part has no price.
+  const totalOf = (s: ComputeSpec) => {
+    try {
+      return monthlyTotal(quoteSpec(s, catalog, { infraMargin: plan.infraMargin }), fee, catalog.settings.gstRate).total
+    } catch {
+      return null
+    }
+  }
   const priceFor = (key: PresetKey, p: ComputePlan) => quoteSpec(presetSpec(key), catalog, { infraMargin: p.infraMargin }).inrMonth
   const planFloorPrice = (p: ComputePlan) => {
     const k = (p.minPreset ?? p.defaultPreset ?? (p.minPlacement === 'pool' ? 'shared' : 'small')) as PresetKey
@@ -156,18 +210,40 @@ export function ComputeConfigurator({
   const fit = validation?.fit
   const bigger = validation && !validation.ok && fit && spec.node.placement === 'dedicated' ? smallestFittingNode(spec, catalog, planSlug) : null
   const recKey = plan.minPreset !== 'basic' ? recommendedPresetKey(planSlug, visitorsPerMonth, plan) : null
+  // Sizes below the plan's minimum are not offered.
+  const rankOf = (k: PresetKey) => (k === 'shared' ? -1 : PRESET_RANK[k])
+  const floorRank = Math.max(1, plan.minPreset ? rankOf(plan.minPreset) : 1)
+  const sizes = DEDICATED_PRESETS.filter(k => rankOf(k) >= floorRank)
+  const basicTotal = isBasic ? totalOf(shapeOf('basic', 'node', false, current)) : null
+  const setDbMode = (mode: DbMode) => {
+    if (!custom) return set(shapeOf(sizeKey, mode, ha, current))
+    edit(s => {
+      const storageGb = Math.max(LIMITS.minStorageGb, s.db.storageGb)
+      s.db =
+        mode === 'dedicated'
+          ? { mode: 'dedicated', class: PRESET_DB_CLASS[sizeOfNode(s.node.type) ?? 'small'] ?? 'db.t4g.micro', storageGb, multiAz: ha }
+          : { mode: 'node', class: null, storageGb, multiAz: false }
+    })
+  }
+  const setHa = (on: boolean) => {
+    if (!custom) return set(shapeOf(sizeKey, dbMode, on, current))
+    edit(s => {
+      s.node.count = on ? Math.max(2, s.node.count) : 1
+      s.db.multiAz = on && s.db.mode === 'dedicated'
+    })
+  }
 
   return (
     <div className="space-y-5">
       {/* ── Plan cards ── */}
-      {plans.length > 0 && (
+      {choosable.length > 0 && (
         <ChoiceCards<string>
           ariaLabel="Plan"
           columns="grid-cols-2 xl:grid-cols-4"
           cardClassName="bg-surface-elevated p-4"
           value={planSlug}
           onChange={s => onPlanChange?.(s)}
-          options={plans.map(p => ({
+          options={choosable.map(p => ({
             value: p.slug,
             label: p.name,
             content: (
@@ -186,7 +262,7 @@ export function ComputeConfigurator({
         <div className="rounded-2xl border border-border-default bg-surface-elevated p-4">
           <div className="font-semibold text-foreground">{PRESETS.basic.label}</div>
           <p className="mt-1 text-sm text-foreground-secondary">{PRESETS.basic.blurb}</p>
-          <p className="mt-2 text-sm text-foreground">{inr(priceFor('basic', plan))}/mo + GST for servers</p>
+          {basicTotal != null && <p className="mt-2 text-sm text-foreground">{inr(basicTotal)}/mo incl. GST</p>}
         </div>
       ) : plan.minPlacement === 'pool' ? (
         <div className="rounded-2xl border border-border-default bg-surface-elevated p-4">
@@ -218,71 +294,73 @@ export function ComputeConfigurator({
             <p className="mt-2 text-xs text-foreground-muted">Recommended server size follows your traffic — change it any time.</p>
           </div>
 
-          {/* ── Size cards ── */}
+          {/* ── Size cards: each with its monthly total, database on the server or on its own ── */}
           <ChoiceCards<PresetKey>
             ariaLabel="Server size"
-            columns="grid-cols-2 xl:grid-cols-4"
+            columns={SIZE_COLUMNS[sizes.length] ?? SIZE_COLUMNS[4]}
             cardClassName="bg-surface-elevated p-4"
-            value={custom ? null : preset === 'custom' ? null : preset}
+            value={custom || !sizes.includes(sizeKey) ? null : sizeKey}
             onChange={k => {
               setCustom(false)
-              set(ha ? withHighAvailability(presetSpec(k)) : presetSpec(k))
+              set(shapeOf(k, dbMode, ha, current))
             }}
-            options={DEDICATED_PRESETS.map(k => ({
-              value: k,
-              label: PRESETS[k].label,
-              content: (
-                <>
-                  <div className="flex items-center justify-between pr-6">
-                    <div className="font-semibold text-foreground">{PRESETS[k].label}</div>
-                    {recKey === k && <span className="ml-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold org-sage org-sage-text">Recommended</span>}
-                  </div>
-                  <div className="mt-1 text-lg font-bold text-foreground">{inr(priceFor(k, plan))}<span className="text-xs font-normal text-foreground-muted">/mo</span></div>
-                  <div className="mt-1 text-xs text-foreground-secondary">{PRESETS[k].blurb}</div>
-                </>
-              ),
-            }))}
+            options={sizes.map(k => {
+              const onServer = totalOf(shapeOf(k, 'node', ha, current))
+              const withDb = totalOf(shapeOf(k, 'dedicated', ha, current))
+              return {
+                value: k,
+                label: PRESETS[k].label,
+                content: (
+                  <>
+                    <div className="flex items-center justify-between pr-6">
+                      <div className="font-semibold text-foreground">{PRESETS[k].label}</div>
+                      {recKey === k && <span className="ml-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold org-sage org-sage-text">Recommended</span>}
+                    </div>
+                    <div className="mt-2 space-y-0.5 text-sm">
+                      {onServer != null && (
+                        <div className={`flex justify-between gap-2 ${dbMode === 'node' ? 'font-bold text-foreground' : 'text-foreground-secondary'}`}>
+                          <span>On your server</span><span>{inr(onServer)}<span className="text-xs font-normal text-foreground-muted">/mo</span></span>
+                        </div>
+                      )}
+                      {withDb != null && (
+                        <div className={`flex justify-between gap-2 ${dbMode === 'dedicated' ? 'font-bold text-foreground' : 'text-foreground-secondary'}`}>
+                          <span>With dedicated DB</span><span>{inr(withDb)}<span className="text-xs font-normal text-foreground-muted">/mo</span></span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-1 text-[10px] text-foreground-muted">Incl. GST and the {plan.name} plan fee</div>
+                    <div className="mt-1 text-xs text-foreground-secondary">{PRESETS[k].blurb}</div>
+                  </>
+                ),
+              }
+            })}
           />
           <label className="flex items-start gap-3 text-sm text-foreground">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={ha}
-              onChange={e => {
-                const base = preset !== 'custom' ? presetSpec(preset) : spec
-                if (e.target.checked) set(withHighAvailability(base))
-                else edit(s => {
-                  s.node.count = 1
-                  s.db.multiAz = false
-                })
-              }}
-            />
+            <input type="checkbox" className="mt-0.5" checked={ha} onChange={e => setHa(e.target.checked)} />
             <span>
               High availability
-              <span className="block text-xs text-foreground-muted">A second server and a standby database in another zone, so one failing never stops the store.</span>
+              <span className="block text-xs text-foreground-muted">
+                {dbMode === 'dedicated'
+                  ? 'A second server and a standby database in another zone, so one failing never stops the store.'
+                  : 'A second server running copies of your store. The database stays on one server; choose a dedicated database for a standby.'}
+              </span>
             </span>
           </label>
-          {/* ── Database: node (included) vs dedicated RDS ── */}
+          {/* ── Database: on the store's server (default) vs its own RDS ── */}
           <div>
             <div className="mb-1 text-sm font-medium text-foreground">Database</div>
-            <Segmented<'node' | 'dedicated'>
+            <Segmented<DbMode>
               ariaLabel="Database"
               size="sm"
-              value={spec.db.mode === 'dedicated' ? 'dedicated' : 'node'}
-              onChange={mode => edit(s => {
-                if (mode === 'dedicated') {
-                  s.db = { mode: 'dedicated', class: s.db.class ?? 'db.t4g.micro', storageGb: s.db.storageGb, multiAz: s.db.multiAz }
-                } else {
-                  s.db = { mode: 'node', class: null, storageGb: s.db.storageGb, multiAz: false }
-                }
-              })}
+              value={dbMode}
+              onChange={setDbMode}
               options={[
-                { value: 'node', label: 'On your server (included)' },
+                { value: 'node', label: 'On your server' },
                 { value: 'dedicated', label: 'Dedicated database (RDS)' },
               ]}
             />
             <p className="mt-1 text-xs text-foreground-muted">
-              {spec.db.mode === 'dedicated'
+              {dbMode === 'dedicated'
                 ? 'A managed PostgreSQL server, separate from your app server.'
                 : 'PostgreSQL runs on your own server — nightly backups to S3.'}
             </p>
@@ -292,7 +370,10 @@ export function ComputeConfigurator({
               ariaLabel="Settings"
               size="sm"
               value={custom ? 'custom' : 'preset'}
-              onChange={v => setCustom(v === 'custom')}
+              onChange={v => {
+                if (v === 'preset') set(shapeOf(sizes.includes(sizeKey) ? sizeKey : (sizes[0] ?? fallbackKey), dbMode, ha, current))
+                setCustom(v === 'custom')
+              }}
               options={[{ value: 'preset', label: 'Sizes' }, { value: 'custom', label: 'Customise' }]}
             />
           )}
@@ -439,7 +520,7 @@ export function ComputeConfigurator({
             <span>{inr(choice.total.total)}</span>
           </div>
           <p className="mt-2 text-xs text-foreground-muted">
-            One subscription covers your plan and servers. {BASIC_PRESET.includes('basic') && isBasic ? 'Basic is a fixed size.' : 'Change size any time from Plan & servers.'}
+            One subscription covers your plan and servers. {isBasic ? 'Basic is a fixed size.' : 'Change size any time from Plan & servers.'}
           </p>
         </div>
       )}

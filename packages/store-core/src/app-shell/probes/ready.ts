@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { query } from '@/lib/shared/db'
+import { pingStoreDb, query } from '@/lib/shared/db'
 import lazyRedis from '@/lib/shared/redis'
 
 /**
@@ -27,6 +27,17 @@ export async function GET() {
   } catch (e: any) {
     ok = false
     checks.db = `fail: ${e?.message || 'error'}`
+  }
+
+  // A pod pinned to one store serves from that store's own database: it must answer too.
+  const slug = process.env.SERVICE_TENANT_SLUG || process.env.TENANT_DB_SLUG
+  if (slug) {
+    try {
+      checks.storeDb = await withTimeout(pingStoreDb(slug), 3000, 'store db')
+    } catch (e: any) {
+      ok = false
+      checks.storeDb = `fail: ${e?.message || 'error'}`
+    }
   }
 
   // Redis: PING (best-effort — an in-memory fallback still counts as reachable)

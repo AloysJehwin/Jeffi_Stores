@@ -120,13 +120,14 @@ export async function POST(request: NextRequest) {
       fpHash: signals.fpHash,
     })
 
+    const cookieDomain = cookieDomainOption(request.headers.get('x-forwarded-host') ?? request.headers.get('host'))
     cookieStore.set('user_sid', sid, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: USER_SESSION_TTL_S,
       path: '/',
-      ...cookieDomainOption(),
+      ...cookieDomain,
     })
 
     cookieStore.set('session_id', user.id, {
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
       sameSite: 'lax',
       maxAge: USER_SESSION_TTL_S,
       path: '/',
-      ...cookieDomainOption(),
+      ...cookieDomain,
     })
 
     return NextResponse.json({

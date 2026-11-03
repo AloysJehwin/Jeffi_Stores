@@ -1,4 +1,4 @@
-import { DB_POOL_CAP, DB_POOL_MIN, DB_RESERVED_CONNECTIONS, POD_RESOURCES, REDIS_RESOURCES, dbMaxConnections, presetOf, presetSpec } from './presets'
+import { DB_POOL_CAP, DB_POOL_MIN, DB_RESERVED_CONNECTIONS, POD_RESOURCES, PRESETS, REDIS_RESOURCES, dbMaxConnections, nodeDbMaxConnections, presetOf, presetSpec } from './presets'
 import { POD_SIZES, SERVICE_NAMES, activeServices, ec2Code, priceOf, rdsCode, type Catalog, type ComputeSpec, type PlanCompute, type PresetKey, type ServiceName, type ServiceSpec } from './spec'
 
 // Numeric floor rank — Basic is 0, each dedicated tier is one step up. Shared is intentionally
@@ -11,16 +11,27 @@ export const PRESET_RANK: Record<Exclude<PresetKey, 'shared'>, number> = {
   xlarge: 4,
 }
 
-const NODE_RANK: Record<string, number> = { 't4g.small': 1, 't4g.medium': 2, 't4g.large': 3, 't4g.xlarge': 4 }
-const DB_RANK: Record<string, number> = { 'db.t4g.micro': 1, 'db.t4g.small': 2, 'db.t4g.medium': 3, 'db.t4g.large': 4 }
+// Servers and databases rank by memory: small..xlarge need at least these MiB.
+const NODE_TIER_MIB = [2048, 4096, 8192, 16384]
+const DB_TIER_MIB = [1024, 2048, 4096, 8192]
+// Memory of the sellable types, for callers without a catalog.
+const KNOWN_MIB: Record<string, number> = {
+  't4g.small': 2048, 't4g.medium': 4096, 't4g.large': 8192, 't4g.xlarge': 16384, 'm7g.large': 8192, 'c7g.large': 4096,
+  'db.t4g.micro': 1024, 'db.t4g.small': 2048, 'db.t4g.medium': 4096, 'db.t4g.large': 8192,
+}
+const memOf = (catalog: Catalog | null | undefined, code: string, name: string) => (catalog ? priceOf(catalog, code)?.memoryMib : null) ?? KNOWN_MIB[name] ?? 0
+const tierOf = (mib: number, tiers: number[]) => tiers.filter(t => mib >= t).length
+
+/** 1 (small) to 4 (xlarge) for a server type; 0 when it is smaller than small or unknown. */
+export const nodeTier = (type: string | null, catalog?: Catalog | null) => tierOf(memOf(catalog, ec2Code(type ?? ''), type ?? ''), NODE_TIER_MIB)
 
 /** The preset-rank the spec is at least as big as. A node-DB spec ranks by its server tier (the DB
  * rides on the node, so the node size sets the floor); a dedicated-RDS spec takes the smaller of its
  * node and db tiers (both must clear a floor to count). */
-export function rankOfSpec(spec: ComputeSpec): number {
-  const nodeRank = NODE_RANK[spec.node.type ?? ''] ?? 0
+export function rankOfSpec(spec: ComputeSpec, catalog?: Catalog | null): number {
+  const nodeRank = nodeTier(spec.node.type, catalog)
   if (spec.db.mode === 'node') return nodeRank
-  const dbRank = DB_RANK[spec.db.class ?? ''] ?? 0
+  const dbRank = tierOf(memOf(catalog, rdsCode(spec.db.class ?? ''), spec.db.class ?? ''), DB_TIER_MIB)
   return Math.min(nodeRank, dbRank)
 }
 
@@ -87,7 +98,9 @@ export function dbBudget(spec: ComputeSpec, catalog: Catalog, plan?: string | nu
   const maxConnections =
     spec.db.mode === 'shared'
       ? Math.floor((s.sharedDbMaxConnections - DB_RESERVED_CONNECTIONS) / s.sharedDbCapacity)
-      : dbMaxConnections(spec.db.class ?? '', priceOf(catalog, rdsCode(spec.db.class ?? ''))?.memoryMib ?? null) - DB_RESERVED_CONNECTIONS
+      : spec.db.mode === 'node'
+        ? nodeDbMaxConnections(priceOf(catalog, ec2Code(spec.node.type ?? ''))?.memoryMib ?? KNOWN_MIB[spec.node.type ?? ''] ?? null) - DB_RESERVED_CONNECTIONS
+        : dbMaxConnections(spec.db.class ?? '', priceOf(catalog, rdsCode(spec.db.class ?? ''))?.memoryMib ?? null) - DB_RESERVED_CONNECTIONS
   const pods = peakPods(spec, plan)
   return { pods, maxConnections, poolPerPod: Math.min(DB_POOL_CAP, Math.floor(maxConnections / pods)) }
 }
@@ -107,7 +120,7 @@ export function fitOf(spec: ComputeSpec, catalog: Catalog, plan?: string | null)
 const int = (n: unknown) => typeof n === 'number' && Number.isInteger(n)
 
 /** Why a spec can't be chosen on this plan at all (wrong kind of server, or custom on a presets-only plan). */
-export function planCompatibilityError(spec: ComputeSpec, plan: PlanCompute): string | null {
+export function planCompatibilityError(spec: ComputeSpec, plan: PlanCompute, catalog?: Catalog | null): string | null {
   const preset = presetOf(spec)
   if (plan.minPlacement === 'pool') return preset === 'shared' ? null : 'This plan runs on shared servers. Choose a higher plan for your own server.'
   // db.mode 'node' is the Basic shape (Postgres on the EC2 node); 'dedicated' is RDS. Both count as the
@@ -118,16 +131,21 @@ export function planCompatibilityError(spec: ComputeSpec, plan: PlanCompute): st
   if (!plan.advanced && preset === 'custom') return 'Choose one of the sizes; custom settings need a higher plan.'
   if (plan.minPreset) {
     if (plan.minPreset === 'basic') {
-      // Basic is fixed — a dedicated single Basic node with Postgres on the node. Check the shape
-      // structurally, not whole-spec equality: a reconstructed spec drifts on inactive-service shape /
-      // storageGb / s3 fields that don't change what Basic actually runs.
+      // Basic is fixed — a dedicated single Basic node with Postgres on the node, one copy of each of its
+      // services. Checked structurally, not whole-spec equality: storageGb (a disk never shrinks), s3 and
+      // inactive services may drift without changing what Basic runs.
       const b = presetSpec('basic')
-      if (!(spec.node.placement === 'dedicated' && spec.node.type === b.node.type && spec.node.count === 1 && spec.db.mode === 'node')) {
+      const sameServices = activeServices(plan.slug).every(k => {
+        const x = spec.services[k]
+        const y = b.services[k]
+        return x?.replicas === y.replicas && x?.maxReplicas === y.maxReplicas && x?.size === y.size
+      })
+      if (!(spec.node.placement === 'dedicated' && spec.node.type === b.node.type && spec.node.count === 1 && spec.db.mode === 'node' && sameServices)) {
         return 'Basic requires the fixed Basic configuration.'
       }
     } else {
       const floor = PRESET_RANK[plan.minPreset as Exclude<PresetKey, 'shared'>] ?? 0
-      if (rankOfSpec(spec) < floor) return `This server is below your plan's minimum (${plan.minPreset}).`
+      if (rankOfSpec(spec, catalog) < floor) return `This server is below your plan's minimum (${plan.minPreset}).`
     }
   }
   return null
@@ -147,7 +165,7 @@ export function validateSpec(
   if (!spec?.node || !spec?.db || !spec?.services || SERVICE_NAMES.some(k => !spec.services[k])) {
     return { ok: false, errors: ['Incomplete compute choice.'], fit: null }
   }
-  const planError = opts.anyPlan ? null : planCompatibilityError(spec, plan)
+  const planError = opts.anyPlan ? null : planCompatibilityError(spec, plan, catalog)
   if (planError) errors.push(planError)
 
   if (spec.node.placement === 'dedicated') {
@@ -165,9 +183,18 @@ export function validateSpec(
     if (cur?.db.mode === 'dedicated' && spec.db.storageGb < cur.db.storageGb) {
       errors.push(`Database storage can only grow (it is ${cur.db.storageGb} GB now).`)
     }
-  } else if (spec.db.multiAz) {
-    errors.push('A standby database needs your own database.')
+  } else if (spec.db.mode === 'node') {
+    // The disk under the server's Postgres: Basic's 10 GB, every other size at least 20 GB.
+    const min = plan.minPreset === 'basic' ? PRESETS.basic.spec.db.storageGb : LIMITS.minStorageGb
+    if (!int(spec.db.storageGb) || spec.db.storageGb < min || spec.db.storageGb > LIMITS.maxStorageGb) {
+      errors.push(`Database disk must be ${min}–${LIMITS.maxStorageGb} GB.`)
+    }
+    const cur = opts.current
+    if (cur?.db.mode === 'node' && spec.db.storageGb < cur.db.storageGb) {
+      errors.push(`Database disk can only grow (it is ${cur.db.storageGb} GB now).`)
+    }
   }
+  if (spec.db.mode !== 'dedicated' && spec.db.multiAz) errors.push('A standby database needs your own database.')
 
   for (const k of namesFor(plan.slug)) {
     const s = spec.services[k]
@@ -188,7 +215,11 @@ export function validateSpec(
     }
   }
   if (fit.db.poolPerPod < DB_POOL_MIN) {
-    errors.push(`The database allows ${fit.db.maxConnections} connections, too few for ${fit.db.pods} service copies. Choose a bigger database or fewer copies.`)
+    errors.push(
+      spec.db.mode === 'node'
+        ? `The database on your server allows ${fit.db.maxConnections} connections, too few for ${fit.db.pods} service copies. Choose fewer copies or a dedicated database.`
+        : `The database allows ${fit.db.maxConnections} connections, too few for ${fit.db.pods} service copies. Choose a bigger database or fewer copies.`
+    )
   }
   return { ok: errors.length === 0, errors, fit }
 }

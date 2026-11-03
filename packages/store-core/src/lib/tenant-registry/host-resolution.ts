@@ -65,13 +65,14 @@ export function appFromHost(hostname: string): HostApp | null {
   // Local dev: `*.localhost` is an alternate root (see slugFromHost).
   const root = host === 'localhost' || host.endsWith('.localhost') ? 'localhost' : ROOT_DOMAIN
   const underRoot = host.endsWith('.' + root)
-  const label = underRoot ? host.slice(0, host.length - root.length - 1) : host
+  // A customer's own domain (shop.brand.com, even admin.brand.com) is always their storefront.
+  if (!underRoot) return null
+  const label = host.slice(0, host.length - root.length - 1)
   const parts = label.split('.')
-  if (underRoot && parts.length === 2 && parts[1] === 'business') return 'business'
+  if (parts.length === 2 && parts[1] === 'business') return 'business'
   const first = parts[0]
   for (const p of APP_PREFIXES) {
-    if (first === p) return p
-    if (underRoot && first.startsWith(p + '-')) return p
+    if (first === p || first.startsWith(p + '-')) return p
   }
   return null
 }
@@ -80,16 +81,10 @@ export { formsHostForSlug, formsHostForHost } from '@/lib/tenancy/forms-host'
 
 async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Promise<TenantContext | null> {
   const pool = controlPlanePool()
-  // For custom_domain, resolve via the tenant_custom_domains table (verified only),
-  // falling back to the legacy tenants.custom_domain column for backward compat.
+  // A custom domain resolves only once verified (DNS proven, certificate issued).
   const whereClause =
     where === 'custom_domain'
-      ? `t.id = (
-         SELECT tenant_id FROM tenant_custom_domains WHERE domain = $1 AND status = 'verified'
-         UNION ALL
-         SELECT id FROM tenants WHERE custom_domain = $1
-         LIMIT 1
-       )`
+      ? `t.id = (SELECT tenant_id FROM tenant_custom_domains WHERE domain = $1 AND status = 'verified')`
       : `t.${where} = $1`
   const res = await pool.query(
     `SELECT t.id, t.slug, t.display_name, t.status, t.instance_state, p.slug AS plan,

@@ -22,10 +22,11 @@ export async function POST(request: NextRequest) {
       maxAge: 0,
       path: '/',
     }
+    const cookieDomain = cookieDomainOption(request.headers.get('x-forwarded-host') ?? request.headers.get('host'))
     cookieStore.set('business_sid', '', baseOpts)
-    cookieStore.set('business_sid', '', { ...baseOpts, ...cookieDomainOption() })
+    cookieStore.set('business_sid', '', { ...baseOpts, ...cookieDomain })
     cookieStore.set('session_id', '', baseOpts)
-    cookieStore.set('session_id', '', { ...baseOpts, ...cookieDomainOption() })
+    cookieStore.set('session_id', '', { ...baseOpts, ...cookieDomain })
 
     const res = NextResponse.json({ message: 'Logged out successfully' })
     const flags = `Path=/; Max-Age=0; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`

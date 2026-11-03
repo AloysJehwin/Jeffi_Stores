@@ -6,13 +6,14 @@ import { api, btnPrimary, inputCls } from '@/components/admin/kit/core'
 import { useActionToast } from '@/components/admin/kit/toast'
 import type { PriceRow, PricingSettings } from '@/lib/compute/spec'
 
-type PlanRow = { slug: string; name: string; tier: number; infraMargin: number; minPreset: string | null }
+type PlanRow = { slug: string; name: string; tier: number; monthlyPriceInr: number; infraMargin: number; minPreset: string | null }
+type PlanPrice = { infraInrMonth: number; totalInrMonth: number } | null
 
 type View = {
   prices: PriceRow[]
   settings: PricingSettings
   plans: PlanRow[]
-  presets: { key: string; label: string; awsInrMonth: number; inrMonth: number; inrDay: number }[]
+  presets: { key: string; label: string; awsInrMonth: number | null; plans: Record<string, PlanPrice> }[]
 }
 
 const ctl = `${inputCls} h-control py-0`
@@ -20,7 +21,7 @@ const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
 
 const SETTINGS: { key: keyof PricingSettings; label: string; step: string }[] = [
   { key: 'usdInr', label: 'USD → INR', step: '0.01' },
-  { key: 'margin', label: 'Margin (0.25 = 25%)', step: '0.01' },
+  { key: 'margin', label: 'Default margin, for plans without one (0.25 = 25%)', step: '0.01' },
   { key: 'gstRate', label: 'GST rate', step: '0.01' },
   { key: 'platformShareUsd', label: 'Platform share per store (USD/month)', step: '0.5' },
   { key: 'rootVolumeGb', label: 'Server disk (GB)', step: '1' },
@@ -68,17 +69,31 @@ export default function ComputePricingClient() {
             <tr>
               <th className="px-4 py-3 text-left font-medium">Size</th>
               <th className="px-4 py-3 text-right font-medium">AWS cost / month</th>
-              <th className="px-4 py-3 text-right font-medium">Store pays / month</th>
-              <th className="px-4 py-3 text-right font-medium">Per day</th>
+              {view.plans.map(pl => (
+                <th key={pl.slug} className="px-4 py-3 text-right font-medium">{pl.name} / month</th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
             {view.presets.map(p => (
               <tr key={p.key}>
                 <td className="px-4 py-2.5 text-foreground">{p.label}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{inr(p.awsInrMonth)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{inr(p.inrMonth)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{inr(p.inrDay)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{p.awsInrMonth == null ? '—' : inr(p.awsInrMonth)}</td>
+                {view.plans.map(pl => {
+                  const price = p.plans[pl.slug]
+                  return (
+                    <td key={pl.slug} className="px-4 py-2.5 text-right tabular-nums">
+                      {price ? (
+                        <>
+                          <span className="text-foreground">{inr(price.totalInrMonth)}</span>
+                          <span className="block text-xs text-foreground-muted">infra {inr(price.infraInrMonth)} + GST + fee</span>
+                        </>
+                      ) : (
+                        <span className="text-foreground-muted">—</span>
+                      )}
+                    </td>
+                  )
+                })}
               </tr>
             ))}
           </tbody>
@@ -91,6 +106,7 @@ export default function ComputePricingClient() {
             <tr>
               <th className="px-4 py-3 text-left font-medium">Plan</th>
               <th className="px-4 py-3 text-left font-medium">Minimum size</th>
+              <th className="px-4 py-3 text-right font-medium">Plan fee / month (incl. GST)</th>
               <th className="px-4 py-3 text-right font-medium">Infra margin</th>
             </tr>
           </thead>
@@ -102,6 +118,9 @@ export default function ComputePricingClient() {
                   <span className="block font-mono text-xs text-foreground-muted">{p.slug}</span>
                 </td>
                 <td className="px-4 py-2.5 text-foreground-muted">{p.minPreset ?? '—'}</td>
+                <td className="px-4 py-2.5 text-right">
+                  <FeeCell value={p.monthlyPriceInr} editable={canWrite} onSave={v => save({ plan: p.slug, monthlyPriceInr: v })} />
+                </td>
                 <td className="px-4 py-2.5 text-right">
                   <MarginCell
                     value={p.infraMargin}
@@ -201,6 +220,30 @@ function UsdCell({ value, editable, onSave }: { value: number; editable: boolean
       type="number"
       min="0"
       step="0.0001"
+      value={v}
+      onChange={e => setV(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => e.key === 'Enter' && commit()}
+    />
+  )
+}
+
+function FeeCell({ value, editable, onSave }: { value: number; editable: boolean; onSave: (v: number) => void }) {
+  const [v, setV] = useState(String(value))
+  useEffect(() => setV(String(value)), [value])
+  if (!editable) return <span className="tabular-nums">{inr(value)}</span>
+  const commit = () => {
+    const n = Number(v)
+    if (v.trim() !== '' && Number.isFinite(n) && n >= 0 && n !== value) onSave(n)
+    else setV(String(value))
+  }
+  return (
+    <input
+      className={`${ctl} w-28 text-right tabular-nums`}
+      type="number"
+      min="0"
+      step="1"
+      aria-label="Plan fee per month"
       value={v}
       onChange={e => setV(e.target.value)}
       onBlur={commit}

@@ -6,9 +6,8 @@ export function describeChange(current: ComputeSpec, next: ComputeSpec, applyMod
   const a = current.node
   const d = next.node
   if (current.db.mode !== next.db.mode) {
-    notes.push(
-      `Your store goes offline for a few minutes while its data is copied to ${next.db.mode === 'dedicated' ? 'its own database' : 'a shared database'}. The old database is kept for a day.`
-    )
+    const where = next.db.mode === 'dedicated' ? 'copied to its own database' : next.db.mode === 'node' ? 'moved onto your server' : 'copied to a shared database'
+    notes.push(`Your store goes offline for a few minutes while its data is ${where}. The old database is kept for a day.`)
   }
   const sameServers = a.placement === d.placement && a.type === d.type
   if (!sameServers || d.count < a.count) {

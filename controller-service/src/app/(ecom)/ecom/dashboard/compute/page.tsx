@@ -1,7 +1,8 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
-import { computeSpecEnabled, computePlans, planCompute } from '@controller/lib/compute/catalog'
+import { computeSpecEnabled, computePlans } from '@controller/lib/compute/catalog'
 import { legacySpecFor } from '@/lib/compute/legacy'
 import { getTenantCompute } from '@controller/lib/compute/store'
+import { priceInrMonthForPlan } from '@controller/lib/compute/pricing-month'
 import { planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-registry'
 import { getTenantS3UsageBytes } from '@jeffi/tenancy'
 import PageHeader from '../_components/PageHeader'
@@ -26,14 +27,14 @@ export default async function ComputePage({ searchParams }: { searchParams: Prom
       </>
     )
   }
-  const [row, plan, plans, matrix, s3Bytes] = await Promise.all([
+  const [row, plans, matrix, s3Bytes] = await Promise.all([
     getTenantCompute(tenant.id),
-    planCompute(tenant.plan ?? ''),
     computePlans(),
     planFeatureMatrix(),
     getTenantS3UsageBytes(tenant.id).catch(() => 0),
   ])
   const current = row?.applied ?? legacySpecFor(tenant.plan)
+  const priceInrMonth = await priceInrMonthForPlan(tenant.plan ?? 'basic', current).catch(() => null)
   const featureMatrix = Object.fromEntries(Object.entries(matrix).map(([k, v]) => [k, Array.from(v)]))
   const s3CapGb = (row?.desired ?? current)?.storage?.s3Gb ?? 0
   const s3UsedGb = s3Bytes / (1024 * 1024 * 1024)
@@ -44,14 +45,15 @@ export default async function ComputePage({ searchParams }: { searchParams: Prom
       <ComputeClient
         tenantId={tenant.id}
         planSlug={tenant.plan ?? 'basic'}
-        planFeeInr={plan?.monthlyPriceInr ?? 0}
+        billingInterval={tenant.billing_interval === 'yearly' ? 'yearly' : 'monthly'}
         current={current}
         change={
           row && row.status !== 'applied' && row.status !== 'paused'
             ? { desired: row.desired, status: row.status, error: row.last_error, applyMode: row.apply_mode }
             : null
         }
-        rateInrHour={row?.rate_inr_hour ? Number(row.rate_inr_hour) : null}
+        priceInrMonth={priceInrMonth}
+        paymentsEnabled={process.env.ECOM_PAYMENTS_ENABLED === 'true'}
         paused={row?.status === 'paused'}
         plans={plans.map(p => ({ slug: p.slug, name: p.name }))}
         featureMatrix={featureMatrix}

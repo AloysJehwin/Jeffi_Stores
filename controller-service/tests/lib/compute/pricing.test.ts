@@ -132,7 +132,13 @@ describe('validateSpec', () => {
     s.node.type = 't4g.xlarge'
     s.services.storefront = { replicas: 2, maxReplicas: 10, size: 'S' }
     s.services.messaging = { replicas: 2, maxReplicas: 6, size: 'S' }
-    expect(validateSpec(s, catalog, pro).errors.join(' ')).toMatch(/connections/)
+    // On the server Postgres allows 100 (90 for the store): ample for these copies; a micro RDS (40) is not.
+    expect(validateSpec(s, catalog, pro).errors.join(' ')).not.toMatch(/connections/)
+    s.db = { mode: 'dedicated', class: 'db.t4g.micro', storageGb: 20, multiAz: false }
+    expect(validateSpec(s, catalog, pro).errors.join(' ')).toMatch(/connections.*bigger database/)
+    s.db = presetSpec('small').db
+    for (const k of ['storefront', 'admin', 'business', 'messaging'] as const) s.services[k] = { replicas: 1, maxReplicas: 10, size: 'S' }
+    expect(validateSpec(s, catalog, pro).errors.join(' ')).toMatch(/database on your server allows 90 connections.*dedicated database/)
   })
 
   it('only lets database storage grow', () => {

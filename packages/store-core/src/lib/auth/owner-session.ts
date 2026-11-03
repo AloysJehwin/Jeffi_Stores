@@ -40,19 +40,19 @@ export async function resolveOwnerSession(sid: string | undefined, signals?: Ses
   return getOwnerById(sess.principalId)
 }
 
-export function ownerCookieOptions() {
+export function ownerCookieOptions(host?: string | null) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict' as const,
     maxAge: OWNER_SESSION_TTL_S,
     path: '/',
-    ...cookieDomainOption(),
+    ...cookieDomainOption(host),
   }
 }
 
 /** Set the owner session cookie on a response. */
-export function setOwnerCookie(res: NextResponse, sid: string): NextResponse {
-  res.cookies.set(OWNER_COOKIE, sid, ownerCookieOptions())
+export function setOwnerCookie(res: NextResponse, sid: string, host?: string | null): NextResponse {
+  res.cookies.set(OWNER_COOKIE, sid, ownerCookieOptions(host))
   return res
 }

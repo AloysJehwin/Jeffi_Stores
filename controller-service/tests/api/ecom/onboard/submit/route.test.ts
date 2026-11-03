@@ -10,6 +10,8 @@ const m = vi.hoisted(() => ({
   link: vi.fn(),
   kyc: vi.fn(),
   addServices: vi.fn(),
+  saveCompute: vi.fn(),
+  planCompute: vi.fn(),
 }))
 
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: 'sid' }) }) }))
@@ -35,8 +37,11 @@ vi.mock('@/lib/tenant-registry', () => ({
 vi.mock('@/lib/shared/ecom-emails', () => ({ sendKycSubmittedEmail: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@controller/lib/k8s/capacity', () => ({ dedicatedCapacityError: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/shipping/delhivery', () => ({ verifyDelhiveryToken: vi.fn() }))
+vi.mock('@controller/lib/compute/catalog', () => ({ computeSpecEnabled: () => false, getCatalog: vi.fn(), planCompute: m.planCompute }))
+vi.mock('@controller/lib/compute/store', () => ({ saveDesiredCompute: m.saveCompute }))
 
 import { POST } from '@controller/app/api/(ecom)/ecom/onboard/submit/route'
+import { presetSpec } from '@/lib/compute/presets'
 
 const SERVICES = { id: 't-1', slug: 'acme', service_types: ['messaging'], store_request: null, status: 'active' }
 const BODY = {
@@ -62,6 +67,9 @@ describe('onboard submit — store upgrade on a services workspace', () => {
     m.tenants.mockResolvedValue([SERVICES])
     m.bank.mockResolvedValue(true)
     m.apply.mockResolvedValue({ ok: true })
+    m.planCompute.mockImplementation(async (slug: string) =>
+      ({ basic: { slug, minPreset: 'basic', defaultPreset: 'basic' }, growth: { slug, minPreset: 'small', defaultPreset: 'small' } } as any)[slug] ?? null
+    )
   })
 
   it('updates the existing tenant and queues the store for review without adding store', async () => {
@@ -72,6 +80,18 @@ describe('onboard submit — store upgrade on a services workspace', () => {
     expect(m.link).not.toHaveBeenCalled()
     expect(m.addServices).not.toHaveBeenCalled()
     expect(m.kyc).toHaveBeenCalledWith('t-1', 'o-1', expect.objectContaining({ review_again: true, pan: 'ABCDE1234F' }))
+  })
+
+  it('always saves a priced compute row: Basic is the basic preset, even when a size was sent', async () => {
+    const res = await POST(req({ ...BODY, compute: presetSpec('large') }))
+    expect(res.status).toBe(200)
+    expect(m.saveCompute).toHaveBeenCalledWith('t-1', presetSpec('basic'))
+  })
+
+  it("prices a paid plan at its floor size while owners can't choose one", async () => {
+    const res = await POST(req({ ...BODY, planSlug: 'growth' }))
+    expect(res.status).toBe(200)
+    expect(m.saveCompute).toHaveBeenCalledWith('t-1', presetSpec('small'))
   })
 
   it('rejects without a verified bank account', async () => {

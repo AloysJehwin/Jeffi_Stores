@@ -3,11 +3,11 @@ import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { getOwnerTenants, getCustomDomain } from '@/lib/tenant-registry'
-import { verifyDomain } from '@controller/lib/domains/dns-verify'
+import { advanceDomain, reconcileDomains } from '@controller/lib/domains/verify-cron'
 
 export const dynamic = 'force-dynamic'
 
-// Manual-verify from the dashboard "Verify" button. Runs the DNS TXT check for this one domain.
+// The dashboard "Verify" button: the same step the 10-minute cron runs, for this one domain.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
@@ -21,7 +21,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
-  const out = await verifyDomain(id)
-  if (out.ok) return NextResponse.json({ ok: true, message: 'DNS verified. Issuing certificate...' })
-  return NextResponse.json({ error: out.error, status: out.status }, { status: 400 })
+  const step = await advanceDomain(row)
+  if (step.reconcile) await reconcileDomains(step.reconcile).catch(() => {}) // the cron retries
+  const moved = step.status !== row.status || step.status === 'verified'
+  if (moved) return NextResponse.json({ ok: true, status: step.status, message: step.message })
+  return NextResponse.json({ error: step.message ?? 'Not ready yet', status: step.status }, { status: 400 })
 }

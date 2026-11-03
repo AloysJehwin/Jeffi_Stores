@@ -4,6 +4,9 @@ import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { rankOf, type ShipmentStatus } from '@/lib/shipping/shipment-status'
 
+/** A pg Pool or client. */
+type Queryable = { query: (text: string, params?: any[]) => Promise<unknown> }
+
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 
@@ -149,7 +152,10 @@ export async function createDelhiveryPickupLocation(params: {
   city?: string
   state?: string
   tenantId?: string
-}): Promise<{ ok: boolean; error?: string }> {
+}, opts: {
+  /** Where the warehouse row is mirrored: the store's own database from outside it (provisioning), null to skip. */
+  db?: Queryable | null
+} = {}): Promise<{ ok: boolean; error?: string }> {
   const token = await resolveDelhiveryToken(params.tenantId)
   if (!token) return { ok: false, error: 'DELHIVERY_API_KEY not configured' }
 
@@ -198,9 +204,10 @@ export async function createDelhiveryPickupLocation(params: {
     if (created || alreadyExists) {
       // Delhivery has no working GET-list API for this token, so we mirror every warehouse we
       // register into our own table and list from there. Upsert keeps re-registration idempotent.
-      await upsertPickupLocation({ name, pin: pincode, phone, address, city, state, tenantId: params.tenantId }).catch(
-        () => {}
-      )
+      if (opts.db !== null)
+        await upsertPickupLocation({ name, pin: pincode, phone, address, city, state, tenantId: params.tenantId }, opts.db).catch(
+          () => {}
+        )
       return { ok: true }
     }
 
@@ -218,9 +225,9 @@ async function upsertPickupLocation(params: {
   city?: string
   state?: string
   tenantId?: string
-}): Promise<void> {
+}, db?: Queryable): Promise<void> {
   const tenantId = params.tenantId ?? null
-  await query(
+  await (db ? db.query.bind(db) : query)(
     `INSERT INTO delhivery_pickup_locations (tenant_id, name, pin, phone, address, city, state, active, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW())
      ON CONFLICT (COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid), name)

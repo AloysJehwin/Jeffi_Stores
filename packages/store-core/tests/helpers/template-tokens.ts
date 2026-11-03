@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 import { BUILTIN_VARIABLE_KEYS } from '@/lib/templates/variables'
 
 // Shared by the no-raw-tokens checks in store-core, admin-service and storefront-service.
-export const IDENTITY = { name: 'Acme Tools', email: 'hi@acme.in', phone: '+91 90000 11111', web: 'acme.in', logoUrl: '', emailAccent: '' }
+export const IDENTITY = { name: 'Acme Tools', email: 'hi@acme.in', phone: '+91 90000 11111', web: 'acme.in', logoUrl: '', faviconUrl: '', emailAccent: '' }
 
 // Any token (either syntax, any case) whose key is registered.
 export function registeredLeaks(s: string | undefined): string[] {

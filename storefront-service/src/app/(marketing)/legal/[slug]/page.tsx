@@ -1,16 +1,14 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getPolicyBySlug, policies } from '@/lib/legals/policies'
+import { getStorePolicyBySlug, getStoreLegalContext, policyPdfName } from '@/lib/legals/store-policies'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import AccountDeletionPanel from '@/components/visitor/account/AccountDeletionPanel'
 
-export async function generateStaticParams() {
-  return policies.map(p => ({ slug: p.slug }))
-}
+export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const [policy, identity] = await Promise.all([Promise.resolve(getPolicyBySlug(slug)), getStoreIdentity()])
+  const [policy, identity] = await Promise.all([getStorePolicyBySlug(slug), getStoreIdentity()])
   if (!policy) return {}
   return {
     title: `${policy.title} | ${identity.name}`,
@@ -20,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PolicyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const policy = getPolicyBySlug(slug)
+  const [policy, { slug: storeSlug }] = await Promise.all([getStorePolicyBySlug(slug), getStoreLegalContext()])
   if (!policy) notFound()
 
   return (
@@ -46,7 +44,7 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
             </div>
             <a
               href={`/api/legal/${policy.slug}/pdf`}
-              download={`jeffistores-${policy.slug}.pdf`}
+              download={policyPdfName(storeSlug, policy.slug)}
               className="shrink-0 inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

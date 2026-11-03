@@ -14,10 +14,11 @@ export const ComputeSpecSchema = z.object({
     count: z.number().int().min(1).max(3),
   }),
   db: z.object({
-    mode: z.enum(['shared', 'dedicated']),
+    mode: z.enum(['shared', 'dedicated', 'node']),
     class: z.string().max(40).nullable(),
     storageGb: z.number().int().min(1).max(1000),
     multiAz: z.boolean(),
   }),
   services: z.object(Object.fromEntries(SERVICE_NAMES.map(n => [n, service])) as Record<(typeof SERVICE_NAMES)[number], typeof service>),
+  storage: z.object({ s3Gb: z.number().int().min(10).max(5000) }).optional(),
 })

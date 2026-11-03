@@ -103,7 +103,14 @@ function basePoolConfig(): any {
   }
 }
 
-function buildTenantPool(infra: TenantInfra): pg.Pool {
+// A node-mode store's pods get its database password in env (from its Postgres Secret): their
+// servers' role can't read jeffi/tenant-db/*. Only for the store it names.
+function podDbPassword(slug: string): string | undefined {
+  const pw = process.env.TENANT_DB_PASSWORD
+  return pw && (process.env.TENANT_DB_SLUG || process.env.SERVICE_TENANT_SLUG) === slug ? pw : undefined
+}
+
+function buildTenantPool(infra: TenantInfra, slug: string): pg.Pool {
   if (!infra.rdsEndpoint) throw new Error('Tenant has no RDS endpoint configured (tenant_infra.rds_endpoint)')
   const config: any = { ...basePoolConfig(), host: infra.rdsEndpoint, port: infra.rdsPort, database: infra.rdsDb }
   const isLocal = infra.rdsEndpoint === 'localhost' || infra.rdsEndpoint === '127.0.0.1'
@@ -123,15 +130,15 @@ function buildTenantPool(infra: TenantInfra): pg.Pool {
     config.password = rdsIamPassword(infra.rdsEndpoint, infra.rdsPort, user, infra.region)
     return createPgPool(config)
   }
-  // Password auth: the store's own Postgres on its EC2 node. Creds live in a Secrets Manager
-  // secret (JSON with password/username/database) referenced by tenant_infra.db_secret_ref; TLS
-  // is unverified because the pod serves a self-signed cert. Cached per secret ref for 5 min.
-  if (!infra.dbSecretRef) throw new Error('Tenant has neither IAM auth nor db_secret_ref set')
-  const ref = infra.dbSecretRef
+  // Password auth: the store's own Postgres on its EC2 node, self-signed TLS (unverified). The
+  // password is the pod's env one, else the Secrets Manager secret at db_secret_ref (cached 5 min).
+  const envPw = podDbPassword(slug)
+  if (!infra.dbSecretRef && !envPw) throw new Error('Tenant has neither IAM auth nor db_secret_ref set')
+  const ref = infra.dbSecretRef!
   const region = infra.region
   config.ssl = { rejectUnauthorized: false }
   config.user = infra.rdsUser || 'jeffi'
-  config.password = async () => (await fetchDbSecret(ref, region)).password
+  config.password = envPw ?? (async () => (await fetchDbSecret(ref, region)).password)
   return createPgPool(config)
 }
 
@@ -142,7 +149,7 @@ export function tenantPool(t: TenantContext): pg.Pool {
   const key = `${t.infra.rdsEndpoint}/${t.infra.rdsDb}/${t.infra.rdsUser ?? ''}`
   const cached = tenantPools.get(t.tenantId)
   if (cached?.key === key) return cached.pool
-  const pool = buildTenantPool(t.infra)
+  const pool = buildTenantPool(t.infra, t.slug)
   tenantPools.set(t.tenantId, { key, pool })
   cached?.pool.end().catch(() => {})
   return pool

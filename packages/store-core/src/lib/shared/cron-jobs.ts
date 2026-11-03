@@ -126,6 +126,30 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    // Moves customer domains along TXT check → certificate → live (lib/domains/verify-cron.ts).
+    id: 'custom_domain_verify',
+    name: 'Custom domain verification',
+    path: '/api/internal/domains/verify-cron',
+    method: 'POST',
+    intervalMs: 10 * MIN,
+    intervalLabel: 'every 10 min',
+    startDelayMs: 150 * SEC,
+    lockTtlMs: 10 * MIN - 30 * SEC,
+    tenantScope: null,
+  },
+  {
+    // Daily S3 dump of each database on a store's own server, checked hourly (lib/provisioning/node-db-backup.ts).
+    id: 'node_db_backup',
+    name: 'Store server database backups',
+    path: '/api/internal/tenants/backup-node-dbs',
+    method: 'POST',
+    intervalMs: HOUR,
+    intervalLabel: 'hourly (each store database once a day)',
+    startDelayMs: 285 * SEC,
+    lockTtlMs: HOUR - MIN,
+    tenantScope: null,
+  },
+  {
     id: 'provisioning_reconcile',
     name: 'Provisioning drift sweep',
     path: '/api/internal/provisioning/reconcile',

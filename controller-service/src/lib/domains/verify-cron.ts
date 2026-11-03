@@ -1,68 +1,88 @@
 import 'server-only'
+import { promises as dns } from 'node:dns'
 import { controlPlanePool } from '@/lib/tenant-registry/shared'
+import { getCustomDomain, type CustomDomain } from '@/lib/tenant-registry/custom-domains'
 import { verifyDomain } from './dns-verify'
 import { requestCert, isCertReady } from './acm'
 
-// Cron entry point: moves every in-flight custom domain forward one step.
-// pending       → verify TXT; on match → dns-verified
-// dns-verified  → requestCert → cert-pending
-// cert-pending  → isCertReady (cert-manager has issued) → verified
-// 'verified' domains are picked up by reconcileK8sPlan's listCustomDomains filter.
+// pending       → TXT `_jeffi.{domain}` matches → dns-verified
+// dns-verified  → the domain resolves to the cluster → cert-pending (+ reconcile: Certificate + route rendered)
+// cert-pending  → cert-manager's Certificate is Ready → verified (+ reconcile); failed after 24h
+
+const ROOT = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
+
+/** Whether the domain's A records reach the same ingress IP as the store's own subdomain (CNAME or A). */
+export async function pointsAtCluster(domain: string, slug: string): Promise<boolean> {
+  const resolve = (h: string) => dns.resolve4(h).catch(() => [] as string[])
+  const [mine, target] = await Promise.all([resolve(domain), resolve(`${slug}.${ROOT}`)])
+  const ingress = new Set([...target, ...(process.env.CLUSTER_INGRESS_IP ? [process.env.CLUSTER_INGRESS_IP] : [])])
+  return mine.length > 0 && mine.every(ip => ingress.has(ip))
+}
+
+export interface DomainStep {
+  status: string
+  /** The tenant whose routes/certificates must be re-rendered. */
+  reconcile?: string
+  message?: string
+}
+
+/** Move one domain forward as far as it can go right now. */
+export async function advanceDomain(row: CustomDomain): Promise<DomainStep> {
+  let status = row.status
+  if (status === 'pending') {
+    const out = await verifyDomain(row.id)
+    if (!out.ok) return { status: out.status, message: out.error }
+    status = 'dns-verified'
+  }
+  if (status === 'dns-verified') {
+    const slug = (await controlPlanePool().query(`SELECT slug FROM tenants WHERE id = $1`, [row.tenant_id])).rows[0]?.slug
+    if (!slug || !(await pointsAtCluster(row.domain, slug))) {
+      return { status, message: `Point ${row.domain} at ${slug}.${ROOT} (CNAME) or our IP (A record) to issue the certificate.` }
+    }
+    await requestCert(row.id)
+    return { status: 'cert-pending', reconcile: row.tenant_id, message: 'Issuing the certificate. This usually takes a few minutes.' }
+  }
+  if (status === 'cert-pending') {
+    if (await isCertReady(row.id)) return { status: 'verified', reconcile: row.tenant_id, message: 'Live.' }
+    const now = await getCustomDomain(row.id)
+    return { status: now?.status ?? status, message: now?.status === 'failed' ? 'The certificate could not be issued. Check the DNS record and try again.' : 'Issuing the certificate.' }
+  }
+  return { status }
+}
+
+/** Re-render the tenant's namespace so the Certificate/IngressRoute set matches its domains. */
+export async function reconcileDomains(tenantId: string): Promise<void> {
+  const { reconcileK8sPlan } = await import('@controller/lib/provisioning/steps')
+  const { getProvisioningProvider } = await import('@controller/lib/provisioning')
+  await reconcileK8sPlan(tenantId, getProvisioningProvider(), { force: true })
+}
+
 export async function runDomainVerifyCron(): Promise<{
   checked: number
   advanced: number
   errors: Array<{ id: string; error: string }>
 }> {
-  const pool = controlPlanePool()
-  const res = await pool.query(
-    `SELECT id, status FROM tenant_custom_domains
-     WHERE status IN ('pending','dns-verified','cert-pending')`
+  const res = await controlPlanePool().query(
+    `SELECT id FROM tenant_custom_domains WHERE status IN ('pending','dns-verified','cert-pending')`
   )
-  const rows: Array<{ id: string; status: string }> = res.rows
   let advanced = 0
   const errors: Array<{ id: string; error: string }> = []
-
-  // Trigger a k8s reconcile when any domain moves to 'verified', so the IngressRoute refreshes.
   const tenantsToReconcile = new Set<string>()
 
-  for (const row of rows) {
+  for (const { id } of res.rows as Array<{ id: string }>) {
     try {
-      if (row.status === 'pending') {
-        const out = await verifyDomain(row.id)
-        if (out.ok) advanced++
-      } else if (row.status === 'dns-verified') {
-        // Re-check in case DNS flipped away; otherwise request the cert.
-        await verifyDomain(row.id).catch(() => {})
-        await requestCert(row.id)
-        advanced++
-      } else if (row.status === 'cert-pending') {
-        const ready = await isCertReady(row.id)
-        if (ready) {
-          advanced++
-          const t = await pool.query(`SELECT tenant_id FROM tenant_custom_domains WHERE id=$1`, [row.id])
-          if (t.rows[0]?.tenant_id) tenantsToReconcile.add(t.rows[0].tenant_id)
-        }
-      }
+      const row = await getCustomDomain(id)
+      if (!row) continue
+      const step = await advanceDomain(row)
+      if (step.status !== row.status) advanced++
+      if (step.reconcile) tenantsToReconcile.add(step.reconcile)
     } catch (e) {
-      errors.push({ id: row.id, error: e instanceof Error ? e.message : String(e) })
+      errors.push({ id, error: e instanceof Error ? e.message : String(e) })
     }
   }
 
-  // Nudge the workload reconcile so verified domains get their Ingress + Certificate applied.
-  if (tenantsToReconcile.size) {
-    try {
-      const { reconcileK8sPlan } = await import('@controller/lib/provisioning/steps')
-      const { getProvisioningProvider } = await import('@controller/lib/provisioning')
-      const provider = await getProvisioningProvider()
-      for (const tenantId of tenantsToReconcile) {
-        await reconcileK8sPlan(tenantId, provider, { force: true }).catch(e => {
-          errors.push({ id: tenantId, error: `reconcile: ${e instanceof Error ? e.message : String(e)}` })
-        })
-      }
-    } catch (e) {
-      errors.push({ id: 'reconcile', error: e instanceof Error ? e.message : String(e) })
-    }
+  for (const tenantId of tenantsToReconcile) {
+    await reconcileDomains(tenantId).catch(e => errors.push({ id: tenantId, error: `reconcile: ${e instanceof Error ? e.message : String(e)}` }))
   }
-
-  return { checked: rows.length, advanced, errors }
+  return { checked: res.rows.length, advanced, errors }
 }

@@ -226,6 +226,9 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     bankAccount: settings.bank_account || '',
     bankIfsc: settings.bank_ifsc || '',
     bankBranch: settings.bank_branch || '',
+    holderName: settings.bank_holder_name || '',
+    sealUrl: settings.business_seal_url || '',
+    city: settings.business_city || '',
   }
 
   const updatedItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at', [orderId])

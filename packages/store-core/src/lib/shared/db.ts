@@ -89,8 +89,17 @@ function buildDefaultPool(): Pool {
   return createPgPool(config)
 }
 
+/**
+ * A node-mode store's pods get its database password in env (TENANT_DB_PASSWORD, from the store's
+ * Postgres Secret): their servers' role can't read jeffi/tenant-db/*. Only for the store it names.
+ */
+export function podDbPassword(slug: string | undefined): string | undefined {
+  const pw = process.env.TENANT_DB_PASSWORD
+  return pw && slug && (process.env.TENANT_DB_SLUG || process.env.SERVICE_TENANT_SLUG) === slug ? pw : undefined
+}
+
 // Build a pool for a specific tenant from its infra pointers (per-tenant RDS).
-function buildTenantPool(infra: NonNullable<ReturnType<typeof getCurrentTenant>>['infra']): Pool {
+function buildTenantPool(infra: NonNullable<ReturnType<typeof getCurrentTenant>>['infra'], slug?: string): Pool {
   if (!infra || !infra.rdsEndpoint) {
     throw new Error('Tenant has no RDS endpoint configured (tenant_infra.rds_endpoint)')
   }
@@ -119,15 +128,15 @@ function buildTenantPool(infra: NonNullable<ReturnType<typeof getCurrentTenant>>
     config.password = rdsIamPassword(infra.rdsEndpoint, infra.rdsPort, user, infra.region)
     return createPgPool(config)
   }
-  // Password auth: the store's own Postgres on its EC2 node. Creds live in a Secrets Manager
-  // secret (JSON with password/username/database) referenced by tenant_infra.db_secret_ref; TLS
-  // is unverified because the pod serves a self-signed cert. Cached per secret ref for 5 min.
-  if (!infra.dbSecretRef) throw new Error('Tenant has neither IAM auth nor db_secret_ref set')
-  const ref = infra.dbSecretRef
+  // Password auth: the store's own Postgres on its EC2 node, self-signed TLS (unverified). The
+  // password is the pod's env one, else the Secrets Manager secret at db_secret_ref (cached 5 min).
+  const envPw = podDbPassword(slug)
+  if (!infra.dbSecretRef && !envPw) throw new Error('Tenant has neither IAM auth nor db_secret_ref set')
+  const ref = infra.dbSecretRef!
   const region = infra.region
   config.ssl = { rejectUnauthorized: false }
   config.user = infra.rdsUser || 'jeffi'
-  config.password = async () => (await fetchDbSecret(ref, region)).password
+  config.password = envPw ?? (async () => (await fetchDbSecret(ref, region)).password)
   return createPgPool(config)
 }
 
@@ -156,11 +165,53 @@ function getPool(explicitTenant?: TenantContextType | null): Pool {
   const key = `${tenant.infra.rdsEndpoint}/${tenant.infra.rdsDb}/${tenant.infra.rdsUser ?? ''}`
   const cached = tenantPools.get(tenant.tenantId)
   if (cached && poolTargets.get(cached) === key) return cached
-  const tp = buildTenantPool(tenant.infra)
+  const tp = buildTenantPool(tenant.infra, tenant.slug)
   poolTargets.set(tp, key)
   tenantPools.set(tenant.tenantId, tp)
   cached?.end().catch(() => {})
   return tp
+}
+
+// The pinned store's infra for the readiness probe: any status (a store being built is probed too).
+let storeInfra: { slug: string; ctx: TenantContextType | null; at: number } | null = null
+
+/**
+ * SELECT 1 on the database of the store `slug` through the pool its requests use. 'pending' while the
+ * store has no database recorded yet.
+ */
+export async function pingStoreDb(slug: string): Promise<'ok' | 'pending'> {
+  if (!storeInfra || storeInfra.slug !== slug || Date.now() - storeInfra.at > 30_000) {
+    const { controlPlanePool } = await import('@/lib/tenant-registry')
+    const r = (
+      await controlPlanePool().query(
+        `SELECT t.id, t.slug, t.display_name, i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
+           FROM tenants t LEFT JOIN tenant_infra i ON i.tenant_id = t.id WHERE t.slug = $1 LIMIT 1`,
+        [slug]
+      )
+    ).rows[0]
+    const ctx: TenantContextType | null = r?.rds_endpoint
+      ? {
+          tenantId: r.id,
+          slug: r.slug,
+          displayName: r.display_name ?? null,
+          plan: null,
+          infra: {
+            rdsEndpoint: r.rds_endpoint,
+            rdsDb: r.rds_db || 'jeffi_stores',
+            rdsPort: r.rds_port || 5432,
+            rdsUser: r.rds_user ?? null,
+            dbSecretRef: r.db_secret_ref ?? null,
+            iamAuth: r.iam_auth !== false,
+            s3Bucket: r.s3_bucket ?? null,
+            region: r.region || 'us-east-1',
+          },
+        }
+      : null
+    storeInfra = { slug, ctx, at: Date.now() }
+  }
+  if (!storeInfra.ctx) return 'pending'
+  await getPool(storeInfra.ctx).query('SELECT 1')
+  return 'ok'
 }
 
 /**

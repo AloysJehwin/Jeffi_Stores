@@ -530,6 +530,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_kyc (
     mobile          character varying(20),     -- owner mobile (distinct from warehouse sellerPhone)
     logo_s3_key     character varying(512),    -- store logo: branding/{owner_id}/logo.*
     seal_s3_key     character varying(512),    -- store seal (for legal docs): branding/{owner_id}/seal.*
+    warehouse       jsonb,                     -- onboarding pickup warehouse {originPincode,pickupLocation,sellerName,sellerAddress,sellerPhone}
     legals_accepted_version character varying(20),   -- POLICY_VERSION the owner agreed to at onboarding
     legals_accepted_at      timestamp with time zone,
     status          character varying(16) NOT NULL DEFAULT 'pending', -- pending|approved|rejected
