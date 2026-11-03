@@ -16,6 +16,7 @@ export const invoiceBusiness = (s: Record<string, string>): InvoiceBusinessSetti
   address: s.business_address || '', state: s.business_state || '', stateCode: s.business_state_code || '',
   phone: s.business_phone || '', email: s.business_email || '',
   bankName: s.bank_name || '', bankAccount: s.bank_account || '', bankIfsc: s.bank_ifsc || '', bankBranch: s.bank_branch || '',
+  holderName: s.bank_holder_name || '', sealUrl: s.business_seal_url || '', city: s.business_city || '',
 })
 
 const num = (v: any) => parseFloat(v || '0')

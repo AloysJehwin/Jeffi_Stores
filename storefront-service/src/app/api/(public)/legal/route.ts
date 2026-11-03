@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
-import { policies } from '@/lib/legals/policies'
+import { getStorePolicies } from '@/lib/legals/store-policies'
+
+export const dynamic = 'force-dynamic'
 
 // The /legal index as JSON for the mobile app (the web page renders the same module server-side).
-export function GET() {
+export async function GET() {
+  const policies = await getStorePolicies()
   return NextResponse.json(
     {
       policies: policies

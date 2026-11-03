@@ -27,8 +27,13 @@ export const PRICE_INR_MONTH_SQL = `COALESCE((SELECT tc.price_inr_month FROM ten
 /** Monthly value of a store: yearly billing is ten months' price over twelve. */
 export const MRR_SQL = `(CASE WHEN t.billing_interval = 'yearly' THEN ${PRICE_INR_MONTH_SQL} * 10 / 12 ELSE ${PRICE_INR_MONTH_SQL} END)`
 
-/** Platform margin earned (not yet due to AWS): price minus (price / (1+GST) / (1+plan.infra_margin)). */
-export const INFRA_MARGIN_MRR_SQL = `(${PRICE_INR_MONTH_SQL} - (${PRICE_INR_MONTH_SQL}::numeric / (1 + 0.18) / (1 + COALESCE(p.infra_margin, 0))))`
+// Price = plan fee (GST included) + infra × (1 + m) × (1 + GST). The fee net of GST is all margin; of the
+// infra, m / (1 + m) of it net of GST is.
+const PLAN_FEE_SQL = `COALESCE(p.monthly_price_inr, 0)`
+const MARGIN_MONTH_SQL = `(${PLAN_FEE_SQL}::numeric / 1.18 + GREATEST(${PRICE_INR_MONTH_SQL} - ${PLAN_FEE_SQL}, 0)::numeric / 1.18 * COALESCE(p.infra_margin, 0) / (1 + COALESCE(p.infra_margin, 0)))`
+
+/** Platform margin earned (not due to AWS or GST) per month; yearly billing is ten months over twelve. */
+export const INFRA_MARGIN_MRR_SQL = `(CASE WHEN t.billing_interval = 'yearly' THEN ${MARGIN_MONTH_SQL} * 10 / 12 ELSE ${MARGIN_MONTH_SQL} END)`
 
 /** A tenant on a paid store plan (needs the tenants t / plans p aliases). */
 export const PAID_STORE_SQL = `(p.product = 'store' AND ${PRICE_INR_MONTH_SQL} > 0 AND 'store' = ANY(t.service_types))`

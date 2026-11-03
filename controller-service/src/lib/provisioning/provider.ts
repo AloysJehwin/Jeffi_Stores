@@ -8,6 +8,8 @@
 // Every method must be IDEMPOTENT and safe to retry (the worker re-runs steps
 // after crashes) — treat "already exists / already owned" as success.
 
+import type { DbAuth } from './tenant-admin-pool'
+
 export interface CreateDbInstanceArgs {
   dbInstanceId: string // jeffi-tenant-{slug}
   paramGroup: string
@@ -56,8 +58,9 @@ export interface ProvisioningProvider {
   /** Poll: is the instance 'available' yet? Returns endpoint when ready, null while pending. */
   getDbEndpoint(dbInstanceId: string): Promise<string | null>
 
-  /** Run the full desired-state schema + create the app login (app_user, or a Starter store's own role) WITH rds_iam. */
-  loadSchema(endpoint: string, dbName: string, appUser?: string): Promise<void>
+  /** Run the full desired-state schema + create the app login (app_user, or a Starter store's own role) WITH rds_iam.
+   * An on-node Postgres (db.auth, or an endpoint that is one) has no app login: the store connects as `jeffi`. */
+  loadSchema(endpoint: string, dbName: string, appUser?: string, db?: DbAuth): Promise<void>
 
   /** Lock a shared Starter host down so no store can connect to its own default databases (idempotent). */
   initSharedDbHost(endpoint: string): Promise<void>
@@ -69,10 +72,10 @@ export interface ProvisioningProvider {
   dropTenantDatabase(endpoint: string, dbName: string, role: string | null): Promise<void>
 
   /** Snapshot the tenant DB to a gzip'd archive (pure-JS, no pg_dump binary). */
-  backupDb(endpoint: string, dbName: string): Promise<Buffer>
+  backupDb(endpoint: string, dbName: string, db?: DbAuth): Promise<Buffer>
 
   /** Restore a gzip'd archive into a fresh (schema-loaded) tenant DB. */
-  restoreDb(endpoint: string, dbName: string, archive: Buffer): Promise<void>
+  restoreDb(endpoint: string, dbName: string, archive: Buffer, db?: DbAuth): Promise<void>
 
   /** Create + lock down the tenant bucket (public-access-block on; writes to app IAM only). */
   ensureBucket(bucket: string): Promise<void>

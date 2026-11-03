@@ -19,7 +19,7 @@ export function adminCookieNameForHost(host: string): string {
 }
 
 export function adminCookieDomainForHost(host: string): { domain?: string } {
-  return isTenantAdminHost(host) ? {} : cookieDomainOption()
+  return isTenantAdminHost(host) ? {} : cookieDomainOption(host)
 }
 
 async function requestHost(): Promise<string> {

@@ -121,6 +121,11 @@ async function send(to: string, subject: string, html: string, attachments?: Arr
   })
 }
 
+// Payments are off until ECOM_PAYMENTS_ENABLED=true: approval starts the build with no checkout.
+export function ecomPaymentsEnabled(): boolean {
+  return process.env.ECOM_PAYMENTS_ENABLED === 'true'
+}
+
 export async function sendKycSubmittedEmail(owner: { email: string; name: string | null }) {
   const name = owner.name ?? 'there'
   const html = baseHtml(
@@ -129,7 +134,11 @@ export async function sendKycSubmittedEmail(owner: { email: string; name: string
     `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">Thank you for applying to Jeffi Commerce. We have received your business details and GST certificate, and our team has started the verification.</p>
-    ${notice('Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, you will complete your subscription payment and your store will be provisioned automatically.')}
+    ${notice(
+      ecomPaymentsEnabled()
+        ? 'Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, you will complete your subscription payment and your store will be provisioned automatically.'
+        : 'Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, we set up your store right away. Billing starts later.'
+    )}
     <p style="margin:0;">We will email you as soon as there is an update. No action is needed from you in the meantime.</p>
   `
   )
@@ -150,12 +159,32 @@ export async function sendKycSubmittedEmail(owner: { email: string; name: string
   await send(PLATFORM_ADMIN, `New merchant application: ${owner.email}`, adminHtml)
 }
 
+/** checkoutUrl null = payments off: approval starts the build directly. */
 export async function sendKycApprovedEmail(
   owner: { email: string; name: string | null },
   tenant: { display_name: string; slug: string },
-  checkoutUrl: string
+  checkoutUrl: string | null
 ) {
   const name = owner.name ?? 'there'
+  if (!checkoutUrl) {
+    const html = baseHtml(
+      "Your application is approved. We're building your store now.",
+      'Your application has been approved',
+      `
+    <p style="margin:0 0 14px;">Hi ${name},</p>
+    <p style="margin:0 0 14px;">Your GST certificate has been verified and your application for <strong>${tenant.display_name}</strong> is approved.</p>
+    ${detailTable([
+      { label: 'Store name', value: tenant.display_name },
+      { label: 'Store address', value: `${tenant.slug}.jeffistores.in` },
+      { label: 'Status', value: 'Setting up' },
+    ])}
+    <p style="margin:0 0 14px;">We have started building your store. No payment is needed now; billing starts later.</p>
+    <p class="muted" style="margin:0;">We will email you the moment it is live, usually within a few minutes.</p>
+  `
+    )
+    await send(owner.email, "Approved: we're building your store", html)
+    return
+  }
   const html = baseHtml(
     'Your application is approved. Complete payment to launch your store.',
     'Your application has been approved',

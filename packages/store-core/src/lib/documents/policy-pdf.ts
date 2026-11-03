@@ -59,7 +59,9 @@ function drawFooter(doc: any, store: StoreHeading, pageNum: number, totalPages: 
   doc.text(`Page ${pageNum} of ${totalPages}`, PAGE_W - MR - 80, y + 8, { width: 80, align: 'right', lineBreak: false })
 }
 
-function drawSeal(doc: any, seal?: string | Buffer) {
+// undefined → the flagship's own seal; null → no seal (a tenant that has uploaded none).
+function drawSeal(doc: any, seal?: string | Buffer | null) {
+  if (seal === null) return
   const sealSrc = seal ?? assetPath('images', 'jeffi-seal.png')
   const SEAL_SIZE = 110
   const x = PAGE_W - MR - SEAL_SIZE
@@ -121,7 +123,7 @@ function renderSection(doc: any, section: Section, startY: number, drawHeaderFn:
 
 export async function generatePolicyPDF(
   policy: Policy,
-  branding?: { logo?: string | Buffer; seal?: string | Buffer }
+  branding?: { logo?: string | Buffer; seal?: string | Buffer | null }
 ): Promise<Buffer> {
   const identity = await getStoreIdentity()
   const logo = branding?.logo ?? (await tenantLogoBuffer()) ?? undefined

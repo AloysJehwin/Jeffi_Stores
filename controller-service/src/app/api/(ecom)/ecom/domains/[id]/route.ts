@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { getOwnerTenants, getCustomDomain, deleteCustomDomain } from '@/lib/tenant-registry'
+import { reconcileDomains } from '@controller/lib/domains/verify-cron'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,5 +32,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const res = await auth(request, id)
   if ('error' in res) return NextResponse.json({ error: res.error }, { status: res.status })
   await deleteCustomDomain(id, res.row.tenant_id)
+  // Prune its route, certificate and TLS secret; a store not yet running has none to prune.
+  if (res.row.status === 'cert-pending' || res.row.status === 'verified') await reconcileDomains(res.row.tenant_id).catch(() => {})
   return NextResponse.json({ ok: true })
 }

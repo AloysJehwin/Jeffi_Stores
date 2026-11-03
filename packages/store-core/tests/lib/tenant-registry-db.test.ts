@@ -158,7 +158,7 @@ describe('tenant-registry (database layer)', () => {
       const mod = await importRegistry()
       await expect(mod.addCustomDomain('t-1', 'acme.jeffistores.in')).resolves.toEqual({
         ok: false,
-        error: 'Cannot use a jeffistores.in subdomain as a custom domain',
+        error: 'Cannot use a jeffistores.in address as a custom domain',
       })
     })
 

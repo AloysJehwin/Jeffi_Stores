@@ -1,88 +1,64 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { listPlans, getOwnerTenants, getDraft, hasService, reopenDraft, getKyc, getOwnerBankAccount } from '@/lib/tenant-registry'
+import { listPlans, getOwnerTenants, getDraft, hasService, reopenDraft, getKyc, getOwnerBankAccount, controlPlanePool } from '@/lib/tenant-registry'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import OnboardEntry from './OnboardEntry'
 import OnboardWizard from './OnboardWizard'
 import PaymentTrigger from './PaymentTrigger'
+import OnboardShell from './OnboardShell'
+import PageHeader from '../dashboard/_components/PageHeader'
+import { Card, Row } from '../dashboard/_components/Card'
+import { statusSteps, REVIEW_STEP, FINAL_STEP } from './steps'
+import { Badge, primaryBtn, secondaryBtn } from './ui'
 import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 import { computeSpecEnabled } from '@controller/lib/compute/catalog'
 
 export const dynamic = 'force-dynamic'
 
-const STEPS = [
-  { id: 0, label: 'Plan', desc: 'Choose your subscription' },
-  { id: 1, label: 'Store', desc: 'Name & subdomain' },
-  { id: 2, label: 'Business', desc: 'Legal details' },
-  { id: 3, label: 'GST', desc: 'Certificate & number' },
-  { id: 4, label: 'Warehouse', desc: 'Pickup address' },
-  { id: 5, label: 'Bank', desc: 'Payout account' },
-  { id: 6, label: 'Review', desc: 'Submit for approval' },
-  { id: 7, label: 'Payment', desc: 'Complete subscription' },
-]
+// Payments off (default): approval starts the build, so the last step is setup, not checkout.
+const paymentsEnabled = () => process.env.ECOM_PAYMENTS_ENABLED === 'true'
 
-function SidebarLayout({ currentStep, children }: { currentStep: number; children: React.ReactNode }) {
+/** A plan + interval carried from the pricing page, kept only when it names an active store plan. */
+function pickedPlan(
+  plans: { slug: string }[],
+  q: { plan?: string; interval?: string }
+): { planSlug: string; interval: 'monthly' | 'yearly' } | null {
+  if (!q.plan || !plans.some(p => p.slug === q.plan)) return null
+  return { planSlug: q.plan, interval: q.interval === 'yearly' ? 'yearly' : 'monthly' }
+}
+
+const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
+
+/** After submit: the console shell with the store's name in the rail and the steps so far. */
+function StatusLayout({
+  owner,
+  tenant,
+  currentStep,
+  children,
+}: {
+  owner: { email: string; name: string | null }
+  tenant: { slug: string; display_name: string }
+  currentStep: number
+  children: React.ReactNode
+}) {
   return (
-    <div className="flex flex-col md:flex-row min-h-[calc(100vh-56px)] bg-surface-secondary">
-      <div className="md:hidden px-4 py-3 border-b border-border-default bg-surface-elevated">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <span className="shrink-0 text-xs text-foreground-muted">
-            Step {currentStep + 1} of {STEPS.length}
-          </span>
-          <span className="min-w-0 truncate text-xs font-semibold text-foreground">
-            {STEPS[currentStep].label}{' '}
-            <span className="font-normal text-foreground-muted">— {STEPS[currentStep].desc}</span>
-          </span>
-        </div>
-        <div className="flex gap-1">
-          {STEPS.map(s => (
-            <div
-              key={s.id}
-              className={`h-1 flex-1 rounded-full ${s.id < currentStep ? 'ecom-accent-bg' : s.id === currentStep ? 'ecom-sel' : 'bg-surface-secondary'}`}
-            />
-          ))}
-        </div>
-      </div>
-      <aside className="hidden lg:flex flex-col w-72 xl:w-80 bg-surface-elevated border-r border-border-default p-8 flex-shrink-0">
-        <div className="mb-10">
-          <h2 className="text-xl font-bold text-foreground">Launch your store</h2>
-          <p className="text-sm text-foreground-muted mt-1">Complete each step to go live.</p>
-        </div>
-        <nav className="flex-1 space-y-1">
-          {STEPS.map(s => {
-            const done = s.id < currentStep
-            const active = s.id === currentStep
-            return (
-              <div
-                key={s.id}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl ${active ? 'ecom-current' : ''}`}
-              >
-                <span
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${active ? 'ecom-sel' : done ? 'org-sage org-sage-text' : 'bg-surface-secondary text-foreground-muted'}`}
-                >
-                  {done ? '✓' : s.id + 1}
-                </span>
-                <div>
-                  <div
-                    className={`text-sm font-medium ${active ? 'font-semibold text-foreground' : done ? 'text-foreground-secondary' : 'text-foreground-muted'}`}
-                  >
-                    {s.label}
-                  </div>
-                  <div className="text-xs text-foreground-muted">{s.desc}</div>
-                </div>
-              </div>
-            )
-          })}
-        </nav>
-      </aside>
-      <main className="flex-1 min-w-0 flex flex-col items-center justify-start sm:justify-center px-4 py-8 sm:px-6 sm:py-10">
-        {children}
-      </main>
-    </div>
+    <OnboardShell
+      owner={owner}
+      heading={tenant.display_name}
+      subheading={`${tenant.slug}.jeffistores.in`}
+      steps={statusSteps(paymentsEnabled())}
+      current={currentStep}
+    >
+      <div className="max-w-3xl">{children}</div>
+    </OnboardShell>
   )
 }
 
-export default async function OnboardPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+export default async function OnboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string; plan?: string; interval?: string }>
+}) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const h = await headers()
   const signals = {
@@ -92,13 +68,14 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
   }
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
   if (!owner) redirect('/signup')
+  const who = { email: owner.email, name: owner.name }
 
   const existing = await getOwnerTenants(owner.id)
   if (existing.length > 0) {
     const t = existing[0]
     if (!hasService(t, 'store') && !t.store_request) {
       if ((await searchParams).mode !== 'add-store') redirect('/dashboard')
-      return <UpgradeWizard ownerId={owner.id} ownerName={owner.name} tenant={t} />
+      return <UpgradeWizard ownerId={owner.id} owner={who} tenant={t} />
     }
     if (t.status === 'active') redirect('/dashboard')
 
@@ -110,7 +87,7 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
     // Approved + awaiting payment → show the payment link (owner completes the subscription here).
     if (t.status === 'awaiting_payment' && t.razorpay_subscription_id) {
       return (
-        <SidebarLayout currentStep={7}>
+        <StatusLayout owner={who} tenant={t} currentStep={FINAL_STEP}>
           <PaymentTrigger
             subscriptionId={t.razorpay_subscription_id}
             checkoutUrl={t.razorpay_checkout_url}
@@ -122,107 +99,110 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
             plan={{ slug: t.plan ?? 'basic', monthlyPrice: t.monthly_price_inr, interval: t.billing_interval }}
             razorpayKeyId={process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? ''}
           />
-        </SidebarLayout>
+        </StatusLayout>
       )
     }
 
     // Approved but the Razorpay subscription/checkout link isn't ready yet.
     if (t.status === 'awaiting_payment') {
       return (
-        <SidebarLayout currentStep={7}>
-          <div className="max-w-lg w-full rounded-2xl border border-[var(--org-apricot)] org-peach p-6 sm:p-8 text-center">
-            <p className="text-sm org-brown font-medium">
-              Payment link is being generated — please refresh in a moment.
+        <StatusLayout owner={who} tenant={t} currentStep={FINAL_STEP}>
+          <PageHeader eyebrow="Store application" title="Approved" actions={<Badge tone="sage">Approved</Badge>} />
+          <Card>
+            <p className="text-sm text-foreground-secondary">
+              {paymentsEnabled()
+                ? 'Payment link is being generated — please refresh in a moment.'
+                : 'Approved — your store setup is starting. Please refresh in a moment.'}
             </p>
-            <a
-              href="/onboard"
-              className="block w-full sm:inline-block sm:w-auto mt-4 px-5 py-3 sm:py-2.5 rounded-xl border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
-            >
+            <a href="/onboard" className={`${secondaryBtn} mt-4 w-full sm:w-auto`}>
               Refresh
             </a>
-          </div>
-        </SidebarLayout>
+          </Card>
+        </StatusLayout>
       )
     }
 
     // Paid → the engine is actively building infra. Show a setting-up state (no payment link).
     if (t.status === 'provisioning') {
       return (
-        <SidebarLayout currentStep={7}>
-          <div className="max-w-lg w-full rounded-2xl border border-border-default org-sand p-6 sm:p-8 text-center">
-            <div className="w-10 h-10 border-2 border-border-default border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <h1 className="text-lg font-bold org-brown">Setting up your store</h1>
-            <p className="text-sm org-brown mt-2 break-words">
-              Payment confirmed — we&apos;re provisioning <span className="font-semibold">{t.slug}.jeffistores.in</span>
-              . This takes a few minutes; you&apos;ll be emailed when it&apos;s live.
-            </p>
-            <a
-              href="/dashboard"
-              className="block w-full sm:inline-block sm:w-auto mt-5 px-5 py-3 sm:py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors"
-            >
+        <StatusLayout owner={who} tenant={t} currentStep={FINAL_STEP}>
+          <PageHeader eyebrow="Store application" title="Setting up your store" actions={<Badge tone="peach">Setting up</Badge>} />
+          <Card>
+            <div className="flex items-start gap-3 text-sm text-foreground-secondary">
+              <span className="mt-0.5 w-4 h-4 shrink-0 border-2 border-[var(--console-terracotta)] border-t-transparent rounded-full animate-spin" />
+              <p className="min-w-0 break-words">
+                {paymentsEnabled() ? 'Payment confirmed' : 'Approved'} — we&apos;re setting up{' '}
+                <span className="font-semibold text-foreground">{t.slug}.jeffistores.in</span>. This takes a few minutes;
+                you&apos;ll be emailed when it&apos;s live.
+              </p>
+            </div>
+            <a href="/dashboard" className={`${primaryBtn} mt-5 w-full sm:w-auto`}>
               Go to dashboard →
             </a>
-          </div>
-        </SidebarLayout>
+          </Card>
+        </StatusLayout>
       )
     }
 
     if (t.status === 'rejected') {
       return (
-        <SidebarLayout currentStep={6}>
-          <div className="max-w-lg w-full rounded-2xl border border-[#e0a89c] bg-[#f2d4cd] p-6 sm:p-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-[#f2d4cd] flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-6 h-6 text-[#8a2e1f]"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h1 className="text-lg font-bold text-[#8a2e1f]">Application rejected</h1>
-            <p className="text-sm text-[#8a2e1f] mt-2">
+        <StatusLayout owner={who} tenant={t} currentStep={REVIEW_STEP}>
+          <PageHeader eyebrow="Store application" title="Application rejected" actions={<Badge tone="red">Rejected</Badge>} />
+          <Card>
+            <p className="text-sm text-foreground-secondary">
               Your GST certificate or business details could not be verified. Please contact support.
             </p>
-            <a
-              href="mailto:support@jeffistores.in"
-              className="block w-full sm:inline-block sm:w-auto mt-5 px-5 py-3 sm:py-2.5 rounded-xl org-sand hover:org-sand text-white text-sm font-semibold transition-colors"
-            >
+            <a href="mailto:support@jeffistores.in" className={`${primaryBtn} mt-5 w-full sm:w-auto`}>
               Contact support
             </a>
-          </div>
-        </SidebarLayout>
+          </Card>
+        </StatusLayout>
       )
     }
 
     // pending_approval — under review
+    const [allPlans, priceRow] = await Promise.all([
+      listPlans('any'),
+      controlPlanePool()
+        .query<{ price: string | null }>(`SELECT price_inr_month AS price FROM tenant_compute WHERE tenant_id = $1`, [t.id])
+        .catch(() => ({ rows: [] as { price: string | null }[] })),
+    ])
+    const planName = allPlans.find(p => p.slug === t.plan)?.name ?? t.plan
+    const priceMonth = priceRow.rows[0]?.price == null ? null : Number(priceRow.rows[0].price)
+    const yearly = t.billing_interval === 'yearly'
     return (
-      <SidebarLayout currentStep={6}>
-        <div className="max-w-lg w-full rounded-2xl border border-[var(--org-apricot)] org-peach p-6 sm:p-8 text-center">
-          <div className="w-12 h-12 rounded-full org-peach flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-6 h-6 org-brown"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-            </svg>
-          </div>
-          <h1 className="text-lg font-bold org-brown">Under review</h1>
-          <p className="text-sm org-brown mt-2 break-words">
-            We&apos;re verifying your GST certificate for <span className="font-semibold">{t.display_name}</span> (
-            {t.slug}.jeffistores.in). This usually takes 1–2 business days. You&apos;ll receive an email once approved.
-          </p>
+      <StatusLayout owner={who} tenant={t} currentStep={REVIEW_STEP}>
+        <PageHeader
+          eyebrow="Store application"
+          title="Under review"
+          description="This usually takes 1–2 business days. You’ll receive an email once approved."
+          actions={<Badge tone="peach">Under review</Badge>}
+        />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card title="Application">
+            <div className="space-y-2.5">
+              <Row label="Store" value={t.display_name} />
+              <Row label="Subdomain" mono value={`${t.slug}.jeffistores.in`} />
+              {planName && <Row label="Plan" value={planName} />}
+              {planName && priceMonth != null && (
+                <Row label="Price" value={`${yearly ? `${inr(priceMonth * 10)}/yr` : `${inr(priceMonth)}/mo`} incl. GST`} />
+              )}
+            </div>
+          </Card>
+          <Card title="What happens next">
+            <p className="text-sm text-foreground-secondary break-words">
+              We&apos;re verifying your GST certificate for <span className="font-semibold text-foreground">{t.display_name}</span>.{' '}
+              {paymentsEnabled()
+                ? "Once approved, you'll complete payment and your store goes live."
+                : 'Once approved, we set up your store right away. Billing starts later.'}
+            </p>
+          </Card>
         </div>
-      </SidebarLayout>
+      </StatusLayout>
     )
   }
 
-  const [plans, draft] = await Promise.all([listPlans(), getDraft(owner.id)])
+  const [plans, draft, query] = await Promise.all([listPlans(), getDraft(owner.id), searchParams])
 
   // A submitted draft belongs to a store that already exists. Replaying it whole put the
   // PREVIOUS store's name, slug and plan into the form for a second store, with nothing to
@@ -259,11 +239,21 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
       }))(draft!.data ?? {})
     : (draft?.data ?? {})
 
+  // A plan picked on the pricing page starts the wizard on it, unless a draft is already in progress.
+  const picked = !draft || submitted ? pickedPlan(plans, query) : null
+  const initialDraft = draft
+    ? { current_step: submitted ? 0 : draft.current_step, data: picked ? { ...carried, ...picked } : carried }
+    : picked
+      ? { current_step: 0, data: picked }
+      : null
+
   return (
     <OnboardEntry
+      owner={who}
       plans={plans}
       computeEnabled={computeSpecEnabled()}
-      initialDraft={draft ? { current_step: submitted ? 0 : draft.current_step, data: carried } : null}
+      paymentsEnabled={paymentsEnabled()}
+      initialDraft={initialDraft}
       reusingPreviousDetails={submitted}
       ownerName={owner.name}
     />
@@ -274,13 +264,14 @@ export default async function OnboardPage({ searchParams }: { searchParams: Prom
 // with the business and bank details already on file.
 async function UpgradeWizard({
   ownerId,
-  ownerName,
+  owner,
   tenant,
 }: {
   ownerId: string
-  ownerName: string | null
+  owner: { email: string; name: string | null }
   tenant: { id: string; slug: string; display_name: string }
 }) {
+  const ownerName = owner.name
   const draft = await getDraft(ownerId)
   const reopened = draft?.status === 'submitted'
   if (reopened) await reopenDraft(ownerId)
@@ -313,8 +304,10 @@ async function UpgradeWizard({
   }
   return (
     <OnboardWizard
+      owner={owner}
       plans={plans}
       computeEnabled={computeSpecEnabled()}
+      paymentsEnabled={paymentsEnabled()}
       initialDraft={{ current_step: reopened ? 0 : (draft?.current_step ?? 0), data }}
       ownerName={ownerName}
       upgrade={{ tenantId: tenant.id, slug: tenant.slug, displayName: tenant.display_name }}

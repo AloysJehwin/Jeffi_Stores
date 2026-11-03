@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     const res = NextResponse.json({ deleted: true })
     const flags = `Path=/; Max-Age=0; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
-    const domain = getCookieDomain()
+    const domain = getCookieDomain(request.headers.get('x-forwarded-host') ?? request.headers.get('host'))
     for (const name of ['user_sid', 'session_id']) {
       res.headers.append('Set-Cookie', `${name}=; ${flags}`)
       if (domain) res.headers.append('Set-Cookie', `${name}=; Domain=${domain}; ${flags}`)

@@ -96,10 +96,12 @@ export {
   reopenDraft,
   saveKyc,
   getKyc,
+  getTenantWarehouse,
   approveKyc,
   rejectKyc,
   type OnboardingDraft,
   type TenantKyc,
+  type TenantWarehouse,
 } from './kyc'
 export {
   saveTenantSocialAccount,
@@ -125,6 +127,7 @@ export {
 } from './integrations'
 export {
   listCustomDomains,
+  routedCustomDomains,
   addCustomDomain,
   setCustomDomainStatus,
   getCustomDomain,

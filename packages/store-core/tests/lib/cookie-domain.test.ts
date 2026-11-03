@@ -66,6 +66,33 @@ describe('getCookieDomain', () => {
       expect(getCookieDomain()).toBe('specific.host.com')
     })
   })
+
+  describe('with a request host (production)', () => {
+    it('returns undefined for a custom store domain (host-only cookie)', () => {
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('COOKIE_DOMAIN', '')
+      expect(getCookieDomain('shop.brand.com')).toBeUndefined()
+      expect(getCookieDomain('notjeffistores.in')).toBeUndefined()
+    })
+
+    it('returns .jeffistores.in for a subdomain, ignoring case and port', () => {
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('COOKIE_DOMAIN', '')
+      expect(getCookieDomain('business.jeffistores.in')).toBe('.jeffistores.in')
+      expect(getCookieDomain('Acme.JeffiStores.in:443')).toBe('.jeffistores.in')
+    })
+
+    it('returns .jeffistores.in for the apex', () => {
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('COOKIE_DOMAIN', '')
+      expect(getCookieDomain('jeffistores.in')).toBe('.jeffistores.in')
+    })
+
+    it('stays undefined outside production even for a matching host', () => {
+      vi.stubEnv('NODE_ENV', 'development')
+      expect(getCookieDomain('jeffistores.in')).toBeUndefined()
+    })
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,6 +147,14 @@ describe('cookieDomainOption', () => {
         secure: true,
         domain: '.jeffistores.in',
       })
+    })
+
+    it('returns {} for a custom store domain and { domain } for a subdomain or apex', () => {
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('COOKIE_DOMAIN', '')
+      expect(cookieDomainOption('shop.brand.com')).toEqual({})
+      expect(cookieDomainOption('www.jeffistores.in')).toEqual({ domain: '.jeffistores.in' })
+      expect(cookieDomainOption('jeffistores.in')).toEqual({ domain: '.jeffistores.in' })
     })
 
     it('spreading in development does not add domain to cookie options', () => {

@@ -41,5 +41,8 @@ describe('dedicatedCapacityError', () => {
   it('counts vCPUs per instance size', () => {
     expect(vcpusFor('t4g.large')).toBe(2)
     expect(vcpusFor('t4g.xlarge')).toBe(4)
+    expect(vcpusFor('t4g.small')).toBe(2)
+    expect(vcpusFor('r7g.medium')).toBe(1)
+    expect(vcpusFor('m7g.2xlarge')).toBe(8)
   })
 })

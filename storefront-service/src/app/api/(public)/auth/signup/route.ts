@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       sameSite: 'lax' as const,
       maxAge: USER_SESSION_TTL_S,
       path: '/',
-      ...cookieDomainOption(),
+      ...cookieDomainOption(request.headers.get('x-forwarded-host') ?? request.headers.get('host')),
     }
     const res = NextResponse.json({
       message: 'Account created successfully',

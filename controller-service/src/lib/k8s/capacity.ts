@@ -4,10 +4,19 @@ import { legacySpecFor } from '@/lib/compute/legacy'
 // Guards plans that need a dedicated EC2 node while the account's On-Demand vCPU quota is too small.
 // EC2_VCPU_QUOTA (provisioning ConfigMap) is the applied quota; unset = no guard.
 
-const VCPU: Record<string, number> = { nano: 2, micro: 2, small: 2, medium: 2, large: 2, xlarge: 4, '2xlarge': 8 }
-
+/**
+ * vCPUs of an EC2 type, by AWS's naming: {n}xlarge is 4n and large 2 in every family; medium is 1
+ * outside the burstable families (r7g/m7g/c7g.medium); a burstable t3/t3a/t4g is 2 at any size below
+ * xlarge (t2 is 1 up to small). Unknown sizes count 2.
+ */
 export function vcpusFor(instanceType: string): number {
-  return VCPU[instanceType.split('.')[1] ?? ''] ?? 2
+  const [family = '', size = ''] = instanceType.split('.')
+  const xl = /^(\d*)xlarge$/.exec(size)
+  if (xl) return 4 * (Number(xl[1]) || 1)
+  if (size === 'large') return 2
+  if (family === 't2') return size === 'medium' ? 2 : 1
+  if (family.startsWith('t')) return 2
+  return size === 'medium' ? 1 : 2
 }
 
 export const CAPACITY_MESSAGE =

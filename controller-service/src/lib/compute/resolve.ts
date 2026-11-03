@@ -49,10 +49,10 @@ export async function resolveCompute(
   return { spec, ...computeParams(spec, await catalogOrDefault(), plan), nodeGen: row?.node_gen ?? 0 }
 }
 
-/** The spec's price per hour (margin included, GST not); null when a part has no price. */
-export async function rateFor(spec: ComputeSpec): Promise<number | null> {
+/** The spec's price per hour at the plan's infra margin (the global one when no plan is given); no GST or plan fee. Null when a part has no price. */
+export async function rateFor(spec: ComputeSpec, plan?: { infraMargin?: number }): Promise<number | null> {
   try {
-    return Math.round(quoteSpec(spec, await catalogOrDefault()).inrHour * 10000) / 10000
+    return Math.round(quoteSpec(spec, await catalogOrDefault(), plan).inrHour * 10000) / 10000
   } catch {
     return null
   }

@@ -255,6 +255,15 @@ export default async function SiteControlsPage() {
                         type="color"
                         initial={c.identity.emailAccent || '#2563eb'}
                       />
+                      <FullSpan>
+                        <TextAreaControl
+                          settingKey="business_hours"
+                          label="Business hours"
+                          hint="Shown on the Support page. One per line, e.g. Mon – Fri: 9 AM – 7 PM."
+                          initial={inv.business_hours ?? c.storefront.businessHours}
+                          rows={3}
+                        />
+                      </FullSpan>
                     </SectionCard>
                   </div>
                   <div>
@@ -282,6 +291,8 @@ export default async function SiteControlsPage() {
                           rows={3}
                         />
                       </FullSpan>
+                      <TextControl settingKey="business_city" label="City" initial={inv.business_city || ''} />
+                      <TextControl settingKey="business_pincode" label="Pincode" initial={inv.business_pincode || ''} />
                       <TextControl settingKey="business_state" label="State" initial={inv.business_state || ''} />
                       <TextControl
                         settingKey="business_state_code"
@@ -295,8 +306,34 @@ export default async function SiteControlsPage() {
                         initial={inv.invoice_prefix || 'JS'}
                       />
                       <FullSpan>
+                        <div className="flex items-center gap-3">
+                          {inv.business_seal_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={inv.business_seal_url}
+                              alt="Seal"
+                              className="h-12 w-12 rounded border border-border-default object-contain"
+                            />
+                          ) : null}
+                          <div className="flex-1">
+                            <TextControl
+                              settingKey="business_seal_url"
+                              label="Seal / signature URL"
+                              hint="Printed in the Authorised Signatory box on invoices and on your policy PDFs."
+                              initial={inv.business_seal_url || ''}
+                              placeholder="https://…/seal.png"
+                            />
+                          </div>
+                        </div>
+                      </FullSpan>
+                      <FullSpan>
                         <div className="pt-2 border-t border-border-default" />
                       </FullSpan>
+                      <TextControl
+                        settingKey="bank_holder_name"
+                        label="Account holder name"
+                        initial={inv.bank_holder_name || ''}
+                      />
                       <TextControl settingKey="bank_name" label="Bank name" initial={inv.bank_name || ''} />
                       <TextControl settingKey="bank_account" label="Account number" initial={inv.bank_account || ''} />
                       <TextControl settingKey="bank_ifsc" label="IFSC code" initial={inv.bank_ifsc || ''} />

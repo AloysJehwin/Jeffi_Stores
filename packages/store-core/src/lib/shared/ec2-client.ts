@@ -37,6 +37,7 @@ function xmlTagAll(xml: string, tag: string): string[] {
 export interface InstanceState {
   instanceType: string
   state: string
+  availabilityZone?: string
 }
 
 export async function describeInstance(instanceId: string): Promise<InstanceState> {
@@ -44,7 +45,25 @@ export async function describeInstance(instanceId: string): Promise<InstanceStat
   return {
     instanceType: xmlTag(xml, 'instanceType') ?? '',
     state: xmlTag(xml, 'name') ?? '', // <instanceState><name>running</name>
+    availabilityZone: xmlTag(xml, 'availabilityZone') ?? undefined, // <placement><availabilityZone>
   }
+}
+
+/** A live (not terminated) instance by its Name tag; null when there is none. */
+export async function findInstanceByName(name: string): Promise<{ instanceId: string; state: string; availabilityZone: string } | null> {
+  const xml = await ec2({
+    Action: 'DescribeInstances',
+    'Filter.1.Name': 'tag:Name',
+    'Filter.1.Value.1': name,
+    'Filter.2.Name': 'instance-state-name',
+    'Filter.2.Value.1': 'pending',
+    'Filter.2.Value.2': 'running',
+    'Filter.2.Value.3': 'stopping',
+    'Filter.2.Value.4': 'stopped',
+  })
+  const instanceId = xmlTag(xml, 'instanceId')
+  if (!instanceId) return null
+  return { instanceId, state: xmlTag(xml, 'name') ?? '', availabilityZone: xmlTag(xml, 'availabilityZone') ?? '' }
 }
 
 export async function stopInstance(instanceId: string): Promise<void> {
@@ -100,7 +119,7 @@ export interface BlockDeviceMapping {
   volumeType?: string // gp3 by default
   sizeGb: number
   deleteOnTermination?: boolean
-  volumeTags?: Record<string, string>
+  encrypted?: boolean
 }
 
 export interface RunInstanceArgs {
@@ -114,8 +133,8 @@ export interface RunInstanceArgs {
   appTag?: string
   metadataHopLimit?: number
   tags?: Record<string, string>
-  // Extra EBS volumes attached at launch (Basic db node: a tagged data disk that survives
-  // instance replacement — the replacement launches in the same AZ and re-attaches it).
+  // Extra EBS volumes created with the instance. They carry no tags: a TagSpecification of type volume
+  // would tag the root volume too (a store's database disk is created and tagged on its own instead).
   blockDeviceMappings?: BlockDeviceMapping[]
   availabilityZone?: string
 }
@@ -164,15 +183,7 @@ export async function runInstance(args: RunInstanceArgs): Promise<{ instanceId: 
     params[`BlockDeviceMapping.${n}.Ebs.VolumeSize`] = String(m.sizeGb)
     params[`BlockDeviceMapping.${n}.Ebs.VolumeType`] = m.volumeType || 'gp3'
     params[`BlockDeviceMapping.${n}.Ebs.DeleteOnTermination`] = String(m.deleteOnTermination ?? false)
-    // Tag the volume at creation so it survives instance replacement — described/attached by tag.
-    const tags = m.volumeTags
-    if (tags) {
-      params[`TagSpecification.2.ResourceType`] = 'volume'
-      Object.entries(tags).forEach(([k, v], j) => {
-        params[`TagSpecification.2.Tag.${j + 1}.Key`] = k
-        params[`TagSpecification.2.Tag.${j + 1}.Value`] = v
-      })
-    }
+    if (m.encrypted) params[`BlockDeviceMapping.${n}.Ebs.Encrypted`] = 'true'
   }
 
   const xml = await ec2(params)
@@ -287,16 +298,41 @@ export async function authorizeSgIngress(args: {
   }
 }
 
-// ── EBS data volumes (Basic db node — tag-tracked across instance replacement) ────
+// ── EBS data volumes (a store's on-node database disk, tagged and moved between its servers) ────
 
 export interface EbsVolume {
   volumeId: string
   availabilityZone: string
-  state: string
+  state: string // creating | available | in-use | deleting | ...
+  sizeGb: number
   attachedInstanceId: string | null
+  attachmentState: string | null // attaching | attached | detaching
 }
 
-/** The data volume (if any) tagged jeffi:role=db for this tenant slug. Null when none exists. */
+export const DB_VOLUME_TAGS = (slug: string) => ({ Name: `jeffi-db-${slug}`, 'jeffi-tenant': slug, 'jeffi:role': 'db' })
+
+/** Volume items of a DescribeVolumes answer (attachment items nest their own <volumeId>). */
+function parseVolumes(xml: string): (EbsVolume & { device: string | null })[] {
+  const starts = [...xml.matchAll(/<item>\s*<volumeId>vol-[0-9a-f]+<\/volumeId>\s*<size>/g)].map(m => m.index!)
+  return starts.map((at, i) => {
+    const item = xml.slice(at, starts[i + 1] ?? xml.length)
+    const att = item.match(/<attachmentSet>([\s\S]*?)<\/attachmentSet>/)?.[1] ?? ''
+    return {
+      volumeId: xmlTag(item, 'volumeId')!,
+      sizeGb: Number(xmlTag(item, 'size') ?? 0),
+      availabilityZone: xmlTag(item, 'availabilityZone') ?? '',
+      state: xmlTag(item.replace(att, ''), 'status') ?? '',
+      attachedInstanceId: xmlTag(att, 'instanceId'),
+      attachmentState: xmlTag(att, 'status'),
+      device: xmlTag(att, 'device'),
+    }
+  })
+}
+
+/**
+ * The store's database volume (tags jeffi:role=db + jeffi-tenant=slug); null when none. A disk on a
+ * root device is skipped: earlier launches tagged every volume of the instance, the root one included.
+ */
 export async function describeTenantDbVolume(slug: string): Promise<EbsVolume | null> {
   const xml = await ec2({
     Action: 'DescribeVolumes',
@@ -305,25 +341,70 @@ export async function describeTenantDbVolume(slug: string): Promise<EbsVolume | 
     'Filter.2.Name': 'tag:jeffi-tenant',
     'Filter.2.Value.1': slug,
   })
-  const volumeId = xmlTag(xml, 'volumeId')
-  if (!volumeId) return null
-  return {
-    volumeId,
-    availabilityZone: xmlTag(xml, 'availabilityZone') ?? '',
-    state: xmlTag(xml, 'status') ?? '',
-    // attachmentSet > item > instanceId
-    attachedInstanceId: xml.match(/<attachmentSet>[\s\S]*?<instanceId>([^<]+)<\/instanceId>/)?.[1] ?? null,
+  const vol = parseVolumes(xml).find(v => !['deleting', 'deleted', 'error'].includes(v.state) && !/^\/dev\/(xvda|sda1?)$/.test(v.device ?? ''))
+  if (!vol) return null
+  const { device: _d, ...rest } = vol
+  return rest
+}
+
+/** One volume by id; null when it no longer exists. */
+export async function describeVolume(volumeId: string): Promise<EbsVolume | null> {
+  try {
+    const vol = parseVolumes(await ec2({ Action: 'DescribeVolumes', 'VolumeId.1': volumeId }))[0]
+    if (!vol) return null
+    const { device: _d, ...rest } = vol
+    return rest
+  } catch (e: any) {
+    if (/InvalidVolume\.NotFound/i.test(e?.message || '')) return null
+    throw e
   }
 }
 
-/** Attach an existing EBS data volume to an instance at `deviceName` (e.g. /dev/sdf). Idempotent. */
+/** Create the store's encrypted gp3 database volume, tagged at creation (only this volume). */
+export async function createTenantDbVolume(args: { slug: string; availabilityZone: string; sizeGb: number }): Promise<string> {
+  const params: Record<string, string> = {
+    Action: 'CreateVolume',
+    AvailabilityZone: args.availabilityZone,
+    Size: String(args.sizeGb),
+    VolumeType: 'gp3',
+    Encrypted: 'true',
+    'TagSpecification.1.ResourceType': 'volume',
+  }
+  Object.entries(DB_VOLUME_TAGS(args.slug)).forEach(([k, v], i) => {
+    params[`TagSpecification.1.Tag.${i + 1}.Key`] = k
+    params[`TagSpecification.1.Tag.${i + 1}.Value`] = v
+  })
+  const id = xmlTag(await ec2(params), 'volumeId')
+  if (!id) throw new Error('CreateVolume returned no volumeId')
+  return id
+}
+
+/**
+ * Attach a volume to a running instance at `deviceName`. Already attached to that instance is success;
+ * anything else (a pending instance, the volume on another one) throws so the caller retries.
+ */
 export async function attachVolume(volumeId: string, instanceId: string, deviceName: string): Promise<void> {
   try {
     await ec2({ Action: 'AttachVolume', VolumeId: volumeId, InstanceId: instanceId, Device: deviceName })
   } catch (e: any) {
-    if (/VolumeInUse|IncorrectState/i.test(e?.message || '')) return
+    if (/VolumeInUse/i.test(e?.message || '') && (await describeVolume(volumeId))?.attachedInstanceId === instanceId) return
     throw e
   }
+}
+
+/** Detach a volume. Already detached is success. `force` only for a disk being retired. */
+export async function detachVolume(volumeId: string, opts: { force?: boolean } = {}): Promise<void> {
+  try {
+    await ec2({ Action: 'DetachVolume', VolumeId: volumeId, ...(opts.force ? { Force: 'true' } : {}) })
+  } catch (e: any) {
+    if (/IncorrectState|InvalidAttachment\.NotFound|InvalidVolume\.NotFound/i.test(e?.message || '')) return
+    throw e
+  }
+}
+
+/** Grow a volume (EBS never shrinks). The filesystem is grown on the node (node-user-data.ts). */
+export async function modifyVolumeSize(volumeId: string, sizeGb: number): Promise<void> {
+  await ec2({ Action: 'ModifyVolume', VolumeId: volumeId, Size: String(sizeGb) })
 }
 
 /** Point-in-time snapshot of a volume, tagged for the tenant. Returns the snapshot id. */
@@ -343,12 +424,34 @@ export async function snapshotVolume(volumeId: string, slug: string, description
   return id
 }
 
-/** Delete an EBS volume. Idempotent: NotFound is success. */
-export async function deleteVolume(volumeId: string): Promise<void> {
+/** pending | completed | error; null when the snapshot does not exist. */
+export async function describeSnapshotState(snapshotId: string): Promise<string | null> {
+  try {
+    const xml = await ec2({ Action: 'DescribeSnapshots', 'SnapshotId.1': snapshotId })
+    return xmlTag(xml, 'status')
+  } catch (e: any) {
+    if (/InvalidSnapshot\.NotFound/i.test(e?.message || '')) return null
+    throw e
+  }
+}
+
+/**
+ * Delete an EBS volume. Idempotent: gone is success. A volume still attached (its instance is shutting
+ * down) is waited on until it is `available`, at most `waitMs`; past that it throws, never deletes.
+ */
+export async function deleteVolume(volumeId: string, opts: { waitMs?: number } = {}): Promise<void> {
+  const until = Date.now() + (opts.waitMs ?? 5 * 60_000)
+  for (;;) {
+    const vol = await describeVolume(volumeId)
+    if (!vol || vol.state === 'deleting' || vol.state === 'deleted') return
+    if (vol.state === 'available') break
+    if (Date.now() >= until) throw new Error(`volume ${volumeId} is still ${vol.state}${vol.attachedInstanceId ? ` on ${vol.attachedInstanceId}` : ''}; not deleted`)
+    await new Promise(r => setTimeout(r, 5000))
+  }
   try {
     await ec2({ Action: 'DeleteVolume', VolumeId: volumeId })
   } catch (e: any) {
-    if (/InvalidVolume\.NotFound|NotFound/i.test(e?.message || '')) return
+    if (/InvalidVolume\.NotFound/i.test(e?.message || '')) return
     throw e
   }
 }

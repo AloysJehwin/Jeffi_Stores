@@ -1,5 +1,5 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
-import { listPlans } from '@/lib/tenant-registry'
+import { listPlans, controlPlanePool } from '@/lib/tenant-registry'
 import { getSubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import PageHeader from '../_components/PageHeader'
 import BillingClient from './BillingClient'
@@ -12,7 +12,13 @@ export const dynamic = 'force-dynamic'
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const { tenant: tenantSlug } = await searchParams
   const { tenant } = await loadOwnerContext({ tenantSlug })
-  const plans = await listPlans()
+  const [plans, priceRow] = await Promise.all([
+    listPlans('any'),
+    controlPlanePool()
+      .query<{ price: string | null }>(`SELECT price_inr_month AS price FROM tenant_compute WHERE tenant_id = $1`, [tenant.id])
+      .catch(() => ({ rows: [] as { price: string | null }[] })),
+  ])
+  const priceInrMonth = priceRow.rows[0]?.price == null ? null : Number(priceRow.rows[0].price)
 
   let renewalDate: string | null = null
   if (tenant.razorpay_subscription_id && tenant.subscription_status === 'active') {
@@ -34,7 +40,13 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       <PageHeader eyebrow="Account" title="Billing" description="Your plan, renewal, add-ons and subscription controls." />
       <div className="space-y-8">
         {adFree && <AdFreeCard initial={adFree} tenantSlug={tenant.slug} />}
-        <BillingClient tenant={tenant} plans={plans} renewalDate={renewalDate} />
+        <BillingClient
+          tenant={tenant}
+          plans={plans}
+          renewalDate={renewalDate}
+          priceInrMonth={priceInrMonth}
+          paymentsEnabled={process.env.ECOM_PAYMENTS_ENABLED === 'true'}
+        />
       </div>
     </>
   )

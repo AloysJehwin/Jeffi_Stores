@@ -121,7 +121,7 @@ describe('renderTenantWorkload', () => {
     }) as any[]
     const cert = byKind(objs, 'Certificate')[0]
     expect(cert.spec).toMatchObject({ dnsNames: ['shop.acme.com'], issuerRef: { name: 'letsencrypt-http' } })
-    const route = byKind(objs, 'IngressRoute', 'custom-0')[0]
+    const route = byKind(objs, 'IngressRoute', 'custom-shop.acme.com')[0]
     expect(route.spec.tls.secretName).toBe(cert.spec.secretName)
   })
 

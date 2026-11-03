@@ -250,10 +250,16 @@ export default function InvoiceView({ order, items, settings, token }: Props) {
           </div>
 
           {/* Bank details (non-cash) */}
-          {settings.bank_name && !isCashSale && (
+          {(settings.bank_account || settings.bank_name) && !isCashSale && (
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm">
               <p className="font-semibold text-gray-600 mb-2">Bank Details</p>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-gray-500">
+                {(settings.bank_holder_name || settings.business_legal_name) && (
+                  <>
+                    <span className="text-gray-400">A/c Holder</span>
+                    <span>{settings.bank_holder_name || settings.business_legal_name}</span>
+                  </>
+                )}
                 {settings.bank_name && (
                   <>
                     <span className="text-gray-400">Bank</span>

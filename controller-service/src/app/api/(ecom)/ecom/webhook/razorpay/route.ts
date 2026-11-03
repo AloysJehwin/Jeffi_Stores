@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       // directly, so no subscription is created and this charged path does not fire — it stays here
       // so re-enabling payments restores the first-charge-starts-store flow unchanged.
       if (tenant.store_request === 'awaiting_payment' || (!tenant.store_request && tenant.status !== 'active' && tenant.status !== 'provisioning')) {
-        // The plan is paid; the store is built once its wallet also holds the servers' first days.
+        // First charge: the subscription covers the plan fee and the servers, so the store starts now.
         await setSubscriptionStatus(tenant.id, 'active')
         await startStoreIfReady(tenant.id)
       } else {

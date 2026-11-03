@@ -11,6 +11,7 @@ import { Card, Row } from '../_components/Card'
 type ComparisonRow = { group: string; label: string; scopeKey: string | null }
 
 type ApplyMode = 'window' | 'now'
+type Interval = 'monthly' | 'yearly'
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
 
@@ -19,6 +20,7 @@ const STATUS: Record<string, string> = {
   applying: 'Being applied',
   failed: 'Could not be applied',
   paused: 'Paused',
+  scheduled: 'At your next renewal',
 }
 
 const summary = (s: ComputeSpec) =>
@@ -47,10 +49,11 @@ function planDelta(from: string, to: string, matrix: Record<string, string[]>, r
 export default function ComputeClient({
   tenantId,
   planSlug,
-  planFeeInr,
+  billingInterval,
   current,
   change,
-  rateInrHour,
+  priceInrMonth,
+  paymentsEnabled,
   paused,
   plans,
   featureMatrix,
@@ -58,10 +61,12 @@ export default function ComputeClient({
 }: {
   tenantId: string
   planSlug: string
-  planFeeInr: number
+  billingInterval: Interval
   current: ComputeSpec
   change: { desired: ComputeSpec; status: string; error: string | null; applyMode: ApplyMode } | null
-  rateInrHour: number | null
+  /** What the running servers cost on the current plan, per month (plan fee and GST included). */
+  priceInrMonth: number | null
+  paymentsEnabled: boolean
   paused: boolean
   plans: { slug: string; name: string }[]
   featureMatrix: Record<string, string[]>
@@ -70,6 +75,7 @@ export default function ComputeClient({
   const router = useRouter()
   const [choice, setChoice] = useState<ComputeChoice | null>(null)
   const [nextPlan, setNextPlan] = useState<string>(planSlug)
+  const [interval, setInterval] = useState<Interval>(billingInterval)
   const [applyMode, setApplyMode] = useState<ApplyMode>(change?.applyMode ?? 'window')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -77,23 +83,27 @@ export default function ComputeClient({
   const next = choice?.spec ?? null
   const specChanged = !!next && specKey(next) !== specKey(current)
   const planChanged = nextPlan !== planSlug
-  const changed = specChanged || planChanged
+  const intervalChanged = interval !== billingInterval
+  const changed = specChanged || planChanged || intervalChanged
   const what = next && specChanged ? describeChange(current, next, applyMode) : null
   const delta = planChanged ? planDelta(planSlug, nextPlan, featureMatrix, comparisonRows) : { gained: [], lost: [] }
   const planName = (slug: string) => plans.find(p => p.slug === slug)?.name ?? slug
 
+  // A plan or billing change goes through the subscription (/api/ecom/plan); a resize on the same plan is a compute change.
   async function apply() {
     if (!next) return
     setSaving(true)
     setError(null)
-    const r = await fetch('/api/ecom/compute', {
-      method: 'PUT',
+    const viaPlan = planChanged || intervalChanged
+    const r = await fetch(viaPlan ? '/api/ecom/plan' : '/api/ecom/compute', {
+      method: viaPlan ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantId, spec: next, applyMode, planSlug: nextPlan }),
+      body: JSON.stringify(viaPlan ? { tenantId, planSlug: nextPlan, spec: next, billingInterval: interval, applyMode } : { tenantId, spec: next, applyMode }),
     }).catch(() => null)
     const d = await r?.json().catch(() => null)
     setSaving(false)
     if (!r?.ok) return setError(d?.error || 'Could not save the change. Try again.')
+    if (d?.checkoutUrl) return void (window.location.href = d.checkoutUrl)
     router.refresh()
   }
 
@@ -103,7 +113,13 @@ export default function ComputeClient({
         <div className="space-y-2">
           <Row label="Plan" value={planName(planSlug)} />
           <Row label="Servers" value={summary(current)} />
-          {rateInrHour != null && <Row label="Cost" value={`${inr(rateInrHour * 730)}/month (${inr(rateInrHour * 24)}/day) + GST`} />}
+          <Row label="Billing" value={<span className="capitalize">{billingInterval}</span>} />
+          {priceInrMonth != null && (
+            <Row
+              label="Cost"
+              value={`${inr(priceInrMonth)}/month incl. GST${billingInterval === 'yearly' ? ` (${inr(priceInrMonth * 10)}/year)` : ''}`}
+            />
+          )}
           {change && (
             <Row
               label="Change"
@@ -128,11 +144,20 @@ export default function ComputeClient({
             <ComputeConfigurator
               planSlug={nextPlan}
               onPlanChange={setNextPlan}
-              value={change?.desired ?? current}
+              value={choice?.spec ?? change?.desired ?? current}
               onChange={setChoice}
               current={current}
-              planFeeInr={planFeeInr}
             />
+            <div>
+              <div className="mb-1 text-sm font-medium text-foreground">Billing</div>
+              <Segmented<Interval>
+                ariaLabel="Billing interval"
+                size="sm"
+                value={interval}
+                onChange={setInterval}
+                options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: '2 months free' }]}
+              />
+            </div>
 
             {changed && (
               <div className="space-y-3 rounded-xl border border-border-default p-4">
@@ -140,6 +165,11 @@ export default function ComputeClient({
                 {planChanged && (
                   <div className="text-sm text-foreground-secondary">
                     Plan: <span className="font-medium text-foreground">{planName(planSlug)}</span> → <span className="font-medium text-foreground">{planName(nextPlan)}</span>
+                  </div>
+                )}
+                {intervalChanged && (
+                  <div className="text-sm text-foreground-secondary">
+                    Billing: <span className="font-medium capitalize text-foreground">{billingInterval}</span> → <span className="font-medium capitalize text-foreground">{interval}</span>
                   </div>
                 )}
                 {delta.gained.length > 0 && (
@@ -175,7 +205,7 @@ export default function ComputeClient({
                   />
                 )}
                 <p className="text-xs text-foreground-muted">
-                  Plan changes are billed on your subscription (upgrade now, downgrade at renewal). Server changes {what?.classChange ? (applyMode === 'now' ? 'apply right away.' : 'apply in the maintenance window.') : 'apply right away.'}
+                  {paymentsEnabled ? 'Plan changes are billed on your subscription (upgrade now, downgrade at renewal).' : 'Plan changes apply now.'} Server changes {what?.classChange ? (applyMode === 'now' ? 'apply right away.' : 'apply in the maintenance window.') : 'apply right away.'}
                 </p>
               </div>
             )}

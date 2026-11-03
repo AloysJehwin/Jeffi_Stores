@@ -60,7 +60,7 @@ export async function provisionTenantOwnerAdmin(opts: {
     let lastConnErr: any
     for (let attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt++) {
       try {
-        await runWithTenantContext(ctx, () => createOwnerAdmin(opts, grantedScopes, storeName))
+        await runWithTenantContext(ctx, () => createOwnerAdmin({ ...opts, ownerPhone: ctx.ownerMobile }, grantedScopes, storeName))
         return { success: true }
       } catch (err: any) {
         const msg = err?.message ?? String(err)
@@ -84,6 +84,7 @@ async function createOwnerAdmin(
     ownerEmail: string
     ownerName: string | null
     storeName?: string | null
+    ownerPhone?: string | null
   },
   grantedScopes: string[],
   storeName: string
@@ -114,13 +115,14 @@ async function createOwnerAdmin(
   // so this never created an owner admin, never issued a certificate and never sent the
   // email — while provisioning still reported done, because the caller swallowed the error.
   // user_type is NOT NULL and must be given explicitly for the conflict target to match.
+  // The KYC mobile, unverified, so the admin's profile isn't blank; never replaces one already set.
   const userRow = await queryOne<{ id: string }>(
-    `INSERT INTO users (email, first_name, last_name, is_active, user_type)
-     VALUES ($1, $2, $3, true, 'customer')
+    `INSERT INTO users (email, first_name, last_name, phone, is_active, user_type)
+     VALUES ($1, $2, $3, $4, true, 'customer')
      ON CONFLICT (email, user_type) DO UPDATE
-       SET first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name
+       SET first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, phone=COALESCE(users.phone, EXCLUDED.phone)
      RETURNING id`,
-    [opts.ownerEmail, firstName, lastName]
+    [opts.ownerEmail, firstName, lastName, opts.ownerPhone || null]
   )
   const userId = userRow!.id
 
@@ -189,16 +191,18 @@ async function createOwnerAdmin(
   )
 }
 
-async function resolveTenantCtx(tenantId: string): Promise<TenantContext | null> {
+async function resolveTenantCtx(tenantId: string): Promise<(TenantContext & { ownerMobile: string | null }) | null> {
   const { controlPlanePool } = await import('@/lib/tenant-registry')
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.display_name, p.slug AS plan,
-            i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.iam_auth, i.s3_bucket, i.region
+    `SELECT t.id, t.slug, t.display_name, p.slug AS plan, k.mobile,
+            i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.iam_auth, i.db_secret_ref, i.s3_bucket, i.region
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
-     WHERE t.id = $1`,
+     LEFT JOIN tenant_kyc k ON k.tenant_id = t.id
+     WHERE t.id = $1
+     LIMIT 1`,
     [tenantId]
   )
   const r = res.rows[0]
@@ -208,12 +212,14 @@ async function resolveTenantCtx(tenantId: string): Promise<TenantContext | null>
     slug: r.slug,
     displayName: r.display_name ?? null,
     plan: r.plan ?? null,
+    ownerMobile: r.mobile?.trim() || null,
     infra: {
       rdsEndpoint: r.rds_endpoint,
       rdsDb: r.rds_db || 'jeffi_stores',
       rdsPort: r.rds_port || 5432,
       rdsUser: r.rds_user ?? null,
-      dbSecretRef: null,
+      // A store's own on-node Postgres logs in with this secret's password (iam_auth false).
+      dbSecretRef: r.db_secret_ref ?? null,
       iamAuth: r.iam_auth !== false,
       s3Bucket: r.s3_bucket ?? null,
       region: r.region || 'us-east-1',

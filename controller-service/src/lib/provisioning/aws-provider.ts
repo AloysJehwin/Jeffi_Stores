@@ -20,12 +20,12 @@ import {
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3'
-import { Pool } from 'pg'
-import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
+import type { Pool } from 'pg'
 import { buildTenantSchemaSql } from '@controller/lib/tenant-migrations-schema'
 import { dumpTenantDb, restoreTenantDb } from '@controller/lib/tenancy/tenant-db-backup'
 import { upsertTenantDns, deleteTenantDns } from '@controller/lib/tenancy/tenant-dns'
 import type { ProvisioningProvider, CreateDbInstanceArgs, DbInstanceState, ModifyDbInstanceArgs } from './provider'
+import { dbTarget, isNodeDb, tenantAdminPool, type DbAuth } from './tenant-admin-pool'
 
 /**
  * Real AWS provisioning provider (Route/RDS/S3).
@@ -236,12 +236,15 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     return null
   }
 
-  async loadSchema(endpoint: string, dbName: string, appUser = APP_IAM_USER): Promise<void> {
+  async loadSchema(endpoint: string, dbName: string, appUser = APP_IAM_USER, db?: DbAuth): Promise<void> {
     const user = ident(appUser)
-    const pool = this.tenantPool(endpoint, dbName)
+    const target = dbTarget(endpoint, dbName, db)
+    const pool = await tenantAdminPool(target)
     try {
       // 1. Apply desired-state schema (reuse the fan-out builder for identical ordering)
       await pool.query(buildTenantSchemaSql())
+      // An on-node Postgres has no rds_iam and no app login: the store connects as its superuser.
+      if (isNodeDb(target)) return
 
       // 2. Create the app login role with rds_iam so the app can connect via IAM token
       await pool.query(`
@@ -262,7 +265,7 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async initSharedDbHost(endpoint: string): Promise<void> {
-    const pool = this.tenantPool(endpoint, 'postgres')
+    const pool = await this.tenantPool(endpoint, 'postgres')
     try {
       for (const db of ['postgres', 'template1', 'jeffi_stores']) {
         const found = await pool.query('SELECT 1 FROM pg_database WHERE datname = $1', [db])
@@ -274,7 +277,7 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async createTenantDatabase(endpoint: string, dbName: string, role: string): Promise<void> {
-    const pool = this.tenantPool(endpoint, 'postgres')
+    const pool = await this.tenantPool(endpoint, 'postgres')
     try {
       const found = await pool.query('SELECT 1 FROM pg_database WHERE datname = $1', [dbName])
       if (!found.rowCount) await pool.query(`CREATE DATABASE ${ident(dbName)}`)
@@ -289,7 +292,7 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async dropTenantDatabase(endpoint: string, dbName: string, role: string | null): Promise<void> {
-    const pool = this.tenantPool(endpoint, 'postgres')
+    const pool = await this.tenantPool(endpoint, 'postgres')
     try {
       await pool.query(`DROP DATABASE IF EXISTS ${ident(dbName)} WITH (FORCE)`)
       if (role) await pool.query(`DROP ROLE IF EXISTS ${ident(role)}`)
@@ -298,8 +301,8 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     }
   }
 
-  async backupDb(endpoint: string, dbName: string): Promise<Buffer> {
-    const pool = this.tenantPool(endpoint, dbName)
+  async backupDb(endpoint: string, dbName: string, db?: DbAuth): Promise<Buffer> {
+    const pool = await tenantAdminPool(dbTarget(endpoint, dbName, db))
     try {
       return await dumpTenantDb(pool, { database: dbName })
     } finally {
@@ -307,8 +310,8 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     }
   }
 
-  async restoreDb(endpoint: string, dbName: string, archive: Buffer): Promise<void> {
-    const pool = this.tenantPool(endpoint, dbName)
+  async restoreDb(endpoint: string, dbName: string, archive: Buffer, db?: DbAuth): Promise<void> {
+    const pool = await tenantAdminPool(dbTarget(endpoint, dbName, db))
     try {
       await restoreTenantDb(pool, archive)
     } finally {
@@ -316,27 +319,9 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     }
   }
 
-  /** Build a pg pool to a tenant DB as the MASTER user (for DDL + data ops).
-   * The master user (postgres) authenticates by PASSWORD, not IAM — IAM auth only
-   * works for roles explicitly granted rds_iam (e.g. app_user, which loadSchema creates).
-   * Uses RDS_MASTER_PASSWORD, the same secret passed to CreateDBInstance. */
-  private tenantPool(endpoint: string, dbName: string): Pool {
-    const masterPassword = process.env.RDS_MASTER_PASSWORD
-    if (!masterPassword) {
-      throw new Error(
-        'RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for schema load / backup / restore'
-      )
-    }
-    return createPgPool({
-      host: endpoint,
-      port: 5432,
-      database: dbName,
-      user: RDS_MASTER_USER,
-      password: masterPassword,
-      ssl: rdsSslOption(),
-      max: 2,
-      connectionTimeoutMillis: 20000,
-    })
+  /** A shared Starter host's maintenance database as the RDS master user (password, not IAM). */
+  private tenantPool(endpoint: string, dbName: string): Promise<Pool> {
+    return tenantAdminPool({ endpoint, dbName })
   }
 
   async ensureBucket(bucket: string): Promise<void> {

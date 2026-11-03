@@ -7,7 +7,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const identity = await getStoreIdentity()
   const content = await getStorefrontContent()
   const name = identity.name?.trim() || 'Store'
-  const logo = identity.logoUrl?.trim()
+  const logo = identity.faviconUrl?.trim() || identity.logoUrl?.trim()
 
   return {
     name,
@@ -18,7 +18,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     display: 'standalone',
     background_color: schemes.light.surface,
     theme_color: schemes.light.surfaceElevated,
-    // Same choice as the tab icon in app/layout.tsx: the tenant's logo, else the platform icons.
+    // Same choice as the tab icon in RootLayout: the store's favicon or logo, else the platform icons.
     icons: logo
       ? [{ src: logo, sizes: 'any', purpose: 'any' }]
       : [

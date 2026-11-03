@@ -4,8 +4,7 @@ import { runDomainVerifyCron } from '@controller/lib/domains/verify-cron'
 
 export const dynamic = 'force-dynamic'
 
-// Runs every ~10 min from k8s CronJob `custom-domain-verify` (deploy/k8s/platform/custom-domain-cron.yaml).
-// Auth: Bearer ${CRON_SECRET}.
+// CRON_JOBS `custom_domain_verify` (every 10 min). Auth: Bearer ${CRON_SECRET}.
 export async function POST(request: NextRequest) {
   if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

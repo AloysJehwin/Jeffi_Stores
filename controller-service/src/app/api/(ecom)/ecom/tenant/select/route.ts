@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     sameSite: 'lax',
     maxAge: 30 * 24 * 60 * 60,
     path: '/',
-    ...cookieDomainOption(),
+    ...cookieDomainOption(request.headers.get('x-forwarded-host') ?? request.headers.get('host')),
   })
   return res
 }

@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
-import { Pool } from 'pg'
-import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
+import type { Pool } from 'pg'
+import { tenantAdminPool } from '@controller/lib/provisioning/tenant-admin-pool'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { buildTenantSchemaSql, desiredTableColumns } from '@controller/lib/tenant-migrations-schema'
 import { repoPath } from '@/lib/shared/paths'
@@ -22,32 +22,22 @@ import { repoPath } from '@/lib/shared/paths'
  */
 
 /**
- * Build a short-lived pool to a tenant's RDS as the MASTER user (password auth).
+ * A short-lived pool to a tenant's database as its admin (tenantAdminPool): the RDS master user by
+ * password, or `jeffi` on a store's own on-node Postgres.
  *
  * The fan-out runs DDL (CREATE TABLE/EXTENSION, ALTER, …). app_user is granted privileges
  * on existing tables/sequences at provisioning time but NOT CREATE on schema public, so
  * connecting via IAM as app_user fails with "permission denied for schema public" the
  * moment the schema tries to create a new object. Provisioning's own loadSchema connects
- * as the master user for exactly this reason (aws-provider.tenantPool) — mirror that here.
+ * as the admin for exactly this reason — mirror that here.
  */
-function tenantPool(infra: { rdsEndpoint: string; rdsPort: number; rdsDb: string }): Pool {
-  const masterUser = process.env.TENANT_RDS_MASTER_USER || 'postgres'
-  const masterPassword = process.env.RDS_MASTER_PASSWORD
-  if (!masterPassword) {
-    throw new Error(
-      'RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for the schema fan-out'
-    )
-  }
-  return createPgPool({
-    host: infra.rdsEndpoint,
-    port: infra.rdsPort,
-    database: infra.rdsDb,
-    user: masterUser,
-    password: masterPassword,
-    ssl: rdsSslOption(),
-    max: 2,
-    connectionTimeoutMillis: 15000,
-    idleTimeoutMillis: 10000,
+function tenantPool(t: TenantTarget): Promise<Pool> {
+  return tenantAdminPool({
+    endpoint: t.rds_endpoint,
+    port: t.rds_port || 5432,
+    dbName: t.rds_db || 'jeffi_stores',
+    iamAuth: t.iam_auth,
+    dbSecretRef: t.db_secret_ref,
   })
 }
 
@@ -58,12 +48,14 @@ interface TenantTarget {
   rds_port: number
   rds_db: string
   region: string
+  iam_auth: boolean | null
+  db_secret_ref: string | null
 }
 
 async function listActiveTenantTargets(): Promise<TenantTarget[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, i.rds_endpoint, i.rds_port, i.rds_db, i.region
+    `SELECT t.id, t.slug, i.rds_endpoint, i.rds_port, i.rds_db, i.region, i.iam_auth, i.db_secret_ref
      FROM tenants t
      JOIN tenant_infra i ON i.tenant_id = t.id
      WHERE t.status = 'active' AND i.rds_endpoint IS NOT NULL`
@@ -239,7 +231,7 @@ export async function runMigrationFanout(gitSha: string): Promise<FanoutResult> 
 
     let pool: Pool | null = null
     try {
-      pool = tenantPool({ rdsEndpoint: t.rds_endpoint, rdsPort: t.rds_port || 5432, rdsDb: t.rds_db || 'jeffi_stores' })
+      pool = await tenantPool(t)
       await applySchemaToTenant(pool, schemaSql, desired)
       await recordRun(t.id, gitSha, 'success')
       result.applied++
@@ -299,7 +291,7 @@ export async function runMigrationFilesFanout(gitSha: string): Promise<FanoutRes
   for (const t of targets) {
     let pool: Pool | null = null
     try {
-      pool = tenantPool({ rdsEndpoint: t.rds_endpoint, rdsPort: t.rds_port || 5432, rdsDb: t.rds_db || 'jeffi_stores' })
+      pool = await tenantPool(t)
       await pool.query(SCHEMA_MIGRATIONS_DDL)
       const doneRes = await pool.query('SELECT filename FROM schema_migrations')
       const done = new Set<string>(doneRes.rows.map((r: { filename: string }) => r.filename))

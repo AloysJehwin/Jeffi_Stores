@@ -11,7 +11,7 @@ import {
   type TenantService,
   type TenantWorkloadInput,
 } from './tenant-workload'
-import { agentNodeUserData } from './node-user-data'
+import { agentNodeUserData, DB_READY_LABEL } from './node-user-data'
 import {
   dedicatedNodeName,
   isTenantNodeName,
@@ -49,7 +49,9 @@ function nodeLaunchConfig() {
     server,
     imageId,
     securityGroupId,
-    iamProfile: process.env.K8S_NODE_IAM_PROFILE || 'jeffi-stores-ec2-profile',
+    // Store and pool servers get the tenant-node profile (no access to other stores' database secrets);
+    // the core's profile only until K8S_TENANT_NODE_IAM_PROFILE is set (service-secrets-iam.sh).
+    iamProfile: process.env.K8S_TENANT_NODE_IAM_PROFILE || process.env.K8S_NODE_IAM_PROFILE || 'jeffi-stores-ec2-profile',
   }
 }
 
@@ -65,10 +67,14 @@ export function poolCapacity(node: any): number {
 const isReady = (node: any) =>
   !!node?.status?.conditions?.some((c: any) => c.type === 'Ready' && c.status === 'True') && !node?.spec?.unschedulable
 
-// A tenant's db-mode Postgres lives on a tagged gp3 data volume that outlives the node
-// instance. On first launch we create it (DeleteOnTermination=false); on a replacement we
-// find it by tag, launch into its AZ, then re-attach after boot.
-const DB_DEVICE_NAME = '/dev/sdf' // surfaces as /dev/nvme1n1 on Nitro arm64
+// A store's on-node Postgres lives on its tagged, encrypted gp3 data volume (ec2-client DB_VOLUME_TAGS),
+// which outlives its servers. It is created in the AZ of the store's first server once that runs, attached
+// at /dev/sdf, and mounted by the server's db agent (node-user-data.ts), which then labels the node
+// jeffi.io/db-ready=true: the Postgres pod's nodeSelector, so it only ever starts on the mounted disk.
+// A later server of the store is launched in the volume's AZ; handOffNodeDb moves the volume to it.
+export { DB_READY_LABEL }
+export const DB_AGENT_LABEL = 'jeffi.io/db-agent'
+const DB_DEVICE_NAME = '/dev/sdf'
 
 async function launchNode(
   nodeName: string,
@@ -76,14 +82,11 @@ async function launchNode(
   labels: Record<string, string>,
   taints: string[] = [],
   tags?: Record<string, string>,
-  dbVolume?: { slug: string; sizeGb: number }
+  opts: { dbAgent?: boolean; availabilityZone?: string } = {}
 ) {
-  const { runInstance, describeTenantDbVolume, attachVolume } = await import('@/lib/shared/ec2-client')
+  const { runInstance } = await import('@/lib/shared/ec2-client')
   const cfg = nodeLaunchConfig()
-  // Replacement path: a volume already exists for this tenant → launch into its AZ and re-attach.
-  const existing = dbVolume ? await describeTenantDbVolume(dbVolume.slug) : null
-  const extraUserData = dbVolume ? dbNodeUserDataFragment() : ''
-  const result = await runInstance({
+  return runInstance({
     name: `jeffi-k8s-${nodeName}`,
     instanceType,
     imageId: cfg.imageId,
@@ -92,51 +95,50 @@ async function launchNode(
     appTag: 'jeffi-k8s',
     metadataHopLimit: 2,
     tags,
-    userData: agentNodeUserData({ nodeName, labels, taints, server: cfg.server, extra: extraUserData }),
-    ...(existing ? { availabilityZone: existing.availabilityZone } : {}),
-    // Only on first launch — a replacement attaches the existing volume after boot.
-    ...(dbVolume && !existing
-      ? {
-          blockDeviceMappings: [
-            {
-              deviceName: DB_DEVICE_NAME,
-              sizeGb: dbVolume.sizeGb,
-              volumeType: 'gp3',
-              deleteOnTermination: false,
-              volumeTags: {
-                Name: `jeffi-db-${dbVolume.slug}`,
-                'jeffi-tenant': dbVolume.slug,
-                'jeffi:role': 'db',
-              },
-            },
-          ],
-        }
-      : {}),
+    userData: agentNodeUserData({ nodeName, labels, taints, server: cfg.server, dbAgent: opts.dbAgent }),
+    ...(opts.availabilityZone ? { availabilityZone: opts.availabilityZone } : {}),
   })
-  if (dbVolume && existing && !existing.attachedInstanceId) {
-    await attachVolume(existing.volumeId, result.instanceId, DB_DEVICE_NAME).catch(e =>
-      console.error(`[tenant-compute] attach db volume ${existing.volumeId} to ${result.instanceId}: ${e?.message}`)
-    )
-  }
-  return result
 }
 
-/** cloud-init fragment that formats /dev/nvme1n1 if empty and mounts it at /var/lib/jeffi/db. */
-function dbNodeUserDataFragment(): string {
-  return `
-# Basic-plan db-node data disk: format if empty, mount at /var/lib/jeffi/db.
-DEV=/dev/nvme1n1
-MNT=/var/lib/jeffi/db
-mkdir -p "$MNT"
-# Wait for the volume to attach (replacement path attaches post-boot).
-for i in 1 2 3 4 5 6 7 8 9 10; do [ -b "$DEV" ] && break; sleep 3; done
-if [ -b "$DEV" ]; then
-  if ! blkid "$DEV" >/dev/null 2>&1; then mkfs.ext4 -F "$DEV"; fi
-  UUID=$(blkid -s UUID -o value "$DEV")
-  grep -q "$UUID" /etc/fstab || echo "UUID=$UUID $MNT ext4 defaults,noatime 0 2" >> /etc/fstab
-  mountpoint -q "$MNT" || mount "$MNT"
-fi
-`
+/** A store server's instance: by the id a launch recorded, else by its Name tag. */
+async function serverInstance(nodeName: string, instanceId?: string) {
+  const ec2 = await import('@/lib/shared/ec2-client')
+  if (!instanceId) return ec2.findInstanceByName(`jeffi-k8s-${nodeName}`)
+  try {
+    const d = await ec2.describeInstance(instanceId)
+    return d.state ? { instanceId, state: d.state, availabilityZone: d.availabilityZone ?? '' } : null
+  } catch (e) {
+    if (ec2.isInstanceNotFound(e)) return null
+    throw e
+  }
+}
+
+/**
+ * The store's database volume on its server `nodeName`: created in that server's AZ when the store has
+ * none, attached when it is free. A volume still on another server is left to handOffNodeDb.
+ */
+export async function ensureNodeDbVolume(
+  slug: string,
+  nodeName: string,
+  sizeGb: number,
+  instanceId?: string
+): Promise<{ attached: boolean; detail: string }> {
+  const ec2 = await import('@/lib/shared/ec2-client')
+  const inst = await serverInstance(nodeName, instanceId)
+  if (!inst || inst.state !== 'running') return { attached: false, detail: `waiting for ${nodeName} to run` }
+  const vol = await ec2.describeTenantDbVolume(slug)
+  if (!vol) {
+    const id = await ec2.createTenantDbVolume({ slug, availabilityZone: inst.availabilityZone, sizeGb })
+    return { attached: false, detail: `created the database volume ${id}` }
+  }
+  if (vol.attachedInstanceId === inst.instanceId) return { attached: vol.attachmentState === 'attached', detail: 'attaching the database volume' }
+  if (vol.attachedInstanceId) return { attached: false, detail: `the database volume is on ${vol.attachedInstanceId}` }
+  if (vol.availabilityZone !== inst.availabilityZone) {
+    throw new Error(`database volume ${vol.volumeId} is in ${vol.availabilityZone}, server ${nodeName} in ${inst.availabilityZone}`)
+  }
+  if (vol.state !== 'available') return { attached: false, detail: `the database volume is ${vol.state}` }
+  await ec2.attachVolume(vol.volumeId, inst.instanceId, DB_DEVICE_NAME)
+  return { attached: false, detail: 'attaching the database volume' }
 }
 
 // instances are the tenant's OWN EC2s by node name (dedicated only). Pool launches report poolInstanceId
@@ -180,18 +182,25 @@ export async function ensureTenantNodes(
       if (isReady(n)) continue
       ready = false
       if (n || instances[name]) continue
-      // The data volume lives on the FIRST node of the tenant (Basic shape is a single node).
-      const withDbVolume = opts?.dbVolume && i === 0 ? { slug, sizeGb: opts.dbVolume.sizeGb } : undefined
+      // The first server takes the database volume, so it goes where the volume is.
+      const vol = i === 0 ? await (await import('@/lib/shared/ec2-client')).describeTenantDbVolume(slug) : null
       const { instanceId } = await launchNode(
         name,
         node.type,
-        { 'jeffi.io/role': 'dedicated', 'jeffi.io/tenant': slug, 'jeffi.io/gen': String(gen) },
+        { 'jeffi.io/role': 'dedicated', 'jeffi.io/tenant': slug, 'jeffi.io/gen': String(gen), [DB_AGENT_LABEL]: 'true' },
         [`jeffi.io/tenant=${slug}:NoSchedule`],
         { 'jeffi-tenant': slug },
-        withDbVolume
+        { dbAgent: true, availabilityZone: vol?.availabilityZone }
       )
       instances[name] = instanceId
       await onLaunched(instanceId, 'dedicated', name)
+    }
+    // An on-node database: its volume on the first server (created, or re-attached once free) before the
+    // servers count as ready. Callers pass dbVolume only while the store runs its database on-node.
+    if (opts?.dbVolume) {
+      const first = tenantNodeName(slug, gen, 0)
+      const vol = await ensureNodeDbVolume(slug, first, opts.dbVolume.sizeGb, instances[first])
+      if (!vol.attached) ready = false
     }
     return { ready, instances }
   }
@@ -234,9 +243,109 @@ export async function scaleTenantWorkloadToZero(slug: string): Promise<void> {
 /** Remove the store's server nodes not in `keep` (an older generation after a resize); returns their instances. */
 export async function removeTenantNodes(slug: string, keep: string[] = []): Promise<string[]> {
   const gone = (await tenantNodes(slug)).filter(n => !keep.includes(n.metadata.name))
-  for (const n of gone) await remove('Node', n.metadata.name)
+  const ids: string[] = []
+  for (const n of gone) {
+    // k3s registers nodes as k3s://<name>, so most carry no instance id: find it by the Name tag.
+    const id =
+      nodeInstanceId(n) ??
+      (await serverInstance(n.metadata.name).then(
+        i => i?.instanceId ?? null,
+        e => (console.error(`[tenant-compute] instance of ${n.metadata.name}: ${e?.message}`), null)
+      ))
+    if (id) ids.push(id)
+    await remove('Node', n.metadata.name)
+  }
   if (!keep.includes(dedicatedNodeName(slug))) await remove('Node', dedicatedNodeName(slug))
-  return gone.map(nodeInstanceId).filter((id): id is string => !!id)
+  return ids
+}
+
+/** The store's newest-generation first server runs the db agent (servers launched before it don't). */
+export async function nodeCanHostDb(slug: string, gen: number): Promise<boolean> {
+  const n = await get<any>('Node', tenantNodeName(slug, gen, 0))
+  return n?.metadata?.labels?.[DB_AGENT_LABEL] === 'true'
+}
+
+async function scalePostgres(slug: string, replicas: number): Promise<void> {
+  const ns = tenantNamespace(slug)
+  const d = await get<any>('Deployment', postgresName(slug), ns)
+  if (d && (d.spec?.replicas ?? 1) !== replicas) await patchMerge('Deployment', postgresName(slug), ns, { spec: { replicas } })
+}
+
+/** Take jeffi.io/db-ready off the store's servers other than `except`, so Postgres cannot start there. */
+async function unlabelDbNodes(slug: string, except?: string): Promise<void> {
+  for (const n of await tenantNodes(slug)) {
+    if (n.metadata.name === except || !n.metadata?.labels?.[DB_READY_LABEL]) continue
+    await patchMerge('Node', n.metadata.name, undefined, { metadata: { labels: { [DB_READY_LABEL]: null } } })
+  }
+}
+
+/**
+ * Move the store's database volume onto its server `nodeName` (the first of a new generation), one step per
+ * call: Postgres stops; the old server holding the volume is terminated (its shutdown unmounts the disk
+ * cleanly; it is about to go anyway) or, when it is not one of the store's servers, the volume is detached;
+ * the volume attaches to the new server, whose db agent mounts it and labels the node; Postgres starts.
+ * Returns 'done', or what it is waiting for. The store's database is down from the stop to the start.
+ */
+export async function handOffNodeDb(slug: string, nodeName: string, terminate: (id: string) => Promise<void>): Promise<string> {
+  const ec2 = await import('@/lib/shared/ec2-client')
+  const vol = await ec2.describeTenantDbVolume(slug)
+  if (!vol) throw new Error(`${slug} has no database volume to move`)
+  const inst = await serverInstance(nodeName)
+  if (!inst || inst.state !== 'running') return `waiting for ${nodeName} to run`
+  if (vol.attachedInstanceId !== inst.instanceId) {
+    await unlabelDbNodes(slug, nodeName)
+    await scalePostgres(slug, 0)
+    if ((await postgresPods(slug)).length) return 'stopping the database'
+    if (vol.attachedInstanceId) {
+      const r = await terminateTenantInstance(slug, vol.attachedInstanceId, terminate)
+      if (r === 'refused') await ec2.detachVolume(vol.volumeId)
+      return 'releasing the database volume'
+    }
+    if (vol.state !== 'available') return `the database volume is ${vol.state}`
+    if (vol.availabilityZone !== inst.availabilityZone) {
+      throw new Error(`database volume ${vol.volumeId} is in ${vol.availabilityZone}, server ${nodeName} in ${inst.availabilityZone}`)
+    }
+    await ec2.attachVolume(vol.volumeId, inst.instanceId, DB_DEVICE_NAME)
+    return 'attaching the database volume'
+  }
+  if (vol.attachmentState !== 'attached') return 'attaching the database volume'
+  if ((await get<any>('Node', nodeName))?.metadata?.labels?.[DB_READY_LABEL] !== 'true') return `waiting for ${nodeName} to mount the database volume`
+  await scalePostgres(slug, 1)
+  return (await postgresPodReady(slug)) ? 'done' : 'starting the database'
+}
+
+/** Grow the store's database volume to `sizeGb` (never shrinks); its server's db agent grows the filesystem. */
+export async function growNodeDbVolume(slug: string, sizeGb: number): Promise<void> {
+  const ec2 = await import('@/lib/shared/ec2-client')
+  const vol = await ec2.describeTenantDbVolume(slug)
+  if (!vol) throw new Error(`${slug} has no database volume to grow`)
+  if (vol.sizeGb < sizeGb) await ec2.modifyVolumeSize(vol.volumeId, sizeGb)
+}
+
+/**
+ * Retire an on-node database the store has moved off, one step per call: its Postgres objects go, the
+ * volume is snapshotted (kept) and, once the snapshot completes, detached and deleted. `st` carries the
+ * snapshot id between calls. Returns true when nothing is left.
+ */
+export async function retireNodeDb(slug: string, st: { snapshotId?: string }): Promise<boolean> {
+  const ns = tenantNamespace(slug)
+  for (const kind of ['Deployment', 'Service', 'Secret']) await remove(kind, postgresName(slug), ns)
+  await unlabelDbNodes(slug)
+  const ec2 = await import('@/lib/shared/ec2-client')
+  const vol = await ec2.describeTenantDbVolume(slug)
+  if (!vol) return true
+  if ((await postgresPods(slug)).length) return false
+  st.snapshotId ??= await ec2.snapshotVolume(vol.volumeId, slug, `retired database of ${slug}`)
+  const snap = await ec2.describeSnapshotState(st.snapshotId)
+  if (snap === 'error') throw new Error(`snapshot ${st.snapshotId} of ${vol.volumeId} failed`)
+  if (snap !== 'completed') return false
+  if (vol.attachedInstanceId) {
+    await ec2.detachVolume(vol.volumeId, { force: true })
+    return false
+  }
+  if (vol.state !== 'available') return false
+  await ec2.deleteVolume(vol.volumeId, { waitMs: 0 })
+  return true
 }
 
 const EMPTY_SINCE = 'jeffi.io/empty-since'
@@ -341,13 +450,27 @@ export async function applyTenantWorkload(input: TenantWorkloadInput, opts: { ke
     }
   }
   for (const name of TENANT_ROUTE_NAMES) if (!rendered.has(`IngressRoute/${name}`)) await remove('IngressRoute', name, ns)
+  await pruneCustomDomains(ns, rendered)
   await retireLegacyApp(input.slug)
+}
+
+/** Drop the route, certificate and TLS secret of every custom domain the store no longer has. */
+async function pruneCustomDomains(ns: string, rendered: Set<string>): Promise<void> {
+  const owned = (o: any) => o?.metadata?.name?.startsWith('custom-')
+  for (const kind of ['IngressRoute', 'Certificate']) {
+    for (const o of (await list<any>(kind, ns).catch(() => [])) ?? []) {
+      const name = o.metadata.name as string
+      if (!owned(o) || rendered.has(`${kind}/${name}`)) continue
+      await remove(kind, name, ns)
+      if (kind === 'Certificate' && o.spec?.secretName) await remove('Secret', o.spec.secretName, ns)
+    }
+  }
 }
 
 /** Restart every store pod (they keep a database pool open, e.g. to a database that has just moved). */
 export async function restartTenantWorkload(slug: string): Promise<void> {
   const at = new Date().toISOString()
-  for (const d of await workloads(slug)) {
+  for (const d of (await workloads(slug)).filter(d => !isPostgres(d))) {
     await patchMerge('Deployment', d.metadata.name, tenantNamespace(slug), {
       spec: { template: { metadata: { annotations: { 'kubectl.kubernetes.io/restartedAt': at } } } },
     })
@@ -379,6 +502,7 @@ async function appDeployment(slug: string): Promise<any> {
 
 /** The store's own Deployments (redis aside), in whichever layout it runs. */
 const workloads = (slug: string) => list<any>('Deployment', tenantNamespace(slug), 'jeffi.io/service')
+const isPostgres = (d: any) => d?.metadata?.labels?.['jeffi.io/service'] === 'postgres'
 
 /** True once the store's app, messaging and document Deployments each have a ready replica. */
 export async function tenantWorkloadReady(slug: string): Promise<boolean> {
@@ -388,17 +512,22 @@ export async function tenantWorkloadReady(slug: string): Promise<boolean> {
   return ready
 }
 
-/** Basic shape: the Postgres pod (`app=postgres`) in the tenant namespace is Ready.
- * Used to defer load_schema until the renderer-provisioned pod has started. */
+const postgresName = (slug: string) => `${slug}-postgres`
+const postgresPods = (slug: string) => list<any>('Pod', tenantNamespace(slug), `app=${postgresName(slug)}`)
+
+/** The store's on-node Postgres pod (labelled app={slug}-postgres) is running and Ready. */
 export async function postgresPodReady(slug: string): Promise<boolean> {
-  const pods = await list<any>('Pod', tenantNamespace(slug), 'app=postgres')
+  const pods = (await postgresPods(slug)).filter(p => !p.metadata?.deletionTimestamp)
   if (!pods.length) return false
-  return pods.every(p => (p.status?.containerStatuses ?? []).every((c: any) => c.ready))
+  return pods.every(p => p.status?.phase === 'Running' && (p.status?.containerStatuses ?? []).length > 0 && p.status.containerStatuses.every((c: any) => c.ready))
 }
 
-/** Rolled out: every replica of every store Deployment is on the current template and ready. */
+/**
+ * Rolled out: every replica of every store Deployment is on the current template and ready. The on-node
+ * Postgres is not counted: it stays on the server with its disk while the app pods move (handOffNodeDb).
+ */
 export async function tenantRolloutComplete(slug: string): Promise<boolean> {
-  const ds = await workloads(slug)
+  const ds = (await workloads(slug)).filter(d => !isPostgres(d))
   return ds.length >= 3 && ds.every(d => {
     if (!d) return false
     const want = d.spec?.replicas ?? 1
@@ -474,31 +603,4 @@ export async function getTenantWorkloadStatus(slug: string): Promise<TenantWorkl
       }
     }),
   }
-}
-
-/**
- * Run a command inside the tenant's Postgres pod (Basic shape db) and return stdout as a Buffer.
- * Used by moveDatabase to pg_dump / pg_restore without exposing the pod's password to the
- * controller. Shells out to `kubectl exec` — the controller image includes kubectl, and
- * KUBECONFIG points at the k3s cluster in-pod (or the dev user's cluster locally).
- */
-export async function execPostgresPod(slug: string, cmd: string[], stdin?: Buffer): Promise<Buffer> {
-  const { spawn } = await import('node:child_process')
-  const ns = tenantNamespace(slug)
-  // -l selector resolves to the single `app=postgres` pod in the namespace.
-  const args = ['exec', '-n', ns, '-i', `deploy/${slug}-postgres`, '--', ...cmd]
-  return new Promise((resolve, reject) => {
-    const child = spawn('kubectl', args, { stdio: ['pipe', 'pipe', 'pipe'] })
-    const out: Buffer[] = []
-    const err: Buffer[] = []
-    child.stdout.on('data', (d: Buffer) => out.push(d))
-    child.stderr.on('data', (d: Buffer) => err.push(d))
-    child.on('error', reject)
-    child.on('close', (code: number) => {
-      if (code === 0) return resolve(Buffer.concat(out))
-      reject(new Error(`kubectl exec ${slug}-postgres exited ${code}: ${Buffer.concat(err).toString('utf8').slice(0, 400)}`))
-    })
-    if (stdin) child.stdin.end(stdin)
-    else child.stdin.end()
-  })
 }

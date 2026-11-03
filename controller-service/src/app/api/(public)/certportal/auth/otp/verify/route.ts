@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     // Verified login clears the resend cooldown so login→logout→login never inherits the backoff.
     await resetSendOtpCounter(key).catch(() => {})
     const token = await issuePortalToken(email, null)
-    return setPortalCookie(NextResponse.json({ email: email.toLowerCase() }), token)
+    return setPortalCookie(NextResponse.json({ email: email.toLowerCase() }), token, request.headers.get('x-forwarded-host') ?? request.headers.get('host'))
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

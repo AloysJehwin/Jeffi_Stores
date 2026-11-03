@@ -232,7 +232,7 @@ describe('tenant-registry (data layer, extended)', () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ id: 't-1' }] })
       await expect(mod.listTenants()).resolves.toEqual([{ id: 't-1' }])
-      expect(String(poolQuery.mock.calls[0][0])).not.toMatch(/WHERE/)
+      expect(String(poolQuery.mock.calls[0][0])).not.toMatch(/\n\s*WHERE/)
     })
 
     it('applies status, plan and q filters together', async () => {

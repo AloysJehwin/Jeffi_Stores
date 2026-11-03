@@ -33,7 +33,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const job = await getProvisioningJob(id)
-  const instId = (job?.created_resources as any)?.dbInstanceId || dbInstanceId(tenant.slug)
+  const created = (job?.created_resources as any) || {}
+  // A database on the store's own server has no RDS instance to stop; it stops with the server.
+  if (tenant.iam_auth === false || created.computeSpec?.db?.mode === 'node') {
+    return NextResponse.json({ error: 'This store runs its database on its own server; there is no RDS instance to stop.' }, { status: 409 })
+  }
+  const instId = created.dbInstanceId || dbInstanceId(tenant.slug)
   const provider = getProvisioningProvider()
 
   try {

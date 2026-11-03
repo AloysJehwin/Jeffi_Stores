@@ -7,6 +7,11 @@ import { getSubscription } from '@controller/lib/payments/razorpay-subscriptions
 import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import PurchaseBeacon from './PurchaseBeacon'
+import OnboardShell from '../OnboardShell'
+import PageHeader from '../../dashboard/_components/PageHeader'
+import { Card } from '../../dashboard/_components/Card'
+import { statusSteps } from '../steps'
+import { primaryBtn } from '../ui'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,43 +43,52 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
     const paid = sub && ['active', 'authenticated', 'charged'].includes(sub.status)
     if (paid) {
       paidNow = true
-      // The plan is paid (the reliable path locally, and a fallback for a late webhook). The store is
-      // built once its wallet also holds the servers' first days; until then /onboard asks for them.
+      // Paid (the reliable path locally, and a fallback for a late webhook). The subscription covers
+      // plan and servers, so this starts the store unless the webhook already did.
       await setSubscriptionStatus(tenant.id, 'active')
       if (!(await startStoreIfReady(tenant.id))) redirect('/onboard?paid=1')
     }
   }
 
+  // Razorpay's return URL: every step, payment included, is done.
+  const steps = statusSteps(true)
   return (
-    <div className="min-h-[calc(100vh-56px)] flex items-center justify-center bg-surface-secondary px-4">
+    <OnboardShell
+      owner={{ email: owner.email, name: owner.name }}
+      heading={tenant?.display_name ?? 'Your store'}
+      subheading={tenantSlug ? `${tenantSlug}.jeffistores.in` : undefined}
+      steps={steps}
+      current={steps.length}
+    >
       {paidNow && tenant && (
         <PurchaseBeacon
           subscriptionId={tenant.razorpay_subscription_id!}
           plan={{ slug: tenant.plan ?? 'basic', monthlyPrice: tenant.monthly_price_inr, interval: tenant.billing_interval }}
         />
       )}
-      <div className="max-w-md w-full rounded-3xl sm:rounded-[2rem] org-sage p-6 sm:p-10 text-center">
-        <span className="inline-flex items-center justify-center w-14 h-14 rounded-full ecom-accent-bg text-white mx-auto mb-5">
-          <CheckMark className="w-7 h-7" />
-        </span>
-        <h1 className="text-2xl font-bold font-display font-black org-sage-text">Payment confirmed!</h1>
-        <p className="text-sm text-foreground-secondary mt-3 break-words">
-          {tenantSlug ? (
-            <>
-              Your store <span className="font-semibold">{tenantSlug}.jeffistores.in</span> is being set up.
-            </>
-          ) : (
-            <>Your store is being set up.</>
-          )}{' '}
-          You&apos;ll be notified when it&apos;s live.
-        </p>
-        <Link
-          href="/dashboard"
-          className="inline-block mt-7 w-full px-5 py-3 sm:py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors"
-        >
+      <div className="max-w-3xl">
+      <PageHeader eyebrow="Payment" title="Payment confirmed!" />
+      <Card>
+        <div className="flex items-start gap-3">
+          <span className="inline-flex shrink-0 items-center justify-center w-9 h-9 rounded-full org-sage org-sage-text">
+            <CheckMark className="w-5 h-5" />
+          </span>
+          <p className="min-w-0 text-sm text-foreground-secondary break-words">
+            {tenantSlug ? (
+              <>
+                Your store <span className="font-semibold text-foreground">{tenantSlug}.jeffistores.in</span> is being set up.
+              </>
+            ) : (
+              <>Your store is being set up.</>
+            )}{' '}
+            You&apos;ll be notified when it&apos;s live.
+          </p>
+        </div>
+        <Link href="/dashboard" className={`${primaryBtn} mt-5 w-full sm:w-auto`}>
           Go to dashboard →
         </Link>
+      </Card>
       </div>
-    </div>
+    </OnboardShell>
   )
 }

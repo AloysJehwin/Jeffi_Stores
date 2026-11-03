@@ -111,6 +111,7 @@ describe('provisioning state machine', () => {
   describe('preflight — fails before ANY billable infra', () => {
     it('fails terminally when RDS_MASTER_PASSWORD is missing', async () => {
       delete process.env.RDS_MASTER_PASSWORD
+      reg.getTenant.mockResolvedValue({ ...TENANT, plan: 'growth' })
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
       await expect(advanceProvisioningJob(job({ step: 'preflight' }), provider)).resolves.toBe('failed')
       expect(lastPatch().last_error ?? '').toMatch(/RDS_MASTER_PASSWORD/)
@@ -126,6 +127,7 @@ describe('provisioning state machine', () => {
     it('reports BOTH missing vars in one error', async () => {
       delete process.env.RDS_MASTER_PASSWORD
       delete process.env.TENANT_APP_TARGET_IP
+      reg.getTenant.mockResolvedValue({ ...TENANT, plan: 'growth' })
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
       await advanceProvisioningJob(job({ step: 'preflight' }), provider)
       const err = lastPatch().last_error ?? ''
@@ -438,7 +440,7 @@ describe('provisioning state machine', () => {
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('timeout')))
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
       const res = await advanceProvisioningJob(
-        job({ step: 'verify_serving', attempts: 7, created_resources: { verifyAttempts: 5 } }),
+        job({ step: 'verify_serving', attempts: 7, created_resources: { verifyAttempts: 5, stepErrors: 7 } }),
         provider
       )
       expect(res).toBe('failed')
@@ -482,7 +484,7 @@ describe('provisioning state machine', () => {
     it('a TRANSIENT error keeps the job pending and schedules a backoff', async () => {
       vi.spyOn(provider, 'ensureBucket').mockRejectedValue(new Error('ECONNRESET talking to S3'))
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
-      const res = await advanceProvisioningJob(job({ step: 'create_bucket', attempts: 1 }), provider)
+      const res = await advanceProvisioningJob(job({ step: 'create_bucket', attempts: 1, created_resources: { stepErrors: 1 } }), provider)
       expect(res).toBe('pending')
       const p = lastPatch()
       expect(p.status).toBe('pending')
@@ -500,7 +502,7 @@ describe('provisioning state machine', () => {
     it('gives up once the attempt cap is reached even for a transient error', async () => {
       vi.spyOn(provider, 'ensureBucket').mockRejectedValue(new Error('ETIMEDOUT'))
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
-      const res = await advanceProvisioningJob(job({ step: 'create_bucket', attempts: 7 }), provider)
+      const res = await advanceProvisioningJob(job({ step: 'create_bucket', attempts: 7, created_resources: { stepErrors: 7 } }), provider)
       expect(res).toBe('failed')
     })
 
@@ -514,7 +516,7 @@ describe('provisioning state machine', () => {
       reg.updateProvisioningJob.mockResolvedValue(undefined)
       reg.getTenant.mockResolvedValue({ ...TENANT })
 
-      await advanceProvisioningJob(job({ step: 'create_bucket', attempts: 4 }), provider)
+      await advanceProvisioningJob(job({ step: 'create_bucket', attempts: 4, created_resources: { stepErrors: 4 } }), provider)
       const later = (lastPatch().nextAttemptAt as Date).getTime() - Date.now()
       expect(later).toBeGreaterThan(first)
     })

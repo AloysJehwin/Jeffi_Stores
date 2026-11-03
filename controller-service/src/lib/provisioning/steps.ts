@@ -14,6 +14,17 @@ import {
   controlPlanePool,
   type ProvisioningJob,
 } from '@/lib/tenant-registry'
+import {
+  AWS_REGION,
+  NODE_DB_USER,
+  TENANT_DB_NAME,
+  nodeDbHost,
+  nodeDbSlug,
+  tenantDbSecretRef,
+  withTenantAdminPool,
+  type DbAuth,
+  type TenantDbTarget,
+} from './tenant-admin-pool'
 
 // Ordered provisioning steps. The worker advances a job one step per tick; each
 // step is idempotent so a crash/retry re-runs it safely. On success the step
@@ -23,6 +34,10 @@ import {
 // `restore_data` runs after the schema is loaded and before the bucket is made — it
 // only does work when the job carries a `restoreFromKey` (churned owner re-onboarding),
 // otherwise it's a no-op passthrough.
+//
+// A store whose Postgres runs on its own server (db.mode 'node') brings that server and the database
+// pod up in wait_db_available, so every step after it (schema, restore, seed, settings) has a live
+// database; ensure_compute later re-applies the same namespace.
 const STEPS = [
   'preflight',
   'create_param_group',
@@ -45,7 +60,7 @@ type Step = (typeof STEPS)[number]
 
 
 // A store's own database name; a Starter store's on a shared host is t_{slug} (res.dbName).
-const TENANT_DB = 'jeffi_stores'
+const TENANT_DB = TENANT_DB_NAME
 
 // The flagship app box serves jeffistores.in only — never a tenant.
 const FLAGSHIP_APP_IP = process.env.FLAGSHIP_APP_IP || '52.20.193.62'
@@ -66,20 +81,18 @@ function paramGroupName(slug: string) {
   return `jeffi-tenant-${slug}-pg16`
 }
 
-// Node-mode tenants run their own Postgres with a password kept in Secrets Manager. The password is
-// generated ONCE per job (stashed on res.dbPassword so a retry reuses it) and written to
-// jeffi/tenant-db/<slug> as JSON {username,password,database}. Never logged.
+/** @deprecated Use getOrCreateTenantDbPassword (tenant-db-secret.ts): a stored password must never be replaced. */
 export function genDbPassword(): string {
-  // base64url has no chars that need quoting in a PG connection; strip padding.
   return require('crypto').randomBytes(24).toString('base64url')
 }
+/** @deprecated Overwrites the stored password; use getOrCreateTenantDbPassword (tenant-db-secret.ts). */
 export async function ensureTenantDbSecret(slug: string, password: string): Promise<void> {
   const { SecretsManagerClient, CreateSecretCommand, PutSecretValueCommand } = await import(
     '@aws-sdk/client-secrets-manager'
   )
-  const client = new SecretsManagerClient({ region: process.env.AWS_REGION || 'ap-south-1' })
-  const SecretId = `jeffi/tenant-db/${slug}`
-  const SecretString = JSON.stringify({ username: 'jeffi', password, database: 'jeffi' })
+  const client = new SecretsManagerClient({ region: AWS_REGION })
+  const SecretId = tenantDbSecretRef(slug)
+  const SecretString = JSON.stringify({ username: NODE_DB_USER, password, database: TENANT_DB })
   try {
     await client.send(new CreateSecretCommand({ Name: SecretId, SecretString }))
   } catch (e: any) {
@@ -88,6 +101,23 @@ export async function ensureTenantDbSecret(slug: string, password: string): Prom
     } else throw e
   }
 }
+
+/** The store's on-node Postgres password (stored once, read back after), for a node-mode spec. */
+async function nodeDbPassword(slug: string, spec: { db: { mode: string } }): Promise<{ dbPassword?: string }> {
+  if (spec.db.mode !== 'node') return {}
+  const { getOrCreateTenantDbPassword } = await import('./tenant-db-secret')
+  return { dbPassword: await getOrCreateTenantDbPassword(slug) }
+}
+
+const isNodeJob = (r: Record<string, any>) => r.computeSpec?.db?.mode === 'node'
+/** Login for a job's own database: an on-node Postgres logs in as `jeffi`; RDS needs nothing extra. */
+const jobDbAuth = (slug: string, r: Record<string, any>): DbAuth | undefined =>
+  isNodeJob(r) ? { iamAuth: false, dbSecretRef: tenantDbSecretRef(slug) } : undefined
+const jobDbTarget = (slug: string, r: Record<string, any>): TenantDbTarget => ({
+  endpoint: r.endpoint,
+  dbName: r.dbName ?? TENANT_DB,
+  ...jobDbAuth(slug, r),
+})
 
 /** Higher plans (growth/pro/enterprise) get a DEDICATED EC2; Basic uses the shared pool. */
 function isDedicatedPlan(plan: string | null): boolean {
@@ -144,7 +174,12 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // mid-provision failure (e.g. absent RDS_MASTER_PASSWORD → "Invalid master
         // password" at create_db_instance; unset TENANT_APP_TARGET_IP → dead DNS).
         const missing: string[] = []
-        if (!process.env.RDS_MASTER_PASSWORD) missing.push('RDS_MASTER_PASSWORD')
+        // Only an RDS database (its own or a seat on a shared host) needs the master password.
+        const { db } = (await jobCompute(job.tenant_id, tenant.plan, res)).spec
+        if (db.mode !== 'node' && !process.env.RDS_MASTER_PASSWORD) missing.push('RDS_MASTER_PASSWORD')
+        // The on-node Postgres is a pod: it needs the k8s compute engine.
+        if (db.mode === 'node' && process.env.PROVISIONING_PROVIDER === 'aws' && process.env.PROVISIONING_COMPUTE !== 'k8s')
+          missing.push('PROVISIONING_COMPUTE=k8s (the store database runs on its server)')
         // k8s serves every tenant through the cluster ingress; the EC2 target / flagship checks don't apply.
         if (process.env.PROVISIONING_COMPUTE === 'k8s') {
           if (!(process.env.CLUSTER_INGRESS_IP || '').trim()) missing.push('CLUSTER_INGRESS_IP')
@@ -189,9 +224,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           return await next(job.id, 'wait_db_available', res)
         }
         if (db.mode === 'node') {
-          // Postgres on the tenant's own node: the EBS data volume + workload renderer stand it
-          // up (ensure_compute). Skip RDS creation; load_schema runs after the pod is Ready.
-          res.endpoint = `${slug}-postgres.tenant-${slug}.svc.cluster.local`
+          // Postgres on the tenant's own node: no RDS. wait_db_available stands up the server, its
+          // data volume and the Postgres pod.
+          res.endpoint = nodeDbHost(slug)
           res.dbName = TENANT_DB
           return await next(job.id, 'wait_db_available', res)
         }
@@ -215,10 +250,24 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // after the deadline instead of polling forever — the catch triggers rollback.
         if (!res.dbWaitStartedAt) res.dbWaitStartedAt = Date.now()
         const DB_WAIT_DEADLINE_MS = 25 * 60 * 1000 // 25 min
-        // Basic shape: the Postgres pod comes up later in ensure_compute via the workload
-        // renderer. load_schema will retry over the cluster-DNS endpoint until the pod is Ready.
-        const nodeDbMode = (await jobCompute(job.tenant_id, tenant.plan, res)).spec.db.mode === 'node'
-        if (nodeDbMode) return await next(job.id, 'load_schema', res)
+        const c = await jobCompute(job.tenant_id, tenant.plan, res)
+        if (c.spec.db.mode === 'node') {
+          // Locally (stub engine) there is no cluster to run it on; the database steps no-op or fail softly.
+          if (process.env.PROVISIONING_COMPUTE !== 'k8s') return await next(job.id, 'load_schema', res)
+          if (!(await nodeDbReady(job, tenant, res, c))) {
+            if (Date.now() - res.dbWaitStartedAt > NODE_DB_WAIT_DEADLINE_MS) {
+              throw new Error(
+                `wait_db_available: the database for "${slug}" was not ready within ${NODE_DB_WAIT_DEADLINE_MS / 60000} min` +
+                  (res.dbConnectError ? ` (${res.dbConnectError})` : '')
+              )
+            }
+            await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
+            return 'pending'
+          }
+          res.endpoint = nodeDbHost(slug)
+          res.dbName = TENANT_DB
+          return await next(job.id, 'load_schema', res)
+        }
         const endpoint = await provider.getDbEndpoint(res.sharedDbHost ?? res.dbInstanceId)
         if (!endpoint) {
           if (Date.now() - res.dbWaitStartedAt > DB_WAIT_DEADLINE_MS) {
@@ -247,15 +296,11 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // Loads the desired-state SCHEMA ONLY (0 rows) into the tenant's own DB. A fresh
         // tenant store is intentionally EMPTY — the owner adds their own catalog. Starter
         // data, if ever wanted, goes through the optional seed_data step below (not here).
-        // Basic shape: the Postgres pod doesn't exist yet (ensure_compute renders it) —
-        // mark the schema as pending and ensure_compute runs loadSchema once the pod is Ready.
-        const c = await jobCompute(job.tenant_id, tenant.plan, res)
-        if (c.spec.db.mode === 'node') {
-          res.schemaPending = true
-          return await next(job.id, 'restore_data', res)
-        }
+        const auth = jobDbAuth(slug, res)
         if (res.rdsUser) await provider.loadSchema(res.endpoint, res.dbName, res.rdsUser)
+        else if (auth) await provider.loadSchema(res.endpoint, TENANT_DB, undefined, auth)
         else await provider.loadSchema(res.endpoint, TENANT_DB)
+        delete res.schemaPending
         return await next(job.id, 'restore_data', res)
       }
 
@@ -266,7 +311,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         if (key) {
           const { getTenantBackup } = await import('@/lib/tenancy/tenant-backup-store')
           const archive = await getTenantBackup(key)
-          await provider.restoreDb(res.endpoint, res.dbName ?? TENANT_DB, archive)
+          const auth = jobDbAuth(slug, res)
+          if (auth) await provider.restoreDb(res.endpoint, res.dbName ?? TENANT_DB, archive, auth)
+          else await provider.restoreDb(res.endpoint, res.dbName ?? TENANT_DB, archive)
           res.restored = true
         }
         return await next(job.id, 'seed_data', res)
@@ -276,12 +323,20 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // Optional starter-catalog seed. No-op unless the job carries a `seedProfile`
         // (mirrors restore_data's opt-in shape). Deliberately separate from load_schema so
         // "empty store" stays the default and seeding never runs by accident. Skipped
-        // entirely when the store was restored from a backup.
+        // entirely when the store was restored from a backup. NON-FATAL: a store without starter
+        // rows is still a working store.
         const profile = res.seedProfile as string | undefined
         if (profile && !res.restored) {
-          const { seedTenantData } = await import('./seed')
-          await seedTenantData(res.endpoint, res.dbName ?? TENANT_DB, profile)
-          res.seeded = profile
+          try {
+            const { seedTenantData } = await import('./seed')
+            const auth = jobDbAuth(slug, res)
+            if (auth) await seedTenantData(res.endpoint, res.dbName ?? TENANT_DB, profile, auth)
+            else await seedTenantData(res.endpoint, res.dbName ?? TENANT_DB, profile)
+            res.seeded = profile
+            delete res.seedError
+          } catch (e: any) {
+            res.seedError = e?.message || 'seeding failed'
+          }
         }
         return await next(job.id, 'create_bucket', res)
       }
@@ -314,7 +369,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           const ownerId = ownerRow?.rows?.[0]?.owner_id
           if (ownerId && res.endpoint) {
             const { seedTenantSiteSettings } = await import('./seed-settings')
-            await seedTenantSiteSettings(job.tenant_id, ownerId, res.endpoint, res.dbName ?? TENANT_DB)
+            await seedTenantSiteSettings(job.tenant_id, ownerId, jobDbTarget(slug, res))
             res.settingsSeeded = true
           } else {
             res.settingsSeeded = 'skipped (missing owner or db endpoint)'
@@ -338,7 +393,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           rdsEndpoint: res.endpoint,
           s3Bucket: res.bucket,
           ...(res.sharedDbHost ? { rdsDb: res.dbName, rdsUser: res.rdsUser, sharedDbHost: res.sharedDbHost } : {}),
-          ...(nodeMode ? { iamAuth: false, dbSecretRef: `jeffi/tenant-db/${slug}`, rdsUser: 'jeffi' } : {}),
+          ...(nodeMode
+            ? { rdsEndpoint: nodeDbHost(slug), rdsDb: TENANT_DB, rdsUser: NODE_DB_USER, iamAuth: false, dbSecretRef: tenantDbSecretRef(slug) }
+            : {}),
         })
         return await next(job.id, 'generate_legals', res)
       }
@@ -358,21 +415,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         if (k8s.k8sComputeEnabled()) {
           if (!res.computeWaitStartedAt) res.computeWaitStartedAt = Date.now()
           const c = await jobCompute(job.tenant_id, tenant.plan, res)
-          const placed = await k8s.ensureTenantNodes(
-            slug,
-            c.spec.node,
-            c.nodeGen,
-            { instances: knownNodeInstances(slug, res), poolInstanceId: res.poolInstanceId },
-            async (id, kind, name) => {
-              if (kind === 'dedicated') {
-                res.nodeInstances = { ...res.nodeInstances, [name]: id }
-                res.ec2InstanceId ??= id
-              } else res.poolInstanceId = id
-              await updateProvisioningJob(job.id, { created_resources: res })
-            },
-            // Basic shape (db on the same node): attach a dedicated gp3 data volume.
-            c.spec.db.mode === 'node' ? { dbVolume: { sizeGb: c.spec.db.storageGb } } : undefined
-          )
+          const placed = await placeNodes(job.id, slug, c, res)
           if (!placed.ready) {
             if (Date.now() - res.computeWaitStartedAt > 15 * 60 * 1000) {
               throw new Error(`ensure_compute: k8s servers for "${slug}" did not become Ready within 15 min`)
@@ -380,42 +423,16 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
             return 'pending'
           }
-          const { listCustomDomains } = await import('@/lib/tenant-registry/custom-domains')
-          const customDomains = (await listCustomDomains(job.tenant_id).catch(() => []))
-            .filter(d => d.status === 'verified')
-            .map(d => d.domain)
-          // Node mode: the store's own Postgres pod needs a password. Generate once (reused on
-          // retry via res.dbPassword), store it in Secrets Manager, and seed it into the pod Secret.
-          let dbPassword: string | undefined
-          if (c.spec.db.mode === 'node') {
-            if (!res.dbPassword) {
-              res.dbPassword = genDbPassword()
-              await updateProvisioningJob(job.id, { created_resources: res })
-            }
-            dbPassword = res.dbPassword as string
-            await ensureTenantDbSecret(slug, dbPassword)
-          }
-          await k8s.applyTenantWorkload({
-            slug,
-            plan: tenant.plan,
-            hosts: tenantHostnames(slug, tenant.plan),
-            customDomains,
-            compute: c.spec,
-            dbPoolMax: c.dbPoolMax,
-            nodeGen: c.nodeGen,
-            ...(dbPassword ? { dbPassword } : {}),
-          })
-          // Basic shape: wait for the Postgres pod and run the deferred load_schema once over
-          // its cluster DNS endpoint. loadSchema is idempotent, so a retry on this step is safe.
+          // An on-node Postgres is already up (wait_db_available) and the same render leaves it running.
+          delete res.dbPassword
+          await applyWorkload(job.tenant_id, slug, tenant.plan, c)
+          // A job started before the database came up first deferred its schema to here.
           if (res.schemaPending && c.spec.db.mode === 'node') {
             if (!(await k8s.postgresPodReady(slug))) {
-              if (Date.now() - res.computeWaitStartedAt > 15 * 60 * 1000) {
-                throw new Error(`ensure_compute: postgres pod for "${slug}" did not become Ready within 15 min`)
-              }
               await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
               return 'pending'
             }
-            await provider.loadSchema(res.endpoint, TENANT_DB)
+            await provider.loadSchema(res.endpoint, TENANT_DB, undefined, { iamAuth: false, dbSecretRef: tenantDbSecretRef(slug) })
             delete res.schemaPending
           }
           await recordApplied(job.tenant_id, slug, res.dbClass ? { ...c.spec, db: { ...c.spec.db, class: res.dbClass } } : c.spec, c.nodeGen)
@@ -470,25 +487,31 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // warehouse config. NON-FATAL — a pickup-registration failure must not block go-live
         // (it can be retried/fixed later; shipments just can't be created until then).
         try {
-          const { getKyc, getDraft, controlPlanePool } = await import('@/lib/tenant-registry')
-          const ownerRow = await controlPlanePool()
-            .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [job.tenant_id])
-            .catch(() => null)
-          const ownerId = ownerRow?.rows?.[0]?.owner_id
-          const draft = ownerId ? await getDraft(ownerId).catch(() => null) : null
-          const wh = (draft?.data as any)?.wh
+          const { getKyc, getTenantWarehouse } = await import('@/lib/tenant-registry')
+          // KYC's saved warehouse, else the onboarding draft's.
+          const wh = (await getTenantWarehouse(job.tenant_id).catch(() => null)) ?? {}
           const kyc = await getKyc(job.tenant_id).catch(() => null)
-          if (wh?.sellerPhone && wh?.originPincode) {
+          const phone = wh.sellerPhone || kyc?.mobile
+          if (phone && wh.originPincode) {
             const { createDelhiveryPickupLocation } = await import('@/lib/shipping/delhivery')
-            const r = await createDelhiveryPickupLocation({
+            const pickup = {
               name: wh.pickupLocation || tenant.slug,
-              phone: wh.sellerPhone,
+              phone,
               pincode: wh.originPincode,
               address: wh.sellerAddress || kyc?.business_address || '',
               registeredName: wh.sellerName || tenant.display_name,
               tenantId: job.tenant_id,
-            })
-            res.delhiveryPickup = r.ok ? 'created' : `error: ${r.error}`
+            }
+            // The store's admin lists its pickup locations from its own database, so the row goes there
+            // (never the control plane's); without a reachable one the store's admin backfills it on read.
+            const { tenantAdminPool } = await import('./tenant-admin-pool')
+            const db = res.endpoint ? await tenantAdminPool(jobDbTarget(slug, res)).catch(() => null) : null
+            try {
+              const r = await createDelhiveryPickupLocation(pickup, { db })
+              res.delhiveryPickup = r.ok ? 'created' : `error: ${r.error}`
+            } finally {
+              await db?.end().catch(() => {})
+            }
           } else {
             res.delhiveryPickup = 'skipped (no warehouse config)'
           }
@@ -593,6 +616,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         }
         await setTenantStatus(job.tenant_id, 'active')
         await setStoreRequest(job.tenant_id, null)
+        // Once per store; never throws.
+        const { notifyStoreLive } = await import('./start-store')
+        await notifyStoreLive(job.tenant_id)
         await recordStepEvent(job.id, 'activate', 'ok', 'tenant activated', {})
         await updateProvisioningJob(job.id, { status: 'done', created_resources: res })
         return 'done'
@@ -604,7 +630,10 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     }
   } catch (e: any) {
     const msg = e?.message || String(e) || 'error'
-    const attempts = (job.attempts || 0) + 1
+    // Errors on THIS step: job.attempts counts every tick, polls included, so a long wait for a
+    // server or database would leave a later step no retries at all.
+    const attempts = (res.stepErrors || 0) + 1
+    res.stepErrors = attempts
     await recordStepEvent(job.id, job.step, 'error', msg, resourcesFor(job.step as Step, res))
     // Classify: transient errors get retried with backoff; deterministic errors fail now.
     const terminal = isTerminalError(msg) || attempts >= MAX_PROVISION_ATTEMPTS
@@ -622,7 +651,8 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
       })
       return 'pending'
     }
-    // Terminal (or out of attempts) → fail + auto-rollback billable resources.
+    // Terminal (or out of attempts) → fail + auto-rollback billable resources. A resumed job starts its count afresh.
+    delete res.stepErrors
     await updateProvisioningJob(job.id, {
       status: 'failed',
       last_error: msg,
@@ -720,6 +750,7 @@ async function next(id: string, step: Step, res: Record<string, any>): Promise<s
   // fifteen call sites.
   const completed = STEPS[Math.max(0, STEPS.indexOf(step) - 1)]
   await recordStepEvent(id, completed, 'ok', null, resourcesFor(completed, res))
+  delete res.stepErrors
 
   // Clear any backoff timer on a successful step transition (prior retries are resolved).
   await updateProvisioningJob(id, { step, status: 'pending', created_resources: res, clearNextAttempt: true })
@@ -783,6 +814,118 @@ async function jobCompute(tenantId: string, plan: string | null, res: Record<str
   res.computeSpec = c.spec
   return c
 }
+
+type JobCompute = Awaited<ReturnType<typeof jobCompute>>
+
+/** The store's servers (and, for an on-node database, its data volume), launched if missing. */
+async function placeNodes(jobId: string, slug: string, c: JobCompute, res: Record<string, any>) {
+  const k8s = await import('@/lib/k8s/tenant-compute')
+  return k8s.ensureTenantNodes(
+    slug,
+    c.spec.node,
+    c.nodeGen,
+    { instances: knownNodeInstances(slug, res), poolInstanceId: res.poolInstanceId },
+    async (id, kind, name) => {
+      if (kind === 'dedicated') {
+        res.nodeInstances = { ...res.nodeInstances, [name]: id }
+        res.ec2InstanceId ??= id
+      } else res.poolInstanceId = id
+      await updateProvisioningJob(jobId, { created_resources: res })
+    },
+    c.spec.db.mode === 'node' ? { dbVolume: { sizeGb: c.spec.db.storageGb } } : undefined
+  )
+}
+
+/** Apply the store's namespace; an on-node database's render always carries its stored password. */
+async function applyWorkload(
+  tenantId: string,
+  slug: string,
+  plan: string | null,
+  c: Pick<JobCompute, 'spec' | 'dbPoolMax' | 'nodeGen'>,
+  hosts = tenantHostnames(slug, plan)
+): Promise<void> {
+  const k8s = await import('@/lib/k8s/tenant-compute')
+  const { routedCustomDomains } = await import('@/lib/tenant-registry/custom-domains')
+  const customDomains = await routedCustomDomains(tenantId).catch(() => [])
+  await k8s.applyTenantWorkload({
+    slug,
+    plan,
+    hosts,
+    customDomains,
+    compute: c.spec,
+    dbPoolMax: c.dbPoolMax,
+    nodeGen: c.nodeGen,
+    ...(await nodeDbPassword(slug, c.spec)),
+  })
+}
+
+const NODE_DB_WAIT_DEADLINE_MS = 30 * 60 * 1000
+
+/**
+ * On-node Postgres: the store's server and data volume, its namespace and the Postgres pod, and a login
+ * that works. Each call does the next missing piece and reports whether the database takes connections.
+ */
+async function nodeDbReady(
+  job: ProvisioningJob,
+  tenant: { slug: string; plan: string | null },
+  res: Record<string, any>,
+  c: JobCompute
+): Promise<boolean> {
+  const slug = tenant.slug
+  if (!(await placeNodes(job.id, slug, c, res)).ready) return false
+  const { dbPassword } = await nodeDbPassword(slug, c.spec)
+  await applyWorkload(job.tenant_id, slug, tenant.plan, c)
+  const k8s = await import('@/lib/k8s/tenant-compute')
+  if (!(await k8s.postgresPodReady(slug))) return false
+  try {
+    // The image creates the store database only on a fresh data directory; make sure it is there.
+    await withTenantAdminPool({ endpoint: nodeDbHost(slug), dbName: 'postgres', dbPassword }, async pool => {
+      const found = await pool.query('SELECT 1 FROM pg_database WHERE datname = $1', [TENANT_DB])
+      if (!found.rowCount) await pool.query(`CREATE DATABASE ${TENANT_DB}`)
+    })
+  } catch (e: any) {
+    res.dbConnectError = e?.message || String(e)
+    return false
+  }
+  delete res.dbConnectError
+  return true
+}
+
+/**
+ * After a store's own servers are terminated: its database data volume (snapshotted first on a teardown)
+ * and its database secret. Never throws; what could not be removed is returned for manual cleanup.
+ */
+async function cleanupNodeDb(
+  slug: string,
+  r: Record<string, any>,
+  opts: { snapshot: boolean; persist?: () => Promise<void> }
+): Promise<Record<string, string>> {
+  const left: Record<string, string> = {}
+  try {
+    const { describeTenantDbVolume, snapshotVolume, deleteVolume } = await import('@/lib/shared/ec2-client')
+    const vol = await describeTenantDbVolume(slug)
+    if (vol) {
+      if (opts.snapshot && !r.dbVolumeSnapshotId) {
+        r.dbVolumeSnapshotId = await snapshotVolume(vol.volumeId, slug, `teardown of ${slug}`)
+        await opts.persist?.().catch(() => {})
+      }
+      await deleteVolume(vol.volumeId)
+    }
+  } catch (e: any) {
+    left.dbVolume = `cleanup failed: ${e?.message || e}`
+  }
+  try {
+    const { deleteTenantDbSecret } = await import('./tenant-db-secret')
+    await deleteTenantDbSecret(slug)
+  } catch (e: any) {
+    left.dbSecret = `delete ${tenantDbSecretRef(slug)} failed: ${e?.message || e}`
+  }
+  return left
+}
+
+/** The store's database ran on its own server (the job's spec, the registry, or the endpoint says so). */
+const ranNodeDb = (slug: string, r: Record<string, any>, tenant?: { iam_auth?: boolean | null; rds_endpoint?: string | null } | null) =>
+  isNodeJob(r) || tenant?.iam_auth === false || nodeDbSlug(tenant?.rds_endpoint ?? r.endpoint) === slug
 
 /** Server instances a job launched, by node name (jobs before generations kept only ec2InstanceId). */
 function knownNodeInstances(slug: string, r: Record<string, any>): Record<string, string> {
@@ -854,6 +997,12 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
       if (why) refused.push(why)
     }
     if (refused.length) r.manualCleanup = { ...((r.manualCleanup as Record<string, unknown>) || {}), instance: refused.join('; ') }
+    // An on-node database: its data volume (now its server is gone) and its password. Nothing of a
+    // failed provision is worth a snapshot; a restore's source is still in S3.
+    if (k8s && ranNodeDb(tenant.slug, r, tenant)) {
+      const left = await cleanupNodeDb(tenant.slug, r, { snapshot: false })
+      if (Object.keys(left).length) r.manualCleanup = { ...((r.manualCleanup as Record<string, unknown>) || {}), ...left }
+    }
   }
   // Billable resources.
   if (r.bucket) await provider.deleteBucket(r.bucket).catch(() => {})
@@ -994,7 +1143,7 @@ export interface DeprovisionResult {
 export async function deprovisionTenant(
   tenantId: string,
   provider: ProvisioningProvider,
-  ctx: { ownerId?: string | null }
+  ctx: { ownerId?: string | null; /** Tear down even when the backup fails (the data is lost). */ force?: boolean }
 ): Promise<DeprovisionResult> {
   const tenant = await getTenant(tenantId)
   if (!tenant) return { ok: false, backupKey: null, backedUp: false, error: 'tenant not found' }
@@ -1011,6 +1160,8 @@ export async function deprovisionTenant(
   const bucket: string = tenant.s3_bucket || created.bucket || `jeffi-tenant-${slug}`
   // A Starter store's database is one of many on a shared host: drop it, never the instance.
   const sharedHost: string | null = tenant.shared_db_host || created.sharedDbHost || null
+  // Postgres on the store's own server: no RDS instance, its volume and secret go instead.
+  const nodeDb = !sharedHost && ranNodeDb(slug, created, tenant)
 
   let backupKey: string | null = null
   let backedUp = false
@@ -1018,15 +1169,24 @@ export async function deprovisionTenant(
   try {
     // 2. Backup (only if there was ever a DB to back up).
     if (endpoint) {
-      const archive = await provider.backupDb(endpoint, tenant.rds_db || created.dbName || TENANT_DB)
-      const { putTenantBackup } = await import('@/lib/tenancy/tenant-backup-store')
-      const { ownerKey } = await putTenantBackup({
-        buffer: archive,
-        ownerId: ctx.ownerId || 'unknown',
-        slug,
-      })
-      backupKey = ownerKey
-      backedUp = true
+      const dbName = tenant.rds_db || created.dbName || TENANT_DB
+      try {
+        const archive = nodeDb
+          ? await provider.backupDb(endpoint, dbName, { iamAuth: false, dbSecretRef: tenantDbSecretRef(slug) })
+          : await provider.backupDb(endpoint, dbName)
+        const { putTenantBackup } = await import('@/lib/tenancy/tenant-backup-store')
+        const { ownerKey } = await putTenantBackup({
+          buffer: archive,
+          ownerId: ctx.ownerId || 'unknown',
+          slug,
+        })
+        backupKey = ownerKey
+        backedUp = true
+      } catch (e: any) {
+        // Nothing is deleted without a backup unless the operator said so.
+        if (!ctx.force) throw e
+        created.backupError = e?.message || String(e)
+      }
     }
 
     // 3. Delete billable resources (idempotent).
@@ -1038,7 +1198,7 @@ export async function deprovisionTenant(
       const { releaseSharedDbSeat } = await import('@controller/lib/compute/shared-db')
       if (!created.sharedDbReleased) await releaseSharedDbSeat(sharedHost)
       created.sharedDbReleased = true
-    } else await provider.deleteDbInstance(instId)
+    } else if (!nodeDb) await provider.deleteDbInstance(instId)
     await provider.deleteBucket(bucket)
 
     // 3a. Compute teardown: a dedicated EC2 (higher plans) is terminated; a Basic tenant used
@@ -1069,28 +1229,18 @@ export async function deprovisionTenant(
       await deletePoolIfEmpty().catch(() => {})
     }
 
-    // 3a.ii Basic shape (db on tenant's own node): snapshot the EBS data volume once, then
-    // delete it. The volume outlives the node (DeleteOnTermination=false), so without this
-    // cleanup it would linger. Tag-tracked — safe when the volume is already gone.
-    try {
-      const { describeTenantDbVolume, snapshotVolume, deleteVolume } = await import(
-        '@/lib/shared/ec2-client'
+    // 3a.ii A database on the store's own server: snapshot its EBS data volume once (it outlives the
+    // server, DeleteOnTermination=false), delete it, and delete the password secret.
+    if (onK8s || nodeDb)
+      Object.assign(
+        computeCleanup,
+        await cleanupNodeDb(slug, created, {
+          snapshot: true,
+          persist: async () => {
+            if (job) await updateProvisioningJob(job.id, { created_resources: created })
+          },
+        })
       )
-      const vol = await describeTenantDbVolume(slug)
-      if (vol) {
-        if (!created.dbVolumeSnapshotId) {
-          created.dbVolumeSnapshotId = await snapshotVolume(
-            vol.volumeId,
-            slug,
-            `teardown of ${slug}`
-          )
-          if (job) await updateProvisioningJob(job.id, { created_resources: created })
-        }
-        await deleteVolume(vol.volumeId)
-      }
-    } catch (e: any) {
-      computeCleanup.dbVolume = `cleanup failed: ${e?.message || e}`
-    }
 
     // 3b. Remove the tenant's DNS records so the subdomains stop resolving. Best-effort but LOUD:
     // a swallowed failure leaves zombie A-records pointing at the just-terminated box (records
@@ -1118,7 +1268,7 @@ export async function deprovisionTenant(
 
     // 3c. Delete the tenant's param group once the DB instance is fully gone (else RDS
     // refuses). Best-effort — a still-deleting DB is retried by a later sweep.
-    if (!sharedHost) await deleteParamGroupWhenDbGone(provider, instId, created.paramGroup || paramGroupName(slug))
+    if (!sharedHost && !nodeDb) await deleteParamGroupWhenDbGone(provider, instId, created.paramGroup || paramGroupName(slug))
 
     // 3d. Neither provider supports deletion. Razorpay has no delete for a linked account and
     // cannot clear a settlement bank (product-update only overwrites account/ifsc/beneficiary);
@@ -1297,7 +1447,9 @@ export async function reconcileK8sPlan(
           created.k8sPlanLaunched = [...(created.k8sPlanLaunched ?? []), id]
         } else created.poolInstanceId = id
         await save({})
-      }
+      },
+      // A replacement server for an on-node database launches in its volume's zone and re-attaches it.
+      c.spec.db.mode === 'node' ? { dbVolume: { sizeGb: c.spec.db.storageGb } } : undefined
     )
     const overdue = now - (created.k8sPendingSince || now) > K8S_PLAN_DEADLINE_MS
     if (!placed.ready) {
@@ -1322,19 +1474,7 @@ export async function reconcileK8sPlan(
       return { ok: true, added, removed, error: 'pending: waiting for node to join' }
     }
 
-    const { listCustomDomains } = await import('@/lib/tenant-registry/custom-domains')
-    const customDomains = (await listCustomDomains(tenantId).catch(() => []))
-      .filter(d => d.status === 'verified')
-      .map(d => d.domain)
-    await k8s.applyTenantWorkload({
-      slug: tenant.slug,
-      plan: tenant.plan,
-      hosts: desired,
-      customDomains,
-      compute: c.spec,
-      dbPoolMax: c.dbPoolMax,
-      nodeGen: c.nodeGen,
-    })
+    await applyWorkload(tenantId, tenant.slug, tenant.plan, c, desired)
 
     if (oldDedicated.length) {
       // Keep the dedicated node until every pod has rolled onto the pool, else the store drops.

@@ -71,6 +71,7 @@ export interface PlanOption extends PlanCompute {
   name: string
   tier: number
   monthlyPriceInr: number
+  active: boolean
   // Per-plan markup applied to the AWS infra bill (plan.infra_margin). Resolved in quoteSpec against settings.margin.
   infraMargin?: number
 }
@@ -78,7 +79,7 @@ export interface PlanOption extends PlanCompute {
 /** Store plans with what each lets the owner choose. Inactive plans only when asked (Starter until it launches). */
 export async function computePlans(opts: { includeInactive?: boolean } = {}): Promise<PlanOption[]> {
   const r = await controlPlanePool().query(
-    `SELECT slug, name, tier, monthly_price_inr, default_preset, min_placement, advanced_compute, infra_margin, min_preset
+    `SELECT slug, name, tier, monthly_price_inr, default_preset, min_placement, advanced_compute, infra_margin, min_preset, is_active
        FROM plans WHERE product = 'store' ${opts.includeInactive ? '' : 'AND is_active = true'} ORDER BY tier`
   )
   return r.rows.map(p => ({
@@ -86,6 +87,7 @@ export async function computePlans(opts: { includeInactive?: boolean } = {}): Pr
     name: p.name,
     tier: p.tier,
     monthlyPriceInr: Number(p.monthly_price_inr),
+    active: p.is_active,
     defaultPreset: (p.default_preset as PresetKey | null) ?? null,
     minPlacement: p.min_placement,
     advanced: p.advanced_compute,

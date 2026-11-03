@@ -3,9 +3,10 @@ import { requireAdminScope } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { clearCatalogCache, computePlans, getCatalog } from '@controller/lib/compute/catalog'
-import { PRESETS } from '@/lib/compute/presets'
-import { quoteSpec } from '@controller/lib/compute/pricing'
-import type { PricingSettings } from '@/lib/compute/spec'
+import { PRESETS, presetSpec } from '@/lib/compute/presets'
+import { PRESET_RANK } from '@/lib/compute/validate'
+import { monthlyTotal, quoteSpec, UnknownPriceError } from '@controller/lib/compute/pricing'
+import type { PresetKey, PricingSettings } from '@/lib/compute/spec'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,16 +18,42 @@ function platformOnly(admin: Awaited<ReturnType<typeof requireAdminScope>>) {
   return admin
 }
 
+// The sizes a plan offers: Basic only its fixed size, the others theirs from the plan's minimum up.
+const rankOf = (k: PresetKey) => (k === 'shared' ? -1 : PRESET_RANK[k])
+const offers = (minPreset: PresetKey | undefined, key: PresetKey) =>
+  minPreset === 'basic' ? key === 'basic' : key !== 'basic' && key !== 'shared' && rankOf(key) >= Math.max(1, minPreset ? rankOf(minPreset) : 1)
+
 async function view() {
   const catalog = await getCatalog()
   const plans = await computePlans()
-  const presets = Object.values(PRESETS).map(p => {
-    const q = quoteSpec(p.spec, catalog)
-    return { key: p.key, label: p.label, awsInrMonth: q.awsInrMonth, inrMonth: q.inrMonth, inrDay: q.inrDay }
-  })
+  const presets = Object.values(PRESETS)
+    .map(p => {
+      const spec = presetSpec(p.key)
+      // Each plan's price for the size: infra at its margin, GST on that, plus its fee.
+      const byPlan = Object.fromEntries(
+        plans.map(pl => {
+          if (!offers(pl.minPreset, p.key)) return [pl.slug, null]
+          try {
+            const q = quoteSpec(spec, catalog, { infraMargin: pl.infraMargin })
+            return [pl.slug, { infraInrMonth: q.inrMonth, totalInrMonth: monthlyTotal(q, pl.monthlyPriceInr, catalog.settings.gstRate).total }]
+          } catch (e) {
+            if (e instanceof UnknownPriceError) return [pl.slug, null]
+            throw e
+          }
+        })
+      )
+      let awsInrMonth: number | null = null
+      try {
+        awsInrMonth = quoteSpec(spec, catalog, { infraMargin: 0 }).awsInrMonth
+      } catch (e) {
+        if (!(e instanceof UnknownPriceError)) throw e
+      }
+      return { key: p.key, label: p.label, awsInrMonth, plans: byPlan }
+    })
+    .filter(p => Object.values(p.plans).some(Boolean))
   return {
     ...catalog,
-    plans: plans.map(p => ({ slug: p.slug, name: p.name, tier: p.tier, infraMargin: p.infraMargin ?? 0, minPreset: p.minPreset ?? null })),
+    plans: plans.map(p => ({ slug: p.slug, name: p.name, tier: p.tier, monthlyPriceInr: p.monthlyPriceInr, infraMargin: p.infraMargin ?? 0, minPreset: p.minPreset ?? null })),
     presets,
   }
 }
@@ -56,7 +83,7 @@ const SETTING_BOUNDS: Partial<Record<keyof PricingSettings, [number, number]>> =
   s3UsdGbMonth: [0, 10],
 }
 
-/** { code, usd_hourly?, …, sellable? } edits one price; { settings: {...} } edits the pricing settings. */
+/** { code, usd_hourly?, …, sellable? } edits one price; { settings: {...} } the pricing settings; { plan, infraMargin?, monthlyPriceInr? } a plan's margin and fee. */
 export async function PATCH(req: NextRequest) {
   const admin = platformOnly(await requireAdminScope(req, 'ecom_billing:write'))
   if (admin instanceof NextResponse) return admin
@@ -77,13 +104,25 @@ export async function PATCH(req: NextRequest) {
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
       [JSON.stringify({ ...settings, ...next })]
     )
-  } else if (typeof b.plan === 'string' && b.infraMargin !== undefined) {
-    const n = Number(b.infraMargin)
-    if (!Number.isFinite(n) || n < 0 || n > 3) return NextResponse.json({ error: 'infraMargin must be between 0 and 3' }, { status: 400 })
-    const r = await pool.query(
-      `UPDATE plans SET infra_margin = $2, updated_at = now() WHERE slug = $1 AND product = 'store'`,
-      [b.plan, n]
-    )
+  } else if (typeof b.plan === 'string' && (b.infraMargin !== undefined || b.monthlyPriceInr !== undefined)) {
+    const sets: string[] = []
+    const vals: unknown[] = [b.plan]
+    if (b.infraMargin !== undefined) {
+      const n = Number(b.infraMargin)
+      if (!Number.isFinite(n) || n < 0 || n > 3) return NextResponse.json({ error: 'infraMargin must be between 0 and 3' }, { status: 400 })
+      vals.push(n)
+      sets.push(`infra_margin = $${vals.length}`)
+    }
+    if (b.monthlyPriceInr !== undefined) {
+      // The plan's flat monthly fee, GST included.
+      const n = Number(b.monthlyPriceInr)
+      if (b.monthlyPriceInr === null || !Number.isFinite(n) || n < 0 || n > 1_000_000) {
+        return NextResponse.json({ error: 'monthlyPriceInr must be a rupee amount of 0 or more' }, { status: 400 })
+      }
+      vals.push(Math.round(n * 100) / 100)
+      sets.push(`monthly_price_inr = $${vals.length}`)
+    }
+    const r = await pool.query(`UPDATE plans SET ${sets.join(', ')}, updated_at = now() WHERE slug = $1 AND product = 'store'`, vals)
     if (!r.rowCount) return NextResponse.json({ error: 'Unknown plan' }, { status: 404 })
   } else {
     const code = typeof b.code === 'string' ? b.code : ''

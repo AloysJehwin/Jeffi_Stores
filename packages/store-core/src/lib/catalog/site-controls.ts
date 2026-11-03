@@ -15,6 +15,7 @@ export interface StoreIdentity {
   phone: string
   web: string
   logoUrl: string // '' means "no logo" — render the store name as text
+  faviconUrl: string // browser-tab icon; '' falls back to logoUrl
   emailAccent: string // '#rrggbb' for email buttons and links; '' keeps the default blue
 }
 
@@ -101,6 +102,8 @@ export interface StorefrontContent {
   metaTagline: string
   /** <meta name="description">. Empty falls back to a generic line built from the store name. */
   metaDescription: string
+  /** Support-page hours, one "Label: value" per line. Flagship default only. */
+  businessHours: string
 }
 
 export interface KeyboardShortcuts {
@@ -157,6 +160,7 @@ const DEFAULTS: SiteControls = {
     phone: '+91 96853 54099',
     web: 'jeffistores.in',
     logoUrl: '',
+    faviconUrl: '',
     emailAccent: '',
   },
   flags: {
@@ -233,6 +237,7 @@ const DEFAULTS: SiteControls = {
     // an unset tagline simply drops from the title rather than advertising someone else's trade.
     metaTagline: 'Industrial Hardware & Tools',
     metaDescription: 'Your trusted hardware partner for industrial machinery parts, tools, and equipment',
+    businessHours: 'Mon – Fri: 9 AM – 7 PM\nSaturday: 9 AM – 6 PM\nSunday: Closed',
   },
   shortcuts: {
     newProduct: 'mod+shift+p',
@@ -264,7 +269,9 @@ const KEYS = [
   'business_phone',
   'business_web',
   'business_logo_url',
+  'business_favicon_url',
   'business_email_accent',
+  'business_hours',
   'feature_razorpay_enabled',
   'feature_cod_enabled',
   'feature_gst_enabled',
@@ -408,6 +415,7 @@ async function identityDefaults(): Promise<StoreIdentity> {
     phone: '',
     web: `${slug}.${domain}`,
     logoUrl: '',
+    faviconUrl: '',
     emailAccent: '',
   }
 }
@@ -454,6 +462,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         phone: str('business_phone', id.phone),
         web: str('business_web', id.web),
         logoUrl: str('business_logo_url', id.logoUrl),
+        faviconUrl: str('business_favicon_url', str('business_logo_url', id.logoUrl)),
         emailAccent: str('business_email_accent', id.emailAccent),
       },
       flags: {
@@ -518,6 +527,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         aboutCopy: str('storefront_about_copy', tenantScoped ? '' : d.storefront.aboutCopy),
         metaTagline: str('meta_tagline', tenantScoped ? '' : d.storefront.metaTagline),
         metaDescription: str('meta_description', tenantScoped ? '' : d.storefront.metaDescription),
+        businessHours: str('business_hours', tenantScoped ? '' : d.storefront.businessHours),
       },
       shortcuts: {
         newProduct: str('shortcut_new_product', d.shortcuts.newProduct),

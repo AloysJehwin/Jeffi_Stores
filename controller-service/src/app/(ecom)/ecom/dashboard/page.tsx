@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
-import { getTenantBilling } from '@/lib/tenant-registry'
+import { getTenantBilling, listPlans, controlPlanePool } from '@/lib/tenant-registry'
 import { getSubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import SiteReachabilityBadge from './SiteReachabilityBadge'
@@ -18,12 +18,16 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const { tenant: tenantSlug } = await searchParams
   const { tenant } = await loadOwnerContext({ tenantSlug })
 
-  const [billing, rzpSub, services] = await Promise.all([
+  const [billing, rzpSub, services, plans, priceRow] = await Promise.all([
     getTenantBilling(tenant.id),
     tenant.razorpay_subscription_id && tenant.subscription_status === 'active'
       ? getSubscription(tenant.razorpay_subscription_id).catch(() => null)
       : Promise.resolve(null),
     serviceStates(tenant),
+    listPlans('any').catch(() => []),
+    controlPlanePool()
+      .query<{ price: string | null }>(`SELECT price_inr_month AS price FROM tenant_compute WHERE tenant_id = $1`, [tenant.id])
+      .catch(() => ({ rows: [] as { price: string | null }[] })),
   ])
   const fmtDay = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
   const renewalDate = rzpSub?.current_end ? fmtDay(new Date(rzpSub.current_end * 1000)) : null
@@ -31,9 +35,13 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const isLive = tenant.status === 'active' && tenant.store_request !== 'provisioning'
   const isStore = (tenant.service_types ?? ['store']).includes('store')
   const storeUrl = `https://${tenant.slug}.jeffistores.in`
-  const monthly = Number(tenant.monthly_price_inr ?? 0)
-  const price = tenant.billing_interval === 'yearly' ? monthly * 10 : monthly
+  // The subscription price: plan fee + servers + GST on servers (tenant_compute.price_inr_month). Yearly is 10× the month.
+  const monthly = Number(priceRow.rows[0]?.price ?? 0)
+  const price = Math.round(tenant.billing_interval === 'yearly' ? monthly * 10 : monthly)
   const priceLabel = price > 0 ? `₹${price.toLocaleString('en-IN')}/${tenant.billing_interval === 'yearly' ? 'yr' : 'mo'}` : '—'
+  const planName = plans.find(p => p.slug === tenant.plan)?.name ?? tenant.plan ?? '—'
+  // With payments off there is no subscription behind the store yet.
+  const subStatus = tenant.razorpay_subscription_id ? tenant.subscription_status : 'Billing starts later'
   const ownRazorpay = tenant.own_razorpay === true
 
   return (
@@ -82,10 +90,10 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
           <Card title="Subscription">
             <div className="space-y-2.5">
-              <Row label="Plan" value={<span className="capitalize font-semibold">{tenant.plan ?? '—'}</span>} />
+              <Row label="Plan" value={<span className="font-semibold">{planName}</span>} />
               <Row label="Billing" value={<span className="capitalize">{tenant.billing_interval}</span>} />
               <Row label="Price" value={priceLabel} />
-              <Row label="Status" value={<span className="capitalize">{tenant.subscription_status}</span>} />
+              <Row label="Status" value={<span className="capitalize">{subStatus}</span>} />
               {renewalDate && <Row label="Renews" value={renewalDate} />}
             </div>
             <Link href="/dashboard/billing" className="inline-block mt-4 text-sm font-semibold ecom-accent-text hover:underline">

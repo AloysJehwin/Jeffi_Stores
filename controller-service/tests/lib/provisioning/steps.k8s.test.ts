@@ -20,7 +20,7 @@ const reg = {
 vi.mock('@/lib/tenant-registry', () => reg)
 const lifecycle = vi.hoisted(() => ({ clearTenantEc2Instance: vi.fn() }))
 vi.mock('@/lib/tenant-registry/lifecycle', () => lifecycle)
-vi.mock('@/lib/tenant-registry/custom-domains', () => ({ listCustomDomains: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/lib/tenant-registry/custom-domains', () => ({ listCustomDomains: vi.fn().mockResolvedValue([]), routedCustomDomains: vi.fn().mockResolvedValue([]) }))
 vi.mock('@/lib/tenancy/tenant-backup-store', () => ({ getTenantBackup: vi.fn(), putTenantBackup: vi.fn() }))
 const poolAuto = vi.hoisted(() => ({ ensurePoolInstance: vi.fn(), deletePoolIfEmpty: vi.fn() }))
 vi.mock('@controller/lib/tenancy/pool-autoscale', () => poolAuto)

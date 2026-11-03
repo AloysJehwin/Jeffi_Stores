@@ -10,6 +10,7 @@ up and cut production over to it.
 | `bootstrap/secrets.sh` | Seeds cluster Secrets from Secrets Manager + local `certs/` (prints no values) |
 | `bootstrap/store-secret.sh` | Writes `jeffi/store` (storefront, admin and business pods) from `jeffi/production` without the control-plane keys in `store-secret-exclude.txt`; prints no values. Each release runs it (Deploy · flagship), and skips the write when nothing changed. Pods fall back to `jeffi/production` if it is missing |
 | `bootstrap/service-secrets-iam.sh` | Lets the core's role read each service's secret and `jeffi/store` |
+| `bootstrap/tenant-db-snapshots.sh` | One-time: daily EBS snapshots (keep 7) of every store database disk on the store's own server (tag `jeffi:role=db`). The `node_db_backup` CronJob writes the daily S3 dumps |
 | `bootstrap/apply-platform.sh` | Applies `platform/` in dependency order |
 | `bootstrap/release.sh` | Builds the four service images from `HEAD`, pushes them to ECR, runs `rollout.sh`, smoke-tests |
 | `bootstrap/rollout.sh` | Rollout: platform, tenant schema fan-out, then every store namespace one at a time |
@@ -52,6 +53,7 @@ Tenant namespaces are **not** in git. The provisioning engine renders them
 - `jeffi-stores-ec2-role`: add `s3:PutObject/GetObject/DeleteObject` on `jeffi-stores-bucket/*` and `jeffi-stores-vault/*`.
   Then remove the `AllowUploadFromApplication` (Principal `*` write) statement from the `jeffi-stores-bucket` policy. Today that bucket is publicly writable and deletable.
 - `jeffi-stores-ec2-role`: `s3:PutObject/GetObject/ListBucket` on `jeffi-stores-mtls-truststore/k3s-etcd/*`. After that, add `--etcd-s3 --etcd-s3-bucket jeffi-stores-mtls-truststore --etcd-s3-folder k3s-etcd` to `core-node.sh` so etcd snapshots leave the box.
+- Store servers (`jeffi-tenant-provisioning` on `jeffi-stores-ec2-role`): `aws iam put-role-policy --role-name jeffi-stores-ec2-role --policy-name jeffi-tenant-provisioning --policy-document file://deploy/aws/tenant-provisioner-iam-policy.json` (instances, database disks and snapshots, `jeffi/tenant-db/*`, `tenant-backups/*`). Then `bash deploy/k8s/bootstrap/service-secrets-iam.sh` (creates `jeffi-tenant-node-profile`), `kubectl -n jeffi patch cm provisioning --type merge -p '{"data":{"K8S_TENANT_NODE_IAM_PROFILE":"jeffi-tenant-node-profile"}}'` and `bash deploy/k8s/bootstrap/tenant-db-snapshots.sh`.
 - Replace the root access keys used locally with a scoped IAM user (GitHub now assumes `jeffi-github-deploy` over OIDC; see Releasing).
 
 ## Releasing

@@ -199,7 +199,9 @@ export async function writeTenantInfra(
 ): Promise<void> {
   const pool = controlPlanePool()
   // A Starter store has its own database + login on a shared host; a dedicated one the defaults.
-  // Node-mode stores run their own Postgres with password auth (iamAuth=false + db_secret_ref).
+  // Node-mode stores run their own Postgres with password auth: iamAuth=false, db_secret_ref
+  // jeffi/tenant-db/{slug}, rds_user jeffi. Any other kind resets both, so a database that moved off
+  // the server never keeps a stale secret ref.
   await pool.query(
     `UPDATE tenant_infra SET rds_endpoint=$1, s3_bucket=$2, rds_db=COALESCE($4, 'jeffi_stores'), rds_user=$5, shared_db_host=$6,
        iam_auth=COALESCE($7, true), db_secret_ref=$8, updated_at=now() WHERE tenant_id=$3`,
@@ -220,7 +222,8 @@ export async function writeTenantInfra(
 export async function clearTenantInfra(tenantId: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
-    `UPDATE tenant_infra SET rds_endpoint=NULL, rds_user=NULL, shared_db_host=NULL, ec2_instance_id=NULL, ec2_target=NULL, s3_bucket=NULL, updated_at=now() WHERE tenant_id=$1`,
+    `UPDATE tenant_infra SET rds_endpoint=NULL, rds_user=NULL, rds_db='jeffi_stores', shared_db_host=NULL, iam_auth=true, db_secret_ref=NULL,
+       ec2_instance_id=NULL, ec2_target=NULL, s3_bucket=NULL, updated_at=now() WHERE tenant_id=$1`,
     [tenantId]
   )
   clearTenantCache()

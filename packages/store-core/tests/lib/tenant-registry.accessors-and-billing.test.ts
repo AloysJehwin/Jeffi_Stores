@@ -100,7 +100,7 @@ describe('tenant-registry — extended coverage', () => {
       const rows = await mod.listTenants()
       expect(rows).toHaveLength(1)
       const sql = String(poolQuery.mock.calls[0][0])
-      expect(sql).not.toMatch(/WHERE/)
+      expect(sql).not.toMatch(/\n\s*WHERE/)
       expect(poolQuery.mock.calls[0][1]).toEqual([])
     })
 

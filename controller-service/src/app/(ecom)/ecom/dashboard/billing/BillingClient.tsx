@@ -27,10 +27,15 @@ export default function BillingClient({
   tenant,
   plans,
   renewalDate,
+  priceInrMonth = null,
+  paymentsEnabled = false,
 }: {
   tenant: TenantRow
   plans: Plan[]
   renewalDate: string | null
+  /** tenant_compute.price_inr_month: plan fee + servers + GST on servers. */
+  priceInrMonth?: number | null
+  paymentsEnabled?: boolean
 }) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -68,6 +73,13 @@ export default function BillingClient({
     }
   }
 
+  // No subscription behind the store (payments off, or not yet paid): no status badge to show.
+  const hasSubscription = !!tenant.razorpay_subscription_id
+  const plan = plans.find(p => p.slug === tenant.plan)
+  const fee = Number(plan?.monthly_price_inr ?? 0)
+  const yearly = tenant.billing_interval === 'yearly'
+  const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
+
   const canCancel =
     !!tenant.razorpay_subscription_id && !['cancelled', 'completed', 'expired'].includes(tenant.subscription_status)
 
@@ -80,16 +92,22 @@ export default function BillingClient({
         </h2>
         <div className="flex flex-wrap items-center gap-4">
           <div>
-            <div className="text-2xl font-bold text-foreground capitalize">{plans.find(p => p.slug === tenant.plan)?.name ?? tenant.plan ?? '—'}</div>
+            <div className="text-2xl font-bold text-foreground">{plan?.name ?? tenant.plan ?? '—'}</div>
             <div className="text-sm text-foreground-muted mt-0.5 capitalize">
               {tenant.billing_interval ?? 'monthly'} billing
             </div>
           </div>
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${subStatusInfo.color}`}
-          >
-            {subStatusInfo.label}
-          </span>
+          {hasSubscription ? (
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${subStatusInfo.color}`}
+            >
+              {subStatusInfo.label}
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-muted">
+              {paymentsEnabled ? 'Awaiting payment' : 'Not billed yet'}
+            </span>
+          )}
           {renewalDate && (
             <div className="text-sm text-foreground-muted ml-auto">
               Next renewal: <span className="text-foreground font-medium">{renewalDate}</span>
@@ -102,6 +120,14 @@ export default function BillingClient({
             </div>
           )}
         </div>
+        {priceInrMonth != null && priceInrMonth > 0 && (
+          <div className="mt-4 text-sm text-foreground-secondary">
+            Plan {inr(fee)} + servers {inr(Math.max(0, priceInrMonth - fee))} (incl. GST) ={' '}
+            <span className="font-semibold text-foreground">{inr(priceInrMonth)}/mo</span>
+            {yearly && <> · billed {inr(priceInrMonth * 10)}/yr</>}
+            {!hasSubscription && !paymentsEnabled && <span className="text-foreground-muted"> (billing starts later)</span>}
+          </div>
+        )}
         {tenant.razorpay_subscription_id && (
           <div className="text-xs text-foreground-muted mt-3 font-mono">{tenant.razorpay_subscription_id}</div>
         )}

@@ -1,5 +1,5 @@
 # SaaS Multi-Tenant Foundation — Status Summary
-_Last updated: 2026-10-14_
+_Last updated: 2026-11-03_
 
 Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until instructed)
 
@@ -44,19 +44,27 @@ Tenant compute is moving from AMI-built EC2s to k3s. The plan is in [`K8S_MIGRAT
 
 Code: `controller-service/src/lib/compute/`.
 
-- **Spec:** each store's EC2 (pool or own type and count), RDS (shared or own class, storage, Multi-AZ) and copies/size per service, in `tenant_compute.desired`/`applied`. Presets Shared/Small/Medium/Large/X-Large; Advanced from Basic up.
-- **Price:** AWS cost (`compute_prices`) × USD→INR × (1 + margin), settings in `platform_infra.compute_pricing`; admin page Settings → Server Pricing; `deploy/k8s/db/refresh-compute-prices.sh` prints price updates.
+- **Spec:** each store's EC2 (own type and count), database (Postgres on the store's own server — the default — or a dedicated RDS class, storage, Multi-AZ) and copies/size per service, in `tenant_compute.desired`/`applied`. Presets offered: Basic (Basic plan only, fixed), Small/Medium/Large/X-Large, floored per plan by `plans.min_preset`; Advanced on every paid plan. The Shared preset remains only for retired Starter stores.
+- **Price:** see *Plans, pricing and payments* below. AWS cost from `compute_prices`, settings in `platform_infra.compute_pricing`; admin page Settings → Server Pricing; `deploy/k8s/db/refresh-compute-prices.sh` prints price updates.
 - **Flag:** `COMPUTE_SPEC_ENABLED=true` shows the picker at onboarding and makes provisioning use the owner's choice. Off, every store runs its plan's old tier (`compute/legacy.ts`) and `tenant_compute` records it.
-- **Provisioning (phase 2):** the database is created at the chosen class/storage/Multi-AZ with `max_connections` by class; each pod gets `DB_POOL_MAX` so all copies fit the database's connections. Starter stores get a database `t_{slug}` and IAM role `app_{slug}` on a shared host (`shared_db_hosts`, `tenant_infra.rds_user`/`shared_db_host`).
-- **Resizing a running store (phase 3):** owner page `/ecom/dashboard/compute` (Servers, shown when the flag is on) or the admin `PUT /api/admin/ecom/[tenantId]/compute`. A price rise needs 7 days of wallet. The provisioning worker runs `reconcileCompute` (`lib/provisioning/compute-reconcile.ts`) one step per tick:
+- **Provisioning (phase 2):** the database is created at the chosen class/storage/Multi-AZ with `max_connections` by class; each pod gets `DB_POOL_MAX` so all copies fit the database's connections. (Retired Starter stores used a database `t_{slug}` and IAM role `app_{slug}` on a shared host: `shared_db_hosts`, `tenant_infra.rds_user`/`shared_db_host`.)
+- **Resizing a running store (phase 3):** owner page `/ecom/dashboard/compute` (Plan & servers, shown when the flag is on) or the admin `PUT /api/admin/ecom/[tenantId]/compute`; the new spec's price replaces `tenant_compute.price_inr_month`. The provisioning worker runs `reconcileCompute` (`lib/provisioning/compute-reconcile.ts`) one step per tick:
   - **Shared ↔ own database:** create the target, take the store offline (`instance_state='migrating'`), wait 90 s for requests to finish, copy, switch `tenant_infra`, restart pods, bring it back. The old database is dropped after 24 h.
   - **Servers:** more servers of the same type join the current generation; any other change starts a new generation `t-{slug}.{gen}-{i}`, pods roll over, then the old servers are removed.
   - **Own database:** storage and standby change at once; the class changes in the maintenance window (or now), with pods lowered to the smaller connection pool first.
   - A failed change retries with backoff, then alerts; admin Infrastructure → Kubernetes has Retry.
-- **Wallet billing for servers (phase 4):** a store's price per hour is kept in `tenant_compute_periods` (one open period, a new one at each price change or pause; `lib/billing/infra-billing.ts`). The `infra_billing` cron (00:30 IST) debits each IST day once, category `infra`, keyed `infra:{tenant}:{day}`, into a negative balance if need be, catching up three days. Then `infra-balance.ts`: a week of runway left → an email every 3 days; below zero → `graceDays` (3), then the store pauses (not served, pods at 0, its own servers and database stopped, billed for storage only). The provisioning worker starts it again once the wallet covers a day. Owner Wallet and Servers pages show the daily cost, runway and pause state; admin Billing shows servers revenue against estimated AWS cost. Off while `COMPUTE_SPEC_ENABLED` is off; the flagship is never billed.
-- **Onboarding prepay:** after the plan is paid, a new store's wallet must hold `minPrepayDays` (30) of its servers before it is built (`onboard/FundServers.tsx`, `startStoreIfReady`).
-- **Plan fees:** Razorpay plans take `plans.monthly_price_inr` (yearly ten months), cached by slug, interval and amount. An upgrade cancels the old subscription only after the new one is saved; a downgrade waits in `tenants.pending_plan_id` until the next recurring charge.
+- **Servers are not billed from the wallet** any more: daily wallet debits for servers (`infra-billing.ts`, `tenant_compute_periods`) and the onboarding server prepay (`FundServers.tsx`) were removed — servers are part of the one subscription price below.
 - **Service split (phase 5):** done, see `docs/MICROSERVICES.md`.
+
+## Plans, pricing and payments (2026-11-03)
+
+- **Store plans:** Basic, Grow (slug `growth`), Pro, Enterprise (`database/control-plane/seed-plans.sql`). Starter is retired (`is_active=false`, never offered). `listPlans()` returns active store plans only; `listPlans('any')` adds the `services` workspace plan. Features per plan: [`PLAN_FEATURE_MATRIX.md`](PLAN_FEATURE_MATRIX.md).
+- **Price** = flat plan fee (`plans.monthly_price_inr`: ₹0 / ₹500 / ₹1,000 / ₹2,000, GST included) + servers at AWS cost × (1 + `plans.infra_margin`: Basic 0%, others 20%) + 18% GST on the servers only — `monthlyTotal(quote, fee, gstRate).total` (`lib/compute/pricing.ts`). Floors at each plan's `min_preset`: Basic ₹2,081, Grow ₹3,188, Pro ₹5,216, Enterprise ₹9,845 per month. Yearly = 10× the month (2 months free), charged once a year.
+- **Stored price:** onboarding submit always saves the store's spec and price to `tenant_compute.desired`/`price_inr_month` — the owner's choice when `COMPUTE_SPEC_ENABLED`, else the plan's `min_preset`; Basic is always the Basic preset. Approval, the owner dashboard and billing read that price.
+- **Database:** Postgres on the store's own server is the default on every plan; a dedicated RDS database is an opt-up on Grow, Pro and Enterprise.
+- **Payments are OFF** until `ECOM_PAYMENTS_ENABLED=true`. Onboarding still shows the plan, price and review, but KYC approval (`api/(admin)/admin/ecom/kyc/[tenantId]/approve`) starts the build at once (`startStore`) and emails "approved, we're building your store"; no Razorpay subscription is created and `subscription_status` is left alone. Owner pages say "billing starts later". With the flag on, approval creates the Razorpay subscription for `price_inr_month` (no fallback to another plan if the store's plan is missing) and the first `subscription.charged` starts the store, as before.
+- **Live email:** sent once per store by `notifyStoreLive(tenantId)` (`lib/provisioning/start-store.ts`, claimed by a `store_live_email` row in `provisioning_step_events`) when the store is actually serving — not when the build starts.
+- **Plan changes:** Razorpay plans are cached by slug, interval and amount. An upgrade cancels the old subscription only after the new one is saved; a downgrade waits in `tenants.pending_plan_id` until the next recurring charge.
 
 ---
 

@@ -159,11 +159,26 @@ export const presetSpec = (key: PresetKey): ComputeSpec => {
   return s
 }
 
-/** A second node and a standby database in another zone. */
+/** A second server; with a dedicated database, also a standby in another zone (on-node Postgres stays on one server). */
 export function withHighAvailability(spec: ComputeSpec): ComputeSpec {
   const s = cloneSpec(spec)
   if (s.node.placement === 'dedicated') s.node.count = Math.max(2, s.node.count)
   if (s.db.mode === 'dedicated') s.db.multiAz = true
+  return s
+}
+
+/** The RDS class each size gets when its database moves off the server. */
+export const PRESET_DB_CLASS: Partial<Record<PresetKey, string>> = {
+  small: 'db.t4g.micro',
+  medium: 'db.t4g.small',
+  large: 'db.t4g.medium',
+  xlarge: 'db.t4g.large',
+}
+
+/** The size with its database on its own RDS instance of the size's class (RDS storage is at least 20 GB). */
+export function withDedicatedDb(spec: ComputeSpec, key: PresetKey): ComputeSpec {
+  const s = cloneSpec(spec)
+  s.db = { mode: 'dedicated', class: PRESET_DB_CLASS[key] ?? 'db.t4g.micro', storageGb: Math.max(20, s.db.storageGb), multiAz: false }
   return s
 }
 
@@ -194,6 +209,11 @@ const DB_MAX_CONNECTIONS: Record<string, number> = {
 }
 
 export const dbMaxConnections = (cls: string, memoryMib: number | null) => DB_MAX_CONNECTIONS[cls] ?? Math.floor((memoryMib ?? 1024) / 16)
+
+// The on-node Postgres pod (tenant-workload.ts postgresWorkload) sets no max_connections, so it runs
+// Postgres's default; a server with too little memory for that many gets memory / 16.
+export const NODE_DB_MAX_CONNECTIONS = 100
+export const nodeDbMaxConnections = (nodeMemoryMib: number | null) => Math.min(NODE_DB_MAX_CONNECTIONS, Math.floor((nodeMemoryMib ?? 1024) / 16))
 
 /** Per-pod database pool: connections are shared by every pod at its scaled-out count. */
 export const DB_POOL_CAP = 15
