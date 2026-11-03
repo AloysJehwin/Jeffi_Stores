@@ -1,30 +1,36 @@
 import Link from 'next/link'
 import { TabLinks } from '@/components/admin/channels/ui'
-import { badgeCls, type Tone } from '@/components/admin/kit/tones'
+import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
+import { MONEY_STATUS, TENANT_STATUS } from './cells'
 
-const TILE_COLS: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' }
+// Two tiles a row on a phone; four from sm (three when there are 3, 5 or 6).
+const tileCols = (n: number) => (n <= 2 ? 'grid-cols-2' : n === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3')
 
-// Headline stat card: one highlighted value and up to 4 tiles. Server component.
+// Headline stat card: one highlighted value and a few tiles. Server component.
 export function EcomHero({
   label,
   value,
   tiles,
+  note,
 }: {
   label: string
   value: string
   tiles: { value: string | number; label: string }[]
+  /** Small muted line under the value (e.g. why a figure is unavailable). */
+  note?: string
 }) {
   return (
-    <div className="bg-surface-elevated rounded-xl border border-accent-500/50 p-4 sm:p-5 flex flex-col justify-between lg:h-56">
-      <div>
+    <div className="bg-surface-elevated rounded-xl border border-accent-500/50 p-4 sm:p-5 flex flex-col justify-between lg:min-h-[14rem] min-w-0">
+      <div className="min-w-0">
         <p className="text-xs text-foreground-muted uppercase tracking-wide font-medium">{label}</p>
-        <p className="text-3xl font-bold text-accent-500 tabular-nums mt-1">{value}</p>
+        <p className="text-2xl sm:text-3xl font-bold text-accent-500 tabular-nums mt-1 break-words">{value}</p>
+        {note && <p className="text-xs text-foreground-muted mt-1">{note}</p>}
       </div>
-      <div className={`grid ${TILE_COLS[Math.min(tiles.length, 4)] ?? 'grid-cols-4'} gap-2 sm:gap-3 mt-4`}>
+      <div className={`grid ${tileCols(tiles.length)} gap-2 sm:gap-3 mt-4`}>
         {tiles.map((t, i) => (
-          <div key={i} className="rounded-lg bg-surface-secondary/60 px-2 py-2 sm:px-3 sm:py-2.5">
-            <p className="text-lg sm:text-xl font-bold leading-none tabular-nums text-foreground">{t.value}</p>
-            <p className="text-[10px] sm:text-xs text-foreground-muted mt-1">{t.label}</p>
+          <div key={i} className="rounded-lg bg-surface-secondary/60 px-2.5 py-2 sm:px-3 sm:py-2.5 min-w-0">
+            <p className="text-base sm:text-xl font-bold leading-tight tabular-nums text-foreground truncate">{t.value}</p>
+            <p className="text-[11px] sm:text-xs text-foreground-muted mt-1 truncate">{t.label}</p>
           </div>
         ))}
       </div>
@@ -36,13 +42,14 @@ export function EcomHero({
 export function PlanMixChart({ mix }: { mix: { plan: string; count: number }[] }) {
   const total = mix.reduce((s, m) => s + m.count, 0) || 1
   const colors: Record<string, string> = {
+    starter: 'bg-teal-500',
     basic: 'bg-sky-500',
     growth: 'bg-emerald-500',
     pro: 'bg-violet-500',
     enterprise: 'bg-amber-500',
   }
   return (
-    <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5 lg:h-56 flex flex-col">
+    <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5 lg:min-h-[14rem] flex flex-col min-w-0">
       <p className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Plan mix</p>
       <div className="flex-1 flex flex-col justify-center gap-3">
         {mix.length === 0 && <p className="text-sm text-foreground-muted">No tenants yet.</p>}
@@ -68,23 +75,17 @@ export function PlanMixChart({ mix }: { mix: { plan: string; count: number }[] }
 // Status/plan/search filter bar (client, URL-param driven).
 export { default as EcomFilters } from './EcomFilters'
 
-const PILL_TONE: Record<string, Tone> = {
-  active: 'green',
-  provisioning: 'amber',
-  suspended: 'red',
-  terminated: 'muted',
-  pending_approval: 'amber',
-  awaiting_payment: 'blue',
-  rejected: 'red',
-  settled: 'green',
-  captured: 'blue',
-  split: 'blue',
-  refunded: 'red',
+// Tenant, KYC, money and domain/bank statuses on one map; unknown ones fall back to a muted humanised chip.
+const PILL_STATUS: StatusMap = {
+  ...MONEY_STATUS,
+  ...TENANT_STATUS,
+  approved: { label: 'Approved', tone: 'green' },
+  verified: { label: 'Verified', tone: 'green' },
 }
 
-// Small pill for statuses reused across pages.
-export function StatusPill({ status }: { status: string }) {
-  return <span className={badgeCls(PILL_TONE[status] ?? 'muted')}>{status}</span>
+/** Status chip for statuses reused across pages (kit StatusBadge). */
+export function StatusPill({ status, map }: { status: string; map?: StatusMap }) {
+  return <StatusBadge status={status} map={map ?? PILL_STATUS} />
 }
 
 export function DetailLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -123,8 +124,8 @@ export function Section({
   className?: string
 }) {
   return (
-    <section className={`rounded-xl border border-border-default p-5 bg-surface-elevated min-w-0 ${className}`}>
-      <div className="flex items-center justify-between gap-3 mb-4">
+    <section className={`rounded-xl border border-border-default p-4 sm:p-5 bg-surface-elevated min-w-0 ${className}`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">{title}</h2>
         {action}
       </div>
@@ -186,5 +187,31 @@ export function TenantTabNav({
       }))}
       value={active}
     />
+  )
+}
+
+/** Side card of label/value rows next to an EcomHero. Server component. */
+export function EcomStatCard({
+  title,
+  rows,
+  note,
+}: {
+  title: string
+  rows: { label: string; value: string | number; tone?: string }[]
+  note?: string
+}) {
+  return (
+    <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5 lg:min-h-[14rem] flex flex-col min-w-0">
+      <p className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">{title}</p>
+      <div className="flex-1 flex flex-col justify-center divide-y divide-border-default/60">
+        {rows.map(r => (
+          <div key={r.label} className="flex items-center justify-between gap-3 py-2">
+            <span className="text-sm text-foreground-muted min-w-0 truncate">{r.label}</span>
+            <span className={`text-sm font-semibold tabular-nums shrink-0 ${r.tone || 'text-foreground'}`}>{r.value}</span>
+          </div>
+        ))}
+      </div>
+      {note && <p className="text-xs text-foreground-muted mt-3">{note}</p>}
+    </div>
   )
 }

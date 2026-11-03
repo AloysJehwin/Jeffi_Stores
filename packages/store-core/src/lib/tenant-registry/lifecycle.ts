@@ -2,6 +2,7 @@ import { controlPlanePool } from './shared'
 import { clearTenantCache } from './host-resolution'
 import { getTenant } from './tenants'
 import { getDraft, reopenDraft } from './kyc'
+import { PLATFORM_TENANT_ID, purgeBlocker } from './purge-rule'
 
 /** Set a tenant's status (e.g. provisioning->active) or instance_state (running/stopped). */
 export async function setTenantStatus(tenantId: string, status: string): Promise<void> {
@@ -229,24 +230,32 @@ export async function clearTenantInfra(tenantId: string): Promise<void> {
   clearTenantCache()
 }
 
-/**
- * Permanently purge a deprovisioned tenant: preserve the owner's Razorpay linked account, delete
- * both S3 backup copies, then DELETE the tenant row (cascades to all tenant-scoped tables). The
- * owners row and the owner-scoped tenant_bank_accounts row are intentionally kept so a returning
- * owner can reuse their existing Route account. No restore after this.
- *
- * Refuses a tenant that still has live infra — the caller must deprovision first.
- */
-const PURGEABLE_STATUSES = new Set(['terminated', 'deprovisioned', 'suspended'])
+// No tenants FK on these (the flagship writes them under the platform id), so no cascade: purge deletes them.
+const UNCASCADED_TABLES = [
+  'import_jobs',
+  'sheet_product_links',
+  'tenant_social_accounts',
+  'tenant_integration_credentials',
+  'razorpay_subscription_index',
+  'ai_provider_identities',
+]
 
+/**
+ * Permanently purge a dead tenant: preserve the owner's Razorpay linked account, delete both S3 backup
+ * copies, its servers, its database-disk snapshot and password secret, then DELETE the tenant row (with
+ * its rows in UNCASCADED_TABLES; the rest cascade). Cloud cleanup is best-effort; the DELETE is the commit
+ * point. The owners row and the owner-scoped tenant_bank_accounts row are intentionally kept so a
+ * returning owner can reuse their existing Route account. No restore after this.
+ */
 export async function purgeTenant(tenantId: string): Promise<{ ok: boolean; error?: string; deletedBackups?: number }> {
+  if (tenantId === PLATFORM_TENANT_ID) return { ok: false, error: 'The platform cannot be deleted' }
   const pool = controlPlanePool()
   const tenant = await getTenant(tenantId)
   if (!tenant) return { ok: false, error: 'Tenant not found' }
-  // 'suspended' = a provisioning run that rolled back; deletable once no DB is left behind.
-  if (tenant.rds_endpoint || !PURGEABLE_STATUSES.has(tenant.status)) {
-    return { ok: false, error: 'Tenant must be deprovisioned (or rolled back) before it can be deleted' }
-  }
+  const blocked = purgeBlocker(tenant)
+  if (blocked) return { ok: false, error: blocked }
+  const slug = tenant.slug
+  const warn = (what: string) => (e: any) => console.error(`[purge] ${slug}: ${what}: ${e?.message || e}`)
 
   const ownerRow = await pool
     .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId])
@@ -274,10 +283,38 @@ export async function purgeTenant(tenantId: string): Promise<{ ok: boolean; erro
     deletedBackups = res.deleted
   }
 
-  const { k8sComputeEnabled, deleteTenantWorkload } = await import('@/lib/k8s/tenant-compute')
-  if (k8sComputeEnabled()) await deleteTenantWorkload(tenant.slug).catch(() => {})
+  const k8s = await import('@/lib/k8s/tenant-compute')
+  if (k8s.k8sComputeEnabled()) {
+    // The namespace delete hands back its server instances; terminate them (this store's nodes only).
+    const ids = (await k8s.deleteTenantWorkload(slug).catch(warn('workload delete'))) ?? []
+    const { terminateInstance } = await import('@/lib/shared/ec2-client')
+    for (const id of ids) {
+      const out = await k8s.terminateTenantInstance(slug, id, terminateInstance).catch(warn(`terminate ${id}`))
+      if (out === 'refused') console.error(`[purge] ${slug}: refused to terminate ${id}: not this store's node`)
+    }
+    // An on-node database's password (deprovision only scheduled its deletion).
+    const { forceDeleteDbSecret } = await import('@/lib/shared/db-secret')
+    await forceDeleteDbSecret(`jeffi/tenant-db/${slug}`, process.env.AWS_REGION || 'us-east-1').catch(warn('db secret delete'))
+  }
 
-  await pool.query(`DELETE FROM tenants WHERE id=$1`, [tenantId])
+  // The database-disk snapshot a teardown took (cleanupNodeDb).
+  const snaps = await pool
+    .query(
+      `SELECT DISTINCT created_resources->>'dbVolumeSnapshotId' AS id FROM provisioning_jobs
+        WHERE tenant_id=$1 AND created_resources->>'dbVolumeSnapshotId' IS NOT NULL`,
+      [tenantId]
+    )
+    .catch(warn('snapshot lookup'))
+  if (snaps?.rows.length) {
+    const { deleteSnapshot } = await import('@/lib/shared/ec2-client')
+    for (const { id } of snaps.rows) await deleteSnapshot(id).catch(warn(`snapshot ${id} delete`))
+  }
+
+  await pool.query(
+    `WITH ${UNCASCADED_TABLES.map((t, i) => `d${i} AS (DELETE FROM ${t} WHERE tenant_id=$1)`).join(', ')}
+     DELETE FROM tenants WHERE id=$1`,
+    [tenantId]
+  )
   // Keep the owner's onboarding answers and let them submit again.
   if (ownerId) await reopenDraft(ownerId).catch(() => {})
   clearTenantCache()

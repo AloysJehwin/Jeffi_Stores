@@ -1,26 +1,18 @@
-import MessagingTab from '@controller/components/admin/ecom/tabs/MessagingTab'
-import { headers } from 'next/headers'
-import { redirect, notFound } from 'next/navigation'
-import { isPlatformAdmin } from '@/lib/auth/scopes'
+import { redirect } from 'next/navigation'
 import {
-  getTenant,
   getTenantBilling,
-  getKyc,
-  listServiceApprovals,
-  hasService,
-  getProvisioningJob,
   getTenantOwners,
   getTenantSocialAccounts,
   listIntegrationCredentials,
-  listCustomDomains,
   getTenantBankAccount,
   lookupTenantContextById,
+  hasService,
 } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { queryMany } from '@/lib/shared/db'
 import type { ShipmentRow } from '@controller/lib/orders/tenant-shipments-shared'
 import { listTenantAdminCerts, getTenantCa } from '@/lib/tenancy/tenant-ca'
-import { getTenantMigrationRuns } from '@controller/lib/tenant-migrations'
+import { DETAIL_PAGE_SIZE, loadInfraDetail, loadTenantDetail, pageParam, withParam } from '@controller/lib/ecom/detail'
 import { TenantTabNav, isTenantTab, type TenantTab } from '@controller/components/admin/ecom/EcomUI'
 import TenantObjectHeader from '@controller/components/admin/ecom/TenantObjectHeader'
 import OverviewTab from '@controller/components/admin/ecom/tabs/OverviewTab'
@@ -30,83 +22,50 @@ import CommerceTab from '@controller/components/admin/ecom/tabs/CommerceTab'
 import ShipmentsTab from '@controller/components/admin/ecom/tabs/ShipmentsTab'
 import KycTab from '@controller/components/admin/ecom/tabs/KycTab'
 import AccessTab from '@controller/components/admin/ecom/tabs/AccessTab'
+import MessagingTab from '@controller/components/admin/ecom/tabs/MessagingTab'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * Single object page for a tenant. Replaces the four pages that each loaded the same
- * getTenant(id) and cross-linked to one another — instances and store-status now redirect
- * here with the matching tab, and the provisioning pages are gone.
- *
- * It stays on /admin/ecom/customers/[id] rather than a route of its own because the sidebar
- * marks a group active with startsWith(href + '/'); a separate path would never expand it.
- *
- * Only the header data is always fetched; each tab loads its own, so the page does not pay
- * for sections nobody is looking at.
- */
-export default async function TenantObjectPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: string }>
-}) {
-  const h = await headers()
-  const role = h.get('x-user-role') || ''
-  if (!isPlatformAdmin(role)) redirect('/admin')
+type Search = { tab?: string; tp?: string; lp?: string }
 
+/**
+ * The Store detail page: the tenant's header (shared with Instance, Status and Billing) and its tabs. Each tab
+ * is a real URL (an alert email can point at ?tab=provisioning) and loads only its own data.
+ *
+ * It stays on /admin/ecom/customers/[id] because the sidebar marks a group active with startsWith(href + '/').
+ */
+export default async function TenantObjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
   const [{ id }, sp] = await Promise.all([params, searchParams])
+  const d = await loadTenantDetail(id)
+  const { t } = d
   const tab: TenantTab = isTenantTab(sp.tab) ? sp.tab : 'overview'
 
-  const t = await getTenant(id)
-  if (!t) notFound()
   // API workspaces (Messaging/Documents only) have no store infrastructure to show or manage.
-  const isStore = hasService(t, 'store')
   const hiddenTabs: TenantTab[] = [
-    ...(isStore ? [] : (['provisioning', 'infrastructure', 'commerce', 'shipments', 'access'] as TenantTab[])),
+    ...(d.isStore ? [] : (['provisioning', 'infrastructure', 'commerce', 'shipments', 'access'] as TenantTab[])),
     ...(hasService(t, 'messaging') ? [] : (['messaging'] as TenantTab[])),
   ]
   if (hiddenTabs.includes(tab)) redirect(`/admin/ecom/customers/${id}/view?tab=overview`)
 
-  // Cheap single-row reads that feed the header or more than one tab: KYC drives the header
-  // badge everywhere, the job feeds Overview's health and Infrastructure's resource ids.
-  // Anything used by exactly one tab is loaded inside that tab's branch instead.
-  const [kyc, headerJob, approvals] = await Promise.all([getKyc(id).catch(() => null), getProvisioningJob(id).catch(() => null), listServiceApprovals(id).catch(() => [])])
-  const kycPending = kyc?.status === 'pending' || approvals.some(a => a.status === 'pending')
-
   return (
     <div className="p-4 sm:p-6 space-y-5 w-full max-w-full min-w-0">
-      <TenantObjectHeader
-        tenant={t}
-        backHref="/admin/ecom/customers"
-        backLabel="Stores"
-        kycPending={kycPending}
-        job={headerJob}
-      />
+      <TenantObjectHeader d={d} back={{ href: '/admin/ecom/customers', label: 'Stores' }} section="store" />
 
       <TenantTabNav
         tenantId={t.id}
         active={tab}
         hidden={hiddenTabs}
-        badges={{
-          kyc: kycPending ? (
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block align-middle" />
-          ) : null,
-        }}
+        badges={{ kyc: d.kycPending ? <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block align-middle" /> : null }}
       />
 
-      <div>
-        {tab === 'overview' && (
-          <OverviewTab tenant={t} job={headerJob} owners={await getTenantOwners(id).catch(() => [])} approvals={approvals} />
-        )}
+      <div className="min-w-0">
+        {tab === 'overview' && <OverviewTab d={d} owners={await getTenantOwners(id).catch(() => [])} />}
         {tab === 'provisioning' && <ProvisioningTab tenant={t} />}
-        {tab === 'infrastructure' && <InfrastructureTab tenant={t} job={headerJob} {...await infraData(id)} />}
-        {tab === 'commerce' && <CommerceTab tenant={t} {...await commerceData(id)} />}
-        {tab === 'shipments' && (
-          <ShipmentsTab tenantId={t.id} ownDelhivery={t.own_delhivery === true} shipments={await shipmentData(id)} />
-        )}
+        {tab === 'infrastructure' && <InfrastructureTab d={d} infra={await loadInfraDetail(d)} />}
+        {tab === 'commerce' && <CommerceTab tenant={t} {...await commerceData(id, sp)} />}
+        {tab === 'shipments' && <ShipmentsTab tenantId={t.id} ownDelhivery={t.own_delhivery === true} shipments={await shipmentData(id)} />}
         {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
-        {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} approvals={approvals} />}
+        {tab === 'kyc' && <KycTab tenant={t} kyc={d.kyc} approvals={d.approvals} />}
         {tab === 'messaging' && hasService(t, 'messaging') && <MessagingTab tenantId={t.id} storeName={t.display_name} />}
       </div>
     </div>
@@ -120,31 +79,35 @@ async function accessData(id: string) {
     getTenantSocialAccounts(id).catch(() => []),
     listIntegrationCredentials(id).catch(() => []),
   ])
-  // getTenantCa carries caKeyPem — the tenant's CA private key. Only the two display fields
-  // cross into the component, so the key cannot ride along into any future client boundary.
+  // getTenantCa carries caKeyPem, the tenant's CA private key. Only the two display fields cross into the
+  // component, so the key cannot ride along into any future client boundary.
   const caSummary = ca ? { subject: ca.subject, expiresAt: ca.expiresAt } : null
   return { certs, ca: caSummary, social, integrations }
 }
 
-async function infraData(id: string) {
-  const [domains, migrations] = await Promise.all([
-    listCustomDomains(id).catch(() => []),
-    getTenantMigrationRuns(id).catch(() => []),
-  ])
-  return { domains, migrations, currentSha: process.env.GIT_SHA || null }
-}
-
-async function commerceData(id: string) {
+async function commerceData(id: string, sp: Search) {
+  const tx = pageParam(sp.tp)
+  const lp = pageParam(sp.lp)
   const [billing, bank] = await Promise.all([
-    getTenantBilling(id).catch(() => null),
+    getTenantBilling(id, {
+      transactions: { limit: DETAIL_PAGE_SIZE, offset: (tx - 1) * DETAIL_PAGE_SIZE },
+      ledger: { limit: DETAIL_PAGE_SIZE, offset: (lp - 1) * DETAIL_PAGE_SIZE },
+    }).catch(() => null),
     getTenantBankAccount(id).catch(() => null),
   ])
-  return { billing, bank }
+  const path = `/admin/ecom/customers/${id}/view`
+  const q = { ...sp, tab: 'commerce' }
+  return {
+    billing,
+    bank,
+    txPage: { page: tx, pageSize: DETAIL_PAGE_SIZE, href: (n: number) => withParam(path, q, 'tp', n) },
+    ledgerPage: { page: lp, pageSize: DETAIL_PAGE_SIZE, href: (n: number) => withParam(path, q, 'lp', n) },
+  }
 }
 
-// Shipment charges live in the *tenant* DB orders table, which the control-plane detail page does
-// not otherwise touch. Resolve the tenant's context by id and run the read inside it so query() hits
-// the tenant pool. Read-only; returns [] for a tenant with no active infra (e.g. pending provisioning).
+// Shipment charges live in the *tenant* DB orders table, which the control-plane detail page does not otherwise
+// touch. Resolve the tenant's context by id and read inside it so query() hits the tenant pool. Read-only;
+// [] for a tenant with no active infra (e.g. pending provisioning).
 async function shipmentData(id: string): Promise<ShipmentRow[]> {
   const ctx = await lookupTenantContextById(id).catch(() => null)
   if (!ctx) return []

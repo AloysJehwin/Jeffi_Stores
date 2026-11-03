@@ -1,6 +1,6 @@
 export const RESERVED_LABELS = new Set([
   'admin', 'business', 'forms', 'vault', 'www', 'ecom', 'invoice', 'quotation', 'purchaseorder',
-  'api', 'app', 'mail', 'static', 'assets', 'cdn', 'certificate', 'public',
+  'api', 'app', 'mail', 'static', 'assets', 'cdn', 'certificate', 'public', 'platform',
 ])
 
 export const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || process.env.PLATFORM_DOMAIN || 'jeffistores.in'

@@ -15,7 +15,7 @@ import {
 import { computeSpecEnabled } from '@controller/lib/compute/catalog'
 import { legacySpecFor } from '@/lib/compute/legacy'
 import { specKey } from '@/lib/compute/presets'
-import { catalogOrDefault, computeParams, rateFor } from '@controller/lib/compute/resolve'
+import { catalogOrDefault, computeParams, rateFor, tenantPlanMargin } from '@controller/lib/compute/resolve'
 import { getTenantCompute, patchTenantCompute, type TenantCompute } from '@controller/lib/compute/store'
 import type { ComputeSpec } from '@/lib/compute/spec'
 import { tenantNodeName } from '@/lib/provisioning/tiers'
@@ -138,7 +138,7 @@ export async function reconcileCompute(tenantId: string, provider: ProvisioningP
       applied,
       progress: keep,
       status: 'applied',
-      rate_inr_hour: await rateFor(applied),
+      rate_inr_hour: await rateFor(applied, await tenantPlanMargin(tenantId)),
       attempts: 0,
       next_at: keep ? new Date(keep.oldDb.dropAfter) : null,
       last_error: null,

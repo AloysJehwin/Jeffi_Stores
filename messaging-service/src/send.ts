@@ -164,7 +164,9 @@ export async function systemVars(tenantId: string): Promise<Vars> {
   const [settings, custom, tenant] = await Promise.all([
     q<{ key: string; value: string }>(`SELECT key, value FROM site_settings WHERE key IN ('business_name','business_email','business_phone','business_web')`),
     q<{ key: string; value: string }>(`SELECT key, value FROM template_variables WHERE is_enabled`),
-    db.query<{ display_name: string; slug: string }>(`SELECT display_name, slug FROM tenants WHERE id=$1`, [tenantId]).then(r => r.rows[0]).catch(() => undefined),
+    tenantId === tpl.PLATFORM_TENANT_ID
+      ? undefined
+      : db.query<{ display_name: string; slug: string }>(`SELECT display_name, slug FROM tenants WHERE id=$1`, [tenantId]).then(r => r.rows[0]).catch(() => undefined),
   ])
   const set = Object.fromEntries(settings.map(r => [r.key, r.value]))
   const name = set.business_name || tenant?.display_name || ''

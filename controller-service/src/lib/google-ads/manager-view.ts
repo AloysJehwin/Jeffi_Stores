@@ -40,12 +40,17 @@ export interface ManagedAccount {
   spendError: string | null
 }
 
-/** Stores keyed by the Google Ads customer id they are connected to. */
+const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
+
+/** Stores keyed by the Google Ads customer id they are connected to. The flagship (platform id) has no tenants row. */
 export async function storesByCustomer(): Promise<Map<string, StoreRef[]>> {
   const r = await controlPlanePool().query(
-    `SELECT c.tenant_id, c.meta, t.display_name, t.slug FROM tenant_integration_credentials c
-     JOIN tenants t ON t.id = c.tenant_id WHERE c.provider = $1 AND c.status = 'connected'`,
-    [GOOGLE_ADS_PROVIDER]
+    `SELECT c.tenant_id, c.meta,
+            CASE WHEN c.tenant_id = $2 THEN 'Platform (flagship)' ELSE t.display_name END AS display_name,
+            CASE WHEN c.tenant_id = $2 THEN 'platform' ELSE t.slug END AS slug
+       FROM tenant_integration_credentials c LEFT JOIN tenants t ON t.id = c.tenant_id
+      WHERE c.provider = $1 AND c.status = 'connected' AND (t.id IS NOT NULL OR c.tenant_id = $2)`,
+    [GOOGLE_ADS_PROVIDER, PLATFORM_TENANT_ID]
   )
   const out = new Map<string, StoreRef[]>()
   for (const row of r.rows) {

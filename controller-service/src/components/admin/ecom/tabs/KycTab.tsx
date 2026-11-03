@@ -1,6 +1,9 @@
 import type { TenantDetail, TenantKyc, ServiceApproval } from '@/lib/tenant-registry'
+import { StatusBadge } from '@/components/admin/kit/status'
+import { badgeCls } from '@/components/admin/kit/tones'
 import ServiceApprovals from './ServiceApprovals'
 import { Field, Mono, Section } from '../EcomUI'
+import { KYC_STATUS, dateIN } from '../cells'
 import KycActionButtons from './KycActionButtons'
 
 const BORDER: Record<string, string> = {
@@ -9,17 +12,11 @@ const BORDER: Record<string, string> = {
   rejected: 'border-red-500/40',
 }
 
-const BADGE: Record<string, string> = {
-  pending: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
-  approved: 'bg-green-500/10 text-green-700 dark:text-green-400',
-  rejected: 'bg-red-500/10 text-red-700 dark:text-red-400',
-}
-
 export default function KycTab({ tenant: t, kyc, approvals = [] }: { tenant: TenantDetail; kyc: TenantKyc | null; approvals?: ServiceApproval[] }) {
   const services = <ServiceApprovals tenantId={t.id} services={t.service_types ?? []} approvals={approvals} />
   if (!kyc) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5 sm:space-y-6 min-w-0">
         <Section title="KYC / GST Verification">
           <p className="text-sm text-foreground-muted">This workspace has not submitted KYC details yet.</p>
         </Section>
@@ -31,21 +28,13 @@ export default function KycTab({ tenant: t, kyc, approvals = [] }: { tenant: Ten
   const pending = kyc.status === 'pending'
 
   return (
-    <div className="space-y-6">
-    <section className={`rounded-xl border p-5 bg-surface-elevated min-w-0 ${BORDER[kyc.status] || BORDER.rejected}`}>
+    <div className="space-y-5 sm:space-y-6 min-w-0">
+    <section className={`rounded-xl border p-4 sm:p-5 bg-surface-elevated min-w-0 ${BORDER[kyc.status] || BORDER.rejected}`}>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-semibold text-foreground">KYC / GST Verification</h2>
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BADGE[kyc.status] || BADGE.rejected}`}
-          >
-            {kyc.status}
-          </span>
-          {t.store_request && (
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400">
-              Store upgrade
-            </span>
-          )}
+          <StatusBadge status={kyc.status} map={KYC_STATUS} />
+          {t.store_request && <span className={badgeCls('amber')}>Store upgrade</span>}
         </div>
 
         {pending && <KycActionButtons tenantId={t.id} mode="pending" />}
@@ -55,18 +44,17 @@ export default function KycTab({ tenant: t, kyc, approvals = [] }: { tenant: Ten
         )}
         {kyc.status === 'approved' && t.razorpay_checkout_url && (
           <div className="text-xs text-foreground-muted">
-            Approved by {kyc.reviewed_by} on{' '}
-            {kyc.reviewed_at ? new Date(kyc.reviewed_at).toLocaleDateString('en-IN') : '—'}
+            Approved by {kyc.reviewed_by} on {dateIN(kyc.reviewed_at)}
           </div>
         )}
         {kyc.status === 'rejected' && (
-          <div className="text-xs text-red-600 dark:text-red-400">
-            Rejected by {kyc.reviewed_by} — {kyc.reviewer_note}
+          <div className="text-xs text-red-600 dark:text-red-400 break-words">
+            Rejected by {kyc.reviewed_by}: {kyc.reviewer_note}
           </div>
         )}
       </div>
 
-      <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 min-w-0">
+      <dl className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 min-w-0">
         <Field label="Business name" value={kyc.business_name} />
         <Field label="Business type" value={kyc.business_type} />
         <Field label="GSTIN" value={<Mono>{kyc.gst_number}</Mono>} />

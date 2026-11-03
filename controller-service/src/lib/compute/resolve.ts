@@ -58,10 +58,24 @@ export async function rateFor(spec: ComputeSpec, plan?: { infraMargin?: number }
   }
 }
 
-/** What the spec still costs per hour while the store is paused; null when a part has no price. */
-export async function pausedRateFor(spec: ComputeSpec): Promise<number | null> {
+/** The tenant's plan margin for rateFor; {} (the catalog's) when its plan has none or can't be read. */
+export async function tenantPlanMargin(tenantId: string): Promise<{ infraMargin?: number }> {
   try {
-    return pausedInrHour(spec, await catalogOrDefault())
+    const r = await controlPlanePool().query<{ m: string | null }>(
+      `SELECT p.infra_margin AS m FROM tenants t JOIN plans p ON p.id = t.plan_id WHERE t.id = $1`,
+      [tenantId]
+    )
+    const m = r.rows[0]?.m
+    return m == null ? {} : { infraMargin: Number(m) }
+  } catch {
+    return {}
+  }
+}
+
+/** What the spec still costs per hour while the store is paused; null when a part has no price. */
+export async function pausedRateFor(spec: ComputeSpec, plan?: { infraMargin?: number }): Promise<number | null> {
+  try {
+    return pausedInrHour(spec, await catalogOrDefault(), plan)
   } catch {
     return null
   }
@@ -72,7 +86,7 @@ export async function pausedRateFor(spec: ComputeSpec): Promise<number | null> {
  * so `desired` follows; otherwise a choice made meanwhile stays pending.
  */
 export async function markComputeApplied(tenantId: string, spec: ComputeSpec, nodeGen: number): Promise<void> {
-  const rate = await rateFor(spec)
+  const rate = await rateFor(spec, await tenantPlanMargin(tenantId))
   const follow = !computeSpecEnabled()
   await controlPlanePool().query(
     `INSERT INTO tenant_compute (tenant_id, preset, desired, applied, status, rate_inr_hour, node_gen, applied_at)

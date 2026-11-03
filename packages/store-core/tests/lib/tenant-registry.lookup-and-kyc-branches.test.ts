@@ -353,21 +353,16 @@ describe('tenant-registry (data layer, extended)', () => {
   })
 
   // ── billing rollups ──
-  it('getTenantBilling sums ledger balance and transaction totals', async () => {
+  it('getTenantBilling reads totals and balance from the aggregate row', async () => {
     const mod = await importRegistry()
     queueRows(
-      {
-        rows: [
-          // transactions
-          { gross_amount: '100', tenant_share: '80', platform_commission: '15', gateway_fee: '5' },
-          { gross_amount: '50', tenant_share: '40', platform_commission: '8', gateway_fee: '2' },
-        ],
-      },
-      { rows: [{ amount: '90' }, { amount: '-10' }] } // ledger
+      { rows: [{ gross_amount: '100' }] }, // transactions page
+      { rows: [{ amount: '90' }] }, // ledger page
+      { rows: [{ txn_count: 2, gross: '150', share: '120', comm: '23', fees: '7', cod: '0', ledger_count: 2, balance: '80' }] }
     )
     const out = await mod.getTenantBilling('t-1')
     expect(out.balance).toBe(80)
-    expect(out.totals).toEqual({ gross: 150, tenantShare: 120, commission: 23, fees: 7 })
+    expect(out.totals).toEqual({ gross: 150, tenantShare: 120, commission: 23, fees: 7, codGross: 0 })
   })
 
   it('billingSummary coerces the aggregate row to numbers', async () => {
