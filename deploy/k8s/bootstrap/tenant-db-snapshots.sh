@@ -9,7 +9,7 @@ set -euo pipefail
 DRY=${1:-}
 REGION=${REGION:-us-east-1}
 ROLE_NAME=jeffi-dlm-tenant-db
-POLICY_DESC='Jeffi: daily snapshots of tenant Postgres EBS volumes (jeffi:role=db)'
+POLICY_DESC='Jeffi daily snapshots of store database volumes tagged jeffi-role db' # DLM allows only letters, digits, spaces, _ and -
 
 # 1. Service role DLM assumes (AWS owns the managed policy for its default permissions).
 ASSUME='{

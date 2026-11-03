@@ -12,7 +12,7 @@ set -euo pipefail
 grant() {
   local ROLE=$1 POLICY=$2 EXTRA=${3:-} DOC
   DOC=$(mktemp)
-  EXTRA="$EXTRA" aws iam get-role-policy --role-name "$ROLE" --policy-name "$POLICY" --query PolicyDocument --output json | python3 -I -c '
+  aws iam get-role-policy --role-name "$ROLE" --policy-name "$POLICY" --query PolicyDocument --output json | EXTRA="$EXTRA" python3 -I -c '
 import json, os, sys
 d = json.load(sys.stdin)
 st = d["Statement"] if isinstance(d["Statement"], list) else [d["Statement"]]
