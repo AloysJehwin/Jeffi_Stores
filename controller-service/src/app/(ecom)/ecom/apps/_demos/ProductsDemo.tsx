@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Package, Boxes, ImageIcon, Rocket, Store, Plus } from 'lucide-react'
-import ProductArt from '@/app/(ecom)/ecom/_demo/ProductArt'
+import ProductArt from '@controller/app/(ecom)/ecom/_demo/ProductArt'
 import { AppDemoShell, useSteps, Field, Panel, Btn, Table, Tag, Done, rs, type DemoStep } from './kit'
 
 const STEPS: DemoStep[] = [

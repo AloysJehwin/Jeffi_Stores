@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { Store, MessageSquare, FileText } from 'lucide-react'
-import { Eyebrow, Display, Pill, ChoiceCards } from '../_ui'
+import { ChoiceCards } from '../_ui'
+import PageHeader from '../dashboard/_components/PageHeader'
+import { primaryBtn } from './ui'
 
 export type ServiceChoice = 'store' | 'messaging' | 'documents'
 
@@ -16,10 +18,8 @@ export default function ServicePicker({ initial = [], onContinue }: { initial?: 
   const [picked, setPicked] = useState<ServiceChoice[]>(initial)
   return (
     <div className="max-w-5xl">
-      <Eyebrow>Get started</Eyebrow>
-      <Display as="h1" className="mt-3 text-4xl lg:text-5xl">What do you need?</Display>
-      <p className="mt-4 text-lg text-foreground-secondary max-w-2xl">Pick one or more. You can add the others any time from your dashboard — they all share one wallet.</p>
-      <ChoiceCards multiple ariaLabel="Services" className="mt-6 sm:mt-10 gap-4 sm:gap-5" columns="grid-cols-1 md:grid-cols-3" cardClassName="rounded-3xl sm:rounded-[2rem] p-5 sm:p-7 bg-surface-elevated" value={picked} onChange={setPicked}
+      <PageHeader eyebrow="Get started" title="What do you need?" description="Pick one or more. You can add the others any time from your dashboard — they all share one wallet." />
+      <ChoiceCards multiple ariaLabel="Services" className="gap-4" columns="grid-cols-1 md:grid-cols-3" cardClassName="rounded-2xl p-5 sm:p-6 bg-surface-elevated" value={picked} onChange={setPicked}
         options={OPTIONS.map(o => {
           const on = picked.includes(o.id)
           const Icon = o.icon
@@ -27,22 +27,22 @@ export default function ServicePicker({ initial = [], onContinue }: { initial?: 
             value: o.id, label: o.title,
             content: (
               <div className="flex items-start gap-4 md:block">
-                <span className={`grid shrink-0 place-items-center w-12 h-12 rounded-full ${on ? 'ecom-sel' : 'org-sage org-sage-text'}`}>
+                <span className={`grid shrink-0 place-items-center w-10 h-10 rounded-full ${on ? 'ecom-sel' : 'org-sage org-sage-text'}`}>
                   <Icon className="w-5 h-5" />
                 </span>
                 <div className="min-w-0 pr-6 md:pr-0">
-                  <h3 className="font-display font-black text-xl sm:text-2xl md:mt-5">{o.title}</h3>
-                  <p className="mt-1.5 md:mt-2 text-base text-foreground-secondary leading-relaxed">{o.copy}</p>
-                  {o.tag && <span className="inline-block mt-3 md:mt-4 rounded-full org-sand px-3 py-1 text-xs font-semibold text-foreground-secondary">{o.tag}</span>}
+                  <h3 className="font-display font-black text-lg sm:text-xl md:mt-4">{o.title}</h3>
+                  <p className="mt-1.5 text-sm text-foreground-secondary leading-relaxed">{o.copy}</p>
+                  {o.tag && <span className="inline-flex items-center mt-3 px-2.5 py-0.5 rounded-full org-sand text-xs font-medium text-foreground-secondary">{o.tag}</span>}
                 </div>
               </div>
             ),
           }
         })} />
-      <div className="mt-8 sm:mt-10">
-        <Pill onClick={() => onContinue(picked)} disabled={picked.length === 0} className="w-full sm:w-auto px-8 py-4 text-base disabled:opacity-40">
+      <div className="mt-6">
+        <button type="button" onClick={() => onContinue(picked)} disabled={picked.length === 0} className={`${primaryBtn} w-full sm:w-auto px-6`}>
           Continue
-        </Pill>
+        </button>
       </div>
     </div>
   )

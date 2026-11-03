@@ -23,8 +23,8 @@ say() { printf '\n== %s\n' "$*"; }
 # Images are tagged by the last commit that changed what goes into them, so script/doc-only commits reuse them.
 # Fixed at 8 characters: %h's length depends on the clone, and a Mac and CI must agree on the tag.
 image_sha() {
-  git -C "$REPO" log -1 --format=%H -- . ':(exclude)docs' ':(exclude)deploy/k8s' ':(exclude)tests' \
-    ':(exclude)integration-tests' ':(exclude)graphify-out' ':(exclude).github' ':(exclude,glob)*.md' | cut -c1-8
+  git -C "$REPO" log -1 --format=%H -- . ':(exclude)docs' ':(exclude)deploy/k8s' ':(exclude,glob)**/tests/**' \
+    ':(exclude,glob)**/integration-tests/**' ':(exclude)graphify-out' ':(exclude).github' ':(exclude,glob)*.md' | cut -c1-8
 }
 image_tag() { echo "local-$(image_sha)"; }
 confirm() {

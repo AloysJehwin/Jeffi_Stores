@@ -32,10 +32,11 @@ if [ "$SCOPE" != flagship ]; then
   say "Tenants"
   n=0
   for ns in $(kubectl get ns -l jeffi.io/tier=tenant -o jsonpath='{.items[*].metadata.name}'); do
-    host=$(kubectl -n "$ns" get ingressroute controller -o jsonpath='{.spec.routes[0].match}' 2>/dev/null | sed -E 's/^Host\(`([^`]+)`.*/\1/')
+    # The store's route: `store` (its own services) or `controller` (the old all-in-one app).
+    host=$(kubectl -n "$ns" get ingressroute store controller -o jsonpath='{.items[0].spec.routes[0].match}' 2>/dev/null | grep -oE 'Host\(`[^`]+`\)' | head -1 | sed -E 's/^Host\(`([^`]+)`\)$/\1/')
     [ -n "$host" ] || continue
-    # A suspended store has its controller scaled to 0 and is expected not to answer.
-    [ "$(kubectl -n "$ns" get deploy -l jeffi.io/service=controller -o jsonpath='{.items[0].spec.replicas}' 2>/dev/null)" = 0 ] && { echo "   skip $host (suspended)"; continue; }
+    # A suspended store has its storefront (or old app) scaled to 0 and is expected not to answer.
+    [ "$(kubectl -n "$ns" get deploy -l 'jeffi.io/service in (storefront,controller)' -o jsonpath='{.items[0].spec.replicas}' 2>/dev/null)" = 0 ] && { echo "   skip $host (suspended)"; continue; }
     n=$((n + 1))
     check "https://$host/api/health" commit
   done

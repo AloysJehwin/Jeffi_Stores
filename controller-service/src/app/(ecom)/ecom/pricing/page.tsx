@@ -2,6 +2,28 @@ import { Fragment } from 'react'
 import Link from 'next/link'
 import { listPlans, planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-registry'
 import PricingCards from './PricingCards'
+import { computePlans, getCatalog } from '@controller/lib/compute/catalog'
+import { presetSpec } from '@/lib/compute/presets'
+import { quoteSpec, monthlyTotal } from '@controller/lib/compute/pricing'
+
+/**
+ * Each plan's "from" price: its minPreset at its own margin, GST on the servers, plus the plan fee.
+ * Shown whether or not owners can pick a size yet: every plan runs on its own server either way.
+ */
+async function floorPrices(): Promise<Record<string, number> | null> {
+  try {
+    const [catalog, plans] = await Promise.all([getCatalog(), computePlans()])
+    return Object.fromEntries(
+      plans.map(p => {
+        const key = p.minPreset ?? p.defaultPreset ?? (p.minPlacement === 'pool' ? 'shared' : 'small')
+        const q = quoteSpec(presetSpec(key), catalog, { infraMargin: p.infraMargin })
+        return [p.slug, Math.round(monthlyTotal(q, p.monthlyPriceInr, catalog.settings.gstRate).total)]
+      })
+    )
+  } catch {
+    return null
+  }
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +45,7 @@ function Dash() {
 }
 
 export default async function PricingPage() {
-  const [plans, matrix] = await Promise.all([listPlans(), planFeatureMatrix()])
+  const [plans, matrix, floors] = await Promise.all([listPlans(), planFeatureMatrix(), floorPrices()])
   const ordered = [...plans].sort((a, b) => a.tier - b.tier)
 
   const has = (planSlug: string, scopeKey: string | null) => {
@@ -33,6 +55,10 @@ export default async function PricingPage() {
 
   const groups = Array.from(new Set(COMPARISON_ROWS.map(r => r.group)))
   const cols = { gridTemplateColumns: `repeat(${ordered.length}, minmax(0, 1fr))` }
+  const fromLabel = (p: { slug: string; monthly_price_inr: string }) =>
+    `from ₹${(floors?.[p.slug] ?? Number(p.monthly_price_inr)).toLocaleString('en-IN')}/mo`
+  // Every store runs on its own server with Postgres on it; Grow and up may move it to a dedicated RDS database.
+  const dedicatedDb = (slug: string) => slug !== 'basic'
 
   return (
     <div className="text-foreground">
@@ -53,7 +79,7 @@ export default async function PricingPage() {
 
       {/* Interactive plan cards with monthly/yearly toggle */}
       <section className="w-full px-4 sm:px-6 lg:px-12 pb-12 sm:pb-16">
-        <PricingCards plans={plans} />
+        <PricingCards plans={plans} fromInr={floors} />
       </section>
 
       {/* Detailed comparison table */}
@@ -67,9 +93,7 @@ export default async function PricingPage() {
                 className={`min-w-0 px-0.5 text-center text-[11px] leading-tight font-semibold break-words ${p.slug === 'growth' ? 'ecom-accent-text' : 'text-foreground'}`}
               >
                 {p.name}
-                <div className="mt-0.5 text-[10px] font-normal text-foreground-muted">
-                  ₹{Number(p.monthly_price_inr).toLocaleString('en-IN')}/mo
-                </div>
+                <div className="mt-0.5 text-[10px] font-normal text-foreground-muted">{fromLabel(p)}</div>
               </div>
             ))}
           </div>
@@ -116,11 +140,21 @@ export default async function PricingPage() {
                 </div>
               </li>
               <li className="px-2 py-3">
-                <div className="px-1 text-sm text-foreground-secondary">Dedicated database & infra</div>
+                <div className="px-1 text-sm text-foreground-secondary">Own server (database included)</div>
                 <div style={cols} className="mt-2 grid">
                   {ordered.map(p => (
                     <div key={p.slug} className="flex justify-center">
-                      {['pro', 'enterprise'].includes(p.slug) ? <Check /> : <Dash />}
+                      <Check />
+                    </div>
+                  ))}
+                </div>
+              </li>
+              <li className="px-2 py-3">
+                <div className="px-1 text-sm text-foreground-secondary">Dedicated database (optional)</div>
+                <div style={cols} className="mt-2 grid">
+                  {ordered.map(p => (
+                    <div key={p.slug} className="flex justify-center">
+                      {dedicatedDb(p.slug) ? <Check /> : <Dash />}
                     </div>
                   ))}
                 </div>
@@ -139,9 +173,7 @@ export default async function PricingPage() {
                     className={`px-4 py-4 text-center font-semibold ${p.slug === 'growth' ? 'ecom-accent-text' : 'text-foreground'}`}
                   >
                     {p.name}
-                    <div className="text-xs font-normal text-foreground-muted">
-                      ₹{Number(p.monthly_price_inr).toLocaleString('en-IN')}/mo
-                    </div>
+                    <div className="text-xs font-normal text-foreground-muted">{fromLabel(p)}</div>
                   </th>
                 ))}
               </tr>
@@ -194,10 +226,18 @@ export default async function PricingPage() {
                 ))}
               </tr>
               <tr className="border-t border-border-default/60">
-                <td className="px-5 py-3 text-foreground-secondary">Dedicated database & infra</td>
+                <td className="px-5 py-3 text-foreground-secondary">Own server (database included)</td>
                 {ordered.map(p => (
                   <td key={p.slug} className="px-4 py-3 text-center">
-                    {['pro', 'enterprise'].includes(p.slug) ? <Check /> : <Dash />}
+                    <Check />
+                  </td>
+                ))}
+              </tr>
+              <tr className="border-t border-border-default/60">
+                <td className="px-5 py-3 text-foreground-secondary">Dedicated database (optional)</td>
+                {ordered.map(p => (
+                  <td key={p.slug} className="px-4 py-3 text-center">
+                    {dedicatedDb(p.slug) ? <Check /> : <Dash />}
                   </td>
                 ))}
               </tr>
@@ -224,8 +264,12 @@ export default async function PricingPage() {
               'No. Every plan — including Basic — ships with the complete storefront: full catalogue, cart, checkout, wishlist, compare and COD. Plans differ only in how much of the admin platform you unlock.',
             ],
             [
+              'What does the price include?',
+              "One subscription for the plan and your store's own server. The plan fee (₹0 on Basic) includes GST; the server is priced at its AWS cost — at cost on Basic, plus 20% on Grow, Pro and Enterprise — with 18% GST on top. Prices shown are each plan's smallest size; you choose the size when you sign up. Your database runs on your server; on Grow and above you can move it to a dedicated database.",
+            ],
+            [
               "Monthly vs yearly — what's the difference?",
-              'Yearly billing charges 10× the monthly price up front (effectively 2 months free). You can switch between monthly and yearly anytime from your billing dashboard — a downgrade takes effect at the next renewal, an upgrade is applied immediately with a prorated credit.',
+              'Yearly is charged once a year at 10× the monthly price (effectively 2 months free). You can switch between monthly and yearly anytime from your billing dashboard — a downgrade takes effect at the next renewal, an upgrade is applied immediately with a prorated credit.',
             ],
             [
               'How do payouts work?',

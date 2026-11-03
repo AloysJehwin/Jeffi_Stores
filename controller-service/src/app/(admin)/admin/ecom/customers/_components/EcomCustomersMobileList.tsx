@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
-import { StatusPill } from '@/components/admin/ecom/EcomUI'
-import PurgeCustomerButton from '@/components/admin/ecom/PurgeCustomerButton'
+import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
+import PurgeCustomerButton from '@controller/components/admin/ecom/PurgeCustomerButton'
 
 interface CustomerTenant {
   id: string

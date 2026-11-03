@@ -4,9 +4,9 @@
 # Database schema
 /database/ @AloysJehwin
 
-# Controller (Next app) API routes and shared library code
+# Next app API routes and shared code
 /controller-service/src/app/api/ @AloysJehwin
-/controller-service/src/lib/ @AloysJehwin
+/packages/store-core/src/ @AloysJehwin
 
 # Services and shared packages
 /messaging-service/ @AloysJehwin

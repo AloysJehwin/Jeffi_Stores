@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ComputeSpecSchema } from '@controller/lib/compute/schema'
 
 /**
  * Onboarding payload validation.
@@ -11,6 +12,8 @@ export const OnboardSchema = z
     // Step 0 — Plan
     planSlug: z.enum(['basic', 'growth', 'pro', 'enterprise']),
     billingInterval: z.enum(['monthly', 'yearly']).default('monthly'),
+    // Server size, when owners choose it (COMPUTE_SPEC_ENABLED); otherwise the plan's default applies later.
+    compute: ComputeSpecSchema.optional(),
     extraServices: z.array(z.enum(['messaging', 'documents'])).default([]),
     // Step 1 — Store
     displayName: z.string().min(1).max(200),

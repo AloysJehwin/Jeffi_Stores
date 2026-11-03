@@ -17,8 +17,9 @@ command, and logs to `~/Documents/db-backups/go-live-<stamp>/`. `--skip-rehearsa
 
 ## What changes
 
-- **Pods.** The platform runs `jeffi-stores-{controller,messaging,document,public-api}-service` in `jeffi`. Each store
-  tenant runs `{slug}-{controller,messaging,document}-service` in `tenant-{slug}`; the public API stays shared.
+- **Pods.** The platform runs `jeffi-stores-{controller,storefront,admin,business,messaging,document,public-api,mobile}-service`
+  in `jeffi`. Each store tenant runs `{slug}-{storefront,admin,business,messaging,document}-service` in `tenant-{slug}`;
+  the public API and mobile backend stay shared.
 - **Database.** `jeffi_stores` gets this release's schema (42 new tables, new foreign keys) and the control plane, copied
   from `jeffi_control_plane`. That DB is left untouched as the fallback.
 - **Secrets.** The four `jeffi/*production` secrets point at `jeffi_stores`. document-service keeps PDFs in a new private
@@ -39,7 +40,7 @@ command, and logs to `~/Documents/db-backups/go-live-<stamp>/`. `--skip-rehearsa
 | `deploy/k8s/db/05-table-owner.sh` | As the master user: the older tables owned by `postgres` go to a new role `jeffi_owner` (members `postgres` and `app_user`), so `app_user` can alter them. Writes a rollback file |
 | `deploy/k8s/db/20-merge-control-plane.sh` | Creates the control-plane tables in `jeffi_stores`, copies the rows, validates the foreign keys, seeds plans |
 | `deploy/k8s/db/30-secrets.sh` | Patches only the DB keys, the bucket and `SERVICE_AUTH_SECRET`; creates the bucket; writes a rollback file |
-| `deploy/k8s/bootstrap/release.sh` | Builds and pushes the four images, then `rollout.sh`: platform, tenant schema fan-out (`db/40-tenant-fanout.sh`), every store, smoke test |
+| `deploy/k8s/bootstrap/release.sh` | Builds and pushes the eight images, then `rollout.sh`: platform, tenant schema fan-out (`db/40-tenant-fanout.sh`), every store (moving each off the old all-in-one app), smoke test |
 | `deploy/k8s/db/50-seeds.sh` | Seeds the platform's message-template catalog (existing templates are skipped), brings unedited emails up to the catalog and moves stored WhatsApp bodies to `{{brand_name}}` (idempotent; every release runs it after the rollout) |
 | `deploy/k8s/bootstrap/doc-hosts-dns.sh` | Points the three document hosts at the cluster; writes a rollback change batch |
 | `deploy/k8s/db/verify.sql` | Post-release checks |

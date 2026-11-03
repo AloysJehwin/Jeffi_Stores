@@ -233,6 +233,7 @@ CREATE TABLE public.orders (
     attributed_at timestamp with time zone,
     ads_consent boolean,
     meta_click_ids jsonb,
+    dispute_status text,
     CONSTRAINT orders_shipment_status_check CHECK (((shipment_status IS NULL) OR (shipment_status = ANY (ARRAY['created'::text, 'picked_up'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivery_attempted'::text, 'delivered'::text, 'rto_initiated'::text, 'rto_in_transit'::text, 'rto_out_for_return'::text, 'rto_delivered'::text]))))
 );
 

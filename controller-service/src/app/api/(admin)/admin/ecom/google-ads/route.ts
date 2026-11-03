@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { managerClient } from '@/lib/google-ads/credentials'
-import { listManagedAccounts } from '@/lib/google-ads/manager-view'
+import { listManagedAccounts } from '@controller/lib/google-ads/manager-view'
 import { adsErrorResponse } from '@/lib/google-ads/manage-route'
 
 export const dynamic = 'force-dynamic'

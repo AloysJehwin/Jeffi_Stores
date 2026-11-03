@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyWebhookSignature } from '@/lib/payments/razorpay-subscriptions'
-import { getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
+import { verifyWebhookSignature } from '@controller/lib/payments/razorpay-subscriptions'
+import { applyPendingPlan, getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
+import { invalidatePlanCache } from '@/lib/auth/plan-gate'
 import { issuePlatformInvoiceLater } from '@/lib/billing/platform-invoice'
-import { triggerProvisioning } from '@/lib/provisioning/trigger'
-import { startStore } from '@/lib/provisioning/start-store'
+import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
+import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,11 +73,22 @@ export async function POST(request: NextRequest) {
       // engine — this is the ONLY place real provisioning starts. Do NOT set 'active' here;
       // only the engine's activate step does that, after infra exists + the host verifies.
       // A services workspace whose store application is approved is not live as a store yet either.
+      // NOTE: while payments are off (ECOM_PAYMENTS_ENABLED unset), KYC-approve starts provisioning
+      // directly, so no subscription is created and this charged path does not fire — it stays here
+      // so re-enabling payments restores the first-charge-starts-store flow unchanged.
       if (tenant.store_request === 'awaiting_payment' || (!tenant.store_request && tenant.status !== 'active' && tenant.status !== 'provisioning')) {
-        await startStore(tenant)
-      } else {
-        // Recurring charge on an already-live tenant — just keep the subscription active.
+        // First charge: the subscription covers the plan fee and the servers, so the store starts now.
         await setSubscriptionStatus(tenant.id, 'active')
+        await startStoreIfReady(tenant.id)
+      } else {
+        // Recurring charge on an already-live tenant: keep the subscription active, and a downgrade made
+        // during the cycle that just ended takes effect now.
+        await setSubscriptionStatus(tenant.id, 'active')
+        const moved = await applyPendingPlan(tenant.id)
+        if (moved) {
+          invalidatePlanCache(tenant.id)
+          await triggerProvisioning({ action: 'reprovision', tenantId: tenant.id, slug: tenant.slug, plan: moved, ownerId: null, reason: 'plan_change' }).catch(() => {})
+        }
       }
       await invoiceSubscriptionCharge(tenant.id, sub, payload.payload?.payment?.entity)
       break
@@ -120,6 +132,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Tax invoice for every successful plan charge (first and recurring). Plan prices include GST.
+// Also records the collected amount in settlement_ledger so the "Subscriptions collected" tile sums it.
 async function invoiceSubscriptionCharge(tenantId: string, sub: any, payment: any) {
   if (!payment?.id || !(Number(payment.amount) > 0)) return
   const plan = (await controlPlanePool().query(
@@ -128,9 +141,17 @@ async function invoiceSubscriptionCharge(tenantId: string, sub: any, payment: an
   const d = (sec?: number) => (sec ? new Date(sec * 1000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null)
   const period = d(sub?.current_start) && d(sub?.current_end) ? ` · ${d(sub.current_start)} – ${d(sub.current_end)}` : ''
   const name = plan?.name || (plan?.slug ? plan.slug[0].toUpperCase() + plan.slug.slice(1) : 'Store')
+  const amountInr = Number(payment.amount) / 100
+  // amount is signed in settlement_ledger: a subscription_charge is a debit (-).
+  await controlPlanePool().query(
+    `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, external_ref, note)
+     VALUES ($1, 'subscription_charge', $2, $3, $4)
+     ON CONFLICT (tenant_id, entry_type, external_ref) WHERE external_ref IS NOT NULL DO NOTHING`,
+    [tenantId, -amountInr, payment.id, `Jeffi Commerce ${name}${period}`]
+  ).catch(e => console.error(`[webhook:subscription.charged] settlement_ledger write failed: ${e?.message}`))
   issuePlatformInvoiceLater({
     tenantId, kind: 'subscription', externalRef: payment.id, sac: '998315',
     description: `Jeffi Commerce ${name} plan (${plan?.billing_interval === 'yearly' ? 'yearly' : 'monthly'})${period}`,
-    amountInr: Number(payment.amount) / 100, pricesIncludeGst: true,
+    amountInr, pricesIncludeGst: true,
   })
 }

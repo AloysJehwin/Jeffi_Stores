@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { verifyPortalToken, PORTAL_COOKIE } from '@/lib/auth/portal-session'
-import { downloadableCert, inCertStore } from '@/lib/auth/cert-mobile'
+import { downloadableCert, inCertStore } from '@controller/lib/auth/cert-mobile'
 import { sendAdminMobileCode } from '@/lib/auth/admin-mobile'
 import { parseBody } from '@/lib/shared/validate'
 

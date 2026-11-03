@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["**/*.ts", "**/*.tsx", "../packages/store-core/src/types/**/*.d.ts", "../packages/store-core/tests/setup.ts", "../packages/store-core/integration-tests/setup.ts", "next-env.d.ts"],
+  "exclude": ["node_modules"]
+}

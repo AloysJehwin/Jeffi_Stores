@@ -39,7 +39,9 @@
         "ec2:DescribeImages",
         "ec2:DescribeSubnets",
         "ec2:DescribeSecurityGroups",
-        "ec2:DescribeInstanceStatus"
+        "ec2:DescribeInstanceStatus",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeSnapshots"
       ],
       "Resource": "*"
     },
@@ -49,7 +51,7 @@
       "Action": "ec2:RunInstances",
       "Resource": "arn:aws:ec2:us-east-1:708835965056:instance/*",
       "Condition": {
-        "StringEquals": { "aws:RequestTag/app": "jeffi-tenant" }
+        "StringEquals": { "aws:RequestTag/app": ["jeffi-tenant", "jeffi-k8s"] }
       }
     },
     {
@@ -58,20 +60,20 @@
       "Action": "ec2:RunInstances",
       "Resource": [
         "arn:aws:ec2:us-east-1::image/*",
-        "arn:aws:ec2:us-east-1:708835965056:subnet/subnet-01ed5f7b63fd320c1",
-        "arn:aws:ec2:us-east-1:708835965056:security-group/sg-0f4f1f26371fe723d",
+        "arn:aws:ec2:us-east-1:708835965056:subnet/*",
+        "arn:aws:ec2:us-east-1:708835965056:security-group/*",
         "arn:aws:ec2:us-east-1:708835965056:network-interface/*",
         "arn:aws:ec2:us-east-1:708835965056:volume/*",
         "arn:aws:ec2:us-east-1:708835965056:key-pair/*"
       ]
     },
     {
-      "Sid": "TagOnlyAtLaunch",
+      "Sid": "TagOnlyAtCreation",
       "Effect": "Allow",
       "Action": "ec2:CreateTags",
       "Resource": "arn:aws:ec2:us-east-1:708835965056:*/*",
       "Condition": {
-        "StringEquals": { "ec2:CreateAction": "RunInstances" }
+        "StringEquals": { "ec2:CreateAction": ["RunInstances", "CreateVolume", "CreateSnapshot"] }
       }
     },
     {
@@ -80,7 +82,43 @@
       "Action": ["ec2:StartInstances", "ec2:StopInstances", "ec2:TerminateInstances", "ec2:ModifyInstanceAttribute"],
       "Resource": "arn:aws:ec2:us-east-1:708835965056:instance/*",
       "Condition": {
-        "StringEquals": { "ec2:ResourceTag/app": "jeffi-tenant" }
+        "StringEquals": { "ec2:ResourceTag/app": ["jeffi-tenant", "jeffi-k8s"] }
+      }
+    },
+    {
+      "Sid": "CreateStoreDatabaseVolumesMustCarryTheDbTag",
+      "Effect": "Allow",
+      "Action": "ec2:CreateVolume",
+      "Resource": "arn:aws:ec2:us-east-1:708835965056:volume/*",
+      "Condition": {
+        "StringEquals": { "aws:RequestTag/jeffi:role": "db" }
+      }
+    },
+    {
+      "Sid": "ManageOnlyStoreDatabaseVolumes",
+      "Effect": "Allow",
+      "Action": ["ec2:AttachVolume", "ec2:DetachVolume", "ec2:ModifyVolume", "ec2:DeleteVolume", "ec2:CreateSnapshot"],
+      "Resource": "arn:aws:ec2:us-east-1:708835965056:volume/*",
+      "Condition": {
+        "StringEquals": { "ec2:ResourceTag/jeffi:role": "db" }
+      }
+    },
+    {
+      "Sid": "AttachDatabaseVolumesOnlyToStoreServers",
+      "Effect": "Allow",
+      "Action": ["ec2:AttachVolume", "ec2:DetachVolume"],
+      "Resource": "arn:aws:ec2:us-east-1:708835965056:instance/*",
+      "Condition": {
+        "StringEquals": { "ec2:ResourceTag/app": "jeffi-k8s" }
+      }
+    },
+    {
+      "Sid": "SnapshotsMustCarryTheTenantTag",
+      "Effect": "Allow",
+      "Action": "ec2:CreateSnapshot",
+      "Resource": "arn:aws:ec2:us-east-1::snapshot/*",
+      "Condition": {
+        "Null": { "aws:RequestTag/jeffi-tenant": "false" }
       }
     },
     {
@@ -99,6 +137,33 @@
       "Resource": "arn:aws:iam::708835965056:role/jeffi-tenant-app-role",
       "Condition": {
         "StringEquals": { "iam:PassedToService": "ec2.amazonaws.com" }
+      }
+    },
+    {
+      "Sid": "StoreDatabasePasswords",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:CreateSecret",
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue",
+        "secretsmanager:DeleteSecret",
+        "secretsmanager:RestoreSecret"
+      ],
+      "Resource": "arn:aws:secretsmanager:us-east-1:708835965056:secret:jeffi/tenant-db/*"
+    },
+    {
+      "Sid": "StoreDatabaseBackups",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::jeffi-stores-bucket/tenant-backups/*"
+    },
+    {
+      "Sid": "ListStoreDatabaseBackups",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::jeffi-stores-bucket",
+      "Condition": {
+        "StringLike": { "s3:prefix": "tenant-backups/*" }
       }
     },
     {

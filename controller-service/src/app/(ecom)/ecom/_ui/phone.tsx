@@ -76,7 +76,7 @@ export function PhoneInput({ value, onChange, defaultCountry = 'IN', countries, 
           options={PHONE_COUNTRIES.filter(c => !countries || countries.includes(c.iso)).map(c => ({ value: c.iso, label: `${c.iso} +${c.code}`, hint: c.name }))} />
         <input id={id} type="tel" inputMode="numeric" autoComplete="tel-national" required={required}
           className={inputClassName ?? `min-w-0 flex-1 rounded-xl bg-surface-elevated px-4 py-3 text-sm text-foreground ${fieldCls}`}
-          value={national} placeholder={country.example} aria-invalid={!ok}
+          value={national} aria-invalid={!ok}
           onChange={e => {
             let n = e.target.value.replace(/\D/g, '')
             if (n.startsWith(country.code) && n.length > Math.max(...country.len)) n = n.slice(country.code.length)

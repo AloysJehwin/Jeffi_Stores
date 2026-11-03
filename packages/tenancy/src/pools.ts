@@ -2,7 +2,24 @@ import pg from 'pg'
 import path from 'node:path'
 import fs from 'node:fs'
 import { Signer } from '@aws-sdk/rds-signer'
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
 import type { TenantContext, TenantInfra } from './context'
+
+interface DbSecret { username?: string; password: string; database?: string; expiresAt: number }
+const secretCache = new Map<string, DbSecret>()
+const SECRET_TTL_MS = 5 * 60 * 1000
+async function fetchDbSecret(ref: string, region: string): Promise<DbSecret> {
+  const now = Date.now()
+  const hit = secretCache.get(ref)
+  if (hit && hit.expiresAt > now) return hit
+  const client = new SecretsManagerClient({ region })
+  const res = await client.send(new GetSecretValueCommand({ SecretId: ref }))
+  const parsed = JSON.parse(res.SecretString || '{}')
+  if (!parsed.password) throw new Error(`Secret ${ref} has no password field`)
+  const entry: DbSecret = { username: parsed.username, password: parsed.password, database: parsed.database, expiresAt: now + SECRET_TTL_MS }
+  secretCache.set(ref, entry)
+  return entry
+}
 
 export function createPgPool(config: pg.PoolConfig): pg.Pool {
   const pool = new pg.Pool(config)
@@ -75,7 +92,7 @@ export function platformPool(): pg.Pool {
 function basePoolConfig(): any {
   const workers = parseInt(process.env.WEB_CONCURRENCY || '1', 10)
   return {
-    max: Math.max(2, Math.floor(15 / workers)),
+    max: Math.max(2, Math.floor((Number(process.env.DB_POOL_MAX) || 15) / workers)),
     min: 1,
     idleTimeoutMillis: 60000,
     connectionTimeoutMillis: 10000,
@@ -86,7 +103,14 @@ function basePoolConfig(): any {
   }
 }
 
-function buildTenantPool(infra: TenantInfra): pg.Pool {
+// A node-mode store's pods get its database password in env (from its Postgres Secret): their
+// servers' role can't read jeffi/tenant-db/*. Only for the store it names.
+function podDbPassword(slug: string): string | undefined {
+  const pw = process.env.TENANT_DB_PASSWORD
+  return pw && (process.env.TENANT_DB_SLUG || process.env.SERVICE_TENANT_SLUG) === slug ? pw : undefined
+}
+
+function buildTenantPool(infra: TenantInfra, slug: string): pg.Pool {
   if (!infra.rdsEndpoint) throw new Error('Tenant has no RDS endpoint configured (tenant_infra.rds_endpoint)')
   const config: any = { ...basePoolConfig(), host: infra.rdsEndpoint, port: infra.rdsPort, database: infra.rdsDb }
   const isLocal = infra.rdsEndpoint === 'localhost' || infra.rdsEndpoint === '127.0.0.1'
@@ -99,21 +123,34 @@ function buildTenantPool(infra: TenantInfra): pg.Pool {
     config.ssl = false
     return createPgPool(config)
   }
-  config.ssl = rdsSslOption()
-  if (!infra.iamAuth) throw new Error('Password-auth tenant pools not implemented; use IAM auth')
-  const user = process.env.RDS_USER || 'app_user'
-  config.user = user
-  config.password = rdsIamPassword(infra.rdsEndpoint, infra.rdsPort, user, infra.region)
+  if (infra.iamAuth) {
+    config.ssl = rdsSslOption()
+    const user = infra.rdsUser || process.env.RDS_USER || 'app_user'
+    config.user = user
+    config.password = rdsIamPassword(infra.rdsEndpoint, infra.rdsPort, user, infra.region)
+    return createPgPool(config)
+  }
+  // Password auth: the store's own Postgres on its EC2 node, self-signed TLS (unverified). The
+  // password is the pod's env one, else the Secrets Manager secret at db_secret_ref (cached 5 min).
+  const envPw = podDbPassword(slug)
+  if (!infra.dbSecretRef && !envPw) throw new Error('Tenant has neither IAM auth nor db_secret_ref set')
+  const ref = infra.dbSecretRef!
+  const region = infra.region
+  config.ssl = { rejectUnauthorized: false }
+  config.user = infra.rdsUser || 'jeffi'
+  config.password = envPw ?? (async () => (await fetchDbSecret(ref, region)).password)
   return createPgPool(config)
 }
 
-const tenantPools = new Map<string, pg.Pool>()
+const tenantPools = new Map<string, { key: string; pool: pg.Pool }>()
 export function tenantPool(t: TenantContext): pg.Pool {
   if (!t.infra?.rdsEndpoint) throw new Error(`Tenant "${t.slug}" has no RDS endpoint configured`)
-  let p = tenantPools.get(t.tenantId)
-  if (!p) {
-    p = buildTenantPool(t.infra)
-    tenantPools.set(t.tenantId, p)
-  }
-  return p
+  // Rebuilt when the store's database moves (a size change between a shared and its own database).
+  const key = `${t.infra.rdsEndpoint}/${t.infra.rdsDb}/${t.infra.rdsUser ?? ''}`
+  const cached = tenantPools.get(t.tenantId)
+  if (cached?.key === key) return cached.pool
+  const pool = buildTenantPool(t.infra, t.slug)
+  tenantPools.set(t.tenantId, { key, pool })
+  cached?.pool.end().catch(() => {})
+  return pool
 }

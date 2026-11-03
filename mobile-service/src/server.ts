@@ -1,6 +1,6 @@
 // Mobile backend (mobile.jeffistores.in): the one host the app talks to. Owns the mobile contract
 // (/v1/app/*: version gate, store identity, feature flags — read from the shared DB) and forwards the
-// storefront operations under /api/* to the controller in-cluster with the caller's own bearer token,
+// storefront operations under /api/* to the storefront in-cluster with the caller's own bearer token,
 // so order creation, payments and auth keep one implementation. Endpoints move off the proxy one at a
 // time as they get a native handler here.
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
@@ -12,7 +12,7 @@ import { randomUUID, timingSafeEqual } from 'node:crypto'
 import type pg from 'pg'
 import { mainPool } from '@jeffi/tenancy'
 
-const CONTROLLER_URL = (process.env.CONTROLLER_URL || 'http://localhost:3000').replace(/\/$/, '')
+const STOREFRONT_URL = (process.env.STOREFRONT_URL || 'http://localhost:3000').replace(/\/$/, '')
 const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://jeffistores.in').replace(/\/$/, '')
 const SITE_HOST = new URL(PUBLIC_SITE_URL).host
 const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null
@@ -73,7 +73,7 @@ await app.register(rateLimit, {
 const MIN_APP_VERSION = process.env.MIN_APP_VERSION || '1.0.0'
 // The web host's /_next/image serves the app's resized images; APP_IMAGE_RESIZE=false sends it the originals.
 const IMAGE_RESIZE = process.env.APP_IMAGE_RESIZE !== 'false'
-// On only once the web host resizes a real gallery image: a release can roll this service out before the controller
+// On only once the web host resizes a real gallery image: a release can roll this service out before the storefront
 // that allows the CDN host. Re-checked hourly when on, every 5 minutes while off.
 let resizeProbe: { at: number; ok: boolean } | null = null
 async function imageResizeReady(): Promise<boolean> {
@@ -87,7 +87,7 @@ async function imageResizeReady(): Promise<boolean> {
       )
     ).rows[0]
     if (row) {
-      const res = await undici(`${CONTROLLER_URL}/_next/image?url=${encodeURIComponent(row.url)}&w=64&q=70`, {
+      const res = await undici(`${STOREFRONT_URL}/_next/image?url=${encodeURIComponent(row.url)}&w=64&q=70`, {
         headers: { host: SITE_HOST, accept: 'image/webp' },
         headersTimeout: 5000,
         bodyTimeout: 5000,
@@ -143,7 +143,7 @@ const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'te', 'tra
 async function forward(req: FastifyRequest, reply: FastifyReply) {
   const headers: Record<string, string> = {}
   for (const [k, v] of Object.entries(req.headers)) if (v && !HOP.has(k)) headers[k] = Array.isArray(v) ? v.join(', ') : v
-  // The controller resolves the store from the host; present the public one so it behaves as for the web.
+  // The storefront resolves the store from the host; present the public one so it behaves as for the web.
   headers.host = SITE_HOST
   headers['x-forwarded-host'] = SITE_HOST
   headers['x-forwarded-proto'] = 'https'
@@ -154,7 +154,7 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
   // Auth responses (token injection) and image-sized ones are rewritten below, so ask for them uncompressed.
   if (req.url.startsWith('/api/auth/') || req.url.startsWith('/api/business/') || sizeForClient) delete headers['accept-encoding']
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
-  const res = await undici(CONTROLLER_URL + req.url, {
+  const res = await undici(STOREFRONT_URL + req.url, {
     method: req.method as any,
     headers,
     body: !hasBody
@@ -169,7 +169,7 @@ async function forward(req: FastifyRequest, reply: FastifyReply) {
   })
   const cookies = ([] as string[]).concat((res.headers['set-cookie'] as string | string[] | undefined) ?? [])
   // Sign-in responses carry the session only as a cookie; the app keeps it as a bearer token instead
-  // (the controller accepts `Authorization: Bearer <sid>`), so copy it into the JSON body as `token`.
+  // (the storefront accepts `Authorization: Bearer <sid>`), so copy it into the JSON body as `token`.
   // Business sign-ins set business_sid instead.
   const sid = cookies.map(c => /^(?:user|business)_sid=([^;]+)/.exec(c)?.[1]).find(v => v && v !== 'deleted')
   const json = String(res.headers['content-type'] ?? '').includes('application/json')

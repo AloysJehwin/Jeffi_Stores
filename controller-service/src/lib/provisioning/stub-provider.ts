@@ -1,4 +1,5 @@
-import type { ProvisioningProvider, CreateDbInstanceArgs } from './provider'
+import type { ProvisioningProvider, CreateDbInstanceArgs, DbInstanceState, ModifyDbInstanceArgs } from './provider'
+import type { DbAuth } from './tenant-admin-pool'
 
 // In-memory stub: exercises the FULL state machine (including the async
 // "wait until available" polling) with zero real AWS. Swap for the real
@@ -22,11 +23,36 @@ export class StubProvisioningProvider implements ProvisioningProvider {
     this.paramGroups.add(paramGroup) // idempotent
   }
 
-  async createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string }> {
+  readonly shapes = new Map<string, DbInstanceState>()
+
+  async createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string; instanceClass?: string }> {
     if (!this.endpoints.has(args.dbInstanceId) && !this.pending.has(args.dbInstanceId)) {
       this.pending.set(args.dbInstanceId, this.availableAfterPolls)
+      this.shapes.set(args.dbInstanceId, {
+        status: 'available',
+        instanceClass: args.instanceClass ?? 'db.t4g.micro',
+        storageGb: args.storageGb ?? 20,
+        multiAz: !!args.multiAz,
+        pending: false,
+      })
     }
     return { dbInstanceId: args.dbInstanceId }
+  }
+
+  async describeDbInstance(dbInstanceId: string): Promise<DbInstanceState | null> {
+    return this.shapes.get(dbInstanceId) ?? null
+  }
+
+  // Applied at once whatever the mode (the stub has no maintenance window).
+  async modifyDbInstance(dbInstanceId: string, args: ModifyDbInstanceArgs): Promise<void> {
+    const s = this.shapes.get(dbInstanceId)
+    if (!s) throw new Error(`DBInstanceNotFound: ${dbInstanceId}`)
+    this.shapes.set(dbInstanceId, {
+      ...s,
+      ...(args.instanceClass ? { instanceClass: args.instanceClass } : {}),
+      ...(args.storageGb ? { storageGb: args.storageGb } : {}),
+      ...(args.multiAz != null ? { multiAz: args.multiAz } : {}),
+    })
   }
 
   async getDbEndpoint(dbInstanceId: string): Promise<string | null> {
@@ -43,18 +69,33 @@ export class StubProvisioningProvider implements ProvisioningProvider {
     return null // still provisioning
   }
 
-  async loadSchema(_endpoint: string, _dbName: string): Promise<void> {
+  // No database exists behind a stub endpoint, an on-node one included: nothing to load.
+  async loadSchema(_endpoint: string, _dbName: string, _appUser?: string, _db?: DbAuth): Promise<void> {
     /* no-op in stub */
   }
 
-  async backupDb(endpoint: string, _dbName: string): Promise<Buffer> {
+  readonly databases = new Set<string>() // endpoint/db for Starter stores on a shared host
+
+  async initSharedDbHost(_endpoint: string): Promise<void> {
+    /* no-op in stub */
+  }
+
+  async createTenantDatabase(endpoint: string, dbName: string, _role: string): Promise<void> {
+    this.databases.add(`${endpoint}/${dbName}`)
+  }
+
+  async dropTenantDatabase(endpoint: string, dbName: string, _role: string | null): Promise<void> {
+    this.databases.delete(`${endpoint}/${dbName}`)
+  }
+
+  async backupDb(endpoint: string, _dbName: string, _db?: DbAuth): Promise<Buffer> {
     // Deterministic fake archive so callers get real bytes to round-trip through S3.
     const buf = Buffer.from(JSON.stringify({ stub: true, endpoint }), 'utf8')
     this.backups.set(endpoint, buf)
     return buf
   }
 
-  async restoreDb(endpoint: string, _dbName: string, archive: Buffer): Promise<void> {
+  async restoreDb(endpoint: string, _dbName: string, archive: Buffer, _db?: DbAuth): Promise<void> {
     this.restored.set(endpoint, archive)
   }
 

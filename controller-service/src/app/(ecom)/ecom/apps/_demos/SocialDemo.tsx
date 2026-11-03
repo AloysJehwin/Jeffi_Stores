@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Link2, ImagePlus, CalendarClock, Heart } from 'lucide-react'
 import { AppDemoShell, useSteps, Done, Tag, Stat, Field, type DemoStep } from './kit'
-import ProductArt from '@/app/(ecom)/ecom/_demo/ProductArt'
+import ProductArt from '@controller/app/(ecom)/ecom/_demo/ProductArt'
 
 const STEPS: DemoStep[] = [
   { id: 'connect', label: 'Connect accounts', icon: Link2 },

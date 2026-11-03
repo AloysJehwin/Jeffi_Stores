@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { getOwnerTenants } from '@/lib/tenant-registry'
+import { getOwnerTenants, controlPlanePool } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,9 +25,15 @@ export async function GET(request: NextRequest) {
   }
 
   const tenants = await getOwnerTenants(owner.id)
-  const allowed = tenants.some(
-    t => parsed!.hostname === `${t.slug}.${PLATFORM_DOMAIN}` || parsed!.hostname === t.custom_domain
-  )
+  const host = parsed.hostname
+  const allowed =
+    tenants.some(t => host === `${t.slug}.${PLATFORM_DOMAIN}`) ||
+    (
+      await controlPlanePool().query(
+        `SELECT 1 FROM tenant_custom_domains WHERE domain = $1 AND status = 'verified' AND tenant_id = ANY($2::uuid[])`,
+        [host, tenants.map(t => t.id)]
+      )
+    ).rows.length > 0
   if (!allowed) return NextResponse.json({ error: 'Disallowed url' }, { status: 403 })
 
   const url = parsed.toString()

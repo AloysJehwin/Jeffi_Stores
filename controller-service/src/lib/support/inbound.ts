@@ -7,10 +7,10 @@ import { sendFreeTextWhatsApp } from '@/lib/shared/whatsapp'
 import { getWhatsAppProvider } from '@/lib/shared/messaging'
 import { storeFile } from '@/lib/drive/files'
 import { supportFolder } from '@/lib/drive/folders'
-import { createSession, openContactSession, openSessionFor, updateSession, type SessionRow } from './sessions'
-import { postMessage, type AttachmentInput } from './messages'
-import { settleCustomerLang } from './translate'
-import type { SupportMessage } from './types'
+import { createSession, openContactSession, openSessionFor, updateSession, type SessionRow } from '@/lib/support/sessions'
+import { postMessage, type AttachmentInput } from '@/lib/support/messages'
+import { settleCustomerLang } from '@/lib/support/translate'
+import type { SupportMessage } from '@/lib/support/types'
 
 // One inbound WhatsApp message, from either provider's webhook: opt-out commands, then the
 // customer's support chat (their account's, or a contact-only one for unknown numbers), media

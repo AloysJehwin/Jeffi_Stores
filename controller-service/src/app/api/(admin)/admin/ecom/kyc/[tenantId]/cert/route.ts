@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { getKyc } from '@/lib/tenant-registry'
-import { getKycDocumentStream } from '@/lib/catalog/kyc-upload'
+import { getKycDocumentStream } from '@controller/lib/catalog/kyc-upload'
 
 export const dynamic = 'force-dynamic'
 

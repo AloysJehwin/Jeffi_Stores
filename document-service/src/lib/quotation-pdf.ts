@@ -16,6 +16,7 @@ export interface QuotationBusiness {
   bankAccount: string
   bankIfsc: string
   bankBranch: string
+  city?: string
 }
 
 export interface QuotationItem {
@@ -792,8 +793,11 @@ export async function generateQuotationPDF(
       .text('Authorised Signatory', bankX + 2, y + sigH - 10, { width: bankW - 4, align: 'right' })
     y += sigH + 6
 
-    doc.font(F).fontSize(7).text('SUBJECT TO RAIPUR JURISDICTION', LM, y, { width: pw, align: 'center' })
-    y += 9
+    const jurisdiction = (business.city || business.state || '').trim().toUpperCase()
+    if (jurisdiction) {
+      doc.font(F).fontSize(7).text(`SUBJECT TO ${jurisdiction} JURISDICTION`, LM, y, { width: pw, align: 'center' })
+      y += 9
+    }
     doc.font(F).fontSize(6.5).text('This is a Computer Generated Invoice', LM, y, { width: pw, align: 'center' })
 
     doc.end()

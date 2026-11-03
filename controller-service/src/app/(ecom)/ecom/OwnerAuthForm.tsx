@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import type { GoogleOAuthResult } from '@/lib/client/google-oauth-popup'
-import { trackOwnerAuth } from '@/lib/client/ecom-analytics'
+import { trackOwnerAuth } from '@controller/lib/client/ecom-analytics'
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
 
 // OTP + Google auth form for ecom owners. mode 'signup' collects a name; 'signin'
 // doesn't. Both hit the same ecom auth endpoints (findOrCreateOwner upserts).
-export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
+// planQuery ("plan=growth&interval=yearly", validated server-side) sends the owner to that plan in /onboard.
+export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signup' | 'signin'; planQuery?: string | null }) {
   const router = useRouter()
   const { showToast } = useToast()
   const [step, setStep] = useState<'email' | 'otp'>('email')
@@ -56,8 +57,8 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
         return
       }
       trackOwnerAuth(mode, 'email')
-      // New owner → onboarding wizard; returning → dashboard.
-      go(mode === 'signup' ? '/onboard' : '/dashboard')
+      // New owner (or one who picked a plan) → onboarding wizard; returning → dashboard.
+      go(afterAuth(mode, planQuery))
       router.refresh()
     } catch {
       showToast('Network error', 'error')
@@ -137,20 +138,20 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
           <span className="flex-1 h-px bg-border-default" /> or <span className="flex-1 h-px bg-border-default" />
         </div>
 
-        <GoogleButton mode={mode} onError={m => showToast(m, 'error')} />
+        <GoogleButton mode={mode} planQuery={planQuery} onError={m => showToast(m, 'error')} />
 
         <p className="mt-6 text-center text-sm text-foreground-muted">
           {mode === 'signup' ? (
             <>
               Already have an account?{' '}
-              <a href="/signin" className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
+              <a href={planQuery ? `/signin?${planQuery}` : '/signin'} className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
                 Sign in
               </a>
             </>
           ) : (
             <>
               New to Jeffi Commerce?{' '}
-              <a href="/signup" className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
+              <a href={planQuery ? `/signup?${planQuery}` : '/signup'} className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
                 Get started
               </a>
             </>
@@ -164,7 +165,15 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
 // Google sign-in — uses the same popup OAuth flow as the storefront (returns an
 // access token from Google), then posts it to the ecom owner auth route. This
 // avoids Google Identity Services One Tap, which needs stricter origin config.
-function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (m: string) => void }) {
+function GoogleButton({
+  mode,
+  planQuery,
+  onError,
+}: {
+  mode: 'signup' | 'signin'
+  planQuery: string | null
+  onError: (m: string) => void
+}) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const { leaving, go } = useLeaveTo()
@@ -204,7 +213,7 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
         return
       }
       trackOwnerAuth(mode, 'google')
-      go(mode === 'signup' ? '/onboard' : '/dashboard')
+      go(afterAuth(mode, planQuery))
       router.refresh()
     } catch {
       onError('Network error')
@@ -243,6 +252,11 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
       </button>
     </>
   )
+}
+
+function afterAuth(mode: 'signup' | 'signin', planQuery: string | null): string {
+  if (planQuery) return `/onboard?${planQuery}`
+  return mode === 'signup' ? '/onboard' : '/dashboard'
 }
 
 function Spinner() {

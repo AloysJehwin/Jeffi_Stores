@@ -34,7 +34,7 @@ import {
   Activity,
   LayoutGrid,
 } from 'lucide-react'
-import { APP_GROUPS } from '@/app/(ecom)/ecom/apps'
+import { APP_GROUPS } from '@controller/app/(ecom)/ecom/apps'
 
 type IconType = ComponentType<{ className?: string }>
 

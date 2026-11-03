@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const reconciled = await reconcileOrphanedTenants().catch(() => [] as string[])
-  const { alertStuckJobs } = await import('@/lib/provisioning/alerts')
+  const { alertStuckJobs } = await import('@controller/lib/provisioning/alerts')
   const alerted = await alertStuckJobs().catch(() => 0)
   return NextResponse.json({ success: true, reconciled, alerted })
 }

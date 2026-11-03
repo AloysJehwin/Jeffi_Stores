@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { priceList } from '@jeffi/pricing'
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { hasService, getKyc } from '@/lib/tenant-registry'
 import { getTenantWallet } from '@/lib/payments/wallet'
 import PageHeader from '../_components/PageHeader'

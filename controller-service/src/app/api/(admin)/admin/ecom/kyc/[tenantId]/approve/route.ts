@@ -13,7 +13,7 @@ import {
   getOwnerBankWithRoute,
   persistLinkedAccountToOwnerBank,
 } from '@/lib/tenant-registry'
-import { createRazorpaySubscription } from '@/lib/payments/razorpay-subscriptions'
+import { createRazorpaySubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import {
   createLinkedAccount,
   createRouteStakeholder,
@@ -27,11 +27,16 @@ import { sendKycApprovedEmail, sendServicesReviewedEmail } from '@/lib/shared/ec
 import { hasService, reviewServiceApproval, controlPlanePool } from '@/lib/tenant-registry'
 // TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
-import { isPaymentBypassed, bypassAuditNote } from '@/lib/payments/ecom-payment-bypass'
-import { dedicatedCapacityError } from '@/lib/k8s/capacity'
-import { startStore } from '@/lib/provisioning/start-store'
+import { isPaymentBypassed, bypassAuditNote } from '@controller/lib/payments/ecom-payment-bypass'
+import { tenantCapacityError } from '@controller/lib/k8s/capacity'
+import { startStore } from '@controller/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
+
+// Payments are off by default while Razorpay subscriptions are disabled platform-wide. When off,
+// KYC approval starts provisioning directly (what the bypass does for one owner, now for everyone);
+// flip ECOM_PAYMENTS_ENABLED=true to restore the subscription + first-charge-webhook path.
+const PAYMENTS_ENABLED = process.env.ECOM_PAYMENTS_ENABLED === 'true'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   const admin = await authenticateAdmin(request)
@@ -57,11 +62,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   // Don't start billing a plan we can't build yet.
-  const capacityError = await dedicatedCapacityError(tenant.plan)
+  const capacityError = await tenantCapacityError(tenantId, tenant.plan)
   if (capacityError) {
     return NextResponse.json(
       {
-        error: `Cannot approve yet: no EC2 capacity for a dedicated ${tenant.plan} node. Move the store to Basic or raise the vCPU quota.`,
+        error: `Cannot approve yet: no EC2 capacity for this store's own servers. Move it to a smaller size or raise the vCPU quota.`,
       },
       { status: 409 }
     )
@@ -208,7 +213,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         /* never mask the original failure */
       }
       try {
-        const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+        const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
         await alertProvisioningFailure(tenant.slug, 'razorpay_linked_account', reason, tenantId)
       } catch {
         /* alerting must never mask the original failure */
@@ -232,16 +237,45 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   // ── end TEMPORARY payment bypass ────────────────────────────────────────────
 
+  // Payments off (default): start provisioning on approval, same call the bypass uses. The
+  // subscription path below (and the first-charge webhook that normally starts the store) is
+  // skipped but kept intact, re-enablable via ECOM_PAYMENTS_ENABLED=true.
+  if (!PAYMENTS_ENABLED) {
+    await startStore({ id: tenantId, store_request: tenant.store_request ? 'awaiting_payment' : null })
+    sendKycApprovedEmail(
+      { email: owner.email, name: owner.name },
+      { display_name: tenant.display_name, slug: tenant.slug },
+      null
+    ).catch(() => {})
+    return NextResponse.json({ ok: true, provisioningStarted: true, linkedAccountId })
+  }
+
   // 2. Create Razorpay Subscription and return checkout URL.
+  // No fallback to another plan: charging a different plan than the owner chose is worse than failing.
   const plans = await listPlans()
-  const plan = plans.find(p => p.slug === tenant.plan) ?? plans[0]
+  const plan = plans.find(p => p.slug === tenant.plan)
+  if (!plan) {
+    return NextResponse.json(
+      { ok: false, kycApproved: true, linkedAccountId, error: `Plan '${tenant.plan ?? 'none'}' is not an active store plan — set the store's plan, then approve again` },
+      { status: 409 }
+    )
+  }
   const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
+  // Price was computed and saved onto tenant_compute by onboard/submit; the subscription charges that total.
+  const priceRow = await controlPlanePool().query<{ price: number | null }>(
+    `SELECT price_inr_month::int AS price FROM tenant_compute WHERE tenant_id = $1`, [tenantId]
+  )
+  const priceInrMonth = Number(priceRow.rows[0]?.price ?? plan.monthly_price_inr ?? 0)
+  if (!(priceInrMonth > 0)) {
+    return NextResponse.json({ ok: false, kycApproved: true, linkedAccountId, error: 'No subscription price on tenant_compute.price_inr_month' }, { status: 500 })
+  }
 
   try {
     const { subscriptionId, shortUrl } = await createRazorpaySubscription({
       planSlug: tenant.plan ?? 'basic',
-      planName: plan?.name ?? 'Basic',
+      planName: plan.name,
       interval: (tenant.billing_interval as any) ?? 'monthly',
+      priceInrMonth,
       ownerEmail: owner.email,
       ownerName: owner.name,
       tenantId,

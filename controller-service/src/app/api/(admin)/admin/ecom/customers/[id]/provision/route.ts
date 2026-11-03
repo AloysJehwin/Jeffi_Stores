@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getTenant, getProvisioningJob } from '@/lib/tenant-registry'
-import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
+import { triggerProvisioning, resolveRestoreKey } from '@controller/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'
 

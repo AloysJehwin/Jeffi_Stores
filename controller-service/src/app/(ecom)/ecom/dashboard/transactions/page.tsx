@@ -1,4 +1,4 @@
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { getTenantBilling } from '@/lib/tenant-registry'
 import PageHeader from '../_components/PageHeader'
 import { TransactionsTable } from '../_components/finance'

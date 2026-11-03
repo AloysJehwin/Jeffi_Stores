@@ -14,7 +14,7 @@ import { config as loadEnv } from 'dotenv'
 loadEnv({ path: '.env.local' })
 loadEnv()
 import pg from 'pg'
-import { buildTenantSchemaSql } from '@/lib/tenant-migrations-schema'
+import { buildTenantSchemaSql } from '@controller/lib/tenant-migrations-schema'
 
 const { Client } = pg
 

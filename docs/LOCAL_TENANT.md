@@ -35,12 +35,16 @@ Restart `npm run dev` after changing it.
 
 ## Open
 
+`npm run dev` starts the four Next apps (storefront :3010, admin :3011, business :3012, controller :3013)
+behind a router on :3000 (`scripts/dev-router.ts`), which routes by host and path like the ingress, so the URLs
+below are unchanged. `npm run dev:<app>` starts the router with one app when that's all you need.
+
 With `npm run dev` running:
 
 | URL | What |
 |---|---|
 | `http://<slug>.localhost:3000` | storefront (serves the tenant's own DB) |
-| `http://admin-<slug>.localhost:3000/login` | tenant admin — enter the email; the OTP prints to the dev-server console (local mail is off) |
+| `http://admin-<slug>.localhost:3000/login` | tenant admin — enter the email; the OTP prints to the admin dev server's console (local mail is off) |
 | `http://invoice-<slug>.localhost:3000` | public document host |
 
 ## How the host resolves

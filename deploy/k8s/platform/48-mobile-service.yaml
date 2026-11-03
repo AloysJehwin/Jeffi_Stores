@@ -27,7 +27,7 @@ spec:
           env:
             - { name: SM_SECRET_ID, value: jeffi/mobile/production }
             - { name: NODE_OPTIONS, value: --max-old-space-size=192 }
-            - { name: CONTROLLER_URL, value: 'http://jeffi-stores-controller-service.jeffi.svc.cluster.local:3000' }
+            - { name: STOREFRONT_URL, value: 'http://jeffi-stores-storefront-service.jeffi.svc.cluster.local:3000' }
             - { name: PUBLIC_SITE_URL, value: 'https://jeffistores.in' }
             - { name: MIN_APP_VERSION, value: '1.0.0' }
             - { name: DB_IAM_AUTH, value: 'true' }

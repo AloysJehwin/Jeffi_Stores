@@ -5,6 +5,7 @@
     "src/**/*.tsx",
     "../packages/*/src/**/*.ts"
   ],
+  "exclude": ["../packages/store-core"],
   "compilerOptions": {
     "jsx": "react-jsx"
   }

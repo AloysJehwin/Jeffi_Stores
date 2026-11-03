@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
-import { runAiHealthCheck, recordAiHealth } from '@/lib/shared/ai-health'
+import { runAiHealthCheck, recordAiHealth } from '@controller/lib/shared/ai-health'
 
 export const dynamic = 'force-dynamic'
 

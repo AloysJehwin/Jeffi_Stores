@@ -26,7 +26,7 @@ trust() { # <subject suffix>..., e.g. environment:production
   "StringLike":{"token.actions.githubusercontent.com:sub":[$subs]}}}]}
 JSON
 }
-repos() { for r in controller messaging document public-api mobile; do printf '"arn:aws:ecr:%s:%s:repository/jeffi-stores-%s-service",' "$AWS_REGION" "$ACCOUNT" "$r"; done; }
+repos() { for r in controller storefront admin business messaging document public-api mobile; do printf '"arn:aws:ecr:%s:%s:repository/jeffi-stores-%s-service",' "$AWS_REGION" "$ACCOUNT" "$r"; done; }
 SECRET="{\"Sid\":\"ReadProductionSecret\",\"Effect\":\"Allow\",\"Action\":\"secretsmanager:GetSecretValue\",\"Resource\":\"arn:aws:secretsmanager:$AWS_REGION:$ACCOUNT:secret:jeffi/production*\"}"
 
 BUILD_TRUST=$(trust "ref:refs/heads/*")
@@ -44,6 +44,7 @@ DEPLOY_TRUST=$(trust "environment:production" "environment:production-release")
 DEPLOY_POLICY=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
  $SECRET,
+ {"Sid":"SyncStoreSecret","Effect":"Allow","Action":["secretsmanager:DescribeSecret","secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"],"Resource":"arn:aws:secretsmanager:$AWS_REGION:$ACCOUNT:secret:jeffi/store-??????"},
  {"Sid":"FindCore","Effect":"Allow","Action":"ec2:DescribeAddresses","Resource":"*"},
  {"Sid":"DbLogin","Effect":"Allow","Action":"rds-db:connect","Resource":"arn:aws:rds-db:$AWS_REGION:$ACCOUNT:dbuser:$DB_RESOURCE/app_user"},
  {"Sid":"TunnelToCore","Effect":"Allow","Action":"ssm:StartSession",

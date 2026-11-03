@@ -2,11 +2,18 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckMark } from '@/app/(ecom)/ecom/Shapes'
-import { ChoiceCards, ChoiceChips, Segmented, focusRing } from '../_ui'
+import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
+import { FileText } from 'lucide-react'
+import { ChoiceCards, ChoiceChips, Segmented } from '../_ui'
 import { useToast } from '@/contexts/ToastContext'
 import { PhoneInput } from '../_ui/phone'
-import { trackStoreApplication } from '@/lib/client/ecom-analytics'
+import { trackStoreApplication } from '@controller/lib/client/ecom-analytics'
+import { ComputeConfigurator, type ComputeChoice } from '../_compute/ComputeConfigurator'
+import PageHeader from '../dashboard/_components/PageHeader'
+import { Card, Row } from '../dashboard/_components/Card'
+import OnboardShell from './OnboardShell'
+import { WIZARD_STEPS } from './steps'
+import { fieldInput, fieldLabel, ghostBtn, noteCls, primaryBtn } from './ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -17,16 +24,18 @@ interface Plan {
 }
 type Interval = 'monthly' | 'yearly'
 
-const STEPS = [
-  { id: 0, label: 'Plan', icon: 'plan', desc: 'Choose your subscription' },
-  { id: 1, label: 'Store', icon: 'store', desc: 'Name & subdomain' },
-  { id: 2, label: 'Business', icon: 'business', desc: 'Legal details' },
-  { id: 3, label: 'GST', icon: 'gst', desc: 'Certificate & number' },
-  { id: 4, label: 'Warehouse', icon: 'warehouse', desc: 'Pickup address' },
-  { id: 5, label: 'Bank', icon: 'bank', desc: 'Payout account' },
-  { id: 6, label: 'Branding', icon: 'branding', desc: 'Logo, seal & consent' },
-  { id: 7, label: 'Review', icon: 'review', desc: 'Submit for approval' },
-] as const
+const STEPS = WIZARD_STEPS
+
+const HEAD: Record<StepIdx, { title: string; description: string }> = {
+  0: { title: 'Choose your plan', description: 'All plans include the full storefront. One subscription — plan and servers together. Cancel anytime.' },
+  1: { title: 'Name your store', description: 'This is what your customers will see.' },
+  2: { title: 'Business details', description: 'Legal information for compliance and invoicing.' },
+  3: { title: 'GST details', description: 'Only if your business is GST-registered. Leave blank if it is not.' },
+  4: { title: 'Pickup warehouse', description: 'Where Delhivery will pick up your orders. You can edit this later.' },
+  5: { title: 'Payout bank account', description: 'Where your sales will be settled. We verify instantly via a ₹1 bank check.' },
+  6: { title: 'Branding & legals', description: 'Your logo and seal appear on your storefront and legal documents.' },
+  7: { title: 'Review & submit', description: 'We’ll review your GST certificate and notify you when your store is approved.' },
+}
 
 type StepIdx = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
@@ -52,9 +61,8 @@ const BUSINESS_TYPES = [
 ]
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-const inp =
-  'w-full rounded-xl border border-border-default bg-surface px-4 py-3 text-[16px] sm:text-sm text-foreground placeholder:text-foreground-muted ecom-field'
-const lbl = 'block text-sm font-medium text-foreground-secondary mb-1.5'
+const inp = fieldInput
+const lbl = fieldLabel
 
 function slugify(s: string) {
   return s
@@ -65,96 +73,25 @@ function slugify(s: string) {
     .slice(0, 63)
 }
 
-// ── Step icon SVGs ─────────────────────────────────────────────────────────────
-function StepIcon({ icon, className }: { icon: string; className?: string }) {
-  const cls = className ?? 'w-5 h-5'
-  const icons: Record<string, JSX.Element> = {
-    plan: (
-      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z"
-        />
-      </svg>
-    ),
-    store: (
-      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z"
-        />
-      </svg>
-    ),
-    business: (
-      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"
-        />
-      </svg>
-    ),
-    gst: (
-      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-        />
-      </svg>
-    ),
-    warehouse: (
-      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205 3 1m1.5.5-1.5-.5M6.75 7.364V3h-3v18m3-13.636 10.5-3.819"
-        />
-      </svg>
-    ),
-    bank: (
-      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z"
-        />
-      </svg>
-    ),
-    review: (
-      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-        />
-      </svg>
-    ),
-    branding: (
-      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M18 6h.008v.008H18V6ZM3.75 4.5h16.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5V6a1.5 1.5 0 0 1 1.5-1.5Z"
-        />
-      </svg>
-    ),
-  }
-  return icons[icon] ?? null
-}
-
 // ── Main Wizard ────────────────────────────────────────────────────────────────
 export default function OnboardWizard({
+  owner,
   plans,
   initialDraft,
   reusingPreviousDetails,
   ownerName,
   extraServices = [],
   upgrade,
+  computeEnabled = false,
+  paymentsEnabled = false,
 }: {
+  /** Shown in the rail with the sign-out button. */
+  owner: { email: string; name: string | null }
   plans: Plan[]
+  /** ECOM_PAYMENTS_ENABLED: approval leads to checkout. Off: approval starts the build directly. */
+  paymentsEnabled?: boolean
+  /** Owners pick their server size here (COMPUTE_SPEC_ENABLED). */
+  computeEnabled?: boolean
   /** A services workspace adding a store: the tenant (and its subdomain) already exists. */
   upgrade?: { tenantId: string; slug: string; displayName: string }
   /** Messaging / documents picked alongside the store on the service picker. */
@@ -174,8 +111,12 @@ export default function OnboardWizard({
   const [busy, setBusy] = useState(false)
 
   // Step 0 — Plan
-  const [planSlug, setPlanSlug] = useState<string>(init.planSlug ?? plans[0]?.slug ?? 'basic')
+  // A draft may name a plan that has since been retired (Starter): start from Basic instead.
+  const [planSlug, setPlanSlug] = useState<string>(
+    plans.some(p => p.slug === init.planSlug) ? init.planSlug : (plans.find(p => p.slug === 'basic') ?? plans[0])?.slug ?? 'basic'
+  )
   const [interval, setInterval] = useState<Interval>(init.interval ?? 'monthly')
+  const [compute, setCompute] = useState<ComputeChoice | null>(null)
 
   // Step 1 — Store
   const [displayName, setDisplayName] = useState(init.displayName ?? '')
@@ -256,7 +197,17 @@ export default function OnboardWizard({
   const effectiveSlug = upgrade ? upgrade.slug : slugEdited ? slug : slugify(displayName)
   const selectedPlan = plans.find(p => p.slug === planSlug)
   const monthly = Number(selectedPlan?.monthly_price_inr ?? 0)
-  const price = interval === 'yearly' ? monthly * 10 : monthly
+  // The configurator only runs on the Plan step; a draft resumed past it keeps what was chosen there.
+  const chosenSpec = compute?.spec ?? init.computeSpec ?? null
+  const totalMonth: number | null = compute?.total?.total ?? (typeof init.priceInrMonth === 'number' ? init.priceInrMonth : null)
+  const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
+  // Yearly is charged once a year at 10× the month (2 months free).
+  const priceLabel =
+    totalMonth == null
+      ? null
+      : interval === 'yearly'
+        ? `${inr(totalMonth * 10)}/yr incl. GST (${inr((totalMonth * 10) / 12)}/mo)`
+        : `${inr(totalMonth)}/mo incl. GST`
 
   // ── Auto-save draft ──────────────────────────────────────────────────────────
   const autosave = useCallback(
@@ -265,6 +216,8 @@ export default function OnboardWizard({
       const data = {
         planSlug,
         interval,
+        computeSpec: chosenSpec,
+        priceInrMonth: totalMonth,
         displayName,
         slug: effectiveSlug,
         productCats,
@@ -301,6 +254,8 @@ export default function OnboardWizard({
     [
       planSlug,
       interval,
+      chosenSpec,
+      totalMonth,
       displayName,
       effectiveSlug,
       productCats,
@@ -429,6 +384,7 @@ export default function OnboardWizard({
         body: JSON.stringify({
           planSlug,
           billingInterval: interval,
+          ...(computeEnabled && chosenSpec ? { compute: chosenSpec } : {}),
           extraServices,
           displayName,
           slug: effectiveSlug,
@@ -510,7 +466,7 @@ export default function OnboardWizard({
   }, [wh.originPincode])
 
   function canNext(): boolean {
-    if (step === 0) return !!planSlug
+    if (step === 0) return !!planSlug && !!compute?.valid
     if (step === 1) return displayName.trim().length > 0 && effectiveSlug.length >= 3 && productCats.length > 0
     if (step === 2)
       return bizName.trim().length > 0 && !!bizType && pan.trim().length === 10 && bizAddress.trim().length > 5
@@ -540,99 +496,43 @@ export default function OnboardWizard({
   const isLast = step === 7
 
   return (
-    <div className="flex min-h-[calc(100vh-56px)] bg-surface-secondary">
-      {/* ── Sidebar ── */}
-      <aside className="hidden lg:flex flex-col w-72 xl:w-80 bg-surface-elevated border-r border-border-default p-8 flex-shrink-0 self-start sticky top-14 h-[calc(100vh-56px)] overflow-y-auto">
-        <div className="mb-10">
-          <h2 className="text-xl font-bold text-foreground">Launch your store</h2>
-          <p className="text-sm text-foreground-muted mt-1">Complete each step to go live.</p>
-        </div>
-        <nav className="flex-1 space-y-1">
-          {STEPS.map(s => {
-            const done = s.id < step
-            const active = s.id === step
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => (s.id < step ? goTo(s.id as StepIdx) : undefined)}
-                disabled={s.id > step}
-                aria-current={active ? 'step' : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors ${focusRing} ${active ? 'ecom-current' : done ? 'text-foreground-secondary ecom-hover cursor-pointer' : 'text-foreground-muted cursor-default'}`}
-              >
-                <span
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? 'ecom-sel' : done ? 'org-sage org-sage-text' : 'bg-surface-secondary text-foreground-muted'}`}
-                >
-                  {done ? <CheckMark className="w-4 h-4" /> : <StepIcon icon={s.icon} className="w-4 h-4" />}
-                </span>
-                <div>
-                  <div className={`text-sm ${active ? 'font-semibold text-foreground' : 'font-medium'}`}>
-                    {s.label}
-                  </div>
-                  <div className="text-xs text-foreground-muted">{s.desc}</div>
-                </div>
-              </button>
-            )
-          })}
-        </nav>
-        {saving && <p className="text-xs text-foreground-muted mt-6">Saving draft…</p>}
-      </aside>
+    <OnboardShell
+      owner={owner}
+      heading={upgrade ? `Add a store to ${upgrade.displayName}` : 'Launch your store'}
+      subheading={`Go live in ${STEPS.length} steps`}
+      steps={STEPS}
+      current={step}
+      onSelect={i => goTo(i as StepIdx)}
+      saving={saving}
+    >
+      <div className={step === 0 ? 'max-w-5xl' : 'max-w-2xl'}>
+        <PageHeader eyebrow={`Step ${step + 1} of ${STEPS.length}`} title={HEAD[step].title} description={HEAD[step].description} />
 
-      {/* ── Main content ── */}
-      <main className="flex-1 min-w-0 flex flex-col">
-        {/* Mobile step indicator */}
-        <div className="lg:hidden sticky top-14 z-10 md:static px-4 sm:px-5 py-3 border-b border-border-default bg-surface-elevated">
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <span className="shrink-0 text-xs text-foreground-muted">
-              Step {step + 1} of {STEPS.length}
-            </span>
-            <span className="min-w-0 truncate text-xs font-semibold text-foreground">
-              {STEPS[step].label} <span className="font-normal text-foreground-muted">— {STEPS[step].desc}</span>
-            </span>
-            {saving && <span className="shrink-0 text-[10px] text-foreground-muted">Saving…</span>}
-          </div>
-          <div className="flex gap-1">
-            {STEPS.map(s => (
-              <div
-                key={s.id}
-                className={`h-1 flex-1 rounded-full transition-colors ${s.id < step ? 'ecom-accent-bg' : s.id === step ? 'ecom-sel' : 'bg-surface-secondary'}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col items-center px-4 sm:px-8 lg:px-16 py-6 sm:py-8 lg:py-10 lg:justify-center">
           {/* ── Restore banner (returning owner with a prior backup) ── */}
           {restoreBackup && step <= 1 && (
-            <div className="w-full max-w-3xl mb-6 rounded-2xl border border-accent-300 bg-accent-50 p-4 sm:p-5">
-              <div className="flex items-start gap-3">
-                <div className="flex-1">
-                  <div className="font-semibold text-foreground">We found a backup of your previous store</div>
-                  <p className="text-sm text-foreground-muted mt-1">
-                    From {new Date(restoreBackup.capturedAt).toLocaleString('en-IN')}. We can restore your products,
-                    orders, and settings after your new store is set up.
-                  </p>
-                  <label className="mt-3 inline-flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={restoreOptIn}
-                      onChange={e => setRestoreOptIn(e.target.checked)}
-                      className="w-4 h-4 rounded accent-accent-600"
-                    />
-                    <span className="text-sm font-medium text-foreground">Restore my previous store data</span>
-                  </label>
-                </div>
-              </div>
+            <div className={`${noteCls} org-peach mb-6`}>
+              <div className="font-semibold text-foreground">We found a backup of your previous store</div>
+              <p className="text-foreground-secondary mt-1">
+                From {new Date(restoreBackup.capturedAt).toLocaleString('en-IN')}. We can restore your products,
+                orders, and settings after your new store is set up.
+              </p>
+              <label className="mt-3 inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={restoreOptIn}
+                  onChange={e => setRestoreOptIn(e.target.checked)}
+                  className="w-4 h-4 rounded accent-accent-600"
+                />
+                <span className="font-medium text-foreground">Restore my previous store data</span>
+              </label>
             </div>
           )}
 
           {/* ── Step 0: Plan ── */}
           {step === 0 && (
-            <div className="w-full max-w-3xl">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Choose your plan</h1>
-              <p className="text-foreground-muted mb-6 sm:mb-8">All plans include the full storefront. Cancel anytime.</p>
+            <div>
               {reusingPreviousDetails && (
-                <div className="mb-6 sm:mb-8 rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
+                <div className="mb-6 rounded-2xl border border-border-default bg-surface-elevated px-5 py-3">
                   <p className="text-sm text-foreground">
                     We have carried over your business details, warehouse and bank account.
                   </p>
@@ -641,34 +541,31 @@ export default function OnboardWizard({
                   </p>
                 </div>
               )}
-              <Segmented<Interval> ariaLabel="Billing interval" className="mb-6 sm:mb-8" value={interval} onChange={setInterval}
+              {/* Unboxed below sm: the configurator's own cards need the width. */}
+              <Card title="Plan & servers" className="max-sm:border-0 max-sm:bg-transparent max-sm:p-0">
+              <div className="space-y-6">
+              <Segmented<Interval> ariaLabel="Billing interval" value={interval} onChange={setInterval}
                 options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: '2 months free' }]} />
-              <ChoiceCards ariaLabel="Plan" columns="grid-cols-2 xl:grid-cols-4" cardClassName="bg-surface-elevated p-4 sm:p-5" value={planSlug} onChange={setPlanSlug}
-                options={plans.map(p => {
-                  const m = Number(p.monthly_price_inr)
-                  const pr = interval === 'yearly' ? m * 10 : m
-                  return {
-                    value: p.slug, label: p.name,
-                    content: (
-                      <>
-                        <div className="pr-6 font-bold text-foreground text-base">{p.name}</div>
-                        <div className="text-2xl font-extrabold text-foreground mt-2">₹{pr.toLocaleString('en-IN')}</div>
-                        <div className="text-xs text-foreground-muted">/{interval === 'yearly' ? 'yr' : 'mo'}</div>
-                        {interval === 'yearly' && (
-                          <div className="text-xs org-sage-text mt-1">2 months free</div>
-                        )}
-                      </>
-                    ),
-                  }
-                })} />
+              <ComputeConfigurator
+                planSlug={planSlug}
+                onPlanChange={setPlanSlug}
+                value={compute?.spec ?? init.computeSpec ?? null}
+                onChange={setCompute}
+              />
+              {interval === 'yearly' && totalMonth != null && (
+                <p className="text-sm text-foreground-secondary">
+                  Billed yearly: <span className="font-semibold text-foreground">{inr(totalMonth * 10)}/yr</span> incl. GST —
+                  10 months&apos; price for 12.
+                </p>
+              )}
+              </div>
+              </Card>
             </div>
           )}
 
           {/* ── Step 1: Store ── */}
           {step === 1 && (
-            <div className="w-full max-w-xl">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Name your store</h1>
-              <p className="text-foreground-muted mb-6 sm:mb-8">This is what your customers will see.</p>
+            <Card>
               <div className="space-y-5">
                 <div>
                   <label className={lbl}>Store name</label>
@@ -676,7 +573,6 @@ export default function OnboardWizard({
                     className={inp}
                     value={displayName}
                     onChange={e => setDisplayName(e.target.value)}
-                    placeholder="Acme Hardware"
                   />
                 </div>
                 <div>
@@ -690,7 +586,6 @@ export default function OnboardWizard({
                         setSlugEdited(true)
                         setSlug(slugify(e.target.value))
                       }}
-                      placeholder="acme"
                     />
                     <span className="shrink-0 text-sm text-foreground-muted whitespace-nowrap font-mono">.jeffistores.in</span>
                   </div>
@@ -724,14 +619,12 @@ export default function OnboardWizard({
                   )}
                 </div>
               </div>
-            </div>
+            </Card>
           )}
 
           {/* ── Step 2: Business ── */}
           {step === 2 && (
-            <div className="w-full max-w-xl">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Business details</h1>
-              <p className="text-foreground-muted mb-6 sm:mb-8">Legal information for compliance and invoicing.</p>
+            <Card>
               <div className="space-y-5">
                 <div>
                   <label className={lbl}>Legal business name</label>
@@ -739,7 +632,6 @@ export default function OnboardWizard({
                     className={inp}
                     value={bizName}
                     onChange={e => setBizName(e.target.value)}
-                    placeholder="Acme Hardware Pvt Ltd"
                   />
                 </div>
                 <div>
@@ -753,7 +645,6 @@ export default function OnboardWizard({
                     className={inp}
                     value={pan}
                     onChange={e => setPan(e.target.value.toUpperCase())}
-                    placeholder="ABCDE1234F"
                     maxLength={10}
                   />
                 </div>
@@ -763,20 +654,15 @@ export default function OnboardWizard({
                     className={`${inp} h-24 resize-none`}
                     value={bizAddress}
                     onChange={e => setBizAddress(e.target.value)}
-                    placeholder="123, MG Road, Bengaluru, Karnataka 560001"
                   />
                 </div>
               </div>
-            </div>
+            </Card>
           )}
 
           {/* ── Step 3: GST ── */}
           {step === 3 && (
-            <div className="w-full max-w-xl">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">GST details</h1>
-              <p className="text-foreground-muted mb-6 sm:mb-8">
-                Only if your business is GST-registered. Leave blank if it is not.
-              </p>
+            <Card>
               <div className="space-y-5">
                 <div>
                   <label className={lbl}>
@@ -786,7 +672,6 @@ export default function OnboardWizard({
                     className={inp}
                     value={gstNumber}
                     onChange={e => setGstNumber(e.target.value.toUpperCase())}
-                    placeholder="29AAAAA0000A1Z5"
                     maxLength={15}
                   />
                   <p className="text-xs text-foreground-muted mt-1">
@@ -819,7 +704,7 @@ export default function OnboardWizard({
                     </div>
                   ) : (
                     <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-border-default hover:border-accent-400 bg-surface cursor-pointer transition-colors">
-                      <StepIcon icon="gst" className="w-8 h-8 text-foreground-muted mb-2" />
+                      <FileText className="w-8 h-8 text-foreground-muted mb-2" />
                       <span className="text-sm text-foreground-muted">
                         {uploadingGst ? 'Uploading…' : 'Click to upload certificate'}
                       </span>
@@ -837,28 +722,23 @@ export default function OnboardWizard({
                   )}
                   {gstErr && <p className="text-xs text-[#8a2e1f] mt-1">{gstErr}</p>}
                 </div>
-                <div className="rounded-xl org-peach border border-[var(--org-apricot)] p-4 text-sm org-brown">
+                <div className={`${noteCls} org-peach`}>
                   Your GST certificate will be reviewed by the Jeffi Commerce team before your store goes live. This
                   usually takes 1–2 business days.
                 </div>
               </div>
-            </div>
+            </Card>
           )}
 
           {/* ── Step 4: Warehouse ── */}
           {step === 4 && (
-            <div className="w-full max-w-xl">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Pickup warehouse</h1>
-              <p className="text-foreground-muted mb-6 sm:mb-8">
-                Where Delhivery will pick up your orders. You can edit this later.
-              </p>
+            <Card>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={lbl}>Origin pincode</label>
                     <input
                       className={inp}
-                      placeholder="560001"
                       maxLength={6}
                       value={wh.originPincode}
                       onChange={e => setWh({ ...wh, originPincode: e.target.value.replace(/\D/g, '') })}
@@ -881,7 +761,6 @@ export default function OnboardWizard({
                     <label className={lbl}>Pickup location name</label>
                     <input
                       className={inp}
-                      placeholder="Main warehouse"
                       value={wh.pickupLocation}
                       onChange={e => setWh({ ...wh, pickupLocation: e.target.value })}
                     />
@@ -890,7 +769,6 @@ export default function OnboardWizard({
                     <label className={lbl}>Seller / warehouse name</label>
                     <input
                       className={inp}
-                      placeholder="Acme Hardware"
                       value={wh.sellerName}
                       onChange={e => setWh({ ...wh, sellerName: e.target.value })}
                     />
@@ -904,12 +782,11 @@ export default function OnboardWizard({
                   <label className={lbl}>Warehouse address</label>
                   <textarea
                     className={`${inp} h-24 resize-none`}
-                    placeholder="123, Industrial Area, Bengaluru"
                     value={wh.sellerAddress}
                     onChange={e => setWh({ ...wh, sellerAddress: e.target.value })}
                   />
                 </div>
-                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface-elevated hover:bg-surface-secondary transition-colors">
+                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary transition-colors">
                   <input
                     type="checkbox"
                     checked={dailyPayout}
@@ -921,7 +798,7 @@ export default function OnboardWizard({
                     <div className="text-xs text-foreground-muted">+5% fee — otherwise weekly, free</div>
                   </div>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface-elevated hover:bg-surface-secondary transition-colors">
+                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary transition-colors">
                   <input
                     type="checkbox"
                     checked={ownDelhivery}
@@ -948,7 +825,6 @@ export default function OnboardWizard({
                         className={inp}
                         type="password"
                         autoComplete="off"
-                        placeholder="••••••••"
                         value={delhiveryToken}
                         onChange={e => setDelhiveryToken(e.target.value.trim())}
                       />
@@ -956,16 +832,12 @@ export default function OnboardWizard({
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           )}
 
           {/* ── Step 5: Bank ── */}
           {step === 5 && (
-            <div className="w-full max-w-xl">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Payout bank account</h1>
-              <p className="text-foreground-muted mb-6 sm:mb-8">
-                Where your sales will be settled. We verify instantly via a ₹1 bank check.
-              </p>
+            <Card>
               <div className="space-y-4">
                 {bankOnFile ? (
                   <div className="rounded-xl border border-[var(--org-sage-deep)]/40 org-sage p-4">
@@ -999,7 +871,6 @@ export default function OnboardWizard({
                     <label className={lbl}>Account holder name</label>
                     <input
                       className={inp}
-                      placeholder="Aloys Jehwin"
                       value={bank.holderName}
                       disabled={bankVerified}
                       onChange={e => {
@@ -1013,7 +884,6 @@ export default function OnboardWizard({
                     <label className={lbl}>Account number</label>
                     <input
                       className={inp}
-                      placeholder="43014146741"
                       value={bank.accountNumber}
                       disabled={bankVerified}
                       onChange={e => {
@@ -1027,7 +897,6 @@ export default function OnboardWizard({
                     <label className={lbl}>IFSC code</label>
                     <input
                       className={inp}
-                      placeholder="SBIN0071256"
                       value={bank.ifsc}
                       disabled={bankVerified}
                       onChange={e => {
@@ -1044,7 +913,7 @@ export default function OnboardWizard({
                     type="button"
                     onClick={verifyBank}
                     disabled={busy || !bank.holderName || bank.accountNumber.length < 9 || bank.ifsc.length !== 11}
-                    className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                    className={`${primaryBtn} w-full sm:w-auto`}
                   >
                     {busy ? 'Saving…' : 'Save account'}
                   </button>
@@ -1074,7 +943,7 @@ export default function OnboardWizard({
                 </>
                 )}
 
-                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface-elevated hover:bg-surface-secondary transition-colors">
+                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary transition-colors">
                   <input
                     type="checkbox"
                     checked={ownRazorpay}
@@ -1100,7 +969,6 @@ export default function OnboardWizard({
                       <label className={lbl}>Razorpay Key ID</label>
                       <input
                         className={inp}
-                        placeholder="rzp_live_xxxxxxxx"
                         value={rzpKeyId}
                         onChange={e => setRzpKeyId(e.target.value.trim())}
                       />
@@ -1111,7 +979,6 @@ export default function OnboardWizard({
                         className={inp}
                         type="password"
                         autoComplete="off"
-                        placeholder="••••••••"
                         value={rzpKeySecret}
                         onChange={e => setRzpKeySecret(e.target.value)}
                       />
@@ -1124,7 +991,6 @@ export default function OnboardWizard({
                         className={inp}
                         type="password"
                         autoComplete="off"
-                        placeholder="••••••••"
                         value={rzpWebhookSecret}
                         onChange={e => setRzpWebhookSecret(e.target.value)}
                       />
@@ -1132,22 +998,17 @@ export default function OnboardWizard({
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           )}
 
           {/* ── Step 6: Review ── */}
           {step === 6 && (
-            <div className="w-full max-w-xl">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Branding & legals</h1>
-              <p className="text-foreground-muted mb-6 sm:mb-8">
-                Your logo and seal appear on your storefront and legal documents.
-              </p>
+            <Card>
 
               <div className="mb-6">
                 <label className={lbl}>Your full name</label>
                 <input
                   className={inp}
-                  placeholder="Name of the store owner"
                   autoComplete="name"
                   maxLength={200}
                   value={ownerFullName}
@@ -1239,20 +1100,17 @@ export default function OnboardWizard({
                   and authorize generation of my store&apos;s legal pages from these details.
                 </span>
               </label>
-            </div>
+            </Card>
           )}
 
           {step === 7 && (
-            <div className="w-full max-w-xl">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Review & submit</h1>
-              <p className="text-foreground-muted mb-6 sm:mb-8">
-                We&apos;ll review your GST certificate and notify you when your store is approved.
-              </p>
-              <div className="rounded-2xl border border-border-default bg-surface-elevated divide-y divide-border-default/60 overflow-hidden mb-6">
+            <div className="space-y-4">
+              <Card title="Your application">
+              <div className="space-y-2.5">
                 {[
                   [
-                    'Plan',
-                    `${selectedPlan?.name} · ${interval} · ₹${price.toLocaleString('en-IN')}/${interval === 'yearly' ? 'yr' : 'mo'}`,
+                    'Subscription',
+                    [selectedPlan?.name, interval, priceLabel].filter(Boolean).join(' · '),
                   ],
                   ['Store', `${displayName} (${effectiveSlug}.jeffistores.in)`],
                   ['Products', productCats.join(', ') || '—'],
@@ -1280,18 +1138,13 @@ export default function OnboardWizard({
                       ]
                     : []),
                 ].map(([k, v]) => (
-                  <div key={k} className="flex items-start justify-between px-4 sm:px-5 py-3 text-sm gap-4">
-                    <span className="text-foreground-muted flex-shrink-0 w-24">{k}</span>
-                    <span className="min-w-0 break-words text-foreground font-medium text-right">{v}</span>
-                  </div>
+                  <Row key={k} label={k} value={v} />
                 ))}
               </div>
+              </Card>
 
               {/* Subdomains preview */}
-              <div className="rounded-xl border border-border-default bg-surface p-4 mb-6">
-                <div className="text-xs text-foreground-muted uppercase tracking-widest mb-3">
-                  Your subdomains on {selectedPlan?.name}
-                </div>
+              <Card title={`Your subdomains${selectedPlan ? ` on ${selectedPlan.name}` : ''}`}>
                 <div className="space-y-1.5 text-xs font-mono">
                   {[
                     { label: 'Storefront', url: `${effectiveSlug}.jeffistores.in`, ok: true },
@@ -1310,7 +1163,7 @@ export default function OnboardWizard({
                     {
                       label: 'Forms',
                       url: `forms-${effectiveSlug}.jeffistores.in`,
-                      ok: ['pro', 'enterprise'].includes(planSlug),
+                      ok: ['growth', 'pro', 'enterprise'].includes(planSlug),
                     },
                     {
                       label: 'B2B portal',
@@ -1330,55 +1183,42 @@ export default function OnboardWizard({
                     </div>
                   ))}
                 </div>
+              </Card>
+              <div className={`${noteCls} org-peach`}>
+                After submitting, our team will review your GST certificate (1–2 business days).{' '}
+                {paymentsEnabled
+                  ? "You'll receive an email when approved — then you'll complete payment and your store goes live."
+                  : "Once we approve your details, we'll set up your store right away. Billing starts later."}
               </div>
-              <div className="rounded-xl org-sand border border-border-default p-4 text-sm org-brown mb-6">
-                After submitting, our team will review your GST certificate (1–2 business days). You&apos;ll receive an
-                email when approved — then you&apos;ll complete payment and your store goes live.
-              </div>
-              <button
-                onClick={submit}
-                disabled={busy}
-                className="w-full py-3.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white font-semibold text-base transition-colors"
-              >
-                {busy ? 'Submitting…' : 'Submit for approval'}
-              </button>
             </div>
           )}
 
           {/* ── Navigation ── */}
-          {!isLast && (
-            <div className="flex items-center justify-between gap-3 mt-6 pt-5 sm:mt-8 sm:pt-6 border-t border-border-default w-full max-w-xl">
-              <button
-                type="button"
-                onClick={() => goTo((step - 1) as StepIdx)}
-                disabled={step === 0}
-                className="px-4 py-3 sm:px-5 sm:py-2.5 rounded-xl text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 text-sm font-medium transition-colors"
-              >
-                ← Back
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => goTo((step - 1) as StepIdx)}
+              disabled={step === 0}
+              className={ghostBtn}
+            >
+              ← Back
+            </button>
+            {isLast ? (
+              <button onClick={submit} disabled={busy} className={`${primaryBtn} flex-1 sm:flex-none px-6`}>
+                {busy ? 'Submitting…' : 'Submit for approval'}
               </button>
+            ) : (
               <button
                 type="button"
                 onClick={() => canNext() && goTo((step + 1) as StepIdx)}
                 disabled={!canNext()}
-                className="flex-1 sm:flex-none px-6 py-3 sm:py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+                className={`${primaryBtn} flex-1 sm:flex-none px-6`}
               >
                 Continue →
               </button>
-            </div>
-          )}
-          {isLast && step > 0 && (
-            <div className="mt-6 w-full max-w-xl">
-              <button
-                type="button"
-                onClick={() => goTo(6 as StepIdx)}
-                className="px-5 py-3 sm:py-2.5 rounded-xl text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
-              >
-                ← Back
-              </button>
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
+            )}
+          </div>
+      </div>
+    </OnboardShell>
   )
 }

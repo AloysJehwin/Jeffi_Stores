@@ -4,8 +4,8 @@ import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { getOwnerTenants } from '@/lib/tenant-registry'
-import { cancelSubscription } from '@/lib/payments/razorpay-subscriptions'
-import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
+import { cancelSubscription } from '@controller/lib/payments/razorpay-subscriptions'
+import { triggerProvisioning, resolveRestoreKey } from '@controller/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { uploadKycDocument } from '@/lib/catalog/kyc-upload'
+import { uploadKycDocument } from '@controller/lib/catalog/kyc-upload'
 
 export const dynamic = 'force-dynamic'
 

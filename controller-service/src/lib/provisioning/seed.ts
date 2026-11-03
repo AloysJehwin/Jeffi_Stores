@@ -1,7 +1,6 @@
-import { Pool } from 'pg'
-import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
 import { catalogFor, SEED_PROFILES } from './seed-catalog'
 import { DEFAULT_SECTIONS } from '@/lib/catalog/homepage-sections'
+import { dbTarget, tenantAdminPool, type DbAuth } from './tenant-admin-pool'
 
 /**
  * Starter-data seeding for a freshly-provisioned tenant DB.
@@ -31,29 +30,16 @@ function skuFrom(name: string, i: number): string {
   return `${base || 'ITEM'}-${String(i + 1).padStart(3, '0')}`
 }
 
-function tenantMasterPool(endpoint: string, dbName: string): Pool {
-  const masterPassword = process.env.RDS_MASTER_PASSWORD
-  if (!masterPassword) throw new Error('RDS_MASTER_PASSWORD is not set — required to seed a tenant DB')
-  const user = process.env.TENANT_RDS_MASTER_USER || process.env.RDS_MASTER_USER || 'postgres'
-  return createPgPool({
-    host: endpoint,
-    port: 5432,
-    database: dbName,
-    user,
-    password: masterPassword,
-    ssl: rdsSslOption(),
-    max: 2,
-    connectionTimeoutMillis: 20000,
-  })
-}
-
-export async function seedTenantData(endpoint: string, dbName: string, profile: string): Promise<void> {
+export async function seedTenantData(endpoint: string, dbName: string, profile: string, db?: DbAuth): Promise<void> {
   if (!KNOWN_PROFILES.has(profile)) {
     throw new Error(`seed_data: unknown seedProfile '${profile}' (known: ${SEED_PROFILES.join(', ')})`)
   }
   const cat = catalogFor(profile)
-  const pool = tenantMasterPool(endpoint, dbName)
-  const client = await pool.connect()
+  const pool = await tenantAdminPool(dbTarget(endpoint, dbName, db))
+  const client = await pool.connect().catch(async e => {
+    await pool.end().catch(() => {})
+    throw e
+  })
   try {
     await client.query('BEGIN')
 

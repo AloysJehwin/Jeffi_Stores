@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { ownerApi } from '@/lib/ecom/owner-api'
+import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { AD_FREE_PRICE_INR, buyAdFreeMonth, getAdFree, setAdFreeRenew } from '@/lib/billing/ad-free'
 import { getWalletBalance } from '@/lib/payments/wallet'
 

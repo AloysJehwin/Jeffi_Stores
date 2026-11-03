@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, Clock, FileText, Loader2, MessageSquare, XCircle } from 'lucide-react'
-import type { ApiService, ServiceState } from '@/lib/ecom/service-states'
+import type { ApiService, ServiceState } from '@controller/lib/ecom/service-states'
 import { DOCUMENT_POINTS, InvoicePreview, MESSAGING_POINTS, WhatsAppPreview, rupees } from '../../_ui/service-previews'
 
 type Prices = { messages: Record<string, number>; documents: Record<string, number>; media: number }

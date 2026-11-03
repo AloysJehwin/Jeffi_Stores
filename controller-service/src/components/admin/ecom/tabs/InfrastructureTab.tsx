@@ -1,5 +1,5 @@
 import type { TenantDetail, ProvisioningJob, CustomDomain } from '@/lib/tenant-registry'
-import type { TenantMigrationRun } from '@/lib/tenant-migrations'
+import type { TenantMigrationRun } from '@controller/lib/tenant-migrations'
 import { Field, FieldGrid, Section, Mono, StatusPill, NOT_PROVISIONED } from '../EcomUI'
 import K8sWorkloadSection from './K8sWorkloadSection'
 
@@ -52,6 +52,7 @@ export default function InfrastructureTab({
 
       {onK8s && (
         <K8sWorkloadSection
+          tenantId={t.id}
           slug={t.slug}
           plan={t.plan}
           pendingPlan={str(res.k8sPendingPlan)}
