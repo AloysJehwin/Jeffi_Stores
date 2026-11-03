@@ -473,7 +473,8 @@ CREATE TABLE IF NOT EXISTS public.tenant_bank_accounts (
 ALTER TABLE ONLY public.tenant_bank_accounts ADD CONSTRAINT tenant_bank_accounts_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_bank_accounts ADD CONSTRAINT tenant_bank_accounts_owner_id_fkey
     FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
-CREATE INDEX IF NOT EXISTS idx_tenant_bank_owner ON public.tenant_bank_accounts USING btree (owner_id);
+-- One bank record per owner: saveBankVerification upserts ON CONFLICT (owner_id).
+CREATE UNIQUE INDEX IF NOT EXISTS tenant_bank_accounts_owner_id_key ON public.tenant_bank_accounts USING btree (owner_id);
 
 -- ── Custom domains (BYO CNAME): Pro=1, Enterprise=3 per plan.max_custom_domains ──
 -- Multi-domain per tenant (supersedes the single tenants.custom_domain column).
