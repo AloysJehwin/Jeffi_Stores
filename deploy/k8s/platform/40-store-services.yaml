@@ -1,7 +1,7 @@
 # The flagship's store services: jeffistores.in's storefront, admin and B2B portal, one Deployment each.
 # Unpinned (no SERVICE_TENANT_SLUG), so they also answer hosts no store namespace claims. Routes: 49-routes.yaml.
-# Sized small: the 1-vCPU core runs them beside the controller until the EC2 quota rises. rollout.sh applies
-# them (label jeffi.io/step=store) before anything else, so their routes only move once they serve.
+# Sized small: the core runs them beside the controller. rollout.sh checks the core has room for them (label
+# jeffi.io/step=store), and the routes and the controller only move once they serve.
 ---
 apiVersion: apps/v1
 kind: Deployment

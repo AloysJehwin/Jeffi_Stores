@@ -1,20 +1,25 @@
 #!/bin/bash
 # Roll a release, in phases (ci.yml runs each as its own job; no phase = all three, in order):
 #   platform   the platform (controller; the flagship's storefront, admin and business; messaging, document,
-#              public-api and mobile services; CronJobs), then its routes once those serve
+#              public-api and mobile services; CronJobs), then its routes once those serve. ci.yml runs it in
+#              parts: `platform prep` (room on the core, the pull secret, what the services share), then
+#              `platform <service>` for each service side by side; the controller (with the routes and CronJobs)
+#              waits for the flagship's storefront, admin and business
 #   tenant-db  the schema and migration files fanned out to every store tenant's database (40-tenant-fanout.sh);
 #              tenant-schema / tenant-migrations run just one half (the pipeline's separate stages)
 #   stores     every store: the controller re-applies its namespace at the release images (its storefront, admin,
 #              business, messaging and document pods), moves a store still on the old all-in-one app onto those
 #              (one store at a time), and we wait for them, stopping at the first failure
 # --dry-run changes nothing: platform shows `kubectl diff`, tenant-db what it would post, stores what it would wait on.
-# Usage: rollout.sh <tag> [platform|tenant-db|tenant-schema|tenant-migrations|stores] [--dry-run]      e.g. rollout.sh local-1a2b3c4d
+# Usage: rollout.sh <tag> [platform [prep|<service>]|tenant-db|tenant-schema|tenant-migrations|stores] [--dry-run]      e.g. rollout.sh local-1a2b3c4d
 source "$(dirname "$0")/../db/lib.sh"
 TAG=${1:?tag}
-PHASE=all
-for a in "${@:2}"; do case $a in platform|tenant-db|tenant-schema|tenant-migrations|stores) PHASE=$a ;; esac; done
+PHASE=all PART=
+for a in "${@:2}"; do case $a in
+  platform|tenant-db|tenant-schema|tenant-migrations|stores) PHASE=$a ;;
+  prep|controller|storefront|admin|business|messaging|documents|public-api|mobile) PART=$a ;;
+esac; done
 REG='708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com'
-PLATFORM=($CTRL jeffi-stores-storefront-service jeffi-stores-admin-service jeffi-stores-business-service jeffi-stores-messaging-service jeffi-stores-document-service jeffi-stores-public-api-service jeffi-stores-mobile-service)
 k8s_tunnel
 manifests() { kubectl kustomize "$REPO/deploy/k8s/platform" | sed -E "s#(${REG}/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:${TAG}#g"; }
 tenants() { kubectl get ns -l jeffi.io/tier=tenant -o jsonpath='{.items[*].metadata.name}'; }
@@ -31,31 +36,54 @@ core_room() {
   rm -rf "$d"
 }
 
-platform() {
-  say "Platform at $TAG"
+# One part of the platform manifests (platform-part.py): a service's own objects, the routes, or what is shared.
+part() { manifests | kubectl create --dry-run=client -f - -o json | python3 -I "$REPO/deploy/k8s/bootstrap/platform-part.py" "$1"; }
+apply_part() {
+  if $DRY_RUN; then part "$1" | kubectl diff -f - || [ $? -eq 1 ]  # 1 = differences shown
+  else part "$1" | kubectl apply -f -; fi
+}
+deploy_of() { [ "$1" = documents ] && echo jeffi-stores-document-service || echo "jeffi-stores-$1-service"; }
+
+platform_prep() {
+  say "Platform at $TAG: room on the core, then what the services share"
   core_room || exit 1
-  if $DRY_RUN; then
-    manifests | kubectl diff -f - || [ $? -eq 1 ]  # 1 = differences shown
-    echo "Dry run: would apply the above and wait for ${PLATFORM[*]}."; return 0
-  fi
   # The freeze suspends the 6-hourly ecr-refresh; renew the pull secret before the release images are pulled.
-  if kubectl -n jeffi get cronjob ecr-refresh >/dev/null 2>&1; then
+  if ! $DRY_RUN && kubectl -n jeffi get cronjob ecr-refresh >/dev/null 2>&1; then
     job=ecr-refresh-$(date +%s)
     kubectl -n jeffi create job --from=cronjob/ecr-refresh "$job" >/dev/null
     kubectl -n jeffi wait --for=condition=complete "job/$job" --timeout=300s
   fi
-  # The flagship's store services first, then the routes (a path only moves once its service serves), then the
-  # rest: the controller is control plane only, so it may only change once the store paths have left it.
-  manifests | kubectl apply -l 'jeffi.io/step=store' -f -
-  for d in "${PLATFORM[@]:1:3}"; do kubectl -n jeffi rollout status deploy/$d --timeout=600s; done
-  manifests | kubectl apply -l 'jeffi.io/routes=platform' -f -
-  manifests | kubectl apply -l 'jeffi.io/step!=store,jeffi.io/routes!=platform' -f -
-  for d in "${PLATFORM[@]}"; do kubectl -n jeffi rollout status deploy/$d --timeout=600s; done
+  apply_part shared
+}
+
+# The controller is control plane only, so it moves once the store paths have left it: after the flagship's
+# storefront, admin and business serve and the routes point at them. Its CronJobs come with it.
+platform_service() {
+  local s=$1
+  say "$s at $TAG"
+  if [ "$s" = controller ]; then
+    if ! $DRY_RUN; then
+      for d in storefront admin business; do kubectl -n jeffi rollout status "deploy/$(deploy_of $d)" --timeout=600s; done
+    fi
+    apply_part routes
+  fi
+  apply_part "$s"
+  $DRY_RUN && return 0
+  kubectl -n jeffi rollout status "deploy/$(deploy_of "$s")" --timeout=600s
+  [ "$s" = controller ] || return 0
   # Earlier platform routes (their hosts are now claimed by 49-routes.yaml).
   kubectl -n jeffi delete deploy/flagship svc/flagship sa/flagship pdb/flagship hpa/flagship \
     ingressroute/flagship ingressroute/flagship-admin ingressroute/flagship-cloudfront-origin \
     ingressroute/jeffi-stores-controller-service ingressroute/jeffi-stores-controller-service-admin \
     ingressroute/jeffi-stores-controller-service-cloudfront-origin --ignore-not-found
+}
+
+platform() {
+  case $PART in
+    prep) platform_prep ;;
+    '') platform_prep; for s in storefront admin business messaging documents public-api mobile controller; do platform_service $s; done ;;
+    *) platform_service "$PART" ;;
+  esac
 }
 
 tenant_db() {
