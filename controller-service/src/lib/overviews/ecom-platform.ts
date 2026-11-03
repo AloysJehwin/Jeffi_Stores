@@ -20,11 +20,23 @@ export const istBucket = (expr: string, bucket: string) =>
 export const bucketSeries = (bucket: string, a: number, b: number) =>
   `SELECT generate_series(date_trunc('${bucket}', $${a}::date), $${b}::date, interval '1 ${bucket}')::date AS b`
 
-/** Monthly value of a plan: yearly billing is ten months' price over twelve. */
-export const MRR_SQL = `(CASE WHEN t.billing_interval = 'yearly' THEN p.monthly_price_inr * 10 / 12 ELSE COALESCE(p.monthly_price_inr, 0) END)`
+// Monthly subscription price: tenant_compute.price_inr_month wins (set when the owner picked their spec);
+// grandfathered stores (no tc row yet) fall back to plan.monthly_price_inr. Yearly billing is 10/12 of monthly.
+export const PRICE_INR_MONTH_SQL = `COALESCE((SELECT tc.price_inr_month FROM tenant_compute tc WHERE tc.tenant_id = t.id), p.monthly_price_inr, 0)`
+
+/** Monthly value of a store: yearly billing is ten months' price over twelve. */
+export const MRR_SQL = `(CASE WHEN t.billing_interval = 'yearly' THEN ${PRICE_INR_MONTH_SQL} * 10 / 12 ELSE ${PRICE_INR_MONTH_SQL} END)`
+
+// Price = plan fee (GST included) + infra × (1 + m) × (1 + GST). The fee net of GST is all margin; of the
+// infra, m / (1 + m) of it net of GST is.
+const PLAN_FEE_SQL = `COALESCE(p.monthly_price_inr, 0)`
+const MARGIN_MONTH_SQL = `(${PLAN_FEE_SQL}::numeric / 1.18 + GREATEST(${PRICE_INR_MONTH_SQL} - ${PLAN_FEE_SQL}, 0)::numeric / 1.18 * COALESCE(p.infra_margin, 0) / (1 + COALESCE(p.infra_margin, 0)))`
+
+/** Platform margin earned (not due to AWS or GST) per month; yearly billing is ten months over twelve. */
+export const INFRA_MARGIN_MRR_SQL = `(CASE WHEN t.billing_interval = 'yearly' THEN ${MARGIN_MONTH_SQL} * 10 / 12 ELSE ${MARGIN_MONTH_SQL} END)`
 
 /** A tenant on a paid store plan (needs the tenants t / plans p aliases). */
-export const PAID_STORE_SQL = `(p.product = 'store' AND p.monthly_price_inr > 0 AND 'store' = ANY(t.service_types))`
+export const PAID_STORE_SQL = `(p.product = 'store' AND ${PRICE_INR_MONTH_SQL} > 0 AND 'store' = ANY(t.service_types))`
 
 /** Paying now: live store on a paid plan. */
 export const PAYING_SQL = `(t.status = 'active' AND ${PAID_STORE_SQL})`
@@ -85,6 +97,8 @@ export interface WalletMix {
   messaging: number
   documents: number
   shipping: number
+  /** Servers (category infra). */
+  infra: number
   other: number
 }
 
@@ -92,7 +106,7 @@ export interface WalletMix {
 export function walletMix(
   rows: { category: string | null; entry_type: string; amount: number; n?: number }[]
 ): WalletMix {
-  const m: WalletMix = { topups: 0, topup_count: 0, messaging: 0, documents: 0, shipping: 0, other: 0 }
+  const m: WalletMix = { topups: 0, topup_count: 0, messaging: 0, documents: 0, shipping: 0, infra: 0, other: 0 }
   for (const r of rows) {
     const amt = Number(r.amount) || 0
     const cat = r.category || r.entry_type
@@ -103,6 +117,7 @@ export function walletMix(
       const v = -amt
       if (MESSAGING.has(cat)) m.messaging += v
       else if (cat === 'document') m.documents += v
+      else if (cat === 'infra') m.infra += v
       else if (cat.startsWith('shipping')) m.shipping += v
       else m.other += v
     } else if (cat.startsWith('shipping')) m.shipping -= amt
@@ -138,6 +153,18 @@ export const ATTENTION_KINDS: Record<string, AttentionKind> = {
     areas: ['customers', 'store-status', 'instances'],
     title: n => `${plural(n, 'live store')} with the instance stopped`,
     href: one => (one ? `/admin/ecom/store-status/${one.id}/view` : '/admin/ecom/store-status?tab=list'),
+  },
+  servers_paused: {
+    severity: 'warning',
+    areas: ['customers', 'billing', 'store-status'],
+    title: n => `${plural(n, 'store')} paused for an unpaid server balance`,
+    href: one => (one ? `/admin/ecom/billing/${one.id}/view` : '/admin/ecom/billing?tab=list'),
+  },
+  servers_grace: {
+    severity: 'info',
+    areas: ['billing'],
+    title: n => `${plural(n, 'wallet')} below zero, running on grace before a pause`,
+    href: one => (one ? `/admin/ecom/billing/${one.id}/view` : '/admin/ecom/billing?tab=list'),
   },
   provisioning_failed: {
     severity: 'critical',
@@ -222,7 +249,11 @@ latest_mig AS (
 )
 SELECT 'failed_payment' AS kind, t.id, t.display_name AS name FROM t WHERE t.subscription_status = 'halted' AND t.status <> 'terminated'
 UNION ALL
-SELECT 'store_down', t.id, t.display_name FROM t WHERE t.status = 'active' AND 'store' = ANY(t.service_types) AND t.instance_state <> 'running'
+SELECT 'store_down', t.id, t.display_name FROM t WHERE t.status = 'active' AND 'store' = ANY(t.service_types) AND t.instance_state NOT IN ('running', 'paused')
+UNION ALL
+SELECT 'servers_paused', t.id, t.display_name FROM t WHERE t.status = 'active' AND t.instance_state = 'paused'
+UNION ALL
+SELECT 'servers_grace', t.id, t.display_name FROM t JOIN tenant_compute c ON c.tenant_id = t.id WHERE t.status = 'active' AND c.low_balance_since IS NOT NULL AND c.status <> 'paused'
 UNION ALL
 SELECT 'provisioning_failed', t.id, t.display_name FROM t JOIN latest_job j ON j.tenant_id = t.id WHERE j.status = 'failed' AND t.status = 'provisioning'
 UNION ALL

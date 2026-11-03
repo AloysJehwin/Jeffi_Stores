@@ -83,6 +83,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       bankAccount: settings.bank_account || '',
       bankIfsc: settings.bank_ifsc || '',
       bankBranch: settings.bank_branch || '',
+      holderName: settings.bank_holder_name || '',
+      sealUrl: settings.business_seal_url || '',
+      city: settings.business_city || '',
     }
 
     const invoiceOrder: InvoiceOrder = {

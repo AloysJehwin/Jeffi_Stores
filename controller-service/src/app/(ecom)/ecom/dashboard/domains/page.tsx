@@ -1,4 +1,4 @@
-import { loadOwnerContext } from '@/lib/ecom/owner-context'
+import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
 import SubdomainList from '../SubdomainList'

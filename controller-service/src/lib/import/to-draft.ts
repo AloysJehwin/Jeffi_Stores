@@ -1,5 +1,5 @@
-import type { ProductGroup, VariantGroup } from './validate-row'
-import { PRODUCT_COLUMNS } from './columns'
+import type { ProductGroup, VariantGroup } from '@/lib/import/validate-row'
+import { PRODUCT_COLUMNS } from '@/lib/import/columns'
 
 // Optional PRODUCT columns an import row may leave blank. Blank → the key is omitted from the draft
 // (coerce.ts), and the shared publish SQL writes NULL for most columns via bare NULLIF — which would

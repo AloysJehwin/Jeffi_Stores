@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { ecomOverviewGet } from '@/lib/overviews/ecom-route'
-import { getEcomInstancesOverview } from '@/lib/overviews/ecom-instances'
+import { ecomOverviewGet } from '@controller/lib/overviews/ecom-route'
+import { getEcomInstancesOverview } from '@controller/lib/overviews/ecom-instances'
 
 export const dynamic = 'force-dynamic'
 

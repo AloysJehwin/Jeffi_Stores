@@ -1,7 +1,7 @@
 # Per-Plan Feature & Page Matrix
 
 Derived from the original architecture PDF (Part 1–5) + live DB scope assignments.
-Last updated: 2026-08-17.
+Last updated: 2026-11-03.
 
 ---
 
@@ -116,26 +116,29 @@ Last updated: 2026-08-17.
 
 ## Infrastructure per Plan
 
-| Resource | Basic | Growth | Pro | Enterprise |
+Every store runs on its own server(s); sizes are presets floored by `plans.min_preset` (`packages/store-core/src/lib/compute/presets.ts`).
+
+| Resource | Basic | Grow (`growth`) | Pro | Enterprise |
 |---------|-------|--------|-----|-----------|
-| RDS instance | Dedicated | Dedicated | Dedicated | Dedicated |
-| EC2 / app server | Pooled shared fleet | Dedicated | Dedicated + larger | Dedicated + ALB + ASG |
+| App server (EC2) | Own `t4g.small`, fixed | Own, from Small | Own, from Medium | Own, from Large |
+| Database | Postgres on the server | On the server (default) or dedicated RDS | On the server (default) or dedicated RDS | On the server (default) or dedicated RDS |
 | S3 bucket | Per-tenant | Per-tenant | Per-tenant | Per-tenant |
-| Nginx / CNAME | Auto-provisioned | Auto-provisioned | Auto-provisioned | Auto-provisioned |
 | ACM cert | Wildcard `*.jeffistores.in` | Wildcard | Wildcard | Wildcard + custom domain cert |
 
 ---
 
 ## Pricing Model
 
-Plans are priced at 50% profit margin over AWS infrastructure cost.
+One subscription: flat plan fee (GST included) + servers at AWS cost × (1 + `plans.infra_margin`) + 18% GST on the servers only (`monthlyTotal` in `controller-service/src/lib/compute/pricing.ts`). The store's price is saved to `tenant_compute.price_inr_month`.
 
-| Plan | Monthly (INR) | Yearly (INR) | Yearly discount |
-|------|:-------------:|:------------:|:---------------:|
-| Basic | ₹4,999 | ₹47,990 | 20% off |
-| Growth | ₹9,999 | ₹95,990 | 20% off |
-| Pro | ₹19,999 | ₹1,91,990 | 20% off |
-| Enterprise | ₹49,999 | ₹4,79,990 | 20% off |
+| Plan | Plan fee / mo | Server margin | From / mo (min preset, incl. GST) |
+|------|:-------------:|:-------------:|:---------------------------------:|
+| Basic | ₹0 | 0% | ₹2,081 |
+| Grow | ₹500 | 20% | ₹3,188 |
+| Pro | ₹1,000 | 20% | ₹5,216 |
+| Enterprise | ₹2,000 | 20% | ₹9,845 |
+
+Yearly = 10× the monthly price (2 months free), charged once a year. Starter (₹999, shared server) is retired. Payments are off until `ECOM_PAYMENTS_ENABLED=true` — see `SAAS_MULTITENANT_STATUS.md`.
 
 Custom domain add-on: charged on top of subscription (amount TBD).
 

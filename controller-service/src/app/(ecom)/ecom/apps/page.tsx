@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { APP_GROUPS } from '@/app/(ecom)/ecom/apps'
+import { APP_GROUPS } from '@controller/app/(ecom)/ecom/apps'
 import AppIcon from './AppIcon'
-import { Eyebrow, Display, Pill, SandCard } from '@/app/(ecom)/ecom/_ui'
+import { Eyebrow, Display, Pill, SandCard } from '@controller/app/(ecom)/ecom/_ui'
 
 export const dynamic = 'force-dynamic'
 

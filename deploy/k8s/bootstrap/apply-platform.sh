@@ -14,6 +14,6 @@ kubectl wait --for condition=established crd/clusterissuers.cert-manager.io --ti
 kubectl apply -f 21-issuers.yaml
 kubectl wait --for condition=established crd/coroots.coroot.com --timeout=300s 2>/dev/null || sleep 30
 kubectl apply -f 50-observability.yaml
-for d in jeffi-stores-controller-service jeffi-stores-messaging-service jeffi-stores-document-service jeffi-stores-public-api-service jeffi-stores-mobile-service; do
+for d in jeffi-stores-controller-service jeffi-stores-storefront-service jeffi-stores-admin-service jeffi-stores-business-service jeffi-stores-messaging-service jeffi-stores-document-service jeffi-stores-public-api-service jeffi-stores-mobile-service; do
   kubectl -n jeffi rollout status deploy/$d --timeout=600s
 done

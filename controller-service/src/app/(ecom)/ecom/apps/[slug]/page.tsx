@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { findApp } from '@/app/(ecom)/ecom/apps'
-import AppIcon from '@/app/(ecom)/ecom/apps/AppIcon'
-import { Eyebrow, Display, Pill, Dot } from '@/app/(ecom)/ecom/_ui'
-import AppDemo from '@/app/(ecom)/ecom/apps/_demos'
+import { findApp } from '@controller/app/(ecom)/ecom/apps'
+import AppIcon from '@controller/app/(ecom)/ecom/apps/AppIcon'
+import { Eyebrow, Display, Pill, Dot } from '@controller/app/(ecom)/ecom/_ui'
+import AppDemo from '@controller/app/(ecom)/ecom/apps/_demos'
 
 export const dynamic = 'force-dynamic'
 

@@ -4,10 +4,10 @@ import { logActivity } from '@/lib/shared/activity'
 import { storeFile } from '@/lib/drive/files'
 import { supportFolder } from '@/lib/drive/folders'
 import { contextByToken } from '@/lib/replies/context'
-import { createSession, getSessionRow, openEmailSession, openSessionFor, updateSession, type SessionRow } from './sessions'
-import { postMessage, type AttachmentInput } from './messages'
-import { settleCustomerLang } from './translate'
-import type { SupportMessage } from './types'
+import { createSession, getSessionRow, openEmailSession, openSessionFor, updateSession, type SessionRow } from '@/lib/support/sessions'
+import { postMessage, type AttachmentInput } from '@/lib/support/messages'
+import { settleCustomerLang } from '@/lib/support/translate'
+import type { SupportMessage } from '@/lib/support/types'
 
 // One email a customer sent to a reply+<token> address (or answered one of our mails): into their
 // support chat as an email message, attachments in the Drive. The caller runs the reply engine.

@@ -4,7 +4,7 @@ import { Card, PageHeader } from '@/components/admin/kit/layout'
 import { LedgerTable, TransactionsTable } from '../BillingTables'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getTenant, getTenantBilling } from '@/lib/tenant-registry'
-import { StatusPill } from '@/components/admin/ecom/EcomUI'
+import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import DnsResyncButton from '../DnsResyncButton'
 import ReconcileButton from '../ReconcileButton'
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { ownerApi } from '@/lib/ecom/owner-api'
+import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { addTenantServices, requestServiceApproval } from '@/lib/tenant-registry'
 import { sendServicesRequestedEmail } from '@/lib/shared/ecom-emails'
 import { parseBody } from '@/lib/shared/validate'

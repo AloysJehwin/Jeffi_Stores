@@ -1,7 +1,7 @@
 export const maxDuration = 120
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ownerApi } from '@/lib/ecom/owner-api'
+import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { hasService, listServiceApprovals, blockedServices } from '@/lib/tenant-registry'
 import { enrichField, parseEnrichBody } from '@/lib/ai/enrich-field'
 

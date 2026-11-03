@@ -1,9 +1,9 @@
 // End-to-end AI monitor behind the ai_health cron: a tiny real chat through the gateway (no
 // fallback, no cache) plus a direct-Ollama reachability check. Alerts the platform admin once
 // per incident and once on recovery; incident state lives in Redis.
-import { aiGatewayUrl } from './ai-client'
-import { directReachable, ollamaDirectUrl } from './ai-direct-ollama'
-import { getRedisClient } from './redis'
+import { aiGatewayUrl } from '@/lib/shared/ai-client'
+import { directReachable, ollamaDirectUrl } from '@/lib/shared/ai-direct-ollama'
+import { getRedisClient } from '@/lib/shared/redis'
 
 export const INCIDENT_KEY = 'ai:health:incident'
 const INCIDENT_TTL_S = 7 * 24 * 3600
@@ -97,7 +97,7 @@ export async function defaultAlertSender(subject: string, body: string): Promise
     console.error(`[ai-health] alert suppressed outside production: ${subject}\n${body}`)
     return
   }
-  const { sendPlatformAlert } = await import('@/lib/provisioning/alerts')
+  const { sendPlatformAlert } = await import('@controller/lib/provisioning/alerts')
   await sendPlatformAlert(subject, body, {
     kind: 'ai_health_alert',
     kicker: 'AI Platform Alert',

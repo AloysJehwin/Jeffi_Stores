@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ownerApi } from '@/lib/ecom/owner-api'
+import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { hasService } from '@/lib/tenant-registry'
-import { uploadTemplateAsset } from '@jeffi/tenancy'
+import { uploadTemplateAsset, StorageCapExceededError } from '@jeffi/tenancy'
 import { readUpload } from '@/lib/shared/form-file'
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +21,13 @@ export async function POST(req: NextRequest) {
   if (!ALLOWED.has(mime)) return NextResponse.json({ error: `unsupported type: ${mime}` }, { status: 400 })
   if (up.bytes.length > MAX_BYTES) return NextResponse.json({ error: 'file too large (max 5MB)' }, { status: 413 })
 
-  const result = await uploadTemplateAsset(up.bytes, up.field('templateId') || null, mime)
-  return NextResponse.json({ url: result.url, key: result.key, bytes: up.bytes.length, mime })
+  try {
+    const result = await uploadTemplateAsset(up.bytes, up.field('templateId') || null, mime)
+    return NextResponse.json({ url: result.url, key: result.key, bytes: up.bytes.length, mime })
+  } catch (e) {
+    if (e instanceof StorageCapExceededError) {
+      return NextResponse.json({ error: 'S3 storage cap reached. Raise it in Plan & servers.' }, { status: 413 })
+    }
+    throw e
+  }
 }

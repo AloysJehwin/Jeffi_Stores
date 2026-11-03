@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 import { CRON_JOBS, isCronJobId } from '@/lib/shared/cron-jobs'
+import { internalRequest } from '@/lib/shared/internal-http'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,9 +12,15 @@ export const dynamic = 'force-dynamic'
 // Each per-tenant call hits the job's own route with that tenant's Host header, so the route's
 // existing Host→tenant resolution routes getPool to the tenant DB and records run status in that
 // tenant's own site_settings. Auth: bearer CRON_SECRET (verifyCronRequest).
+//
+// Store jobs run on the store's admin service, platform jobs on this app. In the cluster the flagship's
+// admin is CRON_FLAGSHIP_BASE and a store's is CRON_STORE_BASE ({slug} filled in); locally every base is
+// the dev router on :3000, which routes by host and path like the ingress does.
 
 const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
-const SELF_BASE = process.env.CRON_SELF_BASE || `http://127.0.0.1:${process.env.PORT || '3000'}`
+const selfBase = () => process.env.CRON_SELF_BASE || 'http://127.0.0.1:3000'
+const flagshipBase = () => process.env.CRON_FLAGSHIP_BASE || selfBase()
+const storeBase = (slug: string) => process.env.CRON_STORE_BASE?.replaceAll('{slug}', slug) || flagshipBase()
 const CONCURRENCY = Math.max(1, Number(process.env.CRON_FANOUT_CONCURRENCY || '5'))
 const PER_CALL_TIMEOUT_MS = Number(process.env.CRON_FANOUT_TIMEOUT_MS || '280000')
 
@@ -24,15 +31,17 @@ type TargetResult = { host: string; slug: string; status: 'ok' | 'failed'; detai
 
 async function runOne(job: (typeof CRON_JOBS)[number], host: string, slug: string, secret: string): Promise<TargetResult> {
   try {
-    const res = await fetch(`${SELF_BASE}${job.path}`, {
+    const base = job.tenantScope === null ? selfBase() : slug === 'flagship' ? flagshipBase() : storeBase(slug)
+    const res = await internalRequest(`${base}${job.path}`, {
       method: job.method,
-      headers: { Host: host, Authorization: `Bearer ${secret}` },
-      signal: AbortSignal.timeout(PER_CALL_TIMEOUT_MS),
+      host,
+      headers: { Authorization: `Bearer ${secret}` },
+      timeoutMs: PER_CALL_TIMEOUT_MS,
     })
     if (!res.ok) return { host, slug, status: 'failed', detail: `HTTP ${res.status}` }
     return { host, slug, status: 'ok' }
   } catch (e: any) {
-    return { host, slug, status: 'failed', detail: e?.message || 'fetch failed' }
+    return { host, slug, status: 'failed', detail: e?.message || 'request failed' }
   }
 }
 

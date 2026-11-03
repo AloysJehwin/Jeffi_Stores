@@ -1,0 +1,247 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getLoyaltySettings } from '@/lib/loyalty/settings'
+import { reconcileLoyaltyUntilDone, type ReconcileResult } from '@/lib/loyalty/reconcile'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
+import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
+import { invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
+import { isGoogleTagSettingKey, validateGoogleTagSetting } from '@/lib/analytics/google-tag'
+import { OPS_EMAIL_KEY, parseOpsEmailInput } from '@/lib/shared/ops-email-config'
+
+// All keys editable via this endpoint. Grouped for readability.
+const EDITABLE_KEYS = [
+  // Store rules
+  'min_order_amount',
+  // Delivery (already existed)
+  'delivery_charges_enabled',
+  'delivery_free_threshold',
+  'delivery_rate_per_kg',
+  'delivery_free_weight_ceiling_kg',
+  // Store identity
+  'business_name',
+  'business_web',
+  'business_logo_url',
+  'business_favicon_url',
+  'business_email_accent',
+  'business_email',
+  'business_phone',
+  'business_hours',
+  // Invoice / legal / bank identity (previously DB-seeded, now editable)
+  'business_gstin',
+  'business_legal_name',
+  'business_trade_name',
+  'business_address',
+  'business_city',
+  'business_pincode',
+  'business_state',
+  'business_state_code',
+  'business_seal_url',
+  'bank_name',
+  'bank_account',
+  'bank_ifsc',
+  'bank_branch',
+  'bank_holder_name',
+  'invoice_prefix',
+  // Feature flags
+  'feature_razorpay_enabled',
+  'feature_cod_enabled',
+  'feature_gst_enabled',
+  'feature_inventory_validation_enabled',
+  'feature_sms_enabled',
+  'feature_whatsapp_enabled',
+  'feature_push_enabled',
+  'feature_marketing_push_enabled',
+  'feature_birthday_enabled',
+  'feature_agent_dock_enabled',
+  'feature_agent_whatsapp_enabled',
+  'feature_reply_actions_enabled',
+  'feature_reply_auto_apply',
+  // Shared with Marketing > Referrals so the two switches can never disagree.
+  'referral_enabled',
+  'loyalty_enabled',
+  'feature_ondevice_summary_enabled',
+  'feature_ondevice_finetune_enabled',
+  'feature_ondevice_summary_mobile_enabled',
+  'feature_ondevice_summary_desktop_enabled',
+  'feature_ondevice_finetune_mobile_enabled',
+  'feature_ondevice_finetune_desktop_enabled',
+  // Business values
+  'cod_surcharge_flat',
+  'cod_surcharge_pct',
+  'shipping_min_charge',
+  'shipping_max_charge',
+  'order_auto_cancel_minutes',
+  'return_standard_charge',
+  'delhivery_origin_pincode',
+  'default_product_weight_g',
+  'default_weight_g',
+  'delhivery_pickup_location',
+  'delhivery_seller_name',
+  'delhivery_seller_address',
+  'delhivery_seller_phone',
+  // Storefront content
+  'storefront_featured_limit',
+  'storefront_new_arrivals_limit',
+  'storefront_stats_json',
+  'storefront_about_copy',
+  // Google tag & Ads (validated below)
+  'google_tag_id',
+  'google_ads_conversion_id',
+  'google_ads_conversion_label',
+  // Keyboard shortcuts
+  'shortcut_new_product',
+  'shortcut_cash_sale',
+  'shortcut_quotation',
+  'shortcut_new_po',
+  'shortcut_orders',
+  'shortcut_packing_slips',
+  'shortcut_returns',
+  'shortcut_gst',
+  'shortcut_labels',
+  'shortcut_inventory',
+  'shortcut_coupons',
+  'shortcut_campaign',
+  'shortcut_financial',
+  'shortcut_customers',
+  'shortcut_crm',
+  'shortcut_reviews',
+  'shortcut_ai_agent',
+  'shortcut_custom',
+  // Daily ops email settings (JSON, validated below)
+  OPS_EMAIL_KEY,
+]
+
+const EDITABLE_SET = new Set(EDITABLE_KEYS)
+
+// Upsert a single key/value pair. site_settings has a UNIQUE(key) constraint.
+// NOTE: updated_by is intentionally NOT written — its FK references users(id),
+// but admin sessions expose the admins PK (adminId), not the linked user_id.
+// The original settings route never set it either; the column stays nullable.
+async function upsert(key: string, value: string) {
+  await query(
+    `INSERT INTO site_settings (key, value, updated_at)
+     VALUES ($1, $2, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+    [key, String(value)]
+  )
+}
+
+// Referral rewards are loyalty points, so the program can't be switched on without loyalty.
+// Switching it off is always allowed.
+async function referralNeedsLoyalty(updates: Array<{ key: string; value: unknown }>): Promise<boolean> {
+  const enabling = updates.some(u => u.key === 'referral_enabled' && String(u.value) === 'true')
+  return enabling && !(await getLoyaltySettings()).enabled
+}
+const REFERRAL_NEEDS_LOYALTY = 'Turn on the loyalty program first. Referral rewards are paid in loyalty points.'
+
+// Customer reward programs (loyalty / refer & earn / birthday) are a Pro+ feature (campaigns scope),
+// matching the Marketing > Customer Programs page. settings:write alone (which Basic/Growth hold) must
+// not let a tenant switch these on by hitting the API directly — fail closed to the plan.
+const CUSTOMER_PROGRAM_KEYS = new Set(['loyalty_enabled', 'referral_enabled', 'feature_birthday_enabled'])
+const CUSTOMER_PROGRAM_DENIED = 'Customer reward programs require the Pro plan.'
+// Block ENABLING a customer-program flag without the campaigns scope; turning a stale flag off (e.g.
+// after a downgrade) is always allowed.
+function enablesLockedProgram(updates: Array<{ key: string; value: unknown }>, hasCampaigns: boolean): boolean {
+  if (hasCampaigns) return false
+  return updates.some(u => CUSTOMER_PROGRAM_KEYS.has(u.key) && String(u.value) === 'true')
+}
+
+// The first time loyalty is switched on, past delivered orders are counted without emailing anyone,
+// then the tier-upgrade email is switched on so members hear about the upgrades that follow. The
+// silent pass stamps no upgrades, so this can't email anyone about tiers they already had.
+async function loyaltyFirstPass(updates: Array<{ key: string; value: unknown }>): Promise<ReconcileResult | null> {
+  if (!updates.some(u => u.key === 'loyalty_enabled' && String(u.value) === 'true')) return null
+  const settings = await getLoyaltySettings()
+  if (!settings.enabled || settings.launchedAt) return null
+  const result = await reconcileLoyaltyUntilDone()
+  await query(`UPDATE campaigns SET enabled = TRUE, updated_at = NOW() WHERE kind = 'loyalty_tier_upgrade'`)
+  return result
+}
+
+// Normalises Google tag / Ads values in place; returns the first validation error.
+function normaliseTagSettings(updates: Array<{ key: string; value: unknown }>): string | null {
+  for (const u of updates) {
+    if (!isGoogleTagSettingKey(u.key)) continue
+    const r = validateGoogleTagSetting(u.key, u.value)
+    if (!r.ok) return r.error
+    u.value = r.value
+  }
+  return null
+}
+
+// Validates JSON settings in place and stamps who saved them; returns the first validation error.
+function normaliseJsonSettings(updates: Array<{ key: string; value: unknown }>, adminId: string): string | null {
+  for (const u of updates) {
+    if (u.key !== OPS_EMAIL_KEY) continue
+    const r = parseOpsEmailInput(u.value)
+    if (!r.ok) return r.error
+    u.value = JSON.stringify({ ...r.value, updatedBy: adminId })
+  }
+  return null
+}
+
+function invalidateFor(keys: string[]) {
+  if (keys.some(k => k.startsWith('delivery_'))) invalidateDeliverySettingsCache()
+  // Any non-delivery key may be part of site-controls; invalidate broadly (cheap).
+  invalidateSiteControlsCache()
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const admin = await authenticateAdmin(request)
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'settings:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+    const hasCampaigns = hasScope(admin.role, admin.scopes, 'campaigns:read')
+    const body = await request.json()
+
+    // Batch mode: { updates: [{ key, value }, ...] }
+    if (Array.isArray(body?.updates)) {
+      const updates = body.updates as Array<{ key: string; value: unknown }>
+      const bad = updates.find(u => !EDITABLE_SET.has(u.key))
+      if (bad) return NextResponse.json({ error: `Setting not editable: ${bad.key}` }, { status: 400 })
+      if (enablesLockedProgram(updates, hasCampaigns))
+        return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
+      if (await referralNeedsLoyalty(updates))
+        return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
+      const tagError = normaliseTagSettings(updates) ?? normaliseJsonSettings(updates, admin.adminId)
+      if (tagError) return NextResponse.json({ error: tagError }, { status: 400 })
+      for (const u of updates) await upsert(u.key, String(u.value))
+      invalidateFor(updates.map(u => u.key))
+      const firstPass = await loyaltyFirstPass(updates)
+      return NextResponse.json({ success: true, count: updates.length, firstPass })
+    }
+
+    // Single mode: { key, value }
+    const { key } = body
+    let { value } = body
+    if (!EDITABLE_SET.has(key)) {
+      return NextResponse.json({ error: 'Setting not editable via this endpoint' }, { status: 400 })
+    }
+    if (enablesLockedProgram([{ key, value }], hasCampaigns)) {
+      return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
+    }
+    if (await referralNeedsLoyalty([{ key, value }])) {
+      return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
+    }
+    if (isGoogleTagSettingKey(key)) {
+      const r = validateGoogleTagSetting(key, value)
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 })
+      value = r.value
+    }
+    if (key === OPS_EMAIL_KEY) {
+      const single = [{ key, value }]
+      const err = normaliseJsonSettings(single, admin.adminId)
+      if (err) return NextResponse.json({ error: err }, { status: 400 })
+      value = single[0].value
+    }
+    await upsert(key, String(value))
+    invalidateFor([key])
+    const firstPass = await loyaltyFirstPass([{ key, value }])
+    return NextResponse.json({ success: true, firstPass })
+  } catch {
+    return NextResponse.json({ error: 'Failed to update setting' }, { status: 500 })
+  }
+}

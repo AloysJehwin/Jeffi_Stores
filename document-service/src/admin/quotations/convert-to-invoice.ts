@@ -19,8 +19,6 @@ import { lineItemExGst } from '../../lib/pricing'
 import { getFeatureFlags, getBusinessValues } from '../../lib/site-controls'
 import { findDigitalProductIds } from '../../lib/digital-guard'
 import { currentBrandNameAsync } from '../../lib/brand'
-import { getRazorpayInstance } from '../../lib/razorpay'
-import sharp from 'sharp'
 import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom, lockNewDraft } from '../../lib/draft-locks'
 
 
@@ -453,56 +451,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    // Generate UPI QR after transaction so order ID is available
-    let qrImageUrl: string | null = null
-    if (paymentMode === 'upi_qr') {
-      try {
-        const rzp = getRazorpayInstance() as any
-        const amountPaise = Math.round(totalAmount * 100)
-        const closeBy = Math.floor(Date.now() / 1000) + 24 * 60 * 60
-        const qr = await rzp.qrCode.create({
-          type: 'upi_qr',
-          name: `Invoice ${result.invoice_number || result.order_number}`,
-          usage: 'single_use',
-          fixed_amount: true,
-          payment_amount: amountPaise,
-          description: `${await currentBrandNameAsync()} Invoice ${result.invoice_number}`,
-          close_by: closeBy,
-        })
-        // Crop the QR code square out of Razorpay's branded 9:16 poster image
-        const RZP_QR_LEFT_RATIO = 136 / 674
-        const RZP_QR_TOP_RATIO = 648 / 1644
-        const RZP_QR_SIZE_RATIO = 399 / 674
-        let fetchedImageUrl: string = qr.image_url
-        try {
-          const imgRes = await fetch(qr.image_url)
-          const buf = Buffer.from(await imgRes.arrayBuffer())
-          const meta = await sharp(buf).metadata()
-          const w = meta.width!
-          const h = meta.height!
-          const cropped = await sharp(buf)
-            .extract({
-              left: Math.round(w * RZP_QR_LEFT_RATIO),
-              top: Math.round(h * RZP_QR_TOP_RATIO),
-              width: Math.round(w * RZP_QR_SIZE_RATIO),
-              height: Math.round(w * RZP_QR_SIZE_RATIO),
-            })
-            .resize(300, 300)
-            .png()
-            .toBuffer()
-          fetchedImageUrl = `data:image/png;base64,${cropped.toString('base64')}`
-        } catch (_) {
-          // keep raw URL as fallback
-        }
-        await query(
-          `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, updated_at = NOW() WHERE id = $3`,
-          [qr.id, fetchedImageUrl, result.id]
-        )
-        qrImageUrl = fetchedImageUrl
-      } catch (_) {
-        // QR generation failure is non-fatal — admin can generate from the invoice page
-      }
-    }
+    // The controller makes the UPI QR on the store's own Razorpay keys (this service holds none).
+    const qrRequest =
+      paymentMode === 'upi_qr'
+        ? {
+            orderId: result.id,
+            orderNumber: result.order_number,
+            amountPaise: Math.round(totalAmount * 100),
+            name: `Invoice ${result.invoice_number || result.order_number}`,
+            description: `${await currentBrandNameAsync()} Invoice ${result.invoice_number}`,
+          }
+        : null
 
     return NextResponse.json({
       success: true,
@@ -513,7 +472,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       savedAsDraft: result.saveAsDraft,
       insufficientItems: result.insufficientItems,
       insufficientDetails: result.shortfalls,
-      qrImageUrl,
+      qrImageUrl: null,
+      qrRequest,
       needsDelivery: enableDelivery && !result.saveAsDraft,
     })
   } catch (err: any) {

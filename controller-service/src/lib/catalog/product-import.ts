@@ -13,7 +13,7 @@ import {
   fillCreateDefaults,
   type ResolvedIds,
   type DraftImage,
-} from '@/lib/import/to-draft'
+} from '@controller/lib/import/to-draft'
 import type { RowResult, ImageProgress, ImportSource } from '@/lib/import/jobs'
 import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
 import { retireProduct } from '@/lib/catalog/product-delete'

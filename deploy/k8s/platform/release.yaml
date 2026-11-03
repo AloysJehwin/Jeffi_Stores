@@ -5,5 +5,8 @@ kind: ConfigMap
 metadata: { name: release, namespace: jeffi }
 data:
   controller: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:set-by-rollout
+  storefront: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-storefront-service:set-by-rollout
+  admin: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-admin-service:set-by-rollout
+  business: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-business-service:set-by-rollout
   messaging: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-messaging-service:set-by-rollout
   documents: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-document-service:set-by-rollout

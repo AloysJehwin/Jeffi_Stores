@@ -16,10 +16,14 @@ const PLAN_BLURB: Record<string, string> = {
   basic: 'Everything to launch — full storefront + core admin.',
   growth: 'Quotations, CRM, returns, coupons, inventory.',
   pro: 'Marketing, AI assistant, B2B portal, channel sync.',
-  enterprise: 'Dedicated infra, custom domain, priority support.',
+  enterprise: 'Large servers from the start, custom domains included, priority support.',
 }
 
-export default function PricingCards({ plans }: { plans: Plan[] }) {
+/**
+ * Plans are a single subscription — servers and plan features in one price. `fromInr` is each plan's
+ * floor price (incl. GST) at its minimum preset; the owner picks the exact size on sign-up.
+ */
+export default function PricingCards({ plans, fromInr }: { plans: Plan[]; fromInr?: Record<string, number> | null }) {
   const [interval, setInterval] = useState<Interval>('monthly')
   const ordered = [...plans].sort((a, b) => a.tier - b.tier)
 
@@ -35,9 +39,8 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-5 w-full">
         {ordered.map(p => {
           const featured = p.slug === 'growth'
-          const monthly = Number(p.monthly_price_inr)
-          const price = interval === 'yearly' ? monthly * 10 : monthly
-          const perMonth = interval === 'yearly' ? monthly : monthly
+          const floor = fromInr?.[p.slug] ?? Number(p.monthly_price_inr)
+          const price = interval === 'yearly' ? floor * 10 : floor
 
           return (
             <div
@@ -54,7 +57,8 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
               {/* Price display */}
               <div className="mt-2">
                 <div className="flex items-end gap-1">
-                  <span className="font-display font-black text-4xl">₹{price.toLocaleString('en-IN')}</span>
+                  <span className="text-xs text-foreground-muted mb-2">from</span>
+                  <span className="font-display font-black text-4xl">₹{Math.round(price).toLocaleString('en-IN')}</span>
                   <span className="text-sm text-foreground-muted font-normal mb-1">
                     /{interval === 'yearly' ? 'yr' : 'mo'}
                   </span>
@@ -64,6 +68,9 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
                     2 months free
                   </div>
                 )}
+                <div className="text-xs text-foreground-secondary mt-1">
+                  Incl. GST · plan &amp; servers in one subscription
+                </div>
               </div>
 
               <p className="text-sm text-foreground-secondary mt-3 flex-1">{PLAN_BLURB[p.slug]}</p>

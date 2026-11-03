@@ -1,0 +1,49 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { revokeSession, revokeVaultSessionsFor } from '@/lib/auth/auth-sessions'
+import { logActivity } from '@/lib/shared/activity'
+import { cookieDomainOption } from '@/lib/auth/cookie-domain'
+
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await authenticateUser(request)
+    if (auth?.userId) {
+      logActivity({ userId: auth.userId, kind: 'logout', summary: 'Logged out' }).catch(() => {})
+    }
+    if (auth?.sid) await revokeSession(auth.sid)
+    if (auth?.userId) await revokeVaultSessionsFor('customer', auth.userId).catch(() => {})
+
+    const store = await cookies()
+    const baseOpts = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+      maxAge: 0,
+      path: '/',
+    }
+    const cookieDomain = cookieDomainOption(request.headers.get('x-forwarded-host') ?? request.headers.get('host'))
+    store.set('user_sid', '', baseOpts)
+    store.set('user_sid', '', { ...baseOpts, ...cookieDomain })
+    store.set('session_id', '', baseOpts)
+    store.set('session_id', '', { ...baseOpts, ...cookieDomain })
+
+    const newGuestSessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
+    store.set('session_id', newGuestSessionId, {
+      maxAge: 30 * 24 * 60 * 60,
+      path: '/',
+      ...cookieDomain,
+    })
+
+    const res = NextResponse.json({ message: 'Logged out successfully' })
+    const flags = `Path=/; Max-Age=0; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
+    res.headers.append('Set-Cookie', `user_sid=; ${flags}`)
+    if (process.env.NODE_ENV === 'production') {
+      res.headers.append('Set-Cookie', `user_sid=; Domain=.jeffistores.in; ${flags}`)
+    }
+    return res
+  } catch (err) {
+    console.error('[route]', err)
+    return NextResponse.json({ error: 'Logout failed' }, { status: 500 })
+  }
+}

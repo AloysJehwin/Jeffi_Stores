@@ -1,7 +1,8 @@
-import AuthSplit from '@/app/(ecom)/ecom/AuthSplit'
+import AuthSplit from '@controller/app/(ecom)/ecom/AuthSplit'
 
 export const dynamic = 'force-dynamic'
 
-export default function EcomSignInPage() {
-  return <AuthSplit mode="signin" />
+export default async function EcomSignInPage({ searchParams }: { searchParams: Promise<{ plan?: string; interval?: string }> }) {
+  const { plan, interval } = await searchParams
+  return <AuthSplit mode="signin" plan={plan} interval={interval} />
 }

@@ -5,6 +5,7 @@ import {
   NOT_PLATFORM,
   PAID_STORE_SQL,
   PAYING_SQL,
+  PRICE_INR_MONTH_SQL,
   PLATFORM_TENANT_ID,
   bucketSeries,
   inIst,
@@ -23,11 +24,12 @@ import {
 // "collected" is settlement_ledger subscription_charge rows, "failed" is a halted subscription,
 // and renewals are the last charge plus one interval. New MRR is paid stores created in the period
 // that went live; churned MRR is paid stores suspended or terminated in the period.
+// Servers are billed at AWS price × (1 + margin), so their AWS cost is estimated at the current margin.
 
 const WENT_LIVE = `t.status IN ('active', 'suspended', 'terminated')`
 const CHURNED = `t.status IN ('suspended', 'terminated')`
 
-export async function getEcomBillingOverview(pool: Pool, cur: Period) {
+export async function getEcomBillingOverview(pool: Pool, cur: Period, margin = 0.25) {
   const prev = previousPeriod(cur)
   const bucket = bucketFor(cur)
   const params = periodParams(cur, prev)
@@ -105,7 +107,7 @@ export async function getEcomBillingOverview(pool: Pool, cur: Period) {
     ),
     pool.query(
       `SELECT t.id, t.display_name AS name, p.slug AS plan, t.billing_interval, ${MRR_SQL}::numeric AS mrr,
-              CASE WHEN t.billing_interval = 'yearly' THEN p.monthly_price_inr * 10 ELSE p.monthly_price_inr END::numeric AS amount,
+              CASE WHEN t.billing_interval = 'yearly' THEN ${PRICE_INR_MONTH_SQL} * 10 ELSE ${PRICE_INR_MONTH_SQL} END::numeric AS amount,
               (SELECT max(l.occurred_at) FROM settlement_ledger l WHERE l.tenant_id = t.id AND l.entry_type = 'subscription_charge') AS last_charge
        FROM tenants t JOIN plans p ON p.id = t.plan_id
        WHERE ${NOT_PLATFORM} AND ${PAYING_SQL} AND t.subscription_status IN ('active', 'authenticated')`
@@ -129,12 +131,15 @@ export async function getEcomBillingOverview(pool: Pool, cur: Period) {
       failed: num(row?.failed),
     }
   }
-  const walletFor = (cur: boolean) =>
-    walletMix(
+  const walletFor = (cur: boolean) => {
+    const w = walletMix(
       wallet.rows
         .filter(x => x.cur === cur)
         .map(x => ({ category: x.category, entry_type: x.entry_type, amount: num(x.amount), n: num(x.n) }))
     )
+    const infra_cost = round2(w.infra / (1 + margin))
+    return { ...w, infra_cost, infra_margin: round2(w.infra - infra_cost) }
+  }
 
   const c = charges.rows[0]
   const by_subscription = Object.fromEntries(subs.rows.map(s => [s.status, num(s.n)])) as Record<string, number>
@@ -193,6 +198,7 @@ export async function getEcomBillingOverview(pool: Pool, cur: Period) {
       commission: delta(current.commission, previous.commission),
       topups: delta(current.wallet.topups, previous.wallet.topups),
       messaging: delta(current.wallet.messaging, previous.wallet.messaging),
+      infra: delta(current.wallet.infra, previous.wallet.infra),
     },
     by_plan: plans.rows.map(p => ({
       plan: p.plan,

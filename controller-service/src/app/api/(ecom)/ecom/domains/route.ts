@@ -7,6 +7,10 @@ import { getOwnerTenants, listCustomDomains, addCustomDomain } from '@/lib/tenan
 
 export const dynamic = 'force-dynamic'
 
+const ROOT = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
+// What the owner points their domain at: a CNAME to the store's subdomain, or (apex) an A record.
+const targets = (slug: string) => ({ cnameTarget: `${slug}.${ROOT}`, aRecord: process.env.CLUSTER_INGRESS_IP || null })
+
 const AddSchema = z.object({
   tenantId: z.string().uuid(),
   domain: z.string().min(4).max(255),
@@ -26,7 +30,7 @@ export async function GET(request: NextRequest) {
   if (!tenants.find(t => t.id === tenantId)) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   const domains = await listCustomDomains(tenantId)
-  return NextResponse.json({ domains, cnameTarget: tenants.find(t => t.id === tenantId)!.slug + '.jeffistores.in' })
+  return NextResponse.json({ domains, ...targets(tenants.find(t => t.id === tenantId)!.slug) })
 }
 
 // POST → add a custom domain (plan-quota enforced)
@@ -46,10 +50,11 @@ export async function POST(request: NextRequest) {
   const result = await addCustomDomain(parsed.data.tenantId, parsed.data.domain)
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 
+  const t = targets(tenant.slug)
   return NextResponse.json({
     ok: true,
     domain: result.domain,
-    cnameTarget: `${tenant.slug}.jeffistores.in`,
-    instructions: `Add a CNAME record: ${result.domain.domain} → ${tenant.slug}.jeffistores.in`,
+    ...t,
+    instructions: `Add a TXT record _jeffi.${result.domain.domain} = ${result.domain.verification_token}, and a CNAME ${result.domain.domain} → ${t.cnameTarget}${t.aRecord ? ` (or an A record to ${t.aRecord} for a root domain)` : ''}.`,
   })
 }

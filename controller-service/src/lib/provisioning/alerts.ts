@@ -1,4 +1,4 @@
-import { controlPlanePool } from '../tenant-registry'
+import { controlPlanePool } from '@/lib/tenant-registry'
 import { mailShell } from '@/lib/shared/mail-template'
 
 const STUCK_AFTER_MIN = 30

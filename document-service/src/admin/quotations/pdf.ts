@@ -37,6 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       bankAccount: s.bank_account || '',
       bankIfsc: s.bank_ifsc || '',
       bankBranch: s.bank_branch || '',
+      city: s.business_city || '',
     }
 
     const pdfItems = (items || []).map((item: any) => ({

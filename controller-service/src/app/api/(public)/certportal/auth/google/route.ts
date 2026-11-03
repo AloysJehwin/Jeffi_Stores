@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const token = await issuePortalToken(identity.email, name)
 
     const res = NextResponse.json({ email: identity.email.toLowerCase(), name })
-    return setPortalCookie(res, token)
+    return setPortalCookie(res, token, request.headers.get('x-forwarded-host') ?? request.headers.get('host'))
   } catch {
     return NextResponse.json({ error: 'Sign-in failed' }, { status: 500 })
   }

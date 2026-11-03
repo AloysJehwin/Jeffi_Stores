@@ -2632,3 +2632,17 @@ CREATE INDEX IF NOT EXISTS idx_homepage_draft_branches_updated ON public.homepag
 CREATE INDEX IF NOT EXISTS idx_review_form_drafts_form ON public.review_form_drafts USING btree (form_id);
 CREATE INDEX IF NOT EXISTS idx_offer_drafts_offer ON public.offer_drafts USING btree (offer_id);
 CREATE INDEX IF NOT EXISTS idx_entity_revisions_resource ON public.entity_revisions USING btree (resource_type, resource_id, revision DESC);
+
+-- Razorpay: the captured webhook finds a payment by its Razorpay order id.
+CREATE INDEX IF NOT EXISTS idx_payments_razorpay_order_id ON public.payments USING btree (((gateway_response ->> 'razorpay_order_id'::text)));
+CREATE INDEX IF NOT EXISTS idx_payment_refunds_order ON public.payment_refunds USING btree (order_id);
+CREATE INDEX IF NOT EXISTS idx_payment_refunds_payment ON public.payment_refunds USING btree (razorpay_payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_refunds_pending ON public.payment_refunds USING btree (created_at) WHERE (status = 'pending'::text);
+CREATE INDEX IF NOT EXISTS idx_payment_disputes_order ON public.payment_disputes USING btree (order_id);
+CREATE INDEX IF NOT EXISTS idx_payment_disputes_open ON public.payment_disputes USING btree (respond_by) WHERE (status = ANY (ARRAY['open'::text, 'under_review'::text]));
+CREATE INDEX IF NOT EXISTS idx_razorpay_settlements_settled_at ON public.razorpay_settlements USING btree (settled_at DESC);
+CREATE INDEX IF NOT EXISTS idx_razorpay_settlement_items_entity ON public.razorpay_settlement_items USING btree (entity_id);
+CREATE INDEX IF NOT EXISTS idx_razorpay_settlement_items_payment ON public.razorpay_settlement_items USING btree (payment_id);
+CREATE INDEX IF NOT EXISTS idx_razorpay_settlement_items_order ON public.razorpay_settlement_items USING btree (order_id);
+CREATE INDEX IF NOT EXISTS idx_razorpay_settlement_items_scope ON public.razorpay_settlement_items USING btree (scope, source_tenant_id);
+

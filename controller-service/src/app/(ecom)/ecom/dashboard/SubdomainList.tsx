@@ -63,19 +63,19 @@ export default function SubdomainList({
       label: 'Purchase orders',
       url: `purchaseorder-${slug}.jeffistores.in`,
       available: ['growth', 'pro', 'enterprise'].includes(p),
-      note: ['growth', 'pro', 'enterprise'].includes(p) ? undefined : 'Growth plan and above',
+      note: ['growth', 'pro', 'enterprise'].includes(p) ? undefined : 'Grow plan and above',
     },
     {
       label: 'Quotations',
       url: `quotation-${slug}.jeffistores.in`,
       available: ['growth', 'pro', 'enterprise'].includes(p),
-      note: ['growth', 'pro', 'enterprise'].includes(p) ? undefined : 'Growth plan and above',
+      note: ['growth', 'pro', 'enterprise'].includes(p) ? undefined : 'Grow plan and above',
     },
     {
       label: 'Review forms',
       url: `forms-${slug}.jeffistores.in`,
-      available: ['pro', 'enterprise'].includes(p),
-      note: ['pro', 'enterprise'].includes(p) ? undefined : 'Pro plan and above',
+      available: ['growth', 'pro', 'enterprise'].includes(p),
+      note: ['growth', 'pro', 'enterprise'].includes(p) ? undefined : 'Grow plan and above',
     },
     {
       label: 'B2B portal',

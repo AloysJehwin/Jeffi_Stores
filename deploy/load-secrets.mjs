@@ -38,7 +38,9 @@ const OUT_DIR = process.env.ENV_OUT_DIR ? resolve(process.env.ENV_OUT_DIR) : REP
 
 const isProduction = process.env.NODE_ENV === 'production' || process.env.SM_ENV === 'production'
 const DEFAULT_SECRET = isProduction ? 'jeffi/production' : 'jeffi/local'
-const SECRET_ID = process.env.SM_SECRET_ID || DEFAULT_SECRET
+let SECRET_ID = process.env.SM_SECRET_ID || DEFAULT_SECRET
+// Read when SM_SECRET_ID doesn't exist or can't be read yet (a new secret rolled out before it was made).
+const SECRET_FALLBACK_ID = process.env.SM_SECRET_FALLBACK_ID
 const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
 const FALLBACK = process.env.ALLOW_ENV_FALLBACK === 'true'
 
@@ -47,7 +49,12 @@ async function loadSecrets() {
 
   let secretString
   try {
-    const res = await client.send(new GetSecretValueCommand({ SecretId: SECRET_ID }))
+    const res = await client.send(new GetSecretValueCommand({ SecretId: SECRET_ID })).catch(err => {
+      if (!SECRET_FALLBACK_ID || !/ResourceNotFound|AccessDenied/.test(`${err.name} ${err.message}`)) throw err
+      process.stderr.write(`[load-secrets] "${SECRET_ID}" unavailable (${err.name}); using "${SECRET_FALLBACK_ID}"\n`)
+      SECRET_ID = SECRET_FALLBACK_ID
+      return client.send(new GetSecretValueCommand({ SecretId: SECRET_ID }))
+    })
     secretString = res.SecretString
   } catch (err) {
     const msg = `[load-secrets] Failed to fetch "${SECRET_ID}" from Secrets Manager: ${err.message}`
@@ -98,9 +105,10 @@ async function loadSecrets() {
     }
     const envPath = resolve(OUT_DIR, '.env.local')
     writeFileSync(envPath, lines.join('\n') + '\n', 'utf8')
-    // Next loads env files from its project dir (controller-service/); point it at this one.
-    const appEnv = resolve(REPO_ROOT, 'controller-service', '.env.local')
-    if (OUT_DIR === REPO_ROOT && existsSync(resolve(REPO_ROOT, 'controller-service'))) {
+    // Next loads env files from each app's project dir; point every app at this one.
+    for (const app of ['controller-service', 'storefront-service', 'admin-service', 'business-service']) {
+      const appEnv = resolve(REPO_ROOT, app, '.env.local')
+      if (OUT_DIR !== REPO_ROOT || !existsSync(resolve(REPO_ROOT, app))) continue
       let stat = null
       try { stat = lstatSync(appEnv) } catch {}
       if (!stat || stat.isSymbolicLink()) {
@@ -143,12 +151,9 @@ await loadSecrets()
 // so `predev` (which just writes .env.local) is unaffected.
 if (process.env.SPAWN_APP === '1') {
   const { spawn } = await import('child_process')
-  // APP_ENTRY picks the process (the controller's cluster-server.js, or a service's src/server.ts with
+  // APP_ENTRY picks the process (a Next app's <app>/cluster-server.js, or a service's src/server.ts with
   // APP_NODE_ARGS='--import tsx'); paths are relative to the repo/image root. APP_ARGS go to the script.
-  const entry = resolve(
-    REPO_ROOT,
-    process.env.APP_ENTRY || (existsSync(resolve(REPO_ROOT, 'controller-service/cluster-server.js')) ? 'controller-service/cluster-server.js' : 'cluster-server.js')
-  )
+  const entry = resolve(REPO_ROOT, process.env.APP_ENTRY || 'controller-service/cluster-server.js')
   const nodeArgs = (process.env.APP_NODE_ARGS || '').split(' ').filter(Boolean)
   const appArgs = (process.env.APP_ARGS || '').split(' ').filter(Boolean)
   const child = spawn(process.execPath, [...nodeArgs, entry, ...appArgs], { stdio: 'inherit', env: process.env, cwd: process.env.APP_CWD ? resolve(REPO_ROOT, process.env.APP_CWD) : dirname(entry) })

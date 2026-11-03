@@ -2,14 +2,24 @@ import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
+import { listPlans } from '@/lib/tenant-registry'
 import OwnerAuthForm from './OwnerAuthForm'
 import { CheckMark } from './Shapes'
 
 // Full-page split auth layout: branded value panel (left) + form (right).
 // Collapses to a single column on mobile with a compact brand header.
 // Server-guarded: an already-signed-in owner is bounced to the dashboard so the
-// auth form is never shown to an authenticated session.
-export default async function AuthSplit({ mode }: { mode: 'signup' | 'signin' }) {
+// auth form is never shown to an authenticated session. A plan picked on the pricing page
+// (?plan=&interval=) is carried through to /onboard.
+export default async function AuthSplit({
+  mode,
+  plan,
+  interval,
+}: {
+  mode: 'signup' | 'signin'
+  plan?: string
+  interval?: string
+}) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const h = await headers()
   const signals = {
@@ -18,7 +28,9 @@ export default async function AuthSplit({ mode }: { mode: 'signup' | 'signin' })
     uaPlatform: h.get('sec-ch-ua-platform'),
   }
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
-  if (owner) redirect('/dashboard')
+  const plans = plan ? await listPlans().catch(() => []) : []
+  const picked = plan && plans.some(p => p.slug === plan) ? `plan=${plan}&interval=${interval === 'yearly' ? 'yearly' : 'monthly'}` : null
+  if (owner) redirect(picked ? `/onboard?${picked}` : '/dashboard')
   const points = [
     'Your own branded storefront + admin',
     'Online & COD payments, settled for you',
@@ -64,7 +76,7 @@ export default async function AuthSplit({ mode }: { mode: 'signup' | 'signin' })
           </span>
           Jeffi Commerce
         </Link>
-        <OwnerAuthForm mode={mode} />
+        <OwnerAuthForm mode={mode} planQuery={picked} />
         <div className="md:hidden mt-10 w-full max-w-sm mx-auto rounded-3xl org-sand p-5">
           <p className="font-display font-black text-lg leading-snug text-foreground">
             Everything you need to sell online — in one place.
