@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { useActionToast } from '@/components/admin/kit/toast'
 import { useRouter } from 'next/navigation'
+import { Check, Send, X } from 'lucide-react'
+import { ActionButton, useActionToast } from '@/components/admin/kit'
 
 export default function KycActionButtons({
   tenantId,
@@ -13,133 +14,59 @@ export default function KycActionButtons({
   mode?: 'pending' | 'retry'
 }) {
   const router = useRouter()
-  const [busy, setBusy] = useState(false)
+  const toast = useActionToast()
   const [showReject, setShowReject] = useState(false)
   const [note, setNote] = useState('')
-  const [err, setErr] = useState<string | null>(null)
-  const toast = useActionToast()
-  const setSuccess = (t: string | null) => t && toast.success(t)
 
-  async function approve() {
-    setBusy(true)
-    setErr(null)
-    setSuccess(null)
-    const res = await fetch(`/api/admin/ecom/kyc/${tenantId}/approve`, { method: 'POST' })
-    const data = await res.json()
-    if (!res.ok || !data.ok) {
-      setErr(data.error || 'Failed')
-      setBusy(false)
-      return
-    }
-    setSuccess(approvedMessage(data))
+  // Approve, or re-run subscription creation for an approved store whose Razorpay step failed.
+  async function approve(retry: boolean) {
+    const res = await fetch(`/api/admin/ecom/kyc/${tenantId}/approve`, { method: 'POST' }).catch(() => null)
+    const data = await res?.json().catch(() => ({}))
+    if (!res?.ok || !data?.ok) return toast.error(data?.error || 'Failed')
+    toast.success(retry && !data.provisioningStarted ? 'Payment link generated; the owner can pay now.' : approvedMessage(data))
     router.refresh()
-    setBusy(false)
   }
 
   async function reject() {
-    if (!note.trim()) {
-      setErr('Please enter a reason for rejection.')
-      return
-    }
-    setBusy(true)
-    setErr(null)
+    if (!note.trim()) return toast.error('Enter a reason for the rejection.')
     const res = await fetch(`/api/admin/ecom/kyc/${tenantId}/reject`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ note }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      setErr(data.error || 'Failed')
-      setBusy(false)
-      return
-    }
+    }).catch(() => null)
+    const data = await res?.json().catch(() => ({}))
+    if (!res?.ok) return toast.error(data?.error || 'Failed')
     router.refresh()
   }
 
-  // Re-runs subscription creation for already-approved tenants where Razorpay failed
-  async function retrySubscription() {
-    setBusy(true)
-    setErr(null)
-    setSuccess(null)
-    const res = await fetch(`/api/admin/ecom/kyc/${tenantId}/approve`, { method: 'POST' })
-    const data = await res.json()
-    if (!res.ok || !data.ok) {
-      setErr(data.error || 'Failed')
-      setBusy(false)
-      return
-    }
-    setSuccess(data.provisioningStarted ? approvedMessage(data) : 'Payment link generated — owner can now pay.')
-    router.refresh()
-    setBusy(false)
-  }
+  if (mode === 'retry') return <ActionButton variant="primary" action={{ label: 'Resend payment link', icon: Send, onClick: () => approve(true) }} />
 
-  if (mode === 'retry') {
+  if (showReject) {
     return (
-      <div className="flex flex-col items-end gap-1">
-        {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
-        <button
-          onClick={retrySubscription}
-          disabled={busy}
-          className="px-4 h-control rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-        >
-          {busy ? 'Generating…' : 'Resend payment link'}
-        </button>
+      <div className="flex w-full flex-col gap-2 sm:w-80">
+        <textarea
+          className="w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground resize-none h-20 focus:outline-none focus:ring-2 focus:ring-red-400"
+          placeholder="Reason for rejection (shown to owner)…"
+          value={note}
+          onChange={e => setNote(e.target.value)}
+        />
+        <div className="flex flex-wrap gap-2">
+          <ActionButton action={{ label: 'Confirm reject', icon: X, danger: true, onClick: reject, disabled: !note.trim() }} />
+          <ActionButton action={{ label: 'Cancel', onClick: () => setShowReject(false) }} />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-2 items-end">
-      {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
-      {showReject ? (
-        <div className="flex flex-col gap-2 w-full sm:w-72">
-          <textarea
-            className="w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm resize-none h-20 focus:outline-none focus:ring-2 focus:ring-red-400"
-            placeholder="Reason for rejection (shown to owner)…"
-            value={note}
-            onChange={e => setNote(e.target.value)}
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={reject}
-              disabled={busy}
-              className="flex-1 px-4 h-control rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-            >
-              {busy ? 'Rejecting…' : 'Confirm reject'}
-            </button>
-            <button
-              onClick={() => setShowReject(false)}
-              disabled={busy}
-              className="px-4 h-control rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowReject(true)}
-            disabled={busy}
-            className="px-4 h-control rounded-lg border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors"
-          >
-            Reject
-          </button>
-          <button
-            onClick={approve}
-            disabled={busy}
-            className="px-5 h-control rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-          >
-            {busy ? 'Approving…' : 'Approve'}
-          </button>
-        </div>
-      )}
+    <div className="flex flex-wrap gap-2">
+      <ActionButton action={{ label: 'Reject', icon: X, danger: true, onClick: () => setShowReject(true) }} />
+      <ActionButton variant="primary" action={{ label: 'Approve', icon: Check, onClick: () => approve(false) }} />
     </div>
   )
 }
 
 // Payments off: approval starts the build directly (no checkout link exists).
 function approvedMessage(data: { provisioningStarted?: boolean; paymentBypassed?: boolean }): string {
-  return data.provisioningStarted || data.paymentBypassed ? 'Approved — store setup started.' : 'Approved — payment link sent to owner.'
+  return data.provisioningStarted || data.paymentBypassed ? 'Approved: store setup started.' : 'Approved: payment link sent to owner.'
 }

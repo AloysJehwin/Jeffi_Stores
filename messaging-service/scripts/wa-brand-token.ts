@@ -76,6 +76,7 @@ async function rowsFor(pool: pg.Pool, tenantId: string) {
 if (process.argv[1] && /wa-brand-token\.ts$/.test(process.argv[1])) {
   const tenants = (await db.query<{ id: string; slug: string }>(
     `SELECT id, slug FROM tenants WHERE status = 'active' OR id = $1 ORDER BY id = $1 DESC, slug`, [PLATFORM_TENANT_ID])).rows
+  if (!tenants.some(t => t.id === PLATFORM_TENANT_ID)) tenants.unshift({ id: PLATFORM_TENANT_ID, slug: 'platform' })
   const totals = { tokenized: 0, reshaped: 0, newVersion: 0, invalid: 0, tenants: 0 }
   for (const t of tenants) {
     let pool: pg.Pool

@@ -382,26 +382,17 @@ CREATE INDEX IF NOT EXISTS idx_provisioning_jobs_tenant ON public.provisioning_j
 CREATE INDEX IF NOT EXISTS idx_provisioning_jobs_active ON public.provisioning_jobs USING btree (status) WHERE status IN ('pending','running');
 CREATE INDEX IF NOT EXISTS idx_tenant_migration_runs_tenant ON public.tenant_migration_runs USING btree (tenant_id, ran_at DESC);
 
+-- No tenants FK on the tables the flagship writes under the platform id (00000000-…, which has no
+-- tenants row): import_jobs, sheet_product_links, tenant_social_accounts, tenant_integration_credentials,
+-- razorpay_subscription_index, ai_provider_identities. purgeTenant deletes a store's rows from them.
 ALTER TABLE ONLY public.import_jobs ADD CONSTRAINT import_jobs_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.import_jobs ADD CONSTRAINT import_jobs_tenant_id_fkey
-    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_import_jobs_active ON public.import_jobs USING btree (status) WHERE status IN ('pending','running');
 CREATE INDEX IF NOT EXISTS idx_import_jobs_tenant ON public.import_jobs USING btree (tenant_id, created_at DESC);
 
 ALTER TABLE ONLY public.sheet_product_links ADD CONSTRAINT sheet_product_links_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.sheet_product_links ADD CONSTRAINT sheet_product_links_tenant_id_fkey
-    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.sheet_product_links ADD CONSTRAINT sheet_product_links_uniq
     UNIQUE (tenant_id, spreadsheet_id, product_id);
 CREATE INDEX IF NOT EXISTS idx_sheet_product_links_sheet ON public.sheet_product_links USING btree (tenant_id, spreadsheet_id);
-
--- Platform sentinel tenant. The flagship (Jeffi's own) admin runs with NO ALS tenant, so its
--- import_jobs are keyed to the NIL uuid; import_jobs.tenant_id FKs to tenants(id), so that row must
--- exist. status='active' keeps it out of provisioning flows; the import worker special-cases this id
--- (PLATFORM_TENANT_ID) and runs its jobs on the platform pool rather than resolving a tenant RDS.
-INSERT INTO public.tenants (id, slug, display_name, status)
-VALUES ('00000000-0000-0000-0000-000000000000', 'platform', 'Platform (flagship)', 'active')
-ON CONFLICT (id) DO NOTHING;
 
 --
 -- owners: ecom store OWNERS — the people who sign up at ecom.jeffistores.in to
@@ -473,7 +464,8 @@ CREATE TABLE IF NOT EXISTS public.tenant_bank_accounts (
 ALTER TABLE ONLY public.tenant_bank_accounts ADD CONSTRAINT tenant_bank_accounts_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_bank_accounts ADD CONSTRAINT tenant_bank_accounts_owner_id_fkey
     FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
-CREATE INDEX IF NOT EXISTS idx_tenant_bank_owner ON public.tenant_bank_accounts USING btree (owner_id);
+-- One bank record per owner: saveBankVerification upserts ON CONFLICT (owner_id).
+CREATE UNIQUE INDEX IF NOT EXISTS tenant_bank_accounts_owner_id_key ON public.tenant_bank_accounts USING btree (owner_id);
 
 -- ── Custom domains (BYO CNAME): Pro=1, Enterprise=3 per plan.max_custom_domains ──
 -- Multi-domain per tenant (supersedes the single tenants.custom_domain column).
@@ -573,8 +565,6 @@ CREATE TABLE IF NOT EXISTS public.tenant_social_accounts (
 );
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_tenant_provider_key UNIQUE (tenant_id, provider);
-ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_tenant_id_fkey
-    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_provider_check
     CHECK (provider IN ('facebook','instagram','gbp','youtube','pinterest','linkedin','x'));
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_status_check
@@ -725,8 +715,6 @@ CREATE TABLE IF NOT EXISTS public.tenant_integration_credentials (
 );
 ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_tenant_provider_key UNIQUE (tenant_id, provider);
-ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_tenant_id_fkey
-    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_status_check
     CHECK (status IN ('connected','error','revoked'));
 CREATE INDEX IF NOT EXISTS idx_tenant_integration_tenant ON public.tenant_integration_credentials USING btree (tenant_id);
@@ -896,7 +884,7 @@ ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS s3_usage_updated_at tim
 --
 CREATE TABLE IF NOT EXISTS public.razorpay_subscription_index (
     razorpay_subscription_id character varying(64) NOT NULL,
-    tenant_id                uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+    tenant_id                uuid NOT NULL,
     collecting_account       character varying(12) NOT NULL DEFAULT 'platform',
     product_id               uuid,
     local_subscription_id    uuid,
@@ -998,7 +986,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_platform_provider_settings_scope_key ON pub
 
 -- ai_provider_identities: per-store AI provider workload identity (non-secret ids). For Anthropic
 -- one workspace + service account + federation rule per store; the gateway exchanges its pod token
--- for a workspace-scoped access token with them. tenant_id is the store (the platform sentinel for
+-- for a workspace-scoped access token with them. tenant_id is the store (the platform id for
 -- the flagship). Provisioned outside the app; read by lib/providers/policy.ts. No row = no Claude
 -- for that store (text falls back to Razer).
 CREATE TABLE IF NOT EXISTS public.ai_provider_identities (
@@ -1013,8 +1001,6 @@ CREATE TABLE IF NOT EXISTS public.ai_provider_identities (
 ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_pkey PRIMARY KEY (tenant_id, provider);
 ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_provider_check
     CHECK (provider IN ('anthropic'));
-ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_tenant_id_fkey
-    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 
 --
 -- Ad-free add-on. Every store shows the platform's Google AdSense ads; a tenant pays Rs 500 a month

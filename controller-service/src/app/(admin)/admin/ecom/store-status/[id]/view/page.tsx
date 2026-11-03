@@ -1,45 +1,35 @@
-import { headers } from 'next/headers'
-import { redirect, notFound } from 'next/navigation'
-import { isPlatformAdmin } from '@/lib/auth/scopes'
-import { getTenant, getProvisioningJob, getTenantOwners } from '@/lib/tenant-registry'
+import { getTenantOwners } from '@/lib/tenant-registry'
+import { loadTenantDetail } from '@controller/lib/ecom/detail'
 import TenantObjectHeader from '@controller/components/admin/ecom/TenantObjectHeader'
-import OverviewTab from '@controller/components/admin/ecom/tabs/OverviewTab'
+import { ApiOverview, Surfaces } from '@controller/components/admin/ecom/tabs/OverviewTab'
+import HealthSummary from '@controller/components/admin/ecom/detail/HealthSummary'
+import RunningNow from '@controller/components/admin/ecom/detail/RunningNow'
+import ProvisioningLogsClient from '@controller/components/admin/ecom/ProvisioningLogsClient'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * Store-status object page. Shares its body with the Overview tab on the customer page —
- * same component, two entry points — so the two can never drift apart.
- */
+/** Store-status detail page: is it healthy, what runs, and the provisioning timeline. */
 export default async function StoreStatusDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const h = await headers()
-  const role = h.get('x-user-role') || ''
-  if (!isPlatformAdmin(role)) redirect('/admin')
-
   const { id } = await params
-  const t = await getTenant(id)
-  if (!t) notFound()
-
-  const [job, owners] = await Promise.all([
-    getProvisioningJob(id).catch(() => null),
-    getTenantOwners(id).catch(() => []),
-  ])
+  const d = await loadTenantDetail(id)
 
   return (
     <div className="p-4 sm:p-6 space-y-5 w-full max-w-full min-w-0 overflow-x-hidden">
-      <TenantObjectHeader
-        tenant={t}
-        backHref="/admin/ecom/store-status"
-        backLabel="Store Status"
-        job={job}
-        related={[
-          { href: `/admin/ecom/customers/${t.id}`, label: 'Store' },
-          { href: `/admin/ecom/customers/${t.id}?tab=provisioning`, label: 'Provisioning' },
-          { href: `/admin/ecom/instances/${t.id}`, label: 'Instance' },
-        ]}
-      />
+      <TenantObjectHeader d={d} back={{ href: '/admin/ecom/store-status', label: 'Store Status' }} section="status" />
 
-      <OverviewTab tenant={t} job={job} owners={owners} />
+      {d.isStore ? (
+        <>
+          <HealthSummary d={d} />
+          <RunningNow d={d} />
+          <Surfaces t={d.t} />
+          <section className="space-y-3 min-w-0">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Provisioning timeline</h2>
+            <ProvisioningLogsClient tenantId={d.t.id} />
+          </section>
+        </>
+      ) : (
+        <ApiOverview tenant={d.t} owners={await getTenantOwners(id).catch(() => [])} approvals={d.approvals} />
+      )}
     </div>
   )
 }

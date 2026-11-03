@@ -47,6 +47,8 @@ data:
   PROVISIONING_COMPUTE: k8s
   CLUSTER_INGRESS_IP: 32.196.38.130
   K8S_NODE_IAM_PROFILE: jeffi-stores-ec2-profile
+  # A store's own servers boot with the store role (service-secrets-iam.sh creates the profile), never the core's.
+  K8S_TENANT_NODE_IAM_PROFILE: jeffi-tenant-node-profile
   # Working cap on the account's On-Demand vCPUs (AWS quota: 256); blocks approvals and resizes whose own servers
   # would not fit. Re-applied every release.
   EC2_VCPU_QUOTA: '32'

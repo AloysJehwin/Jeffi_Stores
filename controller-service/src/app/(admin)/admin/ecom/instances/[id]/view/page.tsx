@@ -1,53 +1,22 @@
-import { headers } from 'next/headers'
-import { redirect, notFound } from 'next/navigation'
-import { isPlatformAdmin } from '@/lib/auth/scopes'
-import { getTenant, getProvisioningJob, listCustomDomains } from '@/lib/tenant-registry'
-import { getTenantMigrationRuns } from '@controller/lib/tenant-migrations'
+import { loadInfraDetail, loadTenantDetail } from '@controller/lib/ecom/detail'
 import TenantObjectHeader from '@controller/components/admin/ecom/TenantObjectHeader'
 import InfrastructureTab from '@controller/components/admin/ecom/tabs/InfrastructureTab'
+import { ApiOverview } from '@controller/components/admin/ecom/tabs/OverviewTab'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Infrastructure object page. Shares its body with the Infrastructure tab on the customer
- * page — same component, two entry points — so the two can never drift apart.
+ * Instance detail page: servers, workloads, database, storage, cost breakdown and DNS. Shares its body with the
+ * Store page's Infrastructure tab (same component, two entry points) so the two never drift apart.
  */
 export default async function InstanceDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const h = await headers()
-  const role = h.get('x-user-role') || ''
-  if (!isPlatformAdmin(role)) redirect('/admin')
-
   const { id } = await params
-  const t = await getTenant(id)
-  if (!t) notFound()
-
-  const [job, domains, migrations] = await Promise.all([
-    getProvisioningJob(id).catch(() => null),
-    listCustomDomains(id).catch(() => []),
-    getTenantMigrationRuns(id).catch(() => []),
-  ])
+  const d = await loadTenantDetail(id)
 
   return (
     <div className="p-4 sm:p-6 space-y-5 w-full max-w-full min-w-0 overflow-x-hidden">
-      <TenantObjectHeader
-        tenant={t}
-        backHref="/admin/ecom/instances"
-        backLabel="Instances"
-        job={job}
-        related={[
-          { href: `/admin/ecom/customers/${t.id}`, label: 'Store' },
-          { href: `/admin/ecom/customers/${t.id}?tab=provisioning`, label: 'Provisioning' },
-          { href: `/admin/ecom/store-status/${t.id}`, label: 'Status' },
-        ]}
-      />
-
-      <InfrastructureTab
-        tenant={t}
-        job={job}
-        domains={domains}
-        migrations={migrations}
-        currentSha={process.env.GIT_SHA || null}
-      />
+      <TenantObjectHeader d={d} back={{ href: '/admin/ecom/instances', label: 'Instances' }} section="instance" />
+      {d.isStore ? <InfrastructureTab d={d} infra={await loadInfraDetail(d)} /> : <ApiOverview tenant={d.t} approvals={d.approvals} />}
     </div>
   )
 }

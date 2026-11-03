@@ -6,12 +6,15 @@ import AdminSelect from '@/components/admin/AdminSelect'
 
 // URL-param filter bar for the ecom list pages. Status + plan (AdminSelect dropdowns)
 // + a debounced search box. Writes to the query string; server pages read searchParams.
+// `plans` comes from planSlugs() (the plans table); inactive plans stay listed since stores can still be on them.
 export default function EcomFilters({
   showPlan = true,
   statusOptions,
+  plans = [],
 }: {
   showPlan?: boolean
   statusOptions?: { value: string; label: string }[]
+  plans?: { slug: string; name: string; active?: boolean }[]
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -46,15 +49,12 @@ export default function EcomFilters({
   ]
   const PLAN_OPTS = [
     { value: '', label: 'All plans' },
-    { value: 'basic', label: 'Basic' },
-    { value: 'growth', label: 'Growth' },
-    { value: 'pro', label: 'Pro' },
-    { value: 'enterprise', label: 'Enterprise' },
+    ...plans.map(p => ({ value: p.slug, label: p.active === false ? `${p.name} (inactive)` : p.name })),
   ]
 
   return (
     <div
-      className={`bg-surface-elevated rounded-lg border border-border-default p-4 mb-6 grid grid-cols-1 gap-3 items-end ${
+      className={`bg-surface-elevated rounded-lg border border-border-default p-3 sm:p-4 grid grid-cols-2 gap-3 items-end ${
         showPlan ? 'sm:grid-cols-[minmax(0,200px)_minmax(0,200px)_1fr]' : 'sm:grid-cols-[minmax(0,200px)_1fr]'
       }`}
     >
@@ -64,6 +64,7 @@ export default function EcomFilters({
         options={STATUS_OPTS}
         onChange={v => setParam('status', v)}
         sm
+        className={showPlan ? 'min-w-0' : 'min-w-0 col-span-2 sm:col-span-1'}
       />
       {showPlan && (
         <AdminSelect
@@ -72,9 +73,10 @@ export default function EcomFilters({
           options={PLAN_OPTS}
           onChange={v => setParam('plan', v)}
           sm
+          className="min-w-0"
         />
       )}
-      <div>
+      <div className="col-span-2 sm:col-span-1 min-w-0">
         <label className="block text-xs font-medium text-foreground-muted mb-1 uppercase tracking-wide">Search</label>
         <input
           className="w-full rounded-lg border border-border-default bg-surface-elevated px-3 h-control text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"

@@ -5,7 +5,7 @@ import { getTenant, purgeTenant } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'
 
-// Hard-delete a deprovisioned tenant: removes its S3 backup + all control-plane rows.
+// Hard-delete a dead tenant (purgeBlocker says which): its servers, backups, DB snapshot + secret, control-plane rows.
 // IRREVERSIBLE — no restore. Platform-operator only, requires { confirm: true }. The owner's
 // bank + Razorpay linked account are kept owner-scoped for re-onboarding.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -136,7 +136,7 @@ describe('manager view', () => {
     expect(spendCalls.map(c => path(c.url))).toEqual([`/customers/${NEW}/googleAds:searchStream`])
     expect(spendCalls[0].headers['login-customer-id']).toBe(MGR)
     expect(r.accounts[0]).toMatchObject({ customerId: NEW, spend30d: 2500, clicks30d: 10, stores: [{ tenantId: 't1', name: 'Acme Store' }] })
-    expect(cpQuery.mock.calls[0][1]).toEqual(['google_ads'])
+    expect(cpQuery.mock.calls[0][1]).toEqual(['google_ads', '00000000-0000-0000-0000-000000000000'])
   })
 
   it('unlinks an active client (INACTIVE) after validating and disconnects stores using it through the manager', async () => {

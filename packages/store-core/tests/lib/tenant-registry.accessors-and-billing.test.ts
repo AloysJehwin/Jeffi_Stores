@@ -254,9 +254,9 @@ describe('tenant-registry — extended coverage', () => {
       await expect(mod.getTenant('t-1')).resolves.toMatchObject({ slug: 'acme' })
     })
 
-    it('getTenantBilling computes balance + totals from ledger and transactions', async () => {
+    it('getTenantBilling returns a page of each with totals and balance over all rows', async () => {
       const mod = await importRegistry()
-      // Promise.all → first pool.query = transactions, second = ledger.
+      // Promise.all → transactions page, ledger page, then the aggregates.
       poolQuery.mockReset()
       poolQuery.mockResolvedValueOnce({
         rows: [
@@ -270,11 +270,17 @@ describe('tenant-registry — extended coverage', () => {
           { id: 'l-2', entry_type: 'debit', amount: '-40', note: null, occurred_at: 'y' },
         ],
       })
-      const out = await mod.getTenantBilling('t-1')
+      poolQuery.mockResolvedValueOnce({
+        rows: [{ txn_count: 7, gross: '300', share: '240', comm: '45', fees: '15', cod: '100', ledger_count: 9, balance: '200' }],
+      })
+      const out = await mod.getTenantBilling('t-1', { transactions: { limit: 2, offset: 4 } })
       expect(out.balance).toBe(200)
-      expect(out.totals).toEqual({ gross: 300, tenantShare: 240, commission: 45, fees: 15 })
+      expect(out.totals).toEqual({ gross: 300, tenantShare: 240, commission: 45, fees: 15, codGross: 100 })
+      expect(out).toMatchObject({ transactionCount: 7, ledgerCount: 9 })
       expect(out.transactions).toHaveLength(2)
       expect(out.ledger).toHaveLength(2)
+      expect(poolQuery.mock.calls[0][1]).toEqual(['t-1', 2, 4])
+      expect(poolQuery.mock.calls[1][1]).toEqual(['t-1', 50, 0])
     })
 
     it('billingSummary coerces the numeric aggregate columns', async () => {

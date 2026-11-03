@@ -59,8 +59,8 @@ pg_docker pg_dump -d jeffi_control_plane --data-only --no-owner --no-privileges 
 {
   echo "TRUNCATE $(for t in $TABLES; do printf 'public.%s, ' "$t"; done | sed 's/, $//');"
   cat "$OUT_DIR/cp-data.sql"
-  # The platform sentinel (schema.sql seeds it; the source normally has it too).
-  echo "INSERT INTO public.tenants (id, slug, display_name, status) VALUES ('00000000-0000-0000-0000-000000000000', 'platform', 'Platform (flagship)', 'active') ON CONFLICT DO NOTHING;"
+  # The old platform sentinel row, if the source still has one: the flagship has no tenants row.
+  echo "DELETE FROM public.tenants WHERE id = '00000000-0000-0000-0000-000000000000';"
 } | dst -1 -q
 
 say "3/4 Foreign keys"
