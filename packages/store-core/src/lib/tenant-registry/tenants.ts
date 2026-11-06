@@ -1,4 +1,5 @@
 import { controlPlanePool, RESERVED_LABELS } from './shared'
+import { TENANT_HOST_PREFIXES } from './host-prefixes'
 import { clearTenantCache } from './host-resolution'
 import type { ComputeSpec } from '@/lib/compute/spec'
 
@@ -41,7 +42,7 @@ const ISO = (col: string) => `to_char(${col} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"H
 export interface TenantListRow extends TenantRow {
   instance_state: string
   ec2_instance_id: string | null
-  /** plans.infra_margin; null when the plan has none (the catalog margin applies). */
+  /** The plan's margin for the store's database (plans.rds_margin on RDS when set, else infra_margin); null when the plan has none (the catalog margin applies). */
   infra_margin: number | null
   /** tenant_compute.applied as stored (normalizeSpec before use); null until compute is applied. */
   applied: ComputeSpec | null
@@ -89,7 +90,7 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
   const res = await pool.query(
     `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at,
             t.instance_state, t.billing_interval, t.subscription_status,
-            p.slug AS plan, p.monthly_price_inr, p.infra_margin::float8 AS infra_margin,
+            p.slug AS plan, p.monthly_price_inr, COALESCE(CASE WHEN COALESCE(tc.applied, tc.desired)->'db'->>'mode' = 'dedicated' THEN p.rds_margin END, p.infra_margin)::float8 AS infra_margin,
             i.rds_endpoint, i.s3_bucket, i.ec2_target, i.ec2_instance_id, i.region, i.s3_usage_bytes::float8 AS s3_usage_bytes,
             tc.applied, tc.price_inr_month, tc.rate_inr_hour::float8 AS rate_inr_hour, ${ISO('tc.applied_at')} AS applied_at, tc.status AS compute_status,
             w.balance::float8 AS wallet_balance,
@@ -178,7 +179,7 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
       error: 'Slug must be 3-63 chars, lowercase letters/numbers/hyphens, no leading/trailing hyphen.',
     }
   }
-  if (RESERVED_LABELS.has(slug)) {
+  if (RESERVED_LABELS.has(slug) || TENANT_HOST_PREFIXES.some(p => slug.startsWith(`${p}-`))) {
     return { ok: false, error: `"${slug}" is reserved and cannot be used as a store subdomain.` }
   }
   if (!input.displayName?.trim()) return { ok: false, error: 'Store name is required.' }

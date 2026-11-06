@@ -69,7 +69,7 @@ export async function getTeamOverview(period: Period) {
                   AND NOT EXISTS (SELECT 1 FROM admin_certificates c2 WHERE c2.admin_id = a.id AND NOT COALESCE(c2.is_revoked, false) AND c2.expires_at > c.expires_at))) AS certs_expiring,
               COUNT(*) FILTER (WHERE a.is_active IS NOT FALSE AND a.mfa_enabled AND
                 (SELECT COUNT(*) FROM admin_mfa_recovery_codes r WHERE r.admin_id = a.id AND r.used_at IS NULL) < 3) AS low_recovery
-       FROM admins a`
+       FROM admins a WHERE a.role IS DISTINCT FROM 'service_account'`
     ),
     queryOne<Record<string, unknown>>(
       `SELECT COUNT(*) FILTER (WHERE ${ps.cur('s.created_at')}) AS signins,

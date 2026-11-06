@@ -58,7 +58,8 @@ ssh_forward() { # <local port> <target>; replaces one of ours that holds the por
   [ "${TUNNEL:-auto}" = ssm ] ||
     { ssh -i "$SSH_KEY" -f -N -o ConnectTimeout=8 -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L "$1:$2" "$CORE" && return 0; }
   ssm_forward "$1" "$2" && return 0
-  ssh_allowed || true
+  ssm_forward "$1" "$2" && return 0 # a session that didn't come up is usually fine the second time
+  [ "${TUNNEL:-auto}" = ssm ] || ssh_allowed || true
   return 1
 }
 ssm_forward() {
@@ -70,8 +71,10 @@ ssm_forward() {
   # The remote-host document refuses 127.0.0.1; a port on the core itself has its own document.
   local doc=AWS-StartPortForwardingSessionToRemoteHost params="host=${2%:*},portNumber=${2##*:},localPortNumber=$1"
   [ "${2%:*}" = 127.0.0.1 ] && { doc=AWS-StartPortForwardingSession; params="portNumber=${2##*:},localPortNumber=$1"; }
+  pkill -f "localPortNumber[^0-9]{0,6}$1([^0-9]|$)" 2>/dev/null || true
   nohup aws ssm start-session --target "$id" --document-name "$doc" --parameters "$params" >/dev/null 2>&1 &
-  for _ in $(seq 1 20); do listening "$1" && return 0; sleep 1; done
+  for _ in $(seq 1 40); do listening "$1" && return 0; sleep 1; done
+  echo "SSM forward on :$1 didn't open within 40 s" >&2
   return 1
 }
 pg_up() { pg_isready -h 127.0.0.1 -p "$PORT" -t 10 -q 2>/dev/null; }

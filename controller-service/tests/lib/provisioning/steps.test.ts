@@ -141,10 +141,16 @@ describe('provisioning state machine', () => {
       await expect(advanceProvisioningJob(job({ step: 'preflight' }), provider)).resolves.toBe('failed')
     })
 
-    it('advances to create_param_group when config is complete', async () => {
+    it('pins the store pipeline and advances to its first database step when config is complete', async () => {
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
       await expect(advanceProvisioningJob(job({ step: 'preflight' }), provider)).resolves.toBe('pending')
-      expect(patches().some(p => p.step === 'create_param_group')).toBe(true)
+      // Basic runs Postgres on its own server, so no parameter group.
+      expect(patches().some(p => p.step === 'launch_server' && p.stepStarted)).toBe(true)
+      expect(patches().some(p => p.step === 'create_param_group')).toBe(false)
+      const pinned = patches().find(p => p.pipeline)?.pipeline
+      expect(pinned?.v).toBe(2)
+      // Stub provider: the owner certificate comes from the worker once the job is done, not a step.
+      expect(pinned.jobs.flatMap((j: any) => j.steps.map((s: any) => s.id))).not.toContain('issue_owner_certificate')
     })
 
     it('fails terminally when TENANT_APP_TARGET_IP is the flagship and no tenant compute is configured', async () => {
@@ -182,6 +188,12 @@ describe('provisioning state machine', () => {
       },
       storage: { s3Gb: 20 },
     }
+
+    it('preflight routes a store with its own RDS to create_param_group', async () => {
+      const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+      await advanceProvisioningJob(job({ step: 'preflight', created_resources: { computeSpec: dedicatedRds } }), provider)
+      expect(patches().some(p => p.step === 'create_param_group')).toBe(true)
+    })
 
     it('create_param_group creates the group and records it', async () => {
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
@@ -466,6 +478,59 @@ describe('provisioning state machine', () => {
       expect(res).toBe('done')
       expect(reg.setTenantStatus).toHaveBeenCalledWith('t-1', 'active')
       expect(lastPatch()).toMatchObject({ status: 'done' })
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  describe('pinned pipeline', () => {
+    const pinned = (...ids: string[]) => ({ v: 2, jobs: [{ id: 'all', label: 'All', steps: ids.map(id => ({ id, label: id })) }] })
+
+    it('moves to the next step of the pinned pipeline, not the legacy list', async () => {
+      const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+      const res = await advanceProvisioningJob(
+        job({ step: 'setup_delhivery', pipeline: pinned('setup_delhivery', 'issue_owner_certificate', 'activate') }),
+        provider
+      )
+      expect(res).toBe('pending')
+      expect(patches().some(p => p.step === 'issue_owner_certificate')).toBe(true)
+      expect(patches().some(p => p.step === 'configure_dns')).toBe(false)
+    })
+
+    it('fails a step that is not in the pinned pipeline', async () => {
+      const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+      const res = await advanceProvisioningJob(job({ step: 'configure_dns', pipeline: pinned('ensure_compute', 'activate') }), provider)
+      expect(res).toBe('failed')
+      expect(String(lastPatch().last_error)).toMatch(/unknown step configure_dns/)
+    })
+
+    it('an owner certificate that keeps failing ends in a warning and the store still goes live (no rollback)', async () => {
+      process.env.PROVISIONING_PROVIDER = 'aws'
+      const ensureOwnerAdmin = vi.fn().mockResolvedValue({ success: false, error: 'tenant DB unreachable', emailed: false, revoked: [], caCreated: false })
+      vi.doMock('@controller/lib/tenancy/tenant-admin-provision', () => ({ ensureOwnerAdmin }))
+      vi.doMock('@controller/lib/provisioning/alerts', () => ({ alertProvisioningFailure: vi.fn().mockResolvedValue(undefined) }))
+      try {
+        const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+        const res = await advanceProvisioningJob(
+          job({ step: 'issue_owner_certificate', pipeline: pinned('issue_owner_certificate', 'activate'), created_resources: { stepErrors: 3 } }),
+          provider
+        )
+        expect(res).toBe('pending')
+        expect(ensureOwnerAdmin).toHaveBeenCalled()
+        expect(lastPatch()).toMatchObject({ step: 'activate', status: 'pending' })
+        expect(patches().some(p => p.status === 'failed')).toBe(false)
+        const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
+        expect(alertProvisioningFailure).toHaveBeenCalledWith('acme', 'owner_admin_cert', expect.stringMatching(/unreachable/), 't-1')
+      } finally {
+        vi.doUnmock('@controller/lib/tenancy/tenant-admin-provision')
+        vi.doUnmock('@controller/lib/provisioning/alerts')
+        delete process.env.PROVISIONING_PROVIDER
+      }
+    })
+
+    it('skips the owner certificate under the stub provider', async () => {
+      const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+      await advanceProvisioningJob(job({ step: 'issue_owner_certificate', pipeline: pinned('issue_owner_certificate', 'activate') }), provider)
+      expect(lastPatch()).toMatchObject({ step: 'activate', status: 'pending' })
     })
   })
 

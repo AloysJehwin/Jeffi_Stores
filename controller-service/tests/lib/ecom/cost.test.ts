@@ -45,6 +45,11 @@ describe('storeCost', () => {
     expect(c).toEqual({ priceMonth: 2903, priceHour: 2, awsMonth: 1168, marginMonth: 1292, mtdEstimate: 144 })
   })
 
+  it("passes the plan's RDS margin, so quoteSpec can pick it for a database on RDS", () => {
+    storeCost({ spec: SPEC, plan: { monthlyPriceInr: 0, infraMargin: 0, rdsMargin: 0.2 }, appliedAt: null, status: 'applied', catalog: CAT, now })
+    expect(pricing.quoteSpec).toHaveBeenCalledWith(SPEC, CAT, { infraMargin: 0, rdsMargin: 0.2 })
+  })
+
   it('uses the paused rate and counts from when compute was applied', () => {
     const c = storeCost({ spec: SPEC, plan: null, appliedAt: '2026-11-03T08:30:00Z', status: 'paused', catalog: CAT, now })
     expect(pricing.quoteSpec).toHaveBeenCalledWith(SPEC, CAT, undefined)
@@ -59,7 +64,7 @@ describe('storeCost', () => {
 describe('costsFor', () => {
   it('reads the catalog and plans once and keys by tenant', async () => {
     catalog.getCatalog.mockResolvedValue(CAT)
-    catalog.computePlans.mockResolvedValue([{ slug: 'basic', monthlyPriceInr: 1180, infraMargin: 0 }])
+    catalog.computePlans.mockResolvedValue([{ slug: 'basic', monthlyPriceInr: 1180, infraMargin: 0, rdsMargin: 0.2 }])
     const out = await costsFor([
       { id: 't1', plan: 'basic', applied: SPEC, applied_at: null, compute_status: 'applied', price_inr_month: 2000 },
       { id: 't2', plan: 'basic', applied: SPEC, applied_at: null, compute_status: 'applied', price_inr_month: null },
@@ -69,6 +74,7 @@ describe('costsFor', () => {
     // No stored price: only the plan fee is billed.
     expect(out.t2).toMatchObject({ priceMonth: 1180, marginMonth: -168, mtdEstimate: null })
     expect(out.t3.priceMonth).toBeNull()
+    expect(pricing.quoteSpec).toHaveBeenCalledWith(SPEC, CAT, { infraMargin: 0, rdsMargin: 0.2 })
     expect(catalog.getCatalog).toHaveBeenCalledTimes(1)
   })
 

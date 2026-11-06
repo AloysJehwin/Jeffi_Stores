@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getTenant, hasService } from '@/lib/tenant-registry'
 import { fetchService } from '@/lib/ecom/service-client'
 
@@ -7,10 +8,11 @@ export const dynamic = 'force-dynamic'
 
 // Platform admin → messaging-service as this customer's Messaging API workspace (space 'api').
 // internal: Jeffi's own edits skip the customer's restrictions and count as approved.
-// /api/admin/ecom/* is platform-admin only (middleware).
+// Platform-admin only: checked here as well as in middleware.
 async function handle(request: NextRequest, { params }: { params: Promise<{ id: string; path: string[] }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isPlatformAdmin(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   const { id, path } = await params
   const tenant = await getTenant(id)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })

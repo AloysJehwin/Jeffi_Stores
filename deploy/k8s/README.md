@@ -18,6 +18,18 @@ up and cut production over to it.
 | `platform/` | Traefik config, cert-manager + wildcard, mTLS edge, the controller/messaging/document/public-api services, Redis, CronJobs, Coroot + Headlamp |
 | `gen-cronjobs.ts` | Regenerates `platform/cronjobs.yaml` from `packages/store-core/src/lib/shared/cron-jobs.ts` (a test fails on drift) |
 
+**Crons.** One CronJob per `CRON_JOBS` entry, in `jeffi`. A job with a `tenantScope` (the nightly Google Merchant and
+Amazon feed syncs included) calls `POST /api/cron/fanout` on the controller, which runs it for the flagship
+(`CRON_FLAGSHIP_BASE`) and every active store whose plan grants the scope, at `CRON_STORE_BASE`
+(`{slug}`, `{service}`: the store's `admin-service`, or its old all-in-one `controller-service` for the store
+crons that app serves; anything else on it is reported `skipped`). Bases: `controller-service/src/lib/cron/targets.ts`.
+Platform jobs call their own route. Runs are recorded in the flagship's `site_settings` (`cron_log_{id}`); the
+store's page in the ecom admin (Provisioning tab, Scheduled jobs) shows its last result per job. A new store's
+pipeline ends with `connect_crons`: once it is live, the controller calls the store's `GET /api/cron/ping`
+exactly as the fan-out will (Host, `CRON_SECRET`) and checks its database, messaging and documents; unreachable
+after 5 min and a few retries, it warns and alerts but never rolls back. A `401` there means `jeffi/store` lacks
+the controller's `CRON_SECRET`.
+
 Tenant namespaces are **not** in git. The provisioning engine renders them
 (`packages/store-core/src/lib/k8s/tenant-workload.ts`) and applies them (`packages/store-core/src/lib/k8s/tenant-compute.ts`) when
 `PROVISIONING_COMPUTE=k8s` (set by the `provisioning` ConfigMap).
@@ -73,6 +85,8 @@ The SQL applied lands in the run summary, and the logs in the `release-logs` art
 
 - **One-time setup:** `bash deploy/k8s/bootstrap/github-oidc.sh` (`--dry-run` prints the policies). It creates `jeffi-github-build` (any branch: ECR push only) and `jeffi-github-deploy` (only the `production` and `production-release` environments: tunnels, database, CloudFront). Then `gh secret set AWS_BUILD_ROLE_ARN`, `gh secret set AWS_ROLE_ARN` (the deploy role) and `base64 < ~/.kube/jeffi-k3s.yaml | gh secret set KUBECONFIG_B64`; in GitHub → Settings → Environments: `production` with yourself as required reviewer, and `production-release` with no reviewer, both limited to `main` and `release/k8s-local`; branch protection on `main` requires `PR Gate`. The k3s admin cert in that kubeconfig lasts about a year: when the deploy job's `kubectl` starts failing, re-set `KUBECONFIG_B64` from the core.
 - **Secrets no workflow reads any more** (delete them): `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `EC2_HOST`, `EC2_INSTANCE_ID`, `EC2_SSH_KEY`, `EC2_USER`, `GH_DEPLOY_TOKEN`, `RDS_MASTER_PASSWORD`, `DATABASE_URL`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `APP_URL`.
+
+**Admin API secret.** `ADMIN_GATEWAY_SECRET` signs the header public-api-service attaches to `/v1/admin` and `/v1/platform` calls it forwards to a store. Before the first release that ships it, run `bash deploy/k8s/bootstrap/ensure-release-secrets.sh --cluster` (add `--dry-run` to look first): it generates `ADMIN_GATEWAY_SECRET` (and `CRON_SECRET`) in `jeffi/production` if missing, never replacing an existing value, copies the gateway secret to `jeffi/public-api/production`, and checks the k8s `cron-secret` the CronJobs read. Each release's `store-secret.sh` copies both to `jeffi/store`. Never put it in `jeffi/messaging/*` or `jeffi/documents/*`. Without it those routes answer 503 and the stores refuse the header; nothing else changes.
 
 **From a Mac** (GitHub unavailable, or a hotfix): commit, run `bash deploy/k8s/db/release-db.sh` (`--dry-run` first) when the database changed, then `bash deploy/k8s/bootstrap/release.sh` (`deploy-local.sh` is an alias), which ends with `50-seeds.sh`. `--build-only` stops after the push; `--rollout-only` skips the builds. Preconditions: a clean working tree, Docker running, ≥15 GB free disk (Docker corrupts its disk when it runs out). From a network that cannot reach port 22 (a VPN with rotating exit IPs) the tunnel falls back to SSM (`brew install --cask session-manager-plugin`); `TUNNEL=ssm` skips the SSH attempt. Never build on the core node: the build needs ~4 GB RAM and starves production.
 

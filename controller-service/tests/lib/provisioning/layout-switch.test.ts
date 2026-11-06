@@ -15,7 +15,7 @@ vi.mock('@controller/lib/provisioning/tenant-db-secret', () => ({ getOrCreateTen
 vi.mock('@controller/lib/provisioning/steps', () => ({ tenantHostnames: (slug: string) => [`${slug}.jeffistores.in`] }))
 const store = vi.hoisted(() => ({ getTenantCompute: vi.fn(), patchTenantCompute: vi.fn() }))
 vi.mock('@controller/lib/compute/store', () => store)
-const resolve = vi.hoisted(() => ({ rateFor: vi.fn(async () => 1.5), tenantPlanMargin: vi.fn(async () => ({ infraMargin: 0.2 })) }))
+const resolve = vi.hoisted(() => ({ rateFor: vi.fn(async () => 1.5), tenantPlanMargin: vi.fn(async () => ({ infraMargin: 0, rdsMargin: 0.2 })) }))
 vi.mock('@controller/lib/compute/resolve', () => ({
   resolveCompute: vi.fn(async () => ({ spec: { ...presetSpec('small'), layout: 'controller' }, dbPoolMax: 5, maxConnections: 100, nodeGen: 2 })),
   ...resolve,
@@ -73,7 +73,7 @@ describe('reconcileLayout', () => {
     expect(await reconcileLayout('t-1')).toEqual({ ok: true, status: 'services' })
     expect(appliedWith(0)).toEqual([expect.objectContaining({ compute: expect.objectContaining({ layout: 'services' }) })])
     expect(saved()).toEqual({ applied: expect.objectContaining({ layout: 'services' }), progress: { oldDb: { id: 'x' } }, rate_inr_hour: 1.5 })
-    expect(resolve.rateFor).toHaveBeenCalledWith(expect.objectContaining({ layout: 'services' }), { infraMargin: 0.2 })
+    expect(resolve.rateFor).toHaveBeenCalledWith(expect.objectContaining({ layout: 'services' }), { infraMargin: 0, rdsMargin: 0.2 })
     expect(resolve.tenantPlanMargin).toHaveBeenCalledWith('t-1')
   })
 

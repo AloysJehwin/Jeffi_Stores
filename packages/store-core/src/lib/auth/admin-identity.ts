@@ -32,6 +32,7 @@ export async function resolveAdminByEmail(email: string): Promise<ResolvedAdmin 
       WHERE LOWER(u.email) = LOWER($1)
         AND a.is_active = true
         AND u.is_active = true
+        AND a.role IS DISTINCT FROM 'service_account'
       LIMIT 1`,
     [email]
   )

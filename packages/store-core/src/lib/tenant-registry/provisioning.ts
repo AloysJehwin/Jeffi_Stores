@@ -9,9 +9,21 @@ export interface ProvisioningJob {
   last_error: string | null
   created_resources: Record<string, any>
   next_attempt_at?: string | null
+  /** The pinned pipeline (controller provisioning/pipeline.ts PipelineDef); null = legacy or not pinned yet. */
+  pipeline?: PinnedPipeline | null
+  /** When the current step started. */
+  step_started_at?: string | null
   created_at: string
   updated_at: string
 }
+
+export interface PinnedPipeline {
+  v: number
+  jobs: { id: string; label: string; steps: { id: string; label: string }[] }[]
+}
+
+// Per-step wait clocks: a resumed job starts each wait afresh instead of inheriting a deadline that already passed.
+const RESUME_CLEARED_KEYS = ['dbWaitStartedAt', 'computeWaitStartedAt', 'verifyStartedAt', 'verifyAttempts', 'stepDetail', 'stepWaitStartedAt']
 
 /** Create (or return existing pending) provisioning job for a tenant. */
 export async function enqueueProvisioning(
@@ -26,7 +38,7 @@ export async function enqueueProvisioning(
   if (existing.rows[0]) return existing.rows[0] as ProvisioningJob
   const created = opts?.restoreFromKey ? { restoreFromKey: opts.restoreFromKey } : {}
   const res = await pool.query(
-    `INSERT INTO provisioning_jobs (tenant_id, created_resources) VALUES ($1, $2::jsonb) RETURNING *`,
+    `INSERT INTO provisioning_jobs (tenant_id, created_resources, step_started_at) VALUES ($1, $2::jsonb, now()) RETURNING *`,
     [tenantId, JSON.stringify(created)]
   )
   return res.rows[0] as ProvisioningJob
@@ -34,7 +46,7 @@ export async function enqueueProvisioning(
 
 export type ResumeOutcome =
   | { ok: true; resumedFrom: string }
-  | { ok: false; reason: 'no_failed_job' | 'rolled_back' | 'already_running'; detail: string }
+  | { ok: false; reason: 'no_failed_job' | 'rolled_back' | 'already_running' | 'bad_step'; detail: string }
 
 /**
  * Put a failed job back in the queue at the step it died on, keeping created_resources so the
@@ -44,8 +56,13 @@ export type ResumeOutcome =
  * so resuming at (say) ensure_compute would carry on against infrastructure that no longer
  * exists. Those runs have to start over — enqueueProvisioning already does that by opening a
  * fresh job.
+ *
+ * `fromStep` re-runs from an earlier step of the job's pipeline (pinned, else `legacySteps`).
  */
-export async function resumeProvisioningJob(tenantId: string): Promise<ResumeOutcome> {
+export async function resumeProvisioningJob(
+  tenantId: string,
+  opts: { fromStep?: string; legacySteps?: readonly string[] } = {}
+): Promise<ResumeOutcome> {
   const pool = controlPlanePool()
   const res = await pool.query(`SELECT * FROM provisioning_jobs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 1`, [
     tenantId,
@@ -67,13 +84,24 @@ export async function resumeProvisioningJob(tenantId: string): Promise<ResumeOut
     }
   }
 
+  let step = job.step
+  if (opts.fromStep) {
+    const steps = job.pipeline?.jobs?.length ? job.pipeline.jobs.flatMap(j => j.steps.map(s => s.id)) : (opts.legacySteps ?? [])
+    const at = steps.indexOf(opts.fromStep)
+    if (at < 0 || at > steps.indexOf(job.step)) {
+      return { ok: false, reason: 'bad_step', detail: `"${opts.fromStep}" is not a step at or before "${job.step}" in this job.` }
+    }
+    step = opts.fromStep
+  }
+
   await pool.query(
     `UPDATE provisioning_jobs
-        SET status='pending', last_error=NULL, next_attempt_at=NULL, updated_at=now()
+        SET status='pending', step=$2, last_error=NULL, next_attempt_at=NULL, updated_at=now(), step_started_at=now(),
+            created_resources = created_resources - $3::text[]
       WHERE id=$1`,
-    [job.id]
+    [job.id, step, RESUME_CLEARED_KEYS]
   )
-  return { ok: true, resumedFrom: job.step }
+  return { ok: true, resumedFrom: step }
 }
 
 /** Fetch active jobs the worker should advance (skips jobs backing off until next_attempt_at). */
@@ -166,6 +194,9 @@ export async function updateProvisioningJob(
     bumpAttempts?: boolean
     nextAttemptAt?: Date | null
     clearNextAttempt?: boolean
+    pipeline?: PinnedPipeline | null
+    /** The step starts now (step_started_at = now()). */
+    stepStarted?: true
   }
 ): Promise<void> {
   const pool = controlPlanePool()
@@ -193,6 +224,11 @@ export async function updateProvisioningJob(
     sets.push(`next_attempt_at=$${args.length}`)
   }
   if (patch.clearNextAttempt) sets.push('next_attempt_at = NULL')
+  if (patch.pipeline !== undefined) {
+    args.push(patch.pipeline === null ? null : JSON.stringify(patch.pipeline))
+    sets.push(`pipeline=$${args.length}::jsonb`)
+  }
+  if (patch.stepStarted) sets.push('step_started_at = now()')
   args.push(id)
   await pool.query(`UPDATE provisioning_jobs SET ${sets.join(', ')} WHERE id=$${args.length}`, args)
 }

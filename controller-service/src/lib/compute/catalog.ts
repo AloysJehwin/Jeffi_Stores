@@ -72,14 +72,15 @@ export interface PlanOption extends PlanCompute {
   tier: number
   monthlyPriceInr: number
   active: boolean
-  // Per-plan markup applied to the AWS infra bill (plan.infra_margin). Resolved in quoteSpec against settings.margin.
+  // Per-plan markups on the AWS infra bill (plans.infra_margin, and rds_margin with the database on RDS). marginFor picks one.
   infraMargin?: number
+  rdsMargin?: number
 }
 
 /** Store plans with what each lets the owner choose. Inactive plans only when asked (Starter until it launches). */
 export async function computePlans(opts: { includeInactive?: boolean } = {}): Promise<PlanOption[]> {
   const r = await controlPlanePool().query(
-    `SELECT slug, name, tier, monthly_price_inr, default_preset, min_placement, advanced_compute, infra_margin, min_preset, is_active
+    `SELECT slug, name, tier, monthly_price_inr, default_preset, min_placement, advanced_compute, infra_margin, rds_margin, min_preset, is_active
        FROM plans WHERE product = 'store' ${opts.includeInactive ? '' : 'AND is_active = true'} ORDER BY tier`
   )
   return r.rows.map(p => ({
@@ -92,6 +93,7 @@ export async function computePlans(opts: { includeInactive?: boolean } = {}): Pr
     minPlacement: p.min_placement,
     advanced: p.advanced_compute,
     infraMargin: p.infra_margin == null ? undefined : Number(p.infra_margin),
+    rdsMargin: p.rds_margin == null ? undefined : Number(p.rds_margin),
     minPreset: (p.min_preset as PresetKey | null) ?? undefined,
   }))
 }

@@ -2,7 +2,7 @@ import 'server-only'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { DEFAULT_SETTINGS, computeSpecEnabled, getCatalog } from './catalog'
 import { legacySpecFor } from '@/lib/compute/legacy'
-import { pausedInrHour, quoteSpec } from './pricing'
+import { pausedInrHour, quoteSpec, type PlanMargins } from './pricing'
 import { getTenantCompute } from './store'
 import { dbBudget } from '@/lib/compute/validate'
 import { dbMaxConnections, presetOf } from '@/lib/compute/presets'
@@ -49,8 +49,8 @@ export async function resolveCompute(
   return { spec, ...computeParams(spec, await catalogOrDefault(), plan), nodeGen: row?.node_gen ?? 0 }
 }
 
-/** The spec's price per hour at the plan's infra margin (the global one when no plan is given); no GST or plan fee. Null when a part has no price. */
-export async function rateFor(spec: ComputeSpec, plan?: { infraMargin?: number }): Promise<number | null> {
+/** The spec's price per hour at the plan's margin for its database mode (the global one when no plan is given); no GST or plan fee. Null when a part has no price. */
+export async function rateFor(spec: ComputeSpec, plan?: PlanMargins): Promise<number | null> {
   try {
     return Math.round(quoteSpec(spec, await catalogOrDefault(), plan).inrHour * 10000) / 10000
   } catch {
@@ -58,22 +58,26 @@ export async function rateFor(spec: ComputeSpec, plan?: { infraMargin?: number }
   }
 }
 
-/** The tenant's plan margin for rateFor; {} (the catalog's) when its plan has none or can't be read. */
-export async function tenantPlanMargin(tenantId: string): Promise<{ infraMargin?: number }> {
+/** The tenant's plan margins for rateFor, which picks one by the spec's database; {} (the catalog's) when its plan has none or can't be read. */
+export async function tenantPlanMargin(tenantId: string): Promise<PlanMargins> {
   try {
-    const r = await controlPlanePool().query<{ m: string | null }>(
-      `SELECT p.infra_margin AS m FROM tenants t JOIN plans p ON p.id = t.plan_id WHERE t.id = $1`,
+    const r = await controlPlanePool().query<{ m: string | null; rds: string | null }>(
+      `SELECT p.infra_margin AS m, p.rds_margin AS rds FROM tenants t JOIN plans p ON p.id = t.plan_id WHERE t.id = $1`,
       [tenantId]
     )
-    const m = r.rows[0]?.m
-    return m == null ? {} : { infraMargin: Number(m) }
+    const row = r.rows[0]
+    if (!row) return {}
+    const out: PlanMargins = {}
+    if (row.m != null) out.infraMargin = Number(row.m)
+    if (row.rds != null) out.rdsMargin = Number(row.rds)
+    return out
   } catch {
     return {}
   }
 }
 
 /** What the spec still costs per hour while the store is paused; null when a part has no price. */
-export async function pausedRateFor(spec: ComputeSpec, plan?: { infraMargin?: number }): Promise<number | null> {
+export async function pausedRateFor(spec: ComputeSpec, plan?: PlanMargins): Promise<number | null> {
   try {
     return pausedInrHour(spec, await catalogOrDefault(), plan)
   } catch {

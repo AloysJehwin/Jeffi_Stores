@@ -1,6 +1,6 @@
 import 'server-only'
 import { vcpuCapacityError } from '@controller/lib/k8s/capacity'
-import { monthlyTotal, quoteSpec, UnknownPriceError, type Quote } from './pricing'
+import { monthlyTotal, quoteSpec, UnknownPriceError, type PlanMargins, type Quote } from './pricing'
 import { presetOf } from '@/lib/compute/presets'
 import { validateSpec, type Validation } from '@/lib/compute/validate'
 import type { Catalog, ComputeSpec, PlanCompute } from '@/lib/compute/spec'
@@ -24,9 +24,9 @@ export async function quoteForPlan(
 ): Promise<PlanQuote> {
   const validation = validateSpec(spec, catalog, plan, opts)
   let quote: Quote | null = null
-  const infraMargin = 'infraMargin' in plan ? plan.infraMargin : undefined
   try {
-    quote = quoteSpec(spec, catalog, { infraMargin })
+    // A bare PlanCompute carries no margins: the catalog's applies.
+    quote = quoteSpec(spec, catalog, plan as PlanMargins)
   } catch (e) {
     if (!(e instanceof UnknownPriceError)) throw e
     validation.ok = false

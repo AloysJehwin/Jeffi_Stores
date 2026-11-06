@@ -6,6 +6,7 @@ import { parseBody } from '@/lib/shared/validate'
 import { getTenant } from '@/lib/tenant-registry'
 import { revokeTenantAdminCert } from '@/lib/tenancy/tenant-ca'
 import { revokePortalCerts } from '@/lib/tenancy/portal-certs'
+import { markTenantDbCertsRevoked } from '@controller/lib/tenancy/tenant-admin-provision'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,8 +14,8 @@ const Body = z.object({ serial: z.string().min(1).max(64) })
 
 // Revoke a tenant admin certificate by serial. Platform-owner only. Flips BOTH the authoritative
 // tenant_admin_certs registry (checked at mTLS auth by tenant-mtls.ts) AND the portal_certs
-// download registry, so a revoked cert can neither authenticate nor be re-downloaded. There was no
-// API caller for revokeTenantAdminCert before this route.
+// download registry, so a revoked cert can neither authenticate nor be re-downloaded, and marks it
+// revoked in the store's own admin_certificates (best-effort) so the store's admin agrees.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const revokedBy = admin.email || admin.adminId || 'platform-admin'
   const wasActive = await revokeTenantAdminCert(parsed.data.serial, revokedBy)
   await revokePortalCerts([parsed.data.serial])
+  await markTenantDbCertsRevoked(tenantId, [parsed.data.serial])
 
   return NextResponse.json({ success: true, alreadyRevoked: !wasActive })
 }

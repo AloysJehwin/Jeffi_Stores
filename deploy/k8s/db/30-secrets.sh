@@ -16,7 +16,7 @@ PATCHES=(
   "jeffi/production CONTROL_PLANE_RDS_DB=jeffi_stores"
   "jeffi/messaging/production CONTROL_PLANE_RDS_DB=jeffi_stores MESSAGING_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL SERVICE_AUTH_SECRET=@prod SHORT_LINK_SECRET=@prod"
   "jeffi/documents/production CONTROL_PLANE_RDS_DB=jeffi_stores DOCUMENTS_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL DOCUMENTS_BUCKET=$BUCKET SERVICE_AUTH_SECRET=@prod"
-  "jeffi/public-api/production CONTROL_PLANE_RDS_DB=jeffi_stores CONTROL_PLANE_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL SERVICE_AUTH_SECRET=@prod"
+  "jeffi/public-api/production CONTROL_PLANE_RDS_DB=jeffi_stores CONTROL_PLANE_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL SERVICE_AUTH_SECRET=@prod ADMIN_GATEWAY_SECRET=@prod"
 )
 
 cat > "$TMP/patch.py" <<'PY'
@@ -33,7 +33,9 @@ def show(k, v):
 changed = 0
 for p in pairs:
     k, v = p.split('=', 1)
-    if v == '@prod': v = prod[k]
+    if v == '@prod':
+        if k not in prod: sys.exit(f'  {k} is missing from jeffi/production: add it there first')
+        v = prod[k]
     if cur.get(k) == v: continue
     new[k] = v; changed += 1
     print(f'  {k}: {show(k, cur.get(k))} -> {show(k, v)}')

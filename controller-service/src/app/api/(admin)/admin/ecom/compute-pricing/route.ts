@@ -3,10 +3,10 @@ import { requireAdminScope } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { clearCatalogCache, computePlans, getCatalog } from '@controller/lib/compute/catalog'
-import { PRESETS, presetSpec } from '@/lib/compute/presets'
+import { PRESETS, presetSpec, withDedicatedDb } from '@/lib/compute/presets'
 import { PRESET_RANK } from '@/lib/compute/validate'
 import { monthlyTotal, quoteSpec, UnknownPriceError } from '@controller/lib/compute/pricing'
-import type { PresetKey, PricingSettings } from '@/lib/compute/spec'
+import type { ComputeSpec, PresetKey, PricingSettings } from '@/lib/compute/spec'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,23 +18,29 @@ function platformOnly(admin: Awaited<ReturnType<typeof requireAdminScope>>) {
   return admin
 }
 
-// The sizes a plan offers: Basic only its fixed size, the others theirs from the plan's minimum up.
+// The sizes a plan offers: Basic only its fixed size (database on the server or RDS), the others theirs from the plan's minimum up.
 const rankOf = (k: PresetKey) => (k === 'shared' ? -1 : PRESET_RANK[k])
 const offers = (minPreset: PresetKey | undefined, key: PresetKey) =>
   minPreset === 'basic' ? key === 'basic' : key !== 'basic' && key !== 'shared' && rankOf(key) >= Math.max(1, minPreset ? rankOf(minPreset) : 1)
 
+// Every preset, with Basic's RDS shape after Basic.
+const SIZES: { key: string; preset: PresetKey; label: string; spec: ComputeSpec }[] = Object.values(PRESETS).flatMap(p => {
+  const row = { key: p.key, preset: p.key, label: p.label, spec: presetSpec(p.key) }
+  return p.key === 'basic' ? [row, { key: 'basic-rds', preset: p.key, label: `${p.label} with RDS`, spec: withDedicatedDb(presetSpec('basic'), 'basic') }] : [row]
+})
+
 async function view() {
   const catalog = await getCatalog()
   const plans = await computePlans()
-  const presets = Object.values(PRESETS)
+  const presets = SIZES
     .map(p => {
-      const spec = presetSpec(p.key)
-      // Each plan's price for the size: infra at its margin, GST on that, plus its fee.
+      const spec = p.spec
+      // Each plan's price for the size: infra at its margin for the database, GST on that, plus its fee.
       const byPlan = Object.fromEntries(
         plans.map(pl => {
-          if (!offers(pl.minPreset, p.key)) return [pl.slug, null]
+          if (!offers(pl.minPreset, p.preset)) return [pl.slug, null]
           try {
-            const q = quoteSpec(spec, catalog, { infraMargin: pl.infraMargin })
+            const q = quoteSpec(spec, catalog, pl)
             return [pl.slug, { infraInrMonth: q.inrMonth, totalInrMonth: monthlyTotal(q, pl.monthlyPriceInr, catalog.settings.gstRate).total }]
           } catch (e) {
             if (e instanceof UnknownPriceError) return [pl.slug, null]
@@ -53,7 +59,10 @@ async function view() {
     .filter(p => Object.values(p.plans).some(Boolean))
   return {
     ...catalog,
-    plans: plans.map(p => ({ slug: p.slug, name: p.name, tier: p.tier, monthlyPriceInr: p.monthlyPriceInr, infraMargin: p.infraMargin ?? 0, minPreset: p.minPreset ?? null })),
+    plans: plans.map(p => ({
+      slug: p.slug, name: p.name, tier: p.tier, monthlyPriceInr: p.monthlyPriceInr, infraMargin: p.infraMargin ?? 0, rdsMargin: p.rdsMargin ?? null,
+      minPreset: p.minPreset ?? null, defaultPreset: p.defaultPreset,
+    })),
     presets,
   }
 }
@@ -83,7 +92,7 @@ const SETTING_BOUNDS: Partial<Record<keyof PricingSettings, [number, number]>> =
   s3UsdGbMonth: [0, 10],
 }
 
-/** { code, usd_hourly?, …, sellable? } edits one price; { settings: {...} } the pricing settings; { plan, infraMargin?, monthlyPriceInr? } a plan's margin and fee. */
+/** { code, usd_hourly?, …, sellable? } edits one price; { settings: {...} } the pricing settings; { plan, infraMargin?, rdsMargin?, monthlyPriceInr? } a plan's margins and fee. */
 export async function PATCH(req: NextRequest) {
   const admin = platformOnly(await requireAdminScope(req, 'ecom_billing:write'))
   if (admin instanceof NextResponse) return admin
@@ -104,14 +113,23 @@ export async function PATCH(req: NextRequest) {
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
       [JSON.stringify({ ...settings, ...next })]
     )
-  } else if (typeof b.plan === 'string' && (b.infraMargin !== undefined || b.monthlyPriceInr !== undefined)) {
+  } else if (typeof b.plan === 'string' && (b.infraMargin !== undefined || b.rdsMargin !== undefined || b.monthlyPriceInr !== undefined)) {
     const sets: string[] = []
     const vals: unknown[] = [b.plan]
     if (b.infraMargin !== undefined) {
       const n = Number(b.infraMargin)
-      if (!Number.isFinite(n) || n < 0 || n > 3) return NextResponse.json({ error: 'infraMargin must be between 0 and 3' }, { status: 400 })
+      if (b.infraMargin === null || !Number.isFinite(n) || n < 0 || n > 3) return NextResponse.json({ error: 'infraMargin must be between 0 and 3' }, { status: 400 })
       vals.push(n)
       sets.push(`infra_margin = $${vals.length}`)
+    }
+    if (b.rdsMargin !== undefined) {
+      // null: the plan's server margin applies with RDS too.
+      const n = b.rdsMargin === null ? null : typeof b.rdsMargin === 'number' ? b.rdsMargin : NaN
+      if (n !== null && (!Number.isFinite(n) || n < 0 || n > 3)) {
+        return NextResponse.json({ error: 'rdsMargin must be between 0 and 3, or null' }, { status: 400 })
+      }
+      vals.push(n)
+      sets.push(`rds_margin = $${vals.length}`)
     }
     if (b.monthlyPriceInr !== undefined) {
       // The plan's flat monthly fee, GST included.

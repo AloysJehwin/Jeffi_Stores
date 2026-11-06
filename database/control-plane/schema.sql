@@ -308,6 +308,9 @@ CREATE TABLE IF NOT EXISTS public.provisioning_jobs (
     created_at         timestamp with time zone NOT NULL DEFAULT now(),
     updated_at         timestamp with time zone NOT NULL DEFAULT now()
 );
+-- The job's pipeline (controller provisioning/pipeline.ts), pinned at preflight; NULL = the legacy step list.
+ALTER TABLE public.provisioning_jobs ADD COLUMN IF NOT EXISTS pipeline        jsonb;
+ALTER TABLE public.provisioning_jobs ADD COLUMN IF NOT EXISTS step_started_at timestamp with time zone;
 
 --
 -- import_jobs: async bulk product import. One row per uploaded/synced spreadsheet.
@@ -786,7 +789,7 @@ CREATE TABLE IF NOT EXISTS public.provisioning_step_events (
     job_id      uuid NOT NULL,
     tenant_id   uuid NOT NULL,
     step        character varying(64) NOT NULL,
-    status      character varying(16) NOT NULL,   -- ok | error
+    status      character varying(16) NOT NULL,   -- ok | skipped | warning | error
     message     text,
     detail      jsonb NOT NULL DEFAULT '{}'::jsonb,  -- resource keys this step produced
     duration_ms integer,
@@ -799,6 +802,7 @@ ALTER TABLE ONLY public.provisioning_step_events
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_provisioning_step_events_job
     ON public.provisioning_step_events USING btree (job_id, created_at);
+ALTER TABLE public.provisioning_step_events ADD COLUMN IF NOT EXISTS started_at timestamp with time zone;
 
 
 --
@@ -865,6 +869,8 @@ ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS egress_quota_bytes  bigint;
 -- Infra-cost pricing: each paid plan marks up AWS cost by infra_margin and floors compute to min_preset.
 ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS infra_margin numeric(4,3) NOT NULL DEFAULT 0;
 ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS min_preset   text         NOT NULL DEFAULT 'small';
+-- Markup when the store's database is on RDS; NULL uses infra_margin.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS rds_margin   numeric(4,3);
 
 -- Own-key tenants verify their customer webhook with their own secret (platform secret can't).
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS razorpay_webhook_secret character varying(255);
@@ -1171,3 +1177,45 @@ ALTER TABLE ONLY public.shared_db_hosts ADD CONSTRAINT shared_db_hosts_status_ch
 -- A Starter store's own login role on its shared host (null = RDS_USER), and which host.
 ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS rds_user       text;
 ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS shared_db_host text;
+
+--
+-- admin_api_tokens: admin API credentials, resolved by the public gateway (public[-{slug}].jeffistores.in)
+-- without opening a store's DB. jfc_ = a person's token (`jeffi login` device flow, or the extension card),
+-- jsa_ = a service account's key. sha256 only; the plaintext is shown once. admin_id / service_account_id
+-- live in the store's own DB. tenant_id is the store; the flagship is the nil uuid (no tenants row, no FK).
+--
+CREATE TABLE IF NOT EXISTS public.admin_api_tokens (
+    id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    token_hash         character(64),                     -- null until a device login is collected
+    token_prefix       character varying(16),
+    tenant_id          uuid NOT NULL,
+    kind               character varying(16) NOT NULL DEFAULT 'cli',     -- cli | service_account | extension
+    admin_id           uuid,
+    service_account_id uuid,
+    admin_role         character varying(32),             -- role at approval: the gateway's platform pre-check
+    status             character varying(16) NOT NULL DEFAULT 'pending', -- pending | denied | active | revoked
+    device_code_hash   character(64),
+    user_code          character varying(9),              -- XXXX-XXXX, pending device logins only
+    scopes             jsonb NOT NULL DEFAULT '[]'::jsonb, -- ["*"] = whatever the holder holds now
+    host               character varying(255) NOT NULL,   -- admin host it was issued on
+    client_name        character varying(120),
+    client_ip          character varying(64),
+    user_agent         character varying(500),
+    created_at         timestamp with time zone NOT NULL DEFAULT now(),
+    approved_at        timestamp with time zone,
+    expires_at         timestamp with time zone,          -- null: until revoked (service-account keys)
+    revoked_at         timestamp with time zone,
+    last_used_at       timestamp with time zone
+);
+ALTER TABLE ONLY public.admin_api_tokens ADD CONSTRAINT admin_api_tokens_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.admin_api_tokens ADD CONSTRAINT admin_api_tokens_token_hash_key UNIQUE (token_hash);
+ALTER TABLE ONLY public.admin_api_tokens ADD CONSTRAINT admin_api_tokens_kind_check
+    CHECK (kind IN ('cli','service_account','extension'));
+ALTER TABLE ONLY public.admin_api_tokens ADD CONSTRAINT admin_api_tokens_status_check
+    CHECK (status IN ('pending','denied','active','revoked'));
+ALTER TABLE ONLY public.admin_api_tokens ADD CONSTRAINT admin_api_tokens_holder_check
+    CHECK (status IN ('pending','denied') OR (kind = 'service_account' AND service_account_id IS NOT NULL) OR (kind <> 'service_account' AND admin_id IS NOT NULL));
+CREATE UNIQUE INDEX IF NOT EXISTS uq_admin_api_tokens_device_code ON public.admin_api_tokens USING btree (device_code_hash) WHERE (device_code_hash IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_admin_api_tokens_user_code ON public.admin_api_tokens USING btree (user_code) WHERE (status = 'pending');
+CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_admin ON public.admin_api_tokens USING btree (tenant_id, admin_id) WHERE (revoked_at IS NULL);
+CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_service_account ON public.admin_api_tokens USING btree (tenant_id, service_account_id) WHERE (service_account_id IS NOT NULL);

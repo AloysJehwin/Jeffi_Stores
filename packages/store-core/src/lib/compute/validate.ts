@@ -1,4 +1,4 @@
-import { DB_POOL_CAP, DB_POOL_MIN, DB_RESERVED_CONNECTIONS, POD_RESOURCES, PRESETS, REDIS_RESOURCES, dbMaxConnections, nodeDbMaxConnections, presetOf, presetSpec } from './presets'
+import { BASIC_DB_CLASSES, DB_POOL_CAP, DB_POOL_MIN, DB_RESERVED_CONNECTIONS, NODE_DB_RESOURCES, POD_RESOURCES, PRESETS, REDIS_RESOURCES, dbMaxConnections, nodeDbMaxConnections, presetOf, presetSpec, specKey, withHighAvailability } from './presets'
 import { POD_SIZES, SERVICE_NAMES, activeServices, ec2Code, priceOf, rdsCode, type Catalog, type ComputeSpec, type PlanCompute, type PresetKey, type ServiceName, type ServiceSpec } from './spec'
 
 // Numeric floor rank — Basic is 0, each dedicated tier is one step up. Shared is intentionally
@@ -11,18 +11,21 @@ export const PRESET_RANK: Record<Exclude<PresetKey, 'shared'>, number> = {
   xlarge: 4,
 }
 
-// Servers and databases rank by memory: small..xlarge need at least these MiB.
-const NODE_TIER_MIB = [2048, 4096, 8192, 16384]
-const DB_TIER_MIB = [1024, 2048, 4096, 8192]
+// Servers and databases rank by memory: small..xlarge need at least these MiB; the last tier is the bigger types above xlarge.
+const NODE_TIER_MIB = [2048, 4096, 8192, 16384, 32768]
+const DB_TIER_MIB = [1024, 2048, 4096, 8192, 16384]
 // Memory of the sellable types, for callers without a catalog.
 const KNOWN_MIB: Record<string, number> = {
-  't4g.small': 2048, 't4g.medium': 4096, 't4g.large': 8192, 't4g.xlarge': 16384, 'm7g.large': 8192, 'c7g.large': 4096,
-  'db.t4g.micro': 1024, 'db.t4g.small': 2048, 'db.t4g.medium': 4096, 'db.t4g.large': 8192,
+  't4g.small': 2048, 't4g.medium': 4096, 't4g.large': 8192, 't4g.xlarge': 16384, 't4g.2xlarge': 32768,
+  'm7g.large': 8192, 'm7g.xlarge': 16384, 'm7g.2xlarge': 32768, 'r7g.large': 16384, 'r7g.xlarge': 32768,
+  'c7g.large': 4096, 'c7g.xlarge': 8192,
+  'db.t4g.micro': 1024, 'db.t4g.small': 2048, 'db.t4g.medium': 4096, 'db.t4g.large': 8192, 'db.t4g.xlarge': 16384,
+  'db.m7g.large': 8192, 'db.r7g.large': 16384, 'db.r7g.xlarge': 32768,
 }
 const memOf = (catalog: Catalog | null | undefined, code: string, name: string) => (catalog ? priceOf(catalog, code)?.memoryMib : null) ?? KNOWN_MIB[name] ?? 0
 const tierOf = (mib: number, tiers: number[]) => tiers.filter(t => mib >= t).length
 
-/** 1 (small) to 4 (xlarge) for a server type; 0 when it is smaller than small or unknown. */
+/** 1 (small) to 4 (xlarge), 5 above it, for a server type; 0 when it is smaller than small or unknown. */
 export const nodeTier = (type: string | null, catalog?: Catalog | null) => tierOf(memOf(catalog, ec2Code(type ?? ''), type ?? ''), NODE_TIER_MIB)
 
 /** The preset-rank the spec is at least as big as. A node-DB spec ranks by its server tier (the DB
@@ -74,13 +77,17 @@ const states = (spec: ComputeSpec) => [
 export const peakPods = (spec: ComputeSpec, plan?: string | null) =>
   Math.max(...states(spec).map(count => namesFor(plan).reduce((n, k) => n + count(k), 0)))
 
-/** Requests at the busiest moment, Redis included. */
+const NODE_DB_MIB = mib(NODE_DB_RESOURCES.requests.memory)
+const NODE_DB_MILLI = milli(NODE_DB_RESOURCES.requests.cpu)
+
+/** Requests at the busiest moment, Redis and (node mode) Postgres included. */
 function requested(spec: ComputeSpec, plan?: string | null) {
+  const nodeDb = spec.db.mode === 'node'
   let cpu = 0
   let mem = 0
   for (const count of states(spec)) {
-    let c = milli(REDIS_RESOURCES.requests.cpu)
-    let m = mib(REDIS_RESOURCES.requests.memory)
+    let c = milli(REDIS_RESOURCES.requests.cpu) + (nodeDb ? NODE_DB_MILLI : 0)
+    let m = mib(REDIS_RESOURCES.requests.memory) + (nodeDb ? NODE_DB_MIB : 0)
     for (const k of namesFor(plan)) {
       const res = POD_RESOURCES[k][spec.services[k].size].requests
       c += milli(res.cpu) * count(k)
@@ -119,6 +126,33 @@ export function fitOf(spec: ComputeSpec, catalog: Catalog, plan?: string | null)
 
 const int = (n: unknown) => typeof n === 'number' && Number.isInteger(n)
 
+// A preset's servers and services (or Basic's), whatever its database and storage.
+const isPlatformSize = (spec: ComputeSpec) =>
+  Object.values(PRESETS).some(p => {
+    if (p.spec.node.placement !== 'dedicated') return false
+    const k = specKey({ ...spec, db: p.spec.db, storage: p.spec.storage })
+    return k === specKey(p.spec) || k === specKey(withHighAvailability(p.spec))
+  })
+
+/**
+ * Why the services don't fit the server(s). A preset or Basic is let through when only the on-server
+ * Postgres tips it over: memory on t4g.small at a release (1720 of 1598 MiB), CPU on Large (1.96 of 1.9 vCPU).
+ */
+export function serverFitErrors(spec: ComputeSpec, catalog: Catalog, plan?: string | null, fit: Fit = fitOf(spec, catalog, plan)): string[] {
+  if (spec.node.placement !== 'dedicated') return []
+  const errors: string[] = []
+  const mem = fit.memory
+  const cpu = fit.cpu
+  const platform = spec.db.mode === 'node' && isPlatformSize(spec)
+  if (mem.requestedMib > mem.allocatableMib && !(platform && mem.requestedMib - NODE_DB_MIB <= mem.allocatableMib)) {
+    errors.push(`The services need ${mem.requestedMib} MB of memory; the server has ${mem.allocatableMib} MB. Choose a bigger server or fewer copies.`)
+  }
+  if (cpu.requestedMilli > cpu.allocatableMilli && !(platform && cpu.requestedMilli - NODE_DB_MILLI <= cpu.allocatableMilli)) {
+    errors.push(`The services need ${fit.cpu.requestedMilli / 1000} vCPU; the server has ${fit.cpu.allocatableMilli / 1000}. Choose a bigger server or fewer copies.`)
+  }
+  return errors
+}
+
 /** Why a spec can't be chosen on this plan at all (wrong kind of server, or custom on a presets-only plan). */
 export function planCompatibilityError(spec: ComputeSpec, plan: PlanCompute, catalog?: Catalog | null): string | null {
   const preset = presetOf(spec)
@@ -131,17 +165,22 @@ export function planCompatibilityError(spec: ComputeSpec, plan: PlanCompute, cat
   if (!plan.advanced && preset === 'custom') return 'Choose one of the sizes; custom settings need a higher plan.'
   if (plan.minPreset) {
     if (plan.minPreset === 'basic') {
-      // Basic is fixed — a dedicated single Basic node with Postgres on the node, one copy of each of its
-      // services. Checked structurally, not whole-spec equality: storageGb (a disk never shrinks), s3 and
-      // inactive services may drift without changing what Basic runs.
+      // Basic is fixed — a dedicated single Basic node, one copy of each of its services — with Postgres on
+      // the node or a small RDS. Checked structurally, not whole-spec equality: storageGb (a disk never
+      // shrinks), s3 and inactive services may drift without changing what Basic runs.
       const b = presetSpec('basic')
       const sameServices = activeServices(plan.slug).every(k => {
         const x = spec.services[k]
         const y = b.services[k]
         return x?.replicas === y.replicas && x?.maxReplicas === y.maxReplicas && x?.size === y.size
       })
-      if (!(spec.node.placement === 'dedicated' && spec.node.type === b.node.type && spec.node.count === 1 && spec.db.mode === 'node' && sameServices)) {
+      if (!(spec.node.placement === 'dedicated' && spec.node.type === b.node.type && spec.node.count === 1 && sameServices)) {
         return 'Basic requires the fixed Basic configuration.'
+      }
+      if (spec.db.mode === 'dedicated') {
+        if (!BASIC_DB_CLASSES.includes(spec.db.class ?? '')) return `Basic offers a ${BASIC_DB_CLASSES.join(' or ')} database.`
+        if (spec.db.multiAz) return 'Basic has no standby database; choose a higher plan.'
+        if (spec.db.storageGb < LIMITS.minStorageGb) return `A Basic database needs at least ${LIMITS.minStorageGb} GB.`
       }
     } else {
       const floor = PRESET_RANK[plan.minPreset as Exclude<PresetKey, 'shared'>] ?? 0
@@ -206,14 +245,7 @@ export function validateSpec(
   if (errors.length) return { ok: false, errors, fit: null }
 
   const fit = fitOf(spec, catalog, plan.slug)
-  if (spec.node.placement === 'dedicated') {
-    if (fit.memory.requestedMib > fit.memory.allocatableMib) {
-      errors.push(`The services need ${fit.memory.requestedMib} MB of memory; the server has ${fit.memory.allocatableMib} MB. Choose a bigger server or fewer copies.`)
-    }
-    if (fit.cpu.requestedMilli > fit.cpu.allocatableMilli) {
-      errors.push(`The services need ${fit.cpu.requestedMilli / 1000} vCPU; the server has ${fit.cpu.allocatableMilli / 1000}. Choose a bigger server or fewer copies.`)
-    }
-  }
+  errors.push(...serverFitErrors(spec, catalog, plan.slug, fit))
   if (fit.db.poolPerPod < DB_POOL_MIN) {
     errors.push(
       spec.db.mode === 'node'
@@ -226,10 +258,22 @@ export function validateSpec(
 
 /** The smallest sellable server the spec fits on, for "choose a bigger server". */
 export function smallestFittingNode(spec: ComputeSpec, catalog: Catalog, plan?: string | null): string | null {
-  const types = catalog.prices.filter(p => p.kind === 'ec2' && p.sellable).sort((a, b) => (a.memoryMib ?? 0) - (b.memoryMib ?? 0) || a.sort - b.sort)
+  // Cheapest that fits, then the smaller one: an r7g.large beats a t4g.xlarge for a memory-bound store.
+  const types = catalog.prices
+    .filter(p => p.kind === 'ec2' && p.sellable)
+    .sort((a, b) => (a.usdHourly ?? Infinity) - (b.usdHourly ?? Infinity) || (a.memoryMib ?? 0) - (b.memoryMib ?? 0) || a.sort - b.sort)
   for (const t of types) {
     const f = fitOf({ ...spec, node: { ...spec.node, type: t.code.slice(4) } }, catalog, plan)
     if (f.memory.requestedMib <= f.memory.allocatableMib && f.cpu.requestedMilli <= f.cpu.allocatableMilli) return t.code.slice(4)
+  }
+  return null
+}
+
+/** The smallest server type the spec fits on, adding servers (up to LIMITS.maxNodes) when no single type does; null when nothing fits. */
+export function fittingServers(spec: ComputeSpec, catalog: Catalog, plan?: string | null): { type: string; count: number } | null {
+  for (let count = Math.max(1, spec.node.count); count <= LIMITS.maxNodes; count++) {
+    const type = smallestFittingNode({ ...spec, node: { ...spec.node, count } }, catalog, plan)
+    if (type) return { type, count }
   }
   return null
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { rejectKyc, getKyc, getOwnerById, getTenant, hasService, reviewServiceApproval, controlPlanePool } from '@/lib/tenant-registry'
 import { sendKycRejectedEmail, sendServicesReviewedEmail } from '@/lib/shared/ecom-emails'
 
@@ -11,6 +12,7 @@ const Schema = z.object({ note: z.string().min(1) })
 export async function POST(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isPlatformAdmin(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { tenantId } = await params
   const raw = await request.json().catch(() => null)
