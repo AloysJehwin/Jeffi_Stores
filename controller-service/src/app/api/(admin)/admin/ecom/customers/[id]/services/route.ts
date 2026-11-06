@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getTenant, listServiceApprovals, reviewServiceApproval, controlPlanePool } from '@/lib/tenant-registry'
 import { sendServicesReviewedEmail } from '@/lib/shared/ecom-emails'
 
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isPlatformAdmin(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   const { id } = await params
   const parsed = z.object({ service: z.enum(['messaging', 'documents']), decision: z.enum(['approved', 'rejected']), note: z.string().max(1000).optional() })
     .refine(b => b.decision === 'approved' || !!b.note?.trim(), { message: 'A note is required to reject' })

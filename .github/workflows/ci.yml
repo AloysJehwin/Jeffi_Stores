@@ -2,10 +2,10 @@ name: Jeffi Stores Pipeline
 
 # One pipeline, one card per stage. Per-app stages are matrices (one job per app inside the card).
 #
-#   Init ─┬→ Lint (10) ───────┬→ Build (9) ───────┐
-#         ├→ Type check (11) ─┘                    │
+#   Init ─┬→ Lint (12) ───────┬→ Build (9) ───────┐
+#         ├→ Type check (12) ─┘                    │
 #         ├→ Security                              ├→ Checks passed (required status; on a release, the approval)
-#         ├→ Unit tests (10) → Coverage ───────────┤
+#         ├→ Unit tests (11) → Coverage ───────────┤
 #         ├→ Integration tests ────────────────────┘
 #         └→ Images (8, release only, after Lint and Type check)
 #
@@ -133,6 +133,9 @@ jobs:
           - { app: public-api, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts public-api-service/src }
           - { app: mobile, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts mobile-service/src }
           - { app: ai-gateway, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts ai-platform/gateway/src ai-platform/sdk }
+          # The CLI's route manifest matches the route handlers; every route test mirrors a route.
+          - { app: api-manifest, run: npm run cli:check }
+          - { app: api-test-mirror, run: node scripts/check-api-test-mirror.mjs }
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -158,6 +161,7 @@ jobs:
           - { app: mobile, run: npm --prefix mobile-service run typecheck }
           - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform run typecheck }
           - { app: mobile-app, install: npm --prefix mobile-service/client ci, run: npm --prefix mobile-service/client run typecheck }
+          - { app: cli, run: npx tsc --noEmit -p packages/cli/tsconfig.json }
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -198,6 +202,7 @@ jobs:
           - { app: admin, part: admin }
           - { app: business, part: business }
           - { app: store-core, part: store-core }
+          - { app: cli, part: cli }
           - { app: messaging, run: npm --prefix messaging-service test }
           - { app: documents, run: npm --prefix document-service test }
           - { app: public-api, run: npm --prefix public-api-service test -- --passWithNoTests }

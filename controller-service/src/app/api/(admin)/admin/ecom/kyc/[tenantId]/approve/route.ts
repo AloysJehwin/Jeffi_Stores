@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import {
   approveKyc,
   getTenant,
@@ -41,6 +42,7 @@ const PAYMENTS_ENABLED = process.env.ECOM_PAYMENTS_ENABLED === 'true'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isPlatformAdmin(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { tenantId } = await params
   const tenant = await getTenant(tenantId)

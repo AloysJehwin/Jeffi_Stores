@@ -9,8 +9,10 @@ import { priceList, toPaise } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import type { ApiScope } from '@jeffi/api-contracts'
 import { FLAGSHIP_GOOGLE_TAG_ID, gtagHeadSnippet } from '@jeffi/api-contracts'
-import { lookupKey, touchKey, type ApiKeyRow } from './keys.js'
+import { cp, lookupKey, touchKey, type ApiKeyRow } from './keys.js'
 import { buildOpenApi } from './openapi.js'
+import { classifyHost, registerAdminGateway, requestHost, storeLookup, tokenLookup } from './admin-gateway.js'
+import { specFor } from './admin-docs.js'
 
 const MESSAGING_URL = (process.env.MESSAGING_URL || 'http://localhost:3101').replace(/\/$/, '')
 const DOCUMENTS_URL = (process.env.DOCUMENTS_URL || 'http://localhost:3102').replace(/\/$/, '')
@@ -29,14 +31,35 @@ declare module 'fastify' {
   }
 }
 
+const cpQuery = (sql: string, params: unknown[]) => cp().query(sql, params)
+const lookupAdminToken = tokenLookup(cpQuery)
+const resolveStore = storeLookup(cpQuery)
+const ADMIN_RATE_PER_MIN = Number(process.env.ADMIN_GATEWAY_RATE_PER_MIN || 120)
+
+// A store's own host (public-{slug}) serves only its admin API and its docs; everything else is the flagship's.
+const STORE_HOST_PATHS = /^\/(v1\/admin\/|openapi\.json(\?|$)|docs(\/|\?|$)|healthz$|$|\?)/
+app.addHook('onRequest', async (req, reply) => {
+  if (classifyHost(requestHost(req.headers)).kind === 'store' && !STORE_HOST_PATHS.test(req.url)) {
+    return reply.code(404).send({ error: 'not_found', message: 'No such endpoint — see /docs' })
+  }
+})
+
 // ── public, unauthenticated ──
 app.get('/healthz', async () => ({ ok: true, service: 'public-api' }))
 const openapi = buildOpenApi()
-app.get('/openapi.json', async () => openapi)
+// Per host: a store's host documents that store's admin API; public. the full API.
+app.get('/openapi.json', async (req, reply) => {
+  const ph = classifyHost(requestHost(req.headers))
+  if (ph.kind === 'other') return openapi
+  const store = await resolveStore(ph)
+  if (!store) return reply.code(404).send({ error: 'not_found', message: 'No such store' })
+  reply.header('cache-control', 'public, max-age=300')
+  return specFor(openapi, ph, store)
+})
 await app.register(apiReference, {
   routePrefix: '/docs',
   configuration: {
-    content: openapi,
+    url: '/openapi.json',
     theme: 'kepler',
     metaData: {
       title: 'Jeffi API Reference',
@@ -48,9 +71,9 @@ await app.register(apiReference, {
 // to Jeffi's here so both the /docs 301-served HTML and /docs/ match, and the platform Google tag
 // goes in the head so docs visits show up next to ecom.jeffistores.in. (Favicon left as-is.)
 const DOCS_GTAG = gtagHeadSnippet(FLAGSHIP_GOOGLE_TAG_ID, { contentGroup: 'api_docs' })
-const brandDocHtml = (html: string) =>
+const brandDocHtml = (html: string, title = 'Jeffi API Reference') =>
   html
-    .replace(/<title>[^<]*<\/title>/i, '<title>Jeffi API Reference</title>')
+    .replace(/<title>[^<]*<\/title>/i, `<title>${title.replace(/[<>&"]/g, '')}</title>`)
     // /docs re-renders /docs/ through this hook, so skip HTML that already has the tag.
     .replace(/<\/head>/i, m => (html.includes('googletagmanager.com/gtag/js') ? m : `${DOCS_GTAG}</head>`))
 
@@ -59,13 +82,20 @@ const brandDocHtml = (html: string) =>
 // /docs/'s HTML directly on /docs with a 200 AND rewrite the HTML's relative asset paths
 // (`js/scalar.js`, `./openapi.json`) to absolute `/docs/*` so the browser resolves them
 // against the right directory regardless of the URL having no trailing slash.
+const docsTitle = async (req: FastifyRequest) => {
+  const ph = classifyHost(requestHost(req.headers))
+  if (ph.kind !== 'store') return undefined
+  const store = await resolveStore(ph).catch(() => null)
+  return store ? `${store.name} API Reference` : undefined
+}
 app.addHook('onSend', async (req, reply, payload) => {
   if (req.url === '/docs' && reply.statusCode === 301) {
     const r = await app.inject({ method: 'GET', url: '/docs/' })
     const html = brandDocHtml(
       r.payload
         .replace(/(src|href)="(?!https?:|\/|data:)([^"]+)"/g, '$1="/docs/$2"')
-        .replace(/"\.?\/?openapi\.json"/g, '"/openapi.json"')
+        .replace(/"\.?\/?openapi\.json"/g, '"/openapi.json"'),
+      await docsTitle(req)
     )
     reply.code(200)
     const ct = r.headers['content-type']
@@ -75,7 +105,7 @@ app.addHook('onSend', async (req, reply, payload) => {
   }
   // Direct /docs/ hit (and any other Scalar HTML): rebrand the tab in place.
   if (req.url.startsWith('/docs') && typeof payload === 'string' && String(reply.getHeader('content-type') || '').includes('text/html')) {
-    const html = brandDocHtml(payload)
+    const html = brandDocHtml(payload, await docsTitle(req))
     reply.header('content-length', Buffer.byteLength(html))
     return html
   }
@@ -88,8 +118,8 @@ app.get('/v1/pricing', async () => priceList())
 await app.register(rateLimit, {
   global: false,
   redis: redis ?? undefined,
-  keyGenerator: req => (req as FastifyRequest).key?.id ?? req.ip,
-  max: req => (req as FastifyRequest).key?.rate_limit_per_min ?? 30,
+  keyGenerator: req => (req as FastifyRequest).key?.id ?? ((req as FastifyRequest).adminToken ? `adm:${(req as FastifyRequest).adminToken!.id}` : req.ip),
+  max: req => (req as FastifyRequest).key?.rate_limit_per_min ?? ((req as FastifyRequest).adminToken ? ADMIN_RATE_PER_MIN : 30),
   timeWindow: '1 minute',
   addHeadersOnExceeding: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true, 'x-ratelimit-reset': true },
   addHeaders: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true, 'x-ratelimit-reset': true, 'retry-after': true },
@@ -238,6 +268,22 @@ app.register(async v1 => {
     return { balance_inr: balance, spent_today_inr: spent, currency: 'INR' }
   })
 }, { prefix: '/v1' })
+
+// /v1/admin/* and /v1/platform/*: jfc_/jsa_ tokens, forwarded to the store's admin (or the controller).
+registerAdminGateway(app, {
+  lookupToken: lookupAdminToken,
+  resolveStore,
+  send: (url, opts) => undici(url, { ...opts, headersTimeout: 120_000, bodyTimeout: 300_000 }),
+  idem: redis
+    ? {
+        get: k => redis.get(k),
+        set: (k, v) => redis.set(k, v, 'EX', 86400),
+        claim: async (k, v, ttl) => (await redis.set(k, v, 'EX', ttl, 'NX')) === 'OK',
+        del: k => redis.del(k),
+      }
+    : null,
+  rateLimit: app.rateLimit(),
+})
 
 // Design thumbnails are the same for everyone, so they need no key (usable as plain <img> sources).
 app.get<{ Params: { key: string } }>('/v1/documents/designs/:key/thumbnail.png', async (req, reply) => {

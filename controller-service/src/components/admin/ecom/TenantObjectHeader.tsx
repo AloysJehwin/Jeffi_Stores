@@ -5,15 +5,14 @@ import { TenantStatus, storeHost } from './cells'
 import TenantActions from './TenantActions'
 import PurgeCustomerButton from './PurgeCustomerButton'
 import KpiStrip from './detail/KpiStrip'
-import SectionNav from './detail/SectionNav'
 import { apiServices, type DetailSection } from './detail/labels'
 
 export { apiServices }
 
 /**
- * Shared header for the four tenant detail pages (Store, Instance, Status, Billing): title, actions, the
- * links between them and a KPI strip. Each page lives under its own list's path prefix because the sidebar
- * marks a group active with startsWith(href + '/').
+ * Shared header for the four tenant detail pages (Store, Instance, Status, Billing): title, actions and
+ * that page's own KPIs. Each page lives under its own list's path prefix because the sidebar marks a group
+ * active with startsWith(href + '/').
  */
 export default function TenantObjectHeader({ d, back, section }: { d: TenantDetailData; back: { href: string; label: string }; section: DetailSection }) {
   const { t, job } = d
@@ -52,8 +51,7 @@ export default function TenantObjectHeader({ d, back, section }: { d: TenantDeta
           ) : undefined
         }
       />
-      <SectionNav tenantId={t.id} active={section} isStore={d.isStore} />
-      <KpiStrip d={d} />
+      <KpiStrip d={d} section={section} />
     </div>
   )
 }

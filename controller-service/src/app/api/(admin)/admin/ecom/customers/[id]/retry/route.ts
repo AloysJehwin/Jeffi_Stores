@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getTenant, getProvisioningJob, resumeProvisioningJob } from '@/lib/tenant-registry'
 import { advanceProvisioningJob } from '@controller/lib/provisioning/steps'
+import { LEGACY_STEP_IDS } from '@controller/lib/provisioning/pipeline'
 import { getProvisioningProvider } from '@controller/lib/provisioning'
 
 export const dynamic = 'force-dynamic'
 
+const Body = z.object({ fromStep: z.string().min(1).max(64).optional() })
+
 /**
  * Resume a failed provisioning job from the step it died on, rather than starting over.
  * enqueueProvisioning opens a NEW job for a failed tenant — fresh created_resources, first
- * step — which re-creates infrastructure that already exists.
+ * step — which re-creates infrastructure that already exists. `fromStep` re-runs from an earlier step.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
@@ -23,7 +27,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const tenant = await getTenant(id)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const resumed = await resumeProvisioningJob(id)
+  const parsed = Body.safeParse((await request.json().catch(() => null)) ?? {})
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+
+  const resumed = await resumeProvisioningJob(id, { fromStep: parsed.data.fromStep, legacySteps: LEGACY_STEP_IDS })
   if (!resumed.ok) return NextResponse.json({ error: resumed.detail, reason: resumed.reason }, { status: 409 })
 
   // Kick it immediately so the operator sees movement instead of waiting for the next sweep.

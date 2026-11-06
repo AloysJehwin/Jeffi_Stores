@@ -1,0 +1,43 @@
+name: CLI release
+
+# Publishes @jeffi/cli to npm when a cli-v* tag is pushed (e.g. cli-v0.2.0). The tag must match
+# packages/cli/package.json's version. Needs the NPM_TOKEN secret (an npm automation token).
+on:
+  push:
+    tags: ['cli-v*']
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+
+concurrency:
+  group: cli-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish @jeffi/cli
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/node-setup
+      - name: Tag matches the package version
+        run: |
+          set -euo pipefail
+          want="cli-v$(node -p "require('./packages/cli/package.json').version")"
+          [ "$GITHUB_REF_NAME" = "$want" ] || { echo "::error::tag $GITHUB_REF_NAME, package.json says $want"; exit 1; }
+      - name: Manifest up to date
+        run: npm run cli:check
+      - name: Tests
+        run: npx vitest run --project cli
+      - name: Build
+        run: npm run cli:build && node packages/cli/dist/jeffi.js --version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - name: Publish
+        working-directory: packages/cli
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

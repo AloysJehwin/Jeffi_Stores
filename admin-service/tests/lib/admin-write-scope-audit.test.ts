@@ -32,6 +32,14 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'account/mobile/verify-otp',
   'sessions/[id]/revoke',
   'sessions/revoke-all',
+  // CLI device login: start/poll are pre-auth; approve, token mint/revoke and logout act on the
+  // caller's own credentials, and a token never exceeds its holder's grant (api-tokens.ts).
+  'cli-auth/start',
+  'cli-auth/poll',
+  'cli/approve',
+  'cli/tokens',
+  'cli/tokens/[id]',
+  'cli/logout',
   'access-request',
   // Self-service: a member marking their own notification bell read, not a scoped action.
   'notifications/read',

@@ -39,7 +39,11 @@ export const RESERVED_LABELS = new Set([
   'certificate',
   // The flagship's slug wherever it acts as a tenant (messaging, documents); no store may take it.
   'platform',
+  // public-api-service: public.<root> and public-{slug}.<root>.
+  'public',
 ])
+
+export { TENANT_HOST_PREFIXES } from './host-prefixes'
 
 export const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
 

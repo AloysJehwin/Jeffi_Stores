@@ -1,22 +1,13 @@
-import Link from 'next/link'
 import type { TenantDetailData } from '@controller/lib/ecom/detail'
 import { Field, FieldGrid, Section } from '../EcomUI'
 import { inr, inrHr } from '../cells'
-import { detailHref } from './labels'
 
 /** Price to the owner, AWS's bill, Jeffi's margin and this month so far. */
 export default function CostSummary({ d }: { d: TenantDetailData }) {
   const { cost, row } = d
   const price = row?.price_inr_month ?? cost.priceMonth
   return (
-    <Section
-      title="Cost"
-      action={
-        <Link href={detailHref(d.t.id, 'instance')} className="text-sm text-accent-600 hover:underline">
-          Breakdown →
-        </Link>
-      }
-    >
+    <Section title="Cost">
       {cost.priceHour == null && price == null ? (
         <p className="text-sm text-foreground-muted">No compute has been applied yet, so there is nothing to price.</p>
       ) : (

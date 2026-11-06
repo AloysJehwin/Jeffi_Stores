@@ -5,6 +5,7 @@ import TeamTable from './TeamTable'
 import { Card } from '@/components/admin/kit/layout'
 import TeamTabs from './TeamTabs'
 import { Suspense } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES, isPlatformOwner, assignableScopes } from '@/lib/auth/scopes'
 import { redirect } from 'next/navigation'
@@ -40,6 +41,7 @@ async function getAllAdmins() {
       ) ORDER BY ac.created_at DESC) FROM admin_certificates ac WHERE ac.admin_id = a.id) AS certificates
     FROM admins a
     LEFT JOIN users u ON u.id = a.user_id
+    WHERE a.role IS DISTINCT FROM 'service_account'
     ORDER BY a.created_at DESC
   `)
 }
@@ -122,11 +124,9 @@ export default async function TeamPanel() {
         <Suspense fallback={null}>
           <TeamTabs>
             {/* Add member */}
-            <div className="max-w-xl">
-              <Card title="Add Team Member" hint="Generate credentials and a client certificate for a new admin user">
-                <CreateAdminForm allowedScopeKeys={allowedScopeKeys} />
-              </Card>
-            </div>
+            <Card title="Add Team Member" hint="Generate credentials and a client certificate for a new admin user">
+              <CreateAdminForm allowedScopeKeys={allowedScopeKeys} />
+            </Card>
 
             <Card
               title="All Members"
@@ -146,13 +146,17 @@ export default async function TeamPanel() {
               title="Available Scopes"
               hint={`${visibleScopes.length} scopes${planSlug ? ` on the ${planSlug} plan` : ''} — assign these when creating a team member`}
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="space-y-2">
                 {Array.from(new Set(visibleScopes.map(s => s.group || 'General'))).map(groupName => {
                   const groupScopes = visibleScopes.filter(s => (s.group || 'General') === groupName)
                   return (
-                    <div key={groupName} className="bg-surface rounded-lg border border-border-default p-4">
-                      <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">{groupName}</p>
-                      <div className="space-y-2.5">
+                    <details key={groupName} className="group rounded-lg border border-border-default bg-surface">
+                      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                        <ChevronRight className="w-4 h-4 shrink-0 text-foreground-muted transition-transform group-open:rotate-90" aria-hidden />
+                        <span className="text-sm font-semibold text-foreground">{groupName}</span>
+                        <span className="text-xs text-foreground-muted tabular-nums">{groupScopes.length}</span>
+                      </summary>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2.5 px-4 pb-4">
                         {groupScopes.map(scope => (
                           <div key={scope.key} className="flex flex-wrap items-start gap-2.5 sm:flex-nowrap">
                             <span className="shrink-0 max-w-full sm:max-w-none mt-px px-1.5 py-0.5 rounded text-xs font-semibold bg-surface-secondary border border-border-default text-foreground-secondary font-mono leading-tight">
@@ -162,7 +166,7 @@ export default async function TeamPanel() {
                           </div>
                         ))}
                       </div>
-                    </div>
+                    </details>
                   )
                 })}
               </div>

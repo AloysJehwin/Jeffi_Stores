@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/auth/scopes'
+import { assignableScopes, isPlatformOwner } from '@/lib/auth/scopes'
 import ScopeGrid from '@/components/admin/ScopeGrid'
 import AdminSelect from '@/components/admin/AdminSelect'
 
@@ -181,7 +181,8 @@ export default function AdminUserActions({
     }
   }
 
-  const allSelected = scopes.length === ADMIN_SCOPES.length
+  const grantable = allowedScopeKeys ?? assignableScopes(false).map(s => s.key)
+  const allSelected = grantable.every(k => scopes.includes(k))
 
   return (
     <>
@@ -460,12 +461,12 @@ export default function AdminUserActions({
                     <label className="text-sm font-medium text-foreground">
                       Scopes
                       <span className="ml-2 text-xs font-normal text-foreground-muted">
-                        {scopes.length} of {ADMIN_SCOPES.length} selected
+                        {grantable.filter(k => scopes.includes(k)).length} of {grantable.length} selected
                       </span>
                     </label>
                     <button
                       type="button"
-                      onClick={() => setScopes(allSelected ? [] : ADMIN_SCOPES.map(s => s.key))}
+                      onClick={() => setScopes(allSelected ? [] : grantable)}
                       className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                     >
                       {allSelected ? 'Deselect all' : 'Select all'}

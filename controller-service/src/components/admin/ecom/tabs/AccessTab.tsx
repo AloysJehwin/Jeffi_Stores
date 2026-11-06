@@ -1,7 +1,5 @@
-import type { TenantDetail, TenantSocialAccount, IntegrationCredential } from '@/lib/tenant-registry'
-import type { AdminCertRow } from '@/lib/tenancy/tenant-ca'
-import { Field, FieldGrid, Mono, Section } from '../EcomUI'
-import CertsTable from '../detail/CertsTable'
+import type { TenantSocialAccount, IntegrationCredential } from '@/lib/tenant-registry'
+import { Section } from '../EcomUI'
 
 type Integration = Omit<IntegrationCredential, 'config_enc'>
 
@@ -29,46 +27,10 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-foreground-muted">{children}</p>
 }
 
-export default function AccessTab({
-  tenant: t,
-  certs,
-  ca,
-  social,
-  integrations,
-}: {
-  tenant: TenantDetail
-  certs: AdminCertRow[]
-  ca: { subject: string; expiresAt: Date } | null
-  social: TenantSocialAccount[]
-  integrations: Integration[]
-}) {
-  const active = certs.filter(c => !c.revoked_at && new Date(c.expires_at) > new Date())
-
+/** The store's connected accounts. Admin certificates have their own tab (CertificatesTab). */
+export default function AccessTab({ social, integrations }: { social: TenantSocialAccount[]; integrations: Integration[] }) {
   return (
     <div className="space-y-5 sm:space-y-6 min-w-0">
-      <Section title="Admin certificate authority">
-        {!ca ? (
-          <Empty>
-            No CA issued for this tenant yet. It is created during provisioning — until then
-            <span className="font-mono text-xs"> admin-{t.slug}.jeffistores.in</span> cannot accept client certificates.
-          </Empty>
-        ) : (
-          <FieldGrid>
-            <Field wide label="Subject" value={<Mono>{ca.subject}</Mono>} />
-            <Field label="Expires" value={<Expiry at={ca.expiresAt} />} />
-            <Field label="Active certificates" value={`${active.length} of ${certs.length}`} />
-          </FieldGrid>
-        )}
-      </Section>
-
-      <Section title="Admin client certificates">
-        {certs.length === 0 ? (
-          <Empty>No client certificates issued. Nobody can reach this store&apos;s admin panel over mTLS.</Empty>
-        ) : (
-          <CertsTable tenantId={t.id} certs={certs} />
-        )}
-      </Section>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         <Section title="Social accounts">
           {social.length === 0 ? (

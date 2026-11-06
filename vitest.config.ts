@@ -29,12 +29,15 @@ export default defineConfig({
     },
     // One project per app or package, each running its own tests/. `npx vitest --project admin` runs one.
     projects: [
+      ...[
       ['store-core', 'packages/store-core'],
       ['storefront', 'storefront-service'],
       ['admin', 'admin-service'],
       ['business', 'business-service'],
       ['controller', 'controller-service'],
     ].map(([name, dir]) => ({ extends: true as const, test: { name, include: [`${dir}/tests/**/*.test.{ts,tsx}`] } })),
+      { extends: true as const, test: { name: 'cli', include: ['packages/cli/tests/**/*.test.ts'], environment: 'node' } },
+    ],
     coverage: {
       provider: 'v8',
       reporter: part ? ['json-summary'] : ['text', 'lcov', 'json-summary', 'json'],

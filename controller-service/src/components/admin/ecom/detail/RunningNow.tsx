@@ -1,23 +1,12 @@
-import Link from 'next/link'
 import type { TenantDetailData } from '@controller/lib/ecom/detail'
 import { Section } from '../EcomUI'
 import { FLEET_UNKNOWN, PlacementCell, RunningCell, ServersCell } from '../cells'
-import { detailHref } from './labels'
 
 /** What the store runs right now: placement, servers, pods and each Deployment. */
-export default function RunningNow({ d, link = true }: { d: TenantDetailData; link?: boolean }) {
+export default function RunningNow({ d }: { d: TenantDetailData }) {
   const { fleet, fleetKnown, serversRunning } = d
   return (
-    <Section
-      title="Running now"
-      action={
-        link ? (
-          <Link href={detailHref(d.t.id, 'instance')} className="text-sm text-accent-600 hover:underline">
-            Instance →
-          </Link>
-        ) : undefined
-      }
-    >
+    <Section title="Running now">
       {!fleetKnown ? (
         <p className="text-sm text-foreground-muted">{FLEET_UNKNOWN}</p>
       ) : (

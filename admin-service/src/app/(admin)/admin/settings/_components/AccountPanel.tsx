@@ -19,7 +19,7 @@ async function getAdminInfo(adminId: string) {
 }
 
 async function getAllAdmins() {
-  return queryMany(`SELECT id, is_active FROM admins`)
+  return queryMany(`SELECT id, is_active FROM admins WHERE role IS DISTINCT FROM 'service_account'`)
 }
 
 /** Account tab of the Settings hub: account, 2FA and system. */

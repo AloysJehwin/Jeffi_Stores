@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { hasScope, getScopeForPath } from '@/lib/auth/scopes'
 import { resolveSession, type SessionSignals } from '@/lib/auth/auth-sessions'
 import { extractSessionSignals, ambientSessionSignals } from '@/lib/auth/session-signals-request'
-import { adminCookieNameForHost } from '@/lib/auth/admin-cookie'
 
 // OPAQUE SESSIONS: the auth cookie value is the session id (a uuid), NOT a JWT.
 // authenticate*/verify* read the cookie and resolveSession() it (Postgres) — the single
@@ -111,15 +110,6 @@ function getTokenFromRequest(request: NextRequest, cookieName: string): string |
   return request.cookies.get(cookieName)?.value || null
 }
 
-// Return the Authorization: Bearer value only (no cookie fallback). Used to gate the
-// stateless extension-token path to Bearer requests, so a session cookie value can
-// never be reinterpreted as a signed JWT.
-function getBearerToken(request: NextRequest): string | null {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) return authHeader.slice(7)
-  return null
-}
-
 // Verify a scoped extension token (minted by POST /api/admin/token/generate). This is a
 // STANDALONE signed JWT (not a session), so we jwtVerify it against JWT_SECRET and accept
 // ONLY tokens tagged type='extension_token' — rejecting review/other JWTs from being
@@ -176,36 +166,27 @@ export async function requireAdminScope(
   return admin
 }
 
-/** `passive`: a tab checking in on its own (session check, event stream, bell poll), not the admin acting. */
+/**
+ * Any admin principal (admin-principal.ts): cookie or bearer session, gateway header, jfc_/jsa_ token,
+ * extension token, or a service account's client certificate. Every non-session principal is held to its
+ * deny list here, and all but the legacy extension JWT to the path's scope and the platform gate too,
+ * whatever the middleware gate mode.
+ * `passive`: a tab checking in on its own (session check, event stream, bell poll), not the admin acting.
+ */
 export async function authenticateAdmin(
   request: NextRequest,
   opts?: { passive?: boolean }
 ): Promise<AdminJWTPayload | null> {
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
-  const sid = getTokenFromRequest(request, adminCookieNameForHost(host))
-  if (!sid) return null
-  const s = await resolveSession(sid, extractSessionSignals(request), { touch: !opts?.passive })
-  if (!s || s.principalType !== 'admin') {
-    // Fallback: a scoped extension token (standalone JWT) sent via Authorization: Bearer.
-    // Bearer-only — a session cookie value must never be reinterpreted as a JWT.
-    const bearer = getBearerToken(request)
-    if (bearer) {
-      const ext = await verifyExtensionToken(bearer)
-      if (ext) return ext
-    }
-    return null
+  const { resolveAdminPrincipal, principalGate, toAdminPayload } = await import('@/lib/auth/admin-principal')
+  const p = await resolveAdminPrincipal(request, { touch: !opts?.passive })
+  if (!p) return null
+  const path = request.nextUrl?.pathname
+  if (p.kind !== 'session' && path) {
+    const strict = p.kind !== 'extension' || !!p.tokenId
+    if (principalGate(p, path, request.method || 'GET', { scope: strict, platform: strict })) return null
   }
-  const result: AdminJWTPayload = {
-    adminId: s.principalId,
-    email: s.email || undefined,
-    role: s.role || '',
-    scopes: s.scopes,
-    sid,
-    sessionId: s.sessionId,
-    deadlineAt: s.deadlineAt,
-    expiresAt: s.expiresAt,
-  }
-  if (typeof process !== 'undefined' && process.versions?.node) {
+  const result = toAdminPayload(p)
+  if (result.adminId && typeof process !== 'undefined' && process.versions?.node) {
     try {
       const mod = await import('@/lib/auth/audit-context')
       mod.setAuditAdminId(result.adminId)
@@ -235,7 +216,12 @@ export async function authenticateServiceAccount(request: NextRequest): Promise<
   if (!sa) return null
 
   queryOne(`UPDATE service_accounts SET last_used_at = NOW() WHERE id = $1`, [sa.id]).catch(() => {})
-  return sa
+  // Held to the store's plan, as the principal resolver does.
+  const { getCurrentTenant } = await import('@/lib/tenancy/tenant-context')
+  const tenantId = getCurrentTenant()?.tenantId ?? request.headers.get('x-tenant-id') ?? null
+  if (!tenantId) return sa
+  const { effectiveScopes } = await import('@/lib/auth/auth-sessions')
+  return { ...sa, allowed_scopes: await effectiveScopes(tenantId, Array.isArray(sa.allowed_scopes) ? sa.allowed_scopes : [], 'service_account') }
 }
 
 export async function requireUserScope(request: NextRequest, scope: string): Promise<UserJWTPayload | NextResponse> {

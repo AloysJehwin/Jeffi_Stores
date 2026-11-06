@@ -25,38 +25,39 @@ import {
   type DbAuth,
   type TenantDbTarget,
 } from './tenant-admin-pool'
+import {
+  LEGACY_STEP_IDS,
+  STEP_CATALOG,
+  buildPipeline,
+  flatSteps,
+  nextStepAfter,
+  ok,
+  pipelineOf,
+  skip,
+  wait,
+  warn,
+  type PipelineDef,
+  type StepId,
+  type StepResult,
+} from './pipeline'
+import { attachDbDisk, createDatabase, launchServer, startPostgres, type NodeDbCtx } from './node-db-steps'
 
-// Ordered provisioning steps. The worker advances a job one step per tick; each
-// step is idempotent so a crash/retry re-runs it safely. On success the step
-// function returns the NEXT step name (or 'done'); on throw the job is marked
-// failed with the error (and can be retried).
+// Provisioning steps. The worker advances a job one step per tick; each step is idempotent so a
+// crash/retry re-runs it safely. A step's handler returns ok / skip / warn (the job moves to the next
+// step of its pinned pipeline, pipeline.ts) or wait (stay and poll again); a throw is retried, then
+// fails the job and rolls back.
 //
 // `restore_data` runs after the schema is loaded and before the bucket is made — it
 // only does work when the job carries a `restoreFromKey` (churned owner re-onboarding),
 // otherwise it's a no-op passthrough.
 //
 // A store whose Postgres runs on its own server (db.mode 'node') brings that server and the database
-// pod up in wait_db_available, so every step after it (schema, restore, seed, settings) has a live
-// database; ensure_compute later re-applies the same namespace.
-const STEPS = [
-  'preflight',
-  'create_param_group',
-  'create_db_instance',
-  'wait_db_available',
-  'load_schema',
-  'restore_data',
-  'seed_data',
-  'create_bucket',
-  'write_infra',
-  'generate_legals',
-  'seed_settings',
-  'ensure_compute',
-  'setup_delhivery',
-  'configure_dns',
-  'verify_serving',
-  'activate',
-] as const
-type Step = (typeof STEPS)[number]
+// pod up in its Database steps (node-db-steps.ts; wait_db_available on a legacy job), so every step
+// after them (schema, restore, seed, settings) has a live database; ensure_compute later re-applies the
+// same namespace.
+/** @deprecated The legacy pipeline's step ids; a job's steps are its pinned pipeline (pipeline.ts). */
+const STEPS = LEGACY_STEP_IDS
+type Step = StepId
 
 
 // A store's own database name; a Starter store's on a shared host is t_{slug} (res.dbName).
@@ -150,25 +151,30 @@ function tenantHostnames(slug: string, plan: string | null): string[] {
   return hosts
 }
 
-/**
- * Advance ONE provisioning job by one step. Returns the job's new status.
- * Pure orchestration — all AWS effects go through `provider` (stub or real).
- */
-export async function advanceProvisioningJob(job: ProvisioningJob, provider: ProvisioningProvider): Promise<string> {
-  const tenant = await getTenant(job.tenant_id)
-  if (!tenant) {
-    await updateProvisioningJob(job.id, { status: 'failed', last_error: 'tenant not found' })
-    return 'failed'
-  }
-  const slug = tenant.slug
-  const res: Record<string, any> = { ...(job.created_resources || {}) }
+type Tenant = NonNullable<Awaited<ReturnType<typeof getTenant>>>
 
-  try {
-    await updateProvisioningJob(job.id, { status: 'running', bumpAttempts: true })
-    const step = job.step as Step
+interface StepCtx {
+  job: ProvisioningJob
+  tenant: Tenant
+  slug: string
+  res: Record<string, any>
+  provider: ProvisioningProvider
+}
 
-    switch (step) {
-      case 'preflight': {
+type Handler = (ctx: StepCtx) => Promise<StepResult>
+
+/** The node-DB steps reach the servers and namespace through the same helpers as ensure_compute. */
+const nodeCtx = ({ job, tenant, slug, res }: StepCtx): NodeDbCtx => ({
+  slug,
+  res,
+  compute: () => jobCompute(job.tenant_id, tenant.plan, res),
+  placeNodes: (c, opts) => placeNodes(job.id, slug, c, res, opts),
+  applyWorkload: c => applyWorkload(job.tenant_id, slug, tenant.plan, c),
+})
+
+/** One handler per step. Bodies are the old switch cases; `ok()` replaces next(<following step>). */
+const HANDLERS: Record<Step, Handler> = {
+  async preflight({ job, tenant, res }) {
         // Fail fast on missing prerequisites BEFORE creating any billable infra, so a
         // misconfigured environment produces one clear error instead of a cryptic
         // mid-provision failure (e.g. absent RDS_MASTER_PASSWORD → "Invalid master
@@ -184,7 +190,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         if (process.env.PROVISIONING_COMPUTE === 'k8s') {
           if (!(process.env.CLUSTER_INGRESS_IP || '').trim()) missing.push('CLUSTER_INGRESS_IP')
           if (missing.length) throw new Error(`preflight: missing required env: ${missing.join(', ')}`)
-          return await next(job.id, 'create_param_group', res)
+          return ok()
         }
         const target = process.env.TENANT_APP_TARGET_IP
         if (!target || !target.trim()) missing.push('TENANT_APP_TARGET_IP')
@@ -197,22 +203,22 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
               `set TENANT_APP_AMI_ID (or POOL_INSTANCE_ID) so tenants are served by their own pool instance.`
           )
         }
-        return await next(job.id, 'create_param_group', res)
-      }
+        return ok()
+  },
 
-      case 'create_param_group': {
+  async create_param_group({ job, tenant, slug, res, provider }) {
         // max_connections by the database class the store chose (50 on a micro). A Starter store's
         // database lives on a shared host, which has its own; a Basic store runs Postgres as a pod
         // on its own node — no RDS, no param group, no pre-launch DB instance.
         const c = await jobCompute(job.tenant_id, tenant.plan, res)
         if (c.spec.db.mode === 'shared' || c.spec.db.mode === 'node')
-          return await next(job.id, 'create_db_instance', res)
+          return skip(`${c.spec.db.mode === 'node' ? 'on-server' : 'shared'} database: no parameter group`)
         await provider.ensureParamGroup(paramGroupName(slug), c.maxConnections)
         res.paramGroup = paramGroupName(slug)
-        return await next(job.id, 'create_db_instance', res)
-      }
+        return ok()
+  },
 
-      case 'create_db_instance': {
+  async create_db_instance({ job, tenant, slug, res, provider }) {
         const c = await jobCompute(job.tenant_id, tenant.plan, res)
         const { db } = c.spec
         if (db.mode === 'shared') {
@@ -221,14 +227,14 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             const { reserveSharedDbHost } = await import('@controller/lib/compute/shared-db')
             res.sharedDbHost = (await reserveSharedDbHost(provider)).id
           }
-          return await next(job.id, 'wait_db_available', res)
+          return ok()
         }
         if (db.mode === 'node') {
           // Postgres on the tenant's own node: no RDS. wait_db_available stands up the server, its
           // data volume and the Postgres pod.
           res.endpoint = nodeDbHost(slug)
           res.dbName = TENANT_DB
-          return await next(job.id, 'wait_db_available', res)
+          return ok()
         }
         const created = await provider.createDbInstance({
           dbInstanceId: dbInstanceId(slug),
@@ -241,10 +247,10 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         res.dbInstanceId = created.dbInstanceId
         // AWS may fall back to the same size on t3 when t4g has no capacity.
         if (created.instanceClass) res.dbClass = created.instanceClass
-        return await next(job.id, 'wait_db_available', res)
-      }
+        return ok()
+  },
 
-      case 'wait_db_available': {
+  async wait_db_available({ job, tenant, slug, res, provider }) {
         // Bound the wait: a db.t4g.micro is normally available in ~9 min. If it never
         // reaches available (stuck in creating/incompatible-parameters, wrong id), fail
         // after the deadline instead of polling forever — the catch triggers rollback.
@@ -253,7 +259,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         const c = await jobCompute(job.tenant_id, tenant.plan, res)
         if (c.spec.db.mode === 'node') {
           // Locally (stub engine) there is no cluster to run it on; the database steps no-op or fail softly.
-          if (process.env.PROVISIONING_COMPUTE !== 'k8s') return await next(job.id, 'load_schema', res)
+          if (process.env.PROVISIONING_COMPUTE !== 'k8s') return skip('no cluster (stub engine)')
           if (!(await nodeDbReady(job, tenant, res, c))) {
             if (Date.now() - res.dbWaitStartedAt > NODE_DB_WAIT_DEADLINE_MS) {
               throw new Error(
@@ -261,12 +267,11 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
                   (res.dbConnectError ? ` (${res.dbConnectError})` : '')
               )
             }
-            await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
-            return 'pending'
+            return wait()
           }
           res.endpoint = nodeDbHost(slug)
           res.dbName = TENANT_DB
-          return await next(job.id, 'load_schema', res)
+          return ok()
         }
         const endpoint = await provider.getDbEndpoint(res.sharedDbHost ?? res.dbInstanceId)
         if (!endpoint) {
@@ -276,8 +281,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             )
           }
           // Still provisioning — stay on this step, worker will poll again next tick.
-          await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
-          return 'pending'
+          return wait()
         }
         if (res.sharedDbHost) {
           const { markSharedDbHostAvailable, tenantDbNames } = await import('@controller/lib/compute/shared-db')
@@ -289,10 +293,15 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           res.rdsUser = names.role
         }
         res.endpoint = endpoint
-        return await next(job.id, 'load_schema', res)
-      }
+        return ok()
+  },
 
-      case 'load_schema': {
+  launch_server: ctx => launchServer(nodeCtx(ctx)),
+  attach_db_disk: ctx => attachDbDisk(nodeCtx(ctx)),
+  start_postgres: ctx => startPostgres(nodeCtx(ctx)),
+  create_database: ctx => createDatabase(nodeCtx(ctx)),
+
+  async load_schema({ slug, res, provider }) {
         // Loads the desired-state SCHEMA ONLY (0 rows) into the tenant's own DB. A fresh
         // tenant store is intentionally EMPTY — the owner adds their own catalog. Starter
         // data, if ever wanted, goes through the optional seed_data step below (not here).
@@ -301,10 +310,10 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         else if (auth) await provider.loadSchema(res.endpoint, TENANT_DB, undefined, auth)
         else await provider.loadSchema(res.endpoint, TENANT_DB)
         delete res.schemaPending
-        return await next(job.id, 'restore_data', res)
-      }
+        return ok()
+  },
 
-      case 'restore_data': {
+  async restore_data({ slug, res, provider }) {
         // Only restores when the job was enqueued with a backup key (re-onboarding a
         // churned owner). No key → fresh store → fall through to optional seeding.
         const key = res.restoreFromKey as string | undefined
@@ -316,10 +325,10 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           else await provider.restoreDb(res.endpoint, res.dbName ?? TENANT_DB, archive)
           res.restored = true
         }
-        return await next(job.id, 'seed_data', res)
-      }
+        return key ? ok() : skip('no backup to restore')
+  },
 
-      case 'seed_data': {
+  async seed_data({ slug, res }) {
         // Optional starter-catalog seed. No-op unless the job carries a `seedProfile`
         // (mirrors restore_data's opt-in shape). Deliberately separate from load_schema so
         // "empty store" stays the default and seeding never runs by accident. Skipped
@@ -338,29 +347,33 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             res.seedError = e?.message || 'seeding failed'
           }
         }
-        return await next(job.id, 'create_bucket', res)
-      }
+        if (!profile || res.restored) return skip(res.restored ? 'store restored from a backup' : 'no starter catalogue chosen')
+        return res.seedError ? warn(res.seedError) : ok()
+  },
 
-      case 'generate_legals': {
+  async generate_legals({ job, res }) {
         // Generate the tenant's own legal pages (terms/privacy/refund/…) templated from their
         // business details + uploaded logo/seal, into the tenant bucket. Runs AFTER create_bucket
         // + write_infra so the bucket exists. NON-FATAL — a legals failure must not block go-live.
+        let failed: string | null = null
         try {
           const { generateTenantLegals } = await import('../legals/provision')
           await generateTenantLegals(job.tenant_id, res.endpoint)
           res.legalsGenerated = true
         } catch (e: any) {
           res.legalsError = e?.message || 'legals generation failed'
+          failed = res.legalsError
         }
-        return await next(job.id, 'seed_settings', res)
-      }
+        return failed ? warn(failed) : ok()
+  },
 
-      case 'seed_settings': {
+  async seed_settings({ job, slug, res }) {
         // Copy the owner's onboarding identity + warehouse (control-plane tenant/KYC/draft) into
         // the tenant's own site_settings so the storefront renders the registered business name,
         // contact, logo and seller/pickup fields instead of slug/blank/platform defaults. Runs
         // after create_bucket + write_infra (logo copy needs the tenant bucket) and mirrors the
         // legals identity read. NON-FATAL — a settings failure must not block go-live.
+        let outcome: StepResult = ok()
         try {
           const { controlPlanePool } = await import('@/lib/tenant-registry')
           const ownerRow = await controlPlanePool()
@@ -373,19 +386,22 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             res.settingsSeeded = true
           } else {
             res.settingsSeeded = 'skipped (missing owner or db endpoint)'
+            outcome = skip('missing owner or db endpoint')
           }
         } catch (e: any) {
           res.settingsError = e?.message || 'settings seeding failed'
+          outcome = warn(res.settingsError)
         }
-        return await next(job.id, 'ensure_compute', res)
-      }
+        return outcome
+  },
 
-      case 'create_bucket':
+  async create_bucket({ slug, res, provider }) {
         await provider.ensureBucket(bucketName(slug))
         res.bucket = bucketName(slug)
-        return await next(job.id, 'write_infra', res)
+        return ok()
+  },
 
-      case 'write_infra': {
+  async write_infra({ job, tenant, slug, res }) {
         // Node mode (the store's own Postgres on its EC2 node): password auth, creds in Secrets
         // Manager at jeffi/tenant-db/<slug>. RDS/shared modes stay on IAM auth.
         const nodeMode = (await jobCompute(job.tenant_id, tenant.plan, res)).spec.db.mode === 'node'
@@ -397,10 +413,10 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             ? { rdsEndpoint: nodeDbHost(slug), rdsDb: TENANT_DB, rdsUser: NODE_DB_USER, iamAuth: false, dbSecretRef: tenantDbSecretRef(slug) }
             : {}),
         })
-        return await next(job.id, 'generate_legals', res)
-      }
+        return ok()
+  },
 
-      case 'ensure_compute': {
+  async ensure_compute({ job, tenant, slug, res, provider }) {
         // Stand up the app compute that will serve this tenant's storefront + admin, by plan:
         //   Basic  → shared pool EC2 (create-if-missing); DNS later points at the pool IP.
         //   higher → a DEDICATED EC2 for this tenant; DNS points at its own IP.
@@ -420,8 +436,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             if (Date.now() - res.computeWaitStartedAt > 15 * 60 * 1000) {
               throw new Error(`ensure_compute: k8s servers for "${slug}" did not become Ready within 15 min`)
             }
-            await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
-            return 'pending'
+            return wait()
           }
           // An on-node Postgres is already up (wait_db_available) and the same render leaves it running.
           delete res.dbPassword
@@ -429,8 +444,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           // A job started before the database came up first deferred its schema to here.
           if (res.schemaPending && c.spec.db.mode === 'node') {
             if (!(await k8s.postgresPodReady(slug))) {
-              await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
-              return 'pending'
+              return wait()
             }
             await provider.loadSchema(res.endpoint, TENANT_DB, undefined, { iamAuth: false, dbSecretRef: tenantDbSecretRef(slug) })
             delete res.schemaPending
@@ -440,7 +454,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           res.computeMode = 'k8s'
           delete res.poolInstanceId
           await writeTenantEc2(job.tenant_id, res.ec2Target, res.ec2InstanceId)
-          return await next(job.id, 'setup_delhivery', res)
+          return ok()
         }
 
         const ec2Configured = tenantComputeConfigured()
@@ -479,10 +493,10 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           res.computeMode = 'pool'
         }
         if (res.ec2Target) await writeTenantEc2(job.tenant_id, res.ec2Target, res.ec2InstanceId)
-        return await next(job.id, 'setup_delhivery', res)
-      }
+        return ok()
+  },
 
-      case 'setup_delhivery': {
+  async setup_delhivery({ job, tenant, slug, res }) {
         // Register the tenant's Delhivery pickup/client-warehouse from their onboarding
         // warehouse config. NON-FATAL — a pickup-registration failure must not block go-live
         // (it can be retried/fixed later; shipments just can't be created until then).
@@ -518,19 +532,20 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         } catch (e: any) {
           res.delhiveryPickup = `error: ${e?.message || 'failed'}`
         }
-        return await next(job.id, 'configure_dns', res)
-      }
+        const pickup = String(res.delhiveryPickup)
+        return pickup === 'created' ? ok() : pickup.startsWith('skipped') ? skip('no warehouse config') : warn(pickup)
+  },
 
-      case 'configure_dns': {
+  async configure_dns({ tenant, slug, res, provider }) {
         const hosts = tenantHostnames(slug, tenant.plan)
         // k8s: *.jeffistores.in is one wildcard record at the cluster ingress, so nothing to upsert.
         // Otherwise point at this tenant's serving IP (dedicated instance or pool).
         if (res.computeMode !== 'k8s') await provider.ensureDns(hosts, res.ec2Target)
         res.dnsHosts = hosts
-        return await next(job.id, 'verify_serving', res)
-      }
+        return res.computeMode === 'k8s' ? skip('wildcard DNS at the cluster ingress') : ok()
+  },
 
-      case 'verify_serving': {
+  async verify_serving({ slug, res, provider }) {
         // Prove the tenant host actually SERVES before marking the store active. Without
         // this, activate "lies": it flips status to active with no evidence the app tier
         // (nginx server_name + TLS + reachable target) answers the new hostname — a real
@@ -542,7 +557,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // probe can never succeed — skip it and advance. The guard stays fully active for the
         // real AWS provider, which is the only place a host actually serves.
         if (process.env.PROVISIONING_PROVIDER !== 'aws') {
-          return await next(job.id, 'activate', res)
+          return skip('stub provider: no host to probe')
         }
         const rootDomain = ROOT_DOMAIN
         const primaryHost = `${slug}.${rootDomain}`
@@ -558,8 +573,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           const gone = await provider.isInstanceGone(res.ec2InstanceId).catch(() => false)
           if (gone) {
             if (attempts < MAX_VERIFY_ATTEMPTS) {
-              await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
-              return 'pending'
+              return wait()
             }
             throw new Error(
               `verify_serving: dedicated instance ${res.ec2InstanceId} is gone/terminated after ${attempts} attempts`
@@ -583,7 +597,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           } catch {
             served = false
           }
-        if (served) return await next(job.id, 'activate', res)
+        if (served) return ok()
         // k8s: a fresh node's first image pull + startup can outlast 6 one-minute ticks; bound by time.
         const withinBudget =
           res.computeMode === 'k8s'
@@ -591,15 +605,52 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             : attempts < MAX_VERIFY_ATTEMPTS
         if (withinBudget) {
           // Not serving yet — stay on this step; the worker retries next tick (DNS/TLS lag).
-          await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
-          return 'pending'
+          return wait()
         }
         throw new Error(
           `verify_serving: ${primaryHost} did not serve after ${attempts} attempts (app tier / DNS / TLS not ready)`
         )
-      }
+  },
 
-      case 'activate': {
+  async issue_owner_certificate({ job, slug, res }) {
+    // The owner's super_admin in the store's own database and their client certificate (tenant CA),
+    // emailed as a portal invite. Up to 4 attempts, then a warning: the store still goes live and the
+    // certificate can be issued from the customer's Certificates tab.
+    if (process.env.PROVISIONING_PROVIDER !== 'aws') return skip('stub provider: no store database')
+    const { ensureOwnerAdmin } = await import('@controller/lib/tenancy/tenant-admin-provision')
+    const prev = res.ownerCert as { serial?: string; emailed?: boolean } | undefined
+    const r = await ensureOwnerAdmin(job.tenant_id, { resendInviteFor: prev?.emailed === false ? prev.serial : undefined })
+    if (r.noOwner) return skip('no owner is linked to this store')
+    if (!r.success) throw new Error(`owner certificate not issued: ${r.error ?? 'unknown error'}`)
+    if (r.outcome !== 'exists') res.ownerCert = { serial: r.serial, emailed: r.emailed }
+    else if (prev?.serial && prev.serial.toUpperCase() === r.serial?.toUpperCase()) res.ownerCert = { ...prev, emailed: prev.emailed || r.emailed }
+    else res.ownerCert = { serial: r.serial, existing: true }
+    // The tenant CA exists now: republish the fleet's client-CA bundle so the admin host asks for it.
+    let fleetError: string | null = null
+    if (res.mtlsFleet !== 'refreshed') {
+      try {
+        const { refreshTenantMtlsFleet } = await import('@controller/lib/tenancy/mtls-fleet')
+        await refreshTenantMtlsFleet(slug)
+        res.mtlsFleet = 'refreshed'
+      } catch (e: any) {
+        fleetError = e?.message ?? String(e)
+        res.mtlsFleet = `error: ${fleetError}`
+      }
+    }
+    if (res.ownerCert.emailed === false) throw new Error(`owner certificate ${r.serial} issued but its invite email failed`)
+    if (fleetError) {
+      try {
+        const { alertProvisioningFailure } = await import('./alerts')
+        await alertProvisioningFailure(slug, 'mtls_fleet_refresh', fleetError, job.tenant_id)
+      } catch {
+        /* alerting must never mask the failure */
+      }
+      return warn(`certificate ready; client-CA bundle not refreshed: ${fleetError}`)
+    }
+    return ok(r.outcome === 'exists' ? 'owner certificate already active' : `issued ${r.serial} to ${r.email}`)
+  },
+
+  async activate({ job, res, provider }) {
         // Guard the write_infra→activate invariant: never mark a tenant active without a
         // persisted RDS endpoint (else getPool would silently fall back to the platform DB).
         const fresh = await getTenant(job.tenant_id)
@@ -619,15 +670,105 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // Once per store; never throws.
         const { notifyStoreLive } = await import('./start-store')
         await notifyStoreLive(job.tenant_id)
-        await recordStepEvent(job.id, 'activate', 'ok', 'tenant activated', {})
-        await updateProvisioningJob(job.id, { status: 'done', created_resources: res })
-        return 'done'
-      }
+        // The runner records the event and moves on (connect_crons on k8s) or marks the job done.
+        return ok('tenant activated')
+  },
 
-      default:
-        await updateProvisioningJob(job.id, { status: 'failed', last_error: `unknown step ${step}` })
-        return 'failed'
+  async connect_crons({ job, slug, res }) {
+    // The platform's cron fan-out reaches this store's pods: the same base, Host and bearer it uses
+    // (lib/cron/targets.ts) against the store's ping route. Records the jobs the store's plan gets.
+    const { CRON_PING_PATH, storeCronJobs } = await import('@/lib/shared/cron-jobs')
+    const { getTenantPlan } = await import('@/lib/auth/plan-gate')
+    const scopes = await getTenantPlan(job.tenant_id).then(
+      p => p.scopes,
+      () => new Set<string>()
+    )
+    res.cronJobs = storeCronJobs(scopes).map(j => j.id)
+    if (process.env.PROVISIONING_PROVIDER !== 'aws') return skip('stub provider: no store pods to reach')
+    if (!onK8sCompute(res)) return skip('not on k8s: no cron fan-out to the store')
+    if (!process.env.CRON_SECRET) throw new Error('connect_crons: missing required env CRON_SECRET on the controller')
+    const { storeCronHost, storeCronTarget } = await import('@controller/lib/cron/targets')
+    const { storeLayouts } = await import('@controller/lib/compute/store')
+    const layout = (await storeLayouts([job.tenant_id]).catch(() => new Map())).get(job.tenant_id) ?? 'services'
+    const target = storeCronTarget(slug, layout, CRON_PING_PATH)
+    if ('skip' in target) return skip(target.skip)
+    const problem = await pingStoreCrons(target.base + CRON_PING_PATH, storeCronHost(slug), slug, res)
+    // Not reachable yet: polled until the step's timeout, then retried with backoff and finally a warning.
+    if (problem) return wait(problem)
+    return ok(`scheduled jobs reach the store (${res.cronJobs.length} jobs)`)
+  },
+}
+
+/** One ping of the store's cron route; null when every check passes, else what failed. */
+async function pingStoreCrons(url: string, host: string, slug: string, res: Record<string, any>): Promise<string | null> {
+  const { internalRequest } = await import('@/lib/shared/internal-http')
+  const at = new Date().toISOString()
+  let r: Awaited<ReturnType<typeof internalRequest>>
+  try {
+    r = await internalRequest(url, { host, headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` }, timeoutMs: 10_000 })
+  } catch (e: any) {
+    res.cronPing = { url, ok: false, at, error: e?.message ?? String(e) }
+    return `${url} unreachable: ${e?.message ?? e}`
+  }
+  let body: Record<string, any> = {}
+  try {
+    body = JSON.parse(r.body)
+  } catch {
+    /* non-JSON: reported by status below */
+  }
+  res.cronPing = { url, ok: r.ok && body.ok === true, status: r.status, at, db: body.db, messaging: body.messaging, documents: body.documents }
+  if (!r.ok) return `${url} answered HTTP ${r.status}${r.status === 401 ? ' (CRON_SECRET missing or different in the store secret)' : ''}`
+  if (body.tenant !== slug) return `${url} answered for ${body.tenant ?? 'no store'}, not ${slug}`
+  const failing = (['db', 'messaging', 'documents'] as const).filter(k => body[k] === 'error')
+  return failing.length ? `the store's ${failing.join(', ')} check failed` : null
+}
+
+/**
+ * The store's pipeline, built from its compute and the environment and pinned on the job. Rebuilt on
+ * each preflight tick (a fixed environment or a resumed job starts from the current one); fixed after.
+ */
+async function pinPipeline(job: ProvisioningJob, plan: string | null, res: Record<string, any>): Promise<PipelineDef> {
+  const c = await jobCompute(job.tenant_id, plan, res)
+  const pipeline = buildPipeline(c.spec, plan, {
+    engine: process.env.PROVISIONING_COMPUTE === 'k8s' ? 'k8s' : 'ec2',
+    provider: process.env.PROVISIONING_PROVIDER === 'aws' ? 'aws' : 'stub',
+    restore: !!res.restoreFromKey,
+    seed: !!res.seedProfile && !res.restoreFromKey,
+  })
+  if (JSON.stringify(pipeline) !== JSON.stringify(job.pipeline ?? null)) await updateProvisioningJob(job.id, { pipeline })
+  return pipeline
+}
+
+/**
+ * Advance ONE provisioning job by one step. Returns the job's new status.
+ * Pure orchestration — all AWS effects go through `provider` (stub or real).
+ */
+export async function advanceProvisioningJob(job: ProvisioningJob, provider: ProvisioningProvider): Promise<string> {
+  const tenant = await getTenant(job.tenant_id)
+  if (!tenant) {
+    await updateProvisioningJob(job.id, { status: 'failed', last_error: 'tenant not found' })
+    return 'failed'
+  }
+  const slug = tenant.slug
+  const res: Record<string, any> = { ...(job.created_resources || {}) }
+  // A job that started before pipelines were pinned carries on with the legacy steps.
+  let pipeline = pipelineOf(job.pipeline)
+
+  try {
+    await updateProvisioningJob(job.id, { status: 'running', bumpAttempts: true })
+    const step = job.step as Step
+    if (step === 'preflight') pipeline = await pinPipeline(job, tenant.plan, res)
+
+    const handler = HANDLERS[step]
+    if (!handler || !flatSteps(pipeline).includes(step)) {
+      await updateProvisioningJob(job.id, { status: 'failed', last_error: `unknown step ${step}` })
+      return 'failed'
     }
+    const result = await handler({ job, tenant, slug, res, provider })
+    if ('wait' in result) return await waitOn(job, step, res, result.detail)
+    if ('skip' in result) return await advance(job, pipeline, res, 'skipped', result.skip)
+    if ('warn' in result) return await advance(job, pipeline, res, 'warning', result.warn)
+    return await advance(job, pipeline, res, 'ok', result.message ?? null)
   } catch (e: any) {
     const msg = e?.message || String(e) || 'error'
     // Errors on THIS step: job.attempts counts every tick, polls included, so a long wait for a
@@ -635,8 +776,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     const attempts = (res.stepErrors || 0) + 1
     res.stepErrors = attempts
     await recordStepEvent(job.id, job.step, 'error', msg, resourcesFor(job.step as Step, res))
+    const policy = STEP_CATALOG[job.step as Step] as (typeof STEP_CATALOG)[Step] | undefined
     // Classify: transient errors get retried with backoff; deterministic errors fail now.
-    const terminal = isTerminalError(msg) || attempts >= MAX_PROVISION_ATTEMPTS
+    const terminal = isTerminalError(msg) || attempts >= (policy?.maxAttempts ?? MAX_PROVISION_ATTEMPTS)
     if (!terminal) {
       // Retryable — keep the job alive (pending) and back off before the next tick.
       const delayMs = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempts - 1))
@@ -650,6 +792,16 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         nextAttemptAt,
       })
       return 'pending'
+    }
+    // A step the store can go live without: warn, alert and carry on. Nothing is rolled back.
+    if (policy?.continueOnError) {
+      try {
+        const { alertProvisioningFailure } = await import('./alerts')
+        await alertProvisioningFailure(slug, policy.alertAs ?? job.step, msg, job.tenant_id)
+      } catch {
+        /* alerting must never mask the failure */
+      }
+      return await advance(job, pipeline, res, 'warning', msg)
     }
     // Terminal (or out of attempts) → fail + auto-rollback billable resources. A resumed job starts its count afresh.
     delete res.stepErrors
@@ -721,19 +873,26 @@ async function retryTransient<T>(
  * are the per-stage log.
  *
  * tenant_id and the duration are derived in SQL from the job row (updated_at was set when the
- * step went 'running'), so callers need only the job id. Never throws: a missing log line must
+ * step went 'running'), so callers need only the job id. `fromStepStart` (a step's outcome): the
+ * step's start and its whole duration from step_started_at. Never throws: a missing log line must
  * not fail a provisioning step.
  */
 async function recordStepEvent(
   jobId: string,
   step: string,
-  status: 'ok' | 'error',
+  status: 'ok' | 'skipped' | 'warning' | 'error',
   message: string | null,
-  detail: Record<string, unknown> = {}
+  detail: Record<string, unknown> = {},
+  fromStepStart = false
 ): Promise<void> {
   try {
     await controlPlanePool().query(
-      `INSERT INTO provisioning_step_events (job_id, tenant_id, step, status, message, detail, duration_ms)
+      fromStepStart
+        ? `INSERT INTO provisioning_step_events (job_id, tenant_id, step, status, message, detail, started_at, duration_ms)
+       SELECT j.id, j.tenant_id, $2, $3, $4, $5::jsonb, j.step_started_at,
+              LEAST(2147483647, GREATEST(0, EXTRACT(EPOCH FROM (now() - COALESCE(j.step_started_at, j.updated_at))) * 1000))::int
+         FROM provisioning_jobs j WHERE j.id = $1`
+        : `INSERT INTO provisioning_step_events (job_id, tenant_id, step, status, message, detail, duration_ms)
        SELECT j.id, j.tenant_id, $2, $3, $4, $5::jsonb,
               GREATEST(0, (EXTRACT(EPOCH FROM (now() - j.updated_at)) * 1000)::int)
          FROM provisioning_jobs j WHERE j.id = $1`,
@@ -744,37 +903,48 @@ async function recordStepEvent(
   }
 }
 
-async function next(id: string, step: Step, res: Record<string, any>): Promise<string> {
-  // `step` is where we are GOING; the one that just succeeded is its predecessor. STEPS is a
-  // linear pipeline, so that is unambiguous and saves threading the completed step through
-  // fifteen call sites.
-  const completed = STEPS[Math.max(0, STEPS.indexOf(step) - 1)]
-  await recordStepEvent(id, completed, 'ok', null, resourcesFor(completed, res))
+/** A step finished (ok / skipped / warning): log it and move to the next step of the pipeline, or done. */
+async function advance(
+  job: ProvisioningJob,
+  pipeline: PipelineDef,
+  res: Record<string, any>,
+  outcome: 'ok' | 'skipped' | 'warning',
+  message: string | null
+): Promise<string> {
+  await recordStepEvent(job.id, job.step, outcome, message, resourcesFor(job.step as Step, res), true)
   delete res.stepErrors
-
+  delete res.stepDetail
+  delete res.stepWaitStartedAt
+  const nextStep = nextStepAfter(pipeline, job.step)
+  if (!nextStep) {
+    await updateProvisioningJob(job.id, { status: 'done', created_resources: res })
+    return 'done'
+  }
   // Clear any backoff timer on a successful step transition (prior retries are resolved).
-  await updateProvisioningJob(id, { step, status: 'pending', created_resources: res, clearNextAttempt: true })
+  await updateProvisioningJob(job.id, { step: nextStep, status: 'pending', created_resources: res, clearNextAttempt: true, stepStarted: true })
   return 'pending'
 }
 
-/** The created_resources keys a given step is responsible for — its visible output. */
-const STEP_OUTPUTS: Partial<Record<Step, string[]>> = {
-  create_param_group: ['paramGroup'],
-  create_db_instance: ['dbInstanceId'],
-  wait_db_available: ['endpoint', 'dbWaitStartedAt'],
-  seed_data: ['seeded', 'seedProfile'],
-  create_bucket: ['bucket'],
-  generate_legals: ['legalsGenerated'],
-  seed_settings: ['settingsSeeded'],
-  ensure_compute: ['ec2Target', 'ec2InstanceId', 'computeMode'],
-  setup_delhivery: ['delhiveryPickup'],
-  configure_dns: ['dnsHosts'],
-  verify_serving: ['verifyAttempts', 'verifyStartedAt'],
+/**
+ * Stay on the step; the worker polls it again next tick. A step with a catalog timeout fails once it has
+ * waited that long (from step_started_at); the older wait steps bound themselves.
+ */
+async function waitOn(job: ProvisioningJob, step: Step, res: Record<string, any>, detail?: string): Promise<string> {
+  const timeoutMs = STEP_CATALOG[step].timeoutMs
+  if (timeoutMs) {
+    const started = job.step_started_at ? new Date(job.step_started_at).getTime() : (res.stepWaitStartedAt ??= Date.now())
+    if (Date.now() - started > timeoutMs) {
+      throw new Error(`${step}: not ready within ${Math.round(timeoutMs / 60000)} min${detail ? ` (${detail})` : ''}`)
+    }
+  }
+  if (detail) res.stepDetail = detail
+  await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
+  return 'pending'
 }
 
 function resourcesFor(step: Step, res: Record<string, any>): Record<string, unknown> {
-  const keys = STEP_OUTPUTS[step]
-  if (!keys) return {}
+  const keys = STEP_CATALOG[step]?.outputs
+  if (!keys?.length) return {}
   const out: Record<string, unknown> = {}
   for (const k of keys) if (res[k] !== undefined) out[k] = res[k]
   return out
@@ -817,8 +987,14 @@ async function jobCompute(tenantId: string, plan: string | null, res: Record<str
 
 type JobCompute = Awaited<ReturnType<typeof jobCompute>>
 
-/** The store's servers (and, for an on-node database, its data volume), launched if missing. */
-async function placeNodes(jobId: string, slug: string, c: JobCompute, res: Record<string, any>) {
+/** The store's servers (and, for an on-node database, its data volume unless `dbVolume: false`), launched if missing. */
+async function placeNodes(
+  jobId: string,
+  slug: string,
+  c: Pick<JobCompute, 'spec' | 'nodeGen'>,
+  res: Record<string, any>,
+  opts: { dbVolume?: boolean } = {}
+) {
   const k8s = await import('@/lib/k8s/tenant-compute')
   return k8s.ensureTenantNodes(
     slug,
@@ -832,7 +1008,7 @@ async function placeNodes(jobId: string, slug: string, c: JobCompute, res: Recor
       } else res.poolInstanceId = id
       await updateProvisioningJob(jobId, { created_resources: res })
     },
-    c.spec.db.mode === 'node' ? { dbVolume: { sizeGb: c.spec.db.storageGb } } : undefined
+    c.spec.db.mode === 'node' && opts.dbVolume !== false ? { dbVolume: { sizeGb: c.spec.db.storageGb } } : undefined
   )
 }
 

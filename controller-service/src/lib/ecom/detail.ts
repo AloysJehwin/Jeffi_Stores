@@ -20,7 +20,7 @@ import {
 import { normalizeSpec, type ComputeSpec } from '@/lib/compute/spec'
 import type { TenantWorkloadStatus } from '@/lib/k8s/tenant-compute'
 import { DEFAULT_SETTINGS, computePlans, getCatalog } from '@controller/lib/compute/catalog'
-import { monthlyTotal, quoteSpec, type Quote } from '@controller/lib/compute/pricing'
+import { marginFor, monthlyTotal, quoteSpec, type Quote } from '@controller/lib/compute/pricing'
 import { getTenantCompute, type TenantCompute } from '@controller/lib/compute/store'
 import { getTenantMigrationRuns, type TenantMigrationRun } from '@controller/lib/tenant-migrations'
 import { costsFor, type StoreCost } from './cost'
@@ -125,7 +125,7 @@ export async function loadInfraDetail(d: TenantDetailData): Promise<InfraDetail>
   let breakdownNote: string | null = spec ? null : 'No compute has been applied to this store yet.'
   if (spec) {
     const plan = plans.find(p => p.slug === t.plan)
-    const margin = plan?.infraMargin ?? catalog.settings.margin ?? 0
+    const margin = marginFor(plan, spec, catalog.settings.margin ?? 0)
     try {
       const quote = quoteSpec(spec, catalog, { infraMargin: margin })
       const planFee = plan?.monthlyPriceInr ?? 0

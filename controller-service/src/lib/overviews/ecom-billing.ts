@@ -15,6 +15,7 @@ import {
   nextRenewal,
   num,
   periodParams,
+  planMarginSql,
   platformAttention,
   round2,
   walletMix,
@@ -24,7 +25,8 @@ import {
 // "collected" is settlement_ledger subscription_charge rows, "failed" is a halted subscription,
 // and renewals are the last charge plus one interval. New MRR is paid stores created in the period
 // that went live; churned MRR is paid stores suspended or terminated in the period.
-// Servers are billed at AWS price × (1 + margin), so their AWS cost is estimated at the current margin.
+// Servers are billed at AWS price × (1 + margin), so their AWS cost is estimated at each store's plan margin
+// (`margin`, the catalog's, for a store without a plan).
 
 const WENT_LIVE = `t.status IN ('active', 'suspended', 'terminated')`
 const CHURNED = `t.status IN ('suspended', 'terminated')`
@@ -85,9 +87,11 @@ export async function getEcomBillingOverview(pool: Pool, cur: Period, margin = 0
       params
     ),
     pool.query(
-      `SELECT ${inIst('occurred_at', 1, 2)} AS cur, category, entry_type, SUM(amount)::numeric AS amount, count(*)::int AS n
-       FROM wallet_ledger
-       WHERE tenant_id <> '${PLATFORM_TENANT_ID}' AND (${inIst('occurred_at', 1, 2)} OR ${inIst('occurred_at', 3, 4)})
+      `SELECT ${inIst('wl.occurred_at', 1, 2)} AS cur, wl.category, wl.entry_type, SUM(wl.amount)::numeric AS amount, count(*)::int AS n,
+              COALESCE(SUM(-wl.amount / (1 + ${planMarginSql(String(Number.isFinite(margin) ? margin : 0))}))
+                FILTER (WHERE wl.entry_type = 'debit' AND COALESCE(wl.category, wl.entry_type) = 'infra'), 0)::numeric AS infra_cost
+       FROM wallet_ledger wl LEFT JOIN tenants t ON t.id = wl.tenant_id LEFT JOIN plans p ON p.id = t.plan_id
+       WHERE wl.tenant_id <> '${PLATFORM_TENANT_ID}' AND (${inIst('wl.occurred_at', 1, 2)} OR ${inIst('wl.occurred_at', 3, 4)})
        GROUP BY 1, 2, 3`,
       params
     ),
@@ -132,12 +136,9 @@ export async function getEcomBillingOverview(pool: Pool, cur: Period, margin = 0
     }
   }
   const walletFor = (cur: boolean) => {
-    const w = walletMix(
-      wallet.rows
-        .filter(x => x.cur === cur)
-        .map(x => ({ category: x.category, entry_type: x.entry_type, amount: num(x.amount), n: num(x.n) }))
-    )
-    const infra_cost = round2(w.infra / (1 + margin))
+    const rows = wallet.rows.filter(x => x.cur === cur)
+    const w = walletMix(rows.map(x => ({ category: x.category, entry_type: x.entry_type, amount: num(x.amount), n: num(x.n) })))
+    const infra_cost = round2(rows.reduce((n, x) => n + num(x.infra_cost), 0))
     return { ...w, infra_cost, infra_margin: round2(w.infra - infra_cost) }
   }
 

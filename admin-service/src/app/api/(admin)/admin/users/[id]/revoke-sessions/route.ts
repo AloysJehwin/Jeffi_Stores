@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
-import { hasScope } from '@/lib/auth/scopes'
+import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
 import { revokeAllForPrincipal, type PrincipalType } from '@/lib/auth/auth-sessions'
+import { revokeAllForAdmin } from '@/lib/auth/api-tokens'
+import { queryMany } from '@/lib/shared/db'
+import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -30,5 +33,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const revoked = await revokeAllForPrincipal(type, id)
-  return NextResponse.json({ success: true, revoked })
+  // A store owner force-logging-out someone who is also an admin ends their CLI and extension tokens too.
+  let tokensRevoked = 0
+  if (isPlatformOwner(admin.role)) {
+    const tenantId = getCurrentTenant()?.tenantId ?? request.headers.get('x-tenant-id')
+    const admins = await queryMany<{ id: string }>(`SELECT id FROM admins WHERE user_id = $1`, [id]).catch(() => [])
+    for (const a of admins) tokensRevoked += await revokeAllForAdmin(tenantId, a.id).catch(() => 0)
+  }
+  return NextResponse.json({ success: true, revoked, tokensRevoked })
 }

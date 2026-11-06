@@ -97,9 +97,9 @@ describe('register', () => {
 
     await register()
 
-    // register() calls setTimeout once per cron job in the registry.
+    // register() calls setTimeout once per cron job in the registry (k8s-only ones excluded).
     const { CRON_JOBS } = await import('@/lib/shared/cron-jobs')
-    expect(setTimeoutSpy).toHaveBeenCalledTimes(CRON_JOBS.length)
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(CRON_JOBS.filter(j => !j.k8sOnly).length)
   })
 
   it('calls delhivery_sync cron endpoint after 30s delay', async () => {

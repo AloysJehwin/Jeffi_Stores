@@ -65,6 +65,20 @@ describe('triggerProvisioning', () => {
     expect(out).toMatchObject({ ok: true, jobStatus: 'done' })
   })
 
+  it('provision (stub) keeps driving a long pipeline to done', async () => {
+    reg.enqueueProvisioning.mockResolvedValue({ id: 'job-1', status: 'pending', created_resources: {} })
+    // A node-database pipeline plus the stub database's polls runs well past 20 ticks.
+    for (let i = 0; i < 30; i++) reg.getProvisioningJob.mockResolvedValueOnce({ id: 'job-1', status: 'pending', step: 'load_schema' })
+    reg.getProvisioningJob.mockResolvedValue({ id: 'job-1', status: 'done', step: 'activate' })
+    steps.advanceProvisioningJob.mockResolvedValue('pending')
+
+    const { triggerProvisioning } = await import('@controller/lib/provisioning/trigger')
+    const out = await triggerProvisioning({ action: 'provision', tenantId: 't-1', slug: 'acme', plan: 'basic', ownerId: 'o-1' })
+
+    expect(steps.advanceProvisioningJob).toHaveBeenCalledTimes(30)
+    expect(out).toMatchObject({ ok: true, jobStatus: 'done' })
+  })
+
   it('provision passes a restoreFromKey through to enqueue', async () => {
     reg.enqueueProvisioning.mockResolvedValue({ id: 'j', status: 'done', created_resources: {} })
     reg.getProvisioningJob.mockResolvedValue({ id: 'j', status: 'done' })

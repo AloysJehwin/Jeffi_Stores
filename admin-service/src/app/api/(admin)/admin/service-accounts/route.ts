@@ -1,28 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin, authenticateServiceAccount } from '@/lib/auth/jwt'
-import { hasScope } from '@/lib/auth/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope, ALL_SCOPE_KEYS } from '@/lib/auth/scopes'
+import { assignableScopeKeys } from '@/lib/auth/scopes-server'
+import { ensureServiceAccountAdmin } from '@/lib/auth/admin-principal'
+import { clientInfoFrom, issueServiceAccountKey } from '@/lib/auth/api-tokens'
 import { query, queryMany } from '@/lib/shared/db'
 import { generateClientCertificate } from '@/lib/tenancy/certificates'
 import { issueTenantAdminCert } from '@/lib/tenancy/tenant-ca'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { resolveRequestTenantId } from '@/lib/tenancy/request-tenant'
 
 export const dynamic = 'force-dynamic'
 
+// Every caller, a service account's certificate included, through the principal (plan-narrowed scopes).
 export async function GET(request: NextRequest) {
-  const sa = await authenticateServiceAccount(request)
-  if (sa) {
-    if (!sa.allowed_scopes.includes('service_accounts:read')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
-    const rows = await queryMany(
-      `SELECT id, name, common_name, allowed_scopes, is_revoked, revoked_at,
-              p12_downloaded, created_at, last_used_at
-       FROM service_accounts
-       ORDER BY created_at DESC`
-    )
-    return NextResponse.json({ service_accounts: rows })
-  }
-
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'service_accounts:read')) {
@@ -63,7 +54,16 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const allowedScopes: string[] = Array.isArray(body.allowed_scopes) ? body.allowed_scopes : []
+  if (body.allowed_scopes != null && (!Array.isArray(body.allowed_scopes) || body.allowed_scopes.some(s => typeof s !== 'string'))) {
+    return NextResponse.json({ error: 'allowed_scopes must be an array of scope keys' }, { status: 400 })
+  }
+  const allowedScopes: string[] = [...new Set(body.allowed_scopes ?? [])]
+  // Known, sold by this store's plan, and held by the creator: a service account is never wider than its maker.
+  const assignable = await assignableScopeKeys(await resolveRequestTenantId())
+  const unknown = allowedScopes.filter(s => !ALL_SCOPE_KEYS.includes(s) || !assignable.includes(s))
+  if (unknown.length) return NextResponse.json({ error: `Invalid scope: ${unknown.join(', ')}` }, { status: 400 })
+  const beyond = allowedScopes.filter(s => !hasScope(admin.role, admin.scopes, s))
+  if (beyond.length) return NextResponse.json({ error: `You can't grant scopes you don't hold: ${beyond.join(', ')}` }, { status: 403 })
 
   const cn = `svc-${name}`
 
@@ -97,6 +97,15 @@ export async function POST(request: NextRequest) {
   )
 
   const created = rows[0]
+  // Its admins row now; first use creates it otherwise.
+  await ensureServiceAccountAdmin({ id: created.id, name: created.name, allowed_scopes: allowedScopes }).catch(() => null)
+  // Its API key for the public host (/v1/admin); shown once, like the .p12 password.
+  const key = await issueServiceAccountKey({
+    tenantId: await resolveRequestTenantId(),
+    serviceAccountId: created.id,
+    name: created.name,
+    host: clientInfoFrom(request).host,
+  }).catch(() => null)
   return NextResponse.json(
     {
       id: created.id,
@@ -106,7 +115,9 @@ export async function POST(request: NextRequest) {
       created_at: created.created_at,
       p12_password: cert.p12Password,
       download_url: `/api/admin/service-accounts/${created.id}/download`,
+      api_key: key?.token ?? null,
+      api_key_prefix: key?.prefix ?? null,
     },
-    { status: 201 }
+    { status: 201, headers: { 'cache-control': 'no-store' } }
   )
 }

@@ -1908,6 +1908,14 @@ CREATE INDEX idx_search_queries_created_at ON public.search_queries USING btree 
 
 
 --
+-- Name: idx_service_accounts_admin_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_service_accounts_admin_id ON public.service_accounts USING btree (admin_id);
+
+
+
+--
 -- Name: idx_service_accounts_created_by; Type: INDEX; Schema: public; Owner: -
 --
 

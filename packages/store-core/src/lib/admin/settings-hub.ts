@@ -2,7 +2,7 @@ import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
 
 // Tabs of the Settings hub (/admin/settings?tab=). Each tab keeps its old route's gate; the old
 // routes redirect into the hub for admins who can open /admin/settings (settings:read).
-export type SettingsHubTabId = 'account' | 'team' | 'service-accounts' | 'audit'
+export type SettingsHubTabId = 'account' | 'team' | 'service-accounts' | 'cli' | 'audit'
 
 export const SETTINGS_HUB_TABS: {
   id: SettingsHubTabId
@@ -15,6 +15,8 @@ export const SETTINGS_HUB_TABS: {
   { id: 'account', label: 'Account', href: '/admin/settings', scope: 'settings:read' },
   { id: 'team', label: 'Team', href: '/admin/team', scope: 'settings:read', ownerOnly: true },
   { id: 'service-accounts', label: 'Service accounts', href: '/admin/service-accounts', scope: 'service_accounts:read' },
+  // No standalone route: `jeffi login` and extension tokens, one's own (owners: everyone's).
+  { id: 'cli', label: 'CLI & tokens', href: '/admin/settings?tab=cli', scope: 'settings:read' },
   { id: 'audit', label: 'Audit log', href: '/admin/audit', scope: 'audit:read' },
 ]
 
