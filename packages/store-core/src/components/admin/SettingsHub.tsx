@@ -27,7 +27,7 @@ export default async function SettingsHub({
   }))
   return (
     <div className="px-4 sm:px-6 pt-4 sm:pt-6 space-y-5">
-      <PageHeader title="Settings" description="Your account, team, service accounts and the audit log" />
+      <PageHeader title="Settings" description="Your account, team, service accounts, CLI tokens and the audit log" />
       <TabLinks tabs={tabs} value={active} actions={actions} />
     </div>
   )

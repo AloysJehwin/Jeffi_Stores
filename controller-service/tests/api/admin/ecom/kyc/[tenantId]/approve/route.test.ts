@@ -111,7 +111,7 @@ import { startStore } from '@controller/lib/provisioning/start-store'
 // ---------------------------------------------------------------------------
 
 const TENANT_ID = 'tnt-0001'
-const ADMIN = { adminId: 'admin-1', email: 'admin@jeffistores.in', role: 'super_admin', scopes: [] }
+const ADMIN = { adminId: 'admin-1', email: 'admin@jeffistores.in', role: 'administrator', scopes: [] }
 
 function postReq(body: unknown = {}) {
   return new NextRequest(

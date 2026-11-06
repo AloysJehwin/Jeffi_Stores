@@ -80,7 +80,8 @@ export const CUSTOMERS_ENTITY: FilterEntity<CustomerKey> = {
   noun: 'Customers',
   root: 'users',
   alias: 'u',
-  base: ['u.is_guest = false'],
+  // Service-account shadow users are not customers.
+  base: ['u.is_guest = false', "u.user_type IS DISTINCT FROM 'service_account'"],
   fields: CUSTOMER_FIELDS,
   sql: SQL,
   period: 'joined',

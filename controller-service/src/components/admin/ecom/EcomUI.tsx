@@ -145,6 +145,7 @@ export const TENANT_TABS = [
   { key: 'commerce', label: 'Commerce' },
   { key: 'shipments', label: 'Shipments' },
   { key: 'access', label: 'Access' },
+  { key: 'certificates', label: 'Certificates' },
   { key: 'kyc', label: 'KYC' },
   { key: 'messaging', label: 'Messaging' },
 ] as const

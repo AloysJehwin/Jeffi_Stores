@@ -1,7 +1,7 @@
 import 'server-only'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { presetOf } from '@/lib/compute/presets'
-import { normalizeSpec, type ComputeSpec } from '@/lib/compute/spec'
+import { normalizeSpec, type ComputeSpec, type StoreLayout } from '@/lib/compute/spec'
 import { priceInrMonthFor } from './pricing-month'
 
 export interface TenantCompute {
@@ -47,6 +47,18 @@ export async function patchTenantCompute(tenantId: string, patch: Patch): Promis
     `UPDATE tenant_compute SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')}, updated_at = now() WHERE tenant_id = $1`,
     [tenantId, ...keys.map(k => json(k, patch[k]))]
   )
+}
+
+/** What each store runs, in one query: the old all-in-one app ('controller') or its own services (no applied row yet: services). */
+export async function storeLayouts(tenantIds: string[]): Promise<Map<string, StoreLayout>> {
+  const out = new Map<string, StoreLayout>()
+  if (!tenantIds.length) return out
+  const r = await controlPlanePool().query<{ tenant_id: string; layout: string | null }>(
+    `SELECT tenant_id, applied->>'layout' AS layout FROM tenant_compute WHERE tenant_id = ANY($1::uuid[]) AND applied IS NOT NULL`,
+    [tenantIds]
+  )
+  for (const row of r.rows) out.set(row.tenant_id, row.layout === 'services' ? 'services' : 'controller')
+  return out
 }
 
 /** Stores whose compute change is due to be worked on. */

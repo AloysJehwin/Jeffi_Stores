@@ -1,10 +1,8 @@
-import Link from 'next/link'
 import type { TenantDetail, BankAccount, TenantBilling } from '@/lib/tenant-registry'
 import { Field, FieldGrid, Mono, Section, StatusPill } from '../EcomUI'
 import { inr } from '../cells'
 import { LedgerTable, TransactionsTable } from '../detail/BillingTables'
 import Pager from '../detail/Pager'
-import { detailHref } from '../detail/labels'
 
 function maskAccount(n: string | null): string {
   if (!n) return '—'
@@ -50,14 +48,7 @@ export default function CommerceTab({
 
   return (
     <div className="space-y-5 sm:space-y-6 min-w-0">
-      <Section
-        title="Money"
-        action={
-          <Link href={detailHref(t.id, 'billing')} className="text-sm text-accent-600 hover:underline">
-            Full billing →
-          </Link>
-        }
-      >
+      <Section title="Money">
         {!billing || billing.transactionCount === 0 ? (
           <p className="text-sm text-foreground-muted">No transactions recorded for this store yet, so there is nothing to settle.</p>
         ) : (

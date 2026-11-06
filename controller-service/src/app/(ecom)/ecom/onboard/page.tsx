@@ -8,6 +8,7 @@ import PaymentTrigger from './PaymentTrigger'
 import OnboardShell from './OnboardShell'
 import PageHeader from '../dashboard/_components/PageHeader'
 import { Card, Row } from '../dashboard/_components/Card'
+import SetupProgress from '../dashboard/_components/SetupProgress'
 import { statusSteps, REVIEW_STEP, FINAL_STEP } from './steps'
 import { Badge, primaryBtn, secondaryBtn } from './ui'
 import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
@@ -135,6 +136,9 @@ export default async function OnboardPage({
                 <span className="font-semibold text-foreground">{t.slug}.jeffistores.in</span>. This takes a few minutes;
                 you&apos;ll be emailed when it&apos;s live.
               </p>
+            </div>
+            <div className="mt-5 border-t border-border-default pt-4">
+              <SetupProgress tenantId={t.id} />
             </div>
             <a href="/dashboard" className={`${primaryBtn} mt-5 w-full sm:w-auto`}>
               Go to dashboard →

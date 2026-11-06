@@ -20,7 +20,7 @@ export async function priceInrMonthForPlan(planSlug: string, spec: ComputeSpec):
   const [plan, catalog] = await Promise.all([planCompute(planSlug), getCatalog()])
   if (!plan) return null
   try {
-    const quote = quoteSpec(spec, catalog, { infraMargin: plan.infraMargin })
+    const quote = quoteSpec(spec, catalog, plan)
     return Math.round(monthlyTotal(quote, plan.monthlyPriceInr ?? 0, catalog.settings.gstRate).total)
   } catch {
     return null

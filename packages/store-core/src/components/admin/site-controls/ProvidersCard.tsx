@@ -8,7 +8,7 @@ import { Badge, Banner, TabAction, Table, Tabs, api, btnGhost, btnPrimary, when 
 import { useActionToast } from '@/components/admin/kit/toast'
 import { SectionCard } from './controls'
 
-// Flagship Site Controls only (platform owner): the provider policy every store follows, plus per-store overrides.
+// Platform Configuration page (flagship only): the provider policy every store follows, plus per-store overrides.
 
 type Key = 'sms_provider' | 'whatsapp_provider' | 'ai_text_providers' | 'ai_image_providers' | 'ai_video_providers' | 'ai_image_default_quality'
 type Setting = { tenant_id: string | null; key: Key; value: unknown; updated_by: string | null; updated_at: string }
@@ -93,7 +93,7 @@ export default function ProvidersCard() {
       />
       {loadError && !data && <Banner ok={false}>{loadError}</Banner>}
       {!data ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <ProvidersSkeleton />
       ) : tab === 'default' ? (
         <>
           <Section title="Messaging">
@@ -363,5 +363,31 @@ function AddOverride({ data, onCancel, onSave }: { data: Data; onCancel: () => v
         </button>
       </div>
     </Section>
+  )
+}
+
+const bar = 'bg-surface-secondary rounded'
+
+// Two provider selects, then the three AI order lists, while the settings load.
+function ProvidersSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="Loading providers">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {[0, 1].map(i => (
+          <div key={i}>
+            <div className={`h-3 w-28 mb-2 ${bar}`} />
+            <div className={`h-control w-full ${bar}`} />
+          </div>
+        ))}
+      </div>
+      {[3, 3, 2].map((n, i) => (
+        <div key={i} className="space-y-2" style={{ animationDelay: `${i * 60}ms` }}>
+          <div className={`h-3 w-24 ${bar}`} />
+          {Array.from({ length: n }).map((_, j) => (
+            <div key={j} className={`h-10 w-full ${bar} opacity-70`} />
+          ))}
+        </div>
+      ))}
+    </div>
   )
 }

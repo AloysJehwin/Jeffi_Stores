@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getKyc } from '@/lib/tenant-registry'
 import { getKycDocumentStream } from '@controller/lib/catalog/kyc-upload'
 
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isPlatformAdmin(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { tenantId } = await params
   const kyc = await getKyc(tenantId)

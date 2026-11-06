@@ -18,6 +18,8 @@ export const POD_RESOURCES: Record<ServiceName, Record<PodSize, Resources>> = {
 
 // Every store also runs a small Redis.
 export const REDIS_RESOURCES = r('10m', '24Mi', '100m', '96Mi')
+// A node-mode store's Postgres pod (tenant-workload.ts postgresWorkload).
+export const NODE_DB_RESOURCES = r('100m', '256Mi', '1', '768Mi')
 
 const svc = (replicas: number, maxReplicas: number, size: PodSize): ServiceSpec => ({ replicas, maxReplicas, size })
 const all = (s: ServiceSpec) => Object.fromEntries(SERVICE_NAMES.map(n => [n, { ...s }])) as Record<ServiceName, ServiceSpec>
@@ -169,11 +171,15 @@ export function withHighAvailability(spec: ComputeSpec): ComputeSpec {
 
 /** The RDS class each size gets when its database moves off the server. */
 export const PRESET_DB_CLASS: Partial<Record<PresetKey, string>> = {
+  basic: 'db.t4g.micro',
   small: 'db.t4g.micro',
   medium: 'db.t4g.small',
   large: 'db.t4g.medium',
   xlarge: 'db.t4g.large',
 }
+
+/** The RDS classes Basic may choose. */
+export const BASIC_DB_CLASSES = ['db.t4g.micro', 'db.t4g.small']
 
 /** The size with its database on its own RDS instance of the size's class (RDS storage is at least 20 GB). */
 export function withDedicatedDb(spec: ComputeSpec, key: PresetKey): ComputeSpec {
@@ -206,6 +212,10 @@ const DB_MAX_CONNECTIONS: Record<string, number> = {
   'db.t4g.small': 120,
   'db.t4g.medium': 250,
   'db.t4g.large': 500,
+  'db.t4g.xlarge': 1000,
+  'db.m7g.large': 500,
+  'db.r7g.large': 1000,
+  'db.r7g.xlarge': 2000,
 }
 
 export const dbMaxConnections = (cls: string, memoryMib: number | null) => DB_MAX_CONNECTIONS[cls] ?? Math.floor((memoryMib ?? 1024) / 16)

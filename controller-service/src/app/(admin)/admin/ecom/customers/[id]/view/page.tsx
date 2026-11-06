@@ -22,6 +22,7 @@ import CommerceTab from '@controller/components/admin/ecom/tabs/CommerceTab'
 import ShipmentsTab from '@controller/components/admin/ecom/tabs/ShipmentsTab'
 import KycTab from '@controller/components/admin/ecom/tabs/KycTab'
 import AccessTab from '@controller/components/admin/ecom/tabs/AccessTab'
+import CertificatesTab from '@controller/components/admin/ecom/tabs/CertificatesTab'
 import MessagingTab from '@controller/components/admin/ecom/tabs/MessagingTab'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +43,7 @@ export default async function TenantObjectPage({ params, searchParams }: { param
 
   // API workspaces (Messaging/Documents only) have no store infrastructure to show or manage.
   const hiddenTabs: TenantTab[] = [
-    ...(d.isStore ? [] : (['provisioning', 'infrastructure', 'commerce', 'shipments', 'access'] as TenantTab[])),
+    ...(d.isStore ? [] : (['provisioning', 'infrastructure', 'commerce', 'shipments', 'access', 'certificates'] as TenantTab[])),
     ...(hasService(t, 'messaging') ? [] : (['messaging'] as TenantTab[])),
   ]
   if (hiddenTabs.includes(tab)) redirect(`/admin/ecom/customers/${id}/view?tab=overview`)
@@ -64,7 +65,8 @@ export default async function TenantObjectPage({ params, searchParams }: { param
         {tab === 'infrastructure' && <InfrastructureTab d={d} infra={await loadInfraDetail(d)} />}
         {tab === 'commerce' && <CommerceTab tenant={t} {...await commerceData(id, sp)} />}
         {tab === 'shipments' && <ShipmentsTab tenantId={t.id} ownDelhivery={t.own_delhivery === true} shipments={await shipmentData(id)} />}
-        {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
+        {tab === 'access' && <AccessTab {...await accessData(id)} />}
+        {tab === 'certificates' && <CertificatesTab tenant={t} {...await certificatesData(id)} />}
         {tab === 'kyc' && <KycTab tenant={t} kyc={d.kyc} approvals={d.approvals} />}
         {tab === 'messaging' && hasService(t, 'messaging') && <MessagingTab tenantId={t.id} storeName={t.display_name} />}
       </div>
@@ -73,16 +75,23 @@ export default async function TenantObjectPage({ params, searchParams }: { param
 }
 
 async function accessData(id: string) {
-  const [certs, ca, social, integrations] = await Promise.all([
-    listTenantAdminCerts(id).catch(() => []),
-    getTenantCa(id).catch(() => null),
+  const [social, integrations] = await Promise.all([
     getTenantSocialAccounts(id).catch(() => []),
     listIntegrationCredentials(id).catch(() => []),
+  ])
+  return { social, integrations }
+}
+
+async function certificatesData(id: string) {
+  const [certs, ca, owners] = await Promise.all([
+    listTenantAdminCerts(id).catch(() => []),
+    getTenantCa(id).catch(() => null),
+    getTenantOwners(id).catch(() => []),
   ])
   // getTenantCa carries caKeyPem, the tenant's CA private key. Only the two display fields cross into the
   // component, so the key cannot ride along into any future client boundary.
   const caSummary = ca ? { subject: ca.subject, expiresAt: ca.expiresAt } : null
-  return { certs, ca: caSummary, social, integrations }
+  return { certs, ca: caSummary, ownerEmail: owners[0]?.email ?? null }
 }
 
 async function commerceData(id: string, sp: Search) {

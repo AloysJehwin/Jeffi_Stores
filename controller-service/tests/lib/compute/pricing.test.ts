@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { quoteSpec, monthlyTotal, chargeFor } from '@controller/lib/compute/pricing'
-import { PRESETS, presetOf, presetSpec, withHighAvailability } from '@/lib/compute/presets'
-import { validateSpec, smallestFittingNode, planCompatibilityError } from '@/lib/compute/validate'
+import { quoteSpec, monthlyTotal, chargeFor, marginFor, pausedInrHour } from '@controller/lib/compute/pricing'
+import { PRESETS, presetOf, presetSpec, withDedicatedDb, withHighAvailability } from '@/lib/compute/presets'
+import { validateSpec, smallestFittingNode, planCompatibilityError, fitOf, fittingServers } from '@/lib/compute/validate'
 import type { Catalog, PlanCompute, PriceRow } from '@/lib/compute/spec'
 
 // The seeded prices (database/control-plane/seed-plans.sql) and default settings.
@@ -77,6 +77,20 @@ describe('quoteSpec', () => {
     expect(chargeFor(q.inrHour, 10)).toBeCloseTo((q.inrMonth / 730) * 10, 1)
   })
 
+  it("prices with the plan's RDS margin when the database is on RDS, else its server margin", () => {
+    const node = presetSpec('basic')
+    const rds = withDedicatedDb(presetSpec('basic'), 'basic')
+    const basic = { infraMargin: 0, rdsMargin: 0.2 }
+    expect(marginFor(basic, node)).toBe(0)
+    expect(marginFor(basic, rds)).toBe(0.2)
+    expect(marginFor({ infraMargin: 0.2 }, rds)).toBe(0.2)
+    expect(marginFor(undefined, rds, 0.25)).toBe(0.25)
+    const q = quoteSpec(rds, catalog, basic)
+    expect(q.inrMonth).toBeCloseTo(q.awsInrMonth * 1.2, 1)
+    expect(quoteSpec(node, catalog, basic).marginInrMonth).toBeCloseTo(0, 2)
+    expect(pausedInrHour(rds, catalog, basic)).toBeCloseTo(pausedInrHour(rds, catalog, { infraMargin: 0.2 }), 4)
+  })
+
   it('refuses a server it has no price for', () => {
     expect(() => quoteSpec({ ...presetSpec('small'), node: { placement: 'dedicated', type: 'x9.huge', count: 1 } }, catalog)).toThrow(/No price/)
   })
@@ -106,6 +120,42 @@ describe('validateSpec', () => {
     const s = presetSpec('small')
     s.services.storefront.maxReplicas = 3
     expect(validateSpec(s, catalog, growth).errors.join(' ')).toMatch(/memory/)
+  })
+
+  it('lets Basic keep its fixed server with its database on the server or a small RDS', () => {
+    const basic: PlanCompute = { slug: 'basic', defaultPreset: 'basic', minPlacement: 'dedicated', minPreset: 'basic', advanced: true }
+    const rds = withDedicatedDb(presetSpec('basic'), 'basic')
+    expect(rds.db).toEqual({ mode: 'dedicated', class: 'db.t4g.micro', storageGb: 20, multiAz: false })
+    expect(validateSpec(presetSpec('basic'), catalog, basic).errors).toEqual([])
+    expect(validateSpec(rds, catalog, basic).errors).toEqual([])
+    expect(planCompatibilityError({ ...rds, db: { ...rds.db, class: 'db.t4g.small' } }, basic)).toBeNull()
+    expect(planCompatibilityError({ ...rds, db: { ...rds.db, class: 'db.t4g.large' } }, basic)).toMatch(/db.t4g.micro or db.t4g.small/)
+    expect(planCompatibilityError({ ...rds, db: { ...rds.db, multiAz: true } }, basic)).toMatch(/standby/)
+    expect(planCompatibilityError({ ...rds, db: { ...rds.db, storageGb: 10 } }, basic)).toMatch(/20 GB/)
+    expect(planCompatibilityError({ ...rds, node: { ...rds.node, type: 't4g.medium' } }, basic)).toMatch(/fixed Basic/)
+  })
+
+  it("counts the server's Postgres, but lets the platform's own sizes through when only it tips them over", () => {
+    const node = fitOf(presetSpec('basic'), catalog, 'basic')
+    const rds = fitOf(withDedicatedDb(presetSpec('basic'), 'basic'), catalog, 'basic')
+    expect(node.memory.requestedMib - rds.memory.requestedMib).toBe(256)
+    expect(node.cpu.requestedMilli - rds.cpu.requestedMilli).toBe(100)
+    // 1720 of 1598 MB at a release on t4g.small: Basic and Small stay valid, one more copy does not.
+    expect(node.memory.requestedMib).toBeGreaterThan(node.memory.allocatableMib)
+    expect(validateSpec(presetSpec('small'), catalog, growth).errors).toEqual([])
+    const s = presetSpec('small')
+    s.services.messaging.replicas = 2
+    s.services.messaging.maxReplicas = 2
+    expect(validateSpec(s, catalog, growth).errors.join(' ')).toMatch(/memory/)
+  })
+
+  it('adds servers when no single server type fits, and finds none when even the most of the largest do not', () => {
+    const s = presetSpec('small')
+    for (const k of ['storefront', 'admin', 'messaging', 'documents'] as const) s.services[k] = { replicas: 6, maxReplicas: 8, size: 'L' }
+    expect(smallestFittingNode(s, catalog, 'growth')).toBeNull()
+    expect(fittingServers(s, catalog, 'growth')).toEqual({ type: 't4g.xlarge', count: 2 })
+    const smallOnly = { ...catalog, prices: catalog.prices.filter(p => p.code !== 'ec2:t4g.large' && p.code !== 'ec2:t4g.xlarge') }
+    expect(fittingServers(s, smallOnly, 'growth')).toBeNull()
   })
 
   it('keeps Starter on the shared preset and paid plans on their own servers', () => {

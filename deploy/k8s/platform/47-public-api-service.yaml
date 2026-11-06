@@ -30,6 +30,10 @@ spec:
             - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
             - { name: DB_IAM_AUTH, value: 'true' }
             - { name: PUBLIC_API_URL, value: 'https://public.jeffistores.in' }
+            # /v1/admin and /v1/platform forward here (the tenant namespaces admit pods of this namespace).
+            - { name: PLATFORM_ADMIN_URL, value: 'http://jeffi-stores-admin-service.jeffi.svc.cluster.local:3000' }
+            - { name: PLATFORM_CONTROLLER_URL, value: 'http://jeffi-stores-controller-service.jeffi.svc.cluster.local:3000' }
+            - { name: TENANT_ADMIN_URL_TEMPLATE, value: 'http://{slug}-admin-service.tenant-{slug}.svc.cluster.local:3000' }
             - name: REDIS_PASSWORD
               valueFrom: { secretKeyRef: { name: redis, key: password } }
             - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
@@ -70,6 +74,13 @@ spec:
       middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
       services: [{ name: jeffi-stores-messaging-service, port: 3101 }]
     - match: Host(`public.jeffistores.in`)
+      priority: 100
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-public-api-service, port: 3100 }]
+    # Each store's own public API host: its /v1/admin routes and its own docs. Above the platform's
+    # store catch-all (49-routes.yaml); tenant IngressRoutes never list public-{slug}.
+    - match: HostRegexp(`^public-[a-z0-9-]+\.jeffistores\.in$`)
       priority: 100
       kind: Rule
       middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]

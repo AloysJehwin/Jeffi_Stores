@@ -159,6 +159,9 @@ CREATE TABLE public.otp_verifications (
 --
 -- Name: service_accounts; Type: TABLE; Schema: public; Owner: -
 --
+-- admin_id: the inactive admins row (role service_account) the account acts as, so created_by
+-- and the audit trail resolve to it.
+--
 
 CREATE TABLE public.service_accounts (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -173,7 +176,8 @@ CREATE TABLE public.service_accounts (
     p12_downloaded boolean DEFAULT false NOT NULL,
     created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    last_used_at timestamp with time zone
+    last_used_at timestamp with time zone,
+    admin_id uuid
 );
 
 

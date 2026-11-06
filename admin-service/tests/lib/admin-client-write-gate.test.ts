@@ -22,6 +22,9 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'packages/store-core/src/components/admin/TwoFactorCard.tsx',
   'packages/store-core/src/components/admin/MobileNumberCard.tsx',
   'packages/store-core/src/components/admin/AdminSupportChat.tsx',
+  // The member approving their own CLI login and revoking their own tokens (owners: anyone's).
+  'admin-service/src/app/(admin)/admin/cli/authorize/AuthorizeClient.tsx',
+  'admin-service/src/app/(admin)/admin/settings/_components/CliTokensPanel.tsx',
   // Self-service: marks the member's own notification bell read; no scoped record mutation.
   'packages/store-core/src/components/admin/NotificationBell.tsx',
   // Self-service: the member's own saved filter views. Sharing one is offered only when the
@@ -50,7 +53,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'packages/store-core/src/components/admin/ServiceAccountRevokeButton.tsx',
   // Owner-only revoke rendered only for owners by service-accounts/_components/ServiceAccountsPanel.tsx (replaced the button above).
   'packages/store-core/src/components/admin/ServiceAccountRowActions.tsx',
-  'admin-service/src/app/(admin)/admin/service-accounts/add/page.tsx',
+  // Its page.tsx redirects anyone without service_accounts:write.
+  'admin-service/src/app/(admin)/admin/service-accounts/add/AddServiceAccountForm.tsx',
   // Read-only view; its only POST is an export/filter, not a scoped write.
   'admin-service/src/app/(admin)/admin/audit/AdminAuditClient.tsx',
   // Dashboard shell: its only POST is a fire-and-forget payout reconciliation on mount,

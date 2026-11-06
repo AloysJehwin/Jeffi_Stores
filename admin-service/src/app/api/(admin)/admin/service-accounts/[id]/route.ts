@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'
+import { revokeServiceAccountKeys } from '@/lib/auth/api-tokens'
+import { resolveRequestTenantId } from '@/lib/tenancy/request-tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,5 +46,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
      WHERE id = $1`,
     [id]
   )
+  await revokeServiceAccountKeys(await resolveRequestTenantId(), id).catch(() => 0)
   return NextResponse.json({ ok: true })
 }

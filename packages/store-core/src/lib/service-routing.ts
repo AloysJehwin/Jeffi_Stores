@@ -1,4 +1,4 @@
-import { CRON_JOBS } from '@/lib/shared/cron-jobs'
+import { CRON_JOBS, CRON_PING_PATH } from '@/lib/shared/cron-jobs'
 import { storeHostForSlug } from '@/lib/tenancy/forms-host'
 import { appFromHost } from '@/lib/tenant-registry/host-resolution'
 
@@ -57,9 +57,10 @@ export interface RouteRule {
   strip?: string // prefix the ingress removes before the app sees the path
 }
 
-const STORE_CRON_PATHS = CRON_JOBS.filter(j => j.tenantScope !== null && j.path.startsWith('/api/cron/')).map(j => j.path)
+const STORE_CRON_PATHS = [...CRON_JOBS.filter(j => j.tenantScope !== null && j.path.startsWith('/api/cron/')).map(j => j.path), CRON_PING_PATH]
 const PLATFORM_WEBHOOKS = ['/api/webhooks/ses-inbound', '/api/webhooks/aws-messaging', '/api/webhooks/twilio']
-// Platform admin pages, served at the admin host's root (admin.x/ecom → /admin/ecom).
+// Platform admin pages, served at the admin host's root (admin.x/ecom → /admin/ecom). /settings/compute-pricing
+// only redirects to /ecom/configuration now.
 const PLATFORM_ADMIN_PAGES = ['/ecom', '/settings/ai-pricing', '/settings/compute-pricing']
 // public/ files (images, fonts, the on-device model, the PWA manifest) live in the storefront only.
 const STATIC_FILE_RE = /\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp4|webm|pdf|mjs|wasm|onnx)$/i

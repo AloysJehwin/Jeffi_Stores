@@ -13,6 +13,7 @@ import { adminCookieNameForHost } from './lib/auth/admin-cookie'
 import { bindingGate } from './lib/auth/session-binding-gate'
 import { currentTraceId } from './lib/shared/otel'
 import { clientCertFromProxy, TRAEFIK_CERT_HEADER, TRAEFIK_CERT_INFO_HEADER } from './lib/tenancy/edge-client-cert'
+import { GATEWAY_HEADER } from '@jeffi/service-auth'
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -112,11 +113,13 @@ async function handle(request: NextRequest) {
   const hostname = pinnedHost(resolveTrustedHost(request))
   const pathname = request.nextUrl.pathname
 
-  // public.<domain> is served by public-api-service, not this app. In production Traefik routes the
-  // host there; in dev the Next server proxies so public.localhost:3000 just works.
-  if (hostname === 'public.localhost' || hostname.startsWith('public.')) {
+  // public.<domain> and public-{slug}.<domain> are served by public-api-service, not this app. In production
+  // Traefik routes the hosts there; in dev the Next server proxies so public[-slug].localhost:3000 just works.
+  if (hostname === 'public.localhost' || hostname.startsWith('public.') || /^public-[a-z0-9-]+\./.test(hostname)) {
     if (process.env.NODE_ENV !== 'production') {
-      return NextResponse.rewrite(new URL(pathname + request.nextUrl.search, process.env.PUBLIC_API_URL || 'http://localhost:3100'))
+      const fwd = new Headers(request.headers)
+      fwd.set('x-forwarded-host', hostname)
+      return NextResponse.rewrite(new URL(pathname + request.nextUrl.search, process.env.PUBLIC_API_URL || 'http://localhost:3100'), { request: { headers: fwd } })
     }
     return new NextResponse('Not found', { status: 404 })
   }
@@ -176,6 +179,9 @@ async function handle(request: NextRequest) {
   stripped.delete('x-service-account-id')
   stripped.delete('x-service-account-name')
   stripped.delete('x-service-account-scopes')
+  stripped.delete('x-admin-principal')
+  // The public gateway's signed principal: restored below only when it verifies for this store and host.
+  stripped.delete(GATEWAY_HEADER)
   // Tenant forwarding headers are also client-forgeable — strip before we (maybe) set them.
   stripped.delete('x-tenant-id')
   stripped.delete('x-tenant-slug')
@@ -214,6 +220,15 @@ async function handle(request: NextRequest) {
         })
       )
     }
+  }
+
+  // A forged or foreign gateway header never reaches a route.
+  const gatewayRaw = isAdminApiPath ? request.headers.get(GATEWAY_HEADER) : null
+  let gatewayOk = false
+  if (gatewayRaw) {
+    const { verifiedGatewayClaims } = await import('./lib/auth/admin-principal')
+    gatewayOk = !!verifiedGatewayClaims(request, tenant?.tenantId ?? null)
+    if (gatewayOk) stripped.set(GATEWAY_HEADER, gatewayRaw)
   }
 
   // Each app answers only what routeFor sends it, and a store's pods only their own store.
@@ -470,7 +485,10 @@ async function handle(request: NextRequest) {
   // were reachable on a tenant admin host with no client certificate at all, and
   // check-session never saw the verified identity, so the panel reported "not detected"
   // however valid the cert was.
-  if (isTenantAdminSubdomain && tenant && process.env.TENANT_MTLS_ENFORCED !== 'false') {
+  // The public gateway authenticated a jfc_/jsa_ token instead (it is the edge for /v1/admin). The CLI's
+  // device login starts with no credential at all; approving it needs a signed-in (cert-carrying) browser.
+  const deviceLogin = pathname === '/api/admin/cli-auth/start' || pathname === '/api/admin/cli-auth/poll'
+  if (isTenantAdminSubdomain && tenant && process.env.TENANT_MTLS_ENFORCED !== 'false' && !gatewayOk && !deviceLogin) {
     const { decodeClientCertHeader, verifyTenantClientCert } = await import('./lib/tenancy/tenant-mtls')
     const pem = decodeClientCertHeader(proxyCert.pem)
     const v = await verifyTenantClientCert(pem, tenant.tenantId).catch(
@@ -488,6 +506,29 @@ async function handle(request: NextRequest) {
     stripped.set('x-client-cert-cn', v.commonName ?? '')
   }
 
+  // ADMIN_PRINCIPAL_GATE: 'log' (default) keeps today's pass-through for cert-carrying /api/admin calls and
+  // logs what 'enforce' would refuse; 'enforce' gates every caller. Lazy: only admin API paths resolve.
+  const gateEnforced = process.env.ADMIN_PRINCIPAL_GATE === 'enforce'
+  const resolvePrincipal = () =>
+    inTenant(async () => {
+      const { resolveAdminPrincipal } = await import('./lib/auth/admin-principal')
+      return resolveAdminPrincipal(request, {
+        cookieName: adminCookie,
+        signals: reqSignals,
+        touch: !isPassiveAdminRequest(pathname, request.method),
+        tenantId: tenant?.tenantId ?? null,
+        // The serial the edge set (platform host) or middleware verified (tenant host); never a client copy.
+        certSerial: stripped.get('x-client-cert-serial'),
+        lookupOnly: true,
+      }).catch(() => null)
+    })
+  // Log mode only resolves a sample of the calls it would merely log (ADMIN_PRINCIPAL_GATE_SAMPLE, default 5%).
+  const sampleRate = Number(process.env.ADMIN_PRINCIPAL_GATE_SAMPLE ?? '0.05')
+  const logSampled = () => Math.random() < (Number.isFinite(sampleRate) ? sampleRate : 0.05)
+  const logGate = (v: { status: number; reason: string }, kind: string | null) =>
+    console.warn(`[admin-gate] would deny ${JSON.stringify({ status: v.status, reason: v.reason, kind, method: request.method, path: pathname, host: hostname })}`)
+  const hasBearer = /^bearer /i.test(request.headers.get('authorization') || '')
+
   const publicApiPaths = [
     '/api/admin/auth/email-otp/start',
     '/api/admin/auth/email-otp/verify',
@@ -500,11 +541,22 @@ async function handle(request: NextRequest) {
     '/api/admin/mfa/enroll-start',
     '/api/admin/mfa/enroll-confirm',
     '/api/admin/mfa/verify',
+    // CLI device login (RFC 8628); the protected half lives under /api/admin/cli/, which this prefix doesn't match.
+    '/api/admin/cli-auth/start',
+    '/api/admin/cli-auth/poll',
   ]
   if (isAdminApiPath && publicApiPaths.some(path => pathname.startsWith(path))) {
     const limited = await applyRateLimit(request)
     if (limited) return limited
     return addSecurityHeaders(passThrough())
+  }
+
+  // Store jobs that are admin routes (feed syncs) run from the cron fan-out with CRON_SECRET, which no admin
+  // principal resolves; the route checks it again. Only GET, only those paths.
+  if (isAdminApiPath && request.method === 'GET' && hasBearer) {
+    const { CRON_ADMIN_PATHS } = await import('./lib/shared/cron-jobs')
+    const { verifyCronRequest } = await import('./lib/shared/cron-auth')
+    if (CRON_ADMIN_PATHS.includes(pathname) && verifyCronRequest(request)) return addSecurityHeaders(passThrough())
   }
 
   if (isAdminSubdomain) {
@@ -523,6 +575,17 @@ async function handle(request: NextRequest) {
     if (isAdminApiPath) {
       // Admin API auth is handled below — fall through
     } else if (pathname.startsWith('/api/')) {
+      // Store routes the admin UI calls on its own host. Bearer and service-account callers are held to
+      // their deny list and the path's scope; cookie sessions are left to the routes, as before.
+      if ((hasBearer || (!request.cookies.get(adminCookie)?.value && stripped.get('x-client-cert-serial'))) && (gateEnforced || logSampled())) {
+        const p = await resolvePrincipal()
+        if (p && (p.credential === 'bearer' || p.kind === 'service_account')) {
+          const { principalGate } = await import('./lib/auth/admin-principal')
+          const v = principalGate(p, pathname, request.method, { platform: false })
+          if (v && gateEnforced) return addSecurityHeaders(NextResponse.json({ error: v.error }, { status: v.status }))
+          if (v) logGate(v, p.kind)
+        }
+      }
       return addSecurityHeaders(passThrough())
     } else if (!isAdminPath) {
       // B2B portal pages have no admin equivalent — redirect to the business subdomain
@@ -613,42 +676,33 @@ async function handle(request: NextRequest) {
       return addSecurityHeaders(passThrough())
     }
 
-    // Service account auth via mTLS client certificate serial.
-    // nginx passes $ssl_client_serial as X-Client-Cert-Serial. The edge runtime
-    // cannot use pg (Node.js crypto), so we pass the request through and let the
-    // route handler validate via authenticateServiceAccount() in jwt.ts.
-    const certSerial = proxyCert.serial || ''
-    if (certSerial) {
+    // Log mode: a cert-carrying call goes straight through, as it always has; a sample is checked and logged.
+    if (!gateEnforced && proxyCert.serial && !logSampled()) return addSecurityHeaders(passThrough())
+
+    // One principal for every caller: bearer (session or extension token), cookie session, or a
+    // service account's client cert. Session CN check, deny list, path scope, platform-only ecom.
+    const { principalGate } = await import('./lib/auth/admin-principal')
+    const principal = await resolvePrincipal()
+    let verdict: { status: 401 | 403; error: string; reason: string } | null = null
+    if (!principal) {
+      const presented = hasBearer || !!request.cookies.get(adminCookie)?.value
+      verdict = presented
+        ? { status: 401, error: 'Invalid token', reason: 'invalid_credential' }
+        : { status: 401, error: 'Unauthorized', reason: 'no_credential' }
+    } else {
+      const certCN = proxyCert.commonName || ''
+      verdict =
+        principal.kind === 'session' && certCN && !certCN.includes(' ') && principal.authCertCN !== certCN
+          ? { status: 403, error: 'Certificate does not match authenticated user', reason: 'cert_cn' }
+          : principalGate(principal, pathname, request.method)
+    }
+
+    if (!gateEnforced && proxyCert.serial) {
+      if (verdict) logGate(verdict, principal?.kind ?? null)
       return addSecurityHeaders(passThrough())
     }
-
-    const token = request.cookies.get(adminCookie)?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const payload = await inTenant(() =>
-      verifyToken(token, reqSignals, { touch: !isPassiveAdminRequest(pathname, request.method) })
-    )
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    const certCN = proxyCert.commonName || ''
-    const tokenCertCN = payload.authCertCN
-    if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
-      return NextResponse.json({ error: 'Certificate does not match authenticated user' }, { status: 403 })
-    }
-
-    const requiredScope = getScopeForPath(pathname)
-    if (requiredScope && !hasScope(payload.role, payload.scopes || [], requiredScope)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
-
-    if (pathname.startsWith('/api/admin/ecom') && !isPlatformAdmin(payload.role)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
-
+    if (verdict) return NextResponse.json({ error: verdict.error }, { status: verdict.status })
+    stripped.set('x-admin-principal', principal!.kind)
     return addSecurityHeaders(passThrough())
   }
 

@@ -1,0 +1,211 @@
+{
+  "routes": {
+    "admin POST /api/admin/messaging-templates": {
+      "body": {
+        "$ref": "messaging-service/src/templates-v2.ts#UpsertInput",
+        "description": "Creates or updates (by channel + slug) a template in the v2 library; forwarded to messaging-service POST /v2/templates."
+      }
+    },
+    "admin POST /api/admin/messaging-templates/{path}": {
+      "body": {
+        "description": "Forwarded to messaging-service POST /v2/templates/{path}; the shape depends on the path.",
+        "anyOf": [
+          {
+            "title": "{id}/publish",
+            "type": "object",
+            "properties": { "versionId": { "type": "string", "description": "The version to make live" } },
+            "required": ["versionId"]
+          },
+          {
+            "title": "preview",
+            "type": "object",
+            "properties": {
+              "channel": { "type": "string", "enum": ["email", "sms", "whatsapp"] },
+              "slug": { "type": "string" },
+              "locale": { "type": "string", "default": "en" },
+              "versionId": { "type": "string" },
+              "variables": { "type": "object", "additionalProperties": true, "description": "Values for the template's variables; missing ones get sample values" }
+            },
+            "required": ["channel", "slug"]
+          },
+          {
+            "title": "validate",
+            "type": "object",
+            "properties": {
+              "channel": { "type": "string", "enum": ["email", "sms", "whatsapp"] },
+              "subject": { "type": "string" },
+              "body": { "type": "string" },
+              "variables": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["channel", "body"]
+          },
+          {
+            "title": "wa/submit-approval",
+            "type": "object",
+            "properties": {
+              "templateId": { "type": "string" },
+              "name": { "type": "string" },
+              "category": { "type": "string" }
+            },
+            "required": ["templateId"]
+          },
+          { "title": "wa/sync-approval", "type": "object", "properties": {}, "description": "No body" }
+        ]
+      }
+    },
+    "admin PUT /api/admin/messaging-templates/{path}": {
+      "body": {
+        "$ref": "messaging-service/src/templates-v2.ts#UpsertInput",
+        "x-partial": true,
+        "description": "path = the template id (messaging-service PUT /v2/templates/{id}). Fields left out keep their current values; slug and channel cannot change."
+      }
+    },
+    "admin DELETE /api/admin/messaging-templates/{path}": {
+      "noBody": true
+    },
+    "admin POST /api/admin/messaging-templates/preview": {
+      "body": {
+        "type": "object",
+        "description": "Renders a template with sample data inside the store's email shell (brand fields are added server-side).",
+        "properties": {
+          "channel": { "type": "string", "enum": ["email", "sms", "whatsapp"] },
+          "slug": { "type": "string" },
+          "locale": { "type": "string", "default": "en" },
+          "versionId": { "type": "string" },
+          "variables": { "type": "object", "additionalProperties": true, "description": "Values for the template's variables; missing ones get sample values" }
+        },
+        "required": ["channel", "slug"]
+      }
+    },
+    "admin POST /api/admin/messaging-templates/wa/submit-approval": {
+      "body": {
+        "type": "object",
+        "properties": {
+          "templateId": { "type": "string", "description": "The template to submit to WhatsApp (Meta) for approval" },
+          "name": { "type": "string" },
+          "category": { "type": "string" }
+        },
+        "required": ["templateId"]
+      }
+    },
+    "admin POST /api/admin/messaging-templates/wa/sync-approval": {
+      "noBody": true
+    },
+    "admin POST /api/admin/messaging-templates/assets/upload": {
+      "bodyContentType": "multipart/form-data",
+      "body": {
+        "type": "object",
+        "description": "An image for a template (png, jpeg, gif, webp or svg, up to 5 MB). The raw file as the body also works: Content-Type its type, X-File-Name and X-Upload-TemplateId headers.",
+        "properties": {
+          "file": { "type": "string", "format": "binary" },
+          "templateId": { "type": "string", "description": "Template the asset belongs to" }
+        },
+        "required": ["file"]
+      }
+    },
+    "admin POST /api/admin/support/sessions/{sessionId}/heartbeat": {
+      "body": {
+        "type": "object",
+        "description": "Optional; sent with navigator.sendBeacon, so any content type is accepted.",
+        "properties": {
+          "leaving": { "type": "boolean", "description": "true when the admin is leaving the conversation" }
+        }
+      }
+    },
+    "platform POST /api/admin/ecom/customers/{id}/messaging/{path}": {
+      "body": {
+        "description": "Forwarded to messaging-service POST /{path} as the customer's Messaging API workspace; the shape depends on the path.",
+        "anyOf": [
+          {
+            "title": "v2/templates",
+            "$ref": "messaging-service/src/templates-v2.ts#UpsertInput"
+          },
+          {
+            "title": "v2/templates/{id}/publish",
+            "type": "object",
+            "properties": { "versionId": { "type": "string" } },
+            "required": ["versionId"]
+          },
+          {
+            "title": "v2/templates/{id}/review",
+            "type": "object",
+            "properties": {
+              "decision": { "type": "string", "enum": ["approved", "rejected"] },
+              "note": { "type": "string", "maxLength": 1000 }
+            },
+            "required": ["decision"]
+          },
+          {
+            "title": "v2/templates/preview",
+            "type": "object",
+            "properties": {
+              "channel": { "type": "string", "enum": ["email", "sms", "whatsapp"] },
+              "slug": { "type": "string" },
+              "locale": { "type": "string", "default": "en" },
+              "versionId": { "type": "string" },
+              "variables": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["channel", "slug"]
+          },
+          {
+            "title": "v2/templates/validate",
+            "type": "object",
+            "properties": {
+              "channel": { "type": "string", "enum": ["email", "sms", "whatsapp"] },
+              "subject": { "type": "string" },
+              "body": { "type": "string" },
+              "variables": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["channel", "body"]
+          },
+          {
+            "title": "wa/submit-approval",
+            "type": "object",
+            "properties": {
+              "templateId": { "type": "string" },
+              "name": { "type": "string" },
+              "category": { "type": "string" }
+            },
+            "required": ["templateId"]
+          }
+        ]
+      }
+    },
+    "platform PUT /api/admin/ecom/customers/{id}/messaging/{path}": {
+      "body": {
+        "description": "Forwarded to messaging-service PUT /{path} as the customer's Messaging API workspace.",
+        "anyOf": [
+          {
+            "title": "v2/settings",
+            "type": "object",
+            "properties": {
+              "standard_templates": { "type": "string", "enum": ["all", "selected"] },
+              "allowed": {
+                "type": "array",
+                "maxItems": 1000,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "channel": { "type": "string", "enum": ["email", "sms", "whatsapp"] },
+                    "slug": { "type": "string", "minLength": 1, "maxLength": 120 }
+                  },
+                  "required": ["channel", "slug"]
+                }
+              },
+              "editing_enabled": { "type": "boolean" },
+              "review_required": { "type": "boolean" }
+            }
+          },
+          {
+            "title": "v2/templates/{id}",
+            "$ref": "messaging-service/src/templates-v2.ts#UpsertInput",
+            "x-partial": true
+          }
+        ]
+      }
+    },
+    "platform DELETE /api/admin/ecom/customers/{id}/messaging/{path}": {
+      "noBody": true
+    }
+  }
+}

@@ -69,12 +69,15 @@ export async function POST(request: NextRequest) {
   }
 
   // The server size the owner chose (when they may choose), else the plan's floor; Basic is one fixed
-  // shape. Always saved with its price: approval and the dashboard read tenant_compute.price_inr_month.
+  // shape with only its database chosen (on the server or RDS). Always saved with its price: approval and
+  // the dashboard read tenant_compute.price_inr_month.
   const plan = await planCompute(d.planSlug)
   if (!plan) return NextResponse.json({ error: 'Unknown plan' }, { status: 400 })
   const compute: ComputeSpec =
     d.planSlug === 'basic'
-      ? presetSpec('basic')
+      ? computeSpecEnabled() && d.compute?.db.mode === 'dedicated'
+        ? { ...presetSpec('basic'), db: d.compute.db }
+        : presetSpec('basic')
       : computeSpecEnabled() && d.compute
         ? d.compute
         : presetSpec(plan.minPreset ?? plan.defaultPreset ?? 'small')

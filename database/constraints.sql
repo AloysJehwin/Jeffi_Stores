@@ -3397,6 +3397,15 @@ ALTER TABLE ONLY public.search_queries
 
 
 --
+-- Name: service_accounts service_accounts_admin_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.service_accounts
+    ADD CONSTRAINT service_accounts_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+
+
+
+--
 -- Name: service_accounts service_accounts_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
