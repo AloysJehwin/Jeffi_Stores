@@ -72,6 +72,7 @@ export async function register() {
   // One staggered setTimeout per registered job, then its steady interval. The registry is the
   // single source for ids/paths/intervals so the recorder and status page always agree.
   for (const job of CRON_JOBS) {
+    if (job.k8sOnly) continue
     setTimeout(() => {
       callCron(job.id, job.path, job.method, job.lockTtlMs)
       setInterval(() => callCron(job.id, job.path, job.method, job.lockTtlMs), job.intervalMs)

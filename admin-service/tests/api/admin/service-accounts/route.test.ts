@@ -4,12 +4,14 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryOne: vi.fn() }))
+vi.mock('@/lib/auth/api-tokens', () => ({ revokeServiceAccountKeys: vi.fn().mockResolvedValue(1) }))
 
 import { GET as getDownload } from '@admin/app/api/(admin)/admin/service-accounts/[id]/download/route'
 import { GET as getSA, DELETE as deleteSA } from '@admin/app/api/(admin)/admin/service-accounts/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'
+import { revokeServiceAccountKeys } from '@/lib/auth/api-tokens'
 
 const ADMIN = { adminId: 'a1', role: 'super_admin', scopes: ['service_accounts'] }
 const params = Promise.resolve({ id: 'sa-1' })
@@ -121,5 +123,7 @@ describe('DELETE /api/admin/service-accounts/[id]', () => {
     const res = await deleteSA(new NextRequest('http://localhost'), { params })
     expect(res.status).toBe(200)
     expect((await res.json()).ok).toBe(true)
+    // Its jsa_ API keys stop working with it.
+    expect(revokeServiceAccountKeys).toHaveBeenCalledWith(null, 'sa-1')
   })
 })

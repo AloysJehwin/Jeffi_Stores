@@ -17,18 +17,20 @@ BEGIN;
 
 -- Starter shares a pool node and database server; it stays inactive (hidden from the plan picker) until
 -- infrastructure billing ships. It has Basic's features (see the starter→basic mapping below).
-INSERT INTO public.plans (slug, name, tier, monthly_price_inr, infra_margin, min_preset, max_custom_domains, is_active, storage_quota_bytes, max_file_bytes, product,
+-- rds_margin: the markup when the store's database is on RDS (NULL: infra_margin). Basic is at cost on its
+-- own server and 20% with RDS.
+INSERT INTO public.plans (slug, name, tier, monthly_price_inr, infra_margin, rds_margin, min_preset, max_custom_domains, is_active, storage_quota_bytes, max_file_bytes, product,
                           default_preset, min_placement, advanced_compute) VALUES
-  ('services', 'Services', 0, 0.00, 0,    'small',  0, true, 0, 0, 'services', NULL, 'pool', false),
-  ('starter', 'Starter', 1, 999.00, 0,    'small',  0, false, 5368709120, 5368709120, 'store', 'shared', 'pool', false),
-  ('basic', 'Basic', 2, 0,    0,    'basic',  0, true, 10737418240, 5368709120, 'store', 'basic', 'dedicated', true),
-  ('growth', 'Grow', 3, 500,  0.2,  'small',  0, true, 53687091200, 5368709120, 'store', 'small', 'dedicated', true),
-  ('pro', 'Pro', 4, 1000,  0.2,  'medium', 1, true, 214748364800, 5368709120, 'store', 'medium', 'dedicated', true),
-  ('enterprise', 'Enterprise', 5, 2000, 0.2, 'large',  3, true, 1099511627776, 5368709120, 'store', 'large', 'dedicated', true)
+  ('services', 'Services', 0, 0.00, 0,    NULL, 'small',  0, true, 0, 0, 'services', NULL, 'pool', false),
+  ('starter', 'Starter', 1, 999.00, 0,    NULL, 'small',  0, false, 5368709120, 5368709120, 'store', 'shared', 'pool', false),
+  ('basic', 'Basic', 2, 0,    0,    0.2,  'basic',  0, true, 10737418240, 5368709120, 'store', 'basic', 'dedicated', true),
+  ('growth', 'Grow', 3, 500,  0.2,  NULL, 'small',  0, true, 53687091200, 5368709120, 'store', 'small', 'dedicated', true),
+  ('pro', 'Pro', 4, 1000,  0.2,  NULL, 'medium', 1, true, 214748364800, 5368709120, 'store', 'medium', 'dedicated', true),
+  ('enterprise', 'Enterprise', 5, 2000, 0.2, NULL, 'large',  3, true, 1099511627776, 5368709120, 'store', 'large', 'dedicated', true)
 ON CONFLICT (slug) DO UPDATE SET
   name = EXCLUDED.name, tier = EXCLUDED.tier,
-  monthly_price_inr = EXCLUDED.monthly_price_inr,
-  infra_margin = EXCLUDED.infra_margin,
+  -- Fee and margins are edited on Server Pricing; the seed only fills an RDS margin that was never set.
+  rds_margin = COALESCE(plans.rds_margin, EXCLUDED.rds_margin),
   min_preset = EXCLUDED.min_preset,
   max_custom_domains = EXCLUDED.max_custom_domains,
   is_active = EXCLUDED.is_active,
@@ -630,19 +632,30 @@ INSERT INTO public.ai_price_list (capability, provider, model, unit_type, cost_i
   ('video', 'replicate', '*',                              'video_second',  2.0000,  5.0000)
 ON CONFLICT (capability, provider, model, unit_type) DO NOTHING;
 
--- Compute prices: AWS us-east-1 on-demand, Linux, USD (checked 2026-10-30). Inserted once so the platform
--- admin's edits stand; deploy/k8s/db/refresh-compute-prices.sh prints UPDATEs for a refresh. RDS storage is gp3.
+-- Compute prices: AWS us-east-1 on-demand, Linux / PostgreSQL, USD (checked 2026-10-30; the 16-32 GB sizes
+-- 2026-11-06, Multi-AZ at twice Single-AZ). Inserted once so the platform admin's edits stand;
+-- deploy/k8s/db/refresh-compute-prices.sh prints UPDATEs for a refresh. RDS storage is gp3.
 INSERT INTO public.compute_prices (code, kind, label, vcpu, memory_mib, usd_hourly, usd_hourly_multi_az, usd_gb_month, usd_gb_month_multi_az, sellable, sort) VALUES
   ('ec2:t4g.small',     'ec2',         't4g.small (2 vCPU, 2 GB)',    2,  2048, 0.0168, NULL,  NULL,  NULL,  true,  10),
   ('ec2:t4g.medium',    'ec2',         't4g.medium (2 vCPU, 4 GB)',   2,  4096, 0.0336, NULL,  NULL,  NULL,  true,  20),
   ('ec2:t4g.large',     'ec2',         't4g.large (2 vCPU, 8 GB)',    2,  8192, 0.0672, NULL,  NULL,  NULL,  true,  30),
   ('ec2:t4g.xlarge',    'ec2',         't4g.xlarge (4 vCPU, 16 GB)',  4, 16384, 0.1344, NULL,  NULL,  NULL,  true,  40),
+  ('ec2:t4g.2xlarge',   'ec2',         't4g.2xlarge (8 vCPU, 32 GB)', 8, 32768, 0.2688, NULL,  NULL,  NULL,  true,  45),
   ('ec2:m7g.large',     'ec2',         'm7g.large (2 vCPU, 8 GB)',    2,  8192, 0.0816, NULL,  NULL,  NULL,  true,  50),
+  ('ec2:m7g.xlarge',    'ec2',         'm7g.xlarge (4 vCPU, 16 GB)',  4, 16384, 0.1632, NULL,  NULL,  NULL,  true,  51),
+  ('ec2:m7g.2xlarge',   'ec2',         'm7g.2xlarge (8 vCPU, 32 GB)', 8, 32768, 0.3264, NULL,  NULL,  NULL,  true,  52),
+  ('ec2:r7g.large',     'ec2',         'r7g.large (2 vCPU, 16 GB)',   2, 16384, 0.1071, NULL,  NULL,  NULL,  true,  55),
+  ('ec2:r7g.xlarge',    'ec2',         'r7g.xlarge (4 vCPU, 32 GB)',  4, 32768, 0.2142, NULL,  NULL,  NULL,  true,  56),
   ('ec2:c7g.large',     'ec2',         'c7g.large (2 vCPU, 4 GB)',    2,  4096, 0.0725, NULL,  NULL,  NULL,  true,  60),
+  ('ec2:c7g.xlarge',    'ec2',         'c7g.xlarge (4 vCPU, 8 GB)',   4,  8192, 0.145,  NULL,  NULL,  NULL,  true,  61),
   ('rds:db.t4g.micro',  'rds',         'db.t4g.micro (2 vCPU, 1 GB)', 2,  1024, 0.016,  0.032, NULL,  NULL,  true, 110),
   ('rds:db.t4g.small',  'rds',         'db.t4g.small (2 vCPU, 2 GB)', 2,  2048, 0.032,  0.065, NULL,  NULL,  true, 120),
   ('rds:db.t4g.medium', 'rds',         'db.t4g.medium (2 vCPU, 4 GB)',2,  4096, 0.065,  0.129, NULL,  NULL,  true, 130),
   ('rds:db.t4g.large',  'rds',         'db.t4g.large (2 vCPU, 8 GB)', 2,  8192, 0.129,  0.258, NULL,  NULL,  true, 140),
+  ('rds:db.t4g.xlarge', 'rds',         'db.t4g.xlarge (4 vCPU, 16 GB)', 4, 16384, 0.258, 0.516, NULL,  NULL,  true, 150),
+  ('rds:db.m7g.large',  'rds',         'db.m7g.large (2 vCPU, 8 GB)', 2,  8192, 0.168,  0.336, NULL,  NULL,  true, 160),
+  ('rds:db.r7g.large',  'rds',         'db.r7g.large (2 vCPU, 16 GB)', 2, 16384, 0.239, 0.478, NULL,  NULL,  true, 170),
+  ('rds:db.r7g.xlarge', 'rds',         'db.r7g.xlarge (4 vCPU, 32 GB)', 4, 32768, 0.478, 0.956, NULL,  NULL,  true, 180),
   ('rds_storage:gp3',   'rds_storage', 'Database storage (gp3)',      NULL, NULL, NULL,  NULL,  0.115, 0.23,  true, 200),
   ('ebs:gp3',           'ebs',         'Server disk (gp3)',           NULL, NULL, NULL,  NULL,  0.08,  NULL,  true, 210)
 ON CONFLICT (code) DO NOTHING;

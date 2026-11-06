@@ -16,13 +16,13 @@ export default function ExtensionTokenCard() {
     // 1) Mint the token — surface the real failure (auth/expired session) distinctly.
     let minted: string
     try {
-      const res = await fetch('/api/admin/token/generate', {
+      const res = await fetch('/api/admin/cli/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scopes: ['products:write'], ttl: 86400 }),
+        body: JSON.stringify({ kind: 'extension', scopes: ['products:write'], ttl: '24h', name: 'Gallery Uploader extension' }),
       })
       if (res.status === 401) throw new Error('Your admin session expired — reload and sign in, then try again.')
-      if (res.status === 403)
+      if (res.status === 400 || res.status === 403)
         throw new Error('Your account lacks the products:write permission needed for the extension token.')
       if (!res.ok) throw new Error(`Failed to generate token (HTTP ${res.status}).`)
       const data = await res.json()
@@ -65,7 +65,7 @@ export default function ExtensionTokenCard() {
               className="flex-1 min-w-0 bg-transparent outline-none"
             />
           ) : (
-            <span className="flex-1 min-w-0 truncate">eyJ••••••••••••••••••••••••••••••</span>
+            <span className="flex-1 min-w-0 truncate">jfc_••••••••••••••••••••••••••••••</span>
           )}
         </div>
         {error && <p className="text-sm text-red-500">{error}</p>}
@@ -83,8 +83,8 @@ export default function ExtensionTokenCard() {
           </button>
         </RequireWrite>
         <p className="text-xs text-foreground-muted">
-          Scoped to product image uploads only, valid 24 hours. Generate a fresh token when it expires. Your login
-          session is never shared.
+          Scoped to product image uploads only, valid 24 hours. Revoke it any time under Settings → CLI &amp; tokens.
+          Your login session is never shared.
         </p>
       </div>
     </div>

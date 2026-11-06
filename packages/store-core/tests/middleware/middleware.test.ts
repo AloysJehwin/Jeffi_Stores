@@ -1,25 +1,37 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ---------------------------------------------------------------------------
 // Mocks — vi.hoisted() ensures these are defined before vi.mock() factories run
 // ---------------------------------------------------------------------------
 
-const { mockVerifyToken, mockVerifyBusinessToken, mockApplyRateLimit, mockGetScopeForPath, mockHasScope } = vi.hoisted(
-  () => ({
-    mockVerifyToken: vi.fn(),
-    mockVerifyBusinessToken: vi.fn(),
-    mockApplyRateLimit: vi.fn().mockResolvedValue(null),
-    mockGetScopeForPath: vi.fn().mockReturnValue(null),
-    mockHasScope: vi.fn().mockReturnValue(true),
-  })
-)
+const {
+  mockVerifyToken,
+  mockVerifyBusinessToken,
+  mockVerifyExtensionToken,
+  mockApplyRateLimit,
+  mockGetScopeForPath,
+  mockHasScope,
+  mockQueryOne,
+} = vi.hoisted(() => ({
+  mockVerifyToken: vi.fn(),
+  mockVerifyBusinessToken: vi.fn(),
+  mockVerifyExtensionToken: vi.fn(),
+  mockApplyRateLimit: vi.fn().mockResolvedValue(null),
+  mockGetScopeForPath: vi.fn().mockReturnValue(null),
+  mockHasScope: vi.fn().mockReturnValue(true),
+  mockQueryOne: vi.fn(),
+}))
 
 vi.mock('@/lib/auth/jwt', () => ({
   verifyToken: mockVerifyToken,
   verifyBusinessToken: mockVerifyBusinessToken,
+  verifyExtensionToken: mockVerifyExtensionToken,
   authenticateAdmin: vi.fn(),
 }))
+
+// Service-account lookups in admin-principal.
+vi.mock('@/lib/shared/db', () => ({ queryOne: mockQueryOne }))
 
 vi.mock('@/lib/shared/rate-limit', () => ({
   applyRateLimit: mockApplyRateLimit,
@@ -28,6 +40,7 @@ vi.mock('@/lib/shared/rate-limit', () => ({
 vi.mock('@/lib/auth/scopes', () => ({
   getScopeForPath: mockGetScopeForPath,
   hasScope: mockHasScope,
+  isPlatformAdmin: (role: string) => role === 'administrator',
 }))
 
 // Import AFTER mocks are hoisted so the module picks up the stubs
@@ -113,6 +126,8 @@ const BIZ_PAYLOAD = {
 describe('middleware', () => {
   beforeEach(() => {
     mockVerifyToken.mockResolvedValue(null)
+    mockVerifyExtensionToken.mockResolvedValue(null)
+    mockQueryOne.mockResolvedValue(null)
     mockApplyRateLimit.mockResolvedValue(null)
     mockGetScopeForPath.mockReturnValue(null)
     mockHasScope.mockReturnValue(true)
@@ -838,6 +853,105 @@ describe('middleware', () => {
       })
       const res = await middleware(req)
       expect(res.status).not.toBe(307)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Admin principal gate (ADMIN_PRINCIPAL_GATE)
+  // -------------------------------------------------------------------------
+  describe('admin principal gate', () => {
+    const PLATFORM = 'https://admin.jeffistores.in'
+    const platformReq = (path: string, headers: Record<string, string> = {}, cookies?: Record<string, string>) =>
+      makeNextRequest(`${PLATFORM}${path}`, { headers: { 'x-forwarded-host': 'admin.jeffistores.in', ...headers }, cookies })
+    const SA_ROW = { id: 'sa-1', name: 'feed-bot', allowed_scopes: ['products:read'], admin_id: 'shadow-1' }
+    let warn: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+    afterEach(() => {
+      vi.unstubAllEnvs()
+      warn.mockRestore()
+    })
+
+    it('enforce: a cert serial with no session or service account is 401 (it used to pass)', async () => {
+      vi.stubEnv('ADMIN_PRINCIPAL_GATE', 'enforce')
+      const res = await middleware(platformReq('/api/admin/orders', { 'x-client-cert-serial': '0AB1' }))
+      expect(res.status).toBe(401)
+    })
+
+    it('log (default): the same call still passes, and the would-be denial is logged', async () => {
+      vi.stubEnv('ADMIN_PRINCIPAL_GATE_SAMPLE', '1')
+      const res = await middleware(platformReq('/api/admin/orders', { 'x-client-cert-serial': '0AB1' }))
+      expect(res.status).not.toBe(401)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('would deny'))
+    })
+
+    it('a non-administrator session gets 403 on /api/admin/ecom', async () => {
+      mockVerifyToken.mockResolvedValue({ ...ADMIN_PAYLOAD, role: 'super_admin' })
+      const res = await middleware(makeNextRequest('http://localhost/api/admin/ecom/kyc/t1/approve', { cookies: { admin_sid: 'sid' } }))
+      expect(res.status).toBe(403)
+    })
+
+    it('enforce: a service account is held to its scopes', async () => {
+      vi.stubEnv('ADMIN_PRINCIPAL_GATE', 'enforce')
+      mockQueryOne.mockResolvedValue(SA_ROW)
+      mockGetScopeForPath.mockImplementation((p: string) => (p.startsWith('/api/admin/orders') ? 'orders:read' : 'products:read'))
+      mockHasScope.mockImplementation((_r: string, scopes: string[], s: string) => scopes.includes(s))
+      const out = await middleware(platformReq('/api/admin/orders', { 'x-client-cert-serial': '0AB1' }))
+      expect(out.status).toBe(403)
+      const ok = await middleware(platformReq('/api/admin/products', { 'x-client-cert-serial': '0AB1' }))
+      expect(ok.status).toBe(200)
+      expect(forwardedRequestHeader(ok, 'x-admin-principal')).toBe('service_account')
+    })
+
+    it('enforce: a service account never reaches the deny-listed routes', async () => {
+      vi.stubEnv('ADMIN_PRINCIPAL_GATE', 'enforce')
+      mockQueryOne.mockResolvedValue({ ...SA_ROW, allowed_scopes: ['settings:write'] })
+      const res = await middleware(platformReq('/api/admin/users', { 'x-client-cert-serial': '0AB1' }))
+      expect(res.status).toBe(403)
+    })
+
+    it('a bearer session is accepted without a cookie', async () => {
+      mockVerifyToken.mockResolvedValue(ADMIN_PAYLOAD)
+      const res = await middleware(makeNextRequest('http://localhost/api/admin/orders', { headers: { authorization: 'Bearer ' + 'a'.repeat(64) } }))
+      expect(res.status).toBe(200)
+    })
+
+    it('the cron fan-out bearer reaches the feed syncs (GET only), and nothing else', async () => {
+      vi.stubEnv('CRON_SECRET', 'cron-s3cret')
+      const cron = (path: string, method = 'GET', secret = 'cron-s3cret') =>
+        middleware(new NextRequest(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${secret}` } }))
+      expect((await cron('/api/admin/merchant/sync')).status).toBe(200)
+      expect((await cron('/api/admin/merchant/amazon/sync')).status).toBe(200)
+      expect((await cron('/api/admin/merchant/sync', 'POST')).status).toBe(401)
+      expect((await cron('/api/admin/merchant/sync', 'GET', 'wrong')).status).toBe(401)
+      expect((await cron('/api/admin/orders')).status).toBe(401)
+    })
+
+    it('an extension token cannot mint another token', async () => {
+      mockVerifyExtensionToken.mockResolvedValue({ adminId: 'ext-1', role: 'admin', scopes: [] })
+      const res = await middleware(makeNextRequest('http://localhost/api/admin/token/generate', { headers: { authorization: 'Bearer eyJext' } }))
+      expect(res.status).toBe(403)
+    })
+
+    it('enforce: store routes on the admin host apply the scope gate to a service account', async () => {
+      vi.stubEnv('ADMIN_PRINCIPAL_GATE', 'enforce')
+      mockQueryOne.mockResolvedValue(SA_ROW)
+      mockGetScopeForPath.mockReturnValue('brands:read')
+      mockHasScope.mockReturnValue(false)
+      const res = await middleware(platformReq('/api/brands', { 'x-client-cert-serial': '0AB1' }))
+      expect(res.status).toBe(403)
+    })
+
+    it('log: store routes on the admin host only log for a service account', async () => {
+      vi.stubEnv('ADMIN_PRINCIPAL_GATE_SAMPLE', '1')
+      mockQueryOne.mockResolvedValue(SA_ROW)
+      mockGetScopeForPath.mockReturnValue('brands:read')
+      mockHasScope.mockReturnValue(false)
+      const res = await middleware(platformReq('/api/brands', { 'x-client-cert-serial': '0AB1' }))
+      expect(res.status).toBe(200)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('would deny'))
     })
   })
 

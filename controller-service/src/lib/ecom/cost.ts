@@ -9,6 +9,8 @@ export interface CostPlan {
   monthlyPriceInr: number
   /** plans.infra_margin; unset falls back to the catalog's margin. */
   infraMargin?: number
+  /** plans.rds_margin, for a database on RDS; unset uses infraMargin. */
+  rdsMargin?: number
 }
 
 export interface StoreCost {
@@ -45,7 +47,7 @@ export function storeCost(args: {
 }): StoreCost {
   const { spec, plan, catalog } = args
   if (!spec) return { ...NONE }
-  const margin = plan?.infraMargin == null ? undefined : { infraMargin: plan.infraMargin }
+  const margin = plan && (plan.infraMargin != null || plan.rdsMargin != null) ? { infraMargin: plan.infraMargin, rdsMargin: plan.rdsMargin } : undefined
   let quote: ReturnType<typeof quoteSpec>
   try {
     quote = quoteSpec(spec, catalog, margin)
@@ -101,7 +103,7 @@ export async function costsFor(
     const p = r.plan ? bySlug.get(r.plan) : undefined
     const c = storeCost({
       spec: r.applied ? normalizeSpec(r.applied) : null,
-      plan: p ? { monthlyPriceInr: p.monthlyPriceInr, infraMargin: p.infraMargin } : null,
+      plan: p ? { monthlyPriceInr: p.monthlyPriceInr, infraMargin: p.infraMargin, rdsMargin: p.rdsMargin } : null,
       appliedAt: r.applied_at,
       status: r.compute_status,
       catalog,

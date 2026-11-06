@@ -14,6 +14,7 @@ const SPECIAL_CASED = new Set([
   '/admin', // getScopeForPath returns dashboard:read explicitly
   '/admin/login', // pre-auth, deliberately null
   '/admin/team', // owner-only: the page redirects on !isPlatformOwner, which no scope expresses
+  '/admin/cli/authorize', // any signed-in admin approves their own CLI login; the token never exceeds their grant
 ])
 
 function adminPages(): string[] {

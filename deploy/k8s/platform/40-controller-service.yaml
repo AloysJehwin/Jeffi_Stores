@@ -38,9 +38,10 @@ spec:
             - { name: CLIENT_CERT_PROXY, value: traefik }
             - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
             - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
-            # The cron fan-out runs store jobs on the flagship's admin service and on each store's own.
+            # The cron fan-out runs store jobs on the flagship's admin service and on each store's own
+            # ({service}: admin-service, or controller-service while a store is on the old all-in-one app).
             - { name: CRON_FLAGSHIP_BASE, value: 'http://jeffi-stores-admin-service.jeffi.svc.cluster.local:3000' }
-            - { name: CRON_STORE_BASE, value: 'http://{slug}-admin-service.tenant-{slug}.svc.cluster.local:3000' }
+            - { name: CRON_STORE_BASE, value: 'http://{slug}-{service}.tenant-{slug}.svc.cluster.local:3000' }
             # Traces → Coroot in-cluster (the public k8s. URL is behind mTLS). Every request is traced (14-day retention).
             - { name: OTEL_SERVICE_NAME, value: jeffi-stores-controller-service }
             - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }

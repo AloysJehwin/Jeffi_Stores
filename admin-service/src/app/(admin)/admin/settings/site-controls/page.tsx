@@ -23,7 +23,6 @@ import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinition
 import TemplateVariablesPanel from '@/components/admin/site-controls/TemplateVariablesPanel'
 import DeliveryEstimateCard from '@/components/admin/site-controls/DeliveryEstimateCard'
 import GoogleTagCard from '@/components/admin/site-controls/GoogleTagCard'
-import ProvidersCard from '@/components/admin/site-controls/ProvidersCard'
 import OpsEmailCard, { type OpsEmailAdmin } from '@/components/admin/site-controls/OpsEmailCard'
 import { loadOpsEmail } from '@/lib/shared/ops-email'
 import { OPS_ATTACHMENTS, OPS_SECTIONS, OPS_SECTION_IDS } from '@/lib/shared/ops-email-config'
@@ -969,21 +968,6 @@ export default async function SiteControlsPage() {
                 </>
               ),
             },
-            ...(!isTenant && isPlatformOwner(admin.role)
-              ? [
-                  {
-                    id: 'platform',
-                    label: 'Platform',
-                    content: (
-                      <>
-                        <div>
-                          <ProvidersCard />
-                        </div>
-                      </>
-                    ),
-                  },
-                ]
-              : []),
           ]}
         />
       </Suspense>

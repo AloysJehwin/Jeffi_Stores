@@ -318,7 +318,8 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   const adminHosts = input.hosts.filter(h => h.startsWith(`admin-${slug}.`))
   const docHosts = input.hosts.filter(h => DOC_APPS.some(a => h.startsWith(`${a}-${slug}.`)))
   const businessHosts = input.hosts.filter(h => h.startsWith(`${slug}.business.`))
-  const publicHosts = input.hosts.filter(h => !adminHosts.includes(h) && !docHosts.includes(h))
+  // public-{slug} is the shared public API gateway's (platform IngressRoute), never the store's.
+  const publicHosts = input.hosts.filter(h => !adminHosts.includes(h) && !docHosts.includes(h) && !h.startsWith(`public-${slug}.`))
   const customDomains = input.customDomains ?? []
 
   // The store's app pods per layout; the one being left (while switching) runs a single copy, no autoscale.

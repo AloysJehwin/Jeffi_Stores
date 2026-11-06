@@ -3,9 +3,10 @@ import { z } from 'zod'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { getOwnerTenants } from '@/lib/tenant-registry'
+import { controlPlanePool, getOwnerTenants, getProvisioningJob } from '@/lib/tenant-registry'
 import { cancelSubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import { triggerProvisioning, resolveRestoreKey } from '@controller/lib/provisioning/trigger'
+import { describePipeline, ownerPipelineView } from '@controller/lib/provisioning/pipeline-view'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,29 @@ const Schema = z.object({
   action: z.enum(['provision', 'reprovision', 'deprovision']),
   tenantId: z.string().uuid(),
 })
+
+/** The owner's view of their store's setup: step labels, states and timing only. */
+export async function GET(request: NextRequest) {
+  const sid = (await cookies()).get(OWNER_COOKIE)?.value
+  const owner = await resolveOwnerSession(sid, extractSessionSignals(request))
+  if (!owner) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+
+  const tenantId = z.string().uuid().safeParse(request.nextUrl.searchParams.get('tenantId'))
+  if (!tenantId.success) return NextResponse.json({ error: 'tenantId is required' }, { status: 400 })
+  const tenants = await getOwnerTenants(owner.id)
+  if (!tenants.some(t => t.id === tenantId.data)) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+
+  const job = await getProvisioningJob(tenantId.data)
+  if (!job) return NextResponse.json({ pipeline: null })
+  const ev = await controlPlanePool()
+    .query(
+      `SELECT step, status, message, started_at, duration_ms, created_at
+         FROM provisioning_step_events WHERE job_id = $1 ORDER BY created_at ASC`,
+      [job.id]
+    )
+    .catch(() => ({ rows: [] }))
+  return NextResponse.json({ pipeline: ownerPipelineView(describePipeline(job, ev.rows)) })
+}
 
 export async function POST(request: NextRequest) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value

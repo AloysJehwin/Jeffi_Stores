@@ -12,6 +12,8 @@ const m = vi.hoisted(() => ({
   addServices: vi.fn(),
   saveCompute: vi.fn(),
   planCompute: vi.fn(),
+  flag: vi.fn(() => false),
+  quote: vi.fn(),
 }))
 
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: 'sid' }) }) }))
@@ -37,11 +39,12 @@ vi.mock('@/lib/tenant-registry', () => ({
 vi.mock('@/lib/shared/ecom-emails', () => ({ sendKycSubmittedEmail: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@controller/lib/k8s/capacity', () => ({ dedicatedCapacityError: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/shipping/delhivery', () => ({ verifyDelhiveryToken: vi.fn() }))
-vi.mock('@controller/lib/compute/catalog', () => ({ computeSpecEnabled: () => false, getCatalog: vi.fn(), planCompute: m.planCompute }))
+vi.mock('@controller/lib/compute/catalog', () => ({ computeSpecEnabled: m.flag, getCatalog: vi.fn(), planCompute: m.planCompute }))
+vi.mock('@controller/lib/compute/quote', () => ({ quoteForPlan: m.quote }))
 vi.mock('@controller/lib/compute/store', () => ({ saveDesiredCompute: m.saveCompute }))
 
 import { POST } from '@controller/app/api/(ecom)/ecom/onboard/submit/route'
-import { presetSpec } from '@/lib/compute/presets'
+import { presetSpec, withDedicatedDb } from '@/lib/compute/presets'
 
 const SERVICES = { id: 't-1', slug: 'acme', service_types: ['messaging'], store_request: null, status: 'active' }
 const BODY = {
@@ -63,6 +66,8 @@ const req = (body: unknown) =>
 describe('onboard submit — store upgrade on a services workspace', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    m.flag.mockReturnValue(false)
+    m.quote.mockResolvedValue({ validation: { ok: true, errors: [] }, capacityError: null })
     m.owner.mockResolvedValue({ id: 'o-1', email: 'o@acme.test' })
     m.tenants.mockResolvedValue([SERVICES])
     m.bank.mockResolvedValue(true)
@@ -85,6 +90,17 @@ describe('onboard submit — store upgrade on a services workspace', () => {
   it('always saves a priced compute row: Basic is the basic preset, even when a size was sent', async () => {
     const res = await POST(req({ ...BODY, compute: presetSpec('large') }))
     expect(res.status).toBe(200)
+    expect(m.saveCompute).toHaveBeenCalledWith('t-1', presetSpec('basic'))
+  })
+
+  it("keeps Basic's server but takes its database choice when owners may choose", async () => {
+    m.flag.mockReturnValue(true)
+    const db = withDedicatedDb(presetSpec('basic'), 'basic').db
+    const res = await POST(req({ ...BODY, compute: { ...presetSpec('large'), db } }))
+    expect(res.status).toBe(200)
+    expect(m.saveCompute).toHaveBeenCalledWith('t-1', { ...presetSpec('basic'), db })
+    m.saveCompute.mockClear()
+    await POST(req({ ...BODY, compute: presetSpec('large') }))
     expect(m.saveCompute).toHaveBeenCalledWith('t-1', presetSpec('basic'))
   })
 

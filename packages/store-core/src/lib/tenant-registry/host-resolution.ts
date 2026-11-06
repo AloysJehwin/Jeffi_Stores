@@ -1,5 +1,8 @@
 import type { TenantContext } from '@/lib/tenancy/tenant-context'
 import { controlPlanePool, RESERVED_LABELS, ROOT_DOMAIN } from './shared'
+import { TENANT_HOST_PREFIXES } from './host-prefixes'
+
+const APP_PREFIXED = new RegExp(`^(${TENANT_HOST_PREFIXES.join('|')})-(.+)$`)
 
 // In-process cache: host -> { ctx, expires }. Short TTL so tenant/plan changes
 // propagate quickly; a null ctx (platform host / unknown) is also cached to avoid
@@ -46,7 +49,7 @@ export function slugFromHost(hostname: string): { slug: string | null; isCustomD
   const label = host.slice(0, host.length - root.length - 1) // strip ".<root>"
   // App subdomains like admin-{tenant} / invoice-{tenant}, plus {tenant}.business.
   const businessScoped = label.match(/^(.+)\.business$/)
-  const appPrefixed = label.match(/^(admin|invoice|quotation|purchaseorder|forms|vault|www)-(.+)$/)
+  const appPrefixed = label.match(APP_PREFIXED)
   const bare = businessScoped ? businessScoped[1] : appPrefixed ? appPrefixed[2] : label
   // Reserved single-label app hosts (admin. / business. / forms. etc.) = platform, not tenant.
   if (RESERVED_LABELS.has(bare)) return { slug: null, isCustomDomain: false }

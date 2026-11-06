@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { TenantDetailData } from '@controller/lib/ecom/detail'
 import { TenantStatus, inr, inrHr } from '../cells'
-import { apiServices } from './labels'
+import { apiServices, type DetailSection } from './labels'
 
 function Tile({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
   return (
@@ -15,8 +15,8 @@ function Tile({ label, value, sub }: { label: string; value: ReactNode; sub?: Re
 
 const cap = (s: string | null | undefined) => (s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ') : '—')
 
-/** Status, plan, what runs and what it costs, two tiles a row on a phone. */
-export default function KpiStrip({ d }: { d: TenantDetailData }) {
+/** The numbers that belong to this detail page only, two tiles a row on a phone. */
+export default function KpiStrip({ d, section }: { d: TenantDetailData; section: DetailSection }) {
   const { t, job, cost, row, fleet, fleetKnown, serversRunning } = d
   const status = <TenantStatus status={t.status} />
   const statusSub = job && (job.status === 'running' || job.status === 'pending') ? `Provisioning: ${job.step}` : job?.status === 'failed' ? `Failed at ${job.step}` : `Instance ${t.instance_state}`
@@ -46,14 +46,31 @@ export default function KpiStrip({ d }: { d: TenantDetailData }) {
   }
 
   const price = row?.price_inr_month ?? cost.priceMonth
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3">
-      <Tile label="Status" value={status} sub={statusSub} />
-      <Tile label="Plan" value={cap(t.plan)} sub={`${cap(t.billing_interval)} · ${cap(t.subscription_status)}`} />
-      <Tile label="Servers" value={servers} sub={serversSub} />
-      <Tile label="Price / mo" value={price == null ? '—' : inr(price)} sub={cost.priceHour == null ? 'No compute applied' : `Infra ${inrHr(cost.priceHour)}`} />
-      <Tile label="AWS / mo" value={inr(cost.awsMonth)} sub={cost.marginMonth == null ? undefined : `Margin ${inr(cost.marginMonth)}`} />
-      <Tile label="This month" value={cost.mtdEstimate == null ? '—' : inr(cost.mtdEstimate)} sub="Infra so far, estimate" />
-    </div>
-  )
+  const tiles: Record<DetailSection, ReactNode[]> = {
+    store: [
+      <Tile key="s" label="Status" value={status} sub={statusSub} />,
+      <Tile key="p" label="Plan" value={cap(t.plan)} sub={`${cap(t.billing_interval)} · ${cap(t.subscription_status)}`} />,
+      <Tile key="pr" label="Price / mo" value={price == null ? '—' : inr(price)} />,
+      <Tile key="m" label="This month" value={cost.mtdEstimate == null ? '—' : inr(cost.mtdEstimate)} sub="Infra so far, estimate" />,
+    ],
+    instance: [
+      <Tile key="sv" label="Servers" value={servers} sub={serversSub} />,
+      <Tile key="pd" label="Pods" value={!fleetKnown ? '—' : fleet?.pods.total ? `${fleet.pods.ready}/${fleet.pods.total}` : 'None'} sub="Ready / total" />,
+      <Tile key="aws" label="AWS / mo" value={inr(cost.awsMonth)} />,
+      <Tile key="r" label="Infra rate" value={inrHr(cost.priceHour)} sub={cost.priceHour == null ? 'No compute applied' : undefined} />,
+    ],
+    status: [
+      <Tile key="s" label="Status" value={status} sub={statusSub} />,
+      <Tile key="sv" label="Serving" value={!fleetKnown ? '—' : fleet?.pods.total ? `${fleet.pods.ready}/${fleet.pods.total} pods` : 'No pods'} />,
+      <Tile key="j" label="Provisioning" value={cap(job?.status)} sub={job?.step ? cap(job.step) : undefined} />,
+      <Tile key="k" label="Review" value={d.kycPending ? 'Pending' : cap(d.kyc?.status)} />,
+    ],
+    billing: [
+      <Tile key="pr" label="Price / mo" value={price == null ? '—' : inr(price)} />,
+      <Tile key="aws" label="AWS / mo" value={inr(cost.awsMonth)} />,
+      <Tile key="mg" label="Margin / mo" value={inr(cost.marginMonth)} />,
+      <Tile key="w" label="Wallet" value={inr(row?.wallet_balance, 2)} />,
+    ],
+  }
+  return <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">{tiles[section]}</div>
 }

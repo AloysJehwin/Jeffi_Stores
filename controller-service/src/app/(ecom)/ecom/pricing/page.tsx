@@ -3,23 +3,27 @@ import Link from 'next/link'
 import { listPlans, planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-registry'
 import PricingCards from './PricingCards'
 import { computePlans, getCatalog } from '@controller/lib/compute/catalog'
-import { presetSpec } from '@/lib/compute/presets'
+import { presetSpec, withDedicatedDb } from '@/lib/compute/presets'
 import { quoteSpec, monthlyTotal } from '@controller/lib/compute/pricing'
 
 /**
  * Each plan's "from" price: its minPreset at its own margin, GST on the servers, plus the plan fee.
  * Shown whether or not owners can pick a size yet: every plan runs on its own server either way.
+ * `rdsExtra`: what moving Basic's database to RDS adds per month.
  */
-async function floorPrices(): Promise<Record<string, number> | null> {
+async function floorPrices(): Promise<{ floors: Record<string, number>; rdsExtra: Record<string, number> } | null> {
   try {
     const [catalog, plans] = await Promise.all([getCatalog(), computePlans()])
-    return Object.fromEntries(
-      plans.map(p => {
-        const key = p.minPreset ?? p.defaultPreset ?? (p.minPlacement === 'pool' ? 'shared' : 'small')
-        const q = quoteSpec(presetSpec(key), catalog, { infraMargin: p.infraMargin })
-        return [p.slug, Math.round(monthlyTotal(q, p.monthlyPriceInr, catalog.settings.gstRate).total)]
-      })
-    )
+    const total = (spec: ReturnType<typeof presetSpec>, p: (typeof plans)[number]) =>
+      Math.round(monthlyTotal(quoteSpec(spec, catalog, p), p.monthlyPriceInr, catalog.settings.gstRate).total)
+    const floors: Record<string, number> = {}
+    const rdsExtra: Record<string, number> = {}
+    for (const p of plans) {
+      const key = p.minPreset ?? p.defaultPreset ?? (p.minPlacement === 'pool' ? 'shared' : 'small')
+      floors[p.slug] = total(presetSpec(key), p)
+      if (key === 'basic') rdsExtra[p.slug] = total(withDedicatedDb(presetSpec('basic'), 'basic'), p) - floors[p.slug]
+    }
+    return { floors, rdsExtra }
   } catch {
     return null
   }
@@ -45,7 +49,8 @@ function Dash() {
 }
 
 export default async function PricingPage() {
-  const [plans, matrix, floors] = await Promise.all([listPlans(), planFeatureMatrix(), floorPrices()])
+  const [plans, matrix, prices] = await Promise.all([listPlans(), planFeatureMatrix(), floorPrices()])
+  const floors = prices?.floors ?? null
   const ordered = [...plans].sort((a, b) => a.tier - b.tier)
 
   const has = (planSlug: string, scopeKey: string | null) => {
@@ -57,8 +62,12 @@ export default async function PricingPage() {
   const cols = { gridTemplateColumns: `repeat(${ordered.length}, minmax(0, 1fr))` }
   const fromLabel = (p: { slug: string; monthly_price_inr: string }) =>
     `from ₹${(floors?.[p.slug] ?? Number(p.monthly_price_inr)).toLocaleString('en-IN')}/mo`
-  // Every store runs on its own server with Postgres on it; Grow and up may move it to a dedicated RDS database.
-  const dedicatedDb = (slug: string) => slug !== 'basic'
+  // Every store runs on its own server with Postgres on it, and may move it to a dedicated RDS database; on Basic at a price.
+  const rdsExtra = (slug: string) => prices?.rdsExtra[slug]
+  const dedicatedDb = (slug: string, cls: string) => {
+    const extra = rdsExtra(slug)
+    return extra == null ? <Check /> : <span className={`text-xs text-foreground-muted ${cls}`}>+₹{extra.toLocaleString('en-IN')}/mo</span>
+  }
 
   return (
     <div className="text-foreground">
@@ -153,8 +162,8 @@ export default async function PricingPage() {
                 <div className="px-1 text-sm text-foreground-secondary">Dedicated database (optional)</div>
                 <div style={cols} className="mt-2 grid">
                   {ordered.map(p => (
-                    <div key={p.slug} className="flex justify-center">
-                      {dedicatedDb(p.slug) ? <Check /> : <Dash />}
+                    <div key={p.slug} className="flex min-w-0 justify-center text-center">
+                      {dedicatedDb(p.slug, 'break-words')}
                     </div>
                   ))}
                 </div>
@@ -237,7 +246,7 @@ export default async function PricingPage() {
                 <td className="px-5 py-3 text-foreground-secondary">Dedicated database (optional)</td>
                 {ordered.map(p => (
                   <td key={p.slug} className="px-4 py-3 text-center">
-                    {dedicatedDb(p.slug) ? <Check /> : <Dash />}
+                    {dedicatedDb(p.slug, '')}
                   </td>
                 ))}
               </tr>
@@ -265,7 +274,7 @@ export default async function PricingPage() {
             ],
             [
               'What does the price include?',
-              "One subscription for the plan and your store's own server. The plan fee (₹0 on Basic) includes GST; the server is priced at its AWS cost — at cost on Basic, plus 20% on Grow, Pro and Enterprise — with 18% GST on top. Prices shown are each plan's smallest size; you choose the size when you sign up. Your database runs on your server; on Grow and above you can move it to a dedicated database.",
+              "One subscription for the plan and your store's own server. The plan fee (₹0 on Basic) includes GST; the server is priced at its AWS cost — at cost on Basic, plus 20% on Grow, Pro and Enterprise — with 18% GST on top. Prices shown are each plan's smallest size; you choose the size when you sign up. Your database runs on your server, or on any plan you can move it to a dedicated database; on Basic that prices your servers at AWS cost plus 20%.",
             ],
             [
               "Monthly vs yearly — what's the difference?",

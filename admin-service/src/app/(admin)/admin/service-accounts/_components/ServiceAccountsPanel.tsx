@@ -1,6 +1,6 @@
 import { queryMany } from '@/lib/shared/db'
 import { headers } from 'next/headers'
-import { ADMIN_SCOPES, hasScope } from '@/lib/auth/scopes'
+import { ADMIN_SCOPES, assignableScopes, hasScope } from '@/lib/auth/scopes'
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { Plus } from 'lucide-react'
@@ -24,7 +24,10 @@ async function getServiceAccounts() {
 export default async function ServiceAccountsPanel() {
   const headersList = await headers()
   const role = headersList.get('x-user-role') || ''
-  const scopes: string[] = JSON.parse(headersList.get('x-user-scopes') || '[]')
+  let scopes: string[] = []
+  try {
+    scopes = JSON.parse(headersList.get('x-user-scopes') || '[]')
+  } catch {}
 
   if (!hasScope(role, scopes, 'service_accounts:read')) redirect(ap('/admin/settings'))
 
@@ -89,7 +92,7 @@ export default async function ServiceAccountsPanel() {
                 Can call GET endpoints only. Safe to give to monitoring scripts, dashboards, and read-heavy automation.
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {ADMIN_SCOPES.filter(s => s.key.endsWith(':read')).map(s => (
+                {assignableScopes(false).filter(s => s.key.endsWith(':read')).map(s => (
                   <span
                     key={s.key}
                     className={badgeCls('muted')}
@@ -109,7 +112,7 @@ export default async function ServiceAccountsPanel() {
                 that needs to mutate data.
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {ADMIN_SCOPES.filter(s => s.key.endsWith(':write')).map(s => (
+                {assignableScopes(false).filter(s => !s.key.endsWith(':read')).map(s => (
                   <span
                     key={s.key}
                     className={badgeCls('amber')}

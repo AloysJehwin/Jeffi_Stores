@@ -83,7 +83,8 @@ const usingStub = () => process.env.PROVISIONING_PROVIDER !== 'aws'
 /** Drive a stub job to completion in-request (local dev + tests are synchronous). */
 async function driveStubToCompletion(tenantId: string): Promise<string | undefined> {
   const provider = getProvisioningProvider()
-  for (let i = 0; i < 20; i++) {
+  // One step per call, plus the stub database's polls.
+  for (let i = 0; i < 60; i++) {
     const job = await getProvisioningJob(tenantId)
     if (!job || job.status === 'done' || job.status === 'failed') return job?.status
     await advanceProvisioningJob(job, provider)

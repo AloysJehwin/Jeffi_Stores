@@ -6,6 +6,7 @@ import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import SiteReachabilityBadge from './SiteReachabilityBadge'
 import PageHeader from './_components/PageHeader'
 import { Card, Row } from './_components/Card'
+import SetupProgress from './_components/SetupProgress'
 import { MoneyTiles, STATUS_PILL, fmt } from './_components/finance'
 import AddStoreClient from './add-store/AddStoreClient'
 import ServicesClient from './services/ServicesClient'
@@ -81,9 +82,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
               {tenant.region && <Row label="Region" value={tenant.region} />}
             </div>
             {isStore && !isLive && (
-              <div className="mt-4 flex items-center gap-2 text-sm text-foreground-secondary">
-                <span className="w-4 h-4 border-2 border-[var(--console-terracotta)] border-t-transparent rounded-full animate-spin" />
-                Provisioning in progress…
+              <div className="mt-4">
+                <SetupProgress tenantId={tenant.id} />
               </div>
             )}
           </Card>

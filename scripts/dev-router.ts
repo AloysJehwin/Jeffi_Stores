@@ -8,18 +8,26 @@ import { ASSET_PREFIX, routeFor, type AppName } from '../packages/store-core/src
 export const DEV_PORTS: Record<AppName, number> = { storefront: 3010, admin: 3011, business: 3012, controller: 3013 }
 const PORT = Number(process.env.DEV_ROUTER_PORT || 3000)
 
-function target(req: http.IncomingMessage) {
+// public.localhost and public-{slug}.localhost are public-api-service's, as Traefik routes them in production.
+const PUBLIC_API_PORT = Number(process.env.DEV_PUBLIC_API_PORT || 3100)
+const isPublicHost = (host = '') => /^public(-[a-z0-9-]+)?\.localhost(:\d+)?$/i.test(host)
+
+function target(req: http.IncomingMessage): { app: AppName | 'public-api'; port: number } {
+  if (isPublicHost(req.headers.host)) return { app: 'public-api', port: PUBLIC_API_PORT }
   const app = routeFor(req.headers.host || 'localhost', (req.url || '/').split('?')[0])
   return { app, port: DEV_PORTS[app] }
 }
 
-const down = (app: AppName) => `${app} isn't running on :${DEV_PORTS[app]}. Start it with npm run dev:${app}, or everything with npm run dev.\n`
+const down = (app: AppName | 'public-api', port: number) =>
+  app === 'public-api'
+    ? `public-api-service isn't running on :${port}. Start it with npm run dev:services.\n`
+    : `${app} isn't running on :${port}. Start it with npm run dev:${app}, or everything with npm run dev.\n`
 
 // An app's asset prefix (/_controller, /_admin, /_business) is stripped before it reaches the app, as the
 // ingress does in production (Next doesn't serve prefixed paths there, and its middleware would rewrite
 // them). HMR's WebSocket keeps it: Next expects it there.
-function upstreamPath(app: AppName, url = '/') {
-  const prefix = app === 'storefront' ? null : ASSET_PREFIX[app]
+function upstreamPath(app: AppName | 'public-api', url = '/') {
+  const prefix = app === 'storefront' || app === 'public-api' ? null : ASSET_PREFIX[app]
   return prefix && url.startsWith(prefix + '/') ? url.slice(prefix.length) : url
 }
 
@@ -31,7 +39,7 @@ const server = http.createServer((req, res) => {
   })
   upstream.on('error', () => {
     if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain' })
-    res.end(down(app))
+    res.end(down(app, port))
   })
   req.pipe(upstream)
 })

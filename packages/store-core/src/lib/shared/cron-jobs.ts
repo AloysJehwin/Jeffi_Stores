@@ -23,6 +23,8 @@ export interface CronJob {
    * (control-plane / infra jobs). Drives the per-tenant fan-out.
    */
   tenantScope: string | null
+  /** Only from the k8s CronJobs, never the in-process scheduler (the feed pushes ran from a host crontab before). */
+  k8sOnly?: boolean
 }
 
 export const CRON_JOBS: readonly CronJob[] = [
@@ -371,6 +373,31 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'amazon:read',
   },
   {
+    // Nightly feed pushes (admin routes; the route takes the cron bearer, middleware lets it through).
+    id: 'merchant_sync',
+    name: 'Google Merchant feed sync',
+    path: '/api/admin/merchant/sync',
+    method: 'GET',
+    intervalMs: DAY,
+    intervalLabel: 'daily',
+    startDelayMs: 720 * SEC,
+    lockTtlMs: DAY - MIN,
+    tenantScope: 'merchant_sync:read',
+    k8sOnly: true,
+  },
+  {
+    id: 'amazon_sync',
+    name: 'Amazon catalog feed sync',
+    path: '/api/admin/merchant/amazon/sync',
+    method: 'GET',
+    intervalMs: DAY,
+    intervalLabel: 'daily',
+    startDelayMs: 735 * SEC,
+    lockTtlMs: DAY - MIN,
+    tenantScope: 'amazon:read',
+    k8sOnly: true,
+  },
+  {
     id: 'amazon_ads_sync',
     name: 'Amazon Ads sync and reports',
     path: '/api/cron/amazon-ads-sync',
@@ -556,6 +583,17 @@ export function isCronJobId(id: unknown): id is string {
   return typeof id === 'string' && CRON_JOB_IDS.includes(id)
 }
 
+/** The store jobs a plan's scopes grant (what the fan-out runs for that store). */
+export function storeCronJobs(scopes: { has(scope: string): boolean }): CronJob[] {
+  return CRON_JOBS.filter(j => j.tenantScope !== null && scopes.has(j.tenantScope))
+}
+
+/** Store jobs that are admin API routes: the cron bearer passes the admin gate for these (middleware). */
+export const CRON_ADMIN_PATHS: readonly string[] = CRON_JOBS.filter(j => j.tenantScope !== null && j.path.startsWith('/api/admin/')).map(j => j.path)
+
+/** Reachability check on a store's admin service (connect_crons). */
+export const CRON_PING_PATH = '/api/cron/ping'
+
 // IN_PROCESS_CRON=false hands scheduling to Kubernetes CronJobs (deploy/k8s), so pods never self-schedule.
 export function inProcessCronEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env.IN_PROCESS_CRON !== 'false'
@@ -573,6 +611,8 @@ const DAILY_AT_IST: Record<string, string> = {
   drive_purge_trash: '15 3',
   wallet_drift: '45 3',
   s3_usage: '30 2',
+  merchant_sync: '15 23',
+  amazon_sync: '45 23',
 }
 
 // Weekly jobs: minute hour * * day-of-week (IST).

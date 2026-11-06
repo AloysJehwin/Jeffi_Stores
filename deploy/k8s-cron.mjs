@@ -1,7 +1,7 @@
 // k8s CronJob entrypoint: call one cron route on the in-cluster app, then record the run so
 // /api/admin/cron/status keeps working. Usage: node deploy/k8s-cron.mjs <jobId> <METHOD> <path>
 const [jobId, method, path] = process.argv.slice(2)
-// Runs are recorded on the controller; a job may run on another app (CRON_TARGET, e.g. the flagship's admin).
+// Runs are recorded on the controller; CRON_TARGET points a one-off call at another app (the CronJobs don't set it).
 const controller = 'http://jeffi-stores-controller-service.jeffi.svc.cluster.local:3000'
 const base = process.env.CRON_TARGET || controller
 const headers = { Host: process.env.CRON_HOST || 'jeffistores.in', Authorization: `Bearer ${process.env.CRON_SECRET}` }

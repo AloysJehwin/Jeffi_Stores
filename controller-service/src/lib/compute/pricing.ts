@@ -1,7 +1,19 @@
 import { HOURS_PER_MONTH, ec2Code, priceOf, rdsCode, type Catalog, type ComputeSpec } from '@/lib/compute/spec'
 
-// What a store's compute costs: AWS on-demand price × USD→INR × (1 + the plan's infra margin), per month
+// What a store's compute costs: AWS on-demand price × USD→INR × (1 + the plan's margin), per month
 // and per hour. GST is not in these figures: monthlyTotal adds it on the infra (the plan fee already includes it).
+
+/** A plan's markups on AWS cost: on its own server, and with its database on RDS (unset: the server one). */
+export interface PlanMargins {
+  infraMargin?: number
+  rdsMargin?: number | null
+}
+
+/** The markup on a spec's whole infra quote: the plan's RDS margin when its database is on RDS, else its server margin; else `fallback` (the catalog's). */
+export function marginFor(plan: PlanMargins | null | undefined, spec: ComputeSpec, fallback = 0): number {
+  const m = spec.db.mode === 'dedicated' ? (plan?.rdsMargin ?? plan?.infraMargin) : plan?.infraMargin
+  return m ?? fallback
+}
 
 export interface QuoteLine {
   key: string
@@ -39,10 +51,9 @@ function perGb(catalog: Catalog, code: string, multiAz = false): number {
   return v
 }
 
-export function quoteSpec(spec: ComputeSpec, catalog: Catalog, plan?: { infraMargin?: number }): Quote {
+export function quoteSpec(spec: ComputeSpec, catalog: Catalog, plan?: PlanMargins | null): Quote {
   const s = catalog.settings
-  // Margin resolution: per-plan markup wins, else the catalog's global setting, else 0.
-  const margin = plan?.infraMargin ?? s.margin ?? 0
+  const margin = marginFor(plan, spec, s.margin ?? 0)
   const toInr = (usd: number) => usd * s.usdInr * (1 + margin)
   const raw: Omit<QuoteLine, 'inrMonth'>[] = []
   const disk = s.rootVolumeGb * perGb(catalog, 'ebs:gp3')
@@ -127,9 +138,9 @@ export function monthlyTotal(quote: Quote, planFeeInr: number, gstRate: number) 
 const KEPT_WHILE_PAUSED = new Set(['storage', 'db:disk', 'db:snapshot', 's3', 'platform'])
 
 /** While a store is paused: its disks, database storage, S3 and the platform share, per hour, at the plan's margin. */
-export function pausedInrHour(spec: ComputeSpec, catalog: Catalog, plan?: { infraMargin?: number }): number {
+export function pausedInrHour(spec: ComputeSpec, catalog: Catalog, plan?: PlanMargins | null): number {
   const s = catalog.settings
-  const margin = plan?.infraMargin ?? s.margin ?? 0
+  const margin = marginFor(plan, spec, s.margin ?? 0)
   const kept = quoteSpec(spec, catalog, plan).lines.filter(l => KEPT_WHILE_PAUSED.has(l.key)).reduce((n, l) => n + l.awsUsdMonth, 0)
   const disks = spec.node.placement === 'pool' ? 0 : spec.node.count * s.rootVolumeGb * perGb(catalog, 'ebs:gp3')
   return Math.round((((kept + disks) * s.usdInr * (1 + margin)) / HOURS_PER_MONTH) * 10000) / 10000

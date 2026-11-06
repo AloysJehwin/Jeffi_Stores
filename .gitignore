@@ -43,7 +43,10 @@ next-env.d.ts
 # run them on the runner, so an ignored script means "No such file" in Actions.
 !.github/scripts/*.sh
 !deploy/k8s/**/*.sh
-/scripts/
+/scripts/*
+# CI runs the CLI manifest generator (npm run cli:check).
+!/scripts/gen-admin-manifest.ts
+!/scripts/admin-manifest/
 *.csv
 RDS_SECURITY_GROUP_FIX.md
 ADD_IP_TO_SECURITY_GROUP.md

@@ -7,6 +7,8 @@ vi.mock('@/lib/tenant-registry', () => ({ listTenants: reg.listTenants }))
 vi.mock('@/lib/auth/plan-gate', () => ({ getTenantPlan: reg.getTenantPlan }))
 const requestMock = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/shared/internal-http', () => ({ internalRequest: requestMock }))
+const compute = vi.hoisted(() => ({ storeLayouts: vi.fn() }))
+vi.mock('@controller/lib/compute/store', () => compute)
 
 import { POST } from '@controller/app/api/(internal)/cron/fanout/route'
 
@@ -27,6 +29,7 @@ beforeEach(() => {
   process.env.CRON_FLAGSHIP_BASE = 'http://flagship-admin:3000'
   process.env.CRON_STORE_BASE = 'http://{slug}-admin:3000'
   requestMock.mockResolvedValue({ ok: true, status: 200 })
+  compute.storeLayouts.mockResolvedValue(new Map())
 })
 
 const hostsCalled = () => requestMock.mock.calls.map(c => c[1]?.host)
@@ -76,5 +79,54 @@ describe('cron fan-out', () => {
     const json = await res.json()
     expect(json.ran).toBe(2) // flagship + alpha both attempted
     expect(json.failed).toBe(1) // only alpha failed
+  })
+
+  describe('layout', () => {
+    const twoStores = () => {
+      reg.listTenants.mockResolvedValue([
+        { id: 't1', slug: 'alpha' },
+        { id: 't2', slug: 'bravo' },
+      ])
+      reg.getTenantPlan.mockResolvedValue({ plan: 'x', scopes: new Set(['orders:read', 'merchant_sync:read']) })
+      compute.storeLayouts.mockResolvedValue(new Map([['t2', 'controller']]))
+    }
+
+    it('a store still on the old all-in-one app runs its store crons there ({service}), in one layout lookup', async () => {
+      process.env.CRON_STORE_BASE = 'http://{slug}-{service}:3000'
+      twoStores()
+      await POST(post('cancel_stale_orders'))
+      expect(compute.storeLayouts).toHaveBeenCalledTimes(1)
+      expect(compute.storeLayouts).toHaveBeenCalledWith(['t1', 't2'])
+      expect(urlsCalled().sort()).toEqual([
+        'http://alpha-admin-service:3000/api/cron/cancel-stale-orders',
+        'http://bravo-controller-service:3000/api/cron/cancel-stale-orders',
+        'http://flagship-admin:3000/api/cron/cancel-stale-orders',
+      ])
+    })
+
+    it('reports a feed sync on the old app as skipped, not failed; stores on their own services get it', async () => {
+      process.env.CRON_STORE_BASE = 'http://{slug}-{service}:3000'
+      twoStores()
+      const json = await (await POST(post('merchant_sync'))).json()
+      expect(urlsCalled().sort()).toEqual(['http://alpha-admin-service:3000/api/admin/merchant/sync', 'http://flagship-admin:3000/api/admin/merchant/sync'])
+      expect(json.failed).toBe(0)
+      expect(json.skipped).toBe(1)
+      expect(json.results).toContainEqual({ host: 'bravo.jeffistores.in', slug: 'bravo', status: 'skipped', detail: 'old all-in-one layout' })
+    })
+
+    it('without a {service} placeholder the old app is unreachable: skipped', async () => {
+      twoStores()
+      const json = await (await POST(post('cancel_stale_orders'))).json()
+      expect(urlsCalled()).not.toContain('http://bravo-admin:3000/api/cron/cancel-stale-orders')
+      expect(json.results.find((r: any) => r.slug === 'bravo')).toMatchObject({ status: 'skipped' })
+    })
+
+    it('no store base (local dev router): every store goes through it, no layout lookup', async () => {
+      delete process.env.CRON_STORE_BASE
+      twoStores()
+      await POST(post('cancel_stale_orders'))
+      expect(compute.storeLayouts).not.toHaveBeenCalled()
+      expect(hostsCalled().sort()).toEqual(['alpha.jeffistores.in', 'bravo.jeffistores.in', 'jeffistores.in'])
+    })
   })
 })
