@@ -93,6 +93,11 @@ describe('every tenant-host exit forwards x-tenant-slug to the request', () => {
     expect(forwardedTenantSlug(res)).toBe('acme')
   })
 
+  it('forwards it on the tenant business subdomain rewrite', async () => {
+    const res = await middleware(req('https://acme.business.jeffistores.in/', 'acme.business.jeffistores.in'))
+    expect(forwardedTenantSlug(res)).toBe('acme')
+  })
+
   it('sets no tenant slug on platform hosts', async () => {
     mockResolveTenant.mockResolvedValue(null)
     for (const host of ['jeffistores.in', 'admin.jeffistores.in', 'ecom.jeffistores.in']) {
