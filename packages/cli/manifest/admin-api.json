@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "0abc7a4b540d4d369afcaa2355a66946b4cc976f143dff3e7573b2c82092cd79",
+ "manifestHash": "ae4ff6f7fcd22008223c910f99bfa4ac0ec6118b04716dc2be7d7becb6c94ba0",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -10731,88 +10731,6 @@
    "bodyContentType": "application/json",
    "summary": "Submit pay for a payable",
    "command": "financial-payables pay"
-  },
-  {
-   "id": "admin POST /api/admin/financial/payables/{id}/payout",
-   "host": "admin",
-   "method": "POST",
-   "path": "/api/admin/financial/payables/{id}/payout",
-   "gatewayPath": "/v1/admin/financial/payables/{id}/payout",
-   "file": "admin-service/src/app/api/(admin)/admin/financial/payables/[id]/payout/route.ts",
-   "pathParams": [
-    {
-     "name": "id",
-     "catchAll": false,
-     "optional": false
-    }
-   ],
-   "query": [],
-   "queryParams": [],
-   "scope": "financial:write",
-   "scopeSource": "literal",
-   "scopes": [
-    "financial:write"
-   ],
-   "guard": "auth",
-   "platform": null,
-   "body": {
-    "type": "object",
-    "properties": {
-     "mode": {
-      "type": "string",
-      "enum": [
-       "NEFT",
-       "RTGS",
-       "IMPS",
-       "UPI"
-      ]
-     },
-     "amount": {
-      "type": "number",
-      "minimum": 0
-     },
-     "notes": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ]
-     }
-    },
-    "required": [
-     "mode",
-     "amount"
-    ]
-   },
-   "bodySource": "zod",
-   "bodyContentType": "application/json",
-   "summary": "Submit payout for a payable",
-   "command": "financial-payables payout"
-  },
-  {
-   "id": "admin POST /api/admin/financial/payables/sync-payouts",
-   "host": "admin",
-   "method": "POST",
-   "path": "/api/admin/financial/payables/sync-payouts",
-   "gatewayPath": "/v1/admin/financial/payables/sync-payouts",
-   "file": "admin-service/src/app/api/(admin)/admin/financial/payables/sync-payouts/route.ts",
-   "pathParams": [],
-   "query": [],
-   "queryParams": [],
-   "scope": "financial:write",
-   "scopeSource": "literal",
-   "scopes": [
-    "financial:write"
-   ],
-   "guard": "auth",
-   "platform": null,
-   "body": null,
-   "noBody": true,
-   "summary": "Sync payouts (financial payables)",
-   "command": "financial-payables sync-payouts"
   },
   {
    "id": "admin GET /api/admin/financial/pl",

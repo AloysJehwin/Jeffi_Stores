@@ -190,7 +190,7 @@ function NeedsAttention({ d }: { d: Overview }) {
       ...a.returns.map(r => ({ key: `r${r.id}`, primary: `${r.order_number ?? 'Return'}${customer(r)}`, secondary: `Return ${days(r.days)} ago, refund pending`, amount: r.amount || undefined, href: r.order_id ? orderHref(r.order_id) : '/admin/returns' })),
       ...a.adjustments.map(r => ({ key: `a${r.id}`, primary: r.order_number, secondary: `Adjustment refund pending for ${days(r.days)}`, amount: r.amount, href: orderHref(r.order_id) })),
     ] },
-    { key: 'payout', title: 'Supplier payouts failed or stuck', tone: red, href: '/admin/financial?tab=payables', action: 'Payables',
+    { key: 'payout', title: 'Supplier payouts that failed', tone: red, href: '/admin/financial?tab=payables', action: 'Payables',
       items: a.payouts.map(r => ({ key: r.id, primary: `${r.supplier_name} · ${r.expense_number}`, secondary: `Payout ${r.payout_status}`, amount: r.amount, href: payableHref(r.expense_id) })) },
   ].filter(g => g.items.length > 0)
 

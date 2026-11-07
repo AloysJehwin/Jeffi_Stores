@@ -540,9 +540,6 @@ async function handle(request: NextRequest) {
     '/api/admin/auth/google',
     '/api/admin/check-session',
     '/api/admin/delhivery/sync-statuses',
-    // RazorpayX payout webhook: called server-to-server with no admin cookie. The route
-    // handler verifies the HMAC signature fail-closed, which is its only auth.
-    '/api/admin/financial/payables/webhook',
     '/api/admin/mfa/enroll-start',
     '/api/admin/mfa/enroll-confirm',
     '/api/admin/mfa/verify',

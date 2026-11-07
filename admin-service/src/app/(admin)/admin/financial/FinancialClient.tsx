@@ -61,8 +61,6 @@ export default function FinancialClient({ razorpayTab }: { razorpayTab: { settle
     if (loaded.current) return
     loaded.current = true
 
-    fetch('/api/admin/financial/payables/sync-payouts', { method: 'POST' }).catch(() => {})
-
     Promise.allSettled([
       fetch('/api/admin/financial/payables').then(r => r.json()),
       fetch('/api/admin/financial/transactions').then(r => r.json()),
