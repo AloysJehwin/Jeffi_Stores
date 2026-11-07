@@ -20,6 +20,8 @@ export interface AdminOAuthState {
   merchantId?: string
   // Google Ads reconnect (to add a scope): keep the chosen account if the new sign-in can reach it.
   keepAccount?: boolean
+  // Meta: which app opened the dialog (the store's own or the platform's); the code is exchanged with it.
+  metaApp?: 'own' | 'platform'
   // Issued-at (unix seconds); stamped by signAdminState and checked by verifyAdminState.
   iat?: number
 }

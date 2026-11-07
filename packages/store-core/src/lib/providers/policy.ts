@@ -33,7 +33,7 @@ export type PolicySource = 'tenant' | 'platform' | 'fallback'
 export interface ProviderPolicy {
   smsProvider: MessagingProviderName
   whatsappProvider: MessagingProviderName
-  /** Empty = the gateway's default order. */
+  /** Claude first, Razer as the fallback, unless a setting says otherwise. */
   aiTextProviders: AiTextProvider[]
   aiImageProviders: AiImageProvider[]
   aiVideoProviders: AiVideoProvider[]
@@ -140,7 +140,7 @@ export async function getProviderPolicy(tenantId?: string | null): Promise<Provi
   return {
     smsProvider: sms ?? 'twilio',
     whatsappProvider: wa ?? 'twilio',
-    aiTextProviders: pick<AiTextProvider[]>('ai_text_providers') ?? [],
+    aiTextProviders: pick<AiTextProvider[]>('ai_text_providers') ?? ['anthropic', 'razer'],
     aiImageProviders: pick<AiImageProvider[]>('ai_image_providers') ?? [],
     aiVideoProviders: pick<AiVideoProvider[]>('ai_video_providers') ?? [],
     aiImageDefaultQuality: pick<AiImageQuality>('ai_image_default_quality'),
@@ -167,7 +167,9 @@ export interface AnthropicIdentity {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const identityCache = new Map<string, { at: number; value: AnthropicIdentity | null }>()
 
-/** A store's Anthropic workload-identity ids (ai_provider_identities); null = none provisioned.
+/** A store's Anthropic workload-identity ids (ai_provider_identities). A store without its own row
+ *  (no per-store workspace yet) shares the platform's: the gateway's federation rule accepts any store's
+ *  request, and spend is still logged and charged per store. null = not even the platform has one.
  *  `tenantId` undefined = the tenant in the current request scope; null/platform = the flagship row. */
 export async function getAnthropicIdentity(tenantId?: string | null): Promise<AnthropicIdentity | null> {
   const id = tenantId === undefined ? await resolveTenantId().catch(() => null) : tenantId
@@ -177,8 +179,9 @@ export async function getAnthropicIdentity(tenantId?: string | null): Promise<An
   const r = await controlPlanePool()
     .query<{ workspace_id: string; service_account_id: string; federation_rule_id: string }>(
       `SELECT workspace_id, service_account_id, federation_rule_id FROM ai_provider_identities
-        WHERE tenant_id = $1::uuid AND provider = 'anthropic'`,
-      [tid]
+        WHERE tenant_id IN ($1::uuid, $2::uuid) AND provider = 'anthropic'
+        ORDER BY (tenant_id = $1::uuid) DESC LIMIT 1`,
+      [tid, PLATFORM_TENANT_ID]
     )
     .catch(() => null)
   const row = r?.rows[0]

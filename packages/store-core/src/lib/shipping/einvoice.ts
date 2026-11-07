@@ -1,3 +1,5 @@
+import { envGstApiCreds, resolveGstApiCreds, type GstApiCreds } from './gst-api-creds'
+
 export interface EInvoiceItem {
   slNo: string
   productDesc: string
@@ -48,43 +50,27 @@ export interface IRNResult {
   status: 'generated' | 'stub'
 }
 
-let cachedToken: { token: string; expiresAt: number } | null = null
+// Per store and account, so one store's token is never used for another.
+const tokenCache = new Map<string, { token: string; expiresAt: number }>()
 
 export function __resetTokenCacheForTests(): void {
-  cachedToken = null
+  tokenCache.clear()
 }
 
-function isConfigured(): boolean {
-  return !!(
-    process.env.EINVOICE_CLIENT_ID &&
-    process.env.EINVOICE_CLIENT_SECRET &&
-    process.env.EINVOICE_USERNAME &&
-    process.env.EINVOICE_PASSWORD &&
-    process.env.EINVOICE_GSTIN
-  )
-}
-
-function baseUrl(): string {
-  return process.env.EINVOICE_BASE_URL || 'https://einvoice1-sandbox.nic.in'
-}
-
-async function getAuthToken(): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
-    return cachedToken.token
-  }
-
-  const res = await fetch(`${baseUrl()}/eivital/v1.04/auth`, {
+/** Fetch a fresh IRP auth token with these credentials (also the connection test). */
+export async function authenticateEInvoice(creds: GstApiCreds): Promise<string> {
+  const res = await fetch(`${creds.baseUrl}/eivital/v1.04/auth`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      client_id: process.env.EINVOICE_CLIENT_ID!,
-      client_secret: process.env.EINVOICE_CLIENT_SECRET!,
-      gstin: process.env.EINVOICE_GSTIN!,
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
+      gstin: creds.gstin,
     },
     body: JSON.stringify({
-      UserName: process.env.EINVOICE_USERNAME,
-      Password: process.env.EINVOICE_PASSWORD,
-      AppKey: process.env.EINVOICE_CLIENT_SECRET,
+      UserName: creds.username,
+      Password: creds.password,
+      AppKey: creds.clientSecret,
       ForceRefreshAccessToken: true,
     }),
   })
@@ -93,9 +79,26 @@ async function getAuthToken(): Promise<string> {
   if (!res.ok || !data?.Data?.AuthToken) {
     throw new Error(`IRP auth failed: ${data?.message || res.statusText}`)
   }
+  return String(data.Data.AuthToken)
+}
 
-  cachedToken = { token: data.Data.AuthToken, expiresAt: Date.now() + 6 * 60 * 60 * 1000 }
-  return cachedToken.token
+async function getAuthToken(creds: GstApiCreds): Promise<string> {
+  const cached = tokenCache.get(creds.cacheKey)
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token
+  const token = await authenticateEInvoice(creds)
+  tokenCache.set(creds.cacheKey, { token, expiresAt: Date.now() + 6 * 60 * 60 * 1000 })
+  return token
+}
+
+function irpHeaders(creds: GstApiCreds, token: string): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
+    gstin: creds.gstin,
+    user_name: creds.username,
+    AuthToken: token,
+  }
 }
 
 function buildIRPPayload(p: EInvoicePayload): object {
@@ -161,8 +164,11 @@ function buildIRPPayload(p: EInvoicePayload): object {
   }
 }
 
+/** Generate with the store's own credentials (the flagship: the platform env, else a stub). A store
+ * without its own credentials gets GstApiNotConnectedError. */
 export async function generateIRN(payload: EInvoicePayload): Promise<IRNResult> {
-  if (!isConfigured()) {
+  const creds = await resolveGstApiCreds('einvoice')
+  if (!creds) {
     return {
       irn: `STUB-${payload.invoiceNumber}-${Date.now()}`,
       ackNo: `STUB-ACK-${Date.now()}`,
@@ -172,18 +178,11 @@ export async function generateIRN(payload: EInvoicePayload): Promise<IRNResult> 
     }
   }
 
-  const token = await getAuthToken()
+  const token = await getAuthToken(creds)
 
-  const res = await fetch(`${baseUrl()}/eicore/v1.03/Invoice`, {
+  const res = await fetch(`${creds.baseUrl}/eicore/v1.03/Invoice`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      client_id: process.env.EINVOICE_CLIENT_ID!,
-      client_secret: process.env.EINVOICE_CLIENT_SECRET!,
-      gstin: process.env.EINVOICE_GSTIN!,
-      user_name: process.env.EINVOICE_USERNAME!,
-      AuthToken: token,
-    },
+    headers: irpHeaders(creds, token),
     body: JSON.stringify(buildIRPPayload(payload)),
   })
 
@@ -202,20 +201,14 @@ export async function generateIRN(payload: EInvoicePayload): Promise<IRNResult> 
 }
 
 export async function cancelIRN(irn: string, cancelReason: 1 | 2 | 3 | 4, cancelRemark: string): Promise<void> {
-  if (!isConfigured()) throw new Error('e-Invoice credentials not configured')
+  const creds = await resolveGstApiCreds('einvoice')
+  if (!creds) throw new Error('e-Invoice credentials not configured')
 
-  const token = await getAuthToken()
+  const token = await getAuthToken(creds)
 
-  const res = await fetch(`${baseUrl()}/eicore/v1.03/Invoice/Cancel`, {
+  const res = await fetch(`${creds.baseUrl}/eicore/v1.03/Invoice/Cancel`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      client_id: process.env.EINVOICE_CLIENT_ID!,
-      client_secret: process.env.EINVOICE_CLIENT_SECRET!,
-      gstin: process.env.EINVOICE_GSTIN!,
-      user_name: process.env.EINVOICE_USERNAME!,
-      AuthToken: token,
-    },
+    headers: irpHeaders(creds, token),
     body: JSON.stringify({ Irn: irn, CnlRsn: cancelReason, CnlRem: cancelRemark }),
   })
 
@@ -223,6 +216,7 @@ export async function cancelIRN(irn: string, cancelReason: 1 | 2 | 3 | 4, cancel
   if (!res.ok) throw new Error(`IRN cancellation failed: ${data?.message || res.statusText}`)
 }
 
+/** Whether the platform env credentials (the flagship's) are set. */
 export function isEInvoiceConfigured(): boolean {
-  return isConfigured()
+  return !!envGstApiCreds('einvoice')
 }

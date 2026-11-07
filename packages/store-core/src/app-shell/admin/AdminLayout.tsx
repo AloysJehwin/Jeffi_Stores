@@ -40,6 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const scopes: string[] = session?.scopes || []
 
   const navLinks = [
+    { href: '/admin/setup', label: 'Setup guide', scope: 'setup_guide:read' },
     { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard:read' },
     { href: '/admin/products', label: 'Products', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/categories', label: 'Categories', scope: 'categories:read', group: 'Catalogue' },
@@ -47,6 +48,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'catalog_enrichment:read', group: 'Catalogue' },
     { href: '/admin/merchant', label: 'Google Merchant', scope: 'merchant_sync:read', group: 'Catalogue' },
     { href: '/admin/amazon', label: 'Amazon', scope: 'amazon:read', group: 'Catalogue' },
+    { href: '/admin/myntra', label: 'Myntra', scope: 'myntra:read', group: 'Catalogue' },
+    { href: '/admin/ajio', label: 'AJIO', scope: 'ajio:read', group: 'Catalogue' },
     { href: '/admin/data-source', label: 'Data Source', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/social-posts', label: 'Social Posts', scope: 'social:read', group: 'Catalogue' },
     { href: '/admin/drive', label: 'Drive', scope: 'drive:read', group: 'Catalogue' },
@@ -75,6 +78,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/traffic', label: 'Traffic', scope: 'traffic:read', group: 'Marketing' },
     { href: '/admin/google-ads', label: 'Google Ads', scope: 'google_ads:read', group: 'Marketing' },
     { href: '/admin/amazon-ads', label: 'Amazon Ads', scope: 'amazon_ads:read', group: 'Marketing' },
+    { href: '/admin/myntra-ads', label: 'Myntra Ads', scope: 'myntra_ads:read', group: 'Marketing' },
+    { href: '/admin/ajio-ads', label: 'AJIO Ads', scope: 'ajio_ads:read', group: 'Marketing' },
     { href: '/admin/meta-ads', label: 'Meta Ads', scope: 'meta_ads:read', group: 'Marketing' },
     { href: '/admin/coupons', label: 'Coupons', scope: 'coupons:read', group: 'Marketing' },
     { href: '/admin/offers', label: 'Offers', scope: 'coupons:read', group: 'Marketing' },

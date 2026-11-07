@@ -45,7 +45,8 @@ import DigitalAccessCard, {
 import { Download, Eye, ImageIcon, Printer, Truck } from 'lucide-react'
 import { Badge, Card, DetailHeader, EntityPage, Field, Fields, StatusBadge } from '@/components/admin/kit'
 import { ChangeLog, OrderStatusHistory } from '@/components/admin/change-log'
-import { ORDER_STATUS_FULL, PAYMENT_STATUS_FULL, inr } from '../../_components/status-maps'
+import { ORDER_STATUS_FULL, PAYMENT_STATUS_FULL, inr, sourceLabel, sourceTone } from '../../_components/status-maps'
+import { CHANNEL_LABEL, isMarketplaceChannel, type MarketplaceChannel } from '@/lib/marketplace/types'
 
 const pill = 'control-md border border-border-default bg-surface-elevated text-foreground hover:bg-surface-secondary'
 const pillIcon = 'control-md control-icon border border-border-default bg-surface-elevated text-foreground-muted hover:bg-surface-secondary hover:text-foreground'
@@ -112,6 +113,8 @@ export default async function OrderDetailsPage({
   const role = h.get('x-user-role') || ''
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'orders:write')
+  // Myntra / AJIO orders are fulfilled on their console; their courier ships them.
+  const marketplace: MarketplaceChannel | null = isMarketplaceChannel(order.source) ? order.source : null
   const canOverrideStatus = isPlatformOwner(role)
   // Session scopes are already narrowed to the tenant's plan, so these hide modules the plan
   // does not include instead of showing controls whose API would refuse them.
@@ -254,6 +257,7 @@ export default async function OrderDetailsPage({
         <>
           <StatusBadge status={order.status} map={ORDER_STATUS_FULL} />
           <StatusBadge status={order.payment_status} map={PAYMENT_STATUS_FULL} label={`Payment: ${PAYMENT_STATUS_FULL[order.payment_status]?.label ?? order.payment_status}`} />
+          {marketplace && <Badge tone={sourceTone(marketplace)}>{sourceLabel(marketplace)}</Badge>}
           {order.subscription_id && (
             <Link href={ap(`/admin/subscriptions/${order.subscription_id}`, host)}>
               <SubscriptionOrderBadge subscriptionId={order.subscription_id} cycle={order.subscription_cycle} />
@@ -274,6 +278,11 @@ export default async function OrderDetailsPage({
       identifiers={[{ label: 'Placed', value: placedAt }, ...(order.invoice_number ? [{ label: 'Invoice', value: String(order.invoice_number), copy: true }] : [])]}
       actions={
         <>
+          {marketplace && (
+            <Link href={ap(`/admin/${marketplace}?tab=orders`, host)} className={`${pill} w-full sm:w-auto`}>
+              <Truck className="h-4 w-4" /> Fulfil on {CHANNEL_LABEL[marketplace]}
+            </Link>
+          )}
           {canPackingSlips && !isAllDigital && (
             <span className="inline-flex w-full sm:w-auto items-center gap-1">
               <a href={`/api/admin/packing-slips/${order.id}`} download title="Download Packing Slip" className={`${pill} flex-1 sm:flex-none`}>
@@ -707,7 +716,19 @@ export default async function OrderDetailsPage({
               />
             ))}
 
-          {order.status !== 'cancelled' && !isReturnStatus && (
+          {marketplace && (
+            <Card title={`Fulfilled on ${CHANNEL_LABEL[marketplace]}`}>
+              <p className="text-sm text-foreground-muted">
+                {CHANNEL_LABEL[marketplace]} sends this order&apos;s status and its courier ships it. Accept, reject and dispatch it, and download its label and invoice, on the{' '}
+                <Link href={ap(`/admin/${marketplace}?tab=orders`, host)} className="text-accent-500 underline hover:text-accent-600">
+                  {CHANNEL_LABEL[marketplace]} page
+                </Link>
+                . The packing slip above still works as a pick list.
+              </p>
+            </Card>
+          )}
+
+          {!marketplace && order.status !== 'cancelled' && !isReturnStatus && (
             <Card title="Update Order Status">
                 {canWrite ? (
                   <UpdateOrderStatus
@@ -732,7 +753,7 @@ export default async function OrderDetailsPage({
 
           <RecordReplies entityType="orders" entityId={order.id} canWrite={canWrite} />
 
-          {order.status === 'confirmed' && !order.awb_number && canWrite && (
+          {!marketplace && order.status === 'confirmed' && !order.awb_number && canWrite && (
             <ProductAdjustments
               orderId={order.id}
               items={(order.order_items || []).map((it: any) => ({
@@ -748,7 +769,7 @@ export default async function OrderDetailsPage({
             />
           )}
 
-          {order.status === 'processing' && !isAllDigital && canWrite && (
+          {!marketplace && order.status === 'processing' && !isAllDigital && canWrite && (
             <ProductAdjustments
               mode="ask"
               orderId={order.id}
@@ -765,7 +786,8 @@ export default async function OrderDetailsPage({
             />
           )}
 
-          {order.status === 'processing' &&
+          {!marketplace &&
+            order.status === 'processing' &&
             !isAllDigital &&
             !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) &&
             canWrite && (
@@ -1123,14 +1145,19 @@ export default async function OrderDetailsPage({
                             {daysLeft != null ? (daysLeft < 0 ? ' (overdue)' : daysLeft === 0 ? ' (today)' : ` (${daysLeft}d left)`) : ''}
                           </div>
                         )}
-                        <a
-                          href={`https://dashboard.razorpay.com/app/disputes/${d.razorpay_dispute_id}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-accent-500 hover:underline"
-                        >
-                          {d.status === 'open' ? 'Respond on Razorpay' : 'View on Razorpay'}
-                        </a>
+                        {/* Route stores' payments sit on the platform account, which answers their disputes. */}
+                        {showSettlement ? (
+                          <a
+                            href={`https://dashboard.razorpay.com/app/disputes/${d.razorpay_dispute_id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-accent-500 hover:underline"
+                          >
+                            {d.status === 'open' ? 'Respond on Razorpay' : 'View on Razorpay'}
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-foreground-muted">Handled by the platform</span>
+                        )}
                       </div>
                     )
                   })}

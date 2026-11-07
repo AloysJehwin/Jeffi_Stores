@@ -327,6 +327,8 @@ export interface GsheetStatus {
   connectedAt: string | null
   // Granted drive.file, so "Create sheet" can make a file in the account's Drive.
   canCreate: boolean
+  /** oauth (platform sign-in), own_oauth (the store's own client) or service_account. */
+  connectedVia: string | null
   lastSync: GsheetSyncSummary | null
 }
 
@@ -363,6 +365,7 @@ export async function getGsheetStatus(tenantId: string): Promise<GsheetStatus> {
     connectedAt: connected ? ((row as { updated_at?: string }).updated_at ?? null) : null,
     // Older connections did not record scopes; they asked for drive.file, so assume it.
     canCreate: connected && meta.can_create !== false,
+    connectedVia: connected ? (typeof meta.connected_via === 'string' ? meta.connected_via : 'oauth') : null,
     lastSync: last ? toSyncSummary(last) : null,
   }
 }

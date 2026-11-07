@@ -13,6 +13,7 @@ import { checkWalletForShipment, chargeDeliveryEstimate } from '@/lib/payments/w
 import { resolveShippingAccount } from '@/lib/shipping/delhivery-account'
 import { applyCourierEdd } from '@/lib/shipping/courier-edd'
 import { orderItemFactorSql } from '@/lib/orders/unit-conversion'
+import { marketplaceRefusal } from '@/lib/marketplace/order-guard'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 
@@ -60,6 +61,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    const marketplace = marketplaceRefusal(order.source, 'delhivery')
+    if (marketplace) return NextResponse.json({ error: marketplace }, { status: 409 })
     if (order.awb_number)
       return NextResponse.json({ error: 'Shipment already created', awb: order.awb_number }, { status: 409 })
     if (order.physical_item_count === 0)

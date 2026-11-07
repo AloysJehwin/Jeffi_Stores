@@ -1,6 +1,7 @@
 import { controlPlanePool } from '@/lib/tenant-registry/shared'
 import { queryMany } from '@/lib/shared/db'
-import { oauthProviderInfo } from '@/lib/integrations/oauth'
+import { metaOAuthInfo } from '@/lib/integrations/oauth'
+import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
 import { connectionInfo, listAccounts } from './accounts'
 import { NETWORK_LABEL, socialRedirectUri } from './oauth'
 import { NETWORKS, networkOf, providerFor } from './providers'
@@ -120,7 +121,7 @@ export async function listAutopostRules(tenantId: string | null) {
 /** Every network with its connection state and whether the platform has its app credentials. */
 export async function listConnections(tenantId: string | null) {
   const rows = await listAccounts(tenantId)
-  const meta = oauthProviderInfo('meta')
+  const meta = await metaOAuthInfo('meta', tenantId ?? PLATFORM_TENANT_ID)
   return NETWORKS.map(network => {
     const p = providerFor(network)
     const row = rows.find(a => a.provider === network)

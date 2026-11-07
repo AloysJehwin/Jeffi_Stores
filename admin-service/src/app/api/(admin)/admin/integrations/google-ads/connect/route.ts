@@ -4,7 +4,7 @@ import { requireAdminScope } from '@/lib/auth/jwt'
 import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
 import { signAdminState } from '@/lib/shared/oauth-state'
 import { oauthProviderInfo, oauthRedirectUri } from '@/lib/integrations/oauth'
-import { adsTenantKey, GOOGLE_ADS_SCOPE } from '@/lib/google-ads/credentials'
+import { adsTenantKey, readAdsConfig, GOOGLE_ADS_SCOPE } from '@/lib/google-ads/credentials'
 import { DATA_MANAGER_SCOPE } from '@/lib/google-ads/conversions/data-manager'
 
 export const dynamic = 'force-dynamic'
@@ -17,12 +17,15 @@ export async function GET(request: NextRequest) {
   if (admin instanceof NextResponse) return admin
 
   const back = `${await currentAdminBaseUrlAsync()}/admin/google-ads`
-  if (!oauthProviderInfo('google_ads').enabled) {
+  const tenantKey = await adsTenantKey()
+  // The store's own developer token stands in for a platform one.
+  const own = process.env.GOOGLE_ADS_DEVELOPER_TOKEN ? null : await readAdsConfig(tenantKey).catch(() => null)
+  if (!oauthProviderInfo('google_ads', own?.developer_token ? ['GOOGLE_ADS_DEVELOPER_TOKEN'] : []).enabled) {
     return NextResponse.redirect(`${back}?connected=0&provider=google_ads&error=not_configured`)
   }
 
   const state = signAdminState({
-    tenantId: await adsTenantKey(),
+    tenantId: tenantKey,
     provider: 'google_ads',
     nonce: crypto.randomBytes(8).toString('hex'),
     returnBase: await currentAdminBaseUrlAsync(),

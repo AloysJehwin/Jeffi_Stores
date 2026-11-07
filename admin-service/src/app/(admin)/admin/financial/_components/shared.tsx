@@ -12,6 +12,7 @@ export type Tab =
   | 'cashflow'
   | 'cod_remittance'
   | 'razorpay'
+  | 'marketplaces'
   | 'disputes'
   | 'messaging'
   | 'ai_costs'
@@ -26,13 +27,6 @@ export const PAYMENT_METHOD_OPTIONS = [
   { value: 'upi', label: 'UPI' },
   { value: 'cash', label: 'Cash' },
   { value: 'cheque', label: 'Cheque' },
-]
-
-export const PAYOUT_MODE_OPTIONS = [
-  { value: 'IMPS', label: 'IMPS (instant)' },
-  { value: 'NEFT', label: 'NEFT' },
-  { value: 'RTGS', label: 'RTGS' },
-  { value: 'UPI', label: 'UPI' },
 ]
 
 export const formatINR = (n: number) => formatINRBase(n, 0)
@@ -55,7 +49,7 @@ export function StatusBadge({ status }: { status: string }) {
   return <span className={badgeCls(hit?.tone ?? 'red')}>{hit?.label ?? status}</span>
 }
 
-// RazorpayX payout lifecycle.
+// Status of a past RazorpayX payout (payouts are now recorded manually).
 export function payoutBadge(status?: string | null) {
   if (!status) return <span className="text-xs text-foreground-muted">-</span>
   const tone = status === 'processed' ? 'green' : status === 'failed' || status === 'reversed' ? 'red' : 'amber'

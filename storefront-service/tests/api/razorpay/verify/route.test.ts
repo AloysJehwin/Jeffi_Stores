@@ -1033,6 +1033,7 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_ORDER)
+      .mockResolvedValueOnce({ id: 'pay-pending' }) // the Razorpay order's pending payment row
       .mockResolvedValueOnce({ ...MOCK_USER, notification_channel: 'sms', phone: '9999999999' })
       .mockResolvedValueOnce(MOCK_ORDER)
     vi.mocked(db.queryMany).mockResolvedValue([])
@@ -1242,6 +1243,7 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ email: 'biz@example.com', phone: '8888888888' }) // bizUser
       .mockResolvedValueOnce(MOCK_ORDER) // order
+      .mockResolvedValueOnce({ id: 'pay-pending' }) // the Razorpay order's pending payment row
       .mockResolvedValueOnce(null) // user null post-tx
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
@@ -1305,5 +1307,55 @@ describe('POST /api/razorpay/verify', () => {
 
     expect(res.status).toBe(500)
     expect(body.error).toMatch(/payment verification failed/i)
+  })
+
+  // A payment is only proof for the checkout or order its Razorpay order was created for.
+  describe('a payment pays only what it was created for', () => {
+    const cartDraft = { userId: 'user-uuid-1', mode: 'cart', cartHash: 'h', couponId: null, shippingAmount: 0, codFeeAmount: 0, addressId: null, notes: null, businessDiscountAmount: 0 }
+    async function primeCart(subtotal: number) {
+      const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
+      vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+      vi.mocked(verifyDraftToken).mockResolvedValue({ ...cartDraft, userId: AUTH_USER.userId } as any)
+      vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
+      vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
+      vi.mocked(hashCartItems).mockReturnValue('h')
+      vi.mocked(orderCommit.cartSubtotal).mockReturnValue(subtotal)
+      vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(0)
+    }
+    const pay = (extra: Record<string, unknown>) =>
+      POST(makeRequest({ razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID, razorpay_signature: VALID_SIGNATURE, ...extra }) as any)
+
+    it('refuses a payment whose Razorpay order belongs to another checkout', async () => {
+      await primeCart(50000)
+      vi.mocked(db.queryOne)
+        .mockResolvedValueOnce(null) // not committed yet
+        .mockResolvedValueOnce(MOCK_USER)
+        .mockResolvedValueOnce(null) // intent claim: no intent for this order + token
+        .mockResolvedValueOnce({ draft_token: 'tok_cheap_cart' }) // the order was made for another draft
+      const res = await pay({ draftToken: 'tok_big_cart' })
+      expect(res.status).toBe(400)
+      expect(orderCommit.commitOrder).not.toHaveBeenCalled()
+    })
+
+    it('refuses when the paid amount differs from the checkout total', async () => {
+      await primeCart(50000)
+      vi.mocked(db.queryOne)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(MOCK_USER)
+        .mockResolvedValueOnce({ id: 'intent-1', amount_paise: 10000 }) // ₹100 paid
+      const res = await pay({ draftToken: 'tok_big_cart' })
+      expect(res.status).toBe(409)
+      expect(orderCommit.commitOrder).not.toHaveBeenCalled()
+    })
+
+    it('refuses a payment for an order that has no pending row for that Razorpay order', async () => {
+      vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+      vi.mocked(db.queryOne)
+        .mockResolvedValueOnce(MOCK_ORDER) // order
+        .mockResolvedValueOnce(null) // no payments row for this Razorpay order
+      const res = await pay({ orderId: ORDER_UUID })
+      expect(res.status).toBe(400)
+      expect(db.withTransaction).not.toHaveBeenCalled()
+    })
   })
 })

@@ -1,7 +1,7 @@
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getIntegrationCredential, saveIntegrationCredential, deleteIntegrationCredential } from '@/lib/tenant-registry'
 import { encryptToken, decryptToken } from '@/lib/crypto/token-cipher'
-import { IntegrationNotConnectedError } from '@/lib/integrations/resolve'
+import { IntegrationNotConnectedError, type GoogleOAuthApp } from '@/lib/integrations/resolve'
 import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
 import { loadGoogleServiceAccount } from '@/lib/shared/google-credentials'
 import { GoogleAdsClient, normalizeCustomerId, GOOGLE_ADS_SCOPE, type GoogleAdsClientOptions, type ServiceAccountKey } from './client'
@@ -19,6 +19,9 @@ import { DATA_MANAGER_SCOPE } from './conversions/data-manager'
 //   platform - flagship only, with no stored row: the flagship's own account GOOGLE_ADS_CUSTOMER_ID read
 //             with the platform Google service account (the one the Merchant sync uses), added
 //             as a user in Google Ads. Tenants never fall back to it.
+//
+// A store may bring its own developer token and OAuth client (developer_token, client_id,
+// client_secret); each one it leaves out falls back to the platform's.
 
 export const GOOGLE_ADS_PROVIDER = 'google_ads'
 export { GOOGLE_ADS_SCOPE }
@@ -32,6 +35,11 @@ export interface GoogleAdsConfig {
   connected_via: AdsConnectedVia
   /** Scopes Google granted with the refresh token (Google sign-in only); conversion uploads need datamanager. */
   scopes?: string[]
+  /** The store's own developer token; the platform's GOOGLE_ADS_DEVELOPER_TOKEN when unset. */
+  developer_token?: string
+  /** The store's own OAuth client the refresh token was issued to. */
+  client_id?: string
+  client_secret?: string
 }
 
 export interface GoogleAdsCreds {
@@ -40,6 +48,9 @@ export interface GoogleAdsCreds {
   customerId: string
   loginCustomerId: string | null
   connectedVia: AdsConnectedVia
+  /** Set only when the store uses its own; the client falls back to the platform's. */
+  developerToken?: string
+  oauthClient?: GoogleOAuthApp
 }
 
 export interface GoogleAdsEnvStatus {
@@ -99,6 +110,10 @@ export async function saveAdsConfig(
     ...(customerId ? { customer_id: customerId } : {}),
     ...(loginCustomerId && loginCustomerId !== customerId ? { login_customer_id: loginCustomerId } : {}),
     ...(cfg.scopes?.length ? { scopes: cfg.scopes } : {}),
+    ...(cfg.developer_token?.trim() ? { developer_token: cfg.developer_token.trim() } : {}),
+    ...(cfg.client_id?.trim() && cfg.client_secret?.trim()
+      ? { client_id: cfg.client_id.trim(), client_secret: cfg.client_secret.trim() }
+      : {}),
   }
   await saveIntegrationCredential({
     tenantId: tenantKey,
@@ -113,6 +128,8 @@ export async function saveAdsConfig(
       // Conversion uploads (Data Manager API) need this scope; null when the token's scopes are unknown.
       data_manager: clean.scopes ? clean.scopes.includes(DATA_MANAGER_SCOPE) : null,
       data_manager_at: clean.scopes ? new Date().toISOString() : null,
+      own_developer_token: !!clean.developer_token,
+      own_oauth_client: !!clean.client_id,
       ...meta,
     },
   })
@@ -136,6 +153,15 @@ export function credsFromConfig(cfg: GoogleAdsConfig | null, tenantKey: string):
     customerId: cfg.customer_id,
     loginCustomerId: cfg.login_customer_id ?? null,
     connectedVia: cfg.connected_via,
+    ...ownAdsAuth(cfg),
+  }
+}
+
+/** The store's own developer token / OAuth client from a stored config, for building a client directly. */
+export function ownAdsAuth(cfg: GoogleAdsConfig | null | undefined): Pick<GoogleAdsCreds, 'developerToken' | 'oauthClient'> {
+  return {
+    ...(cfg?.developer_token ? { developerToken: cfg.developer_token } : {}),
+    ...(cfg?.client_id && cfg.client_secret ? { oauthClient: { clientId: cfg.client_id, clientSecret: cfg.client_secret } } : {}),
   }
 }
 
@@ -174,6 +200,8 @@ export function googleAdsClientFromCreds(c: GoogleAdsCreds, extra: Partial<Googl
     serviceAccount: c.serviceAccount,
     customerId: c.customerId,
     loginCustomerId: c.loginCustomerId,
+    ...(c.developerToken ? { developerToken: c.developerToken } : {}),
+    ...(c.oauthClient ? { oauthClient: c.oauthClient } : {}),
     ...extra,
   })
 }

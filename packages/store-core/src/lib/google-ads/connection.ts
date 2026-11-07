@@ -18,6 +18,8 @@ export interface AdsConnectionStatus {
   customerId: string | null
   loginCustomerId: string | null
   accountName: string | null
+  /** The store's own developer token / OAuth client are saved (never the values). */
+  ownCredentials: { developerToken: boolean; oauthClient: boolean }
 }
 
 function serviceAccountEmail(): string | null {
@@ -36,9 +38,12 @@ export async function getAdsConnectionStatus(tenantKey: string): Promise<AdsConn
   const customerId = meta.customer_id ? String(meta.customer_id) : null
   const env = googleAdsEnvStatus()
   const flagship = tenantKey === PLATFORM_TENANT_ID
+  const ownCredentials = { developerToken: meta.own_developer_token === true, oauthClient: meta.own_oauth_client === true }
   const base = {
     env,
-    oauth: oauthProviderInfo('google_ads'),
+    // Sign-in uses the platform OAuth client; the store's own developer token stands in for the platform's.
+    oauth: oauthProviderInfo('google_ads', ownCredentials.developerToken ? ['GOOGLE_ADS_DEVELOPER_TOKEN'] : []),
+    ownCredentials,
     flagship,
     serviceAccountEmail: flagship ? serviceAccountEmail() : null,
     pendingAccount: live && !customerId,

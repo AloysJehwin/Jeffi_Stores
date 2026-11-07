@@ -14,7 +14,7 @@ vi.mock('@/lib/crypto/token-cipher', () => ({
 const sa = vi.hoisted(() => ({ load: () => ({ client_email: 'sa@jeffi.iam.gserviceaccount.com', private_key: 'pk' }) as any }))
 vi.mock('@/lib/shared/google-credentials', () => ({ loadGoogleServiceAccount: () => sa.load() }))
 
-import { resolveGoogleAdsCreds, saveAdsConfig, googleAdsEnvStatus, adsTenantKey } from '@/lib/google-ads/credentials'
+import { resolveGoogleAdsCreds, saveAdsConfig, googleAdsEnvStatus, adsTenantKey, googleAdsClientFromCreds } from '@/lib/google-ads/credentials'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getIntegrationCredential, saveIntegrationCredential } from '@/lib/tenant-registry'
 import { IntegrationNotConnectedError } from '@/lib/integrations/resolve'
@@ -113,6 +113,79 @@ describe('saveAdsConfig', () => {
     expect(JSON.parse(c.configEnc.replace(/^enc:/, ''))).toEqual({ connected_via: 'oauth', oauth_refresh_token: 'rt', customer_id: '1234567890' })
     expect(JSON.stringify(c.meta)).not.toContain('rt"')
     expect(c.meta).toMatchObject({ customer_id: '1234567890', login_customer_id: null, needs_customer: false })
+  })
+})
+
+describe("the store's own API credentials", () => {
+  const ownRow = row({
+    connected_via: 'manual',
+    oauth_refresh_token: 'rt',
+    customer_id: '1234567890',
+    developer_token: 'own-dev-token',
+    client_id: 'own.apps.googleusercontent.com',
+    client_secret: 'own-secret',
+  })
+  const tokenAndSearch = () =>
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'at', expires_in: 3600 })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: [] })))
+
+  beforeEach(() => {
+    process.env.GOOGLE_ADS_DEVELOPER_TOKEN = 'platform-dev-token'
+    process.env.GOOGLE_OAUTH_CLIENT_ID = 'platform.apps.googleusercontent.com'
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'platform-secret'
+  })
+
+  it("picks the store's developer token and OAuth client when set", async () => {
+    vi.mocked(getIntegrationCredential).mockResolvedValue(ownRow)
+    const creds = await resolveGoogleAdsCreds('t1')
+    expect(creds).toMatchObject({
+      developerToken: 'own-dev-token',
+      oauthClient: { clientId: 'own.apps.googleusercontent.com', clientSecret: 'own-secret' },
+    })
+    const fetchMock = tokenAndSearch()
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      await googleAdsClientFromCreds(creds, { retryDelays: [] }).search('SELECT customer.id FROM customer')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    const tokenBody = fetchMock.mock.calls[0][1].body as URLSearchParams
+    expect(tokenBody.get('client_id')).toBe('own.apps.googleusercontent.com')
+    expect(tokenBody.get('client_secret')).toBe('own-secret')
+    expect(fetchMock.mock.calls[1][1].headers['developer-token']).toBe('own-dev-token')
+  })
+
+  it("uses the platform's token and client when the store has none", async () => {
+    vi.mocked(getIntegrationCredential).mockResolvedValue(row({ connected_via: 'manual', oauth_refresh_token: 'rt', customer_id: '1234567890' }))
+    const creds = await resolveGoogleAdsCreds('t1')
+    expect(creds.developerToken).toBeUndefined()
+    expect(creds.oauthClient).toBeUndefined()
+    const fetchMock = tokenAndSearch()
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      await googleAdsClientFromCreds(creds, { retryDelays: [] }).search('SELECT customer.id FROM customer')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    expect((fetchMock.mock.calls[0][1].body as URLSearchParams).get('client_id')).toBe('platform.apps.googleusercontent.com')
+    expect(fetchMock.mock.calls[1][1].headers['developer-token']).toBe('platform-dev-token')
+  })
+
+  it('saves them encrypted and flags them in meta without the values', async () => {
+    await saveAdsConfig('t1', {
+      connected_via: 'manual',
+      oauth_refresh_token: 'rt',
+      customer_id: '1234567890',
+      developer_token: 'own-dev-token',
+      client_id: 'own.apps.googleusercontent.com',
+      client_secret: 'own-secret',
+    })
+    const c = vi.mocked(saveIntegrationCredential).mock.calls[0][0]
+    expect(JSON.parse(c.configEnc.replace(/^enc:/, ''))).toMatchObject({ developer_token: 'own-dev-token', client_secret: 'own-secret' })
+    expect(c.meta).toMatchObject({ own_developer_token: true, own_oauth_client: true })
+    expect(JSON.stringify(c.meta)).not.toMatch(/own-dev-token|own-secret/)
   })
 })
 

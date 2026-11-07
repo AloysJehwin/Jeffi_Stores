@@ -122,6 +122,8 @@ const PROBES = new Set(['/healthz', '/api/health', '/api/ready'])
 export function servesRequest(app: AppName | null, req: { host: string; path: string; tenantSlug: string | null }): boolean {
   if (!app || PROBES.has(req.path)) return true
   const pinned = pinnedTenantSlug()
-  if (pinned && req.tenantSlug !== pinned) return false
+  // Traefik sends a store's own-key Razorpay webhook on the platform host to that store's pods.
+  const ownWebhook = !!pinned && req.tenantSlug === null && req.path === `/api/webhooks/razorpay/${pinned}`
+  if (pinned && req.tenantSlug !== pinned && !ownWebhook) return false
   return routeFor(req.host, req.path) === app
 }

@@ -564,7 +564,9 @@ CREATE TABLE IF NOT EXISTS public.tenant_social_accounts (
     token_expiry      timestamp with time zone,
     status            character varying(16) NOT NULL DEFAULT 'connected', -- connected|expired|revoked
     connected_at      timestamp with time zone NOT NULL DEFAULT now(),
-    updated_at        timestamp with time zone NOT NULL DEFAULT now()
+    updated_at        timestamp with time zone NOT NULL DEFAULT now(),
+    fb_user_id        character varying(64),                   -- app-scoped Facebook user who signed in (Meta deletion callbacks)
+    granted_scopes    text[]                                   -- Meta permissions granted at sign-in; NULL = unknown (manual or older)
 );
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_tenant_provider_key UNIQUE (tenant_id, provider);
@@ -573,6 +575,7 @@ ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_acco
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_status_check
     CHECK (status IN ('connected','pending','expired','revoked'));
 CREATE INDEX IF NOT EXISTS idx_tenant_social_tenant ON public.tenant_social_accounts USING btree (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_social_fb_user ON public.tenant_social_accounts USING btree (fb_user_id) WHERE fb_user_id IS NOT NULL;
 
 --
 -- scheduled_social_posts: the auto-posting queue. tenant_id NULL = Jeffi's own platform post.
@@ -1219,3 +1222,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_admin_api_tokens_device_code ON public.admi
 CREATE UNIQUE INDEX IF NOT EXISTS uq_admin_api_tokens_user_code ON public.admin_api_tokens USING btree (user_code) WHERE (status = 'pending');
 CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_admin ON public.admin_api_tokens USING btree (tenant_id, admin_id) WHERE (revoked_at IS NULL);
 CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_service_account ON public.admin_api_tokens USING btree (tenant_id, service_account_id) WHERE (service_account_id IS NOT NULL);
+
+--
+-- platform_setup_progress: the platform administrator's manual progress on platform-level approvals
+-- (Setup guide → Platform apps): applied on a date, approved, skipped. Keyed by the item id in
+-- lib/setup-guide/registry.ts PLATFORM_ITEMS. Key presence is read live from the admin-service env.
+--
+CREATE TABLE IF NOT EXISTS public.platform_setup_progress (
+    item_id     character varying(64) NOT NULL,
+    state       character varying(16) NOT NULL,
+    applied_at  date,
+    note        text,
+    updated_by  character varying(255),
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.platform_setup_progress ADD CONSTRAINT platform_setup_progress_pkey PRIMARY KEY (item_id);
+ALTER TABLE ONLY public.platform_setup_progress ADD CONSTRAINT platform_setup_progress_state_check
+    CHECK (state IN ('applied','approved','skipped'));
+CREATE INDEX IF NOT EXISTS idx_platform_setup_progress_state ON public.platform_setup_progress USING btree (state);

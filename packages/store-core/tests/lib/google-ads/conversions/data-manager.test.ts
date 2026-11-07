@@ -179,7 +179,7 @@ describe('DataManagerClient', () => {
   it('uses the Google Ads refresh token, or the service account with the datamanager scope', async () => {
     const fetchImpl = vi.fn(async () => json(200, {}))
     await dataManagerClientFor({ refreshToken: 'rt' }, { fetchImpl: fetchImpl as any }).retrieveRequestStatus('r')
-    expect(googleOAuthAccessToken).toHaveBeenCalledWith('rt', 'Google Ads')
+    expect(googleOAuthAccessToken).toHaveBeenCalledWith('rt', 'Google Ads', undefined)
     await dataManagerClientFor({ serviceAccount: { clientEmail: 'sa@x.iam', privateKey: 'k' } }, { fetchImpl: fetchImpl as any }).retrieveRequestStatus('r')
     expect(googleServiceAccountAccessToken).toHaveBeenCalledWith('sa@x.iam', 'k', DATA_MANAGER_SCOPE)
     expect(() => new DataManagerClient({})).toThrow(/refresh token or a service account/)

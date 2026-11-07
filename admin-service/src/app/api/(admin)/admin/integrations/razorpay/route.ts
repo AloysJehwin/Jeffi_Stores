@@ -5,7 +5,7 @@ import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
 import { encryptToken } from '@/lib/crypto/token-cipher'
 import { getIntegrationCredential, saveIntegrationCredential } from '@/lib/tenant-registry'
 import { ROOT_DOMAIN } from '@/lib/tenant-registry/shared'
-import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
+import { resolveRazorpayCreds, storedRazorpayKeys } from '@/lib/integrations/resolve'
 import { testRazorpay, verifyRazorpayKeys } from '@/lib/integrations/test-connection'
 import { razorpayAccountFor, type RazorpayAccountInfo } from '@/lib/payments/rzp-account'
 import { lastRazorpayWebhook } from '@/lib/payments/rzp-webhook-health'
@@ -26,15 +26,21 @@ export async function GET(request: NextRequest) {
   if (admin instanceof NextResponse) return admin
   const account = await razorpayAccountFor()
   const own = account.ownFlag
-  const creds = account.kind === 'route' && !own ? null : await resolveRazorpayCreds(account.tenantId ?? undefined).catch(() => null)
-  const keyId = creds && (account.kind === 'platform' || creds.isOwn) ? creds.key_id || null : null
+  // The flagship shows the platform keys; a store marked own shows the keys it saved (even before they take effect).
+  const creds =
+    account.kind === 'platform'
+      ? await resolveRazorpayCreds().catch(() => null)
+      : own && account.tenantId
+        ? await storedRazorpayKeys(account.tenantId).catch(() => null)
+        : null
+  const keyId = creds?.key_id || null
   const info: RazorpayAccountInfo = {
     kind: account.kind,
     ownFlag: own,
     editable: own && isPlatformOwner(admin.role) && hasScope(admin.role, admin.scopes, 'financial:write'),
     keyId: keyId ? mask(keyId) : null,
     mode: keyId ? (keyId.startsWith('rzp_live_') ? 'live' : 'test') : null,
-    webhookSecretSet: !!(creds && (account.kind === 'platform' || creds.isOwn) && creds.webhook_secret),
+    webhookSecretSet: !!creds?.webhook_secret,
     webhookUrl:
       account.kind === 'platform' ? `${base()}/api/webhooks/razorpay` : own && account.slug ? `${base()}/api/webhooks/razorpay/${account.slug}` : null,
     events: RAZORPAY_WEBHOOK_EVENTS.filter(e => account.kind === 'platform' || !e.platformOnly).map(e => e.event),
@@ -72,8 +78,8 @@ export async function POST(request: NextRequest) {
   if (!check.ok) return NextResponse.json({ error: check.message }, { status: 400 })
 
   const existing = await getIntegrationCredential(account.tenantId, 'razorpay').catch(() => null)
-  const prev = existing ? await resolveRazorpayCreds(account.tenantId).catch(() => null) : null
-  const webhookSecret = parsed.data.webhook_secret || (prev?.isOwn ? prev.webhook_secret : undefined)
+  const prev = existing ? await storedRazorpayKeys(account.tenantId).catch(() => null) : null
+  const webhookSecret = parsed.data.webhook_secret || prev?.webhook_secret
   await saveIntegrationCredential({
     tenantId: account.tenantId,
     provider: 'razorpay',
