@@ -200,6 +200,11 @@ async function commitDraft(args: {
     if (cartItems.length === 0) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
     const hash = hashCartItems(cartItemsForHash(cartItems))
     if (draft.cartHash && draft.cartHash !== hash) {
+      // Claimed so the webhook doesn't build the order from the changed cart as well.
+      await query(
+        `UPDATE pending_payment_intents SET committed = true WHERE razorpay_order_id = $1 AND draft_token = $2 AND committed = false`,
+        [args.razorpay_order_id, args.token]
+      )
       createAutoTask({
         userId: args.userId,
         sourceKind: 'contact_failed_payment',
@@ -254,7 +259,38 @@ async function commitDraft(args: {
       100
   )
 
-  const created =
+  // The signature proves the payment belongs to razorpay_order_id; the intent proves that order was made for this
+  // checkout, at this amount. Claiming it also elects one winner against the webhook (commitDraftFromCapture).
+  const intent = await queryOne<{ id: string; amount_paise: number }>(
+    `UPDATE pending_payment_intents SET committed = true
+     WHERE razorpay_order_id = $1 AND draft_token = $2 AND user_id = $3 AND committed = false
+     RETURNING id, amount_paise`,
+    [args.razorpay_order_id, args.token, args.userId]
+  )
+  if (!intent) {
+    const claimed = await queryOne<{ draft_token: string }>(`SELECT draft_token FROM pending_payment_intents WHERE razorpay_order_id = $1`, [args.razorpay_order_id])
+    if (!claimed || claimed.draft_token !== args.token) return NextResponse.json({ error: 'Payment does not match this checkout' }, { status: 400 })
+    // The webhook took it and is creating the order.
+    return NextResponse.json({ error: 'Payment received; your order is being created. Check My Orders in a minute.' }, { status: 409 })
+  }
+  if (Math.abs(intent.amount_paise - expectedAmountPaise) > 1) {
+    createAutoTask({
+      userId: args.userId,
+      sourceKind: 'contact_failed_payment',
+      sourceRefId: intent.id,
+      title: `Payment captured but the total changed — manual order needed (${args.razorpay_payment_id})`,
+      description: `Razorpay captured ₹${(intent.amount_paise / 100).toFixed(2)} but the checkout now totals ₹${(expectedAmountPaise / 100).toFixed(2)}. Manually create the order or refund. Payment ID: ${args.razorpay_payment_id}`,
+      priority: 'high',
+      dueInDays: 0,
+    }).catch(() => {})
+    return NextResponse.json({ error: 'The order total changed during payment. Payment captured — contact support to release.' }, { status: 409 })
+  }
+  // A failed commit hands the payment back to the webhook and the sweep.
+  const release = () => query(`UPDATE pending_payment_intents SET committed = false WHERE id = $1`, [intent.id]).catch(() => {})
+
+  let created: Awaited<ReturnType<typeof commitOrder>>
+  try {
+  created =
     draft.mode === 'cart'
       ? await commitOrder({
           mode: 'cart',
@@ -307,13 +343,12 @@ async function commitDraft(args: {
           adsConsent: args.adsConsent,
           metaClicks: args.metaClicks,
         })
+  } catch (e) {
+    await release()
+    throw e
+  }
 
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
-
-  // Mark intent committed — prevents webhook double-commit
-  query(`UPDATE pending_payment_intents SET committed = true WHERE razorpay_order_id = $1 AND committed = false`, [
-    args.razorpay_order_id,
-  ]).catch(() => {})
 
   // The store's Route share (fire-and-forget). commitOrder's unique payment id makes this run once.
   routeCapturedPayment({
@@ -417,6 +452,24 @@ async function markLegacyOrderPaid(args: {
       order: { id: order.id, orderNumber: order.order_number, paymentStatus: 'paid' },
     })
   }
+  // create-order records the Razorpay order against this order; a payment for any other one doesn't pay it.
+  const pendingRow = await queryOne<{ id: string }>(
+    `SELECT id FROM payments WHERE order_id = $1 AND transaction_id = $2 AND payment_gateway = 'razorpay' AND status IN ('pending', 'failed')`,
+    [args.orderId, args.razorpay_order_id]
+  )
+  if (!pendingRow) return NextResponse.json({ error: 'Payment does not match this order' }, { status: 400 })
+  if (order.status === 'cancelled') {
+    createAutoTask({
+      userId: args.userId,
+      sourceKind: 'contact_failed_payment',
+      sourceRefId: args.orderId,
+      title: `Payment captured for cancelled order ${order.order_number} — refund or restore (${args.razorpay_payment_id})`,
+      description: `The order was cancelled before the payment arrived. Refund the payment or restore the order. Payment ID: ${args.razorpay_payment_id}`,
+      priority: 'high',
+      dueInDays: 0,
+    }).catch(() => {})
+    return NextResponse.json({ error: 'This order was cancelled before the payment arrived. Our team will refund you.' }, { status: 409 })
+  }
 
   let flipped = false
   await withTransaction(async client => {
@@ -431,7 +484,7 @@ async function markLegacyOrderPaid(args: {
       `UPDATE payments
        SET transaction_id = $1, status = 'completed',
            gateway_response = $2, updated_at = NOW()
-       WHERE order_id = $3 AND transaction_id = $4 AND payment_gateway = 'razorpay' AND status = 'pending'`,
+       WHERE order_id = $3 AND transaction_id = $4 AND payment_gateway = 'razorpay' AND status IN ('pending', 'failed')`,
       [
         args.razorpay_payment_id,
         JSON.stringify({

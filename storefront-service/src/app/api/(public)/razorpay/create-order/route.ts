@@ -125,7 +125,7 @@ async function handleLegacyOrderId(orderId: string, userId: string, isBusiness: 
     const email = bizUser?.email || ''
     const phone = bizUser?.phone || null
     order = await queryOne(
-      `SELECT id, order_number, user_id, total_amount, payment_status FROM orders
+      `SELECT id, order_number, user_id, total_amount, payment_status, status FROM orders
        WHERE id = $1 AND (
          user_id = $2 OR
          (source = 'business' AND (customer_email = $3 OR ($4::text IS NOT NULL AND customer_phone = $4)))
@@ -134,7 +134,7 @@ async function handleLegacyOrderId(orderId: string, userId: string, isBusiness: 
     )
   } else {
     order = await queryOne(
-      'SELECT id, order_number, user_id, total_amount, payment_status FROM orders WHERE id = $1 AND user_id = $2',
+      'SELECT id, order_number, user_id, total_amount, payment_status, status FROM orders WHERE id = $1 AND user_id = $2',
       [orderId, userId]
     )
   }
@@ -145,6 +145,10 @@ async function handleLegacyOrderId(orderId: string, userId: string, isBusiness: 
 
   if (order.payment_status === 'paid') {
     return NextResponse.json({ error: 'Order is already paid' }, { status: 400 })
+  }
+  // A cancelled order has released its stock; paying it would charge for an order that won't ship.
+  if (order.status === 'cancelled') {
+    return NextResponse.json({ error: 'This order was cancelled and can no longer be paid' }, { status: 400 })
   }
 
   const tenant = await resolveRequestTenant()

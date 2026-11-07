@@ -15,6 +15,11 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
+const { mockPayoutsAllowed } = vi.hoisted(() => ({ mockPayoutsAllowed: vi.fn() }))
+vi.mock('@/lib/payments/razorpayx-guard', () => ({
+  platformPayoutsAllowed: mockPayoutsAllowed,
+  PLATFORM_PAYOUTS_ONLY: 'RazorpayX payouts are only available on the main store.',
+}))
 vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
@@ -49,6 +54,7 @@ function makeReq() {
 }
 
 beforeEach(() => {
+  mockPayoutsAllowed.mockResolvedValue(true)
   vi.clearAllMocks()
   vi.stubGlobal('fetch', mockFetch)
 })
@@ -58,6 +64,14 @@ describe('POST /api/admin/financial/payables/sync-payouts', () => {
     mockAuth.mockResolvedValue(null)
     const res = await POST(makeReq())
     expect(res.status).toBe(401)
+  })
+
+  it('returns 403 for a store: RazorpayX is the platform payout account', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    mockPayoutsAllowed.mockResolvedValue(false)
+    const res = await POST(makeReq())
+    expect(res.status).toBe(403)
   })
 
   it('returns 403 when scope missing', async () => {

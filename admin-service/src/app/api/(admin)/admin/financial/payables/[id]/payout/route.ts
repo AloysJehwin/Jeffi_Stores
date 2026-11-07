@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
+import { PLATFORM_PAYOUTS_ONLY, platformPayoutsAllowed } from '@/lib/payments/razorpayx-guard'
 import { queryOne, query } from '@/lib/shared/db'
 import { parseBody, zCurrency } from '@/lib/shared/validate'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'financial:write'))
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!(await platformPayoutsAllowed())) return NextResponse.json({ error: PLATFORM_PAYOUTS_ONLY }, { status: 403 })
 
     if (!RZP_KEY || !RZP_SECRET || !RZP_ACCOUNT) {
       return NextResponse.json({ error: 'RazorpayX not configured' }, { status: 500 })
