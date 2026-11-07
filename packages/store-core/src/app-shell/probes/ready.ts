@@ -4,7 +4,7 @@ import lazyRedis from '@/lib/shared/redis'
 
 /**
  * Readiness probe. Answers "can this instance actually serve requests right now?"
- * — i.e. are its dependencies (Postgres, Redis) reachable. Returns 503 if not,
+ * — i.e. are its databases reachable (Redis is reported, not required). Returns 503 if not,
  * so the ALB target group and the blue/green deploy gate never route traffic to
  * (or promote) an instance that can't reach the DB. Kept cheap: SELECT 1 + PING,
  * each with a short timeout, so it's safe to poll frequently.
@@ -40,7 +40,8 @@ export async function GET() {
     }
   }
 
-  // Redis: PING (best-effort — an in-memory fallback still counts as reachable)
+  // Redis: PING, reported but never fatal: it only holds short-lived keys (codes, counters, locks), and a
+  // single-copy pod dropped from service on a Redis blip shows the store's admin as "no available server".
   try {
     if (typeof lazyRedis.ping !== 'function') {
       checks.redis = 'ok (no ping; in-memory)'
@@ -49,8 +50,7 @@ export async function GET() {
       checks.redis = pong === 'PONG' || pong === true ? 'ok' : `unexpected: ${pong}`
     }
   } catch (e: any) {
-    ok = false
-    checks.redis = `fail: ${e?.message || 'error'}`
+    checks.redis = `degraded: ${e?.message || 'error'}`
   }
 
   return NextResponse.json({ status: ok ? 'ready' : 'not_ready', checks }, { status: ok ? 200 : 503 })

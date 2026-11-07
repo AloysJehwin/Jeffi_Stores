@@ -10,14 +10,22 @@ const r = (cpu: string, mem: string, limCpu: string, limMem: string): Resources 
 
 export const POD_RESOURCES: Record<ServiceName, Record<PodSize, Resources>> = {
   storefront: { S: r('150m', '384Mi', '1', '640Mi'), M: r('200m', '512Mi', '1500m', '900Mi'), L: r('300m', '768Mi', '2', '1200Mi') },
-  admin: { S: r('150m', '384Mi', '1', '640Mi'), M: r('200m', '512Mi', '1500m', '900Mi'), L: r('300m', '768Mi', '2', '1200Mi') },
+  // The admin idles near 500Mi and spikes on heavy pages; 640Mi got it OOM-killed on a live store.
+  admin: { S: r('150m', '512Mi', '1', '1024Mi'), M: r('200m', '640Mi', '1500m', '1280Mi'), L: r('300m', '768Mi', '2', '1536Mi') },
   business: { S: r('100m', '256Mi', '1', '512Mi'), M: r('150m', '384Mi', '1500m', '640Mi'), L: r('200m', '512Mi', '2', '900Mi') },
   messaging: { S: r('25m', '128Mi', '300m', '256Mi'), M: r('50m', '160Mi', '500m', '384Mi'), L: r('75m', '192Mi', '1', '448Mi') },
   documents: { S: r('25m', '160Mi', '500m', '384Mi'), M: r('50m', '224Mi', '1', '512Mi'), L: r('100m', '256Mi', '1500m', '640Mi') },
 }
 
-// Every store also runs a small Redis.
+// Every store also runs a small Redis (login codes, send counters, locks, live updates). The request is its
+// real use; its cap grows with the store's server (redisSize).
 export const REDIS_RESOURCES = r('10m', '24Mi', '100m', '96Mi')
+
+/** Redis maxmemory and pod memory limit for a server tier (validate.ts nodeTier; 0 = shared pool or unknown). */
+export function redisSize(tier: number): { maxmemoryMb: number; limitMib: number } {
+  const maxmemoryMb = tier >= 3 ? 256 : tier === 2 ? 128 : 64
+  return { maxmemoryMb, limitMib: maxmemoryMb + 64 }
+}
 // A node-mode store's Postgres pod (tenant-workload.ts postgresWorkload).
 export const NODE_DB_RESOURCES = r('100m', '256Mi', '1', '768Mi')
 
