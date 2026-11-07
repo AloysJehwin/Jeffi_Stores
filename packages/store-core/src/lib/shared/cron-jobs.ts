@@ -519,6 +519,28 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'orders:read',
   },
   {
+    id: 'myntra_sync',
+    name: 'Myntra orders, listings, stock and alerts',
+    path: '/api/cron/myntra-sync',
+    method: 'GET',
+    intervalMs: 10 * MIN,
+    intervalLabel: 'every 10 min',
+    startDelayMs: 750 * SEC,
+    lockTtlMs: 10 * MIN - 30 * SEC,
+    tenantScope: 'myntra:read',
+  },
+  {
+    id: 'ajio_sync',
+    name: 'AJIO orders, listings, stock and alerts',
+    path: '/api/cron/ajio-sync',
+    method: 'GET',
+    intervalMs: 10 * MIN,
+    intervalLabel: 'every 10 min',
+    startDelayMs: 765 * SEC,
+    lockTtlMs: 10 * MIN - 30 * SEC,
+    tenantScope: 'ajio:read',
+  },
+  {
     // Platform jobs over every Route store's ledger (control plane).
     id: 'reconcile_settlements',
     name: 'Reconcile Route transfers',

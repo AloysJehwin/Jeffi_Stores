@@ -97,9 +97,14 @@ describe('cron', () => {
     expect(syncGoogleAds).not.toHaveBeenCalled()
   })
 
-  it('skips when the platform has no developer token', async () => {
-    vi.mocked(googleAdsEnvStatus).mockReturnValueOnce({ developerToken: false } as any)
+  it('skips when neither the platform nor the store has a developer token', async () => {
+    vi.mocked(resolveGoogleAdsCreds).mockResolvedValue({} as any)
+    vi.mocked(googleAdsEnvStatus).mockReturnValue({ developerToken: false } as any)
     expect(await (await cronFull(cronReq('/api/cron/google-ads-sync'))).json()).toEqual({ skipped: 'not_configured' })
+    vi.mocked(resolveGoogleAdsCreds).mockResolvedValue({ developerToken: 'own-token' } as any)
+    vi.mocked(syncGoogleAds).mockResolvedValue(result('success') as any)
+    expect(await (await cronFull(cronReq('/api/cron/google-ads-sync'))).json()).toMatchObject({ status: 'success' })
+    vi.mocked(googleAdsEnvStatus).mockReturnValue({ developerToken: true } as any)
   })
 
   it('runs the nightly full sync and the intraday refresh', async () => {

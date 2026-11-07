@@ -89,7 +89,7 @@ describe('merchant/client', () => {
       expect(await getAccessToken()).toBe('oauth-tok')
       expect(await getAccessToken()).toBe('oauth-tok')
       expect(mockGoogleOAuthAccessToken).toHaveBeenCalledTimes(1)
-      expect(mockGoogleOAuthAccessToken).toHaveBeenCalledWith('rt', 'Google Merchant')
+      expect(mockGoogleOAuthAccessToken).toHaveBeenCalledWith('rt', 'Google Merchant', undefined)
       expect(mockFetch).not.toHaveBeenCalled()
     })
 

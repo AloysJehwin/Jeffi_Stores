@@ -2,10 +2,14 @@
 // Env-driven so flipping sandbox -> production is purely an env-var swap (host + LWA creds),
 // with no code change. Modern SP-API for Listings/Feeds/Catalog needs ONLY the 3 LWA values;
 // no AWS SigV4/IAM signing is required.
-import { resolveAmazonCreds } from '@/lib/integrations/resolve'
+import { resolveAmazonCreds, type AmazonCreds } from '@/lib/integrations/resolve'
+import { DEFAULT_SP_API_HOST, isSpApiHost } from './sp-api-hosts'
 
-// SP-API host is environment-driven; defaults to the EU sandbox.
-const SP_API_HOST = process.env.AMAZON_SP_API_HOST || 'https://sandbox.sellingpartnerapi-eu.amazon.com'
+/** The store's chosen SP-API host, else AMAZON_SP_API_HOST, else the EU sandbox. */
+export function spApiHostFor(creds: Pick<AmazonCreds, 'spApiHost'>): string {
+  if (isSpApiHost(creds.spApiHost)) return creds.spApiHost
+  return process.env.AMAZON_SP_API_HOST || DEFAULT_SP_API_HOST
+}
 // When true (set on local dev), pushes to Amazon are refused so local never writes to a
 // real Amazon account (mirrors GMC_PUSH_DISABLED).
 export const AMAZON_PUSH_DISABLED = process.env.AMAZON_PUSH_DISABLED === 'true'
@@ -43,7 +47,10 @@ const RESTRICTIONS_BASE = '/listings/2021-08-01/restrictions'
 const tokenCache = new Map<string, { token: string; expiresAt: number }>()
 
 export async function getAccessToken(): Promise<string> {
-  const creds = await resolveAmazonCreds()
+  return accessTokenFor(await resolveAmazonCreds())
+}
+
+async function accessTokenFor(creds: AmazonCreds): Promise<string> {
   if (!creds.clientId || !creds.clientSecret || !creds.refreshToken) {
     throw new Error('Amazon LWA credentials missing (AMAZON_LWA_CLIENT_ID/SECRET/REFRESH_TOKEN)')
   }
@@ -84,14 +91,15 @@ interface SpApiOptions {
 // Generic SP-API request helper (mirror of gmcRequest). SP-API authenticates via the
 // x-amz-access-token header, NOT Authorization: Bearer.
 export async function spApiRequest(method: string, path: string, opts: SpApiOptions = {}): Promise<any> {
-  const token = await getAccessToken()
+  const creds = await resolveAmazonCreds()
+  const token = await accessTokenFor(creds)
 
   const params = new URLSearchParams()
   for (const [k, v] of Object.entries(opts.query || {})) {
     if (v !== undefined && v !== '') params.set(k, v)
   }
   const qs = params.toString()
-  const url = `${SP_API_HOST}${path}${qs ? `?${qs}` : ''}`
+  const url = `${spApiHostFor(creds)}${path}${qs ? `?${qs}` : ''}`
 
   const res = await fetch(url, {
     method,

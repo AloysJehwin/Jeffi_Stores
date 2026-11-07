@@ -34,6 +34,9 @@ export const APPLY_ORDER = [
   'merchant.sql',
   'amazon-ads.sql',
   'meta-ads.sql',
+  'marketplace.sql',
+  'marketplace-ads.sql',
+  'setup-guide.sql',
   // Service tables live in the main DB, but constraints/indexes.sql reference them.
   'documents.sql',
   'bulk.sql',

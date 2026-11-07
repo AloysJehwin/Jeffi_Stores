@@ -21,6 +21,7 @@ import { isPlatformOwner } from '@/lib/auth/scopes'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { askAboutOrder } from '@/lib/replies/ask'
 import { ORDER_STATUSES, orderLockedError, orderTransitionError, paymentStatusError } from '@/lib/orders/status-flow'
+import { marketplaceRefusal } from '@/lib/marketplace/order-guard'
 import {
   notifyOrderConfirmed,
   notifyOrderShipped,
@@ -366,7 +367,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const currentOrder = await queryOne(
       `
       SELECT
-        o.order_number, o.status, o.payment_status, o.total_amount,
+        o.order_number, o.status, o.payment_status, o.total_amount, o.source,
         o.user_id, o.customer_name, o.customer_email, o.gclid, o.gbraid, o.wbraid,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
@@ -378,6 +379,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (!currentOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    // Myntra / AJIO: the marketplace sends the status (and already moved stock); its courier ships.
+    if (!wantsOverride && status && status !== currentOrder.status) {
+      const refusal = marketplaceRefusal(currentOrder.source, 'status')
+      if (refusal) return NextResponse.json({ error: refusal }, { status: 409 })
     }
 
     const locked = wantsOverride ? null : orderLockedError(currentOrder.status)

@@ -10,6 +10,8 @@ export interface TenantSocialAccount {
   access_token_enc: string
   token_expiry: string | null
   status: string
+  fb_user_id?: string | null
+  granted_scopes?: string[] | null
 }
 
 /** Upsert a tenant's connected Meta account (one row per provider). Token is already encrypted. */
@@ -21,15 +23,19 @@ export async function saveTenantSocialAccount(a: {
   igUserId?: string | null
   accessTokenEnc: string
   tokenExpiry?: Date | null
+  /** Facebook sign-in only: the app-scoped user (Meta's deletion callbacks) and the permissions granted. */
+  fbUserId?: string | null
+  grantedScopes?: string[] | null
 }): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
     `INSERT INTO tenant_social_accounts
-       (tenant_id, provider, page_id, page_name, ig_user_id, access_token_enc, token_expiry, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'connected')
+       (tenant_id, provider, page_id, page_name, ig_user_id, access_token_enc, token_expiry, status, fb_user_id, granted_scopes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'connected',$8,$9)
      ON CONFLICT (tenant_id, provider) DO UPDATE SET
        page_id=EXCLUDED.page_id, page_name=EXCLUDED.page_name, ig_user_id=EXCLUDED.ig_user_id,
        access_token_enc=EXCLUDED.access_token_enc, token_expiry=EXCLUDED.token_expiry,
+       fb_user_id=EXCLUDED.fb_user_id, granted_scopes=EXCLUDED.granted_scopes,
        status='connected', updated_at=now()`,
     [
       a.tenantId,
@@ -39,6 +45,8 @@ export async function saveTenantSocialAccount(a: {
       a.igUserId ?? null,
       a.accessTokenEnc,
       a.tokenExpiry ? a.tokenExpiry.toISOString() : null,
+      a.fbUserId ?? null,
+      a.grantedScopes ?? null,
     ]
   )
 }

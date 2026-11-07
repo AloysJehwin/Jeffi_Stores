@@ -32,6 +32,7 @@ const SOURCE_COLOR: Record<string, string> = {
   online: 'rgb(59 130 246)',
   business: 'rgb(168 85 247)',
   cash_sale: 'rgb(16 185 129)',
+  marketplace: 'rgb(219 39 119)',
   offline: 'rgb(249 115 22)',
 }
 const SOURCE_FALLBACK = 'rgb(148 163 184)'
@@ -220,6 +221,7 @@ function MonthDetail({ d, month }: { d: PL; month: string }) {
     { key: 'online', label: 'Website', revenue: m.revenue_online },
     { key: 'business', label: 'B2B', revenue: m.revenue_business },
     { key: 'cash_sale', label: 'Cash sale', revenue: m.revenue_cash_sale },
+    { key: 'marketplace', label: 'Marketplaces', revenue: m.revenue_marketplace },
     { key: 'offline', label: 'Offline / Store', revenue: m.revenue_offline },
   ].filter(s => s.revenue > 0)
 

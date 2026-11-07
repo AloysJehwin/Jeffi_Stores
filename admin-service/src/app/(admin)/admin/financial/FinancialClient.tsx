@@ -17,6 +17,7 @@ import { AiCostsTab } from './_components/AiCostsTab'
 import { DisputesTab } from './_components/DisputesTab'
 import { RazorpaySettlementsTab } from './_components/RazorpaySettlementsTab'
 import { RoutePayoutsTab } from './_components/RoutePayoutsTab'
+import { MarketplaceSettlementsTab } from './_components/MarketplaceSettlementsTab'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -27,6 +28,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'cashflow', label: 'Cashflow' },
   { key: 'cod_remittance', label: 'COD Remittance' },
   { key: 'razorpay', label: 'Razorpay settlements' },
+  { key: 'marketplaces', label: 'Marketplaces' },
   { key: 'disputes', label: 'Disputes' },
   { key: 'messaging', label: 'Messaging' },
   { key: 'ai_costs', label: 'AI costs' },
@@ -45,6 +47,7 @@ export default function FinancialClient({ razorpayTab }: { razorpayTab: { route:
     'cashflow',
     'cod_remittance',
     ...(razorpayTab ? (['razorpay'] as Tab[]) : []),
+    'marketplaces',
     'disputes',
     'messaging',
     'ai_costs',
@@ -100,6 +103,7 @@ export default function FinancialClient({ razorpayTab }: { razorpayTab: { route:
         {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
         {tab === 'cod_remittance' && <CodRemittanceTab />}
         {tab === 'razorpay' && razorpayTab && (razorpayTab.route ? <RoutePayoutsTab ownPending={razorpayTab.ownPending} /> : <RazorpaySettlementsTab />)}
+        {tab === 'marketplaces' && <MarketplaceSettlementsTab />}
         {tab === 'disputes' && <DisputesTab />}
         {tab === 'messaging' && <MessagingTab />}
         {tab === 'ai_costs' && <AiCostsTab />}

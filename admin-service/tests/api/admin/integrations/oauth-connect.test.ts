@@ -12,6 +12,7 @@ vi.mock('@/lib/tenant-registry', () => ({
   getTenant: vi.fn(async () => ({ slug: 'acme' })),
   saveIntegrationCredential: vi.fn(),
   getIntegrationCredential: vi.fn(async () => null),
+  deleteIntegrationCredential: vi.fn(),
   saveTenantSocialAccount: vi.fn(),
   deleteTenantSocialAccount: vi.fn(),
 }))
@@ -19,18 +20,19 @@ vi.mock('@/lib/crypto/token-cipher', () => ({
   encryptToken: (s: string) => `enc:${s}`,
   decryptToken: (s: string) => s.replace(/^enc:/, ''),
 }))
-vi.mock('@/lib/catalog/meta', () => ({
-  buildOAuthUrl: (redirectUri: string, state: string) =>
-    `https://www.facebook.com/dialog/oauth?redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`,
-  exchangeCodeForToken: vi.fn(async () => 'short'),
-  getLongLivedToken: vi.fn(async () => ({ token: 'long', expiresInSec: 5184000 })),
-  getPageAndIgAccounts: vi.fn(async () => ({
-    pageId: '111',
-    pageName: 'Acme',
-    pageAccessToken: 'ptok',
-    igUserId: '222',
-  })),
-}))
+vi.mock('@/lib/catalog/meta', () => {
+  const cfg = { appId: 'meta-app', appSecret: 'meta-secret', source: 'platform' }
+  return {
+    findMetaConfig: vi.fn(async () => cfg),
+    getMetaConfig: vi.fn(async () => cfg),
+    buildOAuthUrl: (_cfg: unknown, redirectUri: string, state: string) =>
+      `https://www.facebook.com/dialog/oauth?redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`,
+    exchangeCodeForToken: vi.fn(async () => 'short'),
+    getLongLivedToken: vi.fn(async () => ({ token: 'long', expiresInSec: 5184000 })),
+    getMetaUser: vi.fn(async () => ({ id: 'fbu1', granted: ['pages_show_list'] })),
+    listMetaPages: vi.fn(async () => [{ pageId: '111', pageName: 'Acme', pageAccessToken: 'ptok', igUserId: '222' }]),
+  }
+})
 
 import { GET as amazonConnect } from '@admin/app/api/(admin)/admin/integrations/amazon/connect/route'
 import { GET as amazonCallback } from '@admin/app/api/(admin)/admin/integrations/amazon/callback/route'
@@ -46,7 +48,7 @@ import {
   deleteTenantSocialAccount,
   getIntegrationCredential,
 } from '@/lib/tenant-registry'
-import { getPageAndIgAccounts, exchangeCodeForToken } from '@/lib/catalog/meta'
+import { listMetaPages, exchangeCodeForToken } from '@/lib/catalog/meta'
 import { signAdminState } from '@/lib/shared/oauth-state'
 
 const fetchMock = vi.fn()
@@ -253,26 +255,25 @@ describe('Meta connect + callback', () => {
       await metaCallback(get(`https://admin.jeffistores.in/api/admin/social/callback?state=${state}&code=c`))
     )
     expect(back.toString()).toBe('https://admin-acme.jeffistores.in/admin/social-posts?connected=meta')
-    expect(exchangeCodeForToken).toHaveBeenCalledWith('c', 'https://admin.jeffistores.in/api/admin/social/callback')
+    expect(exchangeCodeForToken).toHaveBeenCalledWith(
+      'c',
+      'https://admin.jeffistores.in/api/admin/social/callback',
+      expect.objectContaining({ source: 'platform' })
+    )
     const calls = vi.mocked(saveTenantSocialAccount).mock.calls.map(c => c[0])
     expect(calls.map(c => c.provider)).toEqual(['facebook', 'instagram'])
-    expect(calls[1]).toMatchObject({ tenantId: 't-acme', pageId: '111', igUserId: '222', accessTokenEnc: 'enc:ptok' })
+    expect(calls[1]).toMatchObject({ tenantId: 't-acme', pageId: '111', igUserId: '222', accessTokenEnc: 'enc:ptok', fbUserId: 'fbu1' })
   })
 
   it('drops a stale IG row when the Page no longer has a linked IG account', async () => {
-    vi.mocked(getPageAndIgAccounts).mockResolvedValueOnce({
-      pageId: '111',
-      pageName: 'Acme',
-      pageAccessToken: 'p',
-      igUserId: null,
-    })
+    vi.mocked(listMetaPages).mockResolvedValueOnce([{ pageId: '111', pageName: 'Acme', pageAccessToken: 'p', igUserId: null }])
     const state = signAdminState({ tenantId: 't-acme', provider: 'facebook', nonce: 'n' })
     await metaCallback(get(`https://admin.jeffistores.in/api/admin/social/callback?state=${state}&code=c`))
     expect(deleteTenantSocialAccount).toHaveBeenCalledWith('t-acme', 'instagram')
   })
 
   it('shows Meta errors (e.g. no Page) on the tenant admin', async () => {
-    vi.mocked(getPageAndIgAccounts).mockRejectedValueOnce(new Error('No Facebook Page found'))
+    vi.mocked(listMetaPages).mockRejectedValueOnce(new Error('No Facebook Page found'))
     const state = signAdminState({ tenantId: 't-acme', provider: 'facebook', nonce: 'n' })
     const back = await landing(
       await metaCallback(get(`https://admin.jeffistores.in/api/admin/social/callback?state=${state}&code=c`))

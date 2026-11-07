@@ -9,6 +9,7 @@ import {
 } from '@/lib/tenant-registry'
 import { encryptToken } from '@/lib/crypto/token-cipher'
 import { parseServiceAccountJson } from '@/lib/shared/google-credentials'
+import { isSpApiHost } from '@/lib/amazon/sp-api-hosts'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,25 +74,37 @@ export async function POST(request: NextRequest) {
     if (!/^\d{5,20}$/.test(merchantId)) {
       return NextResponse.json({ error: 'Merchant ID must be the numeric Merchant Center account id' }, { status: 400 })
     }
-    let sa: any
-    try {
-      sa =
-        typeof config.service_account_json === 'string'
-          ? parseServiceAccountJson(config.service_account_json)
-          : { client_email: config.client_email, private_key: config.private_key }
-    } catch {
-      return NextResponse.json({ error: 'Invalid service account JSON' }, { status: 400 })
-    }
-    if (!sa?.client_email || !sa?.private_key) {
-      return NextResponse.json({ error: 'Service account must include client_email and private_key' }, { status: 400 })
-    }
-    if (!/gserviceaccount\.com$/.test(String(sa.client_email)) || !String(sa.private_key).includes('PRIVATE KEY')) {
-      return NextResponse.json({ error: 'That is not a Google service account key' }, { status: 400 })
-    }
     const dataSource = String(config.data_source ?? '').trim()
-    normalized = { client_email: sa.client_email, private_key: sa.private_key, merchant_id: merchantId }
+    // The store's own OAuth client plus a refresh token issued to it (content scope), or a service account.
+    if (config.mode === 'oauth') {
+      const f = Object.fromEntries(['client_id', 'client_secret', 'refresh_token'].map(k => [k, String(config[k] ?? '').trim()]))
+      if (!/\.apps\.googleusercontent\.com$/.test(f.client_id)) {
+        return NextResponse.json({ error: 'OAuth client ID ends with .apps.googleusercontent.com' }, { status: 400 })
+      }
+      if (!f.client_secret) return NextResponse.json({ error: 'Paste the OAuth client secret' }, { status: 400 })
+      if (f.refresh_token.length < 20) return NextResponse.json({ error: 'Paste the OAuth refresh token' }, { status: 400 })
+      normalized = { oauth_refresh_token: f.refresh_token, client_id: f.client_id, client_secret: f.client_secret, merchant_id: merchantId }
+      meta = { merchant_id: merchantId, connected_via: 'own_oauth' }
+    } else {
+      let sa: any
+      try {
+        sa =
+          typeof config.service_account_json === 'string'
+            ? parseServiceAccountJson(config.service_account_json)
+            : { client_email: config.client_email, private_key: config.private_key }
+      } catch {
+        return NextResponse.json({ error: 'Invalid service account JSON' }, { status: 400 })
+      }
+      if (!sa?.client_email || !sa?.private_key) {
+        return NextResponse.json({ error: 'Service account must include client_email and private_key' }, { status: 400 })
+      }
+      if (!/gserviceaccount\.com$/.test(String(sa.client_email)) || !String(sa.private_key).includes('PRIVATE KEY')) {
+        return NextResponse.json({ error: 'That is not a Google service account key' }, { status: 400 })
+      }
+      normalized = { client_email: sa.client_email, private_key: sa.private_key, merchant_id: merchantId }
+      meta = { merchant_id: merchantId, client_email: sa.client_email, connected_via: 'manual' }
+    }
     if (dataSource) normalized.data_source = dataSource
-    meta = { merchant_id: merchantId, client_email: sa.client_email, connected_via: 'manual' }
   } else if (provider === 'delhivery') {
     return NextResponse.json({ error: DELHIVERY_OWNER_MANAGED }, { status: 403 })
   } else if (provider === 'razorpay') {
@@ -105,8 +118,15 @@ export async function POST(request: NextRequest) {
     )
     const problem = amazonConfigProblem(f)
     if (problem) return NextResponse.json({ error: problem }, { status: 400 })
-    normalized = { ...f, marketplace_id: f.marketplace_id || 'A21TJRUUN4KGV' }
-    meta = { seller_id: f.seller_id, marketplace_id: normalized.marketplace_id, connected_via: 'manual' }
+    const host = String(config.sp_api_host ?? '').trim()
+    if (host && !isSpApiHost(host)) return NextResponse.json({ error: 'Choose an SP-API endpoint from the list' }, { status: 400 })
+    normalized = { ...f, marketplace_id: f.marketplace_id || 'A21TJRUUN4KGV', ...(host ? { sp_api_host: host } : {}) }
+    meta = {
+      seller_id: f.seller_id,
+      marketplace_id: normalized.marketplace_id,
+      connected_via: 'manual',
+      ...(host ? { sp_api_host: host } : {}),
+    }
   }
 
   await saveIntegrationCredential({

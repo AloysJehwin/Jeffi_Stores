@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg'
 import { withTransaction } from '@/lib/shared/db'
 import { logStockMovement, recomputeStockStatusForProduct } from '@/lib/orders/inventory'
 import { syncPerishableStock } from '@/lib/catalog/shelf'
@@ -193,9 +194,9 @@ async function restoreTrackedLine(
   return true
 }
 
-export async function restoreOrderStock(orderId: string): Promise<{ skipped: RestoreSkip[] }> {
+export async function restoreOrderStock(orderId: string, txClient?: PoolClient): Promise<{ skipped: RestoreSkip[] }> {
   const skipped: RestoreSkip[] = []
-  await withTransaction(async client => {
+  const run = async (client: PoolClient) => {
     const itemsResult = await client.query(
       `SELECT product_id, variant_id, sub_variant_id, quantity, buy_unit FROM order_items WHERE order_id = $1 AND is_digital = FALSE`,
       [orderId]
@@ -385,6 +386,8 @@ export async function restoreOrderStock(orderId: string): Promise<{ skipped: Res
       statusSynced.add(item.product_id)
       await recomputeStockStatusForProduct(client, item.product_id)
     }
-  })
+  }
+  // Inside the caller's transaction when given one (marketplace order updates).
+  await (txClient ? run(txClient) : withTransaction(run))
   return { skipped }
 }

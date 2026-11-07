@@ -8,6 +8,7 @@ import {
   saveAdsConfig,
   deleteAdsConfig,
   managerClient,
+  ownAdsAuth,
   type GoogleAdsConfig,
 } from '@/lib/google-ads/credentials'
 import { GoogleAdsClient, GoogleAdsApiError, isValidCustomerId, normalizeCustomerId, formatCustomerId } from '@/lib/google-ads/client'
@@ -25,15 +26,31 @@ const optionalId = z
   .optional()
   .nullable()
   .refine(v => !v || isValidCustomerId(v), 'Manager id must be a 10-digit customer id')
+const blank = (v: unknown) => (typeof v === 'string' && !v.trim() ? undefined : v)
+const developerToken = z.preprocess(
+  blank,
+  z.string().trim().regex(/^[A-Za-z0-9_-]{10,64}$/, 'That does not look like a Google Ads developer token').optional()
+)
+const clientId = z.preprocess(
+  blank,
+  z.string().trim().regex(/\.apps\.googleusercontent\.com$/, 'OAuth client ID ends with .apps.googleusercontent.com').optional()
+)
+const clientSecret = z.preprocess(blank, z.string().trim().min(10, 'Paste the OAuth client secret').optional())
 
 const Body = z.discriminatedUnion('action', [
   z.object({ action: z.literal('select'), customerId, loginCustomerId: optionalId }),
-  z.object({
-    action: z.literal('manual'),
-    customerId,
-    loginCustomerId: optionalId,
-    refreshToken: z.string().trim().min(20, 'Paste the OAuth refresh token'),
-  }),
+  z
+    .object({
+      action: z.literal('manual'),
+      customerId,
+      loginCustomerId: optionalId,
+      refreshToken: z.string().trim().min(20, 'Paste the OAuth refresh token'),
+      // The store's own API access; each one left out uses the platform's.
+      developerToken,
+      clientId,
+      clientSecret,
+    })
+    .refine(b => !b.clientId === !b.clientSecret, 'Enter both the OAuth client ID and secret, or neither'),
   z.object({ action: z.literal('manager'), customerId, invite: z.boolean().optional() }),
 ])
 
@@ -92,6 +109,14 @@ export async function POST(request: NextRequest) {
       const existing = body.action === 'select' ? await readAdsConfig(tenantKey) : null
       const refreshToken = body.action === 'manual' ? body.refreshToken : existing?.oauth_refresh_token
       if (!refreshToken) return NextResponse.json({ error: 'Sign in with Google first.' }, { status: 400 })
+      // A pending sign-in carries any own developer token it kept; manual entry brings its own.
+      const own =
+        body.action === 'manual'
+          ? { developer_token: body.developerToken, client_id: body.clientId, client_secret: body.clientSecret }
+          : { developer_token: existing?.developer_token, client_id: existing?.client_id, client_secret: existing?.client_secret }
+      if (!own.developer_token && !process.env.GOOGLE_ADS_DEVELOPER_TOKEN) {
+        return NextResponse.json({ error: 'Enter your Google Ads developer token (this platform has none).' }, { status: 400 })
+      }
       cfg = {
         oauth_refresh_token: refreshToken,
         customer_id: cid,
@@ -99,8 +124,16 @@ export async function POST(request: NextRequest) {
         connected_via: body.action === 'manual' ? 'manual' : 'oauth',
         // The sign-in's granted scopes stay with its token (conversion uploads check them).
         ...(body.action === 'select' && existing?.scopes ? { scopes: existing.scopes } : {}),
+        ...(own.developer_token ? { developer_token: own.developer_token } : {}),
+        ...(own.client_id && own.client_secret ? { client_id: own.client_id, client_secret: own.client_secret } : {}),
       }
-      client = new GoogleAdsClient({ refreshToken, customerId: cid, loginCustomerId: cfg.login_customer_id, retryDelays: [] })
+      client = new GoogleAdsClient({
+        refreshToken,
+        customerId: cid,
+        loginCustomerId: cfg.login_customer_id,
+        retryDelays: [],
+        ...ownAdsAuth(cfg),
+      })
       const info = await verifyAccount(client)
       await saveAdsConfig(tenantKey, cfg, { account_name: info.descriptive_name })
     }

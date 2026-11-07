@@ -7,6 +7,9 @@ import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
 import AnalyticsDashboardClient from './_components/AnalyticsDashboardClient'
 import QuickActionBar from './_components/QuickActionBar'
 import PendingTasksCard from './_components/PendingTasksCard'
+import SetupProgressCard from './_components/SetupProgressCard'
+import { getSetupGuide } from '@/lib/setup-guide/status'
+import { setupTenantId } from '@/lib/setup-guide/route'
 import { AttentionList, type AttentionItem } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -113,7 +116,13 @@ export default async function AdminDashboard() {
   }
   const host = await getHost()
   const can = (scope: string) => hasScope(role, scopes, scope)
-  const [metrics, analytics] = await Promise.all([getDashboardMetrics(), getDashboardAnalytics('30d')])
+  const [metrics, analytics, setup] = await Promise.all([
+    getDashboardMetrics(),
+    getDashboardAnalytics('30d'),
+    setupTenantId()
+      .then(t => getSetupGuide({ role, scopes }, t))
+      .catch(() => null),
+  ])
   const a = analytics.insights.attention
 
   const visibleQuick = QUICK_ACTIONS.filter(x => can(x.scope))
@@ -301,6 +310,7 @@ export default async function AdminDashboard() {
   const opsBlock = (
     <div className="space-y-4">
       <SupportRequestsAlert />
+      {setup && <SetupProgressCard guide={setup} host={host} />}
       <QuickActionBar primary={visibleQuick} more={visibleMore} host={host} />
     </div>
   )

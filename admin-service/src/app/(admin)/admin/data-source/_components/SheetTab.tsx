@@ -6,6 +6,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { Badge, Banner, Section, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/kit/core'
 import GoogleSheetDisconnect from './GoogleSheetDisconnect'
+import SheetOwnCredentials from './SheetOwnCredentials'
 import JobDetail from './JobDetail'
 import { ACTIVE, JobBadge, duration, sheetUrl, type GsheetStatus } from './shared'
 
@@ -31,6 +32,12 @@ async function post(url: string, json?: unknown): Promise<{ ok: boolean; status:
 /** Run a sheet sync; shared by the tab and the Sync action on the tab line. */
 export async function runSheetSync(sheet?: string) {
   return post('/api/admin/data-source/google/sync', sheet?.trim() ? { sheet: sheet.trim() } : {})
+}
+
+const VIA: Record<string, string> = {
+  oauth: 'Google sign-in',
+  own_oauth: 'Your own OAuth client',
+  service_account: 'Service account',
 }
 
 export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; reload: () => Promise<void> }) {
@@ -128,6 +135,7 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
           )}
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <Field label="Google account" value={gsheet.account || (state === 'not_connected' ? '-' : 'Connected (email not recorded)')} />
+            {gsheet.connectedVia && <Field label="Method" value={VIA[gsheet.connectedVia] ?? gsheet.connectedVia} />}
             <Field label="Connected" value={gsheet.connectedAt ? when(gsheet.connectedAt) : '-'} />
             <Field
               label="Sheet"
@@ -201,13 +209,20 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
                 <a href={connectHref(sheetChanged ? sheetInput : undefined)} className={state === 'connected' ? btnGhost : btnPrimary}>
                   <Link2 className="w-4 h-4" /> {state === 'not_connected' ? 'Connect' : 'Reconnect'}
                 </a>
+                <div className="mt-2">
+                  <SheetOwnCredentials sheet={sheetChanged ? sheetInput : undefined} onDone={finish} />
+                </div>
               </Action>
               <Action title="Create sheet" text="Make a new sheet from the import template in your Google Drive and use it for syncs.">
                 <button type="button" onClick={createSheet} disabled={state !== 'connected' || !!busy || gsheet.canCreate === false} className={btnGhost}>
                   <FilePlus2 className="w-4 h-4" /> {busy === 'create' ? 'Creating...' : 'Create sheet'}
                 </button>
                 {state === 'connected' && gsheet.canCreate === false && (
-                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Drive access was not granted. Reconnect and allow it to create sheets.</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                    {gsheet.connectedVia === 'service_account'
+                      ? 'A service account cannot create sheets. Make one yourself, share it with the service account and paste its link.'
+                      : 'Drive access was not granted. Reconnect and allow it to create sheets.'}
+                  </p>
                 )}
               </Action>
               <Action title="Sync now" text="Read the sheet and create or update products by SKU. Runs in the background; progress shows on the left.">

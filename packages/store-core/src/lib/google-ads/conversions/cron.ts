@@ -6,12 +6,14 @@ import { uploadConversions, ConversionUploadInProgressError } from './upload'
 /** Cron entry (per store via the fan-out). */
 export async function handleConversionsCron(req: NextRequest): Promise<NextResponse> {
   if (!verifyCronRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!googleAdsEnvStatus().developerToken) return NextResponse.json({ skipped: 'not_configured' })
+  let creds: Awaited<ReturnType<typeof resolveGoogleAdsCreds>> | undefined
   try {
-    await resolveGoogleAdsCreds()
+    creds = await resolveGoogleAdsCreds()
   } catch {
     return NextResponse.json({ skipped: 'not_connected' })
   }
+  // The store's own developer token, else the platform's.
+  if (!creds?.developerToken && !googleAdsEnvStatus().developerToken) return NextResponse.json({ skipped: 'not_configured' })
   try {
     const r = await uploadConversions()
     return NextResponse.json({ status: r.status, uploaded: r.uploaded, failed: r.failed, retrying: r.retrying, skipped: r.skipped })

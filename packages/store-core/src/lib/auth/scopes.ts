@@ -26,6 +26,20 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/notifications'],
     group: 'Dashboard',
   },
+  {
+    key: 'setup_guide:read',
+    label: 'Setup Guide (Read)',
+    description: 'View the setup checklist and what is left to connect',
+    routes: ['/admin/setup'],
+    group: 'Dashboard',
+  },
+  {
+    key: 'setup_guide:write',
+    label: 'Setup Guide (Write)',
+    description: 'Mark setup steps applied, approved or skipped',
+    routes: ['/admin/setup'],
+    group: 'Dashboard',
+  },
 
   // Catalogue
   {
@@ -133,6 +147,48 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     label: 'Amazon Orders & Stock (Write)',
     description: 'Import Amazon orders into Orders and push stock to Amazon',
     routes: ['/admin/amazon'],
+    group: 'Orders',
+  },
+  {
+    key: 'myntra:read',
+    label: 'Myntra (Read)',
+    description: 'View Myntra orders, returns, listings, stock, settlements and alerts',
+    routes: ['/admin/myntra'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'myntra:write',
+    label: 'Myntra (Write)',
+    description: 'Connect Myntra, map listings, push stock and import settlements',
+    routes: ['/admin/myntra'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'myntra_orders:write',
+    label: 'Myntra Orders (Write)',
+    description: 'Accept, reject and dispatch Myntra orders, and handle Myntra returns',
+    routes: ['/admin/myntra'],
+    group: 'Orders',
+  },
+  {
+    key: 'ajio:read',
+    label: 'AJIO (Read)',
+    description: 'View AJIO orders, returns, listings, stock, settlements and alerts',
+    routes: ['/admin/ajio'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'ajio:write',
+    label: 'AJIO (Write)',
+    description: 'Connect AJIO, map listings, push stock and import settlements',
+    routes: ['/admin/ajio'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'ajio_orders:write',
+    label: 'AJIO Orders (Write)',
+    description: 'Accept, reject and dispatch AJIO orders, and handle AJIO returns',
+    routes: ['/admin/ajio'],
     group: 'Orders',
   },
 
@@ -491,6 +547,34 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     group: 'Marketing',
   },
   {
+    key: 'myntra_ads:read',
+    label: 'Myntra Ads (Read)',
+    description: 'View Myntra Ads spend, sales, campaigns and products from imported reports',
+    routes: ['/admin/myntra-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'myntra_ads:write',
+    label: 'Myntra Ads (Write)',
+    description: 'Import Myntra Ads reports from the Myntra Partner Portal',
+    routes: ['/admin/myntra-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'ajio_ads:read',
+    label: 'AJIO Ads (Read)',
+    description: 'View AJIO Ads spend, sales, campaigns and products from imported reports',
+    routes: ['/admin/ajio-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'ajio_ads:write',
+    label: 'AJIO Ads (Write)',
+    description: 'Import AJIO Ads reports from the AJIO Seller Central',
+    routes: ['/admin/ajio-ads'],
+    group: 'Marketing',
+  },
+  {
     key: 'meta_ads:read',
     label: 'Meta Ads (Read)',
     description: 'View Facebook and Instagram ads performance and Conversions API health',
@@ -800,6 +884,7 @@ export function getScopeForPath(pathname: string): string | null {
   }
 
   if (pathname.startsWith('/api/admin/notifications')) return 'notifications:read'
+  if (pathname.startsWith('/api/admin/setup-guide')) return 'setup_guide:read'
   // Wallet top-up for shared-Delhivery shipping cost — a delhivery-flow helper that lives under
   // /financial but is gated on delhivery:write (see the route handlers), so it must be reachable on
   // plans without financial:* (basic/growth). Keep this above the generic financial match.
@@ -836,6 +921,10 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/amazon-ads')) return 'amazon_ads:read'
   if (pathname.startsWith('/api/admin/integrations/amazon-ads')) return 'amazon_ads:read'
   if (pathname.startsWith('/api/admin/amazon')) return 'amazon:read'
+  if (pathname.startsWith('/api/admin/myntra-ads')) return 'myntra_ads:read'
+  if (pathname.startsWith('/api/admin/myntra')) return 'myntra:read'
+  if (pathname.startsWith('/api/admin/ajio-ads')) return 'ajio_ads:read'
+  if (pathname.startsWith('/api/admin/ajio')) return 'ajio:read'
   if (pathname.startsWith('/api/admin/meta-ads')) return 'meta_ads:read'
   if (pathname.startsWith('/api/admin/integrations/meta-ads')) return 'meta_ads:read'
   if (pathname.startsWith('/api/admin/social')) return 'social:read'
@@ -922,6 +1011,8 @@ export function hasScope(role: string, scopes: string[], requiredScope: string):
   // plan, and exposes no tenant-specific feature data (rows are still filtered per-scope in
   // admin-notify). Grant it to any authenticated admin so no tenant is locked out of the feed.
   if (requiredScope === 'notifications:read') return true
+  // The setup guide sells with every plan: every member reads it, the store owner marks steps.
+  if (requiredScope === 'setup_guide:read' || (requiredScope === 'setup_guide:write' && role === 'super_admin')) return true
   if (scopes.includes(requiredScope)) return true
   // write implies read for all namespaced scopes (e.g. products:write grants products:read)
   if (requiredScope.endsWith(':read')) {

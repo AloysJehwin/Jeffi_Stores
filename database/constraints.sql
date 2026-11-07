@@ -4133,10 +4133,10 @@ ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenan
 ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenant_settings_mode_check CHECK (((standard_templates)::text = ANY ((ARRAY['all'::character varying, 'selected'::character varying])::text[])));
 
 ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying, 'razorpay'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying, 'razorpay'::character varying, 'myntra'::character varying, 'ajio'::character varying, 'myntra_ads'::character varying, 'ajio_ads'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_status_check CHECK (((status)::text = ANY ((ARRAY['running'::character varying, 'success'::character varying, 'partial'::character varying, 'error'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying, 'razorpay'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying, 'razorpay'::character varying, 'myntra'::character varying, 'ajio'::character varying, 'myntra_ads'::character varying, 'ajio_ads'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_status_check CHECK (((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying, 'resolved'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_severity_check CHECK (((severity)::text = ANY ((ARRAY['info'::character varying, 'warning'::character varying, 'critical'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_change_log ADD CONSTRAINT channel_change_log_pkey PRIMARY KEY (id);
@@ -4223,3 +4223,67 @@ ALTER TABLE ONLY public.razorpay_settlements ADD CONSTRAINT razorpay_settlements
 ALTER TABLE ONLY public.razorpay_settlements ADD CONSTRAINT razorpay_settlements_account_check CHECK (account IN ('platform','own'));
 ALTER TABLE ONLY public.razorpay_settlement_items ADD CONSTRAINT razorpay_settlement_items_pkey PRIMARY KEY (settlement_id, entity_id);
 ALTER TABLE ONLY public.razorpay_settlement_items ADD CONSTRAINT razorpay_settlement_items_scope_check CHECK (scope IN ('order','other_store','platform_billing','adjustment','unmatched'));
+
+-- Marketplaces (database/marketplace.sql).
+ALTER TABLE ONLY public.marketplace_orders ADD CONSTRAINT marketplace_orders_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_orders ADD CONSTRAINT marketplace_orders_channel_order_key UNIQUE (channel, external_order_id);
+ALTER TABLE ONLY public.marketplace_orders ADD CONSTRAINT marketplace_orders_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_orders ADD CONSTRAINT marketplace_orders_status_check CHECK (status IN ('created','accepted','packed','ready_to_dispatch','shipped','delivered','cancelled','rejected','returned'));
+ALTER TABLE ONLY public.marketplace_orders ADD CONSTRAINT marketplace_orders_stock_state_check CHECK (stock_state IN ('none','deducted','restored','short','unmatched'));
+ALTER TABLE ONLY public.marketplace_orders ADD CONSTRAINT marketplace_orders_order_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.marketplace_order_items ADD CONSTRAINT marketplace_order_items_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_order_items ADD CONSTRAINT marketplace_order_items_unit_key UNIQUE (marketplace_order_id, external_line_id, unit_index);
+ALTER TABLE ONLY public.marketplace_order_items ADD CONSTRAINT marketplace_order_items_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_order_items ADD CONSTRAINT marketplace_order_items_matched_by_check CHECK (matched_by IS NULL OR matched_by IN ('listing','sub_variant','variant','product'));
+ALTER TABLE ONLY public.marketplace_order_items ADD CONSTRAINT marketplace_order_items_order_fkey FOREIGN KEY (marketplace_order_id) REFERENCES public.marketplace_orders(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.marketplace_shipments ADD CONSTRAINT marketplace_shipments_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_shipments ADD CONSTRAINT marketplace_shipments_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_shipments ADD CONSTRAINT marketplace_shipments_marketplace_order_fkey FOREIGN KEY (marketplace_order_id) REFERENCES public.marketplace_orders(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.marketplace_shipments ADD CONSTRAINT marketplace_shipments_order_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.marketplace_returns ADD CONSTRAINT marketplace_returns_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_returns ADD CONSTRAINT marketplace_returns_channel_return_key UNIQUE (channel, external_return_id);
+ALTER TABLE ONLY public.marketplace_returns ADD CONSTRAINT marketplace_returns_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_returns ADD CONSTRAINT marketplace_returns_type_check CHECK (return_type IN ('customer','rto'));
+ALTER TABLE ONLY public.marketplace_returns ADD CONSTRAINT marketplace_returns_status_check CHECK (status IN ('initiated','in_transit','received','qc_passed','qc_failed','closed','cancelled'));
+ALTER TABLE ONLY public.marketplace_returns ADD CONSTRAINT marketplace_returns_marketplace_order_fkey FOREIGN KEY (marketplace_order_id) REFERENCES public.marketplace_orders(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.marketplace_returns ADD CONSTRAINT marketplace_returns_order_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.marketplace_listings ADD CONSTRAINT marketplace_listings_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_listings ADD CONSTRAINT marketplace_listings_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_listings ADD CONSTRAINT marketplace_listings_status_check CHECK (status IN ('unmapped','mapped','submitted','live','rejected','inactive'));
+ALTER TABLE ONLY public.marketplace_listings ADD CONSTRAINT marketplace_listings_product_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.marketplace_listings ADD CONSTRAINT marketplace_listings_variant_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.marketplace_listings ADD CONSTRAINT marketplace_listings_sub_variant_fkey FOREIGN KEY (sub_variant_id) REFERENCES public.product_sub_variants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.marketplace_listing_tasks ADD CONSTRAINT marketplace_listing_tasks_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_listing_tasks ADD CONSTRAINT marketplace_listing_tasks_channel_task_key UNIQUE (channel, task_id);
+ALTER TABLE ONLY public.marketplace_listing_tasks ADD CONSTRAINT marketplace_listing_tasks_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_listing_tasks ADD CONSTRAINT marketplace_listing_tasks_kind_check CHECK (kind IN ('submit','update','delete'));
+ALTER TABLE ONLY public.marketplace_listing_tasks ADD CONSTRAINT marketplace_listing_tasks_status_check CHECK (status IN ('pending','processing','done','partial','failed'));
+ALTER TABLE ONLY public.marketplace_inventory_state ADD CONSTRAINT marketplace_inventory_state_pkey PRIMARY KEY (channel, marketplace_sku, warehouse_id);
+ALTER TABLE ONLY public.marketplace_inventory_state ADD CONSTRAINT marketplace_inventory_state_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_inventory_state ADD CONSTRAINT marketplace_inventory_state_listing_fkey FOREIGN KEY (listing_id) REFERENCES public.marketplace_listings(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.marketplace_webhook_events ADD CONSTRAINT marketplace_webhook_events_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_webhook_events ADD CONSTRAINT marketplace_webhook_events_channel_key_key UNIQUE (channel, event_key);
+ALTER TABLE ONLY public.marketplace_webhook_events ADD CONSTRAINT marketplace_webhook_events_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_webhook_events ADD CONSTRAINT marketplace_webhook_events_source_check CHECK (source IN ('push','mock','poll','manual'));
+ALTER TABLE ONLY public.marketplace_webhook_events ADD CONSTRAINT marketplace_webhook_events_status_check CHECK (status IN ('pending','done','ignored','failed'));
+ALTER TABLE ONLY public.marketplace_settlements ADD CONSTRAINT marketplace_settlements_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_settlements ADD CONSTRAINT marketplace_settlements_channel_ref_key UNIQUE (channel, settlement_ref);
+ALTER TABLE ONLY public.marketplace_settlements ADD CONSTRAINT marketplace_settlements_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_settlements ADD CONSTRAINT marketplace_settlements_source_check CHECK (source IN ('upload','api'));
+ALTER TABLE ONLY public.marketplace_settlement_lines ADD CONSTRAINT marketplace_settlement_lines_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_settlement_lines ADD CONSTRAINT marketplace_settlement_lines_channel_check CHECK (channel IN ('amazon','myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_settlement_lines ADD CONSTRAINT marketplace_settlement_lines_type_check CHECK (line_type IN ('sale','refund','fee','commission','tax','adjustment','other'));
+ALTER TABLE ONLY public.marketplace_settlement_lines ADD CONSTRAINT marketplace_settlement_lines_settlement_fkey FOREIGN KEY (settlement_id) REFERENCES public.marketplace_settlements(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.marketplace_settlement_lines ADD CONSTRAINT marketplace_settlement_lines_order_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+
+-- Marketplace ads (database/marketplace-ads.sql).
+ALTER TABLE ONLY public.marketplace_ad_daily ADD CONSTRAINT marketplace_ad_daily_pkey PRIMARY KEY (channel, date, campaign_key, ad_group);
+ALTER TABLE ONLY public.marketplace_ad_daily ADD CONSTRAINT marketplace_ad_daily_channel_check CHECK (channel IN ('myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_ad_products ADD CONSTRAINT marketplace_ad_products_pkey PRIMARY KEY (channel, date, campaign_key, product_key);
+ALTER TABLE ONLY public.marketplace_ad_products ADD CONSTRAINT marketplace_ad_products_channel_check CHECK (channel IN ('myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_ad_imports ADD CONSTRAINT marketplace_ad_imports_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.marketplace_ad_imports ADD CONSTRAINT marketplace_ad_imports_channel_check CHECK (channel IN ('myntra','ajio'));
+ALTER TABLE ONLY public.marketplace_ad_imports ADD CONSTRAINT marketplace_ad_imports_kind_check CHECK (kind IN ('campaign','product'));
+
+ALTER TABLE ONLY public.setup_guide_progress ADD CONSTRAINT setup_guide_progress_pkey PRIMARY KEY (step_id);
+ALTER TABLE ONLY public.setup_guide_progress ADD CONSTRAINT setup_guide_progress_state_check CHECK (state IN ('applied','approved','skipped'));

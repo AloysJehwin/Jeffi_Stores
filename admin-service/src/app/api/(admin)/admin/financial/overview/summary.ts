@@ -10,6 +10,7 @@ import {
 } from '@admin/app/(admin)/admin/financial/_components/overview-period'
 import type { FinanceOverviewContract } from '@admin/app/(admin)/admin/financial/_components/finance-overview-contract'
 import { aiTotals } from '../ai-costs/summary'
+import { MARKETPLACE_SOURCES_SQL } from '@/lib/marketplace/sources'
 
 // Finance overview in SQL. Revenue, refunds and COGS follow getPLReport; cash in/out follow
 // getCashflow; receivables and payables follow getReceivablesAging / getPayables, with failed,
@@ -30,10 +31,10 @@ const INACTIVE = `('cancelled', 'returned', 'draft', 'cancel_rejected')`
 const salesCte = (a: number, b: number) => `
   sales AS (
     SELECT o.id, 'order' AS kind, o.total_amount AS amount, ${istDay('COALESCE(o.invoice_date, o.created_at)')} AS d,
-      CASE o.source WHEN 'amazon' THEN 'amazon' WHEN 'business' THEN 'b2b' WHEN 'online' THEN 'website' ELSE 'store' END AS channel,
+      CASE WHEN o.source IN ${MARKETPLACE_SOURCES_SQL} THEN o.source WHEN o.source = 'business' THEN 'b2b' WHEN o.source = 'online' THEN 'website' ELSE 'store' END AS channel,
       CASE
         WHEN o.payment_mode = 'cod' THEN 'cod'
-        WHEN o.payment_mode = 'marketplace' OR o.source = 'amazon' THEN 'marketplace'
+        WHEN o.payment_mode = 'marketplace' OR o.source IN ${MARKETPLACE_SOURCES_SQL} THEN 'marketplace'
         WHEN o.payment_mode LIKE 'upi%' THEN 'upi'
         WHEN o.payment_mode = 'credit' THEN 'credit'
         WHEN o.source = 'online' THEN 'online'
@@ -277,12 +278,12 @@ async function attention() {
        ORDER BY delivered_at ASC LIMIT 5`,
       [String(COD_STALE_DAYS)]
     ),
-    // Cancelled/returned but still marked paid (or COD collected): refund owed (Amazon refunds its own orders).
+    // Cancelled/returned but still marked paid (or COD collected): refund owed (marketplaces refund their own orders).
     queryMany(
       `SELECT id, order_number, COALESCE(customer_name, '') AS customer_name, status, total_amount::float8 AS amount,
          (${TODAY} - ${istDay('COALESCE(cancelled_at, updated_at)')})::int AS days
        FROM orders
-       WHERE status IN ('cancelled', 'returned') AND payment_status IN ('paid', 'cod_collected') AND source <> 'amazon'
+       WHERE status IN ('cancelled', 'returned') AND payment_status IN ('paid', 'cod_collected') AND source NOT IN ${MARKETPLACE_SOURCES_SQL}
        ORDER BY COALESCE(cancelled_at, updated_at) ASC LIMIT 5`
     ),
     queryMany(

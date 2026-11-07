@@ -3,6 +3,7 @@ import { queryMany } from '@/lib/shared/db'
 import { cancelOrder } from '@/lib/orders/orders'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
+import { MARKETPLACE_SOURCES_SQL } from '@/lib/marketplace/sources'
 
 export async function GET(request: NextRequest) {
   if (!verifyCronRequest(request)) {
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
        WHERE status = 'pending'
          AND payment_status IN ('unpaid', 'failed')
          AND payment_mode IS DISTINCT FROM 'cod'
-         AND source IS DISTINCT FROM 'amazon'
+         AND COALESCE(source, '') NOT IN ${MARKETPLACE_SOURCES_SQL}
          AND created_at < NOW() - INTERVAL '${staleWindowMinutes} minutes'
        ORDER BY created_at
        LIMIT 100`

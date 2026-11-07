@@ -6,13 +6,8 @@ import { hasScope } from '@/lib/auth/scopes'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
 import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 import { withTransaction } from '@/lib/shared/db'
-import {
-  isInterState,
-  getFinancialYear,
-  generateInvoiceNumber,
-  getNextInvoiceSequence,
-  round2,
-} from '@/lib/catalog/gst'
+import { isInterState, round2 } from '@/lib/catalog/gst'
+import { issueOrderInvoice } from '@/lib/orders/issue-invoice'
 import {
   deductOrderStock,
   checkLineStock,
@@ -267,23 +262,7 @@ export async function POST(request: NextRequest) {
 
         // Assign an invoice number regardless of GST — GST-off just means a tax-free
         // invoice, but it must still be numbered so it appears on the invoice list.
-        {
-          const settingsResult = await client.query("SELECT value FROM site_settings WHERE key = 'invoice_prefix'")
-          const prefix = settingsResult.rows[0]?.value || 'JS'
-          const fy = getFinancialYear(new Date())
-          const seq = await getNextInvoiceSequence(client, fy)
-          invoiceNumber = generateInvoiceNumber(prefix, fy, seq)
-          const invoiceDate = new Date().toISOString()
-          await client.query(`UPDATE orders SET invoice_number = $1, invoice_date = $2 WHERE id = $3`, [
-            invoiceNumber,
-            invoiceDate,
-            orderId,
-          ])
-          await client.query(
-            `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)`,
-            [orderId, invoiceNumber, fy, seq]
-          )
-        }
+        invoiceNumber = (await issueOrderInvoice(client, orderId)).invoiceNumber
       }
 
       return { orderId, orderNumber: finalOrderNumber, invoiceNumber, saveAsDraft, insufficientItems, shortfalls }

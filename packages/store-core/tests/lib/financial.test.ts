@@ -443,6 +443,21 @@ describe('getPLReport', () => {
     expect(result.totals.gross_margin_pct).toBeCloseTo(44.44, 1)
   })
 
+  it('buckets Amazon, Myntra and AJIO revenue as marketplace, not offline', async () => {
+    const row = (source: string, revenue: string) => ({ month: '2026-01', source, revenue, cogs: '0', tax_collected: '0', order_count: 1 })
+    mockQueryMany
+      .mockResolvedValueOnce([row('amazon', '1000'), row('myntra', '2000'), row('ajio', '3000'), row('offline', '400'), row('online', '50')])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+
+    const result = await getPLReport('2026-01-01', '2026-01-31')
+    expect(result.monthly[0].revenue_marketplace).toBe(6000)
+    expect(result.monthly[0].revenue_offline).toBe(400)
+    expect(result.monthly[0].revenue_online).toBe(50)
+    expect(result.totals.revenue_marketplace).toBe(6000)
+    expect(result.totals.revenue_offline).toBe(400)
+  })
+
   it('sets gross_margin_pct to 0 when revenue is 0', async () => {
     mockQueryMany
       .mockResolvedValueOnce([
