@@ -116,3 +116,6 @@ storefront-service/public/models/onboarding/ort/*.mjs
 **/.env.local
 document-service/.documents/
 /.vitest-reports
+
+# Publishing helper (deploy/k8s/bootstrap/npm-token.sh stores its token)
+!packages/cli/publish.sh

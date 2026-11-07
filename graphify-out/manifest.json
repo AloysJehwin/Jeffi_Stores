@@ -1255,8 +1255,8 @@
     "semantic_hash": ""
   },
   "document-service/src/lib/invoice.ts": {
-    "mtime": 1793951463.4924896,
-    "ast_hash": "6f1ab1863ad15031a4a1a20f665c7636",
+    "mtime": 1793970016.6660876,
+    "ast_hash": "4afdb8ab8b2d845ac5aad8045ce5aa72",
     "semantic_hash": ""
   },
   "document-service/src/lib/mail-template.ts": {
@@ -9450,8 +9450,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/compute/presets.ts": {
-    "mtime": 1793955964.772212,
-    "ast_hash": "43a0439a2de6836b2fe0524ba5f524e7",
+    "mtime": 1794005266.4944649,
+    "ast_hash": "3e8b914eba5f135dbd9c6e7345b1a850",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/compute/spec.ts": {
@@ -10220,8 +10220,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/k8s/tenant-workload.ts": {
-    "mtime": 1793959151.99968,
-    "ast_hash": "1fee0d30381eca2f3c6574728f360047",
+    "mtime": 1794005284.449955,
+    "ast_hash": "08c72fc6a1cb435f50f5317032206aa0",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/legals/policies.ts": {
@@ -18215,8 +18215,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/app-shell/probes/ready.ts": {
-    "mtime": 1793695821.5031266,
-    "ast_hash": "629f3d6600fbc1c79000967d3cde5964",
+    "mtime": 1794005295.3659544,
+    "ast_hash": "0040e0967c816f8401f92c2257f5ff62",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/service-routing.ts": {
@@ -25370,8 +25370,8 @@
     "semantic_hash": ""
   },
   "packages/cli/package.json": {
-    "mtime": 1793956134.1241317,
-    "ast_hash": "54d63060ce6d7c74d55876f209d7111d",
+    "mtime": 1794005334.3129232,
+    "ast_hash": "fcbbbb76f63b8334b1d481753d6e8c6a",
     "semantic_hash": ""
   },
   "packages/cli/src/auth/device.ts": {
@@ -25385,8 +25385,8 @@
     "semantic_hash": ""
   },
   "packages/cli/src/commands/auth.ts": {
-    "mtime": 1793962731.5113177,
-    "ast_hash": "e2a5844f5ca78fb817c212a25b1f751a",
+    "mtime": 1794005334.323841,
+    "ast_hash": "e89f35a2065f5f8facc75b0c69410096",
     "semantic_hash": ""
   },
   "packages/cli/src/commands/curated.ts": {
@@ -25530,8 +25530,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/cli-release.yml": {
-    "mtime": 1793957469.9004567,
-    "ast_hash": "5023617dda3fcc969a84f32ff6ce019d",
+    "mtime": 1794005334.33275,
+    "ast_hash": "d2b63963d7369a0174e7bc2e0d8014a7",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/_components/SetupProgress.tsx": {
@@ -25545,8 +25545,8 @@
     "semantic_hash": ""
   },
   "packages/cli/src/update-check.ts": {
-    "mtime": 1793957491.5284605,
-    "ast_hash": "2f5947fc3d2240e0b1294560c62b4b10",
+    "mtime": 1794005334.3258252,
+    "ast_hash": "081222f4278fc78b4a77b8a3a9ed8e44",
     "semantic_hash": ""
   },
   "scripts/gen-admin-manifest.ts": {

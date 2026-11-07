@@ -1,8 +1,8 @@
 import { dedicatedNodeName, tenantNamespace } from '@/lib/provisioning/tiers'
 import { legacySpecFor } from '@/lib/compute/legacy'
-import { NODE_DB_MAX_CONNECTIONS, POD_RESOURCES, REDIS_RESOURCES } from '@/lib/compute/presets'
+import { NODE_DB_MAX_CONNECTIONS, POD_RESOURCES, REDIS_RESOURCES, redisSize } from '@/lib/compute/presets'
 import { activeServices, type ComputeSpec, type ServiceName, type ServiceSpec, type StoreLayout } from '@/lib/compute/spec'
-import { surges } from '@/lib/compute/validate'
+import { nodeTier, surges } from '@/lib/compute/validate'
 import { STORE_ROLES, type ServiceRole } from '@/lib/service-routing'
 import type { K8sObject } from './client'
 import { DB_READY_LABEL } from './node-user-data'
@@ -85,6 +85,7 @@ const nodeDbEnv = (slug: string): EnvVar[] => [
   { name: 'TENANT_DB_PASSWORD', valueFrom: { secretKeyRef: { name: postgresName(slug), key: 'password', optional: true } } },
 ]
 const postgresName = (slug: string) => `${slug}-postgres`
+const redisPing = { exec: { command: ['sh', '-c', 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep -q PONG'] }, timeoutSeconds: 3 }
 // Postgres memory limit; counted in the namespace quota (its init container's limit is below it).
 const PG_MEM_LIMIT = '768Mi'
 const TLS_INIT_RESOURCES = { requests: { cpu: '50m', memory: '64Mi' }, limits: { memory: '64Mi' } }
@@ -307,6 +308,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   const layout = input.layout ?? spec.layout ?? 'controller'
   const routeTo = input.routeTo ?? layout
   const nodes = spec.node.placement === 'dedicated' ? spec.node.count : 1
+  const redis = redisSize(spec.node.placement === 'dedicated' ? nodeTier(spec.node.type) : 0)
   const place = placement(slug, spec.node, input.nodeGen ?? 0)
   const poolEnv = input.dbPoolMax ? [{ name: 'DB_POOL_MAX', value: String(input.dbPoolMax) }] : []
   const nodeDb = spec.db.mode === 'node'
@@ -362,9 +364,8 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
       spec: {
         hard: {
           pods: String(quotaPods.reduce((n, s) => n + s.maxReplicas + 1, 0) + 3 + (nodeDb ? 1 : 0)),
-          // Room for each Deployment at its autoscale limit plus a rolling pod; +512Mi covers redis + an
-          // HTTP-01 solver pod.
-          'limits.memory': `${Math.ceil((quotaMem.reduce((n, m) => n + m, 0) + 512) / 256) * 256}Mi`,
+          // Room for each Deployment at its autoscale limit plus a rolling pod, redis, and an HTTP-01 solver pod.
+          'limits.memory': `${Math.ceil((quotaMem.reduce((n, m) => n + m, 0) + redis.limitMib + 416) / 256) * 256}Mi`,
         },
       },
     },
@@ -377,26 +378,30 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
         strategy: { type: 'Recreate' },
         selector: { matchLabels: { app: 'redis' } },
         template: {
-          metadata: { labels: { app: 'redis' } },
+          // jeffi.io/tenant lists it with the store's pods (getTenantWorkloadStatus).
+          metadata: { labels: { app: 'redis', 'jeffi.io/tenant': slug } },
           spec: {
             ...place,
             containers: [
               {
                 name: 'redis',
                 image: 'redis:7-alpine',
+                // Only short-lived keys (codes, counters, locks), so no disk; when full it drops the least used.
                 args: [
                   '--requirepass',
                   '$(REDIS_PASSWORD)',
                   '--save',
                   '',
                   '--maxmemory',
-                  '48mb',
+                  `${redis.maxmemoryMb}mb`,
                   '--maxmemory-policy',
-                  'volatile-lru',
+                  'allkeys-lru',
                 ],
                 env: [{ name: 'REDIS_PASSWORD', valueFrom: { secretKeyRef: { name: 'redis', key: 'password' } } }],
                 ports: [{ containerPort: 6379 }],
-                resources: { requests: REDIS_RESOURCES.requests, limits: { memory: REDIS_RESOURCES.limits.memory } },
+                resources: { requests: REDIS_RESOURCES.requests, limits: { memory: `${redis.limitMib}Mi` } },
+                readinessProbe: { ...redisPing, periodSeconds: 10 },
+                livenessProbe: { ...redisPing, periodSeconds: 20, failureThreshold: 3 },
               },
             ],
           },
