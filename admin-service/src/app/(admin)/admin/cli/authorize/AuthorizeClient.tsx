@@ -1,16 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import AdminSelect from '@/components/admin/AdminSelect'
 import { Card, PageBody, PageHeader } from '@/components/admin/kit/layout'
 import { btnGhost, btnPrimary, inputCls, when } from '@/components/admin/kit/core'
 import type { PendingDevice } from '@/lib/auth/api-tokens'
 
 type Preset = 'read' | 'all' | 'custom'
 const TTLS = [
-  { id: '1h', label: '1 hour' },
-  { id: '12h', label: '12 hours' },
-  { id: '24h', label: '24 hours' },
-  { id: '7d', label: '7 days' },
+  { value: '1h', label: '1 hour' },
+  { value: '12h', label: '12 hours' },
+  { value: '24h', label: '24 hours' },
+  { value: '7d', label: '7 days' },
 ]
 
 // Approving a CLI login acts on the admin's own identity: the token never exceeds their grant.
@@ -141,15 +142,13 @@ export default function AuthorizeClient({
             </Card>
 
             <Card title="Valid for">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {TTLS.filter(t => !(administrator && t.id === '7d')).map(t => (
-                  <label key={t.id} className={tile(ttl === t.id)}>
-                    <input type="radio" name="ttl" checked={ttl === t.id} onChange={() => setTtl(t.id)} className="mt-1" />
-                    <span className="font-medium text-foreground">{t.label}</span>
-                  </label>
-                ))}
-              </div>
-              {administrator && <p className="mt-2 text-xs text-foreground-muted">Platform administrator tokens last at most 24 hours.</p>}
+              <AdminSelect
+                className="max-w-xs"
+                value={ttl}
+                onChange={setTtl}
+                options={TTLS.filter(t => !(administrator && t.value === '7d'))}
+                hint={administrator ? 'Platform administrator tokens last at most 24 hours.' : undefined}
+              />
             </Card>
 
             {error && <p className="text-sm text-red-500">{error}</p>}
