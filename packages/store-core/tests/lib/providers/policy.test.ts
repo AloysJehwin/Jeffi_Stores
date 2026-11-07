@@ -75,9 +75,9 @@ describe('provider policy resolution', () => {
     expect((await getProviderPolicy(T)).smsProvider).toBe('twilio')
   })
 
-  it('getAiRouting omits capabilities on the gateway default', async () => {
+  it('getAiRouting routes text Claude first and omits other capabilities on the gateway default', async () => {
     query.mockResolvedValue(rows([{ tenant_id: null, key: 'ai_video_providers', value: ['replicate'] }]))
-    expect(await getAiRouting(T)).toEqual({ video: ['replicate'] })
+    expect(await getAiRouting(T)).toEqual({ text: ['anthropic', 'razer'], video: ['replicate'] })
   })
 })
 
