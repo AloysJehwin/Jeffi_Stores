@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
+import { PLATFORM_PAYOUTS_ONLY, platformPayoutsAllowed } from '@/lib/payments/razorpayx-guard'
 import { queryMany, query } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,7 @@ export async function POST(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'financial:write'))
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!(await platformPayoutsAllowed())) return NextResponse.json({ error: PLATFORM_PAYOUTS_ONLY }, { status: 403 })
 
     if (!RZP_KEY || !RZP_SECRET) {
       return NextResponse.json({ synced: 0 })
