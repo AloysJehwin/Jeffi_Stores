@@ -19,15 +19,7 @@ const fmtTime = (v: string | null) =>
 
 const TYPE_LABEL: Record<string, string> = { payment: 'Payment', refund: 'Refund', transfer: 'Transfer to store', adjustment: 'Adjustment', dispute: 'Dispute', reversal: 'Reversal' }
 
-/** `settlements` is false for a store marked for its own account whose keys aren't set yet. */
-export function RazorpaySettlementsTab({ settlements = true }: { settlements?: boolean }) {
-  if (!settlements)
-    return (
-      <div className="space-y-5">
-        <RazorpayAccountCard />
-        <p className="text-sm text-foreground-muted">Settlements show here once the store&apos;s own Razorpay keys are saved.</p>
-      </div>
-    )
+export function RazorpaySettlementsTab() {
   return <Settlements />
 }
 
