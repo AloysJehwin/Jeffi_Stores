@@ -39,7 +39,7 @@ function Body({ d }: { d: RouteOverview }) {
   return (
     <div className="space-y-5">
       {!d.payoutTarget.linked && (
-        <Banner ok={false}>No bank account is linked for payouts yet. Your share waits with the platform until you add one in the Jeffi Ecom portal.</Banner>
+        <Banner ok={false}>No bank account is linked for payouts yet. Your share waits with the platform until you add one in your Ecom portal.</Banner>
       )}
       <KpiGrid>
         <Kpi label="Online sales" value={money(t.gross)} sub={`${count(t.payments)} payments`} />

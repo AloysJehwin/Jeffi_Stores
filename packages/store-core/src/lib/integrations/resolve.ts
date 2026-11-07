@@ -1,7 +1,7 @@
 import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
 import { createSign } from 'crypto'
 import { resolveTenant, resolveTenantId } from '@/lib/tenancy/tenant-context'
-import { getIntegrationCredential } from '../tenant-registry'
+import { controlPlanePool, getIntegrationCredential } from '../tenant-registry'
 import { decryptToken } from '../crypto/token-cipher'
 import { loadGoogleServiceAccount } from '@/lib/shared/google-credentials'
 
@@ -246,24 +246,44 @@ export interface RazorpayCreds {
   isOwn: boolean
 }
 
-/** Resolve Razorpay API credentials: the tenant's own if they have connected them, else the
- * platform env keys. Like Delhivery (and unlike Google/Amazon) this FALLS BACK to the platform
- * account, because the platform collects on behalf of every tenant who has not brought their own
- * Razorpay account (own_razorpay). `isOwn` tells callers whether a tenant account is in use — e.g.
- * the webhook/verify Route split short-circuits when a tenant collects directly. Pass an explicit
- * `tenantId` for callers off the ALS context; when omitted, the current ALS tenant is used. */
+/** The store's saved Razorpay keys whatever its collection mode, or null. For callers that manage or
+ * verify the keys themselves; payments go through resolveRazorpayCreds. */
+export async function storedRazorpayKeys(tenantId: string): Promise<Omit<RazorpayCreds, 'isOwn'> | null> {
+  const cfg = await tenantConfigFor(tenantId, 'razorpay')
+  if (!cfg?.key_id || !cfg?.key_secret) return null
+  return {
+    key_id: String(cfg.key_id),
+    key_secret: String(cfg.key_secret),
+    webhook_secret: cfg.webhook_secret ? String(cfg.webhook_secret) : undefined,
+  }
+}
+
+const OWN_RZP_TTL_MS = 30_000
+const ownRzp = new Map<string, { own: boolean; at: number }>()
+
+// tenants.own_razorpay, cached briefly. Throws when it can't be read: guessing either way would
+// collect into the wrong account.
+async function collectsOnOwnAccount(tenantId: string): Promise<boolean> {
+  if (tenantId === PLATFORM_TENANT_ID) return true
+  const hit = ownRzp.get(tenantId)
+  if (hit && Date.now() - hit.at < OWN_RZP_TTL_MS) return hit.own
+  const { rows } = await controlPlanePool().query(`SELECT own_razorpay FROM tenants WHERE id = $1`, [tenantId])
+  const own = rows[0]?.own_razorpay === true
+  ownRzp.set(tenantId, { own, at: Date.now() })
+  return own
+}
+
+/** Resolve Razorpay API credentials: the tenant's own keys when it collects on its own account
+ * (tenants.own_razorpay) and has saved them, else the platform env keys. Like Delhivery (and unlike
+ * Google/Amazon) this FALLS BACK to the platform account, because the platform collects on behalf of
+ * every other tenant. Keys saved while the store is on the platform account are ignored, so they can't
+ * divert payments away from Route. `isOwn` tells callers whether a tenant account is in use. Pass an
+ * explicit `tenantId` for callers off the ALS context; when omitted, the current ALS tenant is used. */
 export async function resolveRazorpayCreds(tenantId?: string): Promise<RazorpayCreds> {
   const id = tenantId ?? (await resolveTenantId())
-  if (id) {
-    const cfg = await tenantConfigFor(id, 'razorpay')
-    if (cfg?.key_id && cfg?.key_secret) {
-      return {
-        key_id: String(cfg.key_id),
-        key_secret: String(cfg.key_secret),
-        webhook_secret: cfg.webhook_secret ? String(cfg.webhook_secret) : undefined,
-        isOwn: true,
-      }
-    }
+  if (id && (await collectsOnOwnAccount(id))) {
+    const keys = await storedRazorpayKeys(id)
+    if (keys) return { ...keys, isOwn: true }
   }
   return {
     key_id: process.env.RAZORPAY_KEY_ID || '',

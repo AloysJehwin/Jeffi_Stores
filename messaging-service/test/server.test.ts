@@ -20,11 +20,24 @@ vi.mock('@jeffi/push', () => ({ sendPush: vi.fn() }))
 vi.mock('../src/send.js', () => ({ sendMessage: vi.fn(), getMessage: vi.fn(), toApi: (m: any) => m, SendError: class extends Error {} }))
 vi.mock('../src/templates.js', () => ({ listTemplates: vi.fn(async () => []), upsertTemplate: vi.fn(), archiveTemplate: vi.fn(), toApi: (t: any) => t }))
 
+import twilio from 'twilio'
 import { signServiceToken } from '@jeffi/service-auth'
 import * as wallet from '@jeffi/wallet'
 import { sendPush } from '@jeffi/push'
 import { db } from '../src/db'
 import { app } from '../src/server'
+
+process.env.TWILIO_AUTH_TOKEN = 'tw-test-token'
+process.env.PUBLIC_BASE_URL = 'https://public.example.test'
+// Signed the way Twilio signs a status callback: the registered URL plus the posted form fields.
+const twilioHeaders = (m: string, body: string) => ({
+  'content-type': 'application/x-www-form-urlencoded',
+  'x-twilio-signature': twilio.getExpectedTwilioSignature(
+    'tw-test-token',
+    `https://public.example.test/webhooks/twilio/status?m=${m}`,
+    Object.fromEntries(new URLSearchParams(body))
+  ),
+})
 
 const auth = (claims = {}) => ({ authorization: `Bearer ${signServiceToken({ service: 'gateway', tenantId: 't1', ...claims })}` })
 
@@ -44,20 +57,28 @@ describe('server', () => {
     rows.set('m1', { id: 'm1', tenant_id: 't1', channel: 'sms', to_address: '+91', metadata: {} })
     rows.set('m2', { id: 'm2', tenant_id: 't1', channel: 'sms', to_address: '+91', metadata: { internal: true } })
     const body = 'MessageStatus=delivered&Price=-0.05'
-    const h = { 'content-type': 'application/x-www-form-urlencoded' }
-    expect((await app.inject({ method: 'POST', url: '/webhooks/twilio/status?m=m1', headers: h, payload: body })).statusCode).toBe(200)
-    expect((await app.inject({ method: 'POST', url: '/webhooks/twilio/status?m=m2', headers: h, payload: body })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'POST', url: '/webhooks/twilio/status?m=m1', headers: twilioHeaders('m1', body), payload: body })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'POST', url: '/webhooks/twilio/status?m=m2', headers: twilioHeaders('m2', body), payload: body })).statusCode).toBe(200)
     const [pub, int] = vi.mocked(wallet.trueUp).mock.calls.map(c => c[0].amountInr)
     expect(int).toBeCloseTo(0.05 * 88, 5)
     expect(pub).toBeCloseTo(0.05 * 88 * 1.4, 5)
     expect(rows.get('m1').status).toBe('delivered')
   })
 
+  it('Twilio status webhook refuses unsigned or forged callbacks without touching the wallet', async () => {
+    rows.set('m4', { id: 'm4', tenant_id: 't1', channel: 'sms', to_address: '+91', metadata: {} })
+    const body = 'MessageStatus=delivered&Price=-50'
+    const plain = { 'content-type': 'application/x-www-form-urlencoded' }
+    expect((await app.inject({ method: 'POST', url: '/webhooks/twilio/status?m=m4', headers: plain, payload: body })).statusCode).toBe(403)
+    const forged = { ...twilioHeaders('m4', 'MessageStatus=delivered&Price=-0.01') }
+    expect((await app.inject({ method: 'POST', url: '/webhooks/twilio/status?m=m4', headers: forged, payload: body })).statusCode).toBe(403)
+    expect(wallet.trueUp).not.toHaveBeenCalled()
+  })
+
   it('refunds a send that was never delivered (Meta marketing cap), keeping the P2 processing fee and clearing any media surcharge', async () => {
     rows.set('m3', { id: 'm3', tenant_id: 't1', channel: 'whatsapp', to_address: '+91', metadata: {}, charged_inr: '1.4', status: 'sent' })
-    const h = { 'content-type': 'application/x-www-form-urlencoded' }
     const body = 'MessageStatus=undelivered&ErrorCode=63049&Price=-0.01'
-    expect((await app.inject({ method: 'POST', url: '/webhooks/twilio/status?m=m3', headers: h, payload: body })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'POST', url: '/webhooks/twilio/status?m=m3', headers: twilioHeaders('m3', body), payload: body })).statusCode).toBe(200)
     expect(vi.mocked(wallet.trueUp).mock.calls.map(c => c[0])).toEqual([
       { tenantId: 't1', amountInr: 0.2, externalRef: 'pub:m3', note: 'refund: whatsapp not delivered' },
       { tenantId: 't1', amountInr: 0, externalRef: 'media:m3', note: 'refund: media for a non-delivered send' },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runWithAuditActor } from '@/lib/auth/audit-context'
 import { lookupTenantContextBySlug } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
-import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
+import { storedRazorpayKeys } from '@/lib/integrations/resolve'
 import { dispatchRazorpayEvent, TransientWebhookError, verifyRazorpaySignature } from '@/lib/payments/razorpay-events/dispatch'
 import { noteRazorpayWebhook } from '@/lib/payments/rzp-webhook-health'
 
@@ -28,9 +28,9 @@ async function handle(request: NextRequest, { params }: { params: Promise<{ tena
   return runWithTenantContext(store, async () => {
     let secret: string | undefined
     try {
-      const creds = await resolveRazorpayCreds(store.tenantId)
-      // Never accept the platform secret here: that would let platform-signed events bypass the index.
-      secret = creds.isOwn ? creds.webhook_secret : undefined
+      // The store's own secret only, never the platform's: that would let platform-signed events bypass
+      // the index. Its saved keys count even after it moves back to the platform account, for late events.
+      secret = (await storedRazorpayKeys(store.tenantId))?.webhook_secret
     } catch {
       return NextResponse.json({ error: 'retry' }, { status: 503 })
     }

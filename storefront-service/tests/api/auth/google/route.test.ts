@@ -221,6 +221,7 @@ describe('POST /api/auth/google', () => {
 
   it('uses accessToken path when no idToken provided', async () => {
     // accessToken flow hits /oauth2/v3/userinfo
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ aud: 'test-google-client-id', azp: 'test-google-client-id' }) })
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({

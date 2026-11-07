@@ -76,16 +76,19 @@ export function DisputesTab() {
     {
       key: 'link',
       label: '',
-      render: r => (
-        <a
-          href={`https://dashboard.razorpay.com/app/disputes/${r.razorpay_dispute_id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs text-accent-500 hover:underline whitespace-nowrap"
-        >
-          {r.status === 'open' ? 'Respond on Razorpay' : 'View on Razorpay'}
-        </a>
-      ),
+      render: r =>
+        data?.respondOnRazorpay === false ? (
+          <span className="text-xs text-foreground-muted whitespace-nowrap">Handled by the platform</span>
+        ) : (
+          <a
+            href={`https://dashboard.razorpay.com/app/disputes/${r.razorpay_dispute_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-accent-500 hover:underline whitespace-nowrap"
+          >
+            {r.status === 'open' ? 'Respond on Razorpay' : 'View on Razorpay'}
+          </a>
+        ),
     },
   ]
 
@@ -126,7 +129,7 @@ export function DisputesTab() {
           <>
             <KpiGrid>
               <Kpi label="Open" value={money(t.open_amount)} sub={`${count(t.open_count)} disputes`} highlight={t.open_count > 0} />
-              <Kpi label="Due in 3 days" value={count(t.due_soon)} sub="respond on Razorpay" />
+              <Kpi label="Due in 3 days" value={count(t.due_soon)} sub={data.respondOnRazorpay ? 'respond on Razorpay' : 'the platform responds'} />
               <Kpi label="Lost" value={money(t.lost_amount)} sub="taken back by banks" />
               <Kpi label="Won" value={count(t.won_count)} sub="disputes" />
             </KpiGrid>

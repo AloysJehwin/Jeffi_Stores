@@ -182,6 +182,7 @@ describe('POST /api/business/google', () => {
   })
 
   it('uses accessToken path when no idToken provided', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ aud: 'test-google-client-id', azp: 'test-google-client-id' }) })
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({

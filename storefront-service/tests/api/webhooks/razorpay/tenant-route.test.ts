@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import crypto from 'crypto'
 
 vi.mock('@/lib/tenant-registry', () => ({ lookupTenantContextBySlug: vi.fn() }))
-vi.mock('@/lib/integrations/resolve', () => ({ resolveRazorpayCreds: vi.fn() }))
+vi.mock('@/lib/integrations/resolve', () => ({ storedRazorpayKeys: vi.fn() }))
 vi.mock('@/lib/subscriptions/cycle', async () => ({
   isSubscriptionEvent: (e: string) => e.startsWith('subscription.'),
   processSubscriptionEvent: vi.fn(async () => true),
@@ -10,7 +10,7 @@ vi.mock('@/lib/subscriptions/cycle', async () => ({
 
 import { POST } from '@storefront/app/api/(public)/webhooks/razorpay/[tenant]/route'
 import { lookupTenantContextBySlug } from '@/lib/tenant-registry'
-import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
+import { storedRazorpayKeys } from '@/lib/integrations/resolve'
 import { processSubscriptionEvent } from '@/lib/subscriptions/cycle'
 import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
 
@@ -32,7 +32,7 @@ describe('POST /api/webhooks/razorpay/[tenant]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(lookupTenantContextBySlug).mockResolvedValue(ctx as any)
-    vi.mocked(resolveRazorpayCreds).mockResolvedValue({ key_id: 'k', key_secret: 's', webhook_secret: TENANT_SECRET, isOwn: true })
+    vi.mocked(storedRazorpayKeys).mockResolvedValue({ key_id: 'k', key_secret: 's', webhook_secret: TENANT_SECRET })
   })
 
   it('verifies against the tenant secret and runs the engine in the tenant context', async () => {
@@ -43,7 +43,7 @@ describe('POST /api/webhooks/razorpay/[tenant]', () => {
     })
     const res = await POST(req(evt), params())
     expect(res.status).toBe(200)
-    expect(resolveRazorpayCreds).toHaveBeenCalledWith('t1')
+    expect(storedRazorpayKeys).toHaveBeenCalledWith('t1')
     expect(processSubscriptionEvent).toHaveBeenCalledWith('subscription.charged', evt, { tenantId: 't1', slug: 'acme' })
     expect(seen).toBe('t1')
   })
@@ -55,7 +55,7 @@ describe('POST /api/webhooks/razorpay/[tenant]', () => {
   })
 
   it('refuses tenants without their own Razorpay keys (no platform-secret fallback)', async () => {
-    vi.mocked(resolveRazorpayCreds).mockResolvedValue({ key_id: 'k', key_secret: 's', webhook_secret: 'test-webhook-secret', isOwn: false })
+    vi.mocked(storedRazorpayKeys).mockResolvedValue(null)
     const res = await POST(req(evt, 'test-webhook-secret'), params())
     expect(res.status).toBe(404)
     expect(processSubscriptionEvent).not.toHaveBeenCalled()

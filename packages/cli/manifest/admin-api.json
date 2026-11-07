@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "ae4ff6f7fcd22008223c910f99bfa4ac0ec6118b04716dc2be7d7becb6c94ba0",
+ "manifestHash": "e408dec7fbfdbfdcb231b69b4a28f07fe58bd0b9c5687ca593b4aaf665ade5c3",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -10923,6 +10923,43 @@
    "body": null,
    "summary": "Finance → Receivables overview. Returns a FinanceOverviewContract<Totals>.",
    "command": "financial receivables"
+  },
+  {
+   "id": "admin GET /api/admin/financial/route-payouts",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/financial/route-payouts",
+   "gatewayPath": "/v1/admin/financial/route-payouts",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/route-payouts/route.ts",
+   "pathParams": [],
+   "query": [
+    "from",
+    "to"
+   ],
+   "queryParams": [
+    {
+     "name": "from",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "to",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "financial:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "GET — a Route store's sales, its share and payouts to its bank in a period. The store comes from the request's host, never the query. Stores with settlements of their own use razorpay-settlements (404 here).",
+   "command": "financial route-payouts"
   },
   {
    "id": "admin GET /api/admin/financial/transactions",

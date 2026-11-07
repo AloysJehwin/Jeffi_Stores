@@ -3,48 +3,9 @@ import { query } from '@/lib/shared/db'
 import { issueMfaTicket } from '@/lib/auth/mfa'
 import { resolveAdminByEmail, enforceCertGate } from '@/lib/auth/admin-identity'
 import { logActivity } from '@/lib/shared/activity'
+import { verifyGoogle } from '@/lib/shared/google-verify'
 
 export const dynamic = 'force-dynamic'
-
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
-
-interface GoogleTokenPayload {
-  sub: string
-  email: string
-  email_verified?: boolean
-}
-
-async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload | null> {
-  try {
-    const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`)
-    if (!res.ok) return null
-    const data = await res.json()
-    if (!data.sub || !data.email) return null
-    if (GOOGLE_CLIENT_ID) {
-      const aud = Array.isArray(data.aud) ? data.aud : [data.aud]
-      if (!aud.includes(GOOGLE_CLIENT_ID)) return null
-    }
-    // tokeninfo returns email_verified as the string "true"/"false"
-    if (String(data.email_verified) === 'false') return null
-    return { sub: data.sub, email: data.email, email_verified: true }
-  } catch {
-    return null
-  }
-}
-
-async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleTokenPayload | null> {
-  try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (!data.sub || !data.email || data.email_verified === false) return null
-    return { sub: data.sub, email: data.email, email_verified: true }
-  } catch {
-    return null
-  }
-}
 
 // Layer 2 (identity) — Google sign-in for admins. Verifies the Google token, maps
 // it to an ACTIVE admin (no auto-provisioning), enforces the cert gate, and issues
@@ -56,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'idToken or accessToken required' }, { status: 400 })
     }
 
-    const payload = idToken ? await verifyGoogleToken(idToken) : await verifyGoogleAccessToken(accessToken)
+    const payload = await verifyGoogle({ idToken, accessToken })
     if (!payload) return NextResponse.json({ error: 'Invalid Google token' }, { status: 401 })
 
     const admin = await resolveAdminByEmail(payload.email)
