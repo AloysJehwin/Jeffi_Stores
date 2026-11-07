@@ -1,3 +1,5 @@
+import { envGstApiCreds, resolveGstApiCreds, type GstApiCreds } from './gst-api-creds'
+
 export interface EWayBillPayload {
   supplyType: 'O' | 'I'
   subSupplyType: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12'
@@ -48,44 +50,28 @@ export interface EWayBillResult {
   status: 'generated' | 'stub'
 }
 
-let cachedToken: { token: string; expiresAt: number } | null = null
+// Per store and account, so one store's token is never used for another.
+const tokenCache = new Map<string, { token: string; expiresAt: number }>()
 
 export function __resetTokenCacheForTests(): void {
-  cachedToken = null
+  tokenCache.clear()
 }
 
-function isConfigured(): boolean {
-  return !!(
-    process.env.EWAYBILL_CLIENT_ID &&
-    process.env.EWAYBILL_CLIENT_SECRET &&
-    process.env.EWAYBILL_USERNAME &&
-    process.env.EWAYBILL_PASSWORD &&
-    process.env.EWAYBILL_GSTIN
-  )
-}
-
-function baseUrl(): string {
-  return process.env.EWAYBILL_BASE_URL || 'https://gst.gov.in/api'
-}
-
-async function getAuthToken(): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
-    return cachedToken.token
-  }
-
-  const res = await fetch(`${baseUrl()}/ewayapi/authenticate`, {
+/** Fetch a fresh auth token with these credentials (also the connection test). */
+export async function authenticateEWayBill(creds: GstApiCreds): Promise<string> {
+  const res = await fetch(`${creds.baseUrl}/ewayapi/authenticate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      clientid: process.env.EWAYBILL_CLIENT_ID!,
-      clientsecret: process.env.EWAYBILL_CLIENT_SECRET!,
-      gstin: process.env.EWAYBILL_GSTIN!,
+      clientid: creds.clientId,
+      clientsecret: creds.clientSecret,
+      gstin: creds.gstin,
     },
     body: JSON.stringify({
       action: 'ACCESSTOKEN',
-      username: process.env.EWAYBILL_USERNAME,
-      password: process.env.EWAYBILL_PASSWORD,
-      appkey: process.env.EWAYBILL_CLIENT_SECRET,
+      username: creds.username,
+      password: creds.password,
+      appkey: creds.clientSecret,
     }),
   })
 
@@ -93,13 +79,22 @@ async function getAuthToken(): Promise<string> {
   if (!res.ok || !data?.response?.authtoken) {
     throw new Error(`EWB auth failed: ${data?.message || res.statusText}`)
   }
-
-  cachedToken = { token: data.response.authtoken, expiresAt: Date.now() + 6 * 60 * 60 * 1000 }
-  return cachedToken.token
+  return String(data.response.authtoken)
 }
 
+async function getAuthToken(creds: GstApiCreds): Promise<string> {
+  const cached = tokenCache.get(creds.cacheKey)
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token
+  const token = await authenticateEWayBill(creds)
+  tokenCache.set(creds.cacheKey, { token, expiresAt: Date.now() + 6 * 60 * 60 * 1000 })
+  return token
+}
+
+/** Generate with the store's own credentials (the flagship: the platform env, else a stub). A store
+ * without its own credentials gets GstApiNotConnectedError. */
 export async function generateEWayBill(payload: EWayBillPayload): Promise<EWayBillResult> {
-  if (!isConfigured()) {
+  const creds = await resolveGstApiCreds('ewaybill')
+  if (!creds) {
     return {
       ewbNo: `STUB-EWB-${Date.now()}`,
       ewbDt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
@@ -108,7 +103,7 @@ export async function generateEWayBill(payload: EWayBillPayload): Promise<EWayBi
     }
   }
 
-  const token = await getAuthToken()
+  const token = await getAuthToken(creds)
 
   const body = {
     action: 'GENEWAYBILL',
@@ -160,13 +155,13 @@ export async function generateEWayBill(payload: EWayBillPayload): Promise<EWayBi
     },
   }
 
-  const res = await fetch(`${baseUrl()}/ewayapi/ewayapi`, {
+  const res = await fetch(`${creds.baseUrl}/ewayapi/ewayapi`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      clientid: process.env.EWAYBILL_CLIENT_ID!,
-      clientsecret: process.env.EWAYBILL_CLIENT_SECRET!,
-      gstin: process.env.EWAYBILL_GSTIN!,
+      clientid: creds.clientId,
+      clientsecret: creds.clientSecret,
+      gstin: creds.gstin,
       authtoken: token,
     },
     body: JSON.stringify(body),
@@ -185,6 +180,7 @@ export async function generateEWayBill(payload: EWayBillPayload): Promise<EWayBi
   }
 }
 
+/** Whether the platform env credentials (the flagship's) are set. */
 export function isEWayBillConfigured(): boolean {
-  return isConfigured()
+  return !!envGstApiCreds('ewaybill')
 }

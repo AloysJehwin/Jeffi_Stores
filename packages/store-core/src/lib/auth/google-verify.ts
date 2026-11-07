@@ -1,3 +1,5 @@
+import { googleAccessTokenIsOurs } from '../shared/google-verify'
+
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 
 export interface GoogleTokenPayload {
@@ -15,7 +17,7 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPay
     const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`)
     if (!res.ok) return null
     const data = await res.json()
-    if (!data.sub || !data.email) return null
+    if (!data.sub || !data.email || String(data.email_verified) === 'false') return null
     if (GOOGLE_CLIENT_ID) {
       const aud = Array.isArray(data.aud) ? data.aud : [data.aud]
       if (!aud.includes(GOOGLE_CLIENT_ID)) return null
@@ -29,6 +31,7 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPay
 
 export async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleTokenPayload | null> {
   try {
+    if (!(await googleAccessTokenIsOurs(accessToken))) return null
     const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
     })

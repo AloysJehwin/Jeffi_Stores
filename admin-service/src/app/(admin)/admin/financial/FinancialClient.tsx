@@ -16,6 +16,8 @@ import { MessagingTab } from './_components/MessagingTab'
 import { AiCostsTab } from './_components/AiCostsTab'
 import { DisputesTab } from './_components/DisputesTab'
 import { RazorpaySettlementsTab } from './_components/RazorpaySettlementsTab'
+import { RoutePayoutsTab } from './_components/RoutePayoutsTab'
+import { MarketplaceSettlementsTab } from './_components/MarketplaceSettlementsTab'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -26,12 +28,13 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'cashflow', label: 'Cashflow' },
   { key: 'cod_remittance', label: 'COD Remittance' },
   { key: 'razorpay', label: 'Razorpay settlements' },
+  { key: 'marketplaces', label: 'Marketplaces' },
   { key: 'disputes', label: 'Disputes' },
   { key: 'messaging', label: 'Messaging' },
   { key: 'ai_costs', label: 'AI costs' },
 ]
 
-export default function FinancialClient({ razorpayTab }: { razorpayTab: { settlements: boolean } | null }) {
+export default function FinancialClient({ razorpayTab }: { razorpayTab: { route: boolean; ownPending: boolean } | null }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const tabParam = searchParams.get('tab') as Tab | null
@@ -44,6 +47,7 @@ export default function FinancialClient({ razorpayTab }: { razorpayTab: { settle
     'cashflow',
     'cod_remittance',
     ...(razorpayTab ? (['razorpay'] as Tab[]) : []),
+    'marketplaces',
     'disputes',
     'messaging',
     'ai_costs',
@@ -60,8 +64,6 @@ export default function FinancialClient({ razorpayTab }: { razorpayTab: { settle
   useEffect(() => {
     if (loaded.current) return
     loaded.current = true
-
-    fetch('/api/admin/financial/payables/sync-payouts', { method: 'POST' }).catch(() => {})
 
     Promise.allSettled([
       fetch('/api/admin/financial/payables').then(r => r.json()),
@@ -86,7 +88,11 @@ export default function FinancialClient({ razorpayTab }: { razorpayTab: { settle
 
   return (
     <div className="space-y-5">
-      <Tabs tabs={TABS.filter(t => validTabs.includes(t.key)).map(t => ({ id: t.key, label: t.label }))} value={tab} onChange={handleTabChange} />
+      <Tabs
+        tabs={TABS.filter(t => validTabs.includes(t.key)).map(t => ({ id: t.key, label: t.key === 'razorpay' && razorpayTab?.route ? 'Settlements' : t.label }))}
+        value={tab}
+        onChange={handleTabChange}
+      />
 
       <div>
         {tab === 'overview' && <OverviewTab />}
@@ -96,7 +102,8 @@ export default function FinancialClient({ razorpayTab }: { razorpayTab: { settle
         {tab === 'pl' && <PLTab />}
         {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
         {tab === 'cod_remittance' && <CodRemittanceTab />}
-        {tab === 'razorpay' && razorpayTab && <RazorpaySettlementsTab settlements={razorpayTab.settlements} />}
+        {tab === 'razorpay' && razorpayTab && (razorpayTab.route ? <RoutePayoutsTab ownPending={razorpayTab.ownPending} /> : <RazorpaySettlementsTab />)}
+        {tab === 'marketplaces' && <MarketplaceSettlementsTab />}
         {tab === 'disputes' && <DisputesTab />}
         {tab === 'messaging' && <MessagingTab />}
         {tab === 'ai_costs' && <AiCostsTab />}

@@ -3,8 +3,8 @@ import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
 import { attributeConversion } from '@/lib/shared/marketing'
-import { verifyDraftToken } from '@/lib/orders/order-draft'
-import { loadActiveCart, cartSubtotal, cartTaxAmount, validateCouponForUser, commitOrder } from '@/lib/orders/order-commit'
+import { hashCartItems, verifyDraftToken } from '@/lib/orders/order-draft'
+import { loadActiveCart, cartItemsForHash, cartSubtotal, cartTaxAmount, validateCouponForUser, commitOrder } from '@/lib/orders/order-commit'
 import { notifyAccessGranted } from '@/lib/shared/notify'
 import { createDraftInvoice, generateOrderInvoice } from '@/lib/documents/invoice'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
@@ -344,6 +344,9 @@ export async function commitDraftFromCapture(
   if (draft.mode === 'cart') {
     cartItems = await loadActiveCart(intent.user_id)
     if (cartItems.length === 0) return manual('Payment captured but the cart is empty', 'The cart was emptied before the order could be created.')
+    // The customer edited the cart after paying: building the order from it would not match what was paid for.
+    if (draft.cartHash && draft.cartHash !== hashCartItems(cartItemsForHash(cartItems)))
+      return manual('Payment captured but the cart changed', 'The cart was edited after the payment, so the order was not created from it.')
     subtotal = cartSubtotal(cartItems, gstEnabled)
     taxAmount = cartTaxAmount(cartItems, gstEnabled)
   } else if (draft.mode === 'buyNow' && draft.buyNowItem) {

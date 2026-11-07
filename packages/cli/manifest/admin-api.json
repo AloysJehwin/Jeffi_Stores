@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "0abc7a4b540d4d369afcaa2355a66946b4cc976f143dff3e7573b2c82092cd79",
+ "manifestHash": "7baf2a30529069de8ae0d9d24058ea3c949b7aafe0cdc436dee967eacf9b49e4",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -1361,6 +1361,958 @@
    "body": null,
    "summary": "GET /api/admin/ai/video/[jobId]?usageId=&feature=: poll; the finished video is persisted to S3 once.",
    "command": "ai-video get"
+  },
+  {
+   "id": "admin GET /api/admin/ajio-ads/console",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/ajio-ads/console",
+   "gatewayPath": "/v1/admin/ajio-ads/console",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio-ads/console/route.ts",
+   "pathParams": [],
+   "query": [
+    "from",
+    "tab",
+    "to"
+   ],
+   "queryParams": [
+    {
+     "name": "from",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "tab",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "overview",
+       "campaigns",
+       "products",
+       "imports"
+      ]
+     }
+    },
+    {
+     "name": "to",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "ajio_ads:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio_ads:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "?tab=overview|campaigns|products|imports&from&to",
+   "command": "ajio-ads console"
+  },
+  {
+   "id": "admin POST /api/admin/ajio-ads/import",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio-ads/import",
+   "gatewayPath": "/v1/admin/ajio-ads/import",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio-ads/import/route.ts",
+   "pathParams": [],
+   "query": [
+    "step"
+   ],
+   "queryParams": [
+    {
+     "name": "step",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "preview",
+       "commit"
+      ],
+      "default": "preview"
+     }
+    }
+   ],
+   "scope": "ajio_ads:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio_ads:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary"
+     },
+     "from": {
+      "type": "string"
+     },
+     "to": {
+      "type": "string"
+     },
+     "allowErrors": {
+      "type": "string"
+     },
+     "mapping": {
+      "type": "string",
+      "description": "JSON-encoded"
+     }
+    },
+    "required": [
+     "file"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "Report upload: ?step=preview (map and check) or ?step=commit (replace the report's period).",
+   "command": "ajio-ads import"
+  },
+  {
+   "id": "admin GET /api/admin/ajio/connection",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/ajio/connection",
+   "gatewayPath": "/v1/admin/ajio/connection",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/connection/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Connection status; credential values and the push token are never returned here.",
+   "command": "ajio connection"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/connection",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/connection",
+   "gatewayPath": "/v1/admin/ajio/connection",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/connection/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "test",
+       "rotate-token",
+       "test-order"
+      ]
+     }
+    }
+   ],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "mode": {
+      "type": "string",
+      "enum": [
+       "mock",
+       "sandbox",
+       "live"
+      ]
+     },
+     "fields": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string",
+       "maxLength": 2000
+      }
+     }
+    },
+    "required": [
+     "mode"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Save + test, or ?action=test | rotate-token | test-order.",
+   "command": "ajio connection-create"
+  },
+  {
+   "id": "admin DELETE /api/admin/ajio/connection",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/ajio/connection",
+   "gatewayPath": "/v1/admin/ajio/connection",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/connection/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete connection (ajio)",
+   "command": "ajio connection-delete"
+  },
+  {
+   "id": "admin GET /api/admin/ajio/console",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/ajio/console",
+   "gatewayPath": "/v1/admin/ajio/console",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/console/route.ts",
+   "pathParams": [],
+   "query": [
+    "bucket",
+    "q",
+    "scope",
+    "view"
+   ],
+   "queryParams": [
+    {
+     "name": "bucket",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "new",
+       "to_pack",
+       "rtd",
+       "shipped",
+       "closed"
+      ]
+     }
+    },
+    {
+     "name": "q",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "scope",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "all"
+      ]
+     }
+    },
+    {
+     "name": "view",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "orders",
+       "returns",
+       "overview"
+      ],
+      "default": "overview"
+     }
+    }
+   ],
+   "scope": "ajio:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Overview KPIs and queue counts; ?view=orders&bucket= or ?view=returns for the lists.",
+   "command": "ajio console"
+  },
+  {
+   "id": "admin GET /api/admin/ajio/listings",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/ajio/listings",
+   "gatewayPath": "/v1/admin/ajio/listings",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/listings/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Every sellable unit with its AJIO listing.",
+   "command": "ajio listings"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/listings",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/listings",
+   "gatewayPath": "/v1/admin/ajio/listings",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/listings/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "enum": [
+       "report"
+      ]
+     }
+    }
+   ],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "format": "binary",
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "?action=report: a SKU report upload (preview, or apply=1).",
+   "command": "ajio listings-create"
+  },
+  {
+   "id": "admin PUT /api/admin/ajio/listings",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/ajio/listings",
+   "gatewayPath": "/v1/admin/ajio/listings",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/listings/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "rows": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "key": {
+         "type": "string",
+         "maxLength": 120
+        },
+        "marketplaceSku": {
+         "anyOf": [
+          {
+           "type": "string",
+           "maxLength": 120
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "styleId": {
+         "anyOf": [
+          {
+           "type": "string",
+           "maxLength": 120
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "category": {
+         "anyOf": [
+          {
+           "type": "string",
+           "maxLength": 120
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "listedPrice": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "listedMrp": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "key",
+        "marketplaceSku",
+        "styleId"
+       ]
+      },
+      "minItems": 1,
+      "maxItems": 5000
+     }
+    },
+    "required": [
+     "rows"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Saves mappings typed in the table.",
+   "command": "ajio listings-update"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/listings/export",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/listings/export",
+   "gatewayPath": "/v1/admin/ajio/listings/export",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/listings/export/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "inspect"
+      ]
+     }
+    }
+   ],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:read",
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "format": "binary",
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "?action=inspect reads the template's columns; otherwise fills it for the picked units.",
+   "command": "ajio-listings export"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/listings/images",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/listings/images",
+   "gatewayPath": "/v1/admin/ajio/listings/images",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/listings/images/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 120
+      },
+      "minItems": 1,
+      "maxItems": 2000
+     }
+    },
+    "required": [
+     "keys"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "The zip of photos shaped to AJIO's spec for the picked units.",
+   "command": "ajio-listings images"
+  },
+  {
+   "id": "admin GET /api/admin/ajio/listings/submit",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/ajio/listings/submit",
+   "gatewayPath": "/v1/admin/ajio/listings/submit",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/listings/submit/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get submit (ajio listings)",
+   "command": "ajio-listings submit"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/listings/submit",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/listings/submit",
+   "gatewayPath": "/v1/admin/ajio/listings/submit",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/listings/submit/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 120
+      },
+      "minItems": 1,
+      "maxItems": 2000
+     }
+    },
+    "required": [
+     "keys"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Submits the picked units through the AJIO API (the sync cron polls the result).",
+   "command": "ajio-listings submit-create"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/manifest",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/manifest",
+   "gatewayPath": "/v1/admin/ajio/manifest",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/manifest/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio_orders:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio_orders:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "ids": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "minItems": 1,
+      "maxItems": 1000
+     }
+    },
+    "required": [
+     "ids"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "One AJIO manifest (at most 250 packets) for the picked ready-to-dispatch orders.",
+   "command": "ajio manifest"
+  },
+  {
+   "id": "admin GET /api/admin/ajio/orders/{id}/document",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/ajio/orders/{id}/document",
+   "gatewayPath": "/v1/admin/ajio/orders/{id}/document",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/orders/[id]/document/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "inline",
+    "kind"
+   ],
+   "queryParams": [
+    {
+     "name": "inline",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "1"
+      ]
+     }
+    },
+    {
+     "name": "kind",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "enum": [
+       "label",
+       "invoice",
+       "manifest"
+      ]
+     }
+    }
+   ],
+   "scope": "ajio:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "?kind=label|invoice|manifest: the PDF for a AJIO order.",
+   "command": "ajio-orders document"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/orders/action",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/orders/action",
+   "gatewayPath": "/v1/admin/ajio/orders/action",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/orders/action/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio_orders:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio_orders:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "accept",
+       "reject",
+       "pack",
+       "ready_to_dispatch"
+      ]
+     },
+     "ids": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "minItems": 1,
+      "maxItems": 100
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500
+     },
+     "packet": {
+      "type": "object",
+      "properties": {
+       "weightGrams": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 100000
+       },
+       "lengthCm": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 500
+       },
+       "breadthCm": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 500
+       },
+       "heightCm": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 500
+       }
+      }
+     }
+    },
+    "required": [
+     "action",
+     "ids"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Accept, reject (with a reason), pack or mark ready to dispatch, one order or many.",
+   "command": "ajio-orders action"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/returns/action",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/returns/action",
+   "gatewayPath": "/v1/admin/ajio/returns/action",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/returns/action/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio_orders:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio_orders:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "action": {
+      "type": "string",
+      "enum": [
+       "receive",
+       "qc_pass",
+       "qc_fail"
+      ]
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "id",
+     "action"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Received / QC passed (restocks once) / QC failed for a AJIO return.",
+   "command": "ajio-returns action"
+  },
+  {
+   "id": "admin GET /api/admin/ajio/settlements",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/ajio/settlements",
+   "gatewayPath": "/v1/admin/ajio/settlements",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/settlements/route.ts",
+   "pathParams": [],
+   "query": [
+    "from",
+    "to"
+   ],
+   "queryParams": [
+    {
+     "name": "from",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "to",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "ajio:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Imported AJIO settlements in ?from..to, the receivable and unsettled orders.",
+   "command": "ajio settlements"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/settlements/import",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/settlements/import",
+   "gatewayPath": "/v1/admin/ajio/settlements/import",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/settlements/import/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "format": "binary",
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "A settlement report: preview with the saved column mapping, or commit=1 to import.",
+   "command": "ajio-settlements import"
+  },
+  {
+   "id": "admin GET /api/admin/ajio/stock",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/ajio/stock",
+   "gatewayPath": "/v1/admin/ajio/stock",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/stock/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Our stock vs what was pushed to AJIO, errors and price drift.",
+   "command": "ajio stock"
+  },
+  {
+   "id": "admin POST /api/admin/ajio/stock",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/ajio/stock",
+   "gatewayPath": "/v1/admin/ajio/stock",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/stock/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Push now.",
+   "command": "ajio stock-create"
+  },
+  {
+   "id": "admin PUT /api/admin/ajio/stock",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/ajio/stock",
+   "gatewayPath": "/v1/admin/ajio/stock",
+   "file": "admin-service/src/app/api/(admin)/admin/ajio/stock/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ajio:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ajio:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "buffer": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+     }
+    },
+    "required": [
+     "buffer"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "The safety buffer.",
+   "command": "ajio stock-update"
   },
   {
    "id": "admin GET /api/admin/amazon-ads/connection",
@@ -8188,6 +9140,82 @@
    "command": "data-source-google create"
   },
   {
+   "id": "admin POST /api/admin/data-source/google/credentials",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/data-source/google/credentials",
+   "gatewayPath": "/v1/admin/data-source/google/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/data-source/google/credentials/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "products:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "products:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "anyOf": [
+     {
+      "type": "object",
+      "properties": {
+       "mode": {
+        "const": "oauth",
+        "type": "string"
+       },
+       "clientId": {
+        "type": "string",
+        "pattern": "\\.apps\\.googleusercontent\\.com$"
+       },
+       "clientSecret": {
+        "type": "string",
+        "minLength": 10
+       },
+       "refreshToken": {
+        "type": "string",
+        "minLength": 20
+       },
+       "sheet": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "mode",
+       "clientId",
+       "clientSecret",
+       "refreshToken"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "mode": {
+        "const": "service_account",
+        "type": "string"
+       },
+       "serviceAccountJson": {
+        "type": "string",
+        "minLength": 20
+       },
+       "sheet": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "mode",
+       "serviceAccountJson"
+      ]
+     }
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "The store's own Google access for the sheet sync, instead of signing in through the platform: its own OAuth client plus a refresh token, or a service account it shares the sheet with.",
+   "command": "data-source-google credentials"
+  },
+  {
    "id": "admin POST /api/admin/data-source/google/disconnect",
    "host": "admin",
    "method": "POST",
@@ -10467,6 +11495,43 @@
    "command": "financial-disputes sync"
   },
   {
+   "id": "admin GET /api/admin/financial/marketplace-settlements",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/financial/marketplace-settlements",
+   "gatewayPath": "/v1/admin/financial/marketplace-settlements",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/marketplace-settlements/route.ts",
+   "pathParams": [],
+   "query": [
+    "from",
+    "to"
+   ],
+   "queryParams": [
+    {
+     "name": "from",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "to",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "financial:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "GET — Myntra and AJIO settlements and receivables, and Amazon's settlements (read-only), in a period.",
+   "command": "financial marketplace-settlements"
+  },
+  {
    "id": "admin GET /api/admin/financial/messaging-spend",
    "host": "admin",
    "method": "GET",
@@ -10733,88 +11798,6 @@
    "command": "financial-payables pay"
   },
   {
-   "id": "admin POST /api/admin/financial/payables/{id}/payout",
-   "host": "admin",
-   "method": "POST",
-   "path": "/api/admin/financial/payables/{id}/payout",
-   "gatewayPath": "/v1/admin/financial/payables/{id}/payout",
-   "file": "admin-service/src/app/api/(admin)/admin/financial/payables/[id]/payout/route.ts",
-   "pathParams": [
-    {
-     "name": "id",
-     "catchAll": false,
-     "optional": false
-    }
-   ],
-   "query": [],
-   "queryParams": [],
-   "scope": "financial:write",
-   "scopeSource": "literal",
-   "scopes": [
-    "financial:write"
-   ],
-   "guard": "auth",
-   "platform": null,
-   "body": {
-    "type": "object",
-    "properties": {
-     "mode": {
-      "type": "string",
-      "enum": [
-       "NEFT",
-       "RTGS",
-       "IMPS",
-       "UPI"
-      ]
-     },
-     "amount": {
-      "type": "number",
-      "minimum": 0
-     },
-     "notes": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ]
-     }
-    },
-    "required": [
-     "mode",
-     "amount"
-    ]
-   },
-   "bodySource": "zod",
-   "bodyContentType": "application/json",
-   "summary": "Submit payout for a payable",
-   "command": "financial-payables payout"
-  },
-  {
-   "id": "admin POST /api/admin/financial/payables/sync-payouts",
-   "host": "admin",
-   "method": "POST",
-   "path": "/api/admin/financial/payables/sync-payouts",
-   "gatewayPath": "/v1/admin/financial/payables/sync-payouts",
-   "file": "admin-service/src/app/api/(admin)/admin/financial/payables/sync-payouts/route.ts",
-   "pathParams": [],
-   "query": [],
-   "queryParams": [],
-   "scope": "financial:write",
-   "scopeSource": "literal",
-   "scopes": [
-    "financial:write"
-   ],
-   "guard": "auth",
-   "platform": null,
-   "body": null,
-   "noBody": true,
-   "summary": "Sync payouts (financial payables)",
-   "command": "financial-payables sync-payouts"
-  },
-  {
    "id": "admin GET /api/admin/financial/pl",
    "host": "admin",
    "method": "GET",
@@ -11005,6 +11988,43 @@
    "body": null,
    "summary": "Finance → Receivables overview. Returns a FinanceOverviewContract<Totals>.",
    "command": "financial receivables"
+  },
+  {
+   "id": "admin GET /api/admin/financial/route-payouts",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/financial/route-payouts",
+   "gatewayPath": "/v1/admin/financial/route-payouts",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/route-payouts/route.ts",
+   "pathParams": [],
+   "query": [
+    "from",
+    "to"
+   ],
+   "queryParams": [
+    {
+     "name": "from",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "to",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "financial:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "GET — a Route store's sales, its share and payouts to its bank in a period. The store comes from the request's host, never the query. Stores with settlements of their own use razorpay-settlements (404 here).",
+   "command": "financial route-payouts"
   },
   {
    "id": "admin GET /api/admin/financial/transactions",
@@ -11952,6 +12972,18 @@
        "refreshToken": {
         "type": "string",
         "minLength": 20
+       },
+       "developerToken": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]{10,64}$"
+       },
+       "clientId": {
+        "type": "string",
+        "pattern": "\\.apps\\.googleusercontent\\.com$"
+       },
+       "clientSecret": {
+        "type": "string",
+        "minLength": 10
        }
       },
       "required": [
@@ -14657,6 +15689,161 @@
    "command": "google-ads test"
   },
   {
+   "id": "admin GET /api/admin/gst/credentials",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/gst/credentials",
+   "gatewayPath": "/v1/admin/gst/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/gst/credentials/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "gst:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "gst:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get credentials (GST)",
+   "command": "gst credentials"
+  },
+  {
+   "id": "admin POST /api/admin/gst/credentials",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/gst/credentials",
+   "gatewayPath": "/v1/admin/gst/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/gst/credentials/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "gst:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "gst:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "provider": {
+      "type": "string",
+      "enum": [
+       "ewaybill",
+       "einvoice"
+      ]
+     },
+     "username": {
+      "type": "string",
+      "minLength": 1
+     },
+     "password": {
+      "type": "string",
+      "minLength": 1
+     },
+     "clientId": {
+      "type": "string",
+      "minLength": 1
+     },
+     "clientSecret": {
+      "type": "string",
+      "minLength": 1
+     },
+     "baseUrl": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "provider",
+     "username",
+     "password",
+     "clientId",
+     "clientSecret"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Submit credentials (GST)",
+   "command": "gst credentials-create"
+  },
+  {
+   "id": "admin DELETE /api/admin/gst/credentials",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/gst/credentials",
+   "gatewayPath": "/v1/admin/gst/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/gst/credentials/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "gst:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "gst:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "provider": {
+      "type": "string",
+      "enum": [
+       "ewaybill",
+       "einvoice"
+      ]
+     }
+    },
+    "required": [
+     "provider"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Delete credentials (GST)",
+   "command": "gst credentials-delete"
+  },
+  {
+   "id": "admin POST /api/admin/gst/credentials/test",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/gst/credentials/test",
+   "gatewayPath": "/v1/admin/gst/credentials/test",
+   "file": "admin-service/src/app/api/(admin)/admin/gst/credentials/test/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "gst:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "gst:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "provider": {
+      "type": "string",
+      "enum": [
+       "ewaybill",
+       "einvoice"
+      ]
+     }
+    },
+    "required": [
+     "provider"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Test: fetch an auth token with the store's credentials (the flagship: the platform env).",
+   "command": "gst-credentials test"
+  },
+  {
    "id": "admin GET /api/admin/gst/gstr1",
    "host": "admin",
    "method": "GET",
@@ -16750,8 +17937,131 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "\"Connect with Facebook\" for Meta Ads (ads scopes, separate from the Page connection for posting).",
+   "summary": "\"Connect with Facebook\" for Meta Ads (ads scopes, separate from the Page connection for posting), with the store's own Meta app when it has one, else the platform's.",
    "command": "integrations-meta-ads connect"
+  },
+  {
+   "id": "admin GET /api/admin/integrations/meta-app",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/integrations/meta-app",
+   "gatewayPath": "/v1/admin/integrations/meta-app",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/meta-app/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "social:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "meta_ads:read",
+    "meta_ads:write",
+    "social:read",
+    "social:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get meta app (integrations)",
+   "command": "integrations meta-app"
+  },
+  {
+   "id": "admin POST /api/admin/integrations/meta-app",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/integrations/meta-app",
+   "gatewayPath": "/v1/admin/integrations/meta-app",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/meta-app/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "social:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "meta_ads:read",
+    "meta_ads:write",
+    "social:read",
+    "social:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "appId": {
+      "type": "string",
+      "pattern": "^\\d{5,25}$"
+     },
+     "appSecret": {
+      "anyOf": [
+       {
+        "type": "string",
+        "minLength": 16,
+        "maxLength": 128
+       },
+       {
+        "const": "",
+        "type": "string"
+       }
+      ]
+     },
+     "loginConfigId": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^\\d{5,25}$"
+       },
+       {
+        "const": "",
+        "type": "string"
+       }
+      ]
+     },
+     "adsLoginConfigId": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^\\d{5,25}$"
+       },
+       {
+        "const": "",
+        "type": "string"
+       }
+      ]
+     }
+    },
+    "required": [
+     "appId"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Save the app after checking the id and secret with Meta. Leaving the secret blank keeps the saved one.",
+   "command": "integrations meta-app-create"
+  },
+  {
+   "id": "admin DELETE /api/admin/integrations/meta-app",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/integrations/meta-app",
+   "gatewayPath": "/v1/admin/integrations/meta-app",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/meta-app/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "social:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "meta_ads:read",
+    "meta_ads:write",
+    "social:read",
+    "social:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete meta app (integrations)",
+   "command": "integrations meta-app-delete"
   },
   {
    "id": "admin GET /api/admin/integrations/razorpay",
@@ -23882,6 +25192,919 @@
    "bodyContentType": "application/json",
    "summary": "Verify (MFA)",
    "command": "mfa verify"
+  },
+  {
+   "id": "admin GET /api/admin/myntra-ads/console",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/myntra-ads/console",
+   "gatewayPath": "/v1/admin/myntra-ads/console",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra-ads/console/route.ts",
+   "pathParams": [],
+   "query": [
+    "from",
+    "tab",
+    "to"
+   ],
+   "queryParams": [
+    {
+     "name": "from",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "tab",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "overview",
+       "campaigns",
+       "products",
+       "imports"
+      ]
+     }
+    },
+    {
+     "name": "to",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "myntra_ads:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra_ads:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "?tab=overview|campaigns|products|imports&from&to",
+   "command": "myntra-ads console"
+  },
+  {
+   "id": "admin POST /api/admin/myntra-ads/import",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra-ads/import",
+   "gatewayPath": "/v1/admin/myntra-ads/import",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra-ads/import/route.ts",
+   "pathParams": [],
+   "query": [
+    "step"
+   ],
+   "queryParams": [
+    {
+     "name": "step",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "preview",
+       "commit"
+      ],
+      "default": "preview"
+     }
+    }
+   ],
+   "scope": "myntra_ads:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra_ads:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary"
+     },
+     "from": {
+      "type": "string"
+     },
+     "to": {
+      "type": "string"
+     },
+     "allowErrors": {
+      "type": "string"
+     },
+     "mapping": {
+      "type": "string",
+      "description": "JSON-encoded"
+     }
+    },
+    "required": [
+     "file"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "Report upload: ?step=preview (map and check) or ?step=commit (replace the report's period).",
+   "command": "myntra-ads import"
+  },
+  {
+   "id": "admin GET /api/admin/myntra/connection",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/myntra/connection",
+   "gatewayPath": "/v1/admin/myntra/connection",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/connection/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Connection status; credential values and the push token are never returned here.",
+   "command": "myntra connection"
+  },
+  {
+   "id": "admin POST /api/admin/myntra/connection",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra/connection",
+   "gatewayPath": "/v1/admin/myntra/connection",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/connection/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "test",
+       "rotate-token",
+       "test-order"
+      ]
+     }
+    }
+   ],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "mode": {
+      "type": "string",
+      "enum": [
+       "mock",
+       "sandbox",
+       "live"
+      ]
+     },
+     "fields": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string",
+       "maxLength": 2000
+      }
+     }
+    },
+    "required": [
+     "mode"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Save + test, or ?action=test | rotate-token | test-order.",
+   "command": "myntra connection-create"
+  },
+  {
+   "id": "admin DELETE /api/admin/myntra/connection",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/myntra/connection",
+   "gatewayPath": "/v1/admin/myntra/connection",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/connection/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete connection (myntra)",
+   "command": "myntra connection-delete"
+  },
+  {
+   "id": "admin GET /api/admin/myntra/console",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/myntra/console",
+   "gatewayPath": "/v1/admin/myntra/console",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/console/route.ts",
+   "pathParams": [],
+   "query": [
+    "bucket",
+    "q",
+    "scope",
+    "view"
+   ],
+   "queryParams": [
+    {
+     "name": "bucket",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "new",
+       "to_pack",
+       "rtd",
+       "shipped",
+       "closed"
+      ]
+     }
+    },
+    {
+     "name": "q",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "scope",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "all"
+      ]
+     }
+    },
+    {
+     "name": "view",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "orders",
+       "returns",
+       "overview"
+      ],
+      "default": "overview"
+     }
+    }
+   ],
+   "scope": "myntra:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Overview KPIs and queue counts; ?view=orders&bucket= or ?view=returns for the lists.",
+   "command": "myntra console"
+  },
+  {
+   "id": "admin GET /api/admin/myntra/listings",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/myntra/listings",
+   "gatewayPath": "/v1/admin/myntra/listings",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/listings/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Every sellable unit with its Myntra listing.",
+   "command": "myntra listings"
+  },
+  {
+   "id": "admin POST /api/admin/myntra/listings",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra/listings",
+   "gatewayPath": "/v1/admin/myntra/listings",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/listings/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "enum": [
+       "report"
+      ]
+     }
+    }
+   ],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "format": "binary",
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "?action=report: a SKU report upload (preview, or apply=1).",
+   "command": "myntra listings-create"
+  },
+  {
+   "id": "admin PUT /api/admin/myntra/listings",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/myntra/listings",
+   "gatewayPath": "/v1/admin/myntra/listings",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/listings/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "rows": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "key": {
+         "type": "string",
+         "maxLength": 120
+        },
+        "marketplaceSku": {
+         "anyOf": [
+          {
+           "type": "string",
+           "maxLength": 120
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "styleId": {
+         "anyOf": [
+          {
+           "type": "string",
+           "maxLength": 120
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "category": {
+         "anyOf": [
+          {
+           "type": "string",
+           "maxLength": 120
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "listedPrice": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "listedMrp": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "key",
+        "marketplaceSku",
+        "styleId"
+       ]
+      },
+      "minItems": 1,
+      "maxItems": 5000
+     }
+    },
+    "required": [
+     "rows"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Saves mappings typed in the table.",
+   "command": "myntra listings-update"
+  },
+  {
+   "id": "admin POST /api/admin/myntra/listings/export",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra/listings/export",
+   "gatewayPath": "/v1/admin/myntra/listings/export",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/listings/export/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "inspect"
+      ]
+     }
+    }
+   ],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:read",
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "format": "binary",
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "?action=inspect reads the template's columns; otherwise fills it for the picked units.",
+   "command": "myntra-listings export"
+  },
+  {
+   "id": "admin POST /api/admin/myntra/listings/images",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra/listings/images",
+   "gatewayPath": "/v1/admin/myntra/listings/images",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/listings/images/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 120
+      },
+      "minItems": 1,
+      "maxItems": 2000
+     }
+    },
+    "required": [
+     "keys"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "The zip of photos shaped to Myntra's spec for the picked units.",
+   "command": "myntra-listings images"
+  },
+  {
+   "id": "admin GET /api/admin/myntra/listings/submit",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/myntra/listings/submit",
+   "gatewayPath": "/v1/admin/myntra/listings/submit",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/listings/submit/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get submit (myntra listings)",
+   "command": "myntra-listings submit"
+  },
+  {
+   "id": "admin POST /api/admin/myntra/listings/submit",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra/listings/submit",
+   "gatewayPath": "/v1/admin/myntra/listings/submit",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/listings/submit/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 120
+      },
+      "minItems": 1,
+      "maxItems": 2000
+     }
+    },
+    "required": [
+     "keys"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Submits the picked units through the Myntra API (the sync cron polls the result).",
+   "command": "myntra-listings submit-create"
+  },
+  {
+   "id": "admin GET /api/admin/myntra/orders/{id}/document",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/myntra/orders/{id}/document",
+   "gatewayPath": "/v1/admin/myntra/orders/{id}/document",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/orders/[id]/document/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "inline",
+    "kind"
+   ],
+   "queryParams": [
+    {
+     "name": "inline",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "1"
+      ]
+     }
+    },
+    {
+     "name": "kind",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "enum": [
+       "label",
+       "invoice",
+       "manifest"
+      ]
+     }
+    }
+   ],
+   "scope": "myntra:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "?kind=label|invoice|manifest: the PDF for a Myntra order.",
+   "command": "myntra-orders document"
+  },
+  {
+   "id": "admin POST /api/admin/myntra/orders/action",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra/orders/action",
+   "gatewayPath": "/v1/admin/myntra/orders/action",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/orders/action/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra_orders:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra_orders:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "accept",
+       "reject",
+       "pack",
+       "ready_to_dispatch"
+      ]
+     },
+     "ids": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "minItems": 1,
+      "maxItems": 100
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500
+     },
+     "packet": {
+      "type": "object",
+      "properties": {
+       "weightGrams": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 100000
+       },
+       "lengthCm": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 500
+       },
+       "breadthCm": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 500
+       },
+       "heightCm": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 500
+       }
+      }
+     }
+    },
+    "required": [
+     "action",
+     "ids"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Accept, reject (with a reason), pack or mark ready to dispatch, one order or many.",
+   "command": "myntra-orders action"
+  },
+  {
+   "id": "admin POST /api/admin/myntra/returns/action",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra/returns/action",
+   "gatewayPath": "/v1/admin/myntra/returns/action",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/returns/action/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra_orders:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra_orders:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "action": {
+      "type": "string",
+      "enum": [
+       "receive",
+       "qc_pass",
+       "qc_fail"
+      ]
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "id",
+     "action"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Received / QC passed (restocks once) / QC failed for a Myntra return.",
+   "command": "myntra-returns action"
+  },
+  {
+   "id": "admin GET /api/admin/myntra/settlements",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/myntra/settlements",
+   "gatewayPath": "/v1/admin/myntra/settlements",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/settlements/route.ts",
+   "pathParams": [],
+   "query": [
+    "from",
+    "to"
+   ],
+   "queryParams": [
+    {
+     "name": "from",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "to",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "myntra:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Imported Myntra settlements in ?from..to, the receivable and unsettled orders.",
+   "command": "myntra settlements"
+  },
+  {
+   "id": "admin POST /api/admin/myntra/settlements/import",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra/settlements/import",
+   "gatewayPath": "/v1/admin/myntra/settlements/import",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/settlements/import/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "format": "binary",
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "A settlement report: preview with the saved column mapping, or commit=1 to import.",
+   "command": "myntra-settlements import"
+  },
+  {
+   "id": "admin GET /api/admin/myntra/stock",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/myntra/stock",
+   "gatewayPath": "/v1/admin/myntra/stock",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/stock/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Our stock vs what was pushed to Myntra, errors and price drift.",
+   "command": "myntra stock"
+  },
+  {
+   "id": "admin POST /api/admin/myntra/stock",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/myntra/stock",
+   "gatewayPath": "/v1/admin/myntra/stock",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/stock/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Push now.",
+   "command": "myntra stock-create"
+  },
+  {
+   "id": "admin PUT /api/admin/myntra/stock",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/myntra/stock",
+   "gatewayPath": "/v1/admin/myntra/stock",
+   "file": "admin-service/src/app/api/(admin)/admin/myntra/stock/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "myntra:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "myntra:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "buffer": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+     }
+    },
+    "required": [
+     "buffer"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "The safety buffer.",
+   "command": "myntra stock-update"
   },
   {
    "id": "admin GET /api/admin/notifications",
@@ -34239,6 +36462,195 @@
    "command": "settings providers-delete"
   },
   {
+   "id": "admin GET /api/admin/setup-guide",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/setup-guide",
+   "gatewayPath": "/v1/admin/setup-guide",
+   "file": "admin-service/src/app/api/(admin)/admin/setup-guide/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "setup_guide:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "setup_guide:read",
+    "setup_guide:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Every step this store's plan sells, with its status and the own-credentials guide.",
+   "command": "setup-guide list"
+  },
+  {
+   "id": "admin PATCH /api/admin/setup-guide/{stepId}",
+   "host": "admin",
+   "method": "PATCH",
+   "path": "/api/admin/setup-guide/{stepId}",
+   "gatewayPath": "/v1/admin/setup-guide/{stepId}",
+   "file": "admin-service/src/app/api/(admin)/admin/setup-guide/[stepId]/route.ts",
+   "pathParams": [
+    {
+     "name": "stepId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "setup_guide:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "setup_guide:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "state": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "applied",
+         "approved",
+         "skipped"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "appliedAt": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "state"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Mark a step applied (with the date), approved or skipped; state null clears it.",
+   "command": "setup-guide update"
+  },
+  {
+   "id": "admin GET /api/admin/setup-guide/platform",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/setup-guide/platform",
+   "gatewayPath": "/v1/admin/setup-guide/platform",
+   "file": "admin-service/src/app/api/(admin)/admin/setup-guide/platform/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "setup_guide:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "setup_guide:read"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Get platform (setup guide)",
+   "command": "setup-guide platform"
+  },
+  {
+   "id": "admin PATCH /api/admin/setup-guide/platform",
+   "host": "admin",
+   "method": "PATCH",
+   "path": "/api/admin/setup-guide/platform",
+   "gatewayPath": "/v1/admin/setup-guide/platform",
+   "file": "admin-service/src/app/api/(admin)/admin/setup-guide/platform/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "setup_guide:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "setup_guide:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "state": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "applied",
+         "approved",
+         "skipped"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "appliedAt": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "itemId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+     }
+    },
+    "required": [
+     "state",
+     "itemId"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Update platform (setup guide)",
+   "command": "setup-guide platform-update"
+  },
+  {
    "id": "admin POST /api/admin/shelving/labels",
    "host": "admin",
    "method": "POST",
@@ -35688,10 +38100,10 @@
    "pathParams": [],
    "query": [],
    "queryParams": [],
-   "scope": "campaigns:write",
+   "scope": "social:write",
    "scopeSource": "literal",
    "scopes": [
-    "campaigns:write"
+    "social:write"
    ],
    "guard": "auth",
    "platform": null,
@@ -35739,10 +38151,10 @@
    "pathParams": [],
    "query": [],
    "queryParams": [],
-   "scope": "campaigns:write",
+   "scope": "social:write",
    "scopeSource": "literal",
    "scopes": [
-    "campaigns:write"
+    "social:write"
    ],
    "guard": "auth",
    "platform": null,
@@ -35964,15 +38376,15 @@
    ],
    "query": [],
    "queryParams": [],
-   "scope": "campaigns:write",
+   "scope": "social:write",
    "scopeSource": "literal",
    "scopes": [
-    "campaigns:write"
+    "social:write"
    ],
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "Store-admin \"Connect Facebook/Instagram\". Signs a state carrying the tenant and sends the user to the Meta OAuth dialog, which returns to the fixed platform redirect URI registered on the Meta app.",
+   "summary": "Store-admin \"Connect Facebook/Instagram\". Signs a state carrying the tenant and the Meta app (the store's own, else the platform's) and sends the user to that app's Meta OAuth dialog, which returns to the fixed platform redirect URI.",
    "command": "social-connect get"
   },
   {
@@ -36103,6 +38515,83 @@
    "body": null,
    "summary": "Get insights (social)",
    "command": "social insights"
+  },
+  {
+   "id": "admin GET /api/admin/social/meta",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/social/meta",
+   "gatewayPath": "/v1/admin/social/meta",
+   "file": "admin-service/src/app/api/(admin)/admin/social/meta/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "social:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "social:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get meta (social)",
+   "command": "social meta"
+  },
+  {
+   "id": "admin POST /api/admin/social/meta",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/social/meta",
+   "gatewayPath": "/v1/admin/social/meta",
+   "file": "admin-service/src/app/api/(admin)/admin/social/meta/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "social:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "social:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "pageId": {
+      "type": "string",
+      "pattern": "^\\d{1,30}$"
+     }
+    },
+    "required": [
+     "pageId"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Submit meta (social)",
+   "command": "social meta-create"
+  },
+  {
+   "id": "admin DELETE /api/admin/social/meta",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/social/meta",
+   "gatewayPath": "/v1/admin/social/meta",
+   "file": "admin-service/src/app/api/(admin)/admin/social/meta/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "social:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "social:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete meta (social)",
+   "command": "social meta-delete"
   },
   {
    "id": "admin GET /api/admin/social/networks",

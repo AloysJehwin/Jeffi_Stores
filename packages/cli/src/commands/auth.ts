@@ -106,7 +106,7 @@ export function registerAuth(program: Command, io: Io) {
       const res = await call(ctx, { method: 'GET', path: '/api/admin/cli/whoami' }, { dispatcher: io.dispatcher })
       const d = (res.data ?? {}) as Record<string, unknown> & { server?: { manifestHash?: string; minCli?: string; version?: string }; scopes?: string[] }
       const notes: string[] = []
-      if (d.server?.manifestHash && d.server.manifestHash !== manifest.manifestHash) notes.push("The server's admin API differs from this CLI's manifest; update with npm i -g @jeffi/cli.")
+      if (d.server?.manifestHash && d.server.manifestHash !== manifest.manifestHash) notes.push("The server's admin API differs from this CLI's manifest; update with npm i -g @jeffi_erp/cli.")
       if (d.server?.minCli && !CLI_VERSION.startsWith('0.0.0') && compareVersions(CLI_VERSION, d.server.minCli) < 0) notes.push(`This CLI (${CLI_VERSION}) is older than the server supports (${d.server.minCli}); update it.`)
       emit(io, cmd, { ...d, profile: ctx.profileName, cli: { version: CLI_VERSION, manifestHash: manifest.manifestHash } }, () => {
         const { scopes, server: _server, ...rest } = d

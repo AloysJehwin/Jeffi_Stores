@@ -21,10 +21,12 @@ export const PAYMENT_STATUS_FULL: StatusMap = {
 export const SOURCE_LABEL: Record<string, string> = {
   online: 'Online',
   amazon: 'Amazon',
+  myntra: 'Myntra',
+  ajio: 'AJIO',
   business: 'Business',
   cash_sale: 'Cash Sale',
 }
-export const SOURCE_TONE: Record<string, Tone> = { online: 'blue', business: 'green', amazon: 'amber' }
+export const SOURCE_TONE: Record<string, Tone> = { online: 'blue', business: 'green', amazon: 'amber', myntra: 'amber', ajio: 'amber' }
 export const sourceLabel = (s: string) => SOURCE_LABEL[s] || 'Offline'
 export const sourceTone = (s: string): Tone => SOURCE_TONE[s] ?? 'muted'
 

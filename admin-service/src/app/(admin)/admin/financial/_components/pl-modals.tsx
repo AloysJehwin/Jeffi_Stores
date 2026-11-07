@@ -27,11 +27,12 @@ export function PLMonthModal({ m, all, onClose }: { m: any; all: any[]; onClose:
   const monthLabel = new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 
   // Source donut data
-  const srcTotal = m.revenue_online + m.revenue_business + m.revenue_cash_sale + m.revenue_offline
+  const srcTotal = m.revenue_online + m.revenue_business + m.revenue_cash_sale + m.revenue_marketplace + m.revenue_offline
   const sources = [
     { label: 'Online', value: m.revenue_online, color: '#3b82f6' },
     { label: 'Business', value: m.revenue_business, color: '#8b5cf6' },
     { label: 'Cash Sale', value: m.revenue_cash_sale, color: '#10b981' },
+    { label: 'Marketplaces', value: m.revenue_marketplace, color: '#db2777' },
     { label: 'Offline', value: m.revenue_offline, color: '#f97316' },
   ].filter(s => s.value > 0)
 

@@ -61,6 +61,7 @@ export interface GsheetStatus {
   account?: string | null
   connectedAt?: string | null
   canCreate?: boolean
+  connectedVia?: string | null
   lastSync: GsheetLastSync | null
 }
 

@@ -1,4 +1,5 @@
 import {
+  META_GRAPH,
   publishFacebookCarousel,
   publishFacebookPost,
   publishInstagramCarousel,
@@ -11,7 +12,7 @@ import { SocialApiError, type InboxItem, type Network, type PostMetrics, type So
 // Facebook Pages and Instagram Business through the Graph API. Publishing reuses lib/catalog/meta;
 // insights, comments and replies are here. Connection stays on the existing Meta flow (Page token).
 
-const GRAPH = `https://graph.facebook.com/${process.env.META_GRAPH_VERSION || 'v21.0'}`
+const GRAPH = META_GRAPH
 
 async function graph(network: Network, path: string, params: Record<string, string>, token: string, method: 'GET' | 'POST' = 'GET'): Promise<any> {
   const qs = new URLSearchParams({ ...params, access_token: token })
@@ -55,14 +56,15 @@ export const facebookProvider: SocialProvider = {
       const j = await graph(
         'facebook',
         id,
-        { fields: 'insights.metric(post_impressions,post_impressions_unique,post_clicks),reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares' },
+        // post_impressions(_unique) are gone above v25; views and unique viewers replace them.
+        { fields: 'insights.metric(post_media_view,post_total_media_view_unique,post_clicks),reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares' },
         auth.accessToken
       ).catch(() => null)
       if (!j) continue
       const i = insightValues(j.insights?.data)
       out[id] = {
-        impressions: i.post_impressions,
-        reach: i.post_impressions_unique,
+        impressions: i.post_media_view,
+        reach: i.post_total_media_view_unique,
         clicks: i.post_clicks,
         likes: num(j.reactions?.summary?.total_count),
         comments: num(j.comments?.summary?.total_count),

@@ -1,8 +1,8 @@
 #!/bin/bash
 # Makes sure jeffi/production holds ADMIN_GATEWAY_SECRET and CRON_SECRET: a missing one is generated, an existing
 # one is never replaced. Then copies ADMIN_GATEWAY_SECRET to jeffi/public-api/production (the release does not),
-# and checks the copies the store apps and CronJobs read. Prints no values; rollback commands go to
-# $OUT_DIR/ensure-secrets-rollback.sh.
+# and checks the copies the store apps and CronJobs read. Warns (only) when the Meta app keys are missing.
+# Prints no values; rollback commands go to $OUT_DIR/ensure-secrets-rollback.sh.
 # Usage: bash deploy/k8s/bootstrap/ensure-release-secrets.sh [--dry-run] [--yes] [--sync-store] [--cluster]
 #   --sync-store  refresh jeffi/store now (store-secret.sh); each release does it anyway
 #   --cluster     also check the k8s cron-secret the CronJobs use (not refreshed by the release) and fix it
@@ -47,6 +47,16 @@ json.dump(new, open(sys.argv[2], 'w'))
 sys.exit(0 if n else 3)
 PY
 then TODO="$TODO prod"; fi
+
+say "Meta app keys in jeffi/production (warning only; never written)"
+python3 -I - "$TMP/prod.json" <<'PY'
+import json, sys
+cur = json.load(open(sys.argv[1]))
+for k in ('META_APP_ID', 'META_APP_SECRET'):
+    v = cur.get(k)
+    if isinstance(v, str) and v.strip(): print(f'  {k}: present')
+    else: print(f'  {k}: WARNING, missing. Facebook sign-in for Social Posts and Meta Ads stays off for stores without their own Meta app.')
+PY
 
 say "jeffi/public-api/production (the gateway signs with it)"
 get jeffi/public-api/production > "$TMP/pub.json"

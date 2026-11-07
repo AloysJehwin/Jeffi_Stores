@@ -25,7 +25,6 @@ export default defineConfig({
       JWT_SECRET: 'test-jwt-secret-at-least-32-bytes!!',
       CRON_SECRET: 'test-cron-secret',
       RAZORPAY_WEBHOOK_SECRET: 'test-webhook-secret',
-      RAZORPAYX_WEBHOOK_SECRET: 'test-razorpayx-secret',
       DELHIVERY_API_KEY: 'test-delhivery-key',
       GOOGLE_CLIENT_ID: 'test-google-client-id',
     },

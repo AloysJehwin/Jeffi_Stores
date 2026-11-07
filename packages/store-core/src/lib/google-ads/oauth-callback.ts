@@ -1,7 +1,7 @@
 import type { NextResponse } from 'next/server'
 import { returnToAdmin, type AdminOAuthState } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
-import { readAdsConfig, saveAdsConfig, type GoogleAdsConfig } from './credentials'
+import { readAdsConfig, saveAdsConfig, ownAdsAuth, type GoogleAdsConfig } from './credentials'
 import { GoogleAdsClient } from './client'
 import { verifyAccount } from './accounts'
 
@@ -42,7 +42,17 @@ export async function completeGoogleAdsOAuth(params: URLSearchParams, state: Adm
     if (typeof data.scope === 'string' && !data.scope.includes('auth/adwords')) return fail('scope_not_granted')
     // Granular consent can drop the Data Manager scope; Google Ads still works, uploads ask again.
     const scopes = typeof data.scope === 'string' ? data.scope.split(/\s+/).filter(Boolean) : undefined
-    const base: GoogleAdsConfig = { oauth_refresh_token: data.refresh_token, connected_via: 'oauth', ...(scopes ? { scopes } : {}) }
+    // The token belongs to the platform client, so an own client is dropped; the store's own
+    // developer token is kept only where the platform has none (that is what enabled sign-in).
+    const ownToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN
+      ? undefined
+      : (await readAdsConfig(state.tenantId).catch(() => null))?.developer_token
+    const base: GoogleAdsConfig = {
+      oauth_refresh_token: data.refresh_token,
+      connected_via: 'oauth',
+      ...(scopes ? { scopes } : {}),
+      ...(ownToken ? { developer_token: ownToken } : {}),
+    }
 
     if (state.keepAccount && (await keepAccount(state.tenantId, base))) {
       return returnToAdmin(`${backTo}?connected=google_ads&tab=conversions`)
@@ -64,6 +74,7 @@ async function keepAccount(tenantKey: string, base: GoogleAdsConfig): Promise<bo
         customerId: prev.customer_id,
         loginCustomerId: prev.login_customer_id,
         retryDelays: [],
+        ...ownAdsAuth(base),
       })
     )
     await saveAdsConfig(

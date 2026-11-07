@@ -12,6 +12,7 @@ import { storeContactLine, currentBrandNameAsync, customerMailFromAsync } from '
 import { orderUrlById } from '@/lib/shared/customer-links'
 import { mailShell } from '@/lib/shared/mail-template'
 import { isFulfilledStatus } from '@/lib/orders/fulfilled-status'
+import { marketplaceRefusalFor } from '@/lib/marketplace/order-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,6 +105,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!parsed.ok) return parsed.response
 
     const d = parsed.data
+
+    // Myntra / AJIO orders: status comes from the marketplace, and its courier ships them.
+    if (d.status !== undefined || d.awb_number !== undefined) {
+      const refusal = await marketplaceRefusalFor(id, d.awb_number !== undefined ? 'delhivery' : 'status')
+      if (refusal) return NextResponse.json({ error: refusal }, { status: 409 })
+    }
 
     // Plan-gated status transition validation.
     // Returns module (returns:read) is Growth+ — Basic plan cannot manually set return statuses.

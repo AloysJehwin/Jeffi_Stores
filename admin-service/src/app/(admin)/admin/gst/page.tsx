@@ -7,6 +7,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/shared/admin-path'
 import { Card, DataTable, EmptyState, Field, Fields, FormField, Kpi, KpiGrid, PageBody, PageHeader, StatusBadge, Tabs, TableSkeleton, badgeCls, useActionToast, type DataCol, type StatusMap } from '@/components/admin/kit'
 import { fmtQty } from '@/lib/shared/number-display'
+import TaxCredentialsGear from './_components/TaxCredentialsGear'
 
 type Tab = 'gstr1' | 'gstr3b' | 'irn' | 'itc'
 
@@ -283,7 +284,7 @@ export default function GSTPage() {
 
   return (
     <PageBody>
-      <PageHeader title="GST Compliance" description="GSTR-1 · GSTR-3B · e-Invoice status · ITC Ledger" />
+      <PageHeader title="GST Compliance" description="GSTR-1 · GSTR-3B · e-Invoice status · ITC Ledger" actions={<TaxCredentialsGear />} />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="inline-flex h-control max-w-full items-center overflow-x-auto rounded-lg border border-border-default bg-surface-elevated p-0.5">

@@ -15,6 +15,13 @@ function client() {
 }
 export const twilioConfigured = () => client() !== null
 
+/** Whether a status callback carries Twilio's signature for the URL we registered. */
+export function twilioSignatureValid(signature: string, messageId: string, params: Record<string, string>): boolean {
+  const token = process.env.TWILIO_AUTH_TOKEN
+  const url = statusCallbackUrl(messageId)
+  return !!(token && url && signature && twilio.validateRequest(token, signature, url, params))
+}
+
 export function normalizePhone(raw: string): string {
   const d = raw.replace(/[^\d+]/g, '')
   if (d.startsWith('+')) return d
@@ -23,7 +30,8 @@ export function normalizePhone(raw: string): string {
   return '+' + d
 }
 
-function callback(messageId: string) {
+/** The status callback URL a send registers, which is also what Twilio signs. */
+export function statusCallbackUrl(messageId: string) {
   const base = process.env.PUBLIC_BASE_URL
   // Twilio rejects the whole send for a non-public callback (http://…localhost in dev).
   if (!base || !/^https:\/\//.test(base) || /localhost|127\.0\.0\.1/.test(base)) return undefined
@@ -33,7 +41,7 @@ function callback(messageId: string) {
 export async function sendSms(o: { to: string; body: string; messageId: string }): Promise<string> {
   const c = client()
   if (!c || !SMS_FROM) throw new Error('Twilio SMS not configured')
-  const m = await c.messages.create({ from: SMS_FROM, to: normalizePhone(o.to), body: o.body, statusCallback: callback(o.messageId) })
+  const m = await c.messages.create({ from: SMS_FROM, to: normalizePhone(o.to), body: o.body, statusCallback: statusCallbackUrl(o.messageId) })
   return m.sid
 }
 
@@ -46,7 +54,7 @@ export async function sendWhatsApp(o: {
 }): Promise<string> {
   const c = client()
   if (!c || !WA_FROM) throw new Error('Twilio WhatsApp not configured')
-  const base = { from: `whatsapp:${WA_FROM}`, to: `whatsapp:${normalizePhone(o.to)}`, statusCallback: callback(o.messageId) }
+  const base = { from: `whatsapp:${WA_FROM}`, to: `whatsapp:${normalizePhone(o.to)}`, statusCallback: statusCallbackUrl(o.messageId) }
   const m = o.contentSid
     ? await c.messages.create({ ...base, contentSid: o.contentSid, contentVariables: JSON.stringify(o.variables ?? {}) })
     : await c.messages.create({ ...base, body: o.body ?? '' })
@@ -61,7 +69,7 @@ export function priceUsd(raw: string | undefined): number | null {
 }
 
 /** No public callback URL (local dev) → delivery outcomes have to be polled. */
-export const callbacksEnabled = () => callback('x') !== undefined
+export const callbacksEnabled = () => statusCallbackUrl('x') !== undefined
 
 export async function fetchStatus(sid: string): Promise<{ status: string; code?: string; message?: string }> {
   const c = client()

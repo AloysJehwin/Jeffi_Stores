@@ -14,6 +14,12 @@ export async function ruleSetFor(channel: Channel): Promise<RuleSet<any, any> | 
       return (await import('@/lib/meta-ads/alerts')).META_ADS_RULES
     case 'social':
       return (await import('@/lib/social/alerts')).SOCIAL_RULES
+    case 'myntra':
+    case 'ajio':
+      return (await import('@/lib/marketplace/alerts')).marketplaceRules(channel)
+    case 'myntra_ads':
+    case 'ajio_ads':
+      return (await import('@/lib/marketplace-ads/alerts')).adsRuleSet(channel)
     default:
       return null
   }

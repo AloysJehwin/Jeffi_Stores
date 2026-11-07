@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Settings, X } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import MetaAppCard from './MetaAppCard'
+import AdminSelect from './AdminSelect'
+import { SP_API_HOSTS } from '@/lib/amazon/sp-api-hosts'
 
 type IntegrationRow = { provider: string; label: string | null; status: string; meta: Record<string, any> }
 type SocialRow = {
@@ -12,7 +15,8 @@ type SocialRow = {
   page_id?: string | null
   status: string
 }
-type OAuthInfo = { enabled: boolean; redirectUri: string }
+type OAuthInfo = { enabled: boolean; redirectUri: string; ownApp?: boolean }
+type MetaStatus = { pickPending?: boolean; missingPermissions?: string[] }
 type OAuthMap = Partial<Record<'google_merchant' | 'amazon_seller' | 'meta', OAuthInfo>>
 type Toast = { ok: boolean; text: string } | null
 type SetToast = (t: Toast) => void
@@ -48,6 +52,7 @@ function resultToast(): Toast {
   if (connected === '0' || err) return { ok: false, text: `Could not connect ${name}: ${ERROR_TEXT[err || ''] || err}` }
   const reg = p.get('register_error')
   if (reg) return { ok: false, text: `${name} connected, but Merchant API sync could not be enabled: ${reg}` }
+  if (p.get('pick')) return { ok: true, text: 'Signed in with Facebook. Choose the Page to post to.' }
   return { ok: true, text: `${name} connected. Use Test connection to check it.` }
 }
 
@@ -56,24 +61,27 @@ export default function AdminIntegrationsPopup({
   integrations,
   socialAccounts,
   oauth = {},
+  meta = {},
 }: {
   scope: 'merchant' | 'social'
   integrations: IntegrationRow[]
   socialAccounts: SocialRow[]
   oauth?: OAuthMap
+  meta?: MetaStatus
 }) {
   const router = useRouter()
-  const canWrite = useCanWrite(scope === 'merchant' ? 'merchant_sync' : 'campaigns')
+  const canWrite = useCanWrite(scope === 'merchant' ? 'merchant_sync' : 'social')
   const [open, setOpen] = useState(false)
   const [toast, setToast] = useState<Toast>(null)
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('connect') === '1') setOpen(true)
     const t = resultToast()
     if (!t) return
     setToast(t)
     setOpen(true)
     const url = new URL(window.location.href)
-    for (const k of ['connected', 'error', 'provider', 'register_error']) url.searchParams.delete(k)
+    for (const k of ['connected', 'error', 'provider', 'register_error', 'pick']) url.searchParams.delete(k)
     window.history.replaceState({}, '', url.toString())
   }, [])
 
@@ -136,7 +144,15 @@ export default function AdminIntegrationsPopup({
                   />
                 </>
               ) : (
-                <MetaCard fb={fb} ig={ig} oauth={oauth.meta} canWrite={canWrite} onDone={done} setToast={setToast} />
+                <MetaCard
+                  fb={fb}
+                  ig={ig}
+                  oauth={oauth.meta}
+                  status={meta}
+                  canWrite={canWrite}
+                  onDone={done}
+                  setToast={setToast}
+                />
               )}
             </div>
           </div>
@@ -361,23 +377,28 @@ function GoogleCard({
   const [manual, setManual] = useState(false)
   const [busy, setBusy] = useState(false)
   const [sa, setSa] = useState('')
+  const [mode, setMode] = useState<'sa' | 'oauth'>('sa')
+  const [own, setOwn] = useState({ client_id: '', client_secret: '', refresh_token: '' })
   const [merchantId, setMerchantId] = useState(row?.meta?.merchant_id ? String(row.meta.merchant_id) : '')
   const [dataSource, setDataSource] = useState('')
   const connected = !!row
   const validId = /^\d{5,20}$/.test(merchantId.trim())
+  const ownReady = !!(own.client_id.trim() && own.client_secret.trim() && own.refresh_token.trim())
 
   async function save() {
     setBusy(true)
     setToast(null)
+    const base = { merchant_id: merchantId.trim(), data_source: dataSource.trim() }
     const { ok, data } = await postJson('/api/admin/integrations', 'POST', {
       provider: 'google_merchant',
-      config: { service_account_json: sa, merchant_id: merchantId.trim(), data_source: dataSource.trim() },
+      config: mode === 'oauth' ? { ...base, mode: 'oauth', ...own } : { ...base, service_account_json: sa },
     })
     setBusy(false)
     if (!ok) return setToast({ ok: false, text: data.error || 'Failed to save credentials' })
     setToast({ ok: true, text: 'Google Merchant credentials saved. Use Test connection to check them.' })
     setManual(false)
     setSa('')
+    setOwn({ client_id: '', client_secret: '', refresh_token: '' })
     onDone()
   }
 
@@ -386,7 +407,16 @@ function GoogleCard({
       {connected && (
         <div className="space-y-0.5">
           <Detail label="Merchant ID" value={row?.meta?.merchant_id} />
-          <Detail label="Method" value={row?.meta?.connected_via === 'oauth' ? 'Google sign-in' : 'Service account'} />
+          <Detail
+            label="Method"
+            value={
+              row?.meta?.connected_via === 'oauth'
+                ? 'Google sign-in'
+                : row?.meta?.connected_via === 'own_oauth'
+                  ? 'Your own OAuth client'
+                  : 'Service account'
+            }
+          />
           <Detail label="Service account" value={row?.meta?.client_email} />
         </div>
       )}
@@ -415,7 +445,7 @@ function GoogleCard({
               </a>
             )}
             <button type="button" onClick={() => setManual(o => !o)} className={btnSecondary}>
-              {manual ? 'Hide manual entry' : 'Enter service account'}
+              {manual ? 'Hide manual entry' : 'Use your own credentials'}
             </button>
             {connected && <TestButton provider="google_merchant" setToast={setToast} />}
             {connected && row?.meta?.connected_via === 'oauth' && <EnableMerchantApiButton setToast={setToast} />}
@@ -430,25 +460,65 @@ function GoogleCard({
           </div>
           {manual && (
             <div className="space-y-3 rounded-xl border border-border-default bg-surface-elevated p-4">
-              <Field
-                label="Service account key (JSON)"
-                hint="Create a key in Google Cloud > IAM > Service accounts, then add the service account's email as a user in Merchant Center (People and access)."
-              >
-                <textarea
-                  value={sa}
-                  onChange={e => setSa(e.target.value)}
-                  rows={5}
-                  placeholder='{ "type": "service_account", ... }'
-                  className="w-full text-xs font-mono rounded-lg border border-border-default bg-surface-secondary px-3 py-2 text-foreground"
-                />
-              </Field>
+              <div className="flex flex-wrap gap-2">
+                {(['sa', 'oauth'] as const).map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMode(m)}
+                    aria-pressed={mode === m}
+                    className={mode === m ? btnPrimary : btnSecondary}
+                  >
+                    {m === 'sa' ? 'Service account' : 'Your own OAuth client'}
+                  </button>
+                ))}
+              </div>
+              {mode === 'sa' ? (
+                <Field
+                  label="Service account key (JSON)"
+                  hint="Create a key in Google Cloud > IAM > Service accounts, then add the service account's email as a user in Merchant Center (People and access)."
+                >
+                  <textarea
+                    value={sa}
+                    onChange={e => setSa(e.target.value)}
+                    rows={5}
+                    placeholder='{ "type": "service_account", ... }'
+                    className="w-full text-xs font-mono rounded-lg border border-border-default bg-surface-secondary px-3 py-2 text-foreground"
+                  />
+                </Field>
+              ) : (
+                <>
+                  <p className="text-[11px] text-foreground-muted">
+                    Create an OAuth client (Web application) in your Google Cloud project with
+                    https://developers.google.com/oauthplayground as a redirect URI, then get a refresh token for it with
+                    the content scope (https://www.googleapis.com/auth/content) in the Google OAuth Playground.
+                  </p>
+                  {(
+                    [
+                      ['client_id', 'OAuth client ID', false],
+                      ['client_secret', 'OAuth client secret', true],
+                      ['refresh_token', 'Refresh token', true],
+                    ] as const
+                  ).map(([k, label, secret]) => (
+                    <Field key={k} label={label}>
+                      <input
+                        value={own[k]}
+                        onChange={e => setOwn(o => ({ ...o, [k]: e.target.value }))}
+                        type={secret ? 'password' : 'text'}
+                        autoComplete="off"
+                        className={inputCls}
+                      />
+                    </Field>
+                  ))}
+                </>
+              )}
               <Field
                 label="Data source (optional)"
                 hint="Merchant API data source id; one is found or created when blank."
               >
                 <input value={dataSource} onChange={e => setDataSource(e.target.value)} className={inputCls} />
               </Field>
-              <button onClick={save} disabled={busy || !sa.trim() || !validId} className={btnPrimary}>
+              <button onClick={save} disabled={busy || !validId || (mode === 'sa' ? !sa.trim() : !ownReady)} className={btnPrimary}>
                 {busy ? 'Saving…' : 'Save credentials'}
               </button>
             </div>
@@ -459,7 +529,8 @@ function GoogleCard({
   )
 }
 
-const AMAZON_EMPTY = { client_id: '', client_secret: '', refresh_token: '', seller_id: '', marketplace_id: '' }
+const AMAZON_EMPTY = { client_id: '', client_secret: '', refresh_token: '', seller_id: '', marketplace_id: '', sp_api_host: '' }
+const SP_API_HOST_OPTIONS = [{ value: '', label: 'Platform default' }, ...SP_API_HOSTS.map(h => ({ value: h.value, label: h.label }))]
 
 function AmazonCard({
   row,
@@ -486,6 +557,7 @@ function AmazonCard({
     setToast(null)
     const config: Record<string, string> = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()]))
     if (!config.marketplace_id) delete config.marketplace_id
+    if (!config.sp_api_host) delete config.sp_api_host
     const { ok, data } = await postJson('/api/admin/integrations', 'POST', { provider: 'amazon_seller', config })
     setBusy(false)
     if (!ok) return setToast({ ok: false, text: data.error || 'Failed to save credentials' })
@@ -495,7 +567,7 @@ function AmazonCard({
     onDone()
   }
 
-  const fields: Array<{ k: keyof typeof f; label: string; hint?: string; secret?: boolean }> = [
+  const fields: Array<{ k: Exclude<keyof typeof f, 'sp_api_host'>; label: string; hint?: string; secret?: boolean }> = [
     {
       k: 'seller_id',
       label: 'Seller ID (Merchant Token)',
@@ -518,6 +590,7 @@ function AmazonCard({
         <div className="space-y-0.5">
           <Detail label="Seller ID" value={row?.meta?.seller_id} />
           <Detail label="Marketplace" value={row?.meta?.marketplace_id} />
+          <Detail label="API endpoint" value={SP_API_HOSTS.find(h => h.value === row?.meta?.sp_api_host)?.label} />
           <Detail label="Method" value={viaLabel(row?.meta?.connected_via, 'Seller Central authorization')} />
         </div>
       )}
@@ -558,6 +631,13 @@ function AmazonCard({
                   />
                 </Field>
               ))}
+              <AdminSelect
+                label="SP-API endpoint"
+                hint="Your app's region, or a sandbox for testing. Amazon.in is in the EU region."
+                value={f.sp_api_host}
+                options={SP_API_HOST_OPTIONS}
+                onChange={v => setF(p => ({ ...p, sp_api_host: v }))}
+              />
               <button
                 onClick={save}
                 disabled={busy || !f.client_id || !f.client_secret || !f.refresh_token || !f.seller_id}
@@ -573,10 +653,68 @@ function AmazonCard({
   )
 }
 
+type PickPage = { id: string; name: string; instagram: boolean }
+
+// After a Facebook sign-in that can reach several Pages: choose the one to post to.
+function PagePicker({ onDone, setToast }: { onDone: () => void; setToast: SetToast }) {
+  const [pages, setPages] = useState<PickPage[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  useEffect(() => {
+    postJson('/api/admin/social/meta', 'GET').then(({ ok, data }) => {
+      if (!ok) return setError(data.error || 'Could not list your Pages')
+      setPages(data.pages ?? [])
+      if (data.error) setError(data.error)
+    })
+  }, [])
+
+  async function pick(p: PickPage) {
+    setBusy(p.id)
+    setToast(null)
+    const { ok, data } = await postJson('/api/admin/social/meta', 'POST', { pageId: p.id })
+    setBusy(null)
+    if (!ok) return setToast({ ok: false, text: data.error || 'Could not save the Page' })
+    setToast({ ok: true, text: `Connected to ${data.page_name || p.name}${data.instagram ? ' and its Instagram account' : ''}.` })
+    onDone()
+  }
+
+  async function startOver() {
+    setBusy('cancel')
+    await postJson('/api/admin/social/meta', 'DELETE')
+    setBusy(null)
+    onDone()
+  }
+
+  if (!pages && !error) return <p className="text-xs text-foreground-muted">Loading your Pages…</p>
+  return (
+    <div className="space-y-2 rounded-xl border border-border-default bg-surface-elevated p-4">
+      <p className="text-sm font-medium text-foreground">Choose the Facebook Page to post to</p>
+      {error && <p className="text-xs text-red-600 dark:text-red-400 break-words">{error}</p>}
+      {pages?.length === 0 && !error && <p className="text-xs text-foreground-muted">No Pages are left to choose from.</p>}
+      {pages?.map(p => (
+        <button
+          key={p.id}
+          type="button"
+          disabled={!!busy}
+          onClick={() => pick(p)}
+          className="flex w-full items-center justify-between gap-3 rounded-lg border border-border-default px-3 py-2 text-left text-sm hover:bg-surface-secondary disabled:opacity-40"
+        >
+          <span className="min-w-0 truncate">{busy === p.id ? 'Saving…' : p.name || p.id}</span>
+          <span className="shrink-0 text-xs text-foreground-muted">{p.instagram ? 'with Instagram' : 'no Instagram'}</span>
+        </button>
+      ))}
+      <button type="button" className="text-xs underline" disabled={!!busy} onClick={startOver}>
+        Start over
+      </button>
+    </div>
+  )
+}
+
 function MetaCard({
   fb,
   ig,
   oauth,
+  status,
   canWrite,
   onDone,
   setToast,
@@ -584,6 +722,7 @@ function MetaCard({
   fb?: SocialRow
   ig?: SocialRow
   oauth?: OAuthInfo
+  status: MetaStatus
   canWrite: boolean
   onDone: () => void
   setToast: SetToast
@@ -592,6 +731,7 @@ function MetaCard({
   const [busy, setBusy] = useState(false)
   const [f, setF] = useState({ page_id: '', access_token: '', ig_user_id: '' })
   const connected = !!fb || !!ig
+  const missing = connected ? (status.missingPermissions ?? []) : []
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF(p => ({ ...p, [k]: e.target.value }))
 
@@ -624,10 +764,16 @@ function MetaCard({
         <Detail label="Facebook Page" value={fb ? fb.page_name || fb.page_id || 'Connected' : null} />
         <Detail label="Instagram" value={ig ? `linked via ${ig.page_name || 'Page'}` : null} />
       </div>
+      {missing.length > 0 && (
+        <p className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 break-words">
+          Reconnect to enable insights and comments. This connection was made without {missing.join(', ')}.
+        </p>
+      )}
       {!canWrite ? (
         <p className="text-xs text-foreground-muted">You don&apos;t have permission to change these credentials.</p>
       ) : (
         <>
+          {status.pickPending && <PagePicker onDone={onDone} setToast={setToast} />}
           {oauth?.enabled ? null : <OAuthUnavailable provider="Facebook" oauth={oauth} />}
           <div className="flex flex-wrap items-center gap-2">
             {oauth?.enabled && (
@@ -676,6 +822,7 @@ function MetaCard({
               </button>
             </div>
           )}
+          <MetaAppCard own={oauth?.ownApp} canWrite={canWrite} onChanged={onDone} />
         </>
       )}
     </CardShell>

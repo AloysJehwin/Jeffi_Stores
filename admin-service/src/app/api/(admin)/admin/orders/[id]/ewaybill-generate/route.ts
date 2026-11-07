@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'
-import { generateEWayBill, isEWayBillConfigured, EWayBillPayload } from '@/lib/shipping/ewaybill'
+import { generateEWayBill, EWayBillPayload } from '@/lib/shipping/ewaybill'
+import { GstApiNotConnectedError } from '@/lib/shipping/gst-api-creds'
 import { parseBody } from '@/lib/shared/validate'
 
 const Schema = z
@@ -117,9 +118,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ewbDt: result.ewbDt,
       ewbValidTill: result.ewbValidTill,
       status: result.status,
-      configured: isEWayBillConfigured(),
+      configured: result.status === 'generated',
     })
   } catch (err: any) {
+    if (err instanceof GstApiNotConnectedError) return NextResponse.json({ error: err.message, code: 'not_connected' }, { status: 422 })
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

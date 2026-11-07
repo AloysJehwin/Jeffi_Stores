@@ -96,12 +96,12 @@ export async function verifyRazorpayKeys(keyId: string, keySecret: string): Prom
   }
 }
 
-/** The store's Razorpay keys (its own, or the platform's) against Razorpay. */
+/** A store's saved Razorpay keys against Razorpay (whatever its mode), or the platform's for the flagship. */
 export async function testRazorpay(tenantId?: string): Promise<ConnectionTestResult> {
   try {
-    const { resolveRazorpayCreds } = await import('./resolve')
-    const creds = await resolveRazorpayCreds(tenantId)
-    if (!creds.key_id || !creds.key_secret) return { ok: false, message: 'No Razorpay keys are set.' }
+    const { resolveRazorpayCreds, storedRazorpayKeys } = await import('./resolve')
+    const creds = tenantId ? await storedRazorpayKeys(tenantId) : await resolveRazorpayCreds()
+    if (!creds?.key_id || !creds.key_secret) return { ok: false, message: 'No Razorpay keys are set.' }
     return verifyRazorpayKeys(creds.key_id, creds.key_secret)
   } catch (e) {
     return failure(e)

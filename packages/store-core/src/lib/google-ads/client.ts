@@ -1,4 +1,4 @@
-import { googleOAuthAccessToken, googleServiceAccountAccessToken } from '@/lib/integrations/resolve'
+import { googleOAuthAccessToken, googleServiceAccountAccessToken, type GoogleOAuthApp } from '@/lib/integrations/resolve'
 
 // Google Ads API REST client. Read paths (GAQL search/searchStream, listAccessibleCustomers) are
 // used today; `post` is the generic customer-scoped call that conversion uploads
@@ -31,6 +31,8 @@ export interface ServiceAccountKey {
 export interface GoogleAdsClientOptions {
   /** OAuth refresh token (user sign-in); or a service account added as a user in Google Ads. */
   refreshToken?: string
+  /** The store's own OAuth client the refresh token was issued to; the platform's when unset. */
+  oauthClient?: GoogleOAuthApp
   serviceAccount?: ServiceAccountKey
   customerId: string
   /** Manager (MCC) the credentials act through; sent as login-customer-id. */
@@ -142,7 +144,7 @@ export type AdsRow = Record<string, any>
 export class GoogleAdsClient {
   readonly customerId: string
   readonly loginCustomerId: string | null
-  private readonly auth: Pick<GoogleAdsClientOptions, 'refreshToken' | 'serviceAccount'>
+  private readonly auth: Pick<GoogleAdsClientOptions, 'refreshToken' | 'serviceAccount' | 'oauthClient'>
   private readonly developerToken: string
   private readonly fetchImpl: typeof fetch
   private readonly retryDelays: number[]
@@ -156,18 +158,18 @@ export class GoogleAdsClient {
       throw new Error('Google Ads needs a refresh token or a service account')
     }
     this.developerToken = devToken
-    this.auth = { refreshToken: opts.refreshToken, serviceAccount: opts.serviceAccount }
+    this.auth = { refreshToken: opts.refreshToken, serviceAccount: opts.serviceAccount, oauthClient: opts.oauthClient }
     this.customerId = normalizeCustomerId(opts.customerId)
     const login = normalizeCustomerId(opts.loginCustomerId)
     this.loginCustomerId = login && login !== this.customerId ? login : null
     this.fetchImpl = opts.fetchImpl ?? ((...a) => fetch(...a))
     this.retryDelays = opts.retryDelays ?? DEFAULT_RETRY_DELAYS
-    const { refreshToken, serviceAccount } = this.auth
+    const { refreshToken, serviceAccount, oauthClient } = this.auth
     this.getAccessToken =
       opts.getAccessToken ??
       (serviceAccount
         ? () => googleServiceAccountAccessToken(serviceAccount.clientEmail, serviceAccount.privateKey, GOOGLE_ADS_SCOPE)
-        : () => googleOAuthAccessToken(refreshToken!, 'Google Ads'))
+        : () => googleOAuthAccessToken(refreshToken!, 'Google Ads', oauthClient))
   }
 
   /** A client for another customer reached with the same credentials (e.g. a manager's client). */

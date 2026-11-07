@@ -27,7 +27,7 @@ const Body = z.object({
 })
 
 async function gate(request: NextRequest) {
-  const admin = await requireAdminScope(request, 'campaigns:write')
+  const admin = await requireAdminScope(request, 'social:write')
   if (admin instanceof NextResponse) return { error: admin }
   return { tenantId: await credentialOwnerId() }
 }

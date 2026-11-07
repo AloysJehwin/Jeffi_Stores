@@ -388,7 +388,12 @@ async function handle(request: NextRequest) {
       }
     }
     const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(NextResponse.rewrite(new URL(`/business${slug}${request.nextUrl.search}`, request.url)))
+    // The stripped headers carry x-tenant-slug; without them a store's business host read the flagship database.
+    return addSecurityHeaders(
+      NextResponse.rewrite(new URL(`/business${slug}${request.nextUrl.search}`, request.url), {
+        request: { headers: stripped },
+      })
+    )
   }
 
   // The vault route group is only reachable through the vault host rewrite.
@@ -535,9 +540,6 @@ async function handle(request: NextRequest) {
     '/api/admin/auth/google',
     '/api/admin/check-session',
     '/api/admin/delhivery/sync-statuses',
-    // RazorpayX payout webhook: called server-to-server with no admin cookie. The route
-    // handler verifies the HMAC signature fail-closed, which is its only auth.
-    '/api/admin/financial/payables/webhook',
     '/api/admin/mfa/enroll-start',
     '/api/admin/mfa/enroll-confirm',
     '/api/admin/mfa/verify',

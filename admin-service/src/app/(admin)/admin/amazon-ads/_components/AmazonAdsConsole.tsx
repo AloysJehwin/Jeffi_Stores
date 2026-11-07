@@ -94,6 +94,10 @@ export default function AmazonAdsConsole() {
   }, [loadStatus])
 
   useEffect(() => {
+    if (sp.get('connect') === '1') setGearOpen(true)
+  }, [sp])
+
+  useEffect(() => {
     const c = sp.get('connected')
     if (!c) return
     if (c === '0')

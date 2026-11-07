@@ -2,6 +2,7 @@ import { createHash } from 'crypto'
 import { queryMany } from '@/lib/shared/db'
 import { withChannelLock, errorText, type RunResult } from '@/lib/channels/sync-run'
 import { storePublicBaseUrl } from '@/lib/merchant/store-url'
+import { MARKETPLACE_SOURCES_SQL } from '@/lib/marketplace/sources'
 import { MetaGraph, readMetaAdsConfig } from './client'
 
 // Conversions API: a server-side Purchase for each paid order (cash on delivery once delivered),
@@ -111,7 +112,7 @@ export async function sendCapiEvents(): Promise<RunResult> {
               (SELECT json_agg(json_build_object('sku', i.product_sku, 'quantity', i.quantity, 'price', i.unit_price)) FROM order_items i WHERE i.order_id = o.id) AS items
        FROM orders o
        WHERE o.created_at > now() - make_interval(days => $1)
-         AND o.source IS DISTINCT FROM 'amazon' AND o.status <> 'cancelled'
+         AND COALESCE(o.source, '') NOT IN ${MARKETPLACE_SOURCES_SQL} AND o.status <> 'cancelled'
          AND ((o.payment_status = 'paid' AND o.payment_mode IS DISTINCT FROM 'cod') OR (o.payment_mode = 'cod' AND o.status = 'delivered'))
          AND NOT EXISTS (SELECT 1 FROM mads_capi_events e WHERE e.order_id = o.id AND e.event_name = 'Purchase' AND e.status IN ('sent', 'skipped'))
        ORDER BY o.created_at LIMIT 2000`,

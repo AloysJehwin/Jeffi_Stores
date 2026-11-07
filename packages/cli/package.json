@@ -1,5 +1,5 @@
 {
-  "name": "@jeffi/cli",
+  "name": "@jeffi_erp/cli",
   "version": "0.1.0",
   "description": "Command line for Jeffi Stores admin and platform APIs",
   "type": "module",

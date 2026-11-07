@@ -85,8 +85,6 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // Closes the caller's OWN editor session (admin_id must match); opening one is gated on the
   // resource's :write scope, so a read-only member never holds a session to close.
   'editor-sessions/[id]/close',
-  // Signature-verified webhook, not an admin action.
-  'financial/payables/webhook',
   // Renders a preview; writes nothing.
   'orders/[id]/send-customer-mail/preview',
   // Delivery-estimate preview: computes a date from posted draft settings; writes nothing.

@@ -9,6 +9,7 @@ import { MixDonutCard } from '@/components/admin/kit/charts'
 import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
 import { delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
+import { MARKETPLACE_LABELS, MARKETPLACE_SOURCES, type MarketplaceSource } from '@/lib/marketplace/sources'
 import {
   CashflowTrendCard,
   OutflowDonutCard,
@@ -64,9 +65,14 @@ const METHOD: Record<string, { label: string; color: string }> = {
   cash: { label: 'Cash', color: 'rgb(100 116 139)' },
   card: { label: 'Card', color: 'rgb(236 72 153)' },
 }
+const MARKETPLACE_COLOR: Record<MarketplaceSource, string> = {
+  amazon: 'rgb(249 115 22)',
+  myntra: 'rgb(219 39 119)',
+  ajio: 'rgb(202 138 4)',
+}
 const CHANNEL: Record<string, { label: string; color: string }> = {
   website: { label: 'Website', color: 'rgb(59 130 246)' },
-  amazon: { label: 'Amazon', color: 'rgb(249 115 22)' },
+  ...Object.fromEntries(MARKETPLACE_SOURCES.map(s => [s, { label: MARKETPLACE_LABELS[s], color: MARKETPLACE_COLOR[s] }])),
   store: { label: 'Store / POS', color: 'rgb(16 185 129)' },
   b2b: { label: 'B2B', color: 'rgb(168 85 247)' },
 }
@@ -190,7 +196,7 @@ function NeedsAttention({ d }: { d: Overview }) {
       ...a.returns.map(r => ({ key: `r${r.id}`, primary: `${r.order_number ?? 'Return'}${customer(r)}`, secondary: `Return ${days(r.days)} ago, refund pending`, amount: r.amount || undefined, href: r.order_id ? orderHref(r.order_id) : '/admin/returns' })),
       ...a.adjustments.map(r => ({ key: `a${r.id}`, primary: r.order_number, secondary: `Adjustment refund pending for ${days(r.days)}`, amount: r.amount, href: orderHref(r.order_id) })),
     ] },
-    { key: 'payout', title: 'Supplier payouts failed or stuck', tone: red, href: '/admin/financial?tab=payables', action: 'Payables',
+    { key: 'payout', title: 'Supplier payouts that failed', tone: red, href: '/admin/financial?tab=payables', action: 'Payables',
       items: a.payouts.map(r => ({ key: r.id, primary: `${r.supplier_name} · ${r.expense_number}`, secondary: `Payout ${r.payout_status}`, amount: r.amount, href: payableHref(r.expense_id) })) },
   ].filter(g => g.items.length > 0)
 

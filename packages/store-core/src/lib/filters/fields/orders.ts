@@ -1,4 +1,5 @@
 import { defineFields, type FilterAlias, type FilterOption } from '@jeffi/list-filters/client'
+import { MARKETPLACE_LABELS, MARKETPLACE_SOURCES } from '@/lib/marketplace/sources'
 
 // Orders list filters (client-safe; the SQL is in ../entities/orders.ts).
 
@@ -43,7 +44,7 @@ export const ORDER_SOURCE_OPTIONS = opts([
   ['business', 'Business'],
   ['offline', 'Offline'],
   ['cash_sale', 'Cash sale'],
-  ['amazon', 'Amazon'],
+  ...MARKETPLACE_SOURCES.map((v): [string, string] => [v, MARKETPLACE_LABELS[v]]),
 ])
 
 const PAYMENT_MODE_OPTIONS = opts([

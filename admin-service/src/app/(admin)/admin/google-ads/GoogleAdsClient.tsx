@@ -105,6 +105,10 @@ export default function GoogleAdsClient({
   const [reloadKey, setReloadKey] = useState(0)
   const reload = useCallback(() => setReloadKey(k => k + 1), [])
 
+  useEffect(() => {
+    if (searchParams.get('connect') === '1') setGearOpen(true)
+  }, [searchParams])
+
   // OAuth return (?connected=...) shows once, then the URL is cleaned.
   useEffect(() => {
     const connected = searchParams.get('connected')
@@ -186,7 +190,7 @@ export default function GoogleAdsClient({
     }
   }
 
-  const envReady = status.env.developerToken
+  const envReady = status.env.developerToken || !!status.ownCredentials?.developerToken
   const canWrite = useCanWrite('google_ads')
 
   const state: ConnectionState = connected ? 'connected' : status.pendingAccount ? 'pending' : 'none'

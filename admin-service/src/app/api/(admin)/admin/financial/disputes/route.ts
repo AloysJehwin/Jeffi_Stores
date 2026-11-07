@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
+import { razorpayAccountFor } from '@/lib/payments/rzp-account'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,8 @@ export interface DisputeListRow {
 }
 
 export interface DisputesResponse {
+  /** False for a store paid through the platform account: its disputes are answered by the platform. */
+  respondOnRazorpay: boolean
   totals: { open_count: number; open_amount: number; due_soon: number; lost_amount: number; won_count: number }
   rows: DisputeListRow[]
 }
@@ -33,7 +36,7 @@ export async function GET(request: NextRequest) {
   const status = request.nextUrl.searchParams.get('status') || 'all'
   const where = status === 'open' ? `WHERE d.status IN ('open','under_review')` : status === 'closed' ? `WHERE d.status IN ('won','lost','closed')` : ''
 
-  const [t, rows] = await Promise.all([
+  const [t, rows, account] = await Promise.all([
     queryOne<Record<string, string>>(
       `SELECT COUNT(*) FILTER (WHERE status IN ('open','under_review')) AS open_count,
               COALESCE(SUM(amount) FILTER (WHERE status IN ('open','under_review')), 0) AS open_amount,
@@ -51,9 +54,11 @@ export async function GET(request: NextRequest) {
         ORDER BY (d.status IN ('open','under_review')) DESC, d.respond_by ASC NULLS LAST, d.created_at DESC
         LIMIT 500`
     ),
+    razorpayAccountFor().catch(() => null),
   ])
   const n = (k: string) => Number(t?.[k]) || 0
   const body: DisputesResponse = {
+    respondOnRazorpay: account?.kind !== 'route',
     totals: { open_count: n('open_count'), open_amount: n('open_amount'), due_soon: n('due_soon'), lost_amount: n('lost_amount'), won_count: n('won_count') },
     rows,
   }

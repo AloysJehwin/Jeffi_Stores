@@ -1,4 +1,4 @@
-import { googleOAuthAccessToken, googleServiceAccountAccessToken } from '@/lib/integrations/resolve'
+import { googleOAuthAccessToken, googleServiceAccountAccessToken, type GoogleOAuthApp } from '@/lib/integrations/resolve'
 import { normalizeCustomerId, type ServiceAccountKey } from '../client'
 import type { GoogleAdsCreds } from '../credentials'
 
@@ -213,6 +213,7 @@ export interface RetrieveRequestStatusResponse {
 
 export interface DataManagerClientOptions {
   refreshToken?: string
+  oauthClient?: GoogleOAuthApp
   serviceAccount?: ServiceAccountKey
   fetchImpl?: typeof fetch
   retryDelays?: number[]
@@ -234,12 +235,12 @@ export class DataManagerClient {
     }
     this.fetchImpl = opts.fetchImpl ?? ((...a) => fetch(...a))
     this.retryDelays = opts.retryDelays ?? DEFAULT_RETRY_DELAYS
-    const { refreshToken, serviceAccount } = opts
+    const { refreshToken, serviceAccount, oauthClient } = opts
     this.getAccessToken =
       opts.getAccessToken ??
       (serviceAccount
         ? () => googleServiceAccountAccessToken(serviceAccount.clientEmail, serviceAccount.privateKey, DATA_MANAGER_SCOPE)
-        : () => googleOAuthAccessToken(refreshToken!, 'Google Ads'))
+        : () => googleOAuthAccessToken(refreshToken!, 'Google Ads', oauthClient))
   }
 
   private async accessToken(): Promise<string> {
@@ -296,8 +297,8 @@ export class DataManagerClient {
 
 /** A client on the same credentials as the Google Ads connection (refresh token or service account). */
 export function dataManagerClientFor(
-  creds: Pick<GoogleAdsCreds, 'refreshToken' | 'serviceAccount'>,
+  creds: Pick<GoogleAdsCreds, 'refreshToken' | 'serviceAccount' | 'oauthClient'>,
   extra: Partial<DataManagerClientOptions> = {}
 ): DataManagerClient {
-  return new DataManagerClient({ refreshToken: creds.refreshToken, serviceAccount: creds.serviceAccount, ...extra })
+  return new DataManagerClient({ refreshToken: creds.refreshToken, oauthClient: creds.oauthClient, serviceAccount: creds.serviceAccount, ...extra })
 }

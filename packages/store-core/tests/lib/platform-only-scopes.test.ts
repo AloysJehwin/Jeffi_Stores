@@ -46,10 +46,12 @@ describe('control-plane scopes belong to the platform operator alone', () => {
 // +2 with templates:read/write, the messaging-templates library sold with Mailer → 77;
 // +2 with google_ads:read/write, Google Ads reporting sold on Growth and up → 79;
 // +1 with google_ads_campaigns:write, campaign management sold on Pro and up → 80;
-// +2 with drive:read/write, the staff Drive, on every plan.)
+// +2 with drive:read/write, the staff Drive, on every plan;
+// +10 with Myntra, AJIO and their Ads pages, sold on Pro and up;
+// +2 with setup_guide:read/write, the setup guide, on every plan.)
 describe('the plan ladder never exceeds what a tenant may hold', () => {
   it('caps the top tier at the full tenant scope set', () => {
-    expect(TENANT_SCOPE_KEYS.length).toBe(95)
+    expect(TENANT_SCOPE_KEYS.length).toBe(107)
   })
 
   it('keeps every control-plane scope out of the tenant set', () => {

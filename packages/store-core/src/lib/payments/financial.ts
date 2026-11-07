@@ -1,6 +1,7 @@
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { buildSearchClause, buildVectorSearchClause } from '@/lib/catalog/search'
 import { round2 } from '@/lib/catalog/gst'
+import { isMarketplaceSource } from '@/lib/marketplace/sources'
 
 export interface ReceivableRow {
   order_id: string
@@ -66,6 +67,7 @@ export interface PLMonth {
   revenue_online: number
   revenue_business: number
   revenue_cash_sale: number
+  revenue_marketplace: number
   revenue_offline: number
 }
 
@@ -83,6 +85,7 @@ export interface PLTotals {
   revenue_online: number
   revenue_business: number
   revenue_cash_sale: number
+  revenue_marketplace: number
   revenue_offline: number
 }
 
@@ -398,6 +401,7 @@ export async function getPLReport(from: string, to: string): Promise<{ monthly: 
         revenue_online: 0,
         revenue_business: 0,
         revenue_cash_sale: 0,
+        revenue_marketplace: 0,
         revenue_offline: 0,
       }
     }
@@ -414,6 +418,7 @@ export async function getPLReport(from: string, to: string): Promise<{ monthly: 
     if (r.source === 'online') row.revenue_online += rev
     else if (r.source === 'business') row.revenue_business += rev
     else if (r.source === 'cash_sale') row.revenue_cash_sale += rev
+    else if (isMarketplaceSource(r.source)) row.revenue_marketplace += rev
     else row.revenue_offline += rev
   }
 
@@ -451,6 +456,7 @@ export async function getPLReport(from: string, to: string): Promise<{ monthly: 
     revenue_online: 0,
     revenue_business: 0,
     revenue_cash_sale: 0,
+    revenue_marketplace: 0,
     revenue_offline: 0,
   }
   const totals = monthly.reduce<PLTotals>(
@@ -468,6 +474,7 @@ export async function getPLReport(from: string, to: string): Promise<{ monthly: 
       revenue_online: acc.revenue_online + m.revenue_online,
       revenue_business: acc.revenue_business + m.revenue_business,
       revenue_cash_sale: acc.revenue_cash_sale + m.revenue_cash_sale,
+      revenue_marketplace: acc.revenue_marketplace + m.revenue_marketplace,
       revenue_offline: acc.revenue_offline + m.revenue_offline,
     }),
     zero

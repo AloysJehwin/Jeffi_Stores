@@ -20,7 +20,9 @@ interface AccountOption {
 
 const input = inputCls
 
-type Method = 'google' | 'manual' | 'manager' | 'create' | 'platform'
+type Method = 'google' | 'manual' | 'own' | 'manager' | 'create' | 'platform'
+
+const OWN_EMPTY = { developerToken: '', clientId: '', clientSecret: '', refreshToken: '', customerId: '', loginCustomerId: '' }
 
 /** Env/setup state shown when the platform side is not ready. */
 export function NotConfigured({ status }: { status: AdsConnectionStatus }) {
@@ -44,6 +46,7 @@ export function NotConfigured({ status }: { status: AdsConnectionStatus }) {
       <p className="text-xs text-foreground-muted">
         Redirect URI on the Google OAuth client (the same one Merchant Center uses): <code className="break-all">{status.oauth.redirectUri}</code>
       </p>
+      <p className="text-sm text-foreground-secondary">Or connect with your own developer token under Your own API credentials below.</p>
     </div>
   )
 }
@@ -62,6 +65,7 @@ export default function ConnectPanel({
   const [error, setError] = useState<string | null>(null)
   const toast = useActionToast()
   const [manual, setManual] = useState({ customerId: '', loginCustomerId: '', refreshToken: '' })
+  const [own, setOwn] = useState(OWN_EMPTY)
   const [managed, setManaged] = useState('')
   const canWrite = useCanWrite('google_ads')
   const canCreate = useCanWrite('google_ads_campaigns')
@@ -114,10 +118,12 @@ export default function ConnectPanel({
     window.location.href = '/api/admin/integrations/google-ads/connect'
   }
 
-  const disabled = !status.env.developerToken || !canWrite
+  const hasDevToken = status.env.developerToken || !!status.ownCredentials?.developerToken
+  const disabled = !hasDevToken || !canWrite
   const tabs: { id: Method; label: string; show: boolean }[] = [
     { id: 'google', label: 'Sign in with Google', show: true },
     { id: 'manual', label: 'Enter manually', show: true },
+    { id: 'own', label: 'Your own API credentials', show: true },
     { id: 'manager', label: 'Managed by the platform', show: !!status.env.managerId && status.env.managerRefreshToken },
     { id: 'create', label: 'Create a new account', show: !!status.env.managerId && status.env.managerRefreshToken },
     { id: 'platform', label: 'Platform service account', show: status.flagship },
@@ -255,6 +261,65 @@ export default function ConnectPanel({
           </label>
           <div className="sm:col-span-2">
             <button type="submit" className={btnPrimary} disabled={busy || disabled}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Verify and save
+            </button>
+          </div>
+        </form>
+      )}
+
+      {method === 'own' && (
+        <form
+          className="grid gap-3 sm:grid-cols-2"
+          onSubmit={e => {
+            e.preventDefault()
+            post({ action: 'manual', ...own, loginCustomerId: own.loginCustomerId || null })
+          }}
+        >
+          <div className="sm:col-span-2 space-y-1 text-sm text-foreground-secondary">
+            <p>Use your own Google Ads API access instead of the platform&apos;s:</p>
+            <ol className="list-decimal pl-5 space-y-0.5 text-xs">
+              <li>In your Google Ads manager account, open Admin, API Center and copy the developer token (apply for Basic access to use live accounts).</li>
+              <li>
+                In Google Cloud, enable the Google Ads API and create an OAuth client (Web application) with
+                https://developers.google.com/oauthplayground as an authorised redirect URI.
+              </li>
+              <li>
+                In the Google OAuth Playground, choose &quot;Use your own OAuth credentials&quot;, enter that client, authorise the scope
+                https://www.googleapis.com/auth/adwords (add https://www.googleapis.com/auth/datamanager to upload conversions) and
+                exchange the code for a refresh token. If the consent screen is in Testing, the token expires after 7 days; publish it
+                to keep syncing.
+              </li>
+            </ol>
+          </div>
+          {(
+            [
+              ['developerToken', 'Developer token', status.env.developerToken ? 'Leave blank to use the platform token' : '', true],
+              ['clientId', 'OAuth client ID', 'Ends with .apps.googleusercontent.com', false],
+              ['clientSecret', 'OAuth client secret', '', true],
+              ['refreshToken', 'Refresh token (issued to this client)', '', true],
+              ['customerId', 'Customer id', '123-456-7890', false],
+              ['loginCustomerId', 'Manager id (login customer id, optional)', 'Only if a manager account grants access', false],
+            ] as const
+          ).map(([k, label, placeholder, secret]) => (
+            <label key={k} className="text-sm space-y-1 min-w-0">
+              <span className="text-foreground-secondary">{label}</span>
+              <input
+                className={input}
+                type={secret ? 'password' : 'text'}
+                autoComplete="off"
+                placeholder={placeholder}
+                value={own[k]}
+                onChange={e => setOwn(o => ({ ...o, [k]: e.target.value }))}
+              />
+            </label>
+          ))}
+          <p className="sm:col-span-2 text-xs text-foreground-muted">Secrets are stored encrypted and are never shown again.</p>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              className={btnPrimary}
+              disabled={busy || !canWrite || (!status.env.developerToken && !own.developerToken.trim())}
+            >
               {busy && <Loader2 className="w-4 h-4 animate-spin" />} Verify and save
             </button>
           </div>

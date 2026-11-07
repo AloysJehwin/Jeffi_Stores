@@ -28,6 +28,8 @@ const TIERS: Array<{ pattern: RegExp; config: RateLimitConfig }> = [
   { pattern: /^\/api\/staff\//, config: { windowSecs: 10, max: 30 } },
   { pattern: /^\/api\/admin\/session\//, config: { windowSecs: 60, max: 30 } },
   { pattern: /^\/api\/support\//, config: { windowSecs: 10, max: 15 } },
+  // Marketplace order pushes arrive in bursts from a few IPs; a token guards them.
+  { pattern: /^\/api\/webhooks\/(myntra|ajio)(\/|$)/, config: { windowSecs: 10, max: 2000 } },
   { pattern: /^\/api\/webhooks\//, config: { windowSecs: 10, max: 200 } },
   { pattern: /^\/api\//, config: { windowSecs: 10, max: 60 } },
 ]
