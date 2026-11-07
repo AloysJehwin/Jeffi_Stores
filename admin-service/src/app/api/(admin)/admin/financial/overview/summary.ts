@@ -304,9 +304,7 @@ async function attention() {
       `SELECT ep.id, e.id AS expense_id, e.expense_number, e.supplier_name, ep.amount::float8 AS amount, ep.payout_status,
          (${TODAY} - ${istDay('ep.created_at')})::int AS days
        FROM expense_payments ep JOIN expenses e ON e.id = ep.expense_id
-       WHERE ep.payout_id IS NOT NULL
-         AND (ep.payout_status IN ('failed', 'reversed')
-              OR (ep.payout_status NOT IN ('processed', 'failed', 'reversed', 'cancelled') AND ep.created_at < NOW() - interval '2 days'))
+       WHERE ep.payout_id IS NOT NULL AND ep.payout_status IN ('failed', 'reversed')
        ORDER BY ep.created_at ASC LIMIT 5`
     ),
   ])

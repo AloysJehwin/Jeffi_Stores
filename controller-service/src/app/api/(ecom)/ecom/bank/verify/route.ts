@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { verifyBankAccountFAV } from '@controller/lib/payments/bank-verify'
+import { recordBankAccount } from '@controller/lib/payments/bank-verify'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,10 +13,9 @@ const Schema = z.object({
   holderName: z.string().min(1).max(200),
 })
 
-// Owner submits bank details → recorded against the owner for Route settlements.
-// Where a RazorpayX balance is configured, FAV penny-drops to confirm the holder name; otherwise
-// the details are format-checked and stored 'unverified'. Both are accepted for go-live —
-// Razorpay validates the account when the Route linked account is configured.
+// Owner submits bank details → format-checked and recorded 'unverified' against the owner for Route
+// settlements. That is accepted for go-live: Razorpay validates the account when the Route linked
+// account is configured.
 export async function POST(request: NextRequest) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const owner = await resolveOwnerSession(sid, extractSessionSignals(request))
@@ -29,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   const { accountNumber, ifsc, holderName } = parsed.data
 
-  const result = await verifyBankAccountFAV(owner.id, {
+  const result = await recordBankAccount(owner.id, {
     accountNumber,
     ifsc: ifsc.toUpperCase(),
     holderName,

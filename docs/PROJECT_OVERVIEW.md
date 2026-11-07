@@ -13,7 +13,7 @@ E-commerce platform powering [jeffistores.in](https://jeffistores.in), an indust
 - **Cache / Realtime**: Redis (in Docker network), AWS API Gateway WebSocket for live admin updates
 - **Storage**: AWS S3 + CloudFront for product/gallery images and static assets
 - **Email**: AWS SES SMTP via `nodemailer`
-- **Payments**: Razorpay (checkout) + RazorpayX (payouts)
+- **Payments**: Razorpay (checkout, Route settlements)
 - **Shipping**: Delhivery API
 - **Hosting**: AWS EC2 (Amazon Linux 2023, ARM `t4g.micro`) running Docker Compose
 - **CDN / TLS**: CloudFront in front of EC2 + S3, Let's Encrypt via Certbot on EC2
@@ -108,7 +108,7 @@ Authentication (`auth.ts`, `jwt.ts`, `otp.ts`, `scopes.ts`), DB (`db.ts`, `queri
 
 ### Integrations
 
-- **Razorpay** — payment processing. Env: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `ENABLE_RAZORPAY`, `NEXT_PUBLIC_ENABLE_RAZORPAY`. Payouts use RazorpayX (`RAZORPAYX_KEY_ID`, `RAZORPAYX_KEY_SECRET`, `RAZORPAYX_ACCOUNT_NUMBER`, `RAZORPAYX_WEBHOOK_SECRET`).
+- **Razorpay** — payment processing. Env: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `ENABLE_RAZORPAY`, `NEXT_PUBLIC_ENABLE_RAZORPAY`.
 - **Google Sheets** — product sync to Sheet1 of the Google Merchant/Product sheet (38 cols). Service account key file `jeffi-stores-76e9ecaecdd6.json` mounted into the container; key is **not** in the repo.
 - **Google Merchant Center** — nightly product feed for Google Shopping ads (merchant ID `5762156822`); same service account.
 - **AWS SES** — order/auth/notification emails. Env: `SES_SMTP_USER`, `SES_SMTP_PASSWORD`, `SES_FROM_EMAIL`, `SES_ADMIN_FROM_EMAIL`.
@@ -200,7 +200,6 @@ Grouped by domain. Required-for-prod marked with `*`.
 ### Payments
 - `RAZORPAY_KEY_ID`*, `RAZORPAY_KEY_SECRET`*, `NEXT_PUBLIC_RAZORPAY_KEY_ID`*
 - `RAZORPAY_WEBHOOK_SECRET`, `ENABLE_RAZORPAY`, `NEXT_PUBLIC_ENABLE_RAZORPAY`
-- `RAZORPAYX_KEY_ID`, `RAZORPAYX_KEY_SECRET`, `RAZORPAYX_ACCOUNT_NUMBER`, `RAZORPAYX_WEBHOOK_SECRET`
 
 ### GST / Invoicing
 - `ENABLE_GST`, `NEXT_PUBLIC_ENABLE_GST`

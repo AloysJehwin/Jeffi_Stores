@@ -211,11 +211,9 @@ export async function getTenantBankAccount(tenantId: string): Promise<BankAccoun
 /**
  * Whether the owner has bank details we can settle to.
  *
- * 'verified' means a penny-drop confirmed the holder name. 'unverified' means the details are
- * well-formed but no penny-drop ran — which is the normal case here, because that check needs
- * RazorpayX and this platform settles through Route. Both pass: Razorpay validates the account
- * for real when the Route linked account is configured, so gating go-live on a penny-drop we
- * cannot perform would block every store. 'pending' and 'failed' do not pass.
+ * 'verified' is from an earlier penny-drop check; 'unverified' means the details are well-formed,
+ * the normal case now. Both pass: Razorpay validates the account for real when the Route linked
+ * account is configured. 'pending' and 'failed' do not pass.
  */
 export async function hasVerifiedBank(ownerId: string): Promise<boolean> {
   const status = (await getOwnerBankAccount(ownerId))?.verification_status

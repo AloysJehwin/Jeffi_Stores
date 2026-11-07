@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type Dispatch, type SetStateAction } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
@@ -399,23 +399,15 @@ function AddBillDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   )
 }
 
-// Preserves PayablesPayModal exactly (manual record + RazorpayX payout); only the open/close
-// plumbing changes.
 function PayModalHost({ bill, onClose }: { bill: Bill; onClose: () => void }) {
   const toast = useActionToast()
-  const remainingStr = remaining(bill).toFixed(2)
-  const [payTab, setPayTab] = useState<'manual' | 'razorpayx'>('manual')
   const [payForm, setPayForm] = useState({
-    amount: remainingStr,
+    amount: remaining(bill).toFixed(2),
     payment_date: new Date().toISOString().slice(0, 10),
     payment_method: 'bank_transfer',
     reference: '',
   })
-  const [rzpForm, setRzpForm] = useState({ mode: 'IMPS', amount: remainingStr, notes: '' })
   const [paying, setPaying] = useState(false)
-  const [payoutResult, setPayoutResult] = useState<{ ok: boolean; payout_id?: string; status?: string; error?: string } | null>(null)
-  const hasBank = !!(bill.supplier_account_number && bill.supplier_ifsc)
-  const hasUpi = !!bill.supplier_upi_id
 
   const submitPayment = async () => {
     if (!payForm.amount) return
@@ -430,28 +422,6 @@ function PayModalHost({ bill, onClose }: { bill: Bill; onClose: () => void }) {
     if (res.ok) onClose()
   }
 
-  const submitPayout = async () => {
-    if (!rzpForm.amount) return
-    setPaying(true)
-    setPayoutResult(null)
-    const res = await fetch(`/api/admin/financial/payables/${bill.id}/payout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(rzpForm),
-    })
-    const json = await res.json()
-    setPaying(false)
-    if (json.success) {
-      setPayoutResult({ ok: true, payout_id: json.payout_id, status: json.payout_status })
-      toast.success(`Payout queued. ID ${json.payout_id}, status ${json.payout_status}.`)
-      fetch('/api/admin/financial/payables/sync-payouts', { method: 'POST' }).catch(() => {})
-      onClose()
-    } else {
-      setPayoutResult({ ok: false, error: json.error })
-      toast.error(json.error || 'Payout failed.')
-    }
-  }
-
   return (
     <PayablesPayModal
       payModal={{
@@ -459,19 +429,10 @@ function PayModalHost({ bill, onClose }: { bill: Bill; onClose: () => void }) {
         total_amount: String(bill.total_amount),
         paid_amount: String(bill.paid_amount),
       }}
-      payTab={payTab}
-      setPayTab={setPayTab as Dispatch<SetStateAction<'manual' | 'razorpayx'>>}
       payForm={payForm}
       setPayForm={setPayForm}
-      rzpForm={rzpForm}
-      setRzpForm={setRzpForm}
       paying={paying}
-      payoutResult={payoutResult}
-      setPayoutResult={setPayoutResult as Dispatch<SetStateAction<unknown>>}
-      hasBank={hasBank}
-      hasUpi={hasUpi}
       submitPayment={submitPayment}
-      submitPayout={submitPayout}
       closePayModal={onClose}
     />
   )
