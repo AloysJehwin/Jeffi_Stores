@@ -7,12 +7,14 @@ import { runAdsAlerts } from './alerts'
 /** Shared handler for the nightly full sync and the intraday refresh (run per store by the fan-out). */
 export async function handleAdsCron(req: NextRequest, mode: AdsSyncMode): Promise<NextResponse> {
   if (!verifyCronRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!googleAdsEnvStatus().developerToken) return NextResponse.json({ skipped: 'not_configured' })
+  let creds: Awaited<ReturnType<typeof resolveGoogleAdsCreds>> | undefined
   try {
-    await resolveGoogleAdsCreds()
+    creds = await resolveGoogleAdsCreds()
   } catch {
     return NextResponse.json({ skipped: 'not_connected' })
   }
+  // The store's own developer token, else the platform's.
+  if (!creds?.developerToken && !googleAdsEnvStatus().developerToken) return NextResponse.json({ skipped: 'not_configured' })
   try {
     const r = await syncGoogleAds(mode)
     const alerts = r.status === 'error' ? null : await runAdsAlerts()

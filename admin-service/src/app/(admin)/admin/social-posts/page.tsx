@@ -5,7 +5,8 @@ import { PageBody, PageHeader } from '@/components/admin/kit'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
 import { credentialOwnerId } from '@/lib/integrations/owner'
 import { getTenantSocialAccounts } from '@/lib/tenant-registry'
-import { oauthProviderInfo } from '@/lib/integrations/oauth'
+import { metaOAuthInfo } from '@/lib/integrations/oauth'
+import { missingMetaPermissions, readPendingPagePick } from '@/lib/social/meta-connect'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -18,7 +19,15 @@ export default async function SocialPostsPage() {
   const canApprove = hasScope(role, scopes, 'social:approve')
 
   // Same Meta connect flow for stores and the flagship (whose accounts sit under the platform id).
-  const socialAccounts = canWrite ? await getTenantSocialAccounts(await credentialOwnerId()) : []
+  const ownerId = canWrite ? await credentialOwnerId() : null
+  const [socialAccounts, metaOAuth, pickPending, missingPermissions] = ownerId
+    ? await Promise.all([
+        getTenantSocialAccounts(ownerId),
+        metaOAuthInfo('meta', ownerId),
+        readPendingPagePick(ownerId).then(p => !!p),
+        missingMetaPermissions(ownerId).catch(() => []),
+      ])
+    : [[], undefined, false, []]
 
   return (
     <PageBody>
@@ -35,7 +44,8 @@ export default async function SocialPostsPage() {
                   ? [{ provider: s.provider, page_name: s.page_name, page_id: s.page_id, status: s.status }]
                   : []
               )}
-              oauth={{ meta: oauthProviderInfo('meta') }}
+              oauth={{ meta: metaOAuth }}
+              meta={{ pickPending, missingPermissions }}
             />
           )
         }

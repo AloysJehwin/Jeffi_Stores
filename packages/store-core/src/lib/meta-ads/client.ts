@@ -4,16 +4,16 @@ import { IntegrationNotConnectedError } from '@/lib/integrations/resolve'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
 import { fetchWithRetry } from '@/lib/channels/ratelimit'
+import { META_ADS_SCOPES, META_GRAPH, findMetaConfig } from '@/lib/catalog/meta'
 
 // Meta Marketing API (ad accounts, campaigns, insights) and the Conversions API. The same Meta app
-// as social posting (META_APP_ID / META_APP_SECRET) with ads scopes, stored in its own credential
+// as social posting (the store's own, else META_APP_ID / META_APP_SECRET) with ads scopes, stored in its own credential
 // row 'meta_ads' so connecting ads never replaces the Page token used for posting. A long-lived
 // user token lasts about 60 days; a system user token (entered by hand) does not expire.
 
 export const META_ADS_PROVIDER = 'meta_ads'
-export const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v21.0'
-export const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`
-export const META_ADS_SCOPES = ['ads_read', 'ads_management', 'business_management']
+export const GRAPH = META_GRAPH
+export { META_ADS_SCOPES }
 
 export interface MetaAdsConfig {
   access_token: string
@@ -25,6 +25,8 @@ export interface MetaAdsConfig {
   /** Conversions API token from Events Manager; the access token is used when absent. */
   capi_token?: string
   connected_via: 'oauth' | 'manual'
+  /** App-scoped Facebook user who signed in (for Meta's deauthorize and data-deletion callbacks). */
+  fb_user_id?: string
 }
 
 export class MetaApiError extends Error {
@@ -38,7 +40,8 @@ export class MetaApiError extends Error {
   }
 }
 
-export const metaEnvReady = () => !!(process.env.META_APP_ID && process.env.META_APP_SECRET)
+/** Whether this store can sign in: its own Meta app or the platform's. */
+export const metaAppReady = async (tenantKey?: string) => !!(await findMetaConfig(tenantKey ?? (await metaAdsTenantKey())))
 
 export async function metaAdsTenantKey(): Promise<string> {
   return (await resolveTenantId()) ?? PLATFORM_TENANT_ID
@@ -66,6 +69,7 @@ export async function saveMetaAdsConfig(tenantKey: string, cfg: MetaAdsConfig): 
       ad_account_id: cfg.ad_account_id ?? null,
       pixel_id: cfg.pixel_id ?? null,
       connected_via: cfg.connected_via,
+      fb_user_id: cfg.fb_user_id ?? null,
     },
     expiresAt: cfg.token_expires_at ? new Date(cfg.token_expires_at) : null,
   })

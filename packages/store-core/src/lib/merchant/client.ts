@@ -45,7 +45,7 @@ export async function getAccessToken(): Promise<string> {
 
   // Connected with Google sign-in: refresh the stored token instead of signing a JWT.
   if (creds.refreshToken) {
-    const { token, expiresInSec } = await googleOAuthAccessToken(creds.refreshToken, 'Google Merchant')
+    const { token, expiresInSec } = await googleOAuthAccessToken(creds.refreshToken, 'Google Merchant', creds.oauthClient)
     tokenCache.set(cacheKey, { token, expiresAt: Date.now() + expiresInSec * 1000 })
     return token
   }

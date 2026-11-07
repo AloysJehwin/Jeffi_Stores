@@ -10,6 +10,7 @@ import { checkWalletForShipment, chargeDeliveryEstimate } from '@/lib/payments/w
 import { resolveShippingAccount } from '@/lib/shipping/delhivery-account'
 import { fallbackShippingRate } from '@/lib/shipping/shipping'
 import { orderItemFactorSql } from '@/lib/orders/unit-conversion'
+import { marketplaceRefusal } from '@/lib/marketplace/order-guard'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const order = await queryOne<any>(
       `
       SELECT
-        o.id, o.order_number, o.status, o.total_amount, o.created_at,
+        o.id, o.order_number, o.status, o.total_amount, o.created_at, o.source,
         sa.full_name, sa.address_line1, sa.address_line2, sa.landmark,
         sa.city, sa.state, sa.postal_code, sa.phone AS consignee_phone,
         u.email AS user_email
@@ -50,6 +51,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    const marketplace = marketplaceRefusal(order.source, 'return_pickup')
+    if (marketplace) return NextResponse.json({ error: marketplace }, { status: 409 })
 
     if (order.status !== 'return_approved') {
       return NextResponse.json({ error: `Cannot create RVP — order status is "${order.status}"` }, { status: 400 })

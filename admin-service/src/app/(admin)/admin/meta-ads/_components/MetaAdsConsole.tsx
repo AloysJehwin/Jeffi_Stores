@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, RefreshCw, Send, Unplug } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import ConnectionsGear, { NotConnectedState, type ConnectionState } from '@/components/admin/ConnectionsGear'
+import MetaAppCard from '@/components/admin/MetaAppCard'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { TrendChart, type SeriesDef } from '@/components/admin/kit/charts'
@@ -57,7 +58,7 @@ const SERIES: SeriesDef[] = [
   { key: 'linkClicks', label: 'Link clicks', color: 'rgb(59 130 246)', kind: 'bar', axis: 'count', on: true },
 ]
 const ERRORS: Record<string, string> = {
-  not_configured: 'Facebook sign-in is not configured on this platform (META_APP_ID / META_APP_SECRET).',
+  not_configured: 'Facebook sign-in is not set up. Add your own Meta app in the gear, or the platform sets META_APP_ID / META_APP_SECRET.',
   bad_state: 'The sign-in link expired. Try again.',
 }
 
@@ -89,6 +90,10 @@ export default function MetaAdsConsole() {
   useEffect(() => {
     loadStatus()
   }, [loadStatus])
+
+  useEffect(() => {
+    if (sp.get('connect') === '1') setGearOpen(true)
+  }, [sp])
 
   useEffect(() => {
     const c = sp.get('connected')
@@ -320,8 +325,8 @@ function ConnectPanel({
             </a>
             {!oauthOk && (
               <p className="text-xs text-foreground-muted">
-                Sign-in needs {(status.oauth?.missing ?? []).join(', ')} on the platform, with redirect URI{' '}
-                <code className="break-all">{status.oauth?.redirectUri}</code>. A system user token works without it.
+                Sign-in needs your own Meta app (below) or {(status.oauth?.missing ?? []).join(', ')} on the platform, with
+                redirect URI <code className="break-all">{status.oauth?.redirectUri}</code>. A system user token works without it.
               </p>
             )}
           </div>
@@ -364,6 +369,7 @@ function ConnectPanel({
         </p>
       )}
       {msg && <p className="text-sm text-red-500">{msg}</p>}
+      {canWrite && <MetaAppCard own={!!status.oauth?.ownApp} canWrite={canWrite} onChanged={() => onChanged()} />}
     </div>
   )
 }

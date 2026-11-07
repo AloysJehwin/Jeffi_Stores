@@ -2654,3 +2654,28 @@ CREATE INDEX IF NOT EXISTS idx_razorpay_settlement_items_payment ON public.razor
 CREATE INDEX IF NOT EXISTS idx_razorpay_settlement_items_order ON public.razorpay_settlement_items USING btree (order_id);
 CREATE INDEX IF NOT EXISTS idx_razorpay_settlement_items_scope ON public.razorpay_settlement_items USING btree (scope, source_tenant_id);
 
+-- Marketplaces (database/marketplace.sql).
+CREATE INDEX IF NOT EXISTS idx_marketplace_orders_order_id ON public.marketplace_orders USING btree (order_id) WHERE (order_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_marketplace_orders_channel_status ON public.marketplace_orders USING btree (channel, status, placed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_marketplace_orders_stock_attention ON public.marketplace_orders USING btree (channel) WHERE ((stock_state)::text = ANY (ARRAY['short'::text, 'unmatched'::text]));
+CREATE INDEX IF NOT EXISTS idx_marketplace_order_items_sku ON public.marketplace_order_items USING btree (channel, sku);
+CREATE INDEX IF NOT EXISTS idx_marketplace_shipments_order ON public.marketplace_shipments USING btree (marketplace_order_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_shipments_packet ON public.marketplace_shipments USING btree (channel, packet_id) WHERE (packet_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_marketplace_shipments_manifest ON public.marketplace_shipments USING btree (channel, manifest_id) WHERE (manifest_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_marketplace_returns_order ON public.marketplace_returns USING btree (marketplace_order_id);
+CREATE INDEX IF NOT EXISTS idx_marketplace_returns_status ON public.marketplace_returns USING btree (channel, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_listings_sku ON public.marketplace_listings USING btree (channel, marketplace_sku) WHERE (marketplace_sku IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_listings_unit ON public.marketplace_listings USING btree (channel, product_id, COALESCE(variant_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(sub_variant_id, '00000000-0000-0000-0000-000000000000'::uuid));
+CREATE INDEX IF NOT EXISTS idx_marketplace_listings_status ON public.marketplace_listings USING btree (channel, status);
+CREATE INDEX IF NOT EXISTS idx_marketplace_listing_tasks_open ON public.marketplace_listing_tasks USING btree (channel, submitted_at) WHERE ((status)::text = ANY (ARRAY['pending'::text, 'processing'::text]));
+CREATE INDEX IF NOT EXISTS idx_marketplace_webhook_events_due ON public.marketplace_webhook_events USING btree (channel, next_attempt_at) WHERE ((status)::text = 'pending'::text);
+CREATE INDEX IF NOT EXISTS idx_marketplace_webhook_events_received ON public.marketplace_webhook_events USING btree (channel, received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_marketplace_webhook_events_order ON public.marketplace_webhook_events USING btree (channel, external_order_id);
+CREATE INDEX IF NOT EXISTS idx_marketplace_settlements_settled ON public.marketplace_settlements USING btree (channel, settled_on DESC);
+CREATE INDEX IF NOT EXISTS idx_marketplace_settlement_lines_settlement ON public.marketplace_settlement_lines USING btree (settlement_id);
+CREATE INDEX IF NOT EXISTS idx_marketplace_settlement_lines_order ON public.marketplace_settlement_lines USING btree (channel, external_order_id);
+CREATE INDEX IF NOT EXISTS idx_marketplace_settlement_lines_order_id ON public.marketplace_settlement_lines USING btree (order_id) WHERE (order_id IS NOT NULL);
+-- Marketplace ads (database/marketplace-ads.sql).
+CREATE INDEX IF NOT EXISTS idx_marketplace_ad_products_product ON public.marketplace_ad_products USING btree (channel, product_id) WHERE (product_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_marketplace_ad_imports_channel ON public.marketplace_ad_imports USING btree (channel, imported_at DESC);
+CREATE INDEX IF NOT EXISTS idx_setup_guide_progress_state ON public.setup_guide_progress USING btree (state);

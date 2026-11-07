@@ -1,16 +1,15 @@
 import { NextRequest } from 'next/server'
-import { saveTenantSocialAccount, deleteTenantSocialAccount } from '@/lib/tenant-registry'
-import { exchangeCodeForToken, getLongLivedToken, getPageAndIgAccounts } from '@/lib/catalog/meta'
-import { encryptToken } from '@/lib/crypto/token-cipher'
+import { exchangeCodeForToken, getLongLivedToken, getMetaConfig, getMetaUser, listMetaPages } from '@/lib/catalog/meta'
+import { clearPendingPagePick, saveMetaPage, savePendingPagePick } from '@/lib/social/meta-connect'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
 
 export const dynamic = 'force-dynamic'
 
 // Meta OAuth callback. Cross-site return to the platform OAuth host (no admin cookie): trust comes
-// from the signed state. Exchanges the code for a long-lived user token, resolves the Page (its
-// token does not expire when derived from a long-lived user token) + linked IG account, and stores
-// them on the state's tenant.
+// from the signed state, which also names the Meta app the dialog was opened with. Exchanges the code
+// for a long-lived user token and lists the user's Pages (a Page token does not expire when derived
+// from a long-lived user token). One Page is saved straight away; with several, the store picks one.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   const rawState = params.get('state')
@@ -25,25 +24,19 @@ export async function GET(request: NextRequest) {
   if (!code) return fail('missing_params')
 
   try {
-    const shortToken = await exchangeCodeForToken(code, oauthRedirectUri('meta'))
-    const { token: longToken } = await getLongLivedToken(shortToken)
-    const accounts = await getPageAndIgAccounts(longToken)
-    const accessTokenEnc = encryptToken(accounts.pageAccessToken)
-    const base = { tenantId: state.tenantId, pageId: accounts.pageId, pageName: accounts.pageName, accessTokenEnc }
-
-    await saveTenantSocialAccount({ ...base, provider: 'facebook', tokenExpiry: null })
-    if (accounts.igUserId) {
-      await saveTenantSocialAccount({
-        ...base,
-        provider: 'instagram',
-        igUserId: accounts.igUserId,
-        tokenExpiry: null,
-      })
-    } else {
-      // The Page has no linked IG business account any more; drop a stale IG row.
-      await deleteTenantSocialAccount(state.tenantId, 'instagram')
+    const cfg = await getMetaConfig(state.tenantId, state.metaApp ?? 'platform')
+    const shortToken = await exchangeCodeForToken(code, oauthRedirectUri('meta'), cfg)
+    const { token: longToken } = await getLongLivedToken(shortToken, cfg)
+    const [user, pages] = await Promise.all([getMetaUser(longToken), listMetaPages(longToken)])
+    if (!pages.length) return fail(errorParam('No Facebook Page found on this account (a Page is required to post)'))
+    const signIn = { fbUserId: user.id, granted: user.granted }
+    if (pages.length === 1) {
+      await saveMetaPage(state.tenantId, pages[0], signIn)
+      await clearPendingPagePick(state.tenantId)
+      return returnToAdmin(`${backTo}?connected=meta`)
     }
-    return returnToAdmin(`${backTo}?connected=meta`)
+    await savePendingPagePick(state.tenantId, { ...signIn, userToken: longToken, metaApp: cfg.source })
+    return returnToAdmin(`${backTo}?connected=meta&pick=1`)
   } catch (e) {
     return fail(errorParam(e))
   }

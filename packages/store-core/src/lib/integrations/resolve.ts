@@ -1,8 +1,9 @@
 import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
 import { createSign } from 'crypto'
 import { resolveTenant, resolveTenantId } from '@/lib/tenancy/tenant-context'
-import { controlPlanePool, getIntegrationCredential } from '../tenant-registry'
-import { decryptToken } from '../crypto/token-cipher'
+import { controlPlanePool, getIntegrationCredential, saveIntegrationCredential, deleteIntegrationCredential } from '../tenant-registry'
+import { decryptToken, encryptToken } from '../crypto/token-cipher'
+import type { MarketplaceChannel, MarketplaceMode } from '@/lib/marketplace/types'
 import { loadGoogleServiceAccount } from '@/lib/shared/google-credentials'
 
 // Runtime credential resolution for external integrations. The rule is uniform: if there is a
@@ -31,6 +32,8 @@ export interface GoogleMerchantCreds {
   clientEmail: string
   privateKey: string
   refreshToken?: string
+  /** The store's own OAuth client the refresh token was issued to; the platform's when unset. */
+  oauthClient?: GoogleOAuthApp
   merchantId: string
   // Merchant API primary API data source (`accounts/{id}/dataSources/{id}` or the bare id); found or created when unset.
   dataSource?: string
@@ -42,6 +45,8 @@ export interface AmazonCreds {
   refreshToken: string
   sellerId: string
   marketplaceId: string
+  /** The store's chosen SP-API host (region / sandbox); AMAZON_SP_API_HOST when unset. */
+  spApiHost?: string
 }
 
 /** Decrypt + parse a stored credential blob for a provider under a specific tenant, or null. */
@@ -78,10 +83,12 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
     }
   }
   if (cfg?.oauth_refresh_token && cfg?.merchant_id) {
+    const oauthClient = googleOAuthAppFrom(cfg)
     return {
       clientEmail: '',
       privateKey: '',
       refreshToken: String(cfg.oauth_refresh_token),
+      ...(oauthClient ? { oauthClient } : {}),
       merchantId: String(cfg.merchant_id),
       dataSource: cfg.data_source ? String(cfg.data_source) : undefined,
     }
@@ -103,14 +110,26 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
   }
 }
 
-/** Exchange a refresh token issued to the platform's Google OAuth client for an access token.
- * `scope` is what Google reports as granted to the token (space-separated), when it says. */
+/** A store's own Google OAuth client (the refresh token must have been issued to it). */
+export interface GoogleOAuthApp {
+  clientId: string
+  clientSecret: string
+}
+
+/** The store's own client from a stored blob's client_id/client_secret, or undefined. */
+export function googleOAuthAppFrom(cfg: Record<string, any> | null | undefined): GoogleOAuthApp | undefined {
+  return cfg?.client_id && cfg?.client_secret ? { clientId: String(cfg.client_id), clientSecret: String(cfg.client_secret) } : undefined
+}
+
+/** Exchange a refresh token for an access token, with the store's own OAuth client when given, else
+ * the platform's. `scope` is what Google reports as granted to the token (space-separated), when it says. */
 export async function googleOAuthAccessToken(
   refreshToken: string,
-  what = 'Google'
+  what = 'Google',
+  app?: GoogleOAuthApp | null
 ): Promise<{ token: string; expiresInSec: number; scope?: string }> {
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
+  const clientId = app?.clientId || process.env.GOOGLE_OAUTH_CLIENT_ID
+  const clientSecret = app?.clientId ? app.clientSecret : process.env.GOOGLE_OAUTH_CLIENT_SECRET
   if (!clientId || !clientSecret) throw new Error('Google OAuth not configured')
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -170,6 +189,8 @@ export async function googleServiceAccountAccessToken(
   return { token: String(data.access_token), expiresInSec }
 }
 
+export const GOOGLE_SHEETS_SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.file'
+
 export interface GoogleSheetsCreds {
   accessToken: string
   spreadsheetId: string | null
@@ -184,10 +205,17 @@ export interface GoogleSheetsCreds {
 export async function resolveGoogleSheetsCreds(tenantId?: string): Promise<GoogleSheetsCreds> {
   const id = tenantId ?? (await resolveTenantId())
   const cfg = id ? await tenantConfigFor(id, 'google_sheets') : null
+  const spreadsheetId = cfg?.spreadsheet_id ? String(cfg.spreadsheet_id) : null
+  // A service account the store shared its sheet with.
+  if (cfg?.client_email && cfg?.private_key) {
+    const key = String(cfg.private_key).replace(/\\n/g, '\n')
+    const { token } = await googleServiceAccountAccessToken(String(cfg.client_email), key, GOOGLE_SHEETS_SCOPES)
+    return { accessToken: token, spreadsheetId }
+  }
   const refreshToken = cfg?.oauth_refresh_token
   if (refreshToken) {
-    const { token } = await googleOAuthAccessToken(String(refreshToken), 'Google Sheets')
-    return { accessToken: token, spreadsheetId: cfg?.spreadsheet_id ? String(cfg.spreadsheet_id) : null }
+    const { token } = await googleOAuthAccessToken(String(refreshToken), 'Google Sheets', googleOAuthAppFrom(cfg))
+    return { accessToken: token, spreadsheetId }
   }
   throw new IntegrationNotConnectedError('google_sheets', id ?? 'platform')
 }
@@ -204,6 +232,7 @@ export async function resolveAmazonCreds(): Promise<AmazonCreds> {
       refreshToken: cfg.refresh_token,
       sellerId: cfg.seller_id ?? '',
       marketplaceId: cfg.marketplace_id ?? (process.env.AMAZON_MARKETPLACE_ID || 'A21TJRUUN4KGV'),
+      ...(cfg.sp_api_host ? { spApiHost: String(cfg.sp_api_host) } : {}),
     }
   }
   if (tenant) throw new IntegrationNotConnectedError('amazon_seller', tenant.tenantId)
@@ -291,4 +320,64 @@ export async function resolveRazorpayCreds(tenantId?: string): Promise<RazorpayC
     webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET || undefined,
     isOwn: false,
   }
+}
+
+// ── Marketplaces (Myntra, AJIO) ──────────────────────────────────────────────
+// The seller's own partner credentials only; there is no platform account to fall back to. The
+// flagship's sit under the platform tenant id. The blob also carries the push token we gave the
+// marketplace (the previous one stays valid for 24 h after a rotate) and an optional IP allowlist.
+
+export interface MarketplaceCreds {
+  mode: MarketplaceMode
+  fields: Record<string, string>
+  push_token?: string
+  push_token_prev?: string
+  push_token_rotated_at?: string
+  ip_allowlist?: string[]
+  endpoints?: Record<string, string>
+}
+
+export const MARKETPLACE_PROVIDER: Record<MarketplaceChannel, string> = { myntra: 'myntra_seller', ajio: 'ajio_seller' }
+const MARKETPLACE_MODES: MarketplaceMode[] = ['live', 'sandbox', 'mock']
+
+const strRecord = (v: unknown): Record<string, string> => {
+  const out: Record<string, string> = {}
+  if (v && typeof v === 'object' && !Array.isArray(v)) for (const [k, x] of Object.entries(v)) if (x != null) out[k] = String(x)
+  return out
+}
+
+function toMarketplaceCreds(cfg: Record<string, any>): MarketplaceCreds {
+  const creds: MarketplaceCreds = {
+    mode: MARKETPLACE_MODES.includes(cfg.mode) ? cfg.mode : 'live',
+    fields: strRecord(cfg.fields),
+  }
+  if (cfg.push_token) creds.push_token = String(cfg.push_token)
+  if (cfg.push_token_prev) creds.push_token_prev = String(cfg.push_token_prev)
+  if (cfg.push_token_rotated_at) creds.push_token_rotated_at = String(cfg.push_token_rotated_at)
+  if (Array.isArray(cfg.ip_allowlist)) creds.ip_allowlist = cfg.ip_allowlist.map(String).filter(Boolean)
+  if (cfg.endpoints) creds.endpoints = strRecord(cfg.endpoints)
+  return creds
+}
+
+const marketplaceTenant = async (tenantId?: string) => tenantId ?? (await resolveTenantId()) ?? PLATFORM_TENANT_ID
+
+/** The store's marketplace credentials, or null when it has not connected the marketplace. */
+export async function resolveMarketplaceCreds(channel: MarketplaceChannel, tenantId?: string): Promise<MarketplaceCreds | null> {
+  const cfg = await tenantConfigFor(await marketplaceTenant(tenantId), MARKETPLACE_PROVIDER[channel])
+  return cfg ? toMarketplaceCreds(cfg) : null
+}
+
+export async function saveMarketplaceCreds(channel: MarketplaceChannel, creds: MarketplaceCreds, tenantId?: string): Promise<void> {
+  const clean = toMarketplaceCreds(creds as unknown as Record<string, any>)
+  await saveIntegrationCredential({
+    tenantId: await marketplaceTenant(tenantId),
+    provider: MARKETPLACE_PROVIDER[channel],
+    label: channel === 'myntra' ? 'Myntra' : 'AJIO',
+    configEnc: encryptToken(JSON.stringify(clean)),
+    meta: { mode: clean.mode, has_push_token: !!clean.push_token, push_token_rotated_at: clean.push_token_rotated_at ?? null },
+  })
+}
+
+export async function deleteMarketplaceCreds(channel: MarketplaceChannel, tenantId?: string): Promise<void> {
+  await deleteIntegrationCredential(await marketplaceTenant(tenantId), MARKETPLACE_PROVIDER[channel])
 }

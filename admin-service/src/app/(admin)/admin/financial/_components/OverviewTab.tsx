@@ -9,6 +9,7 @@ import { MixDonutCard } from '@/components/admin/kit/charts'
 import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
 import { delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
+import { MARKETPLACE_LABELS, MARKETPLACE_SOURCES, type MarketplaceSource } from '@/lib/marketplace/sources'
 import {
   CashflowTrendCard,
   OutflowDonutCard,
@@ -64,9 +65,14 @@ const METHOD: Record<string, { label: string; color: string }> = {
   cash: { label: 'Cash', color: 'rgb(100 116 139)' },
   card: { label: 'Card', color: 'rgb(236 72 153)' },
 }
+const MARKETPLACE_COLOR: Record<MarketplaceSource, string> = {
+  amazon: 'rgb(249 115 22)',
+  myntra: 'rgb(219 39 119)',
+  ajio: 'rgb(202 138 4)',
+}
 const CHANNEL: Record<string, { label: string; color: string }> = {
   website: { label: 'Website', color: 'rgb(59 130 246)' },
-  amazon: { label: 'Amazon', color: 'rgb(249 115 22)' },
+  ...Object.fromEntries(MARKETPLACE_SOURCES.map(s => [s, { label: MARKETPLACE_LABELS[s], color: MARKETPLACE_COLOR[s] }])),
   store: { label: 'Store / POS', color: 'rgb(16 185 129)' },
   b2b: { label: 'B2B', color: 'rgb(168 85 247)' },
 }

@@ -34,49 +34,52 @@ afterEach(() => {
 // ── config helpers ─────────────────────────────────────────────────────────
 
 describe('meta config', () => {
-  it('getMetaConfig returns credentials when set', async () => {
-    const { getMetaConfig } = await import('@/lib/catalog/meta')
-    expect(getMetaConfig()).toEqual({ appId: 'APP_ID', appSecret: 'APP_SECRET' })
+  it('platformMetaConfig returns the env app', async () => {
+    const { platformMetaConfig } = await import('@/lib/catalog/meta')
+    expect(platformMetaConfig()).toMatchObject({ appId: 'APP_ID', appSecret: 'APP_SECRET', source: 'platform' })
   })
 
   it('getMetaConfig throws when appId missing', async () => {
     delete process.env.META_APP_ID
     const { getMetaConfig } = await import('@/lib/catalog/meta')
-    expect(() => getMetaConfig()).toThrow(/Meta not configured/)
+    await expect(getMetaConfig()).rejects.toThrow(/Meta not configured/)
   })
 
   it('getMetaConfig throws when appSecret missing', async () => {
     delete process.env.META_APP_SECRET
     const { getMetaConfig } = await import('@/lib/catalog/meta')
-    expect(() => getMetaConfig()).toThrow(/Meta not configured/)
-  })
-
-  it('isMetaEnabled reflects env presence', async () => {
-    const { isMetaEnabled } = await import('@/lib/catalog/meta')
-    expect(isMetaEnabled()).toBe(true)
-    delete process.env.META_APP_SECRET
-    const { isMetaEnabled: again } = await import('@/lib/catalog/meta')
-    expect(again()).toBe(false)
+    await expect(getMetaConfig()).rejects.toThrow(/Meta not configured/)
   })
 })
 
 // ── OAuth ───────────────────────────────────────────────────────────────────
 
 describe('meta OAuth', () => {
-  it('buildOAuthUrl embeds appId, redirect, state, scopes', async () => {
-    const { buildOAuthUrl } = await import('@/lib/catalog/meta')
-    const url = buildOAuthUrl('https://app/cb', 'state123')
+  it('buildOAuthUrl embeds appId, redirect, state, scopes on v27 by default', async () => {
+    const { buildOAuthUrl, platformMetaConfig } = await import('@/lib/catalog/meta')
+    const url = buildOAuthUrl(platformMetaConfig()!, 'https://app/cb', 'state123')
     expect(url).toContain('client_id=APP_ID')
     expect(url).toContain('redirect_uri=https%3A%2F%2Fapp%2Fcb')
     expect(url).toContain('state=state123')
     expect(url).toContain('instagram_content_publish')
-    expect(url).toContain('/dialog/oauth?')
+    expect(url).toContain('instagram_manage_comments')
+    expect(url).toContain('/v27.0/dialog/oauth?')
+  })
+
+  it('buildOAuthUrl sends a login configuration instead of scopes when set', async () => {
+    process.env.META_ADS_LOGIN_CONFIG_ID = '424242'
+    const { buildOAuthUrl, platformMetaConfig } = await import('@/lib/catalog/meta')
+    const url = new URL(buildOAuthUrl(platformMetaConfig()!, 'https://app/cb', 's', 'ads'))
+    expect(url.searchParams.get('config_id')).toBe('424242')
+    expect(url.searchParams.get('override_default_response_type')).toBe('true')
+    expect(url.searchParams.get('response_type')).toBe('code')
+    expect(url.searchParams.get('scope')).toBeNull()
   })
 
   it('buildOAuthUrl honours META_GRAPH_VERSION override', async () => {
     process.env.META_GRAPH_VERSION = 'v99.0'
-    const { buildOAuthUrl } = await import('@/lib/catalog/meta')
-    expect(buildOAuthUrl('https://app/cb', 's')).toContain('/v99.0/dialog/oauth')
+    const { buildOAuthUrl, platformMetaConfig } = await import('@/lib/catalog/meta')
+    expect(buildOAuthUrl(platformMetaConfig()!, 'https://app/cb', 's')).toContain('/v99.0/dialog/oauth')
   })
 
   it('exchangeCodeForToken returns access_token on success', async () => {
@@ -129,49 +132,30 @@ describe('meta OAuth', () => {
 
 // ── page + IG resolution ─────────────────────────────────────────────────────
 
-describe('getPageAndIgAccounts', () => {
-  it('returns the first page with its IG business account', async () => {
+describe('listMetaPages', () => {
+  it('returns every page with its IG business account', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
         res(200, {
-          data: [{ id: 'P1', name: 'Acme', access_token: 'page_tok', instagram_business_account: { id: 'IG1' } }],
+          data: [
+            { id: 'P1', name: 'Acme', access_token: 'page_tok', instagram_business_account: { id: 'IG1' } },
+            { id: 'P2', name: 'Acme Outlet', access_token: 'page_tok2' },
+          ],
         })
       )
     )
-    const { getPageAndIgAccounts } = await import('@/lib/catalog/meta')
-    await expect(getPageAndIgAccounts('user_tok')).resolves.toEqual({
-      pageId: 'P1',
-      pageName: 'Acme',
-      pageAccessToken: 'page_tok',
-      igUserId: 'IG1',
-    })
+    const { listMetaPages } = await import('@/lib/catalog/meta')
+    await expect(listMetaPages('user_tok')).resolves.toEqual([
+      { pageId: 'P1', pageName: 'Acme', pageAccessToken: 'page_tok', igUserId: 'IG1' },
+      { pageId: 'P2', pageName: 'Acme Outlet', pageAccessToken: 'page_tok2', igUserId: null },
+    ])
   })
 
-  it('returns igUserId null when no IG connected', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        res(200, {
-          data: [{ id: 'P1', name: 'Acme', access_token: 'page_tok' }],
-        })
-      )
-    )
-    const { getPageAndIgAccounts } = await import('@/lib/catalog/meta')
-    const r = await getPageAndIgAccounts('user_tok')
-    expect(r.igUserId).toBeNull()
-  })
-
-  it('throws when no page found', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, { data: [] })))
-    const { getPageAndIgAccounts } = await import('@/lib/catalog/meta')
-    await expect(getPageAndIgAccounts('user_tok')).rejects.toThrow(/No Facebook Page/)
-  })
-
-  it('throws when data is entirely absent', async () => {
+  it('returns no pages when data is absent', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, {})))
-    const { getPageAndIgAccounts } = await import('@/lib/catalog/meta')
-    await expect(getPageAndIgAccounts('user_tok')).rejects.toThrow(/No Facebook Page/)
+    const { listMetaPages } = await import('@/lib/catalog/meta')
+    await expect(listMetaPages('user_tok')).resolves.toEqual([])
   })
 })
 

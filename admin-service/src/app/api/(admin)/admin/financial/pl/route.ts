@@ -12,7 +12,7 @@ type SourceRow = { key: string; label: string; revenue: number }
 const DEFAULT_TOTALS: PLTotals = {
   revenue: 0, refunds: 0, net_revenue: 0, cogs: 0, gross_profit: 0, gross_margin_pct: 0,
   operating_expenses: 0, operating_profit: 0, tax_collected: 0, order_count: 0,
-  revenue_online: 0, revenue_business: 0, revenue_cash_sale: 0, revenue_offline: 0,
+  revenue_online: 0, revenue_business: 0, revenue_cash_sale: 0, revenue_marketplace: 0, revenue_offline: 0,
 }
 
 function toSeries(monthly: PLMonth[]) {
@@ -30,6 +30,7 @@ function toSources(t: PLTotals): SourceRow[] {
     { key: 'online', label: 'Website', revenue: t.revenue_online },
     { key: 'business', label: 'B2B', revenue: t.revenue_business },
     { key: 'cash_sale', label: 'Cash sale', revenue: t.revenue_cash_sale },
+    { key: 'marketplace', label: 'Marketplaces', revenue: t.revenue_marketplace },
     { key: 'offline', label: 'Offline / Store', revenue: t.revenue_offline },
   ].filter(s => s.revenue > 0)
 }

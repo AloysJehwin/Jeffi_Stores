@@ -66,6 +66,10 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'admin-service/src/app/(admin)/admin/products/_components/ProductsMobileList.tsx',
   'admin-service/src/app/(admin)/admin/invoices/InvoicesClient.tsx',
   'admin-service/src/app/(admin)/admin/quotations/QuotationsClient.tsx',
+  // Gated on a canWrite prop the parent derives from the feature's :write scope (social/meta_ads,
+  // myntra/ajio), so every save/remove/test-order control is hidden or disabled without it.
+  'packages/store-core/src/components/admin/MetaAppCard.tsx',
+  'packages/store-core/src/components/admin/marketplace/ConnectPanel.tsx',
   // Gated by a server-derived `canWrite` prop that wraps the RowActions ({canWrite && <RowActions/>}).
   'packages/store-core/src/components/admin/CouponTableRow.tsx',
   // Gated on a server-derived canWrite prop (hasScope(role, scopes, 'service_accounts:write')

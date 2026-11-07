@@ -1,6 +1,7 @@
 import { platformOAuthBaseUrl, currentAdminBaseUrl } from '@/lib/catalog/brand'
 import { getTenant } from '@/lib/tenant-registry'
 import type { AdminOAuthState } from '@/lib/shared/oauth-state'
+import { readOwnMetaApp } from '@/lib/catalog/meta'
 
 // Store-admin OAuth connect flows. Every provider redirects to ONE fixed platform host (one URI
 // registered per provider covers every tenant); the signed state carries the tenant, and the
@@ -41,10 +42,20 @@ export interface OAuthProviderInfo {
 }
 
 /** Whether the platform has the app credentials for a provider's OAuth flow, and the redirect URI
- * that must be registered in that provider's developer console. */
-export function oauthProviderInfo(provider: OAuthProvider): OAuthProviderInfo {
-  const missing = REQUIRED_ENV[provider].filter(k => !process.env[k])
+ * that must be registered in that provider's developer console. `ownKeys` are required keys the
+ * store supplies itself (e.g. its own GOOGLE_ADS_DEVELOPER_TOKEN). */
+export function oauthProviderInfo(provider: OAuthProvider, ownKeys: string[] = []): OAuthProviderInfo {
+  const missing = REQUIRED_ENV[provider].filter(k => !process.env[k] && !ownKeys.includes(k))
   return { enabled: missing.length === 0, redirectUri: oauthRedirectUri(provider), missing }
+}
+
+/** Meta sign-in for a store: enabled when it has its own Meta app or the platform keys are set. */
+export async function metaOAuthInfo(
+  provider: 'meta' | 'meta_ads',
+  tenantId: string | null | undefined
+): Promise<OAuthProviderInfo & { ownApp: boolean }> {
+  const ownApp = tenantId ? !!(await readOwnMetaApp(tenantId)) : false
+  return { ...oauthProviderInfo(provider, ownApp ? ['META_APP_ID', 'META_APP_SECRET'] : []), ownApp }
 }
 
 /** admin-{slug} on the same root and scheme as the platform callback host: https://admin-acme.jeffistores.in

@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
-import { exchangeCodeForToken, getLongLivedToken } from '@/lib/catalog/meta'
+import { exchangeCodeForToken, getLongLivedToken, getMetaConfig, getMetaUser } from '@/lib/catalog/meta'
 import { readMetaAdsConfig, saveMetaAdsConfig } from '@/lib/meta-ads/client'
 
 export const dynamic = 'force-dynamic'
 
-// Meta Ads OAuth callback: cookieless and cross-site, trusted through the signed state. Stores a
-// long-lived user token; the ad account is picked on the Meta Ads page. A pixel id set earlier is kept.
+// Meta Ads OAuth callback: cookieless and cross-site, trusted through the signed state, which names the
+// Meta app the dialog was opened with. Stores a long-lived user token; the ad account is picked on the
+// Meta Ads page. A pixel id set earlier is kept.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   const rawState = params.get('state')
@@ -20,8 +21,10 @@ export async function GET(request: NextRequest) {
   const code = params.get('code')
   if (!code) return fail('missing_params')
   try {
-    const short = await exchangeCodeForToken(code, oauthRedirectUri('meta_ads'))
-    const { token, expiresInSec } = await getLongLivedToken(short)
+    const cfg = await getMetaConfig(state.tenantId, state.metaApp ?? 'platform')
+    const short = await exchangeCodeForToken(code, oauthRedirectUri('meta_ads'), cfg)
+    const { token, expiresInSec } = await getLongLivedToken(short, cfg)
+    const user = await getMetaUser(token).catch(() => null)
     const prev = await readMetaAdsConfig(state.tenantId)
     await saveMetaAdsConfig(state.tenantId, {
       access_token: token,
@@ -29,6 +32,7 @@ export async function GET(request: NextRequest) {
       pixel_id: prev?.pixel_id,
       capi_token: prev?.capi_token,
       connected_via: 'oauth',
+      fb_user_id: user?.id,
     })
     return returnToAdmin(`${backTo}?connected=1&pick=1`)
   } catch (e) {

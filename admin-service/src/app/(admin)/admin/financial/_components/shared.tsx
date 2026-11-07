@@ -12,6 +12,7 @@ export type Tab =
   | 'cashflow'
   | 'cod_remittance'
   | 'razorpay'
+  | 'marketplaces'
   | 'disputes'
   | 'messaging'
   | 'ai_costs'

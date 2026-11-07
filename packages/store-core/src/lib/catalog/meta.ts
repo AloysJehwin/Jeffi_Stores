@@ -9,26 +9,138 @@
 //   - Reels cannot carry licensed "trending" audio via the API — silent or own audio only.
 //   - Only FB Pages + IG Business/Creator accounts are postable (never personal profiles).
 
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v21.0'
-const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`
+import { controlPlanePool, deleteIntegrationCredential, getIntegrationCredential, saveIntegrationCredential } from '@/lib/tenant-registry'
+import { decryptToken, encryptToken } from '@/lib/crypto/token-cipher'
 
-export interface MetaConfig {
+/** One Graph version for every Meta caller (Social, Meta Ads, the Conversions API). */
+export const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v27.0'
+export const META_GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`
+const GRAPH = META_GRAPH
+
+/** What post insights and the comment inbox need; connections made before these were asked for lack them. */
+export const META_INSIGHTS_SCOPES = [
+  'read_insights',
+  'pages_read_user_content',
+  'pages_manage_engagement',
+  'instagram_manage_insights',
+  'instagram_manage_comments',
+]
+/** Social Posts sign-in (a classic app; a Business-type app sends its login configuration instead). */
+export const META_SOCIAL_SCOPES = [
+  'pages_show_list',
+  'pages_manage_posts',
+  'pages_read_engagement',
+  'instagram_basic',
+  'instagram_content_publish',
+  'business_management',
+  ...META_INSIGHTS_SCOPES,
+]
+export const META_ADS_SCOPES = ['ads_read', 'ads_management', 'business_management']
+
+export type MetaAppSource = 'own' | 'platform'
+
+export interface OwnMetaApp {
   appId: string
   appSecret: string
+  /** Facebook Login for Business configuration ids (Business-type apps). */
+  loginConfigId?: string | null
+  adsLoginConfigId?: string | null
 }
 
-/** App-level Meta credentials (platform Meta app). Throws if unset — same posture as getRazorpayInstance. */
-export function getMetaConfig(): MetaConfig {
+export interface MetaConfig extends OwnMetaApp {
+  source: MetaAppSource
+}
+
+/** A store's own Meta app, in tenant_integration_credentials like the other own-app providers. */
+export const META_APP_PROVIDER = 'meta_app'
+
+/** The platform Meta app from env, or null. */
+export function platformMetaConfig(): MetaConfig | null {
   const appId = process.env.META_APP_ID
   const appSecret = process.env.META_APP_SECRET
-  if (!appId || !appSecret) {
-    throw new Error('Meta not configured: set META_APP_ID and META_APP_SECRET')
+  if (!appId || !appSecret) return null
+  return {
+    appId,
+    appSecret,
+    loginConfigId: process.env.META_LOGIN_CONFIG_ID || null,
+    adsLoginConfigId: process.env.META_ADS_LOGIN_CONFIG_ID || null,
+    source: 'platform',
   }
-  return { appId, appSecret }
 }
 
-export function isMetaEnabled(): boolean {
-  return !!(process.env.META_APP_ID && process.env.META_APP_SECRET)
+export async function readOwnMetaApp(tenantId: string): Promise<OwnMetaApp | null> {
+  const row = await getIntegrationCredential(tenantId, META_APP_PROVIDER).catch(() => null)
+  if (!row || row.status !== 'connected') return null
+  try {
+    const j = JSON.parse(decryptToken(row.config_enc))
+    return j?.appId && j?.appSecret ? (j as OwnMetaApp) : null
+  } catch {
+    return null
+  }
+}
+
+export async function saveOwnMetaApp(tenantId: string, app: OwnMetaApp): Promise<void> {
+  await saveIntegrationCredential({
+    tenantId,
+    provider: META_APP_PROVIDER,
+    label: 'Meta app',
+    configEnc: encryptToken(JSON.stringify(app)),
+    meta: {
+      app_id: app.appId,
+      login_config_id: app.loginConfigId ?? null,
+      ads_login_config_id: app.adsLoginConfigId ?? null,
+    },
+  })
+}
+
+export async function deleteOwnMetaApp(tenantId: string): Promise<void> {
+  await deleteIntegrationCredential(tenantId, META_APP_PROVIDER)
+}
+
+/** Every store's own app with this app id (for Meta's signed callbacks, which name only the app). */
+export async function ownMetaAppsById(appId?: string | null): Promise<Array<OwnMetaApp & { tenantId: string }>> {
+  const r = await controlPlanePool().query(
+    `SELECT tenant_id, config_enc FROM tenant_integration_credentials
+      WHERE provider = $1 AND status = 'connected' AND ($2::text IS NULL OR meta->>'app_id' = $2) LIMIT 500`,
+    [META_APP_PROVIDER, appId ?? null]
+  )
+  const out: Array<OwnMetaApp & { tenantId: string }> = []
+  for (const row of r.rows) {
+    try {
+      const j = JSON.parse(decryptToken(row.config_enc))
+      if (j?.appId && j?.appSecret) out.push({ ...j, tenantId: String(row.tenant_id) })
+    } catch {}
+  }
+  return out
+}
+
+/**
+ * The Meta app a store signs in with: its own when it has one, else the platform's. `source` pins
+ * one of them (a callback exchanges the code with the app the dialog was opened for). Null when none.
+ */
+export async function findMetaConfig(tenantId?: string | null, source?: MetaAppSource): Promise<MetaConfig | null> {
+  if (source !== 'platform' && tenantId) {
+    const own = await readOwnMetaApp(tenantId)
+    if (own) return { ...own, source: 'own' }
+  }
+  return source === 'own' ? null : platformMetaConfig()
+}
+
+/** As findMetaConfig, but throws when there is no app. */
+export async function getMetaConfig(tenantId?: string | null, source?: MetaAppSource): Promise<MetaConfig> {
+  const cfg = await findMetaConfig(tenantId, source)
+  if (!cfg) {
+    throw new Error(
+      source === 'own' ? "This store's own Meta app is not set up" : 'Meta not configured: set META_APP_ID and META_APP_SECRET'
+    )
+  }
+  return cfg
+}
+
+function requirePlatform(): MetaConfig {
+  const cfg = platformMetaConfig()
+  if (!cfg) throw new Error('Meta not configured: set META_APP_ID and META_APP_SECRET')
+  return cfg
 }
 
 async function graphGet(path: string, params: Record<string, string>): Promise<any> {
@@ -52,33 +164,29 @@ async function graphPost(path: string, body: Record<string, string>): Promise<an
 
 // ── OAuth ────────────────────────────────────────────────────────────────────
 
-/** Build the Facebook Login dialog URL for the per-tenant connect flow. */
-export function buildOAuthUrl(redirectUri: string, state: string): string {
-  const { appId } = getMetaConfig()
-  const scopes = [
-    'pages_show_list',
-    'pages_manage_posts',
-    'pages_read_engagement',
-    'instagram_basic',
-    'instagram_content_publish',
-    'business_management',
-  ].join(',')
-  const qs = new URLSearchParams({
-    client_id: appId,
-    redirect_uri: redirectUri,
-    state,
-    scope: scopes,
-    response_type: 'code',
-  }).toString()
-  return `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${qs}`
+/**
+ * The Facebook Login dialog URL. A Business-type app signs in with its Facebook Login for Business
+ * configuration (config_id) instead of a scope list.
+ */
+export function buildOAuthUrl(cfg: MetaConfig, redirectUri: string, state: string, kind: 'social' | 'ads' = 'social'): string {
+  const configId = kind === 'ads' ? cfg.adsLoginConfigId : cfg.loginConfigId
+  const qs = new URLSearchParams({ client_id: cfg.appId, redirect_uri: redirectUri, state })
+  if (configId) {
+    qs.set('config_id', configId)
+    qs.set('response_type', 'code')
+    qs.set('override_default_response_type', 'true')
+  } else {
+    qs.set('scope', (kind === 'ads' ? META_ADS_SCOPES : META_SOCIAL_SCOPES).join(','))
+    qs.set('response_type', 'code')
+  }
+  return `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${qs}`
 }
 
 /** Exchange an OAuth code for a short-lived user access token. */
-export async function exchangeCodeForToken(code: string, redirectUri: string): Promise<string> {
-  const { appId, appSecret } = getMetaConfig()
+export async function exchangeCodeForToken(code: string, redirectUri: string, cfg: MetaConfig = requirePlatform()): Promise<string> {
   const json = await graphGet('oauth/access_token', {
-    client_id: appId,
-    client_secret: appSecret,
+    client_id: cfg.appId,
+    client_secret: cfg.appSecret,
     redirect_uri: redirectUri,
     code,
   })
@@ -86,18 +194,50 @@ export async function exchangeCodeForToken(code: string, redirectUri: string): P
 }
 
 /** Upgrade a short-lived user token to a long-lived (~60-day) one. */
-export async function getLongLivedToken(shortToken: string): Promise<{ token: string; expiresInSec: number }> {
-  const { appId, appSecret } = getMetaConfig()
+export async function getLongLivedToken(
+  shortToken: string,
+  cfg: MetaConfig = requirePlatform()
+): Promise<{ token: string; expiresInSec: number }> {
   const json = await graphGet('oauth/access_token', {
     grant_type: 'fb_exchange_token',
-    client_id: appId,
-    client_secret: appSecret,
+    client_id: cfg.appId,
+    client_secret: cfg.appSecret,
     fb_exchange_token: shortToken,
   })
   return { token: json.access_token as string, expiresInSec: Number(json.expires_in ?? 60 * 24 * 60 * 60) }
 }
 
-export interface MetaAccounts {
+/** Checks an app id + secret by fetching an app access token. Throws with Meta's reason. */
+export async function verifyMetaApp(appId: string, appSecret: string): Promise<void> {
+  const json = await graphGet('oauth/access_token', {
+    client_id: appId,
+    client_secret: appSecret,
+    grant_type: 'client_credentials',
+  })
+  if (!json?.access_token) throw new Error('Meta returned no app access token')
+}
+
+/** The signed-in Facebook user (app-scoped id) and the permissions they granted. */
+export async function getMetaUser(userToken: string): Promise<{ id: string; granted: string[] }> {
+  const [me, perms] = await Promise.all([
+    graphGet('me', { fields: 'id', access_token: userToken }),
+    graphGet('me/permissions', { access_token: userToken }).catch(() => ({ data: [] })),
+  ])
+  const granted = (perms?.data ?? []).filter((p: any) => p?.status === 'granted').map((p: any) => String(p.permission))
+  return { id: String(me.id), granted }
+}
+
+/** Permissions on any token of this app (a Page token too), via debug_token. Null when Meta won't say. */
+export async function tokenScopes(token: string, cfg: MetaConfig): Promise<string[] | null> {
+  try {
+    const j = await graphGet('debug_token', { input_token: token, access_token: `${cfg.appId}|${cfg.appSecret}` })
+    return j?.data?.is_valid && Array.isArray(j.data.scopes) ? j.data.scopes.map(String) : null
+  } catch {
+    return null
+  }
+}
+
+export interface MetaPage {
   pageId: string
   pageName: string
   pageAccessToken: string
@@ -105,23 +245,24 @@ export interface MetaAccounts {
 }
 
 /**
- * Resolve the user's first Page + its connected IG Business account. The PAGE access token
- * (long-lived) is what we persist and post with — it does not expire on the 60-day clock the
- * user token does, as long as the user token was long-lived at exchange time.
+ * The Pages the user manages, each with its linked IG Business account. The PAGE access token
+ * (long-lived) is what we persist and post with — it does not expire on the 60-day clock the user
+ * token does, as long as the user token was long-lived at exchange time.
  */
-export async function getPageAndIgAccounts(userToken: string): Promise<MetaAccounts> {
+export async function listMetaPages(userToken: string): Promise<MetaPage[]> {
   const pages = await graphGet('me/accounts', {
     access_token: userToken,
     fields: 'id,name,access_token,instagram_business_account',
+    limit: '100',
   })
-  const page = pages.data?.[0]
-  if (!page) throw new Error('No Facebook Page found on this account (a Page is required to post)')
-  return {
-    pageId: page.id,
-    pageName: page.name,
-    pageAccessToken: page.access_token,
-    igUserId: page.instagram_business_account?.id ?? null,
-  }
+  return (pages.data ?? [])
+    .filter((p: any) => p?.id && p?.access_token)
+    .map((p: any) => ({
+      pageId: String(p.id),
+      pageName: String(p.name ?? ''),
+      pageAccessToken: String(p.access_token),
+      igUserId: p.instagram_business_account?.id ?? null,
+    }))
 }
 
 export interface MetaPageInfo {

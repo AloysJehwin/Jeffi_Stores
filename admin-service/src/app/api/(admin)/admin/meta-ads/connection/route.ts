@@ -3,15 +3,16 @@ import { z } from 'zod'
 import { query } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { channelError, readJson, withPlan } from '@/lib/channels/route'
-import { oauthProviderInfo } from '@/lib/integrations/oauth'
-import { disconnectMetaAds, listAdAccounts, metaAdsTenantKey, metaEnvReady, readMetaAdsConfig, saveMetaAdsConfig } from '@/lib/meta-ads/client'
+import { metaOAuthInfo } from '@/lib/integrations/oauth'
+import { disconnectMetaAds, listAdAccounts, metaAdsTenantKey, metaAppReady, readMetaAdsConfig, saveMetaAdsConfig } from '@/lib/meta-ads/client'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   const admin = await withPlan(await requireAdminScope(request, 'meta_ads:read'), 'meta_ads:read', 'Meta Ads')
   if (admin instanceof NextResponse) return admin
-  const cfg = await readMetaAdsConfig()
+  const key = await metaAdsTenantKey()
+  const cfg = await readMetaAdsConfig(key)
   let accounts: Awaited<ReturnType<typeof listAdAccounts>> = []
   let accountError: string | null = null
   if (cfg && !cfg.ad_account_id) {
@@ -21,8 +22,8 @@ export async function GET(request: NextRequest) {
     })
   }
   return NextResponse.json({
-    envReady: metaEnvReady(),
-    oauth: oauthProviderInfo('meta_ads'),
+    envReady: await metaAppReady(key),
+    oauth: await metaOAuthInfo('meta_ads', key),
     connected: !!cfg?.ad_account_id,
     pending: !!cfg && !cfg.ad_account_id,
     adAccountId: cfg?.ad_account_id ?? null,
@@ -55,7 +56,8 @@ export async function POST(request: NextRequest) {
   if (!token) return NextResponse.json({ error: 'Connect with Facebook first, or enter an access token.' }, { status: 409 })
   try {
     const next = { ...(current ?? { connected_via: 'manual' as const }), access_token: token }
-    if (b.accessToken) Object.assign(next, { connected_via: 'manual', token_expires_at: null })
+    // A system user token belongs to no Facebook user, so Meta's deletion callbacks no longer apply.
+    if (b.accessToken) Object.assign(next, { connected_via: 'manual', token_expires_at: null, fb_user_id: undefined })
     if (b.adAccountId) {
       const id = b.adAccountId.startsWith('act_') ? b.adAccountId : `act_${b.adAccountId}`
       const acct = (await listAdAccounts(token)).find(a => a.id === id)
