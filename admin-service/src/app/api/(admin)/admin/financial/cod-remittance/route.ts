@@ -186,9 +186,11 @@ export async function POST(request: NextRequest) {
   if (tenant?.tenantId && remitted.rows.length > 0) {
     const { controlPlanePool } = await import('@/lib/tenant-registry')
     const cpRow = await controlPlanePool()
-      .query(`SELECT daily_payout FROM tenants WHERE id=$1`, [tenant.tenantId])
+      .query(`SELECT daily_payout, own_delhivery FROM tenants WHERE id=$1`, [tenant.tenantId])
       .catch(() => null)
     const dailyPayout = cpRow?.rows[0]?.daily_payout === true
+    // Its own Delhivery account billed the shipping directly; don't deduct it from the share.
+    const ownDelhivery = cpRow?.rows[0]?.own_delhivery === true
     const settledOrders = await queryMany<{
       order_number: string
       total_amount: string
@@ -214,6 +216,7 @@ export async function POST(request: NextRequest) {
         actualDelhiveryChargeInr: actualDelhivery,
         dailyPayout,
         walletBilled: o.delhivery_billed_at != null,
+        ownDelhivery,
       }).catch(() => {})
     }
   }

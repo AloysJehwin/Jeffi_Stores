@@ -1123,14 +1123,19 @@ export default async function OrderDetailsPage({
                             {daysLeft != null ? (daysLeft < 0 ? ' (overdue)' : daysLeft === 0 ? ' (today)' : ` (${daysLeft}d left)`) : ''}
                           </div>
                         )}
-                        <a
-                          href={`https://dashboard.razorpay.com/app/disputes/${d.razorpay_dispute_id}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-accent-500 hover:underline"
-                        >
-                          {d.status === 'open' ? 'Respond on Razorpay' : 'View on Razorpay'}
-                        </a>
+                        {/* Route stores' payments sit on the platform account, which answers their disputes. */}
+                        {showSettlement ? (
+                          <a
+                            href={`https://dashboard.razorpay.com/app/disputes/${d.razorpay_dispute_id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-accent-500 hover:underline"
+                          >
+                            {d.status === 'open' ? 'Respond on Razorpay' : 'View on Razorpay'}
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-foreground-muted">Handled by the platform</span>
+                        )}
                       </div>
                     )
                   })}

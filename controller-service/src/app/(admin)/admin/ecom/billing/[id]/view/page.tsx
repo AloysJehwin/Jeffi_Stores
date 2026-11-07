@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { getTenantBilling } from '@/lib/tenant-registry'
 import { getTenantWallet } from '@/lib/payments/wallet'
-import { hasOwnDelhiveryToken, resolveRazorpayCreds } from '@/lib/integrations/resolve'
+import { hasOwnDelhiveryToken, storedRazorpayKeys } from '@/lib/integrations/resolve'
 import { DETAIL_PAGE_SIZE, loadTenantDetail, pageParam, withParam } from '@controller/lib/ecom/detail'
 import TenantObjectHeader from '@controller/components/admin/ecom/TenantObjectHeader'
 import { Field, FieldGrid, Section } from '@controller/components/admin/ecom/EcomUI'
@@ -47,8 +47,8 @@ export default async function TenantBillingPage({ params, searchParams }: { para
       ledger: { limit: DETAIL_PAGE_SIZE, offset: (lp - 1) * DETAIL_PAGE_SIZE },
     }),
     getTenantWallet(id, wl * WALLET_STEP).catch(() => null),
-    resolveRazorpayCreds(id)
-      .then(c => c.isOwn)
+    storedRazorpayKeys(id)
+      .then(k => !!k)
       .catch(() => false),
     hasOwnDelhiveryToken(id).catch(() => false),
   ])

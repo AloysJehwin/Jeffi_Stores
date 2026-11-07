@@ -4,7 +4,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { parseBody } from '@/lib/shared/validate'
 import { getTenant, setOwnRazorpay } from '@/lib/tenant-registry'
-import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
+import { storedRazorpayKeys } from '@/lib/integrations/resolve'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,8 +26,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // Enabling own-Razorpay without connected, decryptable creds would leave the platform holding the
   // cash while the code skips the Route transfer — the tenant would never be paid. Refuse it.
   if (own_razorpay) {
-    const { isOwn } = await resolveRazorpayCreds(tenantId).catch(() => ({ isOwn: false }))
-    if (!isOwn) {
+    const keys = await storedRazorpayKeys(tenantId).catch(() => null)
+    if (!keys) {
       return NextResponse.json(
         { error: 'Cannot enable own-Razorpay: tenant has no connected Razorpay credentials.' },
         { status: 409 }

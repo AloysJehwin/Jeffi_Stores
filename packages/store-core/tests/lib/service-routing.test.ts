@@ -64,4 +64,15 @@ describe('servesRequest', () => {
     expect(servesRequest('storefront', { host: 'acme.jeffistores.in', path: '/', tenantSlug: 'acme' })).toBe(true)
     expect(servesRequest('storefront', { host: 'other.jeffistores.in', path: '/', tenantSlug: 'other' })).toBe(false)
   })
+
+  it("a store's pods take its own Razorpay webhook on the platform host, and no other store's", () => {
+    process.env.SERVICE_TENANT_SLUG = 'acme'
+    const at = (path: string, tenantSlug: string | null = null) =>
+      servesRequest('storefront', { host: 'jeffistores.in', path, tenantSlug })
+    expect(at('/api/webhooks/razorpay/acme')).toBe(true)
+    expect(at('/api/webhooks/razorpay/other')).toBe(false)
+    expect(at('/api/webhooks/razorpay')).toBe(false)
+    expect(at('/')).toBe(false)
+    expect(at('/api/webhooks/razorpay/acme', 'other')).toBe(false)
+  })
 })

@@ -1,8 +1,9 @@
 import 'server-only'
 import { resolveRequestTenant } from '@/lib/shared/db'
-import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
+import { storedRazorpayKeys } from '@/lib/integrations/resolve'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { isFlagship } from '@/lib/payments/webhook-tenant'
+import { pinnedTenantSlug } from '@/lib/service-routing'
 
 /**
  * Which Razorpay account collects this store's payments:
@@ -35,11 +36,13 @@ export interface RazorpayAccountInfo {
 
 export async function razorpayAccountFor(): Promise<RazorpayAccount> {
   const t = await resolveRequestTenant()
+  // A store's own pod with no tenant resolved must not fall through to the platform account.
+  if (!t && pinnedTenantSlug()) throw new Error(`Store ${pinnedTenantSlug()} could not be resolved`)
   if (!t || isFlagship({ tenantId: t.tenantId })) return { kind: 'platform', tenantId: null, slug: null, ownFlag: false }
   const row = await controlPlanePool()
     .query(`SELECT own_razorpay FROM tenants WHERE id = $1`, [t.tenantId])
     .catch(() => null)
   const ownFlag = row?.rows[0]?.own_razorpay === true
-  const { isOwn } = await resolveRazorpayCreds(t.tenantId).catch(() => ({ isOwn: false }))
-  return { kind: ownFlag && isOwn ? 'own' : 'route', tenantId: t.tenantId, slug: t.slug ?? null, ownFlag }
+  const keys = ownFlag ? await storedRazorpayKeys(t.tenantId).catch(() => null) : null
+  return { kind: keys ? 'own' : 'route', tenantId: t.tenantId, slug: t.slug ?? null, ownFlag }
 }

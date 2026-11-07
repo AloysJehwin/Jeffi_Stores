@@ -21,7 +21,8 @@ const ctx = {
 }
 vi.mock('@/lib/tenancy/tenant-context', () => ctx)
 
-const registry = { getIntegrationCredential: vi.fn() }
+const ownRzp = vi.fn()
+const registry = { getIntegrationCredential: vi.fn(), controlPlanePool: () => ({ query: ownRzp }) }
 vi.mock('@/lib/tenant-registry', () => registry)
 
 // decryptToken is a passthrough here — the row's config_enc is already plain JSON in tests.
@@ -235,6 +236,36 @@ describe('integrations/resolve', () => {
       registry.getIntegrationCredential.mockResolvedValue(null)
       const { resolveAmazonCreds } = await import('@/lib/integrations/resolve')
       await expect(resolveAmazonCreds()).rejects.toThrow(/not connected/i)
+    })
+  })
+
+  describe('resolveRazorpayCreds', () => {
+    const saved = credRow({ key_id: 'rzp_live_own', key_secret: 'own-secret', webhook_secret: 'own-wh' })
+    beforeEach(() => {
+      process.env.RAZORPAY_KEY_ID = 'rzp_live_platform'
+      process.env.RAZORPAY_KEY_SECRET = 'platform-secret'
+    })
+
+    it('ignores keys a store saved while it collects through the platform', async () => {
+      registry.getIntegrationCredential.mockResolvedValue(saved)
+      ownRzp.mockResolvedValue({ rows: [{ own_razorpay: false }] })
+      const { resolveRazorpayCreds } = await import('@/lib/integrations/resolve')
+      const creds = await resolveRazorpayCreds('t-route')
+      expect(creds).toMatchObject({ key_id: 'rzp_live_platform', isOwn: false })
+    })
+
+    it('uses the saved keys once the store collects on its own account', async () => {
+      registry.getIntegrationCredential.mockResolvedValue(saved)
+      ownRzp.mockResolvedValue({ rows: [{ own_razorpay: true }] })
+      const { resolveRazorpayCreds, storedRazorpayKeys } = await import('@/lib/integrations/resolve')
+      expect(await resolveRazorpayCreds('t-own')).toMatchObject({ key_id: 'rzp_live_own', webhook_secret: 'own-wh', isOwn: true })
+      expect(await storedRazorpayKeys('t-route-2')).toMatchObject({ key_id: 'rzp_live_own' })
+    })
+
+    it('throws when the collection mode cannot be read', async () => {
+      ownRzp.mockRejectedValue(new Error('control plane down'))
+      const { resolveRazorpayCreds } = await import('@/lib/integrations/resolve')
+      await expect(resolveRazorpayCreds('t-unknown')).rejects.toThrow(/control plane down/)
     })
   })
 })

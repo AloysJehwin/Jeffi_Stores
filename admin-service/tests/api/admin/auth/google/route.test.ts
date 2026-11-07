@@ -211,7 +211,16 @@ describe('POST /api/admin/auth/google', () => {
     expect(res.status).toBe(401)
   })
 
+  it('accessToken path: 401 for a token issued to another app, userinfo never called', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ aud: 'someone-else', azp: 'someone-else' }) })
+    const res = await POST(makePost({ accessToken: 'at' }) as any)
+    expect(res.status).toBe(401)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(String(mockFetch.mock.calls[0][0])).toContain('tokeninfo?access_token=')
+  })
+
   it('accessToken path: success verify', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ aud: 'test-google-client-id', azp: 'test-google-client-id' }) })
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ sub: 'google-sub-123', email: 'a@b.com', email_verified: true }),

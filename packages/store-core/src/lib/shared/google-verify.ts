@@ -18,7 +18,7 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleIdenti
     const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`)
     if (!res.ok) return null
     const data = await res.json()
-    if (!data.sub || !data.email) return null
+    if (!data.sub || !data.email || String(data.email_verified) === 'false') return null
     if (GOOGLE_CLIENT_ID) {
       const aud = Array.isArray(data.aud) ? data.aud : [data.aud]
       if (!aud.includes(GOOGLE_CLIENT_ID)) return null
@@ -29,8 +29,19 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleIdenti
   }
 }
 
+/** Userinfo accepts any app's access token, so check it was issued to our own client first. */
+export async function googleAccessTokenIsOurs(accessToken: string): Promise<boolean> {
+  const ids = [process.env.GOOGLE_CLIENT_ID, process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID].filter(Boolean)
+  if (!ids.length) return false
+  const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`)
+  if (!res.ok) return false
+  const info = await res.json()
+  return ids.includes(info.aud) || ids.includes(info.azp)
+}
+
 export async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleIdentity | null> {
   try {
+    if (!(await googleAccessTokenIsOurs(accessToken))) return null
     const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
