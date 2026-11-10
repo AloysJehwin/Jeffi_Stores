@@ -3,6 +3,16 @@ import plugin from 'tailwindcss/plugin'
 // Shared with the mobile app: packages/design-tokens is the only place a brand colour is defined.
 import tokens from '@jeffi/design-tokens'
 
+// A CSS-variable colour that honours `/NN` opacity modifiers. A plain `var(--x)` string can't, so
+// `border-border-default/60` emitted nothing and rows fell back to preflight's gray-200 — a bright
+// line in dark mode. Plain uses still get the bare variable; a modifier mixes it with transparent.
+// (Tailwind runs colour functions at build time; its types only admit strings, hence the cast.)
+const alpha = (variable: string) =>
+  ((({ opacityValue }: { opacityValue?: string }) =>
+    opacityValue === undefined || opacityValue.startsWith('var(')
+      ? `var(${variable})`
+      : `color-mix(in srgb, var(${variable}) calc(${opacityValue} * 100%), transparent)`) as unknown) as string
+
 // Shared Tailwind theme; each app's tailwind.config.ts adds its own content globs.
 const preset: Partial<Config> = {
   darkMode: 'class',
@@ -18,9 +28,12 @@ const preset: Partial<Config> = {
         foreground: 'var(--color-foreground)',
         'foreground-secondary': 'var(--color-foreground-secondary)',
         'foreground-muted': 'var(--color-foreground-muted)',
-        'border-default': 'var(--color-border)',
-        'border-secondary': 'var(--color-border-secondary)',
+        'border-default': alpha('--color-border'),
+        'border-secondary': alpha('--color-border-secondary'),
       },
+      // Preflight's default border colour (a bare `border`, or a colour class that didn't resolve)
+      // follows the theme instead of gray-200.
+      borderColor: { DEFAULT: 'var(--color-border)' },
       // Admin control heights — the vertical standard for buttons, inputs and select triggers.
       height: {
         control: '32px',

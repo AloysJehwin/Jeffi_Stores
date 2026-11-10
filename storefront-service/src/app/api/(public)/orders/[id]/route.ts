@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pendingUpiConfirmation } from '@/lib/payments/upi/intents'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 import { productLabel } from '@/lib/catalog/product-label'
 import { z } from 'zod'
@@ -242,6 +243,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       status: order.status,
       paymentStatus: order.payment_status,
       paymentMode: order.payment_mode || null,
+      source: order.source || null,
+      // A UTR the customer submitted, waiting for the store to approve it.
+      upiConfirmation:
+        order.payment_status === 'unpaid' || order.payment_status === 'failed'
+          ? await pendingUpiConfirmation(orderId)
+              .then(p => (p ? { utr: p.utr, submittedAt: p.submittedAt } : null))
+              .catch(() => null)
+          : null,
       razorpayQrImageUrl: order.razorpay_qr_image_url || null,
       createdAt: order.created_at,
       updatedAt: order.updated_at,

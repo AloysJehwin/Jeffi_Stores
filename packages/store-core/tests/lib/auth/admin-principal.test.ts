@@ -215,6 +215,7 @@ describe('gateway principal', () => {
   })
 
   it('refuses a forged, foreign-store, other-host or wrong-API header', async () => {
+    mockQueryOne.mockClear() // isolate from any DB call another file in the shard left on the shared mock
     const forged = signGatewayToken(claims).replace(/.$/, c => (c === 'A' ? 'B' : 'A'))
     expect(await resolveAdminPrincipal(req({ gateway: forged }), { tenantId: null })).toBeNull()
     expect(await resolveAdminPrincipal(req({ gateway: signGatewayToken({ ...claims, tenantId: 'other' }) }), { tenantId: null })).toBeNull()

@@ -53,6 +53,7 @@ const EDITABLE_KEYS = [
   'feature_whatsapp_enabled',
   'feature_push_enabled',
   'feature_marketing_push_enabled',
+  'mobile_app_build_id',
   'feature_birthday_enabled',
   'feature_agent_dock_enabled',
   'feature_agent_whatsapp_enabled',
@@ -159,6 +160,30 @@ async function lockedChannelHint(updates: Array<{ key: string; value: unknown }>
   return lock ? MESSAGING_LOCK_HINT[lock] : null
 }
 
+const APP_BUILD_ID_KEY = 'mobile_app_build_id'
+const APP_BUILD_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,99}$/
+
+// Trims the store app build ID in place ('' clears it); returns a validation error.
+function normaliseAppBuildId(updates: Array<{ key: string; value: unknown }>): string | null {
+  for (const u of updates) {
+    if (u.key !== APP_BUILD_ID_KEY) continue
+    const v = typeof u.value === 'string' ? u.value.trim() : ''
+    if (typeof u.value !== 'string' || (v !== '' && !APP_BUILD_ID_RE.test(v)))
+      return 'Enter the app build ID: 3 to 100 letters, digits, dots, dashes, colons or underscores.'
+    u.value = v
+  }
+  return null
+}
+
+// App push can't be switched on while the store has no app build ID (counting one saved in this request).
+async function lockedPushHint(updates: Array<{ key: string; value: unknown }>): Promise<string | null> {
+  const want = (k: string) => updates.some(u => u.key === k && String(u.value) === 'true')
+  if (!want('feature_push_enabled') && !want('feature_marketing_push_enabled')) return null
+  const saving = updates.find(u => u.key === APP_BUILD_ID_KEY)
+  const hasApp = saving ? String(saving.value).trim() !== '' : !!(await getSiteControls()).mobileApp.buildId
+  return hasApp ? null : MESSAGING_LOCK_HINT.app
+}
+
 // The first time loyalty is switched on, past delivered orders are counted without emailing anyone,
 // then the tier-upgrade email is switched on so members hear about the upgrades that follow. The
 // silent pass stamps no upgrades, so this can't email anyone about tiers they already had.
@@ -218,7 +243,9 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
       if (await referralNeedsLoyalty(updates))
         return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
-      const batchLock = await lockedChannelHint(updates)
+      const appIdError = normaliseAppBuildId(updates)
+      if (appIdError) return NextResponse.json({ error: appIdError }, { status: 400 })
+      const batchLock = (await lockedChannelHint(updates)) ?? (await lockedPushHint(updates))
       if (batchLock) return NextResponse.json({ error: batchLock }, { status: 409 })
       const tagError = normaliseTagSettings(updates) ?? normaliseJsonSettings(updates, admin.adminId)
       if (tagError) return NextResponse.json({ error: tagError }, { status: 400 })
@@ -240,7 +267,13 @@ export async function PATCH(request: NextRequest) {
     if (await referralNeedsLoyalty([{ key, value }])) {
       return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
     }
-    const lockHint = await lockedChannelHint([{ key, value }])
+    if (key === APP_BUILD_ID_KEY) {
+      const single = [{ key, value }]
+      const err = normaliseAppBuildId(single)
+      if (err) return NextResponse.json({ error: err }, { status: 400 })
+      value = single[0].value
+    }
+    const lockHint = (await lockedChannelHint([{ key, value }])) ?? (await lockedPushHint([{ key, value }]))
     if (lockHint) return NextResponse.json({ error: lockHint }, { status: 409 })
     if (isGoogleTagSettingKey(key)) {
       const r = validateGoogleTagSetting(key, value)

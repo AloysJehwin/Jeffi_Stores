@@ -478,6 +478,7 @@ function makeOrder(overrides: Record<string, any> = {}) {
     payment_status: 'unpaid',
     user_id: 'user-1',
     order_type: 'cart',
+    source: 'online',
     customer_name: 'Test Customer',
     customer_email: 'test@example.com',
     total_amount: '500.00',

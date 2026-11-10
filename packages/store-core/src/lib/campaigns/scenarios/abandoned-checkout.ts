@@ -1,6 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import { minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
@@ -10,6 +11,7 @@ interface Params extends Record<string, unknown> {
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
   smsEnabled: boolean
+  pushEnabled?: boolean
 }
 
 interface Row {
@@ -32,6 +34,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
     smsEnabled: false,
+    pushEnabled: false,
   },
   paramSchema: {
     minMinutesAfterCancel: {
@@ -67,6 +70,11 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via SMS',
       description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
+    pushEnabled: {
+      type: 'boolean',
+      label: 'Also send as an app push',
+      description: 'Additionally notify the customer in the store app (quiet hours and the 2-a-day push limit apply)',
     },
   },
 
@@ -234,10 +242,12 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         ctaUrl,
       },
     })
-    if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
+    if ((params as any).whatsappEnabled || (params as any).smsEnabled || params.pushEnabled) {
       const names = items.map(i => i.name)
       const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary, imageUrl: items.find(i => i.image_url)?.image_url ?? undefined, url: ctaUrl }, cooldownMinutes(params)).catch(() => {})
+      const msgVars = { items: summary, imageUrl: items.find(i => i.image_url)?.image_url ?? undefined, url: ctaUrl }
+      if ((params as any).whatsappEnabled || (params as any).smsEnabled) sendCampaignWhatsApp(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
+      if (params.pushEnabled) sendCampaignPush(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

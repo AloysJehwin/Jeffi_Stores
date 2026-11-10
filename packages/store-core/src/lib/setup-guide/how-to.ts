@@ -256,7 +256,7 @@ export const HOW_TO: Record<string, HowTo> = {
   },
   push: {
     steps: [
-      'Open Settings → Site Controls → Notifications. Turn on App push notifications for order updates, and Marketing push notifications for offers.',
+      'Open Settings → Site Controls → Notifications. Enter your Store app build ID (your store needs its own mobile app), then turn on App push notifications for order updates, and Marketing push notifications for offers.',
       'Customers receive them once they allow notifications in their browser or the app.',
       'Send offers from Marketing.',
     ],

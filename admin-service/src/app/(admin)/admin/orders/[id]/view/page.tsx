@@ -22,6 +22,8 @@ import InitiateRefundButton from '@admin/app/(admin)/admin/orders/[id]/_componen
 import { RecordRefundLink } from '@admin/app/(admin)/admin/orders/[id]/_components/ExternalRefundForm'
 import { externalRefundLabel } from '@/lib/payments/external-refund'
 import RetryPaymentEmailButton from '@admin/app/(admin)/admin/orders/[id]/_components/RetryPaymentEmailButton'
+import UpiConfirmationCard from '@admin/app/(admin)/admin/orders/[id]/_components/UpiConfirmationCard'
+import { pendingUpiConfirmation } from '@/lib/payments/upi/intents'
 import RetryRefundButton from '@admin/app/(admin)/admin/orders/[id]/_components/RetryRefundButton'
 import { orderDisputes, orderRefunds, paidWith } from '@/lib/payments/order-payment-info'
 import { estimatedSettlement, orderSettlements } from '@/lib/payments/rzp-settlement-report'
@@ -129,10 +131,11 @@ export default async function OrderDetailsPage({
   const paymentOrderIds = [order.id, order.original_order_id].filter(Boolean)
   // Route stores are paid out by transfer; settlements belong to the flagship and own-key stores.
   const showSettlement = isFlagship(tenant) || ownRazorpay
-  const [refunds, disputes, settlements] = await Promise.all([
+  const [refunds, disputes, settlements, upiPending] = await Promise.all([
     orderRefunds(paymentOrderIds),
     orderDisputes(paymentOrderIds),
     showSettlement ? orderSettlements(paymentOrderIds) : Promise.resolve([]),
+    order.payment_status === 'unpaid' || order.payment_status === 'failed' ? pendingUpiConfirmation(order.id).catch(() => null) : Promise.resolve(null),
   ])
   const settledByPayment = new Map(settlements.map(s => [s.payment_id, s]))
   const routePayouts =
@@ -180,6 +183,7 @@ export default async function OrderDetailsPage({
     (order.payments ?? []).some((p: any) => p.payment_gateway === 'razorpay' && p.status === 'completed' && p.transaction_id)
   const showRetryEmailButton =
     (order.payment_status === 'failed' || order.payment_status === 'unpaid') &&
+    !upiPending &&
     (Date.now() - new Date(order.created_at).getTime()) / 3600000 < 24
 
   const eddDateStr = order.estimated_delivery_date
@@ -330,6 +334,7 @@ export default async function OrderDetailsPage({
 
   const main = (
     <>
+          {upiPending && <UpiConfirmationCard {...upiPending} />}
           <Card title="Order Items">
               <div className="space-y-4">
                 {order.order_items && order.order_items.length > 0 ? (

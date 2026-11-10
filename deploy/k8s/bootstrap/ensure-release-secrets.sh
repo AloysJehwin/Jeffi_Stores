@@ -1,6 +1,7 @@
 #!/bin/bash
-# Makes sure jeffi/production holds ADMIN_GATEWAY_SECRET and CRON_SECRET: a missing one is generated, an existing
-# one is never replaced. Then copies ADMIN_GATEWAY_SECRET to jeffi/public-api/production (the release does not),
+# Makes sure jeffi/production holds ADMIN_GATEWAY_SECRET, CRON_SECRET and UPG_ALERT_SECRET (signs each store's UPI
+# bank-alert forwarding address): a missing one is generated, an existing one is never replaced (that would change
+# every forwarding address). Then copies ADMIN_GATEWAY_SECRET to jeffi/public-api/production (the release does not),
 # and checks the copies the store apps and CronJobs read. Warns (only) when the Meta app keys are missing.
 # Prints no values; rollback commands go to $OUT_DIR/ensure-secrets-rollback.sh.
 # Usage: bash deploy/k8s/bootstrap/ensure-release-secrets.sh [--dry-run] [--yes] [--sync-store] [--cluster]
@@ -13,7 +14,7 @@ for a in "$@"; do case $a in
   *) echo "Unknown option $a" >&2; exit 2 ;;
 esac; done
 umask 077
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+TMP=$(mktemp -d); on_exit 'rm -rf "$TMP"'
 get() { aws secretsmanager get-secret-value --secret-id "$1" --query SecretString --output text; }
 ver() { aws secretsmanager get-secret-value --secret-id "$1" --query VersionId --output text; }
 
@@ -38,7 +39,7 @@ get jeffi/production > "$TMP/prod.json"
 if run python3 -I - "$TMP/prod.json" "$TMP/prod.new" <<'PY'
 import json, secrets, sys
 cur = json.load(open(sys.argv[1])); new, n = dict(cur), 0
-for k in ('ADMIN_GATEWAY_SECRET', 'CRON_SECRET'):
+for k in ('ADMIN_GATEWAY_SECRET', 'CRON_SECRET', 'UPG_ALERT_SECRET'):
     v = cur.get(k)
     if isinstance(v, str) and v.strip(): print(f'  {k}: present ({len(v)} characters), kept'); continue
     new[k] = secrets.token_hex(32); n += 1
@@ -54,8 +55,11 @@ import json, sys
 cur = json.load(open(sys.argv[1]))
 for k in ('META_APP_ID', 'META_APP_SECRET'):
     v = cur.get(k)
-    if isinstance(v, str) and v.strip(): print(f'  {k}: present')
-    else: print(f'  {k}: WARNING, missing. Facebook sign-in for Social Posts and Meta Ads stays off for stores without their own Meta app.')
+    if not (isinstance(v, str) and v.strip()):
+        print(f'  {k}: WARNING, missing. Facebook sign-in for Social Posts and Meta Ads stays off for stores without their own Meta app.')
+    elif k == 'META_APP_ID' and not v.strip().strip('"\'').isdigit():
+        print(f'  {k}: WARNING, not a numeric app id ({len(v)} characters). Facebook rejects it (PLATFORM__INVALID_APP_ID); use the App ID from developers.facebook.com.')
+    else: print(f'  {k}: present')
 PY
 
 say "jeffi/public-api/production (the gateway signs with it)"

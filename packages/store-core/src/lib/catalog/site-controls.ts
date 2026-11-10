@@ -144,11 +144,14 @@ export interface SiteControls {
   storefront: StorefrontContent
   shortcuts: KeyboardShortcuts
   marketing: MarketingTags
+  // The store's mobile app (EAS project ID). null = no app: every push send and push UI is off.
+  mobileApp: { buildId: string | null }
   // Whether the current tenant ships on its own Delhivery account. Platform store / no tenant in
   // scope is treated as true. Drives the COD gate and the admin COD-toggle lock.
   ownDelhivery: boolean
   // Why SMS / WhatsApp is locked on a tenant store: 'addon' = not bought (ecom portal, Billing),
-  // 'number' = bought, waiting for Jeffi to assign the sender. {} when nothing is locked.
+  // 'number' = bought, waiting for Jeffi to assign the sender. push: 'app' = no store app build ID.
+  // {} when nothing is locked.
   locks: MessagingLocks
 }
 
@@ -160,6 +163,9 @@ const envNum = (v: string | undefined, def: number) => {
   const n = parseFloat(v ?? '')
   return Number.isFinite(n) ? n : def
 }
+
+// The flagship app's EAS project (mobile-service/client/app.json expo.extra.eas.projectId).
+export const FLAGSHIP_APP_BUILD_ID = '821b6f4c-8f52-4bbe-88f6-fcf69366efaa'
 
 const DEFAULTS: SiteControls = {
   identity: {
@@ -269,6 +275,7 @@ const DEFAULTS: SiteControls = {
     customShortcuts: '[]',
   },
   marketing: { googleTagId: '', googleAdsConversionId: '', googleAdsConversionLabel: '' },
+  mobileApp: { buildId: FLAGSHIP_APP_BUILD_ID },
   ownDelhivery: true,
   locks: {},
 }
@@ -349,6 +356,7 @@ const KEYS = [
   'google_tag_id',
   'google_ads_conversion_id',
   'google_ads_conversion_label',
+  'mobile_app_build_id',
 ]
 
 /**
@@ -566,6 +574,14 @@ export async function getSiteControls(): Promise<SiteControls> {
         googleAdsConversionId: str('google_ads_conversion_id', ''),
         googleAdsConversionLabel: str('google_ads_conversion_label', ''),
       },
+      // Missing row: the flagship has its app, a tenant has none. A saved '' clears it.
+      mobileApp: {
+        buildId: m.has('mobile_app_build_id')
+          ? (m.get('mobile_app_build_id') ?? '').trim() || null
+          : tenantScoped
+            ? null
+            : FLAGSHIP_APP_BUILD_ID,
+      },
       ownDelhivery: d.ownDelhivery,
       locks: {},
     }
@@ -638,11 +654,29 @@ export async function getSiteControls(): Promise<SiteControls> {
       // Control-plane hiccup: leave the stored flags; messaging-service enforces the lock on send.
     }
 
+    // No store app, no push: forced off so every sender (notifyPush, broadcasts, campaign push) and
+    // every push UI is off until a build ID is set.
+    if (!result.mobileApp.buildId) {
+      result.locks.push = 'app'
+      result.flags.pushEnabled = false
+      result.flags.marketingPushEnabled = false
+    }
+
     cache.set(key, { value: result, expiresAt: Date.now() + TTL_MS })
     return result
   } catch {
     // Even the failure path must not hand a tenant the platform's identity.
-    return { ...DEFAULTS, identity: await identityDefaults(), locks: {} }
+    const identity = await identityDefaults()
+    const tenant = getCurrentTenant() != null || (await tenantSlugFromHeaders()) != null
+    if (!tenant) return { ...DEFAULTS, identity, locks: {} }
+    // A tenant has no app unless its own settings say so, and those could not be read.
+    return {
+      ...DEFAULTS,
+      identity,
+      flags: { ...DEFAULTS.flags, pushEnabled: false, marketingPushEnabled: false },
+      mobileApp: { buildId: null },
+      locks: { push: 'app' },
+    }
   }
 }
 

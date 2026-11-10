@@ -28,6 +28,7 @@ import { presetSpec } from '@/lib/compute/presets'
 import { quoteForPlan } from '@controller/lib/compute/quote'
 import { saveDesiredCompute } from '@controller/lib/compute/store'
 import type { ComputeSpec } from '@/lib/compute/spec'
+import { setRequestedAddons } from '@/lib/billing/requested-addons'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,6 +114,8 @@ export async function POST(request: NextRequest) {
   // 2. Link owner → tenant.
   if (!upgrade) await linkOwnerTenant(owner.id, result.tenantId)
   await saveDesiredCompute(result.tenantId, compute)
+  // Charged from the wallet only once the store is live; a failed save must not lose the application.
+  await setRequestedAddons(result.tenantId, d.addons).catch(e => console.warn('[onboard] add-ons not saved', e?.message || e))
 
   // 2a. Provisioning names the owner admin and addresses the access certificate from owners.name.
   await updateOwnerName(owner.id, d.ownerName)

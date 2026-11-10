@@ -21,7 +21,7 @@ const REAL_ENV = { ...process.env }
 
 beforeEach(() => {
   vi.resetModules()
-  process.env.META_APP_ID = 'APP_ID'
+  process.env.META_APP_ID = '1000000001'
   process.env.META_APP_SECRET = 'APP_SECRET'
   delete process.env.META_GRAPH_VERSION
 })
@@ -36,7 +36,7 @@ afterEach(() => {
 describe('meta config', () => {
   it('platformMetaConfig returns the env app', async () => {
     const { platformMetaConfig } = await import('@/lib/catalog/meta')
-    expect(platformMetaConfig()).toMatchObject({ appId: 'APP_ID', appSecret: 'APP_SECRET', source: 'platform' })
+    expect(platformMetaConfig()).toMatchObject({ appId: '1000000001', appSecret: 'APP_SECRET', source: 'platform' })
   })
 
   it('getMetaConfig throws when appId missing', async () => {
@@ -58,7 +58,7 @@ describe('meta OAuth', () => {
   it('buildOAuthUrl embeds appId, redirect, state, scopes on v27 by default', async () => {
     const { buildOAuthUrl, platformMetaConfig } = await import('@/lib/catalog/meta')
     const url = buildOAuthUrl(platformMetaConfig()!, 'https://app/cb', 'state123')
-    expect(url).toContain('client_id=APP_ID')
+    expect(url).toContain('client_id=1000000001')
     expect(url).toContain('redirect_uri=https%3A%2F%2Fapp%2Fcb')
     expect(url).toContain('state=state123')
     expect(url).toContain('instagram_content_publish')

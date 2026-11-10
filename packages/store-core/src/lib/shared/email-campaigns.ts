@@ -308,7 +308,9 @@ export type MessagingChannels = {
 
 // Customers in an audience; each channel then reaches whoever it can (email: an address, SMS and
 // WhatsApp: a phone, push: an active app install — see lib/push/broadcast). The app audiences pick
-// customers with an install; 'app_installs' also pushes to opted-in signed-out installs.
+// customers signed in on the app: an install attached to them, or a live app session (an install
+// with no push token, e.g. notifications never set up, still counts); 'app_installs' also pushes to
+// opted-in signed-out installs. App sessions: this build's agent, or okhttp / CFNetwork from older builds.
 export async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
   const base = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name, u.unsubscribe_token::text AS unsubscribe_token FROM users u`
   const base_cp = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name, u.unsubscribe_token::text AS unsubscribe_token FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
@@ -316,7 +318,11 @@ export async function resolveAudience(audienceType: string, audienceFilter: Reco
 
   if (audienceType === 'app_users' || audienceType === 'app_installs') {
     return queryMany<Recipient>(
-      `${base} ${where} AND EXISTS (SELECT 1 FROM push_devices d WHERE d.user_id = u.id AND d.disabled_at IS NULL)`
+      `${base} ${where} AND (
+         EXISTS (SELECT 1 FROM push_devices d WHERE d.user_id = u.id AND d.disabled_at IS NULL)
+         OR EXISTS (SELECT 1 FROM auth_sessions s WHERE s.principal_id = u.id AND s.principal_type IN ('customer', 'business')
+                      AND s.revoked_at IS NULL AND s.expires_at > now()
+                      AND (s.user_agent LIKE 'JeffiStoresApp/%' OR s.user_agent LIKE 'okhttp/%' OR s.user_agent LIKE '%CFNetwork/%')))`
     )
   }
 
@@ -428,8 +434,10 @@ export async function sendCampaign(
       resolveVars, fromAddr, baseUrl, sourceCoupon, concurrency,
     })
     // Push: one log row per install, then drained now (quiet-hours rows wait for the dispatch cron).
+    // Dropped when the store has no app or push is off in Site Controls.
     let installs = 0
-    if (channels.push) {
+    const { marketingPushOn } = await import('@/lib/push/marketing')
+    if (channels.push && (await marketingPushOn())) {
       const { enqueueCampaignPush, drainCampaignPush, includesSignedOut, pushReach } = await import('@/lib/push/broadcast')
       const signedOut = includesSignedOut(campaign.audience_type)
       const ids = recipients.map(x => x.user_id)

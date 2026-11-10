@@ -27,7 +27,7 @@ export default function MessagingAddonCard({ initial, tenantSlug }: { initial: M
   // An older single-channel add-on can move to both channels.
   const partial = s.active && (s.tier === 'sms' || s.tier === 'whatsapp')
 
-  async function act(body: { action: 'buy' } | { action: 'renew_on' | 'renew_off' }) {
+  async function act(body: { action: 'buy' } | { action: 'renew_on' | 'renew_off' | 'decline_request' }) {
     setBusy(true)
     try {
       const res = await fetch(`/api/ecom/billing/messaging-addon?tenant=${encodeURIComponent(tenantSlug)}`, {
@@ -121,6 +121,16 @@ export default function MessagingAddonCard({ initial, tenantSlug }: { initial: M
         </div>
       ) : (
         <>
+          {s.requested && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-surface-secondary px-4 py-3">
+              <p className="min-w-0 flex-1 text-sm text-foreground">
+                You chose this during signup — {short ? 'top up your wallet to switch it on.' : 'confirm below to switch it on.'}
+              </p>
+              <button onClick={() => act({ action: 'decline_request' })} disabled={busy} className="text-sm font-medium text-foreground-muted hover:text-foreground disabled:opacity-50">
+                Not now
+              </button>
+            </div>
+          )}
           <p className="text-sm text-foreground-secondary mb-4">Send OTPs, order updates and campaigns by SMS and WhatsApp from your own numbers.</p>
           {buy}
         </>

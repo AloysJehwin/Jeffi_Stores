@@ -1,6 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import { getOrCreateReferralCode } from '@/lib/referrals/codes'
 import { getReferralSettings, isReferralLive } from '@/lib/referrals/settings'
 import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
@@ -11,6 +12,7 @@ interface Params extends Record<string, unknown> {
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
   smsEnabled: boolean
+  pushEnabled?: boolean
 }
 
 interface Row {
@@ -28,6 +30,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
     smsEnabled: false,
+    pushEnabled: false,
   },
   paramSchema: {
     sinceDelivered: {
@@ -54,6 +57,11 @@ export const referralInvite: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via SMS',
       description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
+    pushEnabled: {
+      type: 'boolean',
+      label: 'Also send as an app push',
+      description: 'Additionally notify the customer in the store app (quiet hours and the 2-a-day push limit apply)',
     },
   },
 
@@ -177,14 +185,11 @@ export const referralInvite: ScenarioModule<Params, Row> = {
       },
     })
 
-    if (params.whatsappEnabled || (params as any).smsEnabled) {
+    if (params.whatsappEnabled || (params as any).smsEnabled || params.pushEnabled) {
       // No coupon: the promo template then sends just the headline, which carries the link.
-      sendCampaignWhatsApp(
-        campaign.kind,
-        row.user_id,
-        { headline: `Refer a friend and earn ${rewardPoints} points: ${shareUrl}`, code: '', discount: '' },
-        cooldownMinutes(params)
-      ).catch(() => {})
+      const msgVars = { headline: `Refer a friend and earn ${rewardPoints} points: ${shareUrl}`, code: '', discount: '' }
+      if (params.whatsappEnabled || (params as any).smsEnabled) sendCampaignWhatsApp(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
+      if (params.pushEnabled) sendCampaignPush(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

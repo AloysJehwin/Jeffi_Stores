@@ -8,6 +8,8 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import ScenariosMobileList from './_components/ScenariosMobileList'
+import { useMessagingChannels } from '@/hooks/useStoreFlags'
+import { channelParamOff } from '../_components/campaign-presentation'
 
 interface ScenarioCampaign {
   scenario_kind: string
@@ -47,6 +49,7 @@ function rate(num: number, den: number) {
 export default function ScenariosListClient() {
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const msg = useMessagingChannels()
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
@@ -295,10 +298,10 @@ export default function ScenariosListClient() {
 
               <details className="mt-3">
                 <summary className="text-[10px] uppercase tracking-wide text-foreground-muted cursor-pointer hover:text-foreground transition-colors">
-                  Default parameters ({Object.keys(s.default_parameters).length})
+                  Default parameters ({Object.keys(s.default_parameters).filter(k => !channelParamOff(k, msg)).length})
                 </summary>
                 <div className="mt-2 p-3 bg-surface-secondary rounded-lg font-mono text-xs text-foreground-secondary overflow-auto">
-                  {Object.entries(s.default_parameters).map(([k, v]) => {
+                  {Object.entries(s.default_parameters).filter(([k]) => !channelParamOff(k, msg)).map(([k, v]) => {
                     const def = s.param_schema[k]
                     return (
                       <div key={k} className="py-0.5">

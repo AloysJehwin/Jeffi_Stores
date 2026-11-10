@@ -13,7 +13,7 @@ for a in "$@"; do case $a in
 esac; done
 SECRET=jeffi/npm
 umask 077
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+TMP=$(mktemp -d); on_exit 'rm -rf "$TMP"'
 
 read -r -s -p "npm token for @jeffi_erp (input hidden): " TOKEN < /dev/tty; echo
 TOKEN=$(printf %s "$TOKEN" | tr -d '[:space:]')
