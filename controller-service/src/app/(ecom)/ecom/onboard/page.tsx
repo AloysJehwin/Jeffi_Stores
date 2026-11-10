@@ -53,7 +53,7 @@ function StatusLayout({
       steps={statusSteps(paymentsEnabled())}
       current={currentStep}
     >
-      <div className="max-w-3xl">{children}</div>
+      <div className="w-full">{children}</div>
     </OnboardShell>
   )
 }

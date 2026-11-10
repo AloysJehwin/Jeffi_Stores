@@ -8,7 +8,7 @@ export default function Loading() {
   const steps = statusSteps(true)
   return (
     <ShellLoading steps={steps} done={steps.length}>
-      <div className="max-w-3xl">
+      <div className="w-full">
         <ConsoleHeaderLoading eyebrow="Payment" title="Payment confirmed!" />
         <section className="rounded-2xl border border-border-default bg-surface-elevated p-6">
           <div className="flex items-start gap-3">

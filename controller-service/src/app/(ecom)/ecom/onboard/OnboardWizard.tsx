@@ -519,7 +519,7 @@ export default function OnboardWizard({
       onSelect={i => goTo(i as StepIdx)}
       saving={saving}
     >
-      <div className={step === 0 ? 'max-w-5xl' : 'max-w-2xl'}>
+      <div className="w-full">
         <PageHeader eyebrow={`Step ${step + 1} of ${STEPS.length}`} title={HEAD[step].title} description={HEAD[step].description} />
 
           {/* ── Restore banner (returning owner with a prior backup) ── */}
@@ -610,6 +610,7 @@ export default function OnboardWizard({
           {step === 1 && (
             <Card>
               <div className="space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
                   <label className={lbl}>Store name</label>
                   <input
@@ -635,6 +636,7 @@ export default function OnboardWizard({
                   {upgrade && (
                     <p className="text-xs text-foreground-muted mt-1">Your workspace&apos;s subdomain — already reserved for your store.</p>
                   )}
+                </div>
                 </div>
                 <div>
                   <label className={lbl}>
@@ -669,6 +671,7 @@ export default function OnboardWizard({
           {step === 2 && (
             <Card>
               <div className="space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
                   <label className={lbl}>Legal business name</label>
                   <input
@@ -678,11 +681,6 @@ export default function OnboardWizard({
                   />
                 </div>
                 <div>
-                  <label className={lbl}>Business type</label>
-                  <ChoiceCards ariaLabel="Business type" columns="grid-cols-2 sm:grid-cols-3" cardClassName="px-3 py-2.5 text-sm" value={bizType || null} onChange={setBizType}
-                    options={BUSINESS_TYPES.map(t => ({ value: t.value, label: <span className="font-medium">{t.label}</span> }))} />
-                </div>
-                <div>
                   <label className={lbl}>PAN number</label>
                   <input
                     className={inp}
@@ -690,6 +688,12 @@ export default function OnboardWizard({
                     onChange={e => setPan(e.target.value.toUpperCase())}
                     maxLength={10}
                   />
+                </div>
+                </div>
+                <div>
+                  <label className={lbl}>Business type</label>
+                  <ChoiceCards ariaLabel="Business type" columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" cardClassName="px-3 py-2.5 text-sm" value={bizType || null} onChange={setBizType}
+                    options={BUSINESS_TYPES.map(t => ({ value: t.value, label: <span className="font-medium">{t.label}</span> }))} />
                 </div>
                 <div>
                   <label className={lbl}>Business address</label>
@@ -707,6 +711,7 @@ export default function OnboardWizard({
           {step === 3 && (
             <Card>
               <div className="space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
                   <label className={lbl}>
                     GSTIN <span className="text-foreground-muted font-normal">(optional)</span>
@@ -765,6 +770,7 @@ export default function OnboardWizard({
                   )}
                   {gstErr && <p className="text-xs text-[#8a2e1f] mt-1">{gstErr}</p>}
                 </div>
+                </div>
                 <div className={`${noteCls} org-peach`}>
                   Your GST certificate will be reviewed by the Jeffi Commerce team before your store goes live. This
                   usually takes 1–2 business days.
@@ -777,7 +783,7 @@ export default function OnboardWizard({
           {step === 4 && (
             <Card>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                   <div>
                     <label className={lbl}>Origin pincode</label>
                     <input
@@ -816,7 +822,7 @@ export default function OnboardWizard({
                       onChange={e => setWh({ ...wh, sellerName: e.target.value })}
                     />
                   </div>
-                  <div>
+                  <div className="xl:col-span-2">
                     <label className={lbl}>Seller phone</label>
                     <PhoneInput countries={['IN']} value={wh.sellerPhone} onChange={v => setWh({ ...wh, sellerPhone: v })} inputClassName={`${inp} min-w-0 flex-1`} />
                   </div>
@@ -910,7 +916,7 @@ export default function OnboardWizard({
                   </div>
                 ) : (
                 <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                   <div className="col-span-full sm:col-span-2">
                     <label className={lbl}>Account holder name</label>
                     <input
@@ -1071,6 +1077,7 @@ export default function OnboardWizard({
           {step === 6 && (
             <Card>
 
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4">
               <div className="mb-6">
                 <label className={lbl}>Your full name</label>
                 <input
@@ -1089,6 +1096,7 @@ export default function OnboardWizard({
                 <label className={lbl}>Mobile number</label>
                 <PhoneInput countries={['IN']} value={mobile} onChange={setMobile} inputClassName={`${inp} min-w-0 flex-1`} />
                 <p className="text-xs text-foreground-muted mt-1">Used for account + payout notifications.</p>
+              </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -1171,6 +1179,7 @@ export default function OnboardWizard({
 
           {step === 7 && (
             <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] lg:items-start gap-4">
               <Card title="Your application">
               <div className="space-y-2.5">
                 {[
@@ -1259,6 +1268,7 @@ export default function OnboardWizard({
                   ))}
                 </div>
               </Card>
+              </div>
               <div className={`${noteCls} org-peach`}>
                 After submitting, our team will review your GST certificate (1–2 business days).{' '}
                 {paymentsEnabled

@@ -133,7 +133,7 @@ export function ChoiceCards<T extends string>(props: {
         return (
           <button key={o.value} ref={el => { refs.current[i] = el }} type="button" disabled={o.disabled} title={o.title}
             onClick={() => choose(props, o.value)} {...a11y}
-            className={`${choiceCardCls(on, /\brounded-/.test(cardClassName) ? '' : undefined)} disabled:cursor-not-allowed disabled:opacity-50 ${cardClassName}`}>
+            className={`${choiceCardCls(on, /\brounded-/.test(cardClassName) ? '' : undefined)} flex flex-col justify-start disabled:cursor-not-allowed disabled:opacity-50 ${cardClassName}`}>
             {o.content ?? (
               <>
                 {Icon && <Icon className="mb-2 h-5 w-5 text-foreground-secondary" />}

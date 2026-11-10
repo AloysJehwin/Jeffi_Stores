@@ -66,7 +66,7 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
           plan={{ slug: tenant.plan ?? 'basic', monthlyPrice: tenant.monthly_price_inr, interval: tenant.billing_interval }}
         />
       )}
-      <div className="max-w-3xl">
+      <div className="w-full">
       <PageHeader eyebrow="Payment" title="Payment confirmed!" />
       <Card>
         <div className="flex items-start gap-3">
